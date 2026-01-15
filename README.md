@@ -2,7 +2,6 @@
 
 MediFlow is a local-first, privacy-focused medical record application designed for district doctors and small clinics. It features a modern UI, offline capabilities, and powerful tools for managing patient data, therapies, and clinical diaries.
 
-![MediFlow Screenshot](screenshot.png)
 
 ## Features
 
