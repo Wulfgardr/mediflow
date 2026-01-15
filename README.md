@@ -9,7 +9,7 @@ MediFlow is a local-first, privacy-focused medical record application designed f
 * **Modern UI:** Built with Next.js 15, Tailwind CSS, and Framer Motion for a fluid, "Apple-like" experience.
 * **AI Assistant:** Integrated local AI (via Ollama) or remote (OpenAI) for clinical decision support and summary generation.
 * **Drug Database:** Integrated AIFA drug database with smart search and dosage filtering.
-* **ICD-9 & ICD-11:** Support for standard disease classification systems.
+* **ICD-11:** Support for standard disease classification systems.
 * **Therapy Management:** Structured prescription builder with print-ready PDF generation.
 * **Privacy Mode:** One-click feature to blur sensitive data on screen.
 
@@ -63,7 +63,7 @@ To use the AI Assistant features:
 
 ### Drug Database
 
-Download the `confezioni.csv` file from [AIFA Open Data](https://www.aifa.gov.it/dati-aperti) and import it via the Settings page to populate the drug search.
+Download the `confezioni.csv` file from [AIFA Open Data](https://www.aifa.gov.it/open-data) and import it via the Settings page to populate the drug search.
 
 ## Tech Stack
 
