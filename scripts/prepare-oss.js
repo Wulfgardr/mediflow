@@ -80,13 +80,13 @@ try {
     console.log('Copying files...');
     copyRecursive(SOURCE_DIR, TARGET_DIR);
 
-    // Overwrite README and LICENSE
+    // Overwrite README and LICENSE and other assets
     console.log('Applying OSS assets...');
-    if (fs.existsSync(path.join(SOURCE_DIR, 'oss-assets', 'README.md'))) {
-        fs.copyFileSync(path.join(SOURCE_DIR, 'oss-assets', 'README.md'), path.join(TARGET_DIR, 'README.md'));
-    }
-    if (fs.existsSync(path.join(SOURCE_DIR, 'oss-assets', 'LICENSE'))) {
-        fs.copyFileSync(path.join(SOURCE_DIR, 'oss-assets', 'LICENSE'), path.join(TARGET_DIR, 'LICENSE'));
+    if (fs.existsSync(path.join(SOURCE_DIR, 'oss-assets'))) {
+        const assets = fs.readdirSync(path.join(SOURCE_DIR, 'oss-assets'));
+        for (const asset of assets) {
+            fs.copyFileSync(path.join(SOURCE_DIR, 'oss-assets', asset), path.join(TARGET_DIR, asset));
+        }
     }
 
     console.log('Done! Open Source version ready at: ' + TARGET_DIR);
