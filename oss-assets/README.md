@@ -1,6 +1,10 @@
 # MediFlow (Presentation)
 
-MediFlow is a comprehensive, local-first medical record management system designed for **reliability**, **privacy**, and **speed**. It empowers medical professionals to manage patient data, therapies, and clinical notes without relying on internet connectivity or third-party cloud services.
+Hello there! My name is Leo, I am a physician from Italy and I work in the Community Care setting. The idea of managing patient data, therapies, and clinical notes without relying on internet connectivity or third-party cloud services is what led me to create MediFlow.
+
+MediFlow is a comprehensive, local-first medical record management system designed for **reliability**, **privacy**, and **speed**. It empowers medical professionals and allows to shift the focus from managing IT issues to patient care.
+
+The software "base" is in Italian but feel free to branch, modify, suggest and so much more. I am a newbie in the development world and I am always open to learning and improving. Don't forget that this application is made from the Italian point of view (AIFA for medication references, etc.) and many features and upcoming changes are tied to my everyday clinical practice. Yet this product is made with modularity in mind. Feel free to reach out for any suggestions! Open Source for the win!
 
 ![MediFlow Screenshot](screenshot.png)
 
@@ -8,7 +12,7 @@ MediFlow is a comprehensive, local-first medical record management system design
 
 * **🔒 Privacy First**: Your patient data never leaves your device unless you explicitly export it. We use IndexedDB for robust, encrypted-at-rest local storage.
 * **⚡ Speed & Fluidity**: Built with a "Zero-Lag" philosophy. Every interaction is immediate, thanks to the local-first architecture.
-* **🏥 Clinical Effectiveness**: Tools designed by doctors, for doctors. From smart ICD-9/11 coding to automatic PDF therapy printing.
+* **🏥 Clinical Effectiveness**: Tools designed by doctors, for doctors. From smart ICD-11 coding to automatic PDF therapy printing.
 
 ---
 
