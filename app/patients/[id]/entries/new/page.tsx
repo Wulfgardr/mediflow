@@ -134,6 +134,7 @@ export default function NewEntryPage() {
                                     value={entryDate}
                                     onChange={(e) => setEntryDate(e.target.value)}
                                     className="w-full pl-12 pr-4 py-3 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none text-gray-700 dark:text-gray-200 font-medium dark:[color-scheme:dark]"
+                                    aria-label="Data e ora della visita"
                                     required
                                 />
                             </div>
@@ -256,6 +257,7 @@ export default function NewEntryPage() {
                                             type="button"
                                             onClick={() => removeFile(idx)}
                                             className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                            aria-label={`Rimuovi allegato ${file.name}`}
                                         >
                                             <X className="w-4 h-4" />
                                         </button>

@@ -127,7 +127,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                 <div className="glass-panel p-4 animate-in fade-in slide-in-from-top-4">
                     <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
                         <h4 className="font-semibold text-gray-700">Nuova Prescrizione</h4>
-                        <button onClick={() => setIsAdding(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
+                        <button onClick={() => setIsAdding(false)} aria-label="Chiudi"><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
                     </div>
 
                     <div className="flex items-center gap-4 mb-4">
@@ -267,13 +267,13 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                     {t.motivation && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">&quot;{t.motivation}&quot;</p>}
                                 </div>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button title="Sospendi" onClick={() => updateStatus(t.id, 'suspended')} className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg">
+                                    <button title="Sospendi" aria-label="Sospendi terapia" onClick={() => updateStatus(t.id, 'suspended')} className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg">
                                         <Clock className="w-4 h-4" />
                                     </button>
-                                    <button title="Termina" onClick={() => updateStatus(t.id, 'ended')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+                                    <button title="Termina" aria-label="Termina terapia" onClick={() => updateStatus(t.id, 'ended')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
                                         <StopCircle className="w-4 h-4" />
                                     </button>
-                                    <button title="Elimina (Errore)" onClick={() => handleSoftDelete(t.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                    <button title="Elimina (Errore)" aria-label="Elimina terapia" onClick={() => handleSoftDelete(t.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>

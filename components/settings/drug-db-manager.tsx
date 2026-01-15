@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Database, Upload, Trash2, RefreshCw, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Database, Upload, Trash2, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
 
 export default function DrugDbManager() {
@@ -65,7 +65,7 @@ export default function DrugDbManager() {
                         Database Farmaci AIFA
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Gestisci il prontuario farmaceutico locale per abilitare l'autocompletamento e la codifica AIC.
+                        Gestisci il prontuario farmaceutico locale per abilitare l&apos;autocompletamento e la codifica AIC.
                     </p>
                 </div>
                 <div className="text-right">
@@ -103,21 +103,26 @@ export default function DrugDbManager() {
                         </label>
                     </div>
                 ) : (
-                    <div className="space-y-3 py-6">
-                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                            <span>Importazione in corso...</span>
-                            <span>{Math.round((progress / total) * 100) || 0}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-indigo-500 transition-all duration-300 ease-out"
-                                style={{ width: `${(progress / total) * 100}%` }}
-                            />
-                        </div>
-                        <p className="text-xs text-center text-gray-400">
-                            Elaborati {progress.toLocaleString()} di {total.toLocaleString()} record...
-                        </p>
-                    </div>
+                    (() => {
+                        const loadingStyle = { width: `${(progress / total) * 100}%` };
+                        return (
+                            <div className="space-y-3 py-6">
+                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                                    <span>Importazione in corso...</span>
+                                    <span>{Math.round((progress / total) * 100) || 0}%</span>
+                                </div>
+                                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                                        style={loadingStyle}
+                                    />
+                                </div>
+                                <p className="text-xs text-center text-gray-400">
+                                    Elaborati {progress.toLocaleString()} di {total.toLocaleString()} record...
+                                </p>
+                            </div>
+                        );
+                    })()
                 )}
             </div>
 

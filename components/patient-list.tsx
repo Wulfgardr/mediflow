@@ -82,7 +82,7 @@ export default function PatientList() {
                 </div>
                 <input
                     type="text"
-                    className="block w-full pl-10 pr-3 py-3 border-none rounded-2xl bg-white/60 backdrop-blur-sm shadow-sm ring-1 ring-black/5 focus:ring-2 focus:ring-blue-500 focus:bg-white/80 transition-all text-gray-800 placeholder-gray-400"
+                    className="block w-full pl-10 pr-3 py-3 border-none rounded-2xl bg-white/60 dark:bg-[#0d1117] backdrop-blur-sm shadow-sm ring-1 ring-black/5 dark:ring-[#30363d] focus:ring-2 focus:ring-blue-500 focus:bg-white/80 dark:focus:bg-[#161b22] transition-all text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-[#8b949e]"
                     placeholder="Cerca per nome, cognome o codice fiscale..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -93,7 +93,7 @@ export default function PatientList() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {patients?.map((patient) => (
                     <Link href={`/patients/${patient.id}`} key={patient.id} className="block group">
-                        <div className={`glass-card h-full p-6 relative overflow-hidden ${patient.isArchived ? 'opacity-75 grayscale-[0.3]' : ''}`}>
+                        <div className={`glass-card h-full p-6 relative overflow-hidden ${patient.isArchived ? 'opacity-75 grayscale-[0.3]' : ''} dark:bg-[#161b22] dark:border-[#30363d] dark:hover:border-[#58a6ff]/50`}>
                             <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
                                 <FileText className="w-16 h-16 text-blue-500/10 transform group-hover:scale-110 transition-transform duration-500" />
                             </div>
@@ -101,17 +101,17 @@ export default function PatientList() {
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-inner ${patient.isArchived
-                                        ? 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400'
-                                        : 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 dark:from-blue-900/40 dark:to-indigo-900/40 dark:text-blue-300'
+                                        ? 'bg-gray-100 text-gray-500 dark:bg-[#21262d] dark:text-[#8b949e]'
+                                        : 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 dark:from-[#1f6feb]/20 dark:to-[#58a6ff]/20 dark:text-[#58a6ff]'
                                         }`}>
                                         {patient.firstName[0]}{patient.lastName[0]}
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
+                                        <h3 className="font-bold text-lg text-gray-800 dark:text-[#c9d1d9] group-hover:text-blue-700 dark:group-hover:text-[#58a6ff] transition-colors">
                                             <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                                         </h3>
                                         <div className="flex items-center gap-2">
-                                            <p className="text-xs font-mono text-gray-500">
+                                            <p className="text-xs font-mono text-gray-500 dark:text-[#8b949e]">
                                                 <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                                             </p>
                                             {patient.isArchived && (
@@ -123,8 +123,8 @@ export default function PatientList() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 text-sm text-gray-600">
-                                    <div className="flex justify-between border-b border-gray-100 pb-2">
+                                <div className="space-y-2 text-sm text-gray-600 dark:text-[#8b949e]">
+                                    <div className="flex justify-between border-b border-gray-100 dark:border-[#30363d] pb-2">
                                         <span>Età</span>
                                         <span className="font-medium text-gray-800">
                                             {(() => {
@@ -154,9 +154,9 @@ export default function PatientList() {
                                                     patient.archiveReason === 'assigned_mmg' ? 'MMG' : 'Archiviato'}
                                             </span>
                                         ) : patient.isAdi ? (
-                                            <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200">ADI Attiva</span>
+                                            <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">ADI Attiva</span>
                                         ) : (
-                                            <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs border border-gray-200 dark:bg-white/10 dark:text-gray-400 dark:border-white/5">Ambulatoriale</span>
+                                            <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs border border-gray-200 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d]">Ambulatoriale</span>
                                         )}
                                     </div>
                                 </div>

@@ -28,41 +28,41 @@ export default function DashboardInsights() {
 
             {/* Usage Analytics Strip (Mini Dashboard) */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex flex-col items-center justify-center gap-1">
+                <div className="bg-white dark:bg-[#161b22] p-4 rounded-xl shadow-sm border border-indigo-50 dark:border-[#30363d] flex flex-col items-center justify-center gap-1">
                     <div className="flex items-center gap-2 text-indigo-600 mb-1">
                         <Users className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase">Pazienti</span>
                     </div>
-                    <span className="text-2xl font-bold text-gray-800">
+                    <span className="text-2xl font-bold text-gray-800 dark:text-white">
                         <PrivacyBlur intensity="lg">{stats.patientCount}</PrivacyBlur>
                     </span>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex flex-col items-center justify-center gap-1">
+                <div className="bg-white dark:bg-[#161b22] p-4 rounded-xl shadow-sm border border-indigo-50 dark:border-[#30363d] flex flex-col items-center justify-center gap-1">
                     <div className="flex items-center gap-2 text-emerald-600 mb-1">
                         <FileText className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase">Voci Diario</span>
                     </div>
-                    <span className="text-2xl font-bold text-gray-800">
+                    <span className="text-2xl font-bold text-gray-800 dark:text-white">
                         <PrivacyBlur intensity="lg">{stats.entryCount}</PrivacyBlur>
                     </span>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex flex-col items-center justify-center gap-1">
+                <div className="bg-white dark:bg-[#161b22] p-4 rounded-xl shadow-sm border border-indigo-50 dark:border-[#30363d] flex flex-col items-center justify-center gap-1">
                     <div className="flex items-center gap-2 text-violet-600 mb-1">
                         <Brain className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase">AI Insights</span>
                     </div>
-                    <span className="text-2xl font-bold text-gray-800">
+                    <span className="text-2xl font-bold text-gray-800 dark:text-white">
                         <PrivacyBlur intensity="lg">{stats.aiInsightCount}</PrivacyBlur>
                     </span>
                     <span className="text-[10px] text-gray-400">{(stats.patientCount > 0 ? (stats.aiInsightCount / stats.patientCount * 100).toFixed(0) : 0)}% copertura</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex flex-col items-center justify-center gap-1">
+                <div className="bg-white dark:bg-[#161b22] p-4 rounded-xl shadow-sm border border-indigo-50 dark:border-[#30363d] flex flex-col items-center justify-center gap-1">
                     <div className="flex items-center gap-2 text-amber-600 mb-1">
                         <Activity className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase">Utilizzo</span>
                     </div>
                     {/* Fake Usage Index based on entries per patient */}
-                    <span className="text-lg font-bold text-gray-800">
+                    <span className="text-lg font-bold text-gray-800 dark:text-white">
                         <PrivacyBlur intensity="lg">
                             {(stats.patientCount > 0 ? (stats.entryCount / stats.patientCount).toFixed(1) : 0)}
                         </PrivacyBlur>

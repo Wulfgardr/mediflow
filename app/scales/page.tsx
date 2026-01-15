@@ -119,7 +119,7 @@ export default function ScalesLibraryPage() {
                     <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50/50">
                             <h3 className="font-bold text-lg text-gray-800">Seleziona Paziente</h3>
-                            <button onClick={() => setSelectedScale(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                            <button onClick={() => setSelectedScale(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors" aria-label="Chiudi">
                                 <X className="w-5 h-5 text-gray-500" />
                             </button>
                         </div>

@@ -6,6 +6,7 @@
   opacity: 0.6;
   transition: all 0.5s ease-in-out;
   cursor: default;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -59,46 +60,43 @@ body {
 /* Manually handle dark mode via class */
 /* Manually handle dark mode via class */
 :root.dark {
-  /* Apple HIG Dark Mode Palette */
-  --background: #000000;
-  /* Pure Black (OLED) */
-  --foreground: #FFFFFF;
-  /* Primary Label */
+  /* GitHub Dark Mode Palette */
+  --background: #0d1117;
+  /* GitHub Base */
+  --foreground: #c9d1d9;
+  /* GitHub Text */
 
   /* Semantic Layers */
-  --card: #1C1C1E;
-  /* System Gray 6 Dark (Elevated) */
-  --card-foreground: #FFFFFF;
-  --popover: #1C1C1E;
-  --popover-foreground: #FFFFFF;
+  --card: #161b22;
+  /* GitHub Card/Header */
+  --card-foreground: #c9d1d9;
+  --popover: #161b22;
+  --popover-foreground: #c9d1d9;
 
   /* Controls & Inputs */
-  --input: #2C2C2E;
-  /* System Gray 5 Dark */
-  --border: #38383A;
-  /* Separator Color */
+  --input: #010409;
+  /* GitHub Input Bg */
+  --border: #30363d;
+  /* GitHub Border */
 
   /* Semantic Text */
-  --muted: #8E8E93;
-  /* System Gray */
-  --muted-foreground: rgba(235, 235, 245, 0.6);
-  /* Secondary Label */
+  --muted: #8b949e;
+  /* GitHub Muted */
+  --muted-foreground: #8b949e;
 
   /* Semantic Colors */
-  --primary: #0A84FF;
-  /* System Blue Dark */
-  --apple-blue: #0A84FF;
-  --apple-gray: #8E8E93;
-  --system-gray-6: #1C1C1E;
+  --primary: #58a6ff;
+  /* GitHub Blue */
+  --apple-blue: #58a6ff;
+  --apple-gray: #8b949e;
+  --system-gray-6: #161b22;
 }
 
 :root.dark body {
   background-image: none;
-  background-color: #000000;
+  background-color: var(--background);
 }
 
-/* Ensure input/card backgrounds are readable in dark mode */
-/* Ensure input/card backgrounds are readable in dark mode */
 /* Ensure input/card backgrounds are readable in dark mode */
 :root.dark input,
 :root.dark select,
@@ -110,16 +108,8 @@ body {
 
 /* Fix native select options in dark mode */
 :root.dark select option {
-  background-color: #1e293b;
-  /* slate-800 */
-  color: #f8fafc;
-}
-
-/* Fix native select options in dark mode */
-:root.dark select option {
-  background-color: #1e293b;
-  /* slate-800 */
-  color: #f8fafc;
+  background-color: #161b22;
+  color: #c9d1d9;
 }
 
 /* Light mode overrides (default) - applied when NOT .dark */
@@ -133,14 +123,14 @@ body {
 
 @layer utilities {
   .glass {
-    @apply backdrop-blur-md bg-white/70 dark:bg-[#1C1C1E]/80 border border-white/50 dark:border-white/10 shadow-xl;
+    @apply backdrop-blur-md bg-white/70 dark:bg-[#161b22]/90 border border-white/50 dark:border-[#30363d] shadow-xl;
   }
 
   .glass-card {
-    @apply backdrop-blur-xl bg-white/60 dark:bg-[#1C1C1E] border border-white/40 dark:border-white/5 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
+    @apply backdrop-blur-xl bg-white/60 dark:bg-[#161b22] border border-white/40 dark:border-[#30363d] shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
   }
 
   .glass-panel {
-    @apply backdrop-blur-2xl bg-white/80 dark:bg-[#1C1C1E] border border-white/30 dark:border-white/5 shadow-lg rounded-3xl;
+    @apply backdrop-blur-2xl bg-white/80 dark:bg-[#0d1117] border border-white/30 dark:border-[#30363d] shadow-lg rounded-3xl;
   }
 }

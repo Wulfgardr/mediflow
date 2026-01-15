@@ -51,6 +51,8 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     const currentQuestion = scale.questions[currentStep];
     const progress = ((currentStep + 1) / scale.questions.length) * 100;
 
+    const progressStyle = { width: `${progress}%` };
+
     return (
         <div className="glass-panel max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[500px]">
             {/* Header */}
@@ -61,7 +63,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                 <div className="mt-6 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-blue-500 transition-all duration-500 ease-out"
-                        style={{ width: `${progress}%` }}
+                        style={progressStyle}
                     />
                 </div>
                 <div className="text-right text-xs text-gray-500 mt-1">

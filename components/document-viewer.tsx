@@ -34,6 +34,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500 hover:text-red-500"
+                        aria-label="Chiudi"
                     >
                         <X className="w-6 h-6" />
                     </button>

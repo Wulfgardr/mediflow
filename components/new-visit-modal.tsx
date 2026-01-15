@@ -52,7 +52,7 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         <Modal isOpen={isOpen} onClose={onClose}>
             <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="font-bold text-lg text-gray-800">Nuova Visita</h3>
-                <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors" aria-label="Chiudi">
                     <X className="w-5 h-5 text-gray-500" />
                 </button>
             </div>
