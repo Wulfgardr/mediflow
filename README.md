@@ -25,7 +25,7 @@ MediFlow is a local-first, privacy-focused medical record application designed f
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/mediflow.git
+    git clone https://github.com/Wulfgardr/mediflow.git
     cd mediflow
     ```
 
