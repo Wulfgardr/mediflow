@@ -1,6 +1,6 @@
 # MediFlow - Open Source Medical Record App
 
-MediFlow is a local-first, privacy-focused medical record application designed for district doctors and small clinics. It features a modern UI, offline capabilities, and powerful tools for managing patient data, therapies, and clinical diaries.
+MediFlow is a local-first, privacy-focused medical record application designed for district doctors and small clinics. It features a modern UI, offline capabilities, and powerful tools for managing patient data, therapies, and clinical diaries. The application is born to meet ITALIAN users, but it can be easily personalised.
 
 
 ## Features
