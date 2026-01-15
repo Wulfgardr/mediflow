@@ -1,83 +1,63 @@
-# MediFlow - Open Source Medical Record App
+# MediFlow (Presentation)
 
-MediFlow is a local-first, privacy-focused medical record application designed for district doctors and small clinics. It features a modern UI, offline capabilities, and powerful tools for managing patient data, therapies, and clinical diaries.
+MediFlow is a comprehensive, local-first medical record management system designed for **reliability**, **privacy**, and **speed**. It empowers medical professionals to manage patient data, therapies, and clinical notes without relying on internet connectivity or third-party cloud services.
 
 ![MediFlow Screenshot](screenshot.png)
 
-## Features
+## Core Philosophy
 
-* **Local-First & Secure:** All data is stored locally in the browser (IndexedDB) and on your device. Zero cloud dependency by default.
-* **Modern UI:** Built with Next.js 15, Tailwind CSS, and Framer Motion for a fluid, "Apple-like" experience.
-* **AI Assistant:** Integrated local AI (via Ollama) or remote (OpenAI) for clinical decision support and summary generation.
-* **Drug Database:** Integrated AIFA drug database with smart search and dosage filtering.
-* **ICD-9 & ICD-11:** Support for standard disease classification systems.
-* **Therapy Management:** Structured prescription builder with print-ready PDF generation.
-* **Privacy Mode:** One-click feature to blur sensitive data on screen.
+* **🔒 Privacy First**: Your patient data never leaves your device unless you explicitly export it. We use IndexedDB for robust, encrypted-at-rest local storage.
+* **⚡ Speed & Fluidity**: Built with a "Zero-Lag" philosophy. Every interaction is immediate, thanks to the local-first architecture.
+* **🏥 Clinical Effectiveness**: Tools designed by doctors, for doctors. From smart ICD-9/11 coding to automatic PDF therapy printing.
 
-## Getting Started
+---
 
-### Prerequisites
+# Technical Documentation (ReadMe)
 
-* Node.js 18+
-* npm or pnpm or bun
+## 🛠 Tech Stack
 
-### Installation
+* **Framework**: Next.js 15 (App Router)
+* **Styling**: Tailwind CSS v4 (with custom "Liquid Glass" aesthetics)
+* **Database**: Dexie.js (IndexedDB)
+* **AI Engine**: Local LLM integration via **Ollama** or remote OpenAI fallback.
 
-1. Clone the repository:
+## ⚙️ Logic & Architecture
 
-    ```bash
-    git clone https://github.com/yourusername/mediflow.git
-    cd mediflow
-    ```
+### 1. Data Management
 
-2. Install dependencies:
+The application runs entirely in the browser.
 
-    ```bash
-    npm install
-    ```
+* **Patients & Entries**: Stored in `Dexie` (IndexedDB).
+* **Files**: Attachments are chunked and stored as Blobs locally.
+* **Drug Database**: Uses the AIFA Open Data standard. The OSS version requires you to upload the `confezioni.csv` manually.
 
-3. Run the development server:
+### 2. AI Integration
 
-    ```bash
-    npm run dev
-    ```
+* **Ollama (Local)**: Recommended for privacy. We support `medgemma` and `llama3` models.
+  * *Setup*: Run `ollama serve` on port 11434.
+* **Structure**: The `ai-engine.ts` handles the prompt construction and context window management.
 
-    Open [http://localhost:3000](http://localhost:3000) with your browser.
+### 3. ICD Classification
 
-## Configuration
+* **ICD-9**: Built-in JSON lookup.
+* **ICD-11**: Requires a local Docker container of the WHO API for full functionality/offline support, or uses the public API with an API key.
 
-### AI Setup (Optional)
+## 📦 Patch Notes
 
-To use the AI Assistant features:
+### **v0.2.0 - "The Polished Update"**
 
-1. **Local (Ollama):** Install [Ollama](https://ollama.ai) and pull the models (`medgemma`, `llama3`).
+* **🎨 Dark Mode Refined**: Fixed contrast issues and restored the "Liquid Glass" aesthetic in dark mode.
+* **🧹 Code Quality**: Resolved numerous linter warnings (CSS syntax, inline styles) for a cleaner codebase.
+* **🚀 Performance**: Optimized large list rendering for the patient index.
+* **📦 OSS Prep**: Improved the anonymization script to better separate private assets from the public code.
 
-    ```bash
-    ollama pull medgemma
-    ```
+## 🚀 Getting Started (Dev)
 
-2. **Remote (OpenAI):** Create a `.env.local` file and add your key:
-
-    ```env
-    OPENAI_API_KEY=your_key_here
-    ```
-
-### Drug Database
-
-Download the `confezioni.csv` file from [AIFA Open Data](https://www.aifa.gov.it/dati-aperti) and import it via the Settings page to populate the drug search.
-
-## Tech Stack
-
-* **Framework:** Next.js 15 (App Router)
-* **Styling:** Tailwind CSS v4
-* **Database:** Dexie.js (IndexedDB wrapper)
-* **Formatting:** React Markdown, Lucide Icons
-* **State:** React Context + Hooks
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+1. **Clone**: `git clone ...`
+2. **Install**: `npm install`
+3. **Run**: `npm run dev`
+4. **Setup Drugs**: Go to Settings -> Upload `confezioni.csv` (available from AIFA).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License.

@@ -16,7 +16,8 @@ const TO_EXCLUDE = [
     'scripts',
     'oss-assets',
     'brain',
-    '.gemini'
+    '.gemini',
+    'Farmaci'
 ];
 
 const REPLACEMENTS = [
