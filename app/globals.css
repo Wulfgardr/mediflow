@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+.liquid-blur {
+  filter: blur(5px);
+  opacity: 0.6;
+  transition: all 0.5s ease-in-out;
+  cursor: default;
+  user-select: none;
+}
+
+.liquid-blur:hover {
+  filter: blur(2px);
+  opacity: 0.8;
+}
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #f0f4f8;
+  /* Soft blue-grey background */
+  --foreground: #1e293b;
+
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
+  /* Apple System Colors (Light) */
+  --apple-blue: #007AFF;
+  --apple-gray: #8E8E93;
+  --system-gray-6: #F2F2F7;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* Subtle mesh gradient background */
+  background-image:
+    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* Ensure selected text is readable in dark mode */
+::selection {
+  background: rgba(99, 102, 241, 0.5);
+  /* indigo-500/50 */
+  color: #fff;
+}
+
+/* Manually handle dark mode via class */
+/* Manually handle dark mode via class */
+/* Manually handle dark mode via class */
+:root.dark {
+  /* Apple HIG Dark Mode Palette */
+  --background: #000000;
+  /* Pure Black (OLED) */
+  --foreground: #FFFFFF;
+  /* Primary Label */
+
+  /* Semantic Layers */
+  --card: #1C1C1E;
+  /* System Gray 6 Dark (Elevated) */
+  --card-foreground: #FFFFFF;
+  --popover: #1C1C1E;
+  --popover-foreground: #FFFFFF;
+
+  /* Controls & Inputs */
+  --input: #2C2C2E;
+  /* System Gray 5 Dark */
+  --border: #38383A;
+  /* Separator Color */
+
+  /* Semantic Text */
+  --muted: #8E8E93;
+  /* System Gray */
+  --muted-foreground: rgba(235, 235, 245, 0.6);
+  /* Secondary Label */
+
+  /* Semantic Colors */
+  --primary: #0A84FF;
+  /* System Blue Dark */
+  --apple-blue: #0A84FF;
+  --apple-gray: #8E8E93;
+  --system-gray-6: #1C1C1E;
+}
+
+:root.dark body {
+  background-image: none;
+  background-color: #000000;
+}
+
+/* Ensure input/card backgrounds are readable in dark mode */
+/* Ensure input/card backgrounds are readable in dark mode */
+/* Ensure input/card backgrounds are readable in dark mode */
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  background-color: var(--input);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+/* Fix native select options in dark mode */
+:root.dark select option {
+  background-color: #1e293b;
+  /* slate-800 */
+  color: #f8fafc;
+}
+
+/* Fix native select options in dark mode */
+:root.dark select option {
+  background-color: #1e293b;
+  /* slate-800 */
+  color: #f8fafc;
+}
+
+/* Light mode overrides (default) - applied when NOT .dark */
+:root:not(.dark) body {
+  background-color: #f3f4f6;
+  background-image:
+    radial-gradient(at 40% 20%, hsla(210, 100%, 96%, 1) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(189, 100%, 96%, 1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(341, 100%, 96%, 1) 0px, transparent 50%);
+}
+
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-md bg-white/70 dark:bg-[#1C1C1E]/80 border border-white/50 dark:border-white/10 shadow-xl;
+  }
+
+  .glass-card {
+    @apply backdrop-blur-xl bg-white/60 dark:bg-[#1C1C1E] border border-white/40 dark:border-white/5 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
+  }
+
+  .glass-panel {
+    @apply backdrop-blur-2xl bg-white/80 dark:bg-[#1C1C1E] border border-white/30 dark:border-white/5 shadow-lg rounded-3xl;
+  }
+}
