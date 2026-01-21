@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, Activity, Settings, PlusCircle, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 import { NewVisitModal } from '@/components/new-visit-modal';
 import SystemStatus from '@/components/system-status';
 import { usePrivacy } from '@/components/privacy-provider';
@@ -15,6 +17,15 @@ export function Sidebar() {
     const pathname = usePathname();
     const [showNewVisitModal, setShowNewVisitModal] = useState(false);
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+
+    const profile = useLiveQuery(async () => {
+        const doctor = await db.settings.get('doctorName');
+        const clinic = await db.settings.get('clinicName');
+        return {
+            doctor: doctor?.value || 'Medico',
+            clinic: clinic?.value || 'Ambulatorio'
+        };
+    });
 
     const links = [
         { href: '/', name: 'Pazienti', icon: Users },
@@ -45,8 +56,10 @@ export function Sidebar() {
                             </button>
                         </div>
                         <div className="text-[10px] leading-tight text-gray-400 font-medium">
-                            <span className="block text-gray-700 dark:text-gray-300 font-bold">Dr. Leonardo Pegollo</span>
-                            <span>Ambulatorio del Medico di Distretto</span>
+                            <span className="block text-gray-700 dark:text-gray-300 font-bold truncate">
+                                {profile?.doctor || 'Medico'}
+                            </span>
+                            <span className="truncate block">{profile?.clinic || 'Ambulatorio'}</span>
                         </div>
                     </div>
 

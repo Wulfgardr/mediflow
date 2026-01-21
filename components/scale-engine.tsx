@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ScaleQuestion {
@@ -24,6 +24,25 @@ interface ScaleEngineProps {
     scale: ScaleDefinition;
     onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void;
     onCancel: () => void;
+}
+
+function ProgressBar({ progress }: { progress: number }) {
+    const barRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (barRef.current) {
+            barRef.current.style.width = `${progress}%`;
+        }
+    }, [progress]);
+
+    return (
+        <div className="mt-6 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+                ref={barRef}
+                className="h-full bg-blue-500 transition-all duration-500 ease-out"
+            />
+        </div>
+    );
 }
 
 export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngineProps) {
@@ -60,12 +79,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                 <h2 className="text-2xl font-bold text-gray-800">{scale.title}</h2>
                 <p className="text-gray-600 text-sm mt-1">{scale.description}</p>
 
-                <div className="mt-6 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-blue-500 transition-all duration-500 ease-out"
-                        style={progressStyle}
-                    />
-                </div>
+                <ProgressBar progress={progress} />
                 <div className="text-right text-xs text-gray-500 mt-1">
                     Domanda {currentStep + 1} di {scale.questions.length}
                 </div>

@@ -100,6 +100,7 @@ export default function AnalyticsPage() {
                             type="range"
                             min="0"
                             max="120"
+                            aria-label="Età minima"
                             value={ageRange[0]}
                             onChange={(e) => setAgeRange([parseInt(e.target.value), ageRange[1]])}
                             className="w-full accent-blue-600"
@@ -108,6 +109,7 @@ export default function AnalyticsPage() {
                             type="range"
                             min="0"
                             max="120"
+                            aria-label="Età massima"
                             value={ageRange[1]}
                             onChange={(e) => setAgeRange([ageRange[0], parseInt(e.target.value)])}
                             className="w-full accent-blue-600"
@@ -131,7 +133,10 @@ export default function AnalyticsPage() {
                         <Users className="w-8 h-8 text-blue-200" />
                     </div>
                     <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${(stats?.takenInCharge || 0) / (stats?.total || 1) * 100}%` }}></div>
+                        <div
+                            className="bg-blue-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
+                            style={{ '--prog-width': `${(stats?.takenInCharge || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
+                        ></div>
                     </div>
                     <p className="text-xs text-blue-600 mt-2 font-medium">
                         {Math.round(((stats?.takenInCharge || 0) / (stats?.total || 1)) * 100)}% del totale
@@ -147,7 +152,10 @@ export default function AnalyticsPage() {
                         <Activity className="w-8 h-8 text-orange-200" />
                     </div>
                     <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-orange-500 h-full transition-all duration-1000" style={{ width: `${(stats?.extemp || 0) / (stats?.total || 1) * 100}%` }}></div>
+                        <div
+                            className="bg-orange-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
+                            style={{ '--prog-width': `${(stats?.extemp || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
+                        ></div>
                     </div>
                 </div>
 
@@ -186,8 +194,8 @@ export default function AnalyticsPage() {
                                 </div>
                                 <div className="w-full bg-gray-100 rounded-full h-3">
                                     <div
-                                        className="bg-indigo-500 h-full rounded-full opacity-80"
-                                        style={{ width: `${(count / (stats?.total || 1)) * 100}%` }}
+                                        className="bg-indigo-500 h-full rounded-full opacity-80 w-[var(--prog-width)]"
+                                        style={{ '--prog-width': `${(count / (stats?.total || 1)) * 100}%` } as React.CSSProperties}
                                     ></div>
                                 </div>
                             </div>

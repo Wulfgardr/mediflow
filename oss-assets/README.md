@@ -16,7 +16,7 @@ The software "base" is in Italian but feel free to branch, modify, suggest and s
 
 ---
 
-# Technical Documentation (ReadMe)
+## Technical Documentation (ReadMe)
 
 ## 🛠 Tech Stack
 

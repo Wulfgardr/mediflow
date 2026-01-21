@@ -1,8 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Database, Upload, Trash2, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
+
+function ProgressBar({ progress, total }: { progress: number; total: number }) {
+    const barRef = useRef<HTMLDivElement>(null);
+    const percentage = Math.round((progress / total) * 100) || 0;
+
+    useEffect(() => {
+        if (barRef.current) {
+            barRef.current.style.width = `${percentage}%`;
+        }
+    }, [percentage]);
+
+    return (
+        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+                ref={barRef}
+                className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+            />
+        </div>
+    );
+}
 
 export default function DrugDbManager() {
     const [stats, setStats] = useState<number | null>(null);
@@ -113,8 +133,8 @@ export default function DrugDbManager() {
                                 </div>
                                 <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-indigo-500 transition-all duration-300 ease-out"
-                                        style={loadingStyle}
+                                        className="h-full bg-indigo-500 transition-all duration-300 ease-out progress-bar-fill"
+                                        data-progress={Math.round((progress / total) * 100) || 0}
                                     />
                                 </div>
                                 <p className="text-xs text-center text-gray-400">

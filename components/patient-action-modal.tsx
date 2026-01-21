@@ -113,6 +113,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                         value={archiveReason}
                                         onChange={(e) => setArchiveReason(e.target.value as ArchiveReason)}
                                         className="w-full p-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                                        aria-label="Seleziona motivazione archiviazione"
                                     >
                                         <option value="assigned_mmg">Assegnato a MMG</option>
                                         <option value="deceased">Decesso</option>

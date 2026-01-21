@@ -8,10 +8,11 @@ interface DrugAutocompleteProps {
     onSelect: (drug: AifaDrug) => void;
     placeholder?: string;
     autoFocus?: boolean;
+    defaultValue?: string;
 }
 
-export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmaco o principio attivp...", autoFocus = false }: DrugAutocompleteProps) {
-    const [query, setQuery] = useState("");
+export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmaco o principio attivp...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
+    const [query, setQuery] = useState(defaultValue);
     const [results, setResults] = useState<AifaDrug[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);

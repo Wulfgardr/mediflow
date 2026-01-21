@@ -113,6 +113,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             if (onSelect) onSelect('', '');
                         }}
                         className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                        aria-label="Cancella ricerca"
                     >
                         <X className="w-4 h-4" />
                     </button>

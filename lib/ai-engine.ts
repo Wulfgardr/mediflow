@@ -6,7 +6,7 @@ import OpenAI from 'openai';
 export const DEFAULT_MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
 
 // We can allow env var override if needed, but for now strict local default
-export const OLLAMA_BASE_URL = "http://localhost:11434/v1";
+export const OLLAMA_BASE_URL = process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434/v1";
 
 let openaiInstance: OpenAI | null = null;
 
