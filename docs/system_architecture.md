@@ -24,7 +24,7 @@
 MediFlow nasce con tre principi fondamentali:
 
 | Principio | Descrizione |
-|-----------|-------------|
+| :--- | :--- |
 | **Local-First** | I dati risiedono sul dispositivo. Nessun cloud, nessuna dipendenza esterna. |
 | **Privacy-by-Design** | Crittografia AES-256-GCM client-side. Il PIN non viene mai trasmesso. |
 | **AI-Powered** | LLM medici (MedGemma) eseguiti localmente per supporto decisionale clinico. |
@@ -80,7 +80,7 @@ graph TB
 ### 3.1 Matrice delle Tecnologie
 
 | Layer | Tecnologia | Ruolo | Porta |
-|-------|-----------|-------|-------|
+| :--- | :--- | :--- | :--- |
 | **Frontend** | Next.js 15 + React 19 | UI reattiva, SSR | — |
 | **Styling** | TailwindCSS v4, Framer Motion | Design system, animazioni | — |
 | **DB Client** | API Facade (`lib/db.ts`) | Crittografia + REST calls | — |
@@ -91,7 +91,7 @@ graph TB
 
 ### 3.2 Dipendenze Chiave
 
-```
+```text
 Core:        next@16, react@19, drizzle-orm, better-sqlite3
 Security:    bcryptjs, Web Crypto API (native)
 AI:          openai (client), Ollama/MLX (backend)
@@ -192,7 +192,7 @@ erDiagram
 ### 4.2 Mappa dei Campi Cifrati
 
 | Tabella | Campi Cifrati |
-|---------|---------------|
+| :--- | :--- |
 | `patients` | `address`, `phone`, `caregiver`, `notes`, `aiSummary`, `deletionReason` |
 | `entries` | `content`, `deletionReason` |
 | `therapies` | `motivation`, `deletionReason` |
@@ -283,7 +283,7 @@ sequenceDiagram
 ### 6.1 Crittografia
 
 | Parametro | Valore |
-|-----------|--------|
+| :--- | :--- |
 | **Algoritmo** | AES-256-GCM (Web Crypto API) |
 | **Key Derivation** | PBKDF2-SHA256, 100.000 iterazioni |
 | **IV** | 12 byte casuali per ogni operazione |
@@ -311,7 +311,7 @@ services:
 ### 6.3 Endpoints API Interni
 
 | Endpoint | Metodo | Descrizione |
-|----------|--------|-------------|
+| :--- | :--- | :--- |
 | `/api/patients` | GET, POST | CRUD pazienti |
 | `/api/entries` | GET, POST | Diario clinico |
 | `/api/therapies` | GET, POST | Piano terapeutico |
@@ -330,7 +330,7 @@ services:
 ### 7.1 Funzionalità Cliniche
 
 | Modulo | Descrizione |
-|--------|-------------|
+| :--- | :--- |
 | **📋 Anagrafica Paziente** | Gestione completa dati demografici, ADI, caregiver |
 | **📝 Diario Clinico** | Visite, telefonate, esami, ricoveri, accessi, note |
 | **💊 Piano Terapeutico** | Prescrizioni con DB AIFA, storico sospensioni |
@@ -342,7 +342,7 @@ services:
 ### 7.2 Funzionalità AI
 
 | Feature | Descrizione |
-|---------|-------------|
+| :--- | :--- |
 | **Clinical Insight** | Analisi automatica del quadro clinico del paziente |
 | **Chat Assistente** | Conversazione libera con contesto clinico |
 | **PDF Extraction** | OCR e summarization di referti allegati |
@@ -351,7 +351,7 @@ services:
 ### 7.3 Sicurezza & Compliance
 
 | Requisito | Implementazione |
-|-----------|-----------------|
+| :--- | :--- |
 | **GDPR Art. 17** | Cancellazione sicura con soft-delete + audit trail |
 | **GDPR Art. 20** | Export dati in formato portabile (JSON/PDF) |
 | **Minimizzazione** | Solo dati strettamente necessari |
