@@ -8,7 +8,7 @@ import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
-import PatientStatusManager from '@/components/patient-status-manager';
+
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -19,11 +19,19 @@ export default function PatientDetailPage() {
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
-        () => db.entries.where('patientId').equals(id).reverse().sortBy('date'),
+        async () => {
+            const items = await db.entries.filter((e: any) => e.patientId === id).toArray();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return items.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        },
         [id]
     );
     const checkups = useLiveQuery(
-        () => db.checkups.where('patientId').equals(id).filter(c => c.status !== 'completed').sortBy('date'),
+        async () => {
+            const items = await db.checkups.filter((c: any) => c.patientId === id).toArray();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return items.filter((c: any) => c.status !== 'completed').sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        },
         [id]
     );
 
@@ -110,19 +118,7 @@ export default function PatientDetailPage() {
                         </div>
 
                         {/* Diagnoses / ICD */}
-                        {
-                            patient.diagnoses && patient.diagnoses.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {patient.diagnoses.map((d, i) => (
-                                        <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 text-red-700 dark:text-red-300 text-xs font-medium shadow-sm">
-                                            <Activity className="w-3.5 h-3.5" />
-                                            <span className="font-bold">{d.code}</span>
-                                            <span className="opacity-75 hidden sm:inline border-l border-red-200 dark:border-red-800 pl-1.5 ml-0.5">{d.description}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )
-                        }
+
 
                         {(patient.notes) && (
                             <div className="mt-2 p-3 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-xl text-sm text-amber-900 dark:text-amber-100 flex gap-2 items-start">
@@ -137,7 +133,7 @@ export default function PatientDetailPage() {
 
 
 
-                        <PatientStatusManager patient={patient} />
+
                     </div>
 
                     <div className="flex flex-col gap-3 min-w-[200px]">
@@ -147,7 +143,8 @@ export default function PatientDetailPage() {
                                 const scaleEntries = entries?.filter(e => e.type === 'scale') || [];
 
                                 // Fetch therapies for the report
-                                const therapies = await db.therapies.where('patientId').equals(id).toArray();
+                                // Fetch therapies for the report
+                                const therapies = await db.therapies.filter((t: any) => t.patientId === id).toArray();
 
                                 import('@/lib/report-service').then(mod => {
                                     if (patient && entries) {
@@ -168,6 +165,24 @@ export default function PatientDetailPage() {
                             <Plus className="w-4 h-4" />
                             Nuova Visita
                         </Link>
+
+                        <button
+                            onClick={async () => {
+                                const { openSissPrescrizione } = await import('@/lib/siss');
+                                const result = await openSissPrescrizione(patient.taxCode);
+                                if (result.success) {
+                                    // Show a simple browser alert for now (could be replaced with toast)
+                                    alert(result.message);
+                                } else {
+                                    alert("⚠️ " + result.message);
+                                }
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95"
+                            title="Apri SISS e copia CF negli appunti"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Prescrizione SISS
+                        </button>
                     </div>
                 </div>
             </div>

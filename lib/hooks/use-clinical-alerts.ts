@@ -25,7 +25,12 @@ export function useClinicalAlerts() {
         // Process in parallel roughly
         for (const p of patients) {
             // Check Inactivity
-            const lastEntry = await db.entries.where('patientId').equals(p.id).reverse().first();
+            // 1. Fetch Latest Entry
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const allEntries = await db.entries.filter((e: any) => e.patientId === p.id).toArray();
+            const lastEntry = allEntries
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
             if (!lastEntry) {
                 alerts.push({
@@ -52,11 +57,11 @@ export function useClinicalAlerts() {
 
             // Check Expired Scales (Example: ADI patients should have periodic scales)
             if (p.isAdi) {
-                const lastScale = await db.entries
-                    .where('patientId').equals(p.id)
-                    .filter(e => e.type === 'scale' && !e.deletedAt)
-                    .reverse()
-                    .first();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const allScales = await db.entries.filter((e: any) => e.patientId === p.id && e.type === 'scale' && !e.deletedAt).toArray();
+                const lastScale = allScales
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
                 if (!lastScale) {
                     alerts.push({

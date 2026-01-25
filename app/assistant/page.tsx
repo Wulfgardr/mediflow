@@ -1,55 +1,77 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import OpenAI from "openai";
-import { Send, Bot, User, Loader2, Sparkles, AlertTriangle, Paperclip, X, Image as ImageIcon, FileText, Plus, MessageSquare, Info, Cpu, Zap, Clock, Activity, Trash2, Archive, ArchiveRestore } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertTriangle, Paperclip, X, FileText, Plus, MessageSquare, Archive, ArchiveRestore, Activity, Trash2, Cpu, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { db, Conversation, Message as DbMessage } from '@/lib/db'; // Make sure interfaces are exported
-import { useLiveQuery } from 'dexie-react-hooks';
+import { db, Conversation, Message as DbMessage } from '@/lib/db';
+
 import ReactMarkdown from 'react-markdown';
 import { fileToBase64, isImageFile, isTextDocument, extractTextFromFile } from '@/lib/ai/file-parsers';
 import { v4 as uuidv4 } from 'uuid';
 
-// Interface for UI state (extends DB message with loading state if needed)
-interface UIMessage extends DbMessage {
+interface UIMessage {
+    id: string;
+    conversationId: string;
+    role: string;
+    content: string;
+    createdAt: Date;
+    metadata?: string;
     isTyping?: boolean;
+    attachmentType?: string;
+    attachmentBase64?: string;
 }
 
 export default function AssistantPage() {
-    // --- State ---
-    const [engine, setEngine] = useState<OpenAI | null>(null);
-    const [isModelLoading, setIsModelLoading] = useState(false);
-
     // Conversation State
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
     const [messages, setMessages] = useState<UIMessage[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [showNerdStats, setShowNerdStats] = useState(false);
-    const [showArchived, setShowArchived] = useState(false);
 
     // Attachments
     const [attachment, setAttachment] = useState<File | null>(null);
-    const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
 
-    // Sidebar
-    const conversations = useLiveQuery(() => db.conversations.orderBy('updatedAt').reverse().toArray());
-    const patients = useLiveQuery(() => db.patients.toArray());
+    // Sidebar Data
+    const [conversationsList, setConversationsList] = useState<Conversation[]>([]);
+    const [patientsList, setPatientsList] = useState<any[]>([]);
+
+    // Helper to refresh conversations list from DB
+    const refreshConversations = async () => {
+        const convs = await db.conversations.toArray();
+        setConversationsList(convs.sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    };
+
+    useEffect(() => {
+        const loadData = async () => {
+            await refreshConversations();
+            const pats = await db.patients.toArray();
+            setPatientsList(pats);
+        };
+        loadData();
+        // Poll every 5 seconds for updates (poor man's live query)
+        const interval = setInterval(loadData, 5000);
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const conversations = conversationsList;
+    const patients = patientsList;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // --- Tagging State ---
+    const [showTagMenu, setShowTagMenu] = useState(false);
+    const [tagQuery, setTagQuery] = useState("");
+    const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+    const [selectedPatientName, setSelectedPatientName] = useState<string | null>(null);
+
     // --- Effects ---
-
-    useEffect(() => {
-        initEngine();
-    }, []);
-
     useEffect(() => {
         scrollToBottom();
     }, [messages, isLoading]);
 
-    // Load messages when active conversation changes
     useEffect(() => {
         if (activeConversationId) {
             loadMessages(activeConversationId);
@@ -58,30 +80,31 @@ export default function AssistantPage() {
         }
     }, [activeConversationId]);
 
-    // --- Engine & Logic ---
-
-    const initEngine = async () => {
-        try {
-            const openai = await import('@/lib/ai-engine').then(m => m.getAiEngine());
-            setEngine(openai);
-        } catch (err) {
-            console.error(err);
+    // Tagging Logic: Monitor input for '@'
+    useEffect(() => {
+        const lastWord = input.split(' ').pop();
+        if (lastWord && lastWord.startsWith('@')) {
+            setTagQuery(lastWord.slice(1)); // Remove the @
+            setShowTagMenu(true);
+        } else {
+            setShowTagMenu(false);
         }
-    };
+    }, [input]);
+
+    // --- Engine & Logic ---
+    // No explicit init needed for Service pattern, handled per-call or lazy loaded.
 
     const loadMessages = async (conversationId: string) => {
-        const stored = await db.messages.where('conversationId').equals(conversationId).sortBy('createdAt');
+        const allMessages = await db.messages.toArray();
+        const stored = allMessages
+            .filter((m: any) => m.conversationId === conversationId)
+            .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         setMessages(stored);
     };
 
     const startNewChat = async () => {
         const newId = uuidv4();
-        const id = await db.conversations.add({
-            id: newId,
-            title: "Nuova Conversazione",
-            updatedAt: new Date(),
-            createdAt: new Date()
-        });
+        await db.conversations.add({ id: newId, title: "Nuova Conversazione", updatedAt: new Date(), createdAt: new Date() });
         setActiveConversationId(newId);
     };
 
@@ -90,43 +113,100 @@ export default function AssistantPage() {
         if (!file) return;
 
         if (isImageFile(file)) {
-            const base64 = await fileToBase64(file);
             setAttachment(file);
-            setAttachmentPreview(base64);
         } else if (isTextDocument(file)) {
             setAttachment(file);
-            setAttachmentPreview(null); // No preview for text docs yet
         } else {
-            alert("Formato file non supportato. Usa Immagini o PDF/Testo.");
+            alert("Formato file non supportato.");
         }
     };
 
+    // --- Folder Logic ---
+    const [viewMode, setViewMode] = useState<'active' | 'archived' | 'trash'>('active');
+
     const deleteConversation = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
         e.stopPropagation();
-        if (!confirm("Sei sicuro di voler eliminare questa chat definitivamente?")) return;
+        const conv = conversationsList.find(c => c.id === id);
+        if (!conv) return;
 
-        await db.messages.where('conversationId').equals(id).delete();
-        await db.conversations.delete(id);
+        if (viewMode === 'trash') {
+            if (!confirm("Sei sicuro di voler eliminare questa chat definitivamente?")) return;
+            // Delete associated messages first
+            const allMessages = await db.messages.toArray();
+            const messagesToDelete = allMessages.filter((m: { conversationId: string }) => m.conversationId === id);
+            await db.messages.bulkDelete(messagesToDelete.map((m: { id: string }) => m.id));
+            // Then delete the conversation
+            await db.conversations.delete(id);
+        }
 
+        // Deselect if this was the active conversation
         if (activeConversationId === id) {
             setActiveConversationId(null);
             setMessages([]);
         }
+
+        await refreshConversations();
+    };
+
+    // Schema check required. Let's look at `lib/db.ts` first before applying complex logic.
+    // Assuming for now we only have `isArchived`. I will implement "Trash" as `isDeleted` flag in DB.
+
+    const moveToTrash = async (e: React.MouseEvent, conversation: Conversation) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await db.conversations.update(conversation.id, { isDeleted: true, isArchived: false });
+
+        // Deselect if this was the active conversation
+        if (activeConversationId === conversation.id) {
+            setActiveConversationId(null);
+            setMessages([]);
+        }
+
+        await refreshConversations();
+    };
+
+    const restoreFromTrash = async (e: React.MouseEvent, conversation: Conversation) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await db.conversations.update(conversation.id, { isDeleted: false });
+        await refreshConversations();
     };
 
     const toggleArchive = async (e: React.MouseEvent, conversation: Conversation) => {
+        e.preventDefault();
         e.stopPropagation();
-        await db.conversations.update(conversation.id, { isArchived: !conversation.isArchived });
+        await db.conversations.update(conversation.id, { isArchived: !conversation.isArchived, isDeleted: false });
+
+        // Deselect if archiving the active conversation
+        if (activeConversationId === conversation.id && !conversation.isArchived) {
+            setActiveConversationId(null);
+            setMessages([]);
+        }
+
+        await refreshConversations();
     };
 
     const clearAttachment = () => {
         setAttachment(null);
-        setAttachmentPreview(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
+    // --- Tagging Handlers ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const selectPatientTag = (patient: any) => {
+        const words = input.split(' ');
+        words.pop(); // Remove the partial @tag
+        const newText = words.join(' ') + ` @${patient.lastName} `; // Add full name and space
+        setInput(newText);
+        setSelectedPatientId(patient.id);
+        setSelectedPatientName(`${patient.lastName} ${patient.firstName}`);
+        setShowTagMenu(false);
+        // Focus back on input (optional, referencing input ref would be better)
+    };
+
     const sendMessage = async () => {
-        if ((!input.trim() && !attachment) || !engine) return;
+        if ((!input.trim() && !attachment)) return;
 
         let conversationId = activeConversationId;
         if (!conversationId) {
@@ -140,17 +220,15 @@ export default function AssistantPage() {
             setActiveConversationId(conversationId);
         }
 
-        // Prepare User Message
         const userMsgId = uuidv4();
         let attachmentData: string | undefined = undefined;
         let attachmentType: 'image' | 'file' | undefined = undefined;
 
         if (attachment) {
             if (isImageFile(attachment)) {
-                attachmentData = await fileToBase64(attachment); // Full base64 for display/storage
+                attachmentData = await fileToBase64(attachment);
                 attachmentType = 'image';
             } else {
-                // For text files, we extract content now
                 attachmentData = await extractTextFromFile(attachment);
                 attachmentType = 'file';
             }
@@ -166,88 +244,100 @@ export default function AssistantPage() {
             createdAt: new Date()
         };
 
-        // Optimistic Update
-        setMessages(prev => [...prev, newUserMsg]);
+        const updatedMessages = [...messages, newUserMsg];
+        setMessages(updatedMessages);
         setInput("");
         clearAttachment();
         setIsLoading(true);
 
-        // Save User Message
+        // Context Handling
+        const currentPatientId = selectedPatientId;
+        // Clean up UI selections
+        setSelectedPatientId(null);
+        setSelectedPatientName(null);
+
         await db.messages.add(newUserMsg);
-        await db.conversations.update(conversationId, { updatedAt: new Date(), title: messages.length === 0 ? input.slice(0, 30) + "..." : undefined }); // First msg sets title
+        await db.conversations.update(conversationId, { updatedAt: new Date() });
 
         try {
-            // Build Context & Prompt
-            const context = await buildContext(input);
+            // Import Service & Prompts dynamically
+            const { AIService } = await import('@/lib/ai-service');
+            const { AIPrompts } = await import('@/lib/ai-prompts');
+            const { buildPatientContext, findAndBuildSmartContext } = await import('@/lib/ai-context');
 
-            // Construct payload for OpenAI SDK
-            // Note: If image, we need special "content" array format
-            const messagesPayload = messages.concat(newUserMsg).map(m => {
-                if (m.attachmentType === 'image' && m.attachmentBase64) {
-                    return {
-                        role: m.role,
-                        content: [
-                            { type: "text", text: m.content },
-                            { type: "image_url", image_url: { url: m.attachmentBase64 } }
-                        ]
-                    };
-                }
-                if (m.attachmentType === 'file' && m.attachmentBase64) {
-                    return {
-                        role: m.role,
-                        content: `${m.content}\n\n--- ALLEGATO (${m.attachmentType}) ---\n${m.attachmentBase64}`
-                    };
-                }
-                return { role: m.role, content: m.content };
-            });
+            const service = await AIService.create();
 
-            // Inject Context into the LAST user message for the model
-            if (context && messagesPayload.length > 0) {
-                const lastMsgIdx = messagesPayload.length - 1;
-                const lastMsg = messagesPayload[lastMsgIdx];
-                if (lastMsg.role === 'user') {
-                    if (Array.isArray(lastMsg.content)) {
-                        // Multimodal (Image + Text)
-                        const textPart = lastMsg.content.find((c: any) => c.type === 'text');
-                        if (textPart) {
-                            textPart.text = `${textPart.text}\n\n${context}`;
-                        }
-                    } else {
-                        // Text only
-                        lastMsg.content = `${lastMsg.content}\n\n${context}`;
-                    }
+            // 1. Build Context
+            let contextString = "";
+            let contextSource = "NONE";
+
+            if (currentPatientId) {
+                // Explicit Tag
+                contextString = await buildPatientContext(currentPatientId);
+                contextSource = "TAG";
+            } else {
+                // Implicit Search
+                const smartResult = await findAndBuildSmartContext(newUserMsg.content);
+                if (smartResult.found) {
+                    contextString = smartResult.summary;
+                    contextSource = "SMART: " + smartResult.patientName;
                 }
             }
 
-            // Add system prompt if start
-            const systemMsg = {
-                role: "system",
-                content: `Sei MedAssistant AI.
-CONNESSIONE DATABASE: ATTIVA.
-CONTESTO PAZIENTE: Se presente nel messaggio seguente, DEVI usarlo. Non dire mai "non ho accesso ai dati" se i dati sono nel testo del prompt.
-FORMATO: Rispondi in italiano preciso. Usa Markdown.
-`
-            };
+            // 2. Prepare Payload
+            // Convert DB messages to Ollama format
+            const historyPayload = updatedMessages.map(m => {
+                let content = m.content;
+                // Inject file content into text for the model to "see" it
+                if (m.attachmentType === 'file' && m.attachmentBase64) {
+                    content += `\n\n[ALLEGATO FILE]:\n${m.attachmentBase64}`;
+                }
 
-            const startTime = performance.now();
-            const response = await engine.chat.completions.create({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                messages: [systemMsg, ...messagesPayload] as any,
-                model: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
+                // If this is the VERY LAST message (the current one), inject context
+                if (m.id === userMsgId && contextString) {
+                    content += `\n\n${contextString}`;
+                }
+
+                const msgObj: { role: string; content: string; images?: string[] } = {
+                    role: m.role,
+                    content: content
+                };
+
+                // Add images if present
+                if (m.attachmentType === 'image' && m.attachmentBase64) {
+                    // Ollama expects base64 without header usually, need to check if SDK or API handles it.
+                    // Native API expects "images": ["base64..."]
+                    // fileToBase64 usually returns "data:image/png;base64,....."
+                    // We need to strip the prefix for Ollama API
+                    const pureBase64 = m.attachmentBase64.split(',')[1];
+                    msgObj.images = [pureBase64];
+                }
+
+                return msgObj;
             });
-            const endTime = performance.now();
-            const latency = Math.round(endTime - startTime);
 
-            let replyContent = response.choices[0].message.content || "Nessuna risposta.";
-            const usage = response.usage;
+            // Prepend System Prompt
+            const finalPayload = [
+                { role: "system", content: AIPrompts.SYSTEM_CHAT },
+                ...historyPayload
+            ];
 
-            // Parse out Chain of Thought (<unused94>...<unused95>)
+            // 3. Call Ollama
+            const result = await service.chat(finalPayload);
+
+            // 4. Handle Response
+            let replyContent = result.content;
             let reasoning = "";
+
+            // Strip Reasoning if present (DeepSeek/R1 style)
             const thoughtMatch = replyContent.match(/<unused94>([\s\S]*?)<unused95>/);
             if (thoughtMatch) {
                 reasoning = thoughtMatch[1].trim();
                 replyContent = replyContent.replace(/<unused94>[\s\S]*?<unused95>/, '').trim();
             }
+            // Strip standard <think> tags too just in case
+            replyContent = replyContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
 
             const assistMsgId = uuidv4();
             const newAssistMsg: DbMessage = {
@@ -255,15 +345,14 @@ FORMATO: Rispondi in italiano preciso. Usa Markdown.
                 conversationId,
                 role: 'assistant',
                 content: replyContent,
-                metadata: {
-                    latencyMs: latency,
-                    tokensIn: usage?.prompt_tokens,
-                    tokensOut: usage?.completion_tokens,
-                    model: response.model,
+                metadata: JSON.stringify({
+                    latencyMs: result.stats.latency,
+                    tokensIn: result.stats.tokensIn,
+                    tokensOut: result.stats.tokensOut,
+                    model: "ollama-native",
                     reasoning: reasoning,
-                    // Store context usage for debugging
-                    contextUsed: context ? "YES" : "NO"
-                },
+                    contextUsed: contextSource
+                }),
                 createdAt: new Date()
             };
 
@@ -272,161 +361,109 @@ FORMATO: Rispondi in italiano preciso. Usa Markdown.
 
         } catch (err) {
             console.error(err);
+            const errorMsg = "Errore di connessione: Provider AI non risponde. Verifica le Impostazioni.";
             setMessages(prev => [...prev, {
-                id: uuidv4(), conversationId: conversationId!, role: 'assistant', content: "Errore generazione risposta.", createdAt: new Date()
+                id: uuidv4(), conversationId: conversationId!, role: 'assistant', content: `⚠️ ${errorMsg}`, createdAt: new Date()
             }]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Helper to find patient mentions and inject context
-    const buildContext = async (text: string) => {
-        // Fetch fresh patients list directly to avoid stale closures
-        const allPatients = await db.patients.toArray();
+    const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
+    const formatDate = (d: Date) => new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' }).format(d);
 
-        const lowercaseInput = text.toLowerCase();
-        // Simple name matching strategy
-        const matchedPatient = allPatients.find(p =>
-            lowercaseInput.includes(p.firstName.toLowerCase()) ||
-            lowercaseInput.includes(p.lastName.toLowerCase())
-        );
-
-        if (!matchedPatient) {
-            console.log("No patient matched in input:", text);
-            return "";
-        }
-
-        console.log("Matched Patient:", matchedPatient.lastName);
-
-        // 1. Fetch Latest Clinical Entries (Diary)
-        const entries = await db.entries
-            .where('patientId')
-            .equals(matchedPatient.id)
-            .reverse()
-            .limit(5)
-            .toArray();
-
-        const diaryContext = entries
-            .map(e => `[${e.date.toLocaleDateString()}] ${e.type.toUpperCase()}: ${e.content}`)
-            .join("\n");
-
-        // 2. Fetch Active Therapies
-        const therapies = await db.therapies
-            .where('patientId')
-            .equals(matchedPatient.id)
-            .filter(t => t.status === 'active')
-            .toArray();
-
-        const therapyContext = therapies
-            .map(t => `- ${t.drugName} ${t.dosage}`)
-            .join("\n");
-
-        // 3. Fetch Recent Attachments (Summaries)
-        const attachments = await db.attachments
-            .where('patientId')
-            .equals(matchedPatient.id)
-            .reverse()
-            .limit(5)
-            .toArray();
-
-        const docsContext = attachments
-            .filter(a => a.summarySnapshot)
-            .map(a => `[DOC ${a.name}]: ${a.summarySnapshot}`)
-            .join("\n");
-
-        return `
---- CONTESTO PAZIENTE TROVATO ---
-Nome: ${matchedPatient.firstName} ${matchedPatient.lastName}
-Età: ${matchedPatient.birthDate ? new Date().getFullYear() - matchedPatient.birthDate.getFullYear() : 'N/A'}
-
-[TERAPIA ATTIVA]
-${therapyContext || "Nessuna terapia registrata."}
-
-[ULTIME NOTE CLINICHE]
-${diaryContext || "Nessuna nota recente."}
-
-[DOCUMENTI RECENTI]
-${docsContext || "Nessun documento analizzato."}
---- FINE CONTESTO ---
-Usa queste informazioni se pertinenti alla richiesta.
-`;
-    };
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    const formatDate = (d: Date) => {
-        return new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' }).format(d);
-    };
+    // Filter patients for tag menu
+    const filteredPatients = patients?.filter(p =>
+        p.lastName.toLowerCase().includes(tagQuery.toLowerCase()) ||
+        p.firstName.toLowerCase().includes(tagQuery.toLowerCase())
+    ).slice(0, 5);
 
     return (
         <div className="flex h-[calc(100vh-2rem)] gap-4">
             {/* Sidebar History */}
             <div className="w-64 glass-panel flex flex-col p-2 hidden md:flex shrink-0">
-                <button
-                    onClick={startNewChat}
-                    className="flex items-center gap-2 w-full p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-bold shadow-md mb-4"
-                >
-                    <Plus className="w-5 h-5" />
-                    Nuova Chat
+                <button onClick={startNewChat} className="flex items-center gap-2 w-full p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-bold shadow-md mb-4 py-3">
+                    <Plus className="w-5 h-5" /> Nuova Chat
                 </button>
 
+                {/* Filters */}
+                <div className="flex p-1 bg-gray-100 rounded-lg mb-4 text-xs font-medium">
+                    <button
+                        onClick={() => setViewMode('active')}
+                        className={cn("flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1", viewMode === 'active' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                        title="Chat Attive"
+                    >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('archived')}
+                        className={cn("flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1", viewMode === 'archived' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                        title="Archivio"
+                    >
+                        <Archive className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('trash')}
+                        className={cn("flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1", viewMode === 'trash' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                        title="Cestino"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
+                {/* History List */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                    <div className="flex items-center justify-between px-2 mb-2">
-                        <span className="text-xs font-bold text-gray-400 uppercase">
-                            {showArchived ? "Archivio" : "Recenti"}
-                        </span>
-                        <button
-                            onClick={() => setShowArchived(!showArchived)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
-                        >
-                            {showArchived ? <MessageSquare className="w-3 h-3" /> : <Archive className="w-3 h-3" />}
-                            {showArchived ? "Chat Attive" : "Archivio"}
-                        </button>
+                    <div className="px-2 mb-2 text-xs font-bold text-gray-400 uppercase">
+                        {viewMode === 'active' && "Recenti"}
+                        {viewMode === 'archived' && "Archivio"}
+                        {viewMode === 'trash' && "Cestino"}
                     </div>
 
-                    {conversations?.filter(c => showArchived ? c.isArchived : !c.isArchived).map(c => (
-                        <div
-                            key={c.id}
-                            className={cn(
-                                "group w-full text-left p-3 rounded-xl text-sm transition-all border flex items-start justify-between relative",
-                                activeConversationId === c.id
-                                    ? "bg-indigo-50 border-indigo-200 text-indigo-700 font-medium shadow-sm"
-                                    : "hover:bg-gray-50 border-transparent text-gray-600"
-                            )}
-                            onClick={() => setActiveConversationId(c.id)}
-                        // role="button" removed to avoid nesting interactive controls warning
-                        >
+                    {conversations?.filter(c => {
+                        if (viewMode === 'trash') return c.isDeleted;
+                        if (viewMode === 'archived') return c.isArchived && !c.isDeleted;
+                        return !c.isArchived && !c.isDeleted;
+                    }).map(c => (
+                        <div key={c.id} onClick={() => setActiveConversationId(c.id)} className={cn("group w-full text-left p-3 rounded-xl text-sm transition-all border flex items-start justify-between relative cursor-pointer", activeConversationId === c.id ? "bg-indigo-50 border-indigo-200 text-indigo-700 font-medium shadow-sm" : "hover:bg-gray-50 border-transparent text-gray-600")}>
                             <div className="flex-1 min-w-0 pr-6">
                                 <div className="truncate font-medium">{c.title}</div>
                                 <div className="text-[10px] text-gray-400 mt-1">{c.updatedAt.toLocaleDateString()}</div>
                             </div>
 
                             <div className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/80 backdrop-blur-sm rounded-lg p-0.5 shadow-sm">
-                                <button
-                                    onClick={(e) => toggleArchive(e, c)}
-                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
-                                    title={c.isArchived ? "Ripristina" : "Archivia"}
-                                >
-                                    {c.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                                </button>
-                                <button
-                                    onClick={(e) => deleteConversation(e, c.id)}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md"
-                                    title="Elimina definitivamente"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {viewMode === 'trash' ? (
+                                    <>
+                                        <button onClick={(e) => restoreFromTrash(e, c)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md" aria-label="Ripristina" title="Ripristina">
+                                            <ArchiveRestore className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button onClick={(e) => deleteConversation(e, c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md" aria-label="Elimina Definitivamente" title="Elimina Definitivamente">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button onClick={(e) => toggleArchive(e, c)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md" aria-label={c.isArchived ? "Ripristina" : "Archivia"} title={c.isArchived ? "Ripristina" : "Archivia"}>
+                                            {c.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                                        </button>
+                                        <button onClick={(e) => moveToTrash(e, c)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md" aria-label="Sposta nel cestino" title="Sposta nel cestino">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))}
-                    {conversations?.filter(c => showArchived ? c.isArchived : !c.isArchived).length === 0 && (
-                        <div className="text-center text-gray-400 text-sm py-10 opacity-60">
-                            {showArchived ? "Nessuna chat archiviata" : "Nessuna conversazione recente"}
-                        </div>
-                    )}
+
+                    {conversations?.filter(c => {
+                        if (viewMode === 'trash') return c.isDeleted;
+                        if (viewMode === 'archived') return c.isArchived && !c.isDeleted;
+                        return !c.isArchived && !c.isDeleted;
+                    }).length === 0 && (
+                            <div className="text-center text-gray-400 text-sm py-10 opacity-60">
+                                {viewMode === 'trash' ? "Cestino vuoto" : viewMode === 'archived' ? "Nessuna chat archiviata" : "Nessuna conversazione recente"}
+                            </div>
+                        )}
                 </div>
             </div>
 
@@ -435,14 +472,12 @@ Usa queste informazioni se pertinenti alla richiesta.
                 {/* Header */}
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-sm z-30">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-lg shadow-md">
-                            <Bot className="w-5 h-5" />
-                        </div>
+                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-lg shadow-md"><Bot className="w-5 h-5" /></div>
                         <div>
                             <h2 className="font-bold text-gray-800">MedAssistant Pro</h2>
                             <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
-                                {engine ? <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> : <span className="w-2 h-2 bg-amber-500 rounded-full" />}
-                                {engine ? "Online (MedGemma 1.5)" : "Connessione..."}
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                Online
                             </p>
                         </div>
                     </div>
@@ -462,46 +497,53 @@ Usa queste informazioni se pertinenti alla richiesta.
                             <Cpu className="w-4 h-4" />
                             Performance Monitor
                         </div>
-                        {messages.filter(m => m.role === 'assistant').slice(-1).map(lastMsg => (
-                            <div key={lastMsg.id} className="space-y-2">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Latenza:</span>
-                                    <span className="font-mono font-medium text-gray-800">{lastMsg.metadata?.latencyMs || '-'} ms</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Tokens Input:</span>
-                                    <span className="font-mono font-medium text-gray-800">{lastMsg.metadata?.tokensIn || '-'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Tokens Output:</span>
-                                    <span className="font-mono font-medium text-gray-800">{lastMsg.metadata?.tokensOut || '-'}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-green-600 bg-green-50 p-1.5 rounded">
-                                    <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> TPS Est.:</span>
-                                    <span className="font-mono font-bold">
-                                        {lastMsg.metadata?.tokensOut && lastMsg.metadata?.latencyMs
-                                            ? Math.round((lastMsg.metadata.tokensOut / (lastMsg.metadata.latencyMs / 1000)) * 10) / 10
-                                            : '-'}
-                                    </span>
-                                </div>
+                        {messages.filter(m => m.role === 'assistant').slice(-1).map(lastMsg => {
+                            let meta: any = {};
+                            try {
+                                if (lastMsg.metadata) meta = JSON.parse(lastMsg.metadata);
+                            } catch (e) { console.error("Bad metadata JSON", e); }
 
-                                {lastMsg.metadata?.reasoning && (
-                                    <div className="mt-2 pt-2 border-t border-indigo-50">
-                                        <p className="text-[10px] text-indigo-400 mb-1 flex items-center gap-1"><Cpu className="w-3 h-3" /> Chain of Thought:</p>
-                                        <div className="max-h-32 overflow-y-auto bg-gray-50 p-1.5 rounded text-[10px] font-mono leading-tight text-gray-600">
-                                            {lastMsg.metadata.reasoning}
-                                        </div>
+                            return (
+                                <div key={lastMsg.id} className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Latenza:</span>
+                                        <span className="font-mono font-medium text-gray-800">{meta?.latencyMs || '-'} ms</span>
                                     </div>
-                                )}
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Tokens Input:</span>
+                                        <span className="font-mono font-medium text-gray-800">{meta?.tokensIn || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Tokens Output:</span>
+                                        <span className="font-mono font-medium text-gray-800">{meta?.tokensOut || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-green-600 bg-green-50 p-1.5 rounded">
+                                        <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> TPS Est.:</span>
+                                        <span className="font-mono font-bold">
+                                            {meta?.tokensOut && meta?.latencyMs
+                                                ? Math.round((meta.tokensOut / (meta.latencyMs / 1000)) * 10) / 10
+                                                : '-'}
+                                        </span>
+                                    </div>
 
-                                <div className="flex justify-between border-t border-gray-100 pt-1 mt-1">
-                                    <span className="text-gray-400">Context:</span>
-                                    <span className={cn("font-bold", lastMsg.metadata?.contextUsed === "YES" ? "text-green-600" : "text-gray-400")}>
-                                        {lastMsg.metadata?.contextUsed || "NO"}
-                                    </span>
+                                    {meta?.reasoning && (
+                                        <div className="mt-2 pt-2 border-t border-indigo-50">
+                                            <p className="text-[10px] text-indigo-400 mb-1 flex items-center gap-1"><Cpu className="w-3 h-3" /> Chain of Thought:</p>
+                                            <div className="max-h-32 overflow-y-auto bg-gray-50 p-1.5 rounded text-[10px] font-mono leading-tight text-gray-600">
+                                                {meta.reasoning}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between border-t border-gray-100 pt-1 mt-1">
+                                        <span className="text-gray-400">Context:</span>
+                                        <span className={cn("font-bold", meta?.contextUsed === "YES" ? "text-green-600" : "text-gray-400")}>
+                                            {meta?.contextUsed || "NO"}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {messages.filter(m => m.role === 'assistant').length === 0 && (
                             <div className="text-gray-400 italic text-center py-2">Invia un messaggio per vedere le statistiche.</div>
                         )}
@@ -517,55 +559,68 @@ Usa queste informazioni se pertinenti alla richiesta.
                         </div>
                     )}
 
-                    {messages.map((msg) => (
-                        <div key={msg.id} className={cn("flex gap-4 max-w-3xl", msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto")}>
-                            {/* Avatar */}
-                            <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 border-white",
-                                msg.role === 'user' ? "bg-gray-200 text-gray-600" : "bg-indigo-600 text-white"
-                            )}>
-                                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                            </div>
+                    {messages.map((msg) => {
+                        let meta: any = {};
+                        try {
+                            if (msg.metadata) meta = JSON.parse(msg.metadata);
+                        } catch (e) {
+                            // console.error("Error parsing message metadata", e);
+                        }
 
-                            {/* Bubble */}
-                            <div className={cn(
-                                "flex flex-col gap-1 min-w-0",
-                                msg.role === 'user' ? "items-end" : "items-start"
-                            )}>
+                        return (
+                            <div key={msg.id} className={cn("flex gap-4 max-w-3xl", msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto")}>
+                                {/* Avatar */}
                                 <div className={cn(
-                                    "p-4 rounded-2xl shadow-sm leading-relaxed max-w-full overflow-hidden text-sm",
-                                    msg.role === 'user'
-                                        ? "bg-indigo-600 text-white rounded-br-none"
-                                        : "bg-white text-gray-800 border border-gray-100 rounded-bl-none"
+                                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm border-2 border-white",
+                                    msg.role === 'user' ? "bg-gray-200 text-gray-600" : "bg-indigo-600 text-white"
                                 )}>
-                                    {/* Attachment Display */}
-                                    {msg.attachmentType === 'image' && msg.attachmentBase64 && (
-                                        <div className="mb-3 rounded-lg overflow-hidden border border-white/20">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={msg.attachmentBase64} alt="Allegato" className="max-w-xs max-h-60 object-cover" />
-                                        </div>
-                                    )}
-                                    {msg.attachmentType === 'file' && (
-                                        <div className="mb-3 flex items-center gap-2 bg-black/10 p-2 rounded text-xs font-mono">
-                                            <FileText className="w-4 h-4" /> Contenuto File Estratto
-                                        </div>
-                                    )}
-
-                                    <div className={cn("prose prose-sm max-w-none", msg.role === 'user' ? "prose-invert" : "text-gray-700")}>
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                    </div>
+                                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                                 </div>
-                                <span className="text-[10px] text-gray-400 px-1">{formatDate(msg.createdAt)}</span>
-                            </div>
-                        </div>
-                    ))}
 
-                    {/* Typing Indicator */}
+                                {/* Bubble */}
+                                <div className={cn(
+                                    "flex flex-col gap-1 min-w-0",
+                                    msg.role === 'user' ? "items-end" : "items-start"
+                                )}>
+                                    <div className={cn(
+                                        "p-4 rounded-2xl shadow-sm leading-relaxed max-w-full overflow-hidden text-sm",
+                                        msg.role === 'user'
+                                            ? "bg-indigo-600 text-white rounded-br-none"
+                                            : "bg-white text-gray-800 border border-gray-100 rounded-bl-none"
+                                    )}>
+                                        {/* Attachment Display */}
+                                        {msg.attachmentType === 'image' && msg.attachmentBase64 && (
+                                            <div className="mb-3 rounded-lg overflow-hidden border border-white/20">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={msg.attachmentBase64} alt="Allegato" className="max-w-xs max-h-60 object-cover" />
+                                            </div>
+                                        )}
+                                        {msg.attachmentType === 'file' && (
+                                            <div className="mb-3 flex items-center gap-2 bg-black/10 p-2 rounded text-xs font-mono">
+                                                <FileText className="w-4 h-4" /> Contenuto File Estratto
+                                            </div>
+                                        )}
+
+                                        <div className={cn("prose prose-sm max-w-none", msg.role === 'user' ? "prose-invert" : "text-gray-700")}>
+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        </div>
+
+                                        {/* Debug Metadata for Assistant */}
+                                        {msg.role === 'assistant' && meta?.contextUsed && meta.contextUsed !== 'NONE' && (
+                                            <div className="mt-2 pt-2 border-t border-gray-100 text-[10px] text-green-600 flex items-center gap-1 font-mono">
+                                                <Sparkles className="w-3 h-3" />
+                                                Context: {meta.contextUsed}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 px-1">{formatDate(msg.createdAt)}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
                     {isLoading && (
                         <div className="flex gap-4 max-w-3xl mr-auto animate-pulse">
-                            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                                <Bot className="w-4 h-4" />
-                            </div>
+                            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0"><Bot className="w-4 h-4" /></div>
                             <div className="p-4 rounded-2xl bg-white shadow-sm border border-gray-100 flex items-center gap-1">
                                 <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
                                 <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-75"></div>
@@ -578,71 +633,58 @@ Usa queste informazioni se pertinenti alla richiesta.
 
                 {/* Input Area */}
                 <div className="p-4 bg-white border-t border-gray-100 relative z-20">
-                    {/* Attachment Preview */}
-                    {attachment && (
-                        <div className="absolute bottom-full left-4 mb-2 bg-white p-2 rounded-xl shadow-lg border border-indigo-100 flex items-center gap-3 animate-in slide-in-from-bottom-2 fade-in">
-                            {attachmentPreview ? (
-                                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden relative">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={attachmentPreview} className="w-full h-full object-cover" alt="Preview" />
-                                </div>
-                            ) : (
-                                <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                            )}
-                            <div className="mr-2">
-                                <p className="text-xs font-bold text-gray-700 truncate max-w-[150px]">{attachment.name}</p>
-                                <p className="text-[10px] text-gray-400">{Math.round(attachment.size / 1024)} KB</p>
+                    {/* Tagging Menu */}
+                    {showTagMenu && filteredPatients && filteredPatients.length > 0 && (
+                        <div className="absolute bottom-full left-16 mb-2 bg-white rounded-xl shadow-xl border border-indigo-100 w-64 overflow-hidden z-50 animate-in slide-in-from-bottom-2 fade-in">
+                            <div className="px-3 py-2 bg-indigo-50 text-indigo-700 text-xs font-bold border-b border-indigo-100">
+                                Seleziona Paziente (@)
                             </div>
-                            <button
-                                onClick={clearAttachment}
-                                className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-red-500 transition-colors"
-                                title="Rimuovi allegato"
-                                aria-label="Rimuovi allegato"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            {filteredPatients.map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => selectPatientTag(p)}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-gray-700 flex justify-between items-center"
+                                >
+                                    <span>{p.lastName} {p.firstName}</span>
+                                    <span className="text-[10px] text-gray-400">{p.taxCode}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {selectedPatientName && (
+                        <div className="absolute bottom-full left-16 mb-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border border-green-100 shadow-sm animate-in zoom-in fade-in">
+                            <User className="w-3 h-3" />
+                            Contesto: {selectedPatientName}
+                            <button onClick={() => { setSelectedPatientId(null); setSelectedPatientName(null); }} className="hover:text-green-900" aria-label="Rimuovi contesto" title="Rimuovi contesto"><X className="w-3 h-3" /></button>
                         </div>
                     )}
 
                     <div className="flex gap-2 items-end">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="image/*,.pdf,.txt,.md,.csv"
-                            onChange={handleFileUpload}
-                            aria-label="Carica file" // Accessibility fix
-                        />
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="p-3 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                            title="Allega file o immagine"
-                        >
-                            <Paperclip className="w-5 h-5" />
-                        </button>
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf,.txt" onChange={handleFileUpload} aria-label="Carica file" title="Carica file" />
+                        <button onClick={() => fileInputRef.current?.click()} className="p-3 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" aria-label="Allega file" title="Allega file"><Paperclip className="w-5 h-5" /></button>
 
-                        <div className="flex-1 bg-gray-50 border border-gray-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-2xl flex items-center transition-all">
+                        <div className="flex-1 bg-gray-50 border border-gray-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-2xl flex items-center transition-all relative">
                             <input
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                                placeholder="Scrivi un messaggio..."
-                                disabled={!engine || isLoading}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        if (showTagMenu && filteredPatients && filteredPatients.length > 0) {
+                                            e.preventDefault();
+                                            selectPatientTag(filteredPatients[0]);
+                                        } else {
+                                            sendMessage();
+                                        }
+                                    }
+                                }}
+                                placeholder="Scrivi un messaggio... (Usa @ per taggare un paziente)"
+                                disabled={isLoading}
                                 className="flex-1 bg-transparent border-0 focus:ring-0 px-4 py-3 min-h-[50px] max-h-[150px] text-sm font-medium placeholder:text-gray-400"
                             />
                         </div>
 
-                        <button
-                            onClick={sendMessage}
-                            disabled={!engine || isLoading || (!input.trim() && !attachment)}
-                            className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:grayscale transition-all shadow-md shadow-indigo-600/20 active:scale-95"
-                            title="Invia messaggio"
-                            aria-label="Invia messaggio"
-                        >
-                            <Send className="w-5 h-5" />
-                        </button>
+                        <button onClick={sendMessage} disabled={isLoading || (!input.trim() && !attachment)} className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md" aria-label="Invia messaggio" title="Invia messaggio"><Send className="w-5 h-5" /></button>
                     </div>
                     <p className="text-[10px] text-center mt-2 text-gray-400 flex items-center justify-center gap-1">
                         <AlertTriangle className="w-3 h-3 text-amber-500" />

@@ -10,9 +10,9 @@ import { useClinicalAlerts } from '@/lib/hooks/use-clinical-alerts';
 export default function DashboardInsights() {
     // 1. Fetch Global Stats
     const stats = useLiveQuery(async () => {
-        const patientCount = await db.patients.filter(p => !p.deletedAt && !p.isArchived).count();
+        const patientCount = await db.patients.filter(p => !p.isArchived).count();
         const entryCount = await db.entries.count();
-        const aiInsightCount = await db.patients.filter(p => !p.deletedAt && !p.isArchived && !!p.aiSummary).count();
+        const aiInsightCount = await db.patients.filter(p => !p.isArchived && !!p.aiSummary).count();
         const therapyCount = await db.therapies.count();
 
         return { patientCount, entryCount, aiInsightCount, therapyCount };

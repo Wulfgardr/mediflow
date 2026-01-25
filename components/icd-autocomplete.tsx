@@ -5,8 +5,8 @@ import { searchICDHybrid, ICDSearchResult } from '@/lib/icd-service'; // UPDATED
 import { Search, X, Server, AlertTriangle } from 'lucide-react';
 
 interface ICDAutocompleteProps {
-    value?: { code: string; description: string; system: 'ICD-9' | 'ICD-10' | 'ICD-11' };
-    onChange?: (value: { code: string; description: string; system: 'ICD-9' | 'ICD-10' | 'ICD-11' }) => void;
+    value?: { code: string; description: string; system: string };
+    onChange?: (value: { code: string; description: string; system: string }) => void;
     // Alternative simple mode
     initialValue?: { code: string; title: string } | null;
     onSelect?: (code: string, title: string) => void;
@@ -135,11 +135,8 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
                             <div className="flex items-center gap-2">
                                 {/* System Badge */}
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${item.system === 'ICD-11' ? 'bg-blue-100 text-blue-700' :
-                                    item.system === 'ICD-9' ? 'bg-orange-100 text-orange-700' :
-                                        'bg-purple-100 text-purple-700'
-                                    }`}>
-                                    {item.system === 'ICD-11' ? <Server className="w-3 h-3" /> : (item.isLegacy ? <AlertTriangle className="w-3 h-3" /> : null)}
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-blue-100 text-blue-700">
+                                    <Server className="w-3 h-3" />
                                     {item.system} {item.code}
                                 </span>
                             </div>

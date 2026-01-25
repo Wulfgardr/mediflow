@@ -1,4 +1,4 @@
-import { ClinicalEntry, db, Attachment } from '@/lib/db';
+import { db, Attachment } from '@/lib/db';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import DocumentViewer from './document-viewer';
@@ -87,7 +87,7 @@ export default function Timeline({ entries }: TimelineProps) {
             </div>
 
             {/* Document Viewer Modal */}
-            {viewingFile && (
+            {viewingFile && viewingFile.data && (
                 <DocumentViewer
                     file={viewingFile.data}
                     fileName={viewingFile.name}

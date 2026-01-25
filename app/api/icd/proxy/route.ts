@@ -1,23 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ICD_LOCAL_URL = 'http://localhost:8888';
+const ICD_LOCAL_URL = process.env.ICD_BASE_URL || 'http://127.0.0.1:8888';
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
 
     if (!query) {
-        // Just a status check if no query
+        // Status check
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1000);
-            await fetch(ICD_LOCAL_URL, {
+            // Increase timeout to 5s to handle container cold starts or network latency
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            // Check a known valid endpoint instead of root, with required headers
+            const checkUrl = `${ICD_LOCAL_URL}/icd/release/11/2024-01/mms`;
+
+            const res = await fetch(checkUrl, {
                 method: 'HEAD',
+                headers: {
+                    'API-Version': 'v2',
+                    'Accept': 'application/json'
+                },
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
-            return NextResponse.json({ status: 'online' }, { status: 200 });
-        } catch {
+
+            // Accept 200 (OK) or 405 (Method Not Allowed - implies server is up)
+            // 404 might mean wrong URL but server up.
+            if (res.ok || res.status === 405 || res.status === 404) {
+                return NextResponse.json({ status: 'online' }, { status: 200 });
+            }
+            // If we get here, something else is wrong (e.g. 500)
+            return NextResponse.json({ status: 'offline' }, { status: 503 });
+
+        } catch (error) {
+            console.error("ICD Status Check Failed:", error);
             return NextResponse.json({ status: 'offline' }, { status: 503 });
         }
     }

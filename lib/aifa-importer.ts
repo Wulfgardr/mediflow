@@ -87,5 +87,8 @@ export async function clearDrugDatabase() {
 }
 
 export async function getDrugStats() {
+    // Optimize: Don't download all DB just to count
+    // Use the optimized API route if available, or just fallback
+    // For now we rely on the implementation in db.ts
     return await db.drugs.count();
 }

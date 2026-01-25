@@ -1,23 +1,9 @@
-version: '3.8'
+# Docker Compose - MediFlow (Minimal)
+# Solo servizi essenziali. L'app Next.js e Ollama girano nativamente sul Mac.
 
 services:
-  # Next.js Application
-  app:
-    build: .
-    container_name: mediflow-app
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_OLLAMA_URL=http://localhost:11434/v1
-      # Note: Browser runs Client Components, so 'localhost' refers to user machine.
-      # If we used Server Components for AI, we would need 'http://ollama:11434/v1'
-    depends_on:
-      - icd-api
-      - ollama
-
-  # ICD-11 API (Local Dockerized)
+  # ICD-11 API (WHO Classification)
+  # Necessario per la funzionalità di ricerca diagnosi ICD-11
   icd-api:
     image: whoicd/icd-api
     container_name: mediflow-icd
@@ -28,25 +14,9 @@ services:
       - acceptLicense=true
       - saveAnalytics=false
       - include=2024-01_en
-      # Note: Italian not yet available, using English as fallback
-
-      # Ollama (Local AI)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: mediflow-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
+      # Nota: Italiano non ancora disponibile, usa Inglese come fallback
     volumes:
-      - ollama-data:/root/.ollama
-    # GPU support on Linux would need:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+      - icd-data:/app/data
 
 volumes:
-  ollama-data:
+  icd-data:

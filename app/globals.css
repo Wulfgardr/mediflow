@@ -134,3 +134,9 @@ body {
     @apply backdrop-blur-2xl bg-white/80 dark:bg-[#0d1117] border border-white/30 dark:border-[#30363d] shadow-lg rounded-3xl;
   }
 }
+
+/* Progress bar widths (used by analytics/settings pages) */
+/* These allow dynamic widths via CSS custom properties */
+.progress-bar-width {
+  width: var(--prog-width, 0%);
+}

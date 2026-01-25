@@ -31,6 +31,7 @@ export default function ScaleRunnerPage() {
                 patientId,
                 date: new Date(),
                 type: 'scale',
+                title: scaleDef.title,
                 setting, // Saved setting
                 content: `Valutazione ${scaleDef.title} completata.\nPunteggio: ${result.score}\nInterpretazione: ${result.interpretation}`,
                 metadata: {
@@ -41,6 +42,7 @@ export default function ScaleRunnerPage() {
                     answers: result.answers
                 },
                 createdAt: new Date(),
+                updatedAt: new Date(),
                 attachments: []
             });
 

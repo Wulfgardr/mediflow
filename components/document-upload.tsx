@@ -19,7 +19,12 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
 
     const attachments = useLiveQuery(
-        () => db.attachments.where('patientId').equals(patientId).reverse().sortBy('createdAt'),
+        async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const items = await db.attachments.filter((a: any) => a.patientId === patientId).toArray();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return items.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        },
         [patientId]
     );
 
@@ -46,14 +51,22 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     }
                 }
 
+                const base64Data = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
                 await db.attachments.add({
                     id: uuidv4(),
                     patientId: patientId,
                     name: file.name,
                     type: file.type,
-                    data: file,
+                    size: file.size,
+                    path: `uploads/${file.name}`,
+                    data: base64Data,
                     summarySnapshot: summary,
-                    source: 'manual',
                     createdAt: new Date()
                 });
 
@@ -141,7 +154,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             </div>
 
             {/* Viewer Modal */}
-            {viewingFile && (
+            {viewingFile && viewingFile.data && (
                 <DocumentViewer
                     file={viewingFile.data}
                     fileName={viewingFile.name}

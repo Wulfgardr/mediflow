@@ -3,35 +3,33 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Activity, Settings, PlusCircle, Brain } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, Settings, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+// import { useLiveQuery } from 'dexie-react-hooks';
+// import { db } from '@/lib/db';
 import { NewVisitModal } from '@/components/new-visit-modal';
 import SystemStatus from '@/components/system-status';
 import { usePrivacy } from '@/components/privacy-provider';
 import { Eye, EyeOff } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useSecurity } from '@/components/security-provider';
 
 export function Sidebar() {
     const pathname = usePathname();
     const [showNewVisitModal, setShowNewVisitModal] = useState(false);
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+    const { user } = useSecurity();
 
-    const profile = useLiveQuery(async () => {
-        const doctor = await db.settings.get('doctorName');
-        const clinic = await db.settings.get('clinicName');
-        return {
-            doctor: doctor?.value || 'Medico',
-            clinic: clinic?.value || 'Ambulatorio'
-        };
-    });
+    const profile = {
+        doctor: user?.displayName || 'Medico',
+        clinic: user?.ambulatoryName || 'Ambulatorio'
+    };
 
     const links = [
         { href: '/', name: 'Pazienti', icon: Users },
         { name: 'Diario Clinico', href: '/diary', icon: LayoutDashboard },
         { name: 'Scale & Test', href: '/scales', icon: Activity },
-        { name: 'AI Assistant', href: '/assistant', icon: Brain, highlight: true },
+        // { name: 'AI Assistant', href: '/assistant', icon: Brain, highlight: true },
         { name: 'Impostazioni', href: '/settings', icon: Settings },
     ];
 

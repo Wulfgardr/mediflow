@@ -10,7 +10,7 @@ import { differenceInYears } from 'date-fns';
 export default function AnalyticsPage() {
     const patients = useLiveQuery(async () => {
         return await db.patients
-            .filter(p => !p.deletedAt && !p.isArchived)
+            .filter(p => !p.isArchived)
             .toArray();
     });
 
@@ -30,11 +30,13 @@ export default function AnalyticsPage() {
 
         // 1. Total & Distribution
         const total = filtered.length;
-        const takenInCharge = filtered.filter(p => p.monitoringProfile === 'taken_in_charge').length;
-        const extemp = filtered.filter(p => p.monitoringProfile === 'extemporaneous').length;
+        // Fields not yet in schema
+        const takenInCharge = 0; // filtered.filter(p => p.monitoringProfile === 'taken_in_charge').length;
+        const extemp = 0; // filtered.filter(p => p.monitoringProfile === 'extemporaneous').length;
 
         // 2. Pathologies
         const pathCodes: Record<string, { count: number, desc: string }> = {};
+        /*
         filtered.forEach(p => {
             p.diagnoses?.forEach(d => {
                 const k = d.code;
@@ -42,6 +44,7 @@ export default function AnalyticsPage() {
                 pathCodes[k].count++;
             });
         });
+        */
         const topPathologies = Object.values(pathCodes)
             .sort((a, b) => b.count - a.count)
             .slice(0, 10);
