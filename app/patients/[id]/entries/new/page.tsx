@@ -64,15 +64,24 @@ export default function NewEntryPage() {
                     }
                 }
 
+                // Convert to Base64
+                const base64Data = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
                 const attachmentId = uuidv4();
                 await db.attachments.add({
                     id: attachmentId,
                     patientId: id,
                     name: file.name,
                     type: file.type,
-                    data: file,
+                    size: file.size,
+                    path: `uploads/${file.name}`, // Placeholder path since we store in data
+                    data: base64Data,
                     summarySnapshot: summary,
-                    source: 'visit',
                     createdAt: new Date()
                 });
                 attachmentIds.push(attachmentId);
@@ -81,15 +90,23 @@ export default function NewEntryPage() {
             setUploadProgress('Salvataggio voce diario...');
 
             // 2. Create Entry
+            const typeLabels: Record<string, string> = {
+                visit: 'Visita Ambulatoriale',
+                remote: 'Videoconsulto',
+                note: 'Nota Clinica'
+            };
+
             await db.entries.add({
                 id: uuidv4(),
                 patientId: id,
                 type,
+                title: typeLabels[type] || 'Nuova Voce',
                 date: new Date(entryDate), // Authentic User-Specified Date
                 content,
                 setting,
                 attachments: attachmentIds,
                 createdAt: new Date(), // Audit Timestamp
+                updatedAt: new Date(),
             });
 
             router.push(`/patients/${id}`);

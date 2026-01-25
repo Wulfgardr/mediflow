@@ -50,6 +50,7 @@ export default function ScalesPage() {
             patientId: id,
             type: 'scale',
             date: new Date(),
+            title: `Valutazione ${selectedScale.title}`,
             content: `${selectedScale.title}\nPunteggio: ${result.score}\nEsito: ${result.interpretation}`,
             metadata: {
                 scaleId: selectedScale.id,
@@ -60,6 +61,7 @@ export default function ScalesPage() {
             },
             attachments: [],
             createdAt: new Date(),
+            updatedAt: new Date(),
         });
 
         router.push(`/patients/${id}`);

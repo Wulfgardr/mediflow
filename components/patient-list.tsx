@@ -2,7 +2,7 @@
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Search, UserPlus, FileText, Users, Archive } from 'lucide-react';
+import { Search, UserPlus, FileText, Archive } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
@@ -16,8 +16,7 @@ export default function PatientList() {
         async () => {
             let collection = db.patients.orderBy('lastName');
 
-            // Filter out deleted and then by archive status
-            collection = collection.filter(p => !p.deletedAt);
+
 
             if (viewMode === 'active') {
                 collection = collection.filter(p => !p.isArchived);
@@ -26,12 +25,12 @@ export default function PatientList() {
             }
 
             if (search) {
-                const lowerSearch = search.toLowerCase();
-                return await collection.filter(p =>
-                    p.lastName.toLowerCase().includes(lowerSearch) ||
-                    p.firstName.toLowerCase().includes(lowerSearch) ||
-                    p.taxCode.toLowerCase().includes(lowerSearch)
-                ).toArray();
+                const terms = search.toLowerCase().trim().split(/\s+/);
+                return await collection.filter(p => {
+                    const searchableText = `${p.lastName} ${p.firstName} ${p.taxCode || ''}`.toLowerCase();
+                    // All terms must be present in the searchable text
+                    return terms.every(term => searchableText.includes(term));
+                }).toArray();
             }
             return collection.toArray();
         },
@@ -128,15 +127,6 @@ export default function PatientList() {
                                         <span>Età</span>
                                         <span className="font-medium text-gray-800">
                                             {(() => {
-                                                const age = patient.birthDate && !isNaN(new Date(patient.birthDate).getTime())
-                                                    ? new Date().getFullYear() - new Date(patient.birthDate).getFullYear()
-                                                    : (patient.taxCode ? calculateAge(estimateBirthYearFromTaxCode(patient.taxCode) || 0) : null);
-
-                                                // Handle the case where estimate returns null/0 (invalid tax code)
-                                                // If age > 200 it's probably wrong (0 case), so check validity.
-                                                // Actually calculateAge(null) would be currentYear - 0 = 2024. 
-                                                // let's be more precise.
-
                                                 const estYear = estimateBirthYearFromTaxCode(patient.taxCode);
                                                 const finalAge = patient.birthDate && !isNaN(new Date(patient.birthDate).getTime())
                                                     ? new Date().getFullYear() - new Date(patient.birthDate).getFullYear()
@@ -150,8 +140,7 @@ export default function PatientList() {
                                         <span>Stato</span>
                                         {patient.isArchived ? (
                                             <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-xs border border-amber-100">
-                                                {patient.archiveReason === 'deceased' ? 'Deceduto' :
-                                                    patient.archiveReason === 'assigned_mmg' ? 'MMG' : 'Archiviato'}
+                                                Archiviato
                                             </span>
                                         ) : patient.isAdi ? (
                                             <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">ADI Attiva</span>

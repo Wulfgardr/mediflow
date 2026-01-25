@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow - System Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown-dark.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+        }
+
+        .markdown-body {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 45px;
+            background: rgba(22, 27, 34, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .markdown-body h1 {
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 16px;
+        }
+
+        .markdown-body h2 {
+            color: #a5b4fc;
+            border-bottom: 1px solid #374151;
+        }
+
+        .markdown-body table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .markdown-body table th {
+            background: rgba(79, 70, 229, 0.3);
+        }
+
+        .markdown-body blockquote {
+            border-left: 4px solid #4f46e5;
+            background: rgba(79, 70, 229, 0.1);
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* GitHub-style alerts */
+        .markdown-body blockquote p:first-child strong {
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        .markdown-body .contains-task-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        pre.mermaid {
+            background: transparent !important;
+            text-align: center;
+        }
+
+        .mermaid {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Custom styling for NOTE, TIP, WARNING, IMPORTANT alerts */
+        .alert-note {
+            background: rgba(56, 139, 253, 0.15);
+            border-left-color: #388bfd;
+        }
+
+        .alert-tip {
+            background: rgba(46, 160, 67, 0.15);
+            border-left-color: #2ea043;
+        }
+
+        .alert-important {
+            background: rgba(130, 80, 223, 0.15);
+            border-left-color: #8250df;
+        }
+
+        .alert-warning {
+            background: rgba(210, 153, 34, 0.15);
+            border-left-color: #d29922;
+        }
+
+        .alert-caution {
+            background: rgba(248, 81, 73, 0.15);
+            border-left-color: #f85149;
+        }
+    </style>
+</head>
+
+<body>
+    <article class="markdown-body" id="content">
+        <p style="text-align: center; color: #6b7280;">Caricamento diagrammi...</p>
+    </article>
+
+    <!-- Content embedded directly to avoid CORS issues -->
+    <script type="text/markdown" id="markdown-source">
+# 🏥 MediFlow — Architettura di Sistema
+
+> *Cartella Clinica Elettronica Local-First con Intelligenza Artificiale*
+
+---
+
+## 📋 Indice
+
+1. [Vision & Filosofia](#1-vision--filosofia)
+2. [Panoramica Architetturale](#2-panoramica-architetturale)
+3. [Stack Tecnologico](#3-stack-tecnologico)
+4. [Topologia dei Container Dati](#4-topologia-dei-container-dati)
+5. [Flussi di Processo](#5-flussi-di-processo)
+6. [Specifiche Avanzate](#6-specifiche-avanzate)
+7. [Capacità dell'Applicazione](#7-capacità-dellapplicazione)
+
+---
+
+## 1. Vision & Filosofia
+
+> [!IMPORTANT]
+> **Zero-Knowledge by Design**: Il server non può mai leggere i dati clinici del paziente. La chiave di decifrazione esiste solo nella memoria volatile del browser.
+
+MediFlow nasce con tre principi fondamentali:
+
+| Principio | Descrizione |
+|-----------|-------------|
+| **Local-First** | I dati risiedono sul dispositivo. Nessun cloud, nessuna dipendenza esterna. |
+| **Privacy-by-Design** | Crittografia AES-256-GCM client-side. Il PIN non viene mai trasmesso. |
+| **AI-Powered** | LLM medici (MedGemma) eseguiti localmente per supporto decisionale clinico. |
+
+---
+
+## 2. Panoramica Architetturale
+
+L'architettura è **ibrida**: combina l'agilità dello sviluppo web con la sicurezza e le performance di un'app desktop.
+
+```mermaid
+graph TB
+    subgraph "🖥️ Client Browser"
+        UI["React UI<br/>(Next.js)"]
+        ENC["🔐 Encryption Layer<br/>(AES-GCM)"]
+        API_CLIENT["API Facade<br/>(lib/db.ts)"]
+    end
+
+    subgraph "🍎 macOS Host (Native)"
+        NEXT["Next.js Server<br/>:3000"]
+        SQLITE[("💾 SQLite<br/>medical.db")]
+        OLLAMA["🤖 Ollama<br/>:11434"]
+        MLX["🍏 Apple MLX<br/>:8080"]
+    end
+
+    subgraph "🐳 Docker"
+        ICD["🏛️ WHO ICD-11 API<br/>:8888"]
+    end
+
+    UI --> ENC
+    ENC --> API_CLIENT
+    API_CLIENT -->|"REST API"| NEXT
+    NEXT -->|"Drizzle ORM"| SQLITE
+    NEXT -->|"/api/proxy/ai/chat"| OLLAMA
+    NEXT -.->|"Alternative"| MLX
+    NEXT -->|"/api/icd/proxy"| ICD
+
+    style UI fill:#4f46e5,color:#fff
+    style ENC fill:#dc2626,color:#fff
+    style SQLITE fill:#059669,color:#fff
+    style ICD fill:#0284c7,color:#fff
+    style OLLAMA fill:#f97316,color:#fff
+```
+
+> [!NOTE]
+> **Perché nativo e non tutto Docker?**
+> Su macOS con Apple Silicon, Ollama nativo accede direttamente alla GPU Metal, offrendo inferenza 5-10x più veloce rispetto a un container emulato.
+
+---
+
+## 3. Stack Tecnologico
+
+### 3.1 Matrice delle Tecnologie
+
+| Layer | Tecnologia | Ruolo | Porta |
+|-------|-----------|-------|-------|
+| **Frontend** | Next.js 15 + React 19 | UI reattiva, SSR | — |
+| **Styling** | TailwindCSS v4, Framer Motion | Design system, animazioni | — |
+| **DB Client** | API Facade (`lib/db.ts`) | Crittografia + REST calls | — |
+| **DB Server** | SQLite + Drizzle ORM | Persistenza tipizzata | — |
+| **AI Engine** | Ollama / Apple MLX | Inferenza LLM locale | 11434 / 8080 |
+| **ICD-11** | WHO Official Docker Image | Codifiche diagnosi | 8888 |
+| **Auth** | bcrypt + AES-GCM | Hashing PIN + cifratura dati | — |
+
+### 3.2 Dipendenze Chiave
+
+```
+Core:        next@16, react@19, drizzle-orm, better-sqlite3
+Security:    bcryptjs, Web Crypto API (native)
+AI:          openai (client), Ollama/MLX (backend)
+Utilities:   date-fns, uuid, zod, jspdf
+```
+
+---
+
+## 4. Topologia dei Container Dati
+
+Il database SQLite (`medical.db`) contiene le seguenti entità, gestite tramite **Drizzle ORM** con schema tipizzato in `lib/schema.ts`.
+
+### 4.1 Entity-Relationship Diagram
+
+```mermaid
+erDiagram
+    USERS ||--o{ PATIENTS : "gestisce"
+    PATIENTS ||--o{ ENTRIES : "ha"
+    PATIENTS ||--o{ THERAPIES : "assume"
+    PATIENTS ||--o{ CHECKUPS : "registra"
+    PATIENTS ||--o{ ATTACHMENTS : "allega"
+    CONVERSATIONS ||--o{ MESSAGES : "contiene"
+
+    USERS {
+        text id PK
+        text username UK
+        text displayName
+        text ambulatoryName
+        text passwordHash "🔐"
+        text encryptedMasterKey "🔐"
+        text salt
+    }
+
+    PATIENTS {
+        text id PK
+        text firstName "🔐 ENC"
+        text lastName "🔐 ENC"
+        text taxCode
+        int birthDate
+        text address "🔐 ENC"
+        text phone "🔐 ENC"
+        text notes "🔐 ENC"
+        text aiSummary "🔐 ENC"
+        bool isArchived
+    }
+
+    ENTRIES {
+        text id PK
+        text patientId FK
+        text type
+        int date
+        text content "🔐 ENC"
+    }
+
+    THERAPIES {
+        text id PK
+        text patientId FK
+        text drugName
+        text dosage
+        text status
+        int startDate
+        int endDate
+    }
+
+    CHECKUPS {
+        text id PK
+        text patientId FK
+        int date
+        text title
+        text status
+    }
+
+    CONVERSATIONS {
+        text id PK
+        text title "🔐 ENC"
+        bool isArchived
+    }
+
+    MESSAGES {
+        text id PK
+        text conversationId FK
+        text role
+        text content "🔐 ENC"
+        text reasoning "🔐 ENC"
+    }
+
+    ATTACHMENTS {
+        text id PK
+        text patientId FK
+        text name
+        blob data
+    }
+```
+
+> [!WARNING]
+> I campi marcati con 🔐 sono **cifrati lato client** prima della trasmissione. Il database contiene solo stringhe `ENC:iv:ciphertext`.
+
+### 4.2 Mappa dei Campi Cifrati
+
+| Tabella | Campi Cifrati |
+|---------|---------------|
+| `patients` | `address`, `phone`, `caregiver`, `notes`, `aiSummary`, `deletionReason` |
+| `entries` | `content`, `deletionReason` |
+| `therapies` | `motivation`, `deletionReason` |
+| `checkups` | `notes` |
+| `conversations` | `title` |
+| `messages` | `content`, `reasoning` |
+
+---
+
+## 5. Flussi di Processo
+
+### 5.1 Flusso di Autenticazione e Decifrazione
+
+```mermaid
+sequenceDiagram
+    actor Medico
+    participant Browser
+    participant SessionStorage
+    participant API as Next.js API
+    participant DB as SQLite
+
+    Medico->>Browser: Inserisce PIN
+    Browser->>Browser: Deriva chiave (PBKDF2)
+    Browser->>API: POST /api/auth/login {username, PIN hash}
+    API->>DB: Verifica credenziali
+    DB-->>API: encryptedMasterKey
+    API-->>Browser: {ok: true, encryptedMasterKey}
+    Browser->>Browser: Decifra MasterKey con PIN
+    Browser->>SessionStorage: Salva MasterKey (JWK)
+    Note over Browser,SessionStorage: La chiave esiste SOLO in RAM/SessionStorage
+
+    loop Per ogni richiesta dati
+        Browser->>Browser: Recupera MasterKey da Session
+        Browser->>Browser: Cifra payload (AES-GCM)
+        Browser->>API: POST /api/patients {encrypted data}
+        API->>DB: INSERT cifrato
+    end
+```
+
+### 5.2 Flusso di Consultazione AI
+
+```mermaid
+sequenceDiagram
+    actor Medico
+    participant UI as React UI
+    participant Facade as lib/db.ts
+    participant Proxy as /api/proxy/ai/chat
+    participant LLM as Ollama/MLX
+
+    Medico->>UI: "Analizza quadro clinico"
+    UI->>Facade: Recupera dati paziente
+    Facade->>Facade: Decifra campi sensibili
+    UI->>UI: Anonimizza (rimuove nome/CF)
+    UI->>UI: Costruisce prompt clinico
+    UI->>Proxy: POST {messages: [...], model: "medgemma"}
+    Proxy->>LLM: Forward request (localhost:11434/v1/chat/completions)
+    LLM-->>Proxy: {choices: [{message: {content: "..."}}]}
+    Proxy-->>UI: Risposta AI
+    UI->>UI: Mostra insight + opzione salvataggio
+    opt Salva AI Summary
+        UI->>Facade: Cifra e salva in patients.aiSummary
+    end
+```
+
+### 5.3 Flusso Ricerca Diagnosi ICD-11
+
+```mermaid
+sequenceDiagram
+    actor Medico
+    participant UI as Autocomplete
+    participant Proxy as /api/icd/proxy
+    participant Docker as mediflow-icd:8888
+
+    Medico->>UI: Digita "Diabete mellito"
+    UI->>Proxy: GET /api/icd/proxy?q=Diabete%20mellito
+    Proxy->>Docker: GET /icd/release/11/2024-01/mms/search?q=...
+    Docker-->>Proxy: {destinationEntities: [...]}
+    Proxy-->>UI: JSON con codici ICD-11
+    UI->>UI: Mostra dropdown risultati
+    Medico->>UI: Seleziona "5A10 - Diabete mellito tipo 1"
+    UI->>UI: Associa codice alla scheda paziente
+```
+
+---
+
+## 6. Specifiche Avanzate
+
+### 6.1 Crittografia
+
+| Parametro | Valore |
+|-----------|--------|
+| **Algoritmo** | AES-256-GCM (Web Crypto API) |
+| **Key Derivation** | PBKDF2-SHA256, 100.000 iterazioni |
+| **IV** | 12 byte casuali per ogni operazione |
+| **Key Storage** | JWK esportato in `sessionStorage` (volatile) |
+| **At-Rest** | Solo ciphertext (`ENC:base64iv:base64data`) |
+
+### 6.2 Configurazione Docker (`docker-compose.yml`)
+
+```yaml
+services:
+  icd-api:
+    image: whoicd/icd-api
+    container_name: mediflow-icd
+    restart: unless-stopped
+    ports:
+      - "8888:80"
+    environment:
+      - acceptLicense=true
+      - saveAnalytics=false
+      - include=2024-01_en
+    volumes:
+      - icd-data:/app/data
+```
+
+### 6.3 Endpoints API Interni
+
+| Endpoint | Metodo | Descrizione |
+|----------|--------|-------------|
+| `/api/patients` | GET, POST | CRUD pazienti |
+| `/api/entries` | GET, POST | Diario clinico |
+| `/api/therapies` | GET, POST | Piano terapeutico |
+| `/api/checkups` | GET, POST | Controlli e misurazioni |
+| `/api/conversations` | GET, POST | Storico chat AI |
+| `/api/messages` | GET, POST | Messaggi singoli |
+| `/api/proxy/ai/chat` | POST | Proxy verso Ollama/MLX |
+| `/api/icd/proxy` | GET | Proxy verso ICD-11 Docker |
+| `/api/auth/login` | POST | Autenticazione |
+| `/api/auth/setup` | POST | Primo setup profilo |
+
+---
+
+## 7. Capacità dell'Applicazione
+
+### 7.1 Funzionalità Cliniche
+
+| Modulo | Descrizione |
+|--------|-------------|
+| **📋 Anagrafica Paziente** | Gestione completa dati demografici, ADI, caregiver |
+| **📝 Diario Clinico** | Visite, telefonate, esami, ricoveri, accessi, note |
+| **💊 Piano Terapeutico** | Prescrizioni con DB AIFA, storico sospensioni |
+| **🩺 Diagnosi ICD** | Ricerca ICD-9 (legacy) e ICD-11 (standard attuale) |
+| **📊 Monitoraggio** | Parametri vitali: PA, peso, glicemia, SpO2, scale ADL/IADL |
+| **📎 Allegati** | Upload PDF/immagini con estrazione testo AI |
+| **🗓️ Prossimi Controlli** | Scheduler appuntamenti e follow-up |
+
+### 7.2 Funzionalità AI
+
+| Feature | Descrizione |
+|---------|-------------|
+| **Clinical Insight** | Analisi automatica del quadro clinico del paziente |
+| **Chat Assistente** | Conversazione libera con contesto clinico |
+| **PDF Extraction** | OCR e summarization di referti allegati |
+| **Suggestion Engine** | Promemoria intelligenti (es. rinnovi, screening) |
+
+### 7.3 Sicurezza & Compliance
+
+| Requisito | Implementazione |
+|-----------|-----------------|
+| **GDPR Art. 17** | Cancellazione sicura con soft-delete + audit trail |
+| **GDPR Art. 20** | Export dati in formato portabile (JSON/PDF) |
+| **Minimizzazione** | Solo dati strettamente necessari |
+| **Pseudonimizzazione** | Dati AI anonimizzati prima dell'inferenza |
+| **Audit Log** | Tracciabilità accessi (in roadmap) |
+
+---
+
+> [!TIP]
+> Per avviare l'intero ecosistema: esegui **`Start_MediFlow.command`**. Lo script verifica Ollama, avvia Docker, e lancia l'app.
+
+---
+
+*Generato il 25 Gennaio 2026 — MediFlow v0.2.0*
+    </script>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose', // Allow HTML in nodes
+            themeVariables: {
+                primaryColor: '#4f46e5',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#6366f1',
+                lineColor: '#94a3b8',
+                secondaryColor: '#1e293b',
+                tertiaryColor: '#334155'
+            }
+        });
+
+        // Custom renderer for GitHub-style alerts
+        const renderer = new marked.Renderer();
+        const originalBlockquote = renderer.blockquote;
+        renderer.blockquote = function (quote) {
+            const text = quote.text || quote;
+            // Check for GitHub alert syntax in a safer way
+            if (typeof text !== 'string') return `<blockquote>${text}</blockquote>`;
+
+            const alertMatch = text.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/);
+            if (alertMatch) {
+                const alertType = alertMatch[1].toLowerCase();
+                const cleanText = text.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/, '');
+                const icon = {
+                    note: 'ℹ️',
+                    tip: '💡',
+                    important: '❗',
+                    warning: '⚠️',
+                    caution: '🔴'
+                }[alertType];
+                return `<blockquote class="alert-${alertType}"><p><strong>${icon} ${alertType.toUpperCase()}</strong></p><p>${cleanText}</p></blockquote>`;
+            }
+            return `<blockquote>${text}</blockquote>`;
+        };
+
+        marked.setOptions({
+            renderer: renderer,
+            gfm: true,
+            breaks: true
+        });
+
+        async function renderDocs() {
+            try {
+                // Read from the embedded script tag instead of fetch
+                const scriptTag = document.getElementById('markdown-source');
+                const markdown = scriptTag.textContent;
+
+                // Pre-process mermaid blocks
+                const processed = markdown.replace(/```mermaid\n([\s\S]*?)```/g, (match, code) => {
+                    return `<pre class="mermaid">${code}</pre>`;
+                });
+
+                document.getElementById('content').innerHTML = marked.parse(processed);
+
+                // Render mermaid diagrams
+                await mermaid.run({ querySelector: '.mermaid' });
+
+            } catch (e) {
+                document.getElementById('content').innerHTML = `<p style="color: #f87171;">Errore Rendering: ${e.message}</p>`;
+                console.error(e);
+            }
+        }
+
+        renderDocs();
+    </script>
+</body>
+
+</html>

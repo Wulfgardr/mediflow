@@ -45,13 +45,10 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                         <div className="w-20 shrink-0">
                             <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Sistema</label>
                             {(() => {
-                                const sys = watch(`diagnoses.${index}.system`) || 'ICD-9';
-                                const isLegacy = sys === 'ICD-9';
+                                const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                 const isV11 = sys === 'ICD-11';
                                 return (
-                                    <div className={`w-full py-2.5 px-3 text-xs font-bold text-center rounded-lg border font-mono ${isLegacy
-                                        ? 'border-red-200 bg-red-100/50 text-red-700'
-                                        : (isV11 ? 'border-blue-200 bg-blue-100 text-blue-700' : 'border-purple-200 bg-purple-100 text-purple-700')
+                                    <div className={`w-full py-2.5 px-3 text-xs font-bold text-center rounded-lg border font-mono ${isV11 ? 'border-blue-200 bg-blue-100 text-blue-700' : 'border-purple-200 bg-purple-100 text-purple-700'
                                         }`}>
                                         {sys}
                                     </div>
@@ -80,7 +77,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                         code: watch(`diagnoses.${index}.code`) || "",
                                         description: watch(`diagnoses.${index}.description`) || "",
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        system: (watch(`diagnoses.${index}.system`) as any) || "ICD-9"
+                                        system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11"
                                     }}
                                     onChange={(val) => {
                                         setValue(`diagnoses.${index}.code`, val.code);
@@ -335,7 +332,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             <div className="glass-panel p-6 space-y-6 relative z-50 dark:bg-[#161b22] dark:border-[#30363d]">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
                     <Activity className="w-5 h-5 text-red-500" />
-                    Patologie & Diagnosi (ICD-9/10)
+                    Patologie e Diagnosi (ICD-11)
                 </h3>
 
                 <DiagnosesFieldArray register={register} control={control} errors={errors} setValue={setValue} watch={watch} />

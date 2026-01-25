@@ -1,7 +1,5 @@
-import * as pdfjsLib from 'pdfjs-dist';
 
-// Point to the worker file via CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+// Client-side text parsing only - Extraction happens on server via API
 
 export interface ExtractedPatientData {
     firstName?: string;
@@ -14,25 +12,23 @@ export interface ExtractedPatientData {
 }
 
 export async function extractTextFromPdf(file: Blob): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const formData = new FormData();
+    formData.append('file', file);
 
-    let fullText = '';
-    const maxPages = Math.min(pdf.numPages, 3); // Read first 3 pages
+    const response = await fetch('/api/pdf-extract', {
+        method: 'POST',
+        body: formData
+    });
 
-    for (let i = 1; i <= maxPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-
-        // Improve joining: Check checking if we should add a newline based on 'transform' y coordinate could be better,
-        // but for now let's just join with spaces to be safe.
-        // We add a special separator for likely new lines/blocks if items are far apart? Too complex for now.
-        const pageText = (textContent.items as Array<{ str: string }>).map((item) => item.str).join(' ');
-        fullText += pageText + '\n';
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to extract text from PDF");
     }
 
-    return fullText;
+    const data = await response.json();
+    return data.text || "";
 }
+
 
 export function parsePatientData(text: string): ExtractedPatientData {
     const data: ExtractedPatientData = { rawText: text };

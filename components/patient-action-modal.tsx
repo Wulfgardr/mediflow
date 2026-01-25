@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Trash2, Archive, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MonitoringProfile } from '@/lib/db';
+
 
 type ActionType = 'delete' | 'archive' | 'export';
 type ArchiveReason = 'assigned_mmg' | 'deceased' | 'other';

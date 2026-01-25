@@ -27,23 +27,17 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
                 setIsLoading(true);
                 try {
                     // 1. Efficient DB Fetch using ONLY the first token
-                    const firstToken = tokens[0];
+                    const firstToken = tokens[0].toLowerCase();
 
-                    const nameMatches = await db.drugs
-                        .where('name')
-                        .startsWithIgnoreCase(firstToken)
-                        .limit(50) // Increased limit to allow filtering
-                        .toArray();
+                    const allDrugs = await db.drugs.toArray();
 
-                    const principleMatches = await db.drugs
-                        .where('activePrinciple')
-                        .startsWithIgnoreCase(firstToken)
-                        .limit(50)
-                        .toArray();
+                    const nameMatches = allDrugs.filter((d: any) => d.name.toLowerCase().startsWith(firstToken)).slice(0, 50);
+                    const principleMatches = allDrugs.filter((d: any) => d.activePrinciple && d.activePrinciple.toLowerCase().startsWith(firstToken)).slice(0, 50);
 
                     // 2. Merge and Deduplicate
                     const merged = [...nameMatches, ...principleMatches];
-                    const uniqueMap = new Map(merged.map(item => [item.aic, item]));
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const uniqueMap = new Map(merged.map((item: any) => [item.aic, item]));
                     const unique = Array.from(uniqueMap.values());
 
                     // 3. Smart Filtering: Check if ALL tokens match anywhere in the drug data

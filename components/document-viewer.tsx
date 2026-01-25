@@ -4,21 +4,22 @@ import { X, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface DocumentViewerProps {
-    file: Blob;
+    file: Blob | string;
     fileName: string;
     onClose: () => void;
 }
 
 export default function DocumentViewer({ file, fileName, onClose }: DocumentViewerProps) {
-    const [url, setUrl] = useState<string | null>(null);
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const url = typeof file === 'string' ? file : blobUrl;
 
     useEffect(() => {
-        if (file) {
+        if (file && typeof file !== 'string') {
             const objectUrl = URL.createObjectURL(file);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setUrl(objectUrl);
+            setBlobUrl(objectUrl);
             return () => URL.revokeObjectURL(objectUrl);
         }
+        if (!file) setBlobUrl(null);
     }, [file]);
 
     return (

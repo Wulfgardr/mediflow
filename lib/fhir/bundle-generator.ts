@@ -7,8 +7,10 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
     const patient = await db.patients.get(patientId);
     if (!patient) throw new Error("Patient not found");
 
-    const entries = await db.entries.where('patientId').equals(patientId).toArray();
-    const therapies = await db.therapies.where('patientId').equals(patientId).toArray();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries = await db.entries.filter((e: any) => e.patientId === patientId).toArray();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const therapies = await db.therapies.filter((t: any) => t.patientId === patientId).toArray();
 
     const bundle: Bundle = {
         resourceType: "Bundle",
@@ -50,7 +52,7 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
 
     // 4. Medications
     therapies.forEach(t => {
-        if (t.deletedAt) return;
+
         bundle.entry?.push({
             resource: toFhirMedicationStatement(t, patientId)
         });

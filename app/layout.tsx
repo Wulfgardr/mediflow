@@ -22,8 +22,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="it">
-      <body className={cn(inter.className, "antialiased overflow-x-hidden")}>
+    <html lang="it" suppressHydrationWarning>
+      <body className={cn(inter.className, "antialiased overflow-x-hidden")} suppressHydrationWarning>
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
           <SecurityProvider>
             <LockScreen />

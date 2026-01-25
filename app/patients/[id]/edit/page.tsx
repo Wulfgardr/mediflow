@@ -20,7 +20,7 @@ export default function EditPatientPage() {
         if (!p) return null;
 
         // Fetch relations
-        const checkups = await db.checkups.where('patientId').equals(id).toArray();
+        const checkups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
         return { ...p, checkups };
     }, [id]);
 
@@ -29,29 +29,15 @@ export default function EditPatientPage() {
         try {
             const { statusReason, checkups, ...cleanData } = data;
 
-            // Handle Status Change History
-            let updatedHistory = patient?.statusHistory || [];
-            if (patient && cleanData.monitoringProfile !== patient.monitoringProfile) {
-                updatedHistory = [
-                    ...updatedHistory,
-                    {
-                        date: new Date(),
-                        status: cleanData.monitoringProfile,
-                        reason: statusReason || "Modifica da scheda anagrafica",
-                    }
-                ];
-            }
-
             await db.patients.update(id, {
                 ...cleanData,
                 birthDate: new Date(cleanData.birthDate),
-                statusHistory: updatedHistory,
                 updatedAt: new Date(),
             });
 
             // Handle Checkups (Diffing)
             // 1. Get current IDs to find deletions
-            const existingCheckups = await db.checkups.where('patientId').equals(id).toArray();
+            const existingCheckups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
             const existingIds = new Set(existingCheckups.map(c => c.id));
             const comingIds = new Set(checkups.filter((c: any) => c.id).map((c: any) => c.id));
 
@@ -118,17 +104,11 @@ export default function EditPatientPage() {
         }
 
         if (actionType === 'delete') {
-            await db.patients.update(id, {
-                deletedAt: new Date(),
-                deletionReason: data.deletionReason,
-                updatedAt: new Date()
-            });
-            router.push('/'); // Redirect to dashboard, patient will be hidden
+            await db.patients.delete(id);
+            router.push('/'); // Redirect to dashboard
         } else { // This is for archive
             await db.patients.update(id, {
                 isArchived: true,
-                archiveReason: data.archiveReason,
-                archiveNote: data.archiveNote,
                 updatedAt: new Date()
             });
             router.push('/'); // Redirect to dashboard
@@ -140,8 +120,6 @@ export default function EditPatientPage() {
 
         await db.patients.update(id, {
             isArchived: false,
-            archiveReason: undefined,
-            archiveNote: undefined,
             updatedAt: new Date()
         });
         // Stay on page but refresh UI (automatic via liveQuery)
@@ -167,10 +145,7 @@ export default function EditPatientPage() {
                     <div>
                         <h3 className="font-bold text-amber-800">Paziente Archiviato</h3>
                         <p className="text-sm text-amber-700 mt-1">
-                            Questo paziente è attualmente in archivio per motivo: <strong>{
-                                patient.archiveReason === 'assigned_mmg' ? 'Affidamento MMG' :
-                                    patient.archiveReason === 'deceased' ? 'Decesso' : 'Altro'
-                            }</strong>.
+                            Questo paziente è attualmente in archivio.
                         </p>
                         <button
                             onClick={handleRestore}

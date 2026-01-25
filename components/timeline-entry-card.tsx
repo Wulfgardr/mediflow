@@ -24,7 +24,10 @@ const TYPE_LABELS: Record<string, string> = {
 
 function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], onView: (file: Attachment) => void }) {
     const attachments = useLiveQuery(
-        () => db.attachments.where('id').anyOf(attachmentIds).toArray(),
+        async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return await db.attachments.filter((a: any) => attachmentIds.includes(a.id)).toArray();
+        },
         [attachmentIds]
     );
 

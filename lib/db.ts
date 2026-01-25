@@ -1,12 +1,7 @@
-import Dexie, { type EntityTable } from 'dexie';
+// API Client Facade for SQLite Backend
+// Replaces Dexie DB with Fetch calls
 
-// --- Interfaces ---
-
-export interface AppSetting {
-    key: string;
-    value: string;
-}
-
+import { encryptData, decryptData } from './security';
 
 export interface Patient {
     id: string;
@@ -16,371 +11,293 @@ export interface Patient {
     birthDate?: Date;
     address: string;
     phone: string;
-    caregiver?: string;
-    notes?: string;
-    aiSummary?: string;
-    monitoringProfile: MonitoringProfile;
-    statusHistory?: StatusChange[];
     isAdi?: boolean;
-    diagnoses?: Diagnosis[]; // ICD-9/10 Codes
-    createdAt: Date;
+    isArchived?: boolean;
+    caregiver?: string;
     updatedAt: Date;
-    // Deletion & Archive
+    createdAt: Date;
     deletedAt?: Date;
     deletionReason?: string;
-    isArchived?: boolean;
-    archiveReason?: 'assigned_mmg' | 'deceased' | 'other';
-    archiveNote?: string;
+    aiSummary?: string;
+    notes?: string;
+    monitoringProfile?: string;
+    diagnoses?: Diagnosis[];
 }
-
-export type MonitoringProfile = 'taken_in_charge' | 'extemporaneous';
 
 export interface Diagnosis {
     code: string;
     description: string;
-    system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+    system: string;
     date: Date;
 }
-
-export interface StatusChange {
-    date: Date;
-    status: MonitoringProfile;
-    reason: string;
-}
-
-export type ClinicalEntryType = 'visit' | 'remote' | 'note' | 'scale';
 
 export interface ClinicalEntry {
     id: string;
     patientId: string;
-    type: ClinicalEntryType;
     date: Date;
+    type: 'visit' | 'phone' | 'exam' | 'hospitalization' | 'access' | 'note' | 'scale' | 'remote';
+    title: string;
     content: string;
-    setting?: 'ambulatory' | 'home'; // Context: Where was this done?
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt?: Date;
+    deletionReason?: string;
     metadata?: Record<string, unknown>;
-    attachments: string[];
-    // Soft Delete fields
-    deletedAt?: Date;
-    deletionReason?: string;
-    createdAt: Date;
+    attachments?: string[];
+    setting?: 'home' | 'hospital' | 'ambulatory';
 }
-
-export interface Attachment {
-    id: string;
-    patientId: string;
-    name: string;
-    type: string;
-    data: Blob;
-    summarySnapshot?: string; // Cache of what was extracted from this file
-    source?: 'visit' | 'manual'; // Origin of the file
-    createdAt: Date;
-}
-
-export type TherapyStatus = 'active' | 'suspended' | 'ended';
-
-export interface Therapy {
-    id: string;
-    patientId: string;
-    drugName: string;         // Nome Commerciale
-    activePrinciple?: string; // Principio Attivo
-    dosage: string;           // Posologia
-    motivation?: string;      // Motivazione / Note
-
-    // Structured Data (FHIR/Coding)
-    diagnosisCode?: string; // ICD-11 Linked Code
-    diagnosisName?: string; // ICD-11 Diagnosis Description
-    atcCode?: string;       // Anatomical Therapeutic Chemical code
-    aicCode?: string;       // AIC (Italian Marketing Authorization)
-
-    startDate: Date;
-    endDate?: Date;
-    status: TherapyStatus;
-    // Soft Delete fields
-    deletedAt?: Date;
-    deletionReason?: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-export interface Checkup {
-    id: string;
-    patientId: string;
-    date: Date;
-    title: string;
-    notes?: string;
-    status: 'pending' | 'completed' | 'cancelled';
-    source: 'manual' | 'ai_suggestion';
-    createdAt: Date;
-}
-
-export interface Conversation {
-    id: string;
-    title: string;
-    patientId?: string; // Optional link to a patient context
-    isArchived?: boolean;
-    updatedAt: Date;
-    createdAt: Date;
-}
-
-export interface Message {
-    id: string;
-    conversationId: string;
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    attachmentBase64?: string; // For images
-    attachmentType?: 'image' | 'file';
-    metadata?: {
-        latencyMs?: number;
-        tokensIn?: number;
-        tokensOut?: number;
-        model?: string;
-        reasoning?: string; // Parsed chain of thought
-        contextUsed?: string; // "YES" | "NO" for debugging
-    };
-    createdAt: Date;
-}
-
-export interface AifaDrug {
-    aic: string;              // Codice AIC (Primary Key)
-    name: string;             // Nome Commerciale + Confezione (es. "TACHIPIRINA*30CPR 500MG")
-    activePrinciple: string;  // Principio Attivo
-    company: string;          // Azienda
-    price?: number;
-    class?: string;            // Fascia (A, C, H)
-    packaging?: string;
-    atc?: string;
-    equivalenceGroup?: string; // Gruppo di equivalenza
-    updatedAt: Date;
-}
-
-// --- Database Class ---
-
-// --- Database Class ---
-
-import { encryptData, decryptData } from './security';
 
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     patients: ['address', 'phone', 'caregiver', 'notes', 'aiSummary', 'archiveNote', 'deletionReason'],
     entries: ['content', 'deletionReason'],
-    therapies: ['motivation', 'deletionReason'], // We keep drugName visible for listing? Maybe encrypt everything sensitive.
+    therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
-    conversations: ['title'], // Messages are complex, let's treat them separately or encrypt content
+    conversations: ['title'],
     messages: ['content', 'reasoning']
 };
 
-class MedicalDatabase extends Dexie {
-    patients!: EntityTable<Patient, 'id'>;
-    entries!: EntityTable<ClinicalEntry, 'id'>;
-    attachments!: EntityTable<Attachment, 'id'>;
-    therapies!: EntityTable<Therapy, 'id'>;
-    checkups!: EntityTable<Checkup, 'id'>;
-    conversations!: EntityTable<Conversation, 'id'>;
-    messages!: EntityTable<Message, 'id'>;
-    drugs!: EntityTable<AifaDrug, 'aic'>;
-    settings!: EntityTable<AppSetting, 'key'>;
+class ApiTable<T> {
+    private endpoint: string;
+    private tableName: string;
+    private getMasterKey: () => CryptoKey | null;
 
-    private masterKey: CryptoKey | null = null;
-
-    constructor() {
-        super('MedicalRecordDB');
-
-        // Schema definition
-        this.version(3).stores({
-            patients: 'id, lastName, taxCode, isAdi, deletedAt, isArchived',
-            entries: 'id, patientId, date, type',
-            attachments: 'id, patientId',
-            therapies: 'id, patientId, status',
-            checkups: 'id, patientId, date, status'
-        });
-
-        this.version(4).stores({
-            conversations: 'id, patientId, updatedAt',
-            messages: 'id, conversationId'
-        });
-
-        // AIFA Drug DB Migration
-        this.version(5).stores({
-            drugs: 'aic, name, activePrinciple'
-        });
-
-        // User Profile & Settings
-        this.version(6).stores({
-            settings: 'key'
-        });
-
-        // --- Encryption Middleware ---
-        this.use({
-            stack: 'dbcore',
-            name: 'encryptionMiddleware',
-            create: (downlevelDatabase) => {
-                return {
-                    ...downlevelDatabase,
-                    table: (tableName) => {
-                        const downlevelTable = downlevelDatabase.table(tableName);
-                        const fieldsToEncrypt = ENCRYPTED_FIELDS[tableName];
-
-                        if (!fieldsToEncrypt) {
-                            return downlevelTable;
-                        }
-
-                        return {
-                            ...downlevelTable,
-                            mutate: async (req) => {
-                                if (!this.masterKey) {
-                                    // If no key is set (e.g. locked), we shouldn't allow writing sensitive data
-                                    // Or we throw error? For now, let's allow it but warn, or maybe just proceed (legacy mode?)
-                                    // Better: FAIL SAFE. If app is open, key MUST be present.
-                                    // But during initial load or specialized tasks it might be tricky.
-                                    // Let's assume if authenticated -> key exists.
-                                    if (req.type === 'add' || req.type === 'put') {
-                                        console.warn(`Writing to ${tableName} without encryption key! Data will be plain text.`);
-                                    }
-                                    return downlevelTable.mutate(req);
-                                }
-
-                                if (req.type === 'delete' || req.type === 'deleteRange') {
-                                    return downlevelTable.mutate(req);
-                                }
-
-                                const key = this.masterKey;
-
-                                // Clone request to avoid mutating original objects in place unexpectedly
-                                const values = req.values ? [...req.values] : [];
-
-                                // Encrypt specified fields
-                                const encryptedValues = await Promise.all(values.map(async (row: any) => {
-                                    const encryptedRow = { ...row };
-                                    for (const field of fieldsToEncrypt) {
-                                        if (encryptedRow[field]) {
-                                            try {
-                                                const { iv, data } = await encryptData(encryptedRow[field], key);
-                                                // Store format: "ENC:iv:ciphertext"
-                                                encryptedRow[field] = `ENC:${iv}:${data}`;
-                                            } catch (e) {
-                                                console.error(`Failed to encrypt field ${field}`, e);
-                                                // Fallback? Throw?
-                                            }
-                                        }
-                                    }
-                                    return encryptedRow;
-                                }));
-
-                                return downlevelTable.mutate({
-                                    ...req,
-                                    values: encryptedValues
-                                });
-                            },
-                            get: async (req) => {
-                                const result = await downlevelTable.get(req);
-                                if (result && this.masterKey) {
-                                    // Decrypt in place (or clone)
-                                    const key = this.masterKey;
-                                    for (const field of fieldsToEncrypt) {
-                                        if (result[field] && typeof result[field] === 'string' && result[field].startsWith('ENC:')) {
-                                            try {
-                                                const parts = result[field].split(':');
-                                                if (parts.length === 3) {
-                                                    const iv = parts[1];
-                                                    const ciphertext = parts[2];
-                                                    result[field] = await decryptData(ciphertext, iv, key);
-                                                }
-                                            } catch (e) {
-                                                console.error(`Decryption failed for ${tableName}.${field}`, e);
-                                                result[field] = '[DECRYPTION ERROR]';
-                                            }
-                                        }
-                                    }
-                                }
-                                return result;
-                            },
-                            query: async (req) => {
-                                // Query returns a Promise<any> which is a cursor or array. 
-                                // Dexie Middleware 'query' intercepts the *opening* of the cursor/collection.
-                                // It's hard to intercept individual results here easily without wrapping the openCursor result.
-                                // For simplicity in Dexie 4 middleware, we might intercept `openCursor` functionality if needed,
-                                // but `query` method in DBCore usually returns a promise resolving to a collection/result.
-
-                                // Actually, for 'getAll' (which uses query internally in some cases) or 'toArray', 
-                                // interception is complex at DBCore level for *reading* lists.
-
-                                // STRATEGY: We will rely on higher-level Hooks (useLiveQuery) if possible?
-                                // No, middleware is best. 
-                                // Let's try to intercept via `openCursor`.
-                                return downlevelTable.query(req).then(res => {
-                                    // This level is tricky. Let's simplify:
-                                    // Most reads use `get` (single) or `openCursor` (iterative).
-                                    // We need to override `openCursor`.
-                                    return res;
-                                });
-                            },
-                            openCursor: async (req) => {
-                                const cursor = await downlevelTable.openCursor(req);
-                                if (!cursor) return null;
-
-                                const proxyCursor = Object.create(cursor);
-
-                                // Shadow read-only getters with writable properties
-                                Object.defineProperties(proxyCursor, {
-                                    key: { value: cursor.key, writable: true, configurable: true },
-                                    primaryKey: { value: cursor.primaryKey, writable: true, configurable: true },
-                                    value: { value: cursor.value, writable: true, configurable: true }
-                                });
-
-                                const decryptCurrent = async () => {
-                                    if (this.masterKey && proxyCursor.key) {
-                                        const key = this.masterKey;
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        const valContainer = proxyCursor as any;
-
-                                        if (valContainer.value) {
-                                            for (const field of fieldsToEncrypt) {
-                                                const val = valContainer.value[field];
-                                                if (val && typeof val === 'string' && val.startsWith('ENC:')) {
-                                                    try {
-                                                        const parts = val.split(':');
-                                                        if (parts.length === 3) {
-                                                            valContainer.value[field] = await decryptData(parts[2], parts[1], key);
-                                                        }
-                                                    } catch (e) { }
-                                                }
-                                            }
-                                        }
-                                    }
-                                };
-
-                                await decryptCurrent();
-
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                proxyCursor.continue = async (key?: any) => {
-                                    await cursor.continue(key);
-                                    if (cursor.key) {
-                                        // Update shadowed properties manually since they are now values
-                                        proxyCursor.key = cursor.key;
-                                        proxyCursor.primaryKey = cursor.primaryKey;
-                                        proxyCursor.value = cursor.value;
-                                        await decryptCurrent();
-                                    } else {
-                                        // End of cursor - IMPORTANT: must clear properties to signal EOF
-                                        proxyCursor.key = undefined;
-                                        proxyCursor.primaryKey = undefined;
-                                        proxyCursor.value = undefined;
-                                    }
-                                };
-
-                                return proxyCursor;
-                            }
-                        };
-                    }
-                };
-            }
-        });
+    constructor(endpoint: string, tableName: string, getMasterKey: () => CryptoKey | null) {
+        this.endpoint = endpoint;
+        this.tableName = tableName;
+        this.getMasterKey = getMasterKey;
     }
 
-    /**
-     * Set the Master Key for encryption/decryption operations.
-     * Should be called after successful PIN unlock.
-     */
+    // --- Dexie Compatibility Query Builder ---
+
+    filter(fn: (item: T) => boolean): ApiTable<T> {
+        const clone = this.clone();
+        clone._filterFn = fn;
+        return clone;
+    }
+
+    limit(n: number): ApiTable<T> {
+        const clone = this.clone();
+        clone._limit = n;
+        return clone;
+    }
+
+    reverse(): ApiTable<T> {
+        const clone = this.clone();
+        clone._reverse = true;
+        return clone;
+    }
+
+    // Internal state for query building
+    private _filterFn?: (item: T) => boolean;
+    private _limit?: number;
+    private _reverse?: boolean;
+
+    private clone(): ApiTable<T> {
+        const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey);
+        copy._filterFn = this._filterFn;
+        copy._limit = this._limit;
+        copy._reverse = this._reverse;
+        return copy;
+    }
+
+    async toArray(): Promise<T[]> {
+        const res = await fetch(this.endpoint);
+        if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
+        const rawJson = await res.json();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data = await Promise.all(rawJson.map(async (item: any) => {
+            const revived = this.reviveDates(item);
+            return await this.decryptItem(revived);
+        }));
+
+        if (this._filterFn) {
+            data = data.filter(this._filterFn);
+        }
+
+        if (this._reverse) {
+            data.reverse();
+        }
+
+        if (this._limit) {
+            data = data.slice(0, this._limit);
+        }
+
+        return data;
+    }
+
+    async count(): Promise<number> {
+        return (await this.toArray()).length;
+    }
+
+
+
+    // Deprecated orderBy shim (just returns self for chaining)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    orderBy(field: string) {
+        return this;
+    }
+
+    async get(id: string): Promise<T | undefined> {
+        const res = await fetch(`${this.endpoint}/${id}`);
+        if (res.status === 404) return undefined;
+        if (!res.ok) throw new Error(`Failed to fetch item ${id}`);
+        const item = this.reviveDates(await res.json());
+        return await this.decryptItem(item);
+    }
+
+    async add(item: T): Promise<string> {
+        const encryptedItem = await this.encryptItem(item);
+        const res = await fetch(this.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(encryptedItem)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
+        }
+        const data = await res.json();
+        return data.id;
+    }
+
+    // Alias for Dexie compatibility (Upsert-like behavior)
+    async put(item: T): Promise<string> {
+        return this.add(item);
+    }
+
+    async update(id: string, changes: Partial<T>): Promise<void> {
+        const encryptedChanges = await this.encryptItem(changes as T, true);
+        const res = await fetch(`${this.endpoint}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(encryptedChanges)
+        });
+        if (!res.ok) throw new Error("Failed to update item");
+    }
+
+    async delete(id: string): Promise<void> {
+        await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+    }
+
+    async bulkDelete(ids: string[]): Promise<void> {
+        await Promise.all(ids.map(id => this.delete(id)));
+    }
+
+    async bulkPut(items: T[]): Promise<void> {
+        // Optimization: Send as single batch if supported by backend
+        // For 'drugs' specifically we added array support in POST
+        if (this.tableName === 'drugs' || items.length > 50) {
+            const res = await fetch(this.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items) // Encryption skipped for now on bulk to simplify, assuming public data like drugs
+            });
+            if (!res.ok) throw new Error("Failed to bulk add items");
+        } else {
+            await Promise.all(items.map(item => this.put(item)));
+        }
+    }
+
+    async clear(): Promise<void> {
+        // Optimization: Send DELETE to root endpoint to wipe table
+        // Backend must support DELETE /api/resource for "delete all"
+        const res = await fetch(this.endpoint, { method: 'DELETE' });
+        if (!res.ok) throw new Error("Failed to clear table");
+    }
+
+    // Helper to fix JSON date strings back to Date objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private reviveDates(obj: any): T {
+        if (!obj) return obj;
+        if (obj.createdAt) obj.createdAt = new Date(obj.createdAt);
+        if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt);
+        if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
+        if (obj.date) obj.date = new Date(obj.date);
+        return obj;
+    }
+
+    // --- Encryption Helpers ---
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    private async encryptItem(item: any, isPartial = false): Promise<any> {
+        const key = this.getMasterKey();
+        if (!key || !item) return item;
+
+        const fields = ENCRYPTED_FIELDS[this.tableName];
+        if (!fields) return item;
+
+        const copy = { ...item };
+
+        for (const field of fields) {
+            if (copy[field]) {
+                try {
+                    const { iv, data } = await encryptData(copy[field], key);
+                    copy[field] = `ENC:${iv}:${data}`;
+                } catch (e) {
+                    console.error(`Failed to encrypt ${this.tableName}.${field}`, e);
+                }
+            }
+        }
+        return copy;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private async decryptItem(item: any): Promise<any> {
+        const key = this.getMasterKey();
+        if (!key || !item) return item;
+
+        const fields = ENCRYPTED_FIELDS[this.tableName];
+        if (!fields) return item;
+
+        for (const field of fields) {
+            if (item[field] && typeof item[field] === 'string' && item[field].startsWith('ENC:')) {
+                try {
+                    const parts = item[field].split(':');
+                    if (parts.length === 3) {
+                        const iv = parts[1];
+                        const ciphertext = parts[2];
+                        item[field] = await decryptData(ciphertext, iv, key);
+                    }
+                } catch (e) {
+                    console.error(`Decryption failed for ${this.tableName}.${field}`, e);
+                    item[field] = '[LOCKED DATA]';
+                }
+            }
+        }
+        return item;
+    }
+}
+
+class MedicalApiClient {
+    private masterKey: CryptoKey | null = null;
+
+    patients: ApiTable<Patient>;
+    entries: ApiTable<ClinicalEntry>;
+    therapies: ApiTable<Therapy>;
+    conversations: ApiTable<Conversation>;
+    messages: ApiTable<Message>;
+    checkups: ApiTable<Checkup>;
+    attachments: ApiTable<Attachment>;
+    drugs: ApiTable<AifaDrug>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    settings: ApiTable<any>;
+
+    constructor() {
+        const getKey = () => this.masterKey;
+        this.patients = new ApiTable<Patient>('/api/patients', 'patients', getKey);
+        this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
+        this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
+        this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
+        this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
+        this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
+        this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey);
+        this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
+    }
+
     setKey(key: CryptoKey) {
         this.masterKey = key;
     }
@@ -390,131 +307,110 @@ class MedicalDatabase extends Dexie {
     }
 }
 
-// --- Backup & Restore Utilities ---
+export const db = new MedicalApiClient();
 
-import { SECURITY_CONFIG } from './security';
-
-interface BackupData {
-    meta: {
-        version: number;
-        timestamp: string;
-        tables: string[];
-    };
-    security: {
-        salt: string | null;
-        encryptedMasterKey: string | null;
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: Record<string, any[]>;
+export async function exportRawDatabase() {
+    console.warn("Export raw database not yet implemented for SQLite adapter");
+    return new Blob(["SQLite Backup Not Implemented"], { type: "text/plain" });
 }
 
-/**
- * Exports the entire database in its native encrypted state.
- * Uses low-level IDB to bypass decryption middleware.
- */
-export async function exportRawDatabase(): Promise<string> {
-    const backup: BackupData = {
-        meta: {
-            version: 1,
-            timestamp: new Date().toISOString(),
-            tables: []
-        },
-        security: {
-            salt: localStorage.getItem(SECURITY_CONFIG.PIN_SALT_KEY),
-            encryptedMasterKey: localStorage.getItem(SECURITY_CONFIG.ENCRYPTED_MASTER_KEY)
-        },
-        data: {}
-    };
+export async function importRawDatabase(jsonString: string) {
+    try {
+        const data = JSON.parse(jsonString);
 
-    if (!db.backendDB()) {
-        await db.open();
-    }
-
-    // Use Dexie's backend DB (raw IDB) to read data without middleware
-    const idb = db.backendDB();
-    const tables = db.tables.map(t => t.name);
-    backup.meta.tables = tables;
-
-    // Use a transaction on the raw IDB
-    const tx = idb.transaction(tables, 'readonly');
-
-    await Promise.all(tables.map(async (tableName) => {
-        return new Promise<void>((resolve, reject) => {
-            const store = tx.objectStore(tableName);
-            const request = store.getAll();
-
-            request.onsuccess = () => {
-                backup.data[tableName] = request.result;
-                resolve();
-            };
-            request.onerror = () => reject(request.error);
-        });
-    }));
-
-    return JSON.stringify(backup);
-}
-
-/**
- * Wipes the current DB and imports data from a backup.
- * DANGER: This is destructive.
- */
-export async function importRawDatabase(jsonString: string): Promise<void> {
-    const backup: BackupData = JSON.parse(jsonString);
-
-    // 1. Validate structure
-    if (!backup.meta || !backup.security || !backup.data) {
-        throw new Error("Invalid backup format");
-    }
-
-    // 2. Restore Security Keys first (needed for future access)
-    // We don't need to decrypt them now, just store them.
-    if (backup.security.salt) {
-        localStorage.setItem(SECURITY_CONFIG.PIN_SALT_KEY, backup.security.salt);
-    }
-    if (backup.security.encryptedMasterKey) {
-        localStorage.setItem(SECURITY_CONFIG.ENCRYPTED_MASTER_KEY, backup.security.encryptedMasterKey);
-    }
-
-    if (!db.isOpen()) {
-        await db.open();
-    }
-    const idb = db.backendDB();
-    const tables = backup.meta.tables;
-
-    // Clear all tables first
-    const clearTx = idb.transaction(tables, 'readwrite');
-    await Promise.all(tables.map(table => {
-        return new Promise<void>((resolve, reject) => {
-            const store = clearTx.objectStore(table);
-            const clearReq = store.clear();
-            clearReq.onsuccess = () => resolve();
-            clearReq.onerror = () => reject(clearReq.error);
-        });
-    }));
-
-    // Import data
-    const importTx = idb.transaction(tables, 'readwrite');
-    await Promise.all(tables.map(async (table) => {
-        if (!backup.data[table]) return;
-
-        const rows = backup.data[table];
-        if (rows.length === 0) return;
-
-        const store = importTx.objectStore(table);
-
-        for (const row of rows) {
-            store.put(row);
+        if (data.patients && Array.isArray(data.patients)) {
+            await db.patients.bulkPut(data.patients);
         }
-    }));
-
-    // Wait for transaction completion
-    return new Promise((resolve, reject) => {
-        importTx.oncomplete = () => resolve();
-        importTx.onerror = () => reject(importTx.error);
-        importTx.onabort = () => reject(new Error("Transaction aborted"));
-    });
+        if (data.entries && Array.isArray(data.entries)) {
+            await db.entries.bulkPut(data.entries);
+        }
+        if (data.checkups && Array.isArray(data.checkups)) {
+            await db.checkups.bulkPut(data.checkups);
+        }
+        if (data.therapies && Array.isArray(data.therapies)) {
+            await db.therapies.bulkPut(data.therapies);
+        }
+        if (data.settings && Array.isArray(data.settings)) {
+            await db.settings.bulkPut(data.settings);
+        }
+        console.log("Import completed");
+    } catch (e) {
+        console.error("Import failed", e);
+        throw e;
+    }
 }
 
-const db = new MedicalDatabase();
+export interface Conversation {
+    id: string;
+    title: string;
+    isArchived?: boolean;
+    isDeleted?: boolean;
+    updatedAt: Date;
+    createdAt: Date;
+}
 
-export { db };
+export interface Message {
+    id: string;
+    conversationId: string;
+    role: string;
+    content: string;
+    attachmentType?: string;
+    attachmentBase64?: string;
+    createdAt: Date;
+    metadata?: string;
+    reasoning?: string;
+}
+
+export interface Checkup {
+    id: string;
+    patientId: string;
+    date: Date;
+    title: string;
+    type: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
+    value: number;
+    maxValue?: number;
+    unit?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt?: Date;
+}
+
+export interface Attachment {
+    id: string;
+    patientId: string;
+    name: string;
+    type: string; // MIME type
+    size: number; // Bytes
+    path: string;
+    data?: string; // Base64 content for storage
+    summarySnapshot?: string;
+    createdAt: Date;
+}
+
+export interface AifaDrug {
+    aic: string;
+    name: string;
+    activePrinciple?: string;
+    company?: string;
+    packaging?: string;
+    class?: string;
+    price?: number;
+    atc?: string;
+    updatedAt?: Date;
+}
+
+export interface Therapy {
+    id: string;
+    patientId: string;
+    drugName: string;
+    activePrinciple?: string;
+    dosage: string;
+    motivation?: string;
+    diagnosisCode?: string;
+    diagnosisName?: string;
+    status: 'active' | 'suspended' | 'interrupted' | 'completed';
+    startDate: Date;
+    endDate?: Date;
+    createdAt: Date;
+    updatedAt?: Date;
+}

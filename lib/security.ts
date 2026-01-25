@@ -39,7 +39,7 @@ export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<C
     return window.crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',
-            salt: salt,
+            salt: salt as unknown as BufferSource,
             iterations: SECURITY_CONFIG.ITERATIONS,
             hash: 'SHA-256',
         },
@@ -100,7 +100,7 @@ export async function unwrapMasterKey(encryptedMasterKeyB64: string, kek: Crypto
 /**
  * Encrypts arbitrary data (string or object) using the Master Key
  */
-export async function encryptData(data: any, masterKey: CryptoKey): Promise<{ iv: string; data: string }> {
+export async function encryptData(data: unknown, masterKey: CryptoKey): Promise<{ iv: string; data: string }> {
     const json = JSON.stringify(data);
     const enc = new TextEncoder();
     const encoded = enc.encode(json);
@@ -121,7 +121,7 @@ export async function encryptData(data: any, masterKey: CryptoKey): Promise<{ iv
 /**
  * Decrypts data using the Master Key
  */
-export async function decryptData(encryptedData: string, ivB64: string, masterKey: CryptoKey): Promise<any> {
+export async function decryptData(encryptedData: string, ivB64: string, masterKey: CryptoKey): Promise<unknown> {
     const iv = base64ToArrayBuffer(ivB64);
     const data = base64ToArrayBuffer(encryptedData);
 
@@ -136,17 +136,16 @@ export async function decryptData(encryptedData: string, ivB64: string, masterKe
         const json = dec.decode(decryptedBuffer);
         return JSON.parse(json);
     } catch (e) {
-        console.error('Decryption failed', e);
-        // If decryption fails, return null or throw. 
-        // In migration context, failing to decrypt might mean it wasn't encrypted? 
-        // But here we assume inputs are encrypted.
-        throw new Error('Decryption failed');
+        console.warn('Decryption failed, returning null', e);
+        // Fallback: return null so the UI can decide how to handle it (e.g. show "Locked" or empty)
+        // Throwing causes the entire LiveQuery to fail.
+        return null;
     }
 }
 
 // --- Utilities ---
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function arrayBufferToBase64(buffer: ArrayBuffer | ArrayBufferLike): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {

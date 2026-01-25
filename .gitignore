@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.venv_mlx/
+
+# local database
+*.db
+*.db-journal
+
+# logs
+.pm2/
+logs/

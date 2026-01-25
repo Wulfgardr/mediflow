@@ -16,48 +16,98 @@ The software "base" is in Italian but feel free to branch, modify, suggest and s
 
 ---
 
-## Technical Documentation (ReadMe)
+## ⚖️ Compliance & GDPR (Work in Progress)
 
-## 🛠 Tech Stack
+**Primum non nocere (First, do no harm) applies to data too.**
 
-* **Framework**: Next.js 15 (App Router)
-* **Styling**: Tailwind CSS v4 (with custom "Liquid Glass" aesthetics)
-* **Database**: Dexie.js (IndexedDB)
-* **AI Engine**: Local LLM integration via **Ollama** or remote OpenAI fallback.
+This application is designed following the principles of **Privacy by Design** and **Data Minimization**, implementing state-of-the-art technical best practices for data protection:
 
-## ⚙️ Logic & Architecture
+* **Local-First Architecture**: Data resides *exclusively* in the user's browser (IndexedDB).
+* **AES-GCM Encryption**: Sensitive data (notes, diary) is encrypted at rest using a Master Key derived from your PIN.
+* **Zero-Knowledge**: Keys never leave the device.
 
-### 1. Data Management
+However, full compliance with **GDPR** (EU Regulation 2016/679) is a complex process involving legal and organizational aspects beyond just technology.
 
-The application runs entirely in the browser.
+* **Best Effort**: Adherence to GDPR standards is currently a "Best Effort" goal.
+* **Professional Use**: requires specific legal validation by the Data Controller (the Doctor/Clinic).
+* **Tools Provided**: The app provides tools (Audit Log, Export, Secure Deletion) to facilitate compliance, but does not substitute specialized legal advice.
 
-* **Patients & Entries**: Stored in `Dexie` (IndexedDB).
-* **Files**: Attachments are chunked and stored as Blobs locally.
-* **Drug Database**: Uses the AIFA Open Data standard. The OSS version requires you to upload the `confezioni.csv` manually.
+---
 
-### 2. AI Integration
+## 🚀 Key Features (v0.3.0)
 
-* **Ollama (Local)**: Recommended for privacy. We support `medgemma` and `llama3` models.
-  * *Setup*: Run `ollama serve` on port 11434.
-* **Structure**: The `ai-engine.ts` handles the prompt construction and context window management.
+### 1. Onboarding & Security
 
-### 3. ICD Classification
+A new **Onboarding Wizard** guides you through the initial setup:
 
-* **ICD-9**: Built-in JSON lookup.
-* **ICD-11**: Requires a local Docker container of the WHO API for full functionality/offline support, or uses the public API with an API key.
+* **Privacy Acceptance**: Explicit disclaimer about the local-hosted nature of the data.
+* **Profile Setup**: Dynamic configuration of Doctor and Clinic names for printouts and UI.
+* **Secure PIN**: Mandatory setup of a PIN to encrypt the Master Key.
 
-## 📦 Patch Notes
+### 2. Data Integrity (Backup & Restore)
 
-### **v0.2.0 - "The Polished Update"**
+* **Export**: Full encrypted backup to `.mediflow` JSON file (includes security salt/keys).
+* **Import**: Restore capability to migrate data between devices (Destructive operation).
 
-* **🎨 Dark Mode Refined**: Fixed contrast issues and restored the "Liquid Glass" aesthetic in dark mode.
-* **🧹 Code Quality**: Resolved numerous linter warnings (CSS syntax, inline styles) for a cleaner codebase.
-* **🚀 Performance**: Optimized large list rendering for the patient index.
-* **📦 OSS Prep**: Improved the anonymization script to better separate private assets from the public code.
+### 3. AI & ICD Integration
 
-## 🚀 Getting Started (Dev)
+* **ICD-11 & ICD-9**: Dual coding support.
+* **Local AI (Ollama)**: Integration with local LLMs for clinical summaries without data leaks.
 
-1. **Clone**: `git clone ...`
+---
+
+## 📐 Process Architecture
+
+### System Orchestration (Docker)
+
+How the containers interact in the "All-in-One" deployment:
+
+```mermaid
+graph TD
+    subgraph Docker_Host_Mac
+        subgraph MediFlow_Network
+            App["Next.js App (Port 3000)"]
+            ICD["ICD-API (Port 8888)"]
+            Ollama["Ollama AI (Port 11434)"]
+
+            App -->|REST Proxy| ICD
+            App -->|REST Proxy| Ollama
+        end
+        
+        Browser["User Browser"] -->|HTTP| App
+        Browser -->|Direct Fetch - Mixed| ICD
+    end
+
+    Volume["Ollama Models (Volume)"] -.-> Ollama
+```
+
+### Security & Privacy Cycle
+
+The "Local-First" data flow ensuring privacy:
+
+```mermaid
+graph LR
+    Input["Dati Sensibili (Paziente/Note)"] -->|Input UI| Encrypt["AES-GCM (Browser Crypto API)"]
+    Encrypt -->|Ciphertext| Store["IndexedDB (Storage Locale)"]
+    
+    subgraph Backup_Process
+        Store -->|Raw Export| JSON["File .mediflow (Encrypted JSON)"]
+        Keys["Protezione Chiavi (Salt + Wrapped Key)"] --> JSON
+    end
+
+    JSON -->|User Responsibility| Safe["Chiavetta USB / Vault"]
+```
+
+---
+
+## 🛠 Technical Overview
+
+* **Stack**: Next.js 15, Tailwind CSS v4, Dexie.js.
+* **Architecture**: "All-in-One" Docker orchestration (App + ICD-API + Ollama) for easy deployment.
+
+## 🚀 Getting Started (Developers)
+
+1. **Clone**: `git clone https://github.com/Wulfgardr/mediflow.git`
 2. **Install**: `npm install`
 3. **Run**: `npm run dev`
 4. **Setup Drugs**: Go to Settings -> Upload `confezioni.csv` (available from AIFA).

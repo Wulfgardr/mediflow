@@ -16,6 +16,22 @@ export default function NewPatientPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {
         try {
+            // DUPLICATE CHECK: Enforce uniqueness on Tax Code
+            // We check manually here because the DB schema (historical reasons) might not have unique index
+            if (data.taxCode) {
+                const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode).toArray())[0];
+                if (existing) {
+                    const confirmMsg = `Attenzione: Esiste già un paziente con questo Codice Fiscale.\n\n${existing.lastName} ${existing.firstName}\nID: ${existing.id}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
+                    if (confirm(confirmMsg)) {
+                        router.push(`/patients/${existing.id}`);
+                        return;
+                    } else {
+                        // If they say Cancel, we abort the save to prevent duplicate
+                        return;
+                    }
+                }
+            }
+
             const patientId = uuidv4();
             const { checkups, ...patientData } = data;
 
@@ -46,7 +62,7 @@ export default function NewPatientPage() {
             router.push('/');
         } catch (error) {
             console.error("Failed to save patient", error);
-            alert("Errore durante il salvataggio. Controlla che il codice fiscale non sia duplicato.");
+            alert("Errore durante il salvataggio. Controlla i dati e riprova.");
         }
     };
 
