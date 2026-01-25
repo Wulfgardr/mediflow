@@ -65,7 +65,7 @@ export default function SettingsPage() {
                     // Or auto-run test quietly? No, expensive.
                     // Just check if we can reach our own proxy which connects to it.
                     // For now, let's just leave it to "Test Diagnostico" but show a label.
-                } catch (e) { }
+                } catch { }
             };
             checkOllama();
         }
@@ -86,7 +86,7 @@ export default function SettingsPage() {
             await fetch('/api/system/mlx', { method });
             await new Promise(r => setTimeout(r, 1000)); // wait for startup
             await fetchMlxStatus();
-        } catch (e) {
+        } catch {
             alert("Errore nel controllo del processo");
         } finally {
             setIsMlxLoading(false);
@@ -652,7 +652,7 @@ export default function SettingsPage() {
                                         <span>{progress}%</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 w-[var(--prog-width)]" style={{ '--prog-width': `${progress}%` } as React.CSSProperties}></div>
+                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
                                     </div>
                                     <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
                                 </div>
