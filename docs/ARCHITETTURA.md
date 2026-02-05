@@ -21,6 +21,7 @@ graph TD
     end
 
     subgraph "Layer 2: Core & Dati (Backend Locale)"
+        Proxy["🔒 TLS Proxy (:3443)"]
         NextAPI["⚙️ Next.js Server (:3000)"]
         DB[(💾 SQLite: medical.db)]
     end
@@ -30,8 +31,9 @@ graph TD
         ICD["🏥 ICD-11 Docker (:8888)"]
     end
 
-    Native -->|HTTPS :3443| NextAPI
-    Web -->|HTTP :3000| NextAPI
+    Native -->|HTTPS| Proxy
+    Proxy -->|HTTP| NextAPI
+    Web -->|HTTP| NextAPI
     NextAPI --> DB
     NextAPI --> Ollama
     NextAPI --> ICD
