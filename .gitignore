@@ -19,10 +19,16 @@
 
 # production
 /build
+native/**/.build/
+native/**/Build/
 
 # misc
 .DS_Store
+AGENTS.md
 *.pem
+certs/
+*.key
+*.crt
 
 # debug
 npm-debug.log*

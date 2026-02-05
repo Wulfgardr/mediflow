@@ -60,6 +60,30 @@ export async function buildPatientContext(patientId: string): Promise<string> {
         .map(a => `[DOC ${a.name}]: ${a.summarySnapshot}`)
         .join("\n");
 
+    /* @Codex */
+    let insightsContext = "";
+    if (patient.documentInsights) {
+        try {
+            const rawInsights = typeof patient.documentInsights === 'string'
+                ? JSON.parse(patient.documentInsights)
+                : patient.documentInsights;
+
+            if (Array.isArray(rawInsights)) {
+                insightsContext = rawInsights
+                    .slice(0, 3)
+                    .map((insight) => {
+                        const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
+                        const summary = insight?.summary ?? "";
+                        return summary ? `- ${summary}${fileName}` : "";
+                    })
+                    .filter(Boolean)
+                    .join("\n");
+            }
+        } catch {
+            insightsContext = "";
+        }
+    }
+
     return `
 --- CONTESTO PAZIENTE (ID: ${patient.id}) ---
 DATIGRAFICI: ${patient.lastName} ${patient.firstName} (Età: ${age})
@@ -73,6 +97,9 @@ ${diaryContext || "Nessuna nota recente."}
 
 [DOCUMENTI RECENTI]
 ${docsContext || "Nessun documento analizzato."}
+
+[ARCHIVIO INTELLIGENTE]
+${insightsContext || "Nessuna sintesi disponibile."}
 --- FINE CONTESTO ---
 Usa queste informazioni per rispondere alla richiesta dell'utente.
 `;

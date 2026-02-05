@@ -124,15 +124,53 @@ body {
 @layer utilities {
   .glass {
     @apply backdrop-blur-md bg-white/70 dark:bg-[#161b22]/90 border border-white/50 dark:border-[#30363d] shadow-xl;
+    /* @Codex */
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.05));
+    /* @Codex */
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
 
   .glass-card {
     @apply backdrop-blur-xl bg-white/60 dark:bg-[#161b22] border border-white/40 dark:border-[#30363d] shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
+    /* @Codex */
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.2));
+    /* @Codex */
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  /* @Codex */
+  .glass-card:hover {
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
   }
 
   .glass-panel {
     @apply backdrop-blur-2xl bg-white/80 dark:bg-[#0d1117] border border-white/30 dark:border-[#30363d] shadow-lg rounded-3xl;
+    /* @Codex */
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.2));
+    /* @Codex */
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
+
+  /* @Codex */
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* @Codex */
+:root.dark .glass,
+:root.dark .glass-card,
+:root.dark .glass-panel {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* @Codex */
+:root.dark .glass-card:hover {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Progress bar widths (used by analytics/settings pages) */

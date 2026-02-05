@@ -1,5 +1,6 @@
 #!/bin/bash
 # Default Model: Optimized 4-bit MedGemma 2 or similar
+# @Codex
 DEFAULT_MODEL="mlx-community/medgemma-1.5-4b-it-bf16"
 MODEL=${1:-$DEFAULT_MODEL}
 PORT=8080

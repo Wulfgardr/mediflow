@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function PUT(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await request.json();
         const { id, displayName, ambulatoryName } = body;

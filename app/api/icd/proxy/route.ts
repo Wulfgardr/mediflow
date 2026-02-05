@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 const ICD_LOCAL_URL = process.env.ICD_BASE_URL || 'http://127.0.0.1:8888';
 
 export async function GET(request: NextRequest) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
 

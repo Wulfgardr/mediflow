@@ -30,7 +30,8 @@ export default function RootLayout({
             <PrivacyProvider>
               <div className="flex">
                 <Sidebar />
-                <main className="flex-1 ml-64 p-8 min-h-screen">
+                {/* @Codex: align main offset with updated sidebar width */}
+                <main className="flex-1 ml-80 p-8 min-h-screen">
                   {/* Main Content Area - adding a max-width container for readability */}
                   <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {children}

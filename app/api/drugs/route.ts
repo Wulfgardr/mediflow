@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
 import { sql } from 'drizzle-orm';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     // Basic search implementation or fetch all
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
@@ -29,6 +35,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await request.json();
 
@@ -84,6 +94,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     // Handle clear() -> effectively delete all
     // ApiTable.clear() calls toArray() then bulkDelete(). 
     // This is TERRIBLE for 50k items.

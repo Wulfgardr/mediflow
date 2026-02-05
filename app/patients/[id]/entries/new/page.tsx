@@ -8,7 +8,12 @@ import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { useDropzone } from 'react-dropzone';
-import { extractTextFromPdf, parsePatientData } from '@/lib/pdf-service';
+/* @Codex */
+import { extractPatientDataSmart, extractDocumentTextForSummary } from '@/lib/pdf-service';
+/* @Codex */
+import { synthesizeDocument } from '@/lib/document-synthesis-service';
+/* @Codex */
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
 
 export default function NewEntryPage() {
     const params = useParams();
@@ -44,23 +49,37 @@ export default function NewEntryPage() {
 
         try {
             const attachmentIds: string[] = [];
+            /* @Codex */
+            const aiModels = await getAiModelLabels();
 
             // 1. Process and Upload Files
             for (const file of files) {
                 let summary = "Allegato alla visita";
 
-                // Construct a better summary if PDF
-                if (file.type === 'application/pdf') {
+                const isPdf = file.type === 'application/pdf';
+                const isImage = file.type.startsWith('image/');
+
+                /* @Codex */
+                if (isPdf || isImage) {
                     try {
-                        const text = await extractTextFromPdf(file);
-                        const data = parsePatientData(text);
-                        if (data.notes && data.notes.length > 5) {
-                            summary = data.notes;
+                        setUploadProgress(`AI OCR (${aiModels.ocr})...`);
+                        const extracted = await extractPatientDataSmart(file);
+                        let rawText = extracted.rawText;
+                        if (!rawText || rawText.length < 200) {
+                            rawText = await extractDocumentTextForSummary(file);
+                        }
+
+                        if (rawText) {
+                            setUploadProgress(`Sintesi documento (${aiModels.clinical})...`);
+                            const insight = await synthesizeDocument(rawText, file.name, id);
+                            summary = insight.summary;
+                        } else if (extracted.notes && extracted.notes.length > 5) {
+                            summary = extracted.notes;
                         } else {
                             summary = "Documento allegato (analizzato)";
                         }
                     } catch (err) {
-                        console.warn("PDF extraction failed", err);
+                        console.warn("Documento OCR/Sintesi fallita", err);
                     }
                 }
 
@@ -108,6 +127,10 @@ export default function NewEntryPage() {
                 createdAt: new Date(), // Audit Timestamp
                 updatedAt: new Date(),
             });
+
+            /* @Codex */
+            setUploadProgress('Aggiornamento AI Patient Summary...');
+            await regeneratePatientSummary(id);
 
             router.push(`/patients/${id}`);
         } catch (err) {

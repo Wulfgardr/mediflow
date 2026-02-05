@@ -3,6 +3,20 @@
 
 import { encryptData, decryptData } from './security';
 
+// Document insight from OCR + AI synthesis
+export interface DocumentInsight {
+    id: string;
+    date: Date;
+    fileName: string;
+    rawMarkdown: string;  // DeepSeek-OCR output
+    summary: string;      // MedGemma synthesis
+    extractedData?: {
+        diagnosis?: string;
+        medications?: string[];
+        labs?: Record<string, string>;
+    };
+}
+
 export interface Patient {
     id: string;
     firstName: string;
@@ -19,9 +33,28 @@ export interface Patient {
     deletedAt?: Date;
     deletionReason?: string;
     aiSummary?: string;
+    documentInsights?: DocumentInsight[]; // Last 3 scanned docs
     notes?: string;
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
+    ambulatoryId?: string;
+}
+
+export interface PatientAmbulatory {
+    patientId: string;
+    ambulatoryId: string;
+    assignedAt: Date;
+}
+
+export interface Ambulatory {
+    id: string;
+    name: string;
+    address?: string;
+    parentId?: string | null;
+    type?: 'live' | 'test';
+    description?: string;
+    isDefault?: boolean;
+    createdAt: Date;
 }
 
 export interface Diagnosis {
@@ -49,12 +82,14 @@ export interface ClinicalEntry {
 
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
-    patients: ['address', 'phone', 'caregiver', 'notes', 'aiSummary', 'archiveNote', 'deletionReason'],
+    patients: ['address', 'phone', 'caregiver', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
     entries: ['content', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
     conversations: ['title'],
-    messages: ['content', 'reasoning']
+    messages: ['content', 'reasoning'],
+    /* @Codex */
+    attachments: ['name', 'path', 'data', 'summarySnapshot']
 };
 
 class ApiTable<T> {
@@ -103,6 +138,8 @@ class ApiTable<T> {
 
     async toArray(): Promise<T[]> {
         const res = await fetch(this.endpoint);
+        /* @Codex */
+        if (res.status === 401 || res.status === 403) return [];
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
         const rawJson = await res.json();
 
@@ -274,6 +311,7 @@ class MedicalApiClient {
     private masterKey: CryptoKey | null = null;
 
     patients: ApiTable<Patient>;
+    ambulatories: ApiTable<Ambulatory>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
     conversations: ApiTable<Conversation>;
@@ -283,10 +321,13 @@ class MedicalApiClient {
     drugs: ApiTable<AifaDrug>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings: ApiTable<any>;
+    patientsToAmbulatories: ApiTable<PatientAmbulatory>;
 
     constructor() {
         const getKey = () => this.masterKey;
         this.patients = new ApiTable<Patient>('/api/patients', 'patients', getKey);
+        this.ambulatories = new ApiTable<Ambulatory>('/api/ambulatories', 'ambulatories', getKey);
+        // ... (existing)
         this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
         this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
@@ -296,9 +337,11 @@ class MedicalApiClient {
         this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
+        this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
     }
 
-    setKey(key: CryptoKey) {
+    /* @Codex */
+    setKey(key: CryptoKey | null) {
         this.masterKey = key;
     }
 
