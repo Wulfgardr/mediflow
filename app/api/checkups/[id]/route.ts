@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const { id } = await params;
         const body = await request.json();
@@ -28,6 +34,10 @@ export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const { id } = await params;
         await dbServer.delete(checkups).where(eq(checkups.id, id));

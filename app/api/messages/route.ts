@@ -3,8 +3,14 @@ import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
 import { eq, asc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
 
@@ -24,6 +30,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await request.json();
         const newId = body.id || uuidv4();

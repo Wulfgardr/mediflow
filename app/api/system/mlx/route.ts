@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { PM2Manager } from '@/lib/pm2-manager';
+/* @Codex */
+import { requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
 
 
 // Note: Robust auth check should be added here using sessions.
 // For now relying on API route protection if any.
 
-export async function GET() {
+export async function GET(request: Request) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
+
     try {
         await PM2Manager.connect();
         const status = await PM2Manager.getStatus();
@@ -16,11 +23,15 @@ export async function GET() {
     }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
     // Security Check
     // TODO: Add robust auth check here.
     // For now, we rely on middleware if present, or just proceed.
     // The user requested security.
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
 
     try {
         await PM2Manager.connect();
@@ -33,7 +44,12 @@ export async function POST() {
     }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
+
     try {
         await PM2Manager.connect();
         await PM2Manager.stop();

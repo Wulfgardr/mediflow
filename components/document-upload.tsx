@@ -1,13 +1,18 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, X, Eye, Loader2 } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { extractTextFromPdf, parsePatientData } from '@/lib/pdf-service';
+/* @Codex */
+import { extractPatientDataSmart, extractDocumentTextForSummary } from '@/lib/pdf-service';
+/* @Codex */
+import { synthesizeDocument } from '@/lib/document-synthesis-service';
+/* @Codex */
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
 import DocumentViewer from '@/components/document-viewer';
 
 interface DocumentUploadProps {
@@ -17,6 +22,19 @@ interface DocumentUploadProps {
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+    /* @Codex */
+    const [aiStage, setAiStage] = useState<string>("");
+    /* @Codex */
+    const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
+
+    /* @Codex */
+    useEffect(() => {
+        const loadModels = async () => {
+            const models = await getAiModelLabels();
+            setAiModels(models);
+        };
+        loadModels();
+    }, []);
 
     const attachments = useLiveQuery(
         async () => {
@@ -34,20 +52,40 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         setIsProcessing(true);
+        /* @Codex */
+        setAiStage("Inizializzazione AI...");
+        let shouldRefreshSummary = false;
         // Limit total files if needed, here we just process
         for (const file of acceptedFiles) {
             try {
                 // Auto-extract analysis on upload
                 let summary = "Nessuna informazione rilevante trovata.";
+                const isPdf = file.type === 'application/pdf';
+                const isImage = file.type.startsWith('image/');
 
-                if (file.type === 'application/pdf') {
-                    const text = await extractTextFromPdf(file);
-                    const data = parsePatientData(text);
-                    if (data.notes) {
-                        summary = data.notes; // "Diagnosi: ..."
-                    } else {
-                        // Fallback: take first 100 chars of text as simplistic summary? No, better keep it clean.
-                        summary = "Analisi completata (nessuna diagnosi esplicita rilevata)";
+                /* @Codex */
+                /* @Codex */
+                if (isPdf || isImage) {
+                    try {
+                        setAiStage(`OCR in corso (${aiModels?.ocr ?? 'deepseek-ocr'})...`);
+                        const extracted = await extractPatientDataSmart(file);
+                        let rawText = extracted.rawText;
+                        if (!rawText || rawText.length < 200) {
+                            rawText = await extractDocumentTextForSummary(file);
+                        }
+
+                        if (rawText) {
+                            setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'medgemma'})...`);
+                            const insight = await synthesizeDocument(rawText, file.name, patientId);
+                            summary = insight.summary;
+                            shouldRefreshSummary = true;
+                        } else if (extracted.notes) {
+                            summary = extracted.notes;
+                        } else {
+                            summary = "Analisi completata (nessuna diagnosi esplicita rilevata)";
+                        }
+                    } catch (err) {
+                        console.warn('[DocumentUpload] OCR/Sintesi fallita', err);
                     }
                 }
 
@@ -77,8 +115,19 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 alert("Errore caricamento file: " + file.name);
             }
         }
+        /* @Codex */
+        if (shouldRefreshSummary) {
+            try {
+                setAiStage("Aggiornamento AI Patient Summary...");
+                await regeneratePatientSummary(patientId);
+            } catch (err) {
+                console.warn('[DocumentUpload] Aggiornamento summary fallito', err);
+            }
+        }
         setIsProcessing(false);
-    }, [patientId]);
+        /* @Codex */
+        setAiStage("");
+    }, [patientId, aiModels]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
@@ -111,6 +160,18 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
                 <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file).</p>
             </div>
+
+            {/* @Codex */}
+            {(isProcessing || aiStage) && (
+                <div className="text-xs text-gray-500">
+                    <span className="font-medium">AI:</span> {aiStage || "Attesa..."}
+                    {aiModels && (
+                        <div className="mt-1 text-[10px] text-gray-400">
+                            OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* File List */}
             <div className="flex flex-col gap-3">

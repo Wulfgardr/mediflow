@@ -10,6 +10,8 @@ import {
 import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
+/* @Codex */
+import { AuthHealthScreen, AuthHealthPayload } from '@/components/auth-health-screen';
 
 export interface User {
     id: string;
@@ -37,6 +39,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [requiresSetup, setRequiresSetup] = useState<boolean | null>(null); // null = loading
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    /* @Codex */
+    const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
+    /* @Codex */
+    const [isRepairing, setIsRepairing] = useState(false);
 
     // Inactivity Timeout
     const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
@@ -44,6 +50,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const lock = () => {
         setIsLocked(true);
+        // @Codex - clear server session when locking
+        void fetch('/api/auth/logout', { method: 'POST' });
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
     };
 
@@ -92,8 +100,56 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
-            const res = await fetch('/api/auth/check');
-            const data = await res.json();
+            /* @Codex */
+            const res = await fetch('/api/auth/check', { cache: 'no-store' });
+            /* @Codex */
+            const text = await res.text();
+            /* @Codex */
+            let data: AuthHealthPayload | null = null;
+            if (text) {
+                try {
+                    data = JSON.parse(text) as AuthHealthPayload;
+                } catch (error) {
+                    console.warn('Auth check returned non-JSON payload', error);
+                }
+            }
+            /* @Codex */
+            if (!data) {
+                setAuthHealth({
+                    status: 'error',
+                    error: {
+                        code: 'AUTH_CHECK_INVALID',
+                        message: res.ok ? 'Risposta non valida dal server.' : `Errore server (HTTP ${res.status}).`
+                    }
+                });
+                setRequiresSetup(false);
+                setIsAuthenticated(false);
+                setIsLocked(true);
+                return;
+            }
+            /* @Codex */
+            if (!res.ok) {
+                setAuthHealth({
+                    ...data,
+                    status: 'error',
+                    error: data.error ?? { code: 'AUTH_CHECK_HTTP', message: `Errore server (HTTP ${res.status}).` }
+                });
+                setRequiresSetup(false);
+                setIsAuthenticated(false);
+                setIsLocked(true);
+                return;
+            }
+
+            /* @Codex */
+            if (data?.status === 'error' || data?.error) {
+                setAuthHealth(data);
+                setRequiresSetup(false);
+                setIsAuthenticated(false);
+                setIsLocked(true);
+                return;
+            }
+            /* @Codex */
+            setAuthHealth(null);
 
             // If setup is missing on server, force setup flow regardless of session
             if (!data.isSetup) {
@@ -102,12 +158,47 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // Setup exists.
                 setRequiresSetup(false);
+                // @Codex - if server session is missing, lock and clear local session
+                if (data.hasSession === false) {
+                    sessionStorage.removeItem('mediflow_session_key');
+                    sessionStorage.removeItem('mediflow_user');
+                    db.setKey(null);
+                    setIsAuthenticated(false);
+                    setIsLocked(true);
+                    return;
+                }
                 // If we didn't restore session, we remain unauthenticated (showing lock screen if set)
                 // If isSessionRestored is true, we are already authenticated via restoreSession
             }
         } catch (e) {
             console.error("Auth check failed", e);
-            setRequiresSetup(true);
+            /* @Codex */
+            setAuthHealth({
+                status: 'error',
+                error: { code: 'AUTH_CHECK_FAILED', message: 'Impossibile verificare lo stato di sicurezza.' }
+            });
+            setRequiresSetup(false);
+            setIsAuthenticated(false);
+            setIsLocked(true);
+        }
+    };
+
+    /* @Codex */
+    const repairFromLegacy = async () => {
+        if (isRepairing) return;
+        setIsRepairing(true);
+        try {
+            const res = await fetch('/api/system/repair-db', { method: 'POST' });
+            if (!res.ok) {
+                const payload = await res.json().catch(() => null);
+                throw new Error(payload?.error || 'Ripristino fallito');
+            }
+            await checkAuthStatus();
+        } catch (e) {
+            console.error('Repair failed', e);
+            alert('Ripristino fallito. Verifica i dettagli in console.');
+        } finally {
+            setIsRepairing(false);
         }
     };
 
@@ -224,7 +315,28 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 })
             });
 
-            if (!res.ok) throw new Error("Setup failed server-side");
+            /* @Codex */
+            if (!res.ok) {
+                let payload: any = null;
+                try {
+                    payload = await res.json();
+                } catch {
+                    payload = null;
+                }
+
+                if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                    setRequiresSetup(false);
+                    const success = await login(pin);
+                    if (!success) {
+                        setIsAuthenticated(false);
+                        setIsLocked(true);
+                        alert("Setup già completato. Inserisci il PIN esistente.");
+                    }
+                    return;
+                }
+
+                throw new Error(payload?.error || "Setup failed server-side");
+            }
 
             // Set Active
             db.setKey(masterKey);
@@ -241,6 +353,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             alert("Errore configurazione: " + e);
         }
     };
+
+    /* @Codex */
+    if (authHealth?.status === 'error') {
+        return (
+            <AuthHealthScreen
+                health={authHealth}
+                onRetry={() => checkAuthStatus()}
+                onRepair={repairFromLegacy}
+                isRepairing={isRepairing}
+            />
+        );
+    }
 
     // Loading state
     if (requiresSetup === null) {

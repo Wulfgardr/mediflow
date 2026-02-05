@@ -1,49 +1,120 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FileText, Loader2, CheckCircle } from 'lucide-react';
-import { extractTextFromPdf, parsePatientData, ExtractedPatientData } from '@/lib/pdf-service';
-import { cn } from '@/lib/utils'; // Assuming cn exists
+import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
+import { extractPatientDataSmart, ExtractedPatientData } from '@/lib/pdf-service';
+import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { cn } from '@/lib/utils';
+/* @Codex */
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
 
 interface PdfImporterProps {
     onDataExtracted: (data: ExtractedPatientData) => void;
+    patientId?: string; // Optional: if provided, enables archiving
 }
 
-export default function PdfImporter({ onDataExtracted }: PdfImporterProps) {
+export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterProps) {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSynthesizing, setIsSynthesizing] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [extractionSource, setExtractionSource] = useState<'ai' | 'regex' | 'hybrid' | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [saveToArchive] = useState(true); // Default on (no toggle UI for simplicity)
+    const [archiveSaved, setArchiveSaved] = useState(false);
+    /* @Codex */
+    const [aiStage, setAiStage] = useState<string>("");
+    /* @Codex */
+    const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
+
+    /* @Codex */
+    useEffect(() => {
+        const loadModels = async () => {
+            const models = await getAiModelLabels();
+            setAiModels(models);
+        };
+        loadModels();
+    }, []);
 
     const onDrop = async (acceptedFiles: File[]) => {
         if (acceptedFiles.length === 0) return;
 
         const file = acceptedFiles[0];
-        if (file.type !== 'application/pdf') {
-            alert('Per favore carica solo file PDF.');
+        const isPdf = file.type === 'application/pdf';
+        const isImage = file.type.startsWith('image/');
+
+        if (!isPdf && !isImage) {
+            setError('Formati supportati: PDF, JPG, PNG');
             return;
         }
 
         setIsProcessing(true);
+        /* @Codex */
+        setAiStage(`OCR in corso (${aiModels?.ocr ?? 'deepseek-ocr'})...`);
         setSuccess(false);
+        setError(null);
+        setExtractionSource(null);
+        setArchiveSaved(false);
 
         try {
-            const text = await extractTextFromPdf(file);
-            const data = parsePatientData(text);
+            // Use smart extraction (AI-first with regex fallback)
+            const data = await extractPatientDataSmart(file);
+            setExtractionSource(data.source);
             onDataExtracted(data);
             setSuccess(true);
+
+            // Auto-save to archive if enabled and patientId is present
+            if (saveToArchive && patientId && data.rawText) {
+                setIsSynthesizing(true);
+                /* @Codex */
+                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'medgemma'})...`);
+                try {
+                    await synthesizeDocument(data.rawText, file.name, patientId);
+                    setArchiveSaved(true);
+                    /* @Codex */
+                    setAiStage("Aggiornamento AI Patient Summary...");
+                    await regeneratePatientSummary(patientId);
+                } catch (synthErr) {
+                    console.error('Synthesis error:', synthErr);
+                    // Don't fail the whole operation, just note the archive wasn't saved
+                }
+                setIsSynthesizing(false);
+            }
         } catch (err) {
             console.error(err);
-            alert('Errore nella lettura del PDF.');
+            setError(err instanceof Error ? err.message : 'Errore nella lettura del documento.');
         } finally {
             setIsProcessing(false);
+            /* @Codex */
+            setAiStage("");
         }
     };
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         maxFiles: 1,
-        accept: { 'application/pdf': ['.pdf'] }
+        accept: {
+            'application/pdf': ['.pdf'],
+            'image/jpeg': ['.jpg', '.jpeg'],
+            'image/png': ['.png']
+        }
     });
+
+    const getSourceBadge = () => {
+        if (!extractionSource) return null;
+        const badges = {
+            ai: { icon: Sparkles, text: 'AI OCR', color: 'text-purple-600 bg-purple-100' },
+            hybrid: { icon: Sparkles, text: 'AI + Regex', color: 'text-blue-600 bg-blue-100' },
+            regex: { icon: FileText, text: 'Pattern', color: 'text-gray-600 bg-gray-100' }
+        };
+        const badge = badges[extractionSource];
+        return (
+            <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", badge.color)}>
+                <badge.icon className="w-3 h-3" />
+                {badge.text}
+            </span>
+        );
+    };
 
     return (
         <div className="mb-8">
@@ -52,32 +123,79 @@ export default function PdfImporter({ onDataExtracted }: PdfImporterProps) {
                 className={cn(
                     "relative border-2 border-dashed rounded-xl p-6 transition-all cursor-pointer overflow-hidden backdrop-blur-sm",
                     isDragActive ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-white/10 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-white/5",
-                    success ? "border-green-500 bg-green-50 dark:bg-green-900/20" : ""
+                    success ? "border-green-500 bg-green-50 dark:bg-green-900/20" : "",
+                    error ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
                 )}
             >
-                <input {...getInputProps()} />
+                <input {...getInputProps()} aria-label="Carica documento" />
 
                 {isProcessing ? (
                     <div className="flex flex-col items-center justify-center py-4 text-blue-600">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                        <p className="font-medium animate-pulse">Analisi documento in corso...</p>
+                        <p className="font-medium animate-pulse">Analisi documento con AI...</p>
+                        <p className="text-xs text-blue-500 mt-1">{aiStage || "DeepSeek OCR 2 in elaborazione"}</p>
+                        {aiModels && (
+                            <p className="text-[10px] text-blue-400 mt-1">OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}</p>
+                        )}
+                    </div>
+                ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-4 text-red-600">
+                        <AlertCircle className="w-8 h-8 mb-2" />
+                        <p className="font-bold">Errore</p>
+                        <p className="text-xs text-red-700">{error}</p>
                     </div>
                 ) : success ? (
                     <div className="flex flex-col items-center justify-center py-4 text-green-600">
                         <CheckCircle className="w-8 h-8 mb-2" />
-                        <p className="font-bold">Dati estratti con successo!</p>
+                        <div className="flex items-center gap-2">
+                            <p className="font-bold">Dati estratti con successo!</p>
+                            {getSourceBadge()}
+                        </div>
                         <p className="text-xs text-green-700">Controlla i campi compilati qui sotto.</p>
+
+                        {/* Archive status indicator */}
+                        {patientId && (
+                            <div className="mt-2 flex items-center gap-2">
+                                {isSynthesizing ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Salvataggio in Archivio...
+                                    </span>
+                                ) : archiveSaved ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                        <Archive className="w-3 h-3" />
+                                        Salvato in Archivio Intelligente
+                                    </span>
+                                ) : null}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 text-blue-600 rounded-lg shrink-0">
-                            <FileText className="w-6 h-6" />
+                        <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg shrink-0">
+                            <div className="relative">
+                                <FileText className="w-6 h-6 text-blue-600" />
+                                <Sparkles className="w-3 h-3 text-purple-500 absolute -top-1 -right-1" />
+                            </div>
                         </div>
                         <div>
-                            <h3 className="font-bold text-gray-800 dark:text-gray-200">Importa da Documento</h3>
+                            <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                Importa da Documento
+                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                    AI OCR
+                                </span>
+                            </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Trascina qui un PDF (referto, scheda) per compilare automaticamente i campi.
+                                Trascina un PDF o immagine (referto, scheda) per compilare automaticamente i campi.
                             </p>
+                            <div className="flex gap-2 mt-1">
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                                    <FileText className="w-3 h-3" /> PDF
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                                    <Image className="w-3 h-3" /> JPG, PNG
+                                </span>
+                            </div>
                         </div>
                     </div>
                 )}

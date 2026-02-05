@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 
-export type AIProvider = 'ollama' | 'mlx';
+export type AIProvider = 'ollama';
 
 export interface AIStats {
     latency: number;
@@ -10,7 +10,14 @@ export interface AIStats {
 
 export interface ChatMessage {
     role: string;
-    content: string;
+    content: string | ChatMessageContent[];
+}
+
+// Multimodal content support (for vision models like DeepSeek-OCR)
+export interface ChatMessageContent {
+    type: 'text' | 'image_url';
+    text?: string;
+    image_url?: { url: string }; // base64 data URL or http URL
 }
 
 export class AIService {
@@ -25,35 +32,66 @@ export class AIService {
         this.model = model;
     }
 
-    static async create(): Promise<AIService> {
-        const providerSetting = await db.settings.get('aiProvider');
-        const urlSetting = await db.settings.get('aiUrl'); // Generalized setting name? Or keep separate?
-        // Let's keep separate logic or try to migrate.
-        // For simplicity, let's read distinct keys for now to avoid migration headache, 
-        // OR better: use one key 'aiUrl' but fallback to 'ollamaUrl' if missing.
+    /* @Codex */
+    getModelInfo() {
+        return {
+            provider: this.provider,
+            model: this.model,
+            baseUrl: this.baseUrl
+        };
+    }
 
-        const provider = (providerSetting?.value as AIProvider) || 'ollama';
+    static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
+        /* @Codex */
+        let provider: AIProvider = 'ollama';
 
         let defaultUrl = "http://127.0.0.1:11434";
-        if (provider === 'mlx') defaultUrl = "http://127.0.0.1:8080";
 
         // Try reading generic 'aiUrl' first, then 'ollamaUrl' as fallback
         const genericUrl = await db.settings.get('aiUrl');
         const legacyUrl = await db.settings.get('ollamaUrl');
 
-        // Logic: if generic set, use it. If not, if ollama provider, use legacy. Else default.
         let url = genericUrl?.value;
         if (!url && provider === 'ollama') url = legacyUrl?.value;
-
-        // IMPORTANT: If MLX is selected but no URL saved, default to port 8080.
-        // If URL IS saved (e.g. user saved "http://localhost:8080"), use that.
-        // IMPORTANT: If URL is missing, default to Ollama (Plan A) unless explicitly MLX
         if (!url) {
             url = defaultUrl;
         }
+        /* @Codex */
+        if (provider === 'ollama' && url.includes(":8080")) {
+            url = legacyUrl?.value || "http://127.0.0.1:11434";
+        }
 
-        const modelSetting = await db.settings.get('aiModel');
-        const model = modelSetting?.value || (provider === 'mlx' ? "mlx-community/MedGemma-2-9b-IT-4bit" : "medgemma");
+        // --- Task-Based Model Selection ---
+        // 1. Try to get specific model for the task
+        const modelClinical = await db.settings.get('aiModel_clinical');
+        const modelReasoning = await db.settings.get('aiModel_reasoning');
+        const modelOcr = await db.settings.get('aiModel_ocr');
+        // 2. Fallback to legacy 'aiModel' (which was serving as global previously)
+        const modelLegacy = await db.settings.get('aiModel');
+
+        // Defaults if DB is empty
+        /* @Codex */
+        const defaultClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
+        const defaultOcr = "deepseek-ocr"; // DeepSeek-OCR 3B via Ollama
+        /* @Codex */
+        const defaultReasoning = "qwen2.5:32b"; // Assuming Qwen is generally available or user will configure
+
+        let model = "";
+
+        if (task === 'clinical') {
+            model = modelClinical?.value || modelLegacy?.value || defaultClinical;
+        } else if (task === 'ocr') {
+            // OCR task: DeepSeek-OCR for document understanding
+            model = modelOcr?.value || defaultOcr;
+        } else { // reasoning
+            model = modelReasoning?.value || defaultReasoning;
+            // "Legacy Fallback": If no specific reasoning model is set, check if legacy model is set.
+            if (!modelReasoning?.value && modelLegacy?.value) {
+                model = modelLegacy.value;
+            }
+        }
+
+        console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
 
         return new AIService(provider, url, model);
     }
@@ -70,12 +108,12 @@ export class AIService {
             model: this.model,
             messages: messages,
             stream: false,
-            // formatted options for OpenAI / MLX
+            // formatted options for OpenAI-compatible providers
             temperature: 0.4,
             max_tokens: maxTokens || 4096
         };
 
-        // Target Endpoint: /v1/chat/completions (Standard for Ollama and MLX)
+        // Target Endpoint: /v1/chat/completions (OpenAI-compatible)
         // We use our Proxy to forward the request to the correct local URL
         const targetUrl = `${this.baseUrl}/v1/chat/completions`;
 
@@ -110,7 +148,7 @@ export class AIService {
                 }
             };
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("AI Service Chat Error:", e);
             throw e;
         }
@@ -129,15 +167,101 @@ export class AIService {
         // Simple ping to check connectivity
         try {
             // Hack/Efficiency: use chat with empty/short prompt to test connectivity
-            await this.chat([{ role: 'user', content: 'ping' }]);
-            return { status: 'ok', message: `${this.provider.toUpperCase()} Ready`, models: [] };
-        } catch (e: any) {
-            return { status: 'error', message: `Connessione fallita: ${e.message}`, models: [] };
+            // await this.chat([{ role: 'user', content: 'ping' }]);
+            // Better: use the new models endpoint to verify connectivity AND get models
+            const models = await this.listModels();
+            return { status: 'ok', message: `${this.provider.toUpperCase()} Ready`, models: models.map(m => m.name) };
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            return { status: 'error', message: `Connessione fallita: ${message}`, models: [] };
         }
     }
 
     async ping(): Promise<boolean> {
         const health = await this.getHealth();
         return health.status === 'ok';
+    }
+
+    /**
+     * List installed models via API proxy
+     */
+    async listModels(): Promise<{ name: string; size: number; details: Record<string, unknown> }[]> {
+        if (this.provider !== 'ollama') return [];
+
+        const targetUrl = this.baseUrl; // already cleaned
+        try {
+            const res = await fetch('/api/ai/models', {
+                headers: { 'x-target-url': targetUrl }
+            });
+            if (!res.ok) throw new Error("Failed to fetch models");
+            const data = await res.json();
+            return data.models || [];
+        } catch (e) {
+            console.error("List Models Error:", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Pull a model via API proxy with progress callback
+     */
+    async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
+        if (this.provider !== 'ollama') throw new Error("Pulling models only supported for Ollama");
+
+        const targetUrl = this.baseUrl;
+
+        const response = await fetch('/api/ai/pull', { // Use our new proxy route
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-target-url': targetUrl
+            },
+            body: JSON.stringify({ model: modelName })
+        });
+
+        if (!response.ok || !response.body) {
+            throw new Error("Failed to start model pull");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+
+                // Process all complete lines
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+
+                        // Calculate percentage if available
+                        let percent = 0;
+                        if (data.total && data.completed) {
+                            percent = Math.round((data.completed / data.total) * 100);
+                        }
+
+                        if (onProgress) {
+                            onProgress(data.status, percent);
+                        }
+
+                        if (data.error) throw new Error(data.error);
+                    } catch (e) {
+                        // ignore parse errors for partial chunks
+                        console.warn("Parse error chunk", e);
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
     }
 }

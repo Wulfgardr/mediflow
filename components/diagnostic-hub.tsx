@@ -27,8 +27,12 @@ export default function DiagnosticHub() {
                 const start = performance.now();
                 // We use auth/check as a proxy for DB health since it reads from DB
                 const res = await fetch('/api/auth/check');
+                /* @Codex */
+                const data = await res.json().catch(() => null);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                await res.json();
+                if (data?.status === 'error' || data?.error) {
+                    throw new Error(data?.error?.message || 'Database non disponibile');
+                }
                 return { status: 'ok', latency: Math.round(performance.now() - start) };
             }
         },
@@ -36,7 +40,7 @@ export default function DiagnosticHub() {
             id: 'ai',
             name: 'AI Neural Engine',
             icon: <Activity className="w-4 h-4" />,
-            description: 'Verifica connettività al provider AI (Ollama/MLX)',
+            description: 'Verifica connettività al provider AI (Ollama)',
             checkFn: async () => {
                 const start = performance.now();
                 // Dynamically import to ensure client-side execution
@@ -81,6 +85,20 @@ export default function DiagnosticHub() {
                 const start = performance.now();
                 const res = await fetch('/api/settings/aiProvider'); // Simple GET
                 if (!res.ok) throw new Error("API Error");
+                return { status: 'ok', latency: Math.round(performance.now() - start) };
+            }
+        },
+        {
+            id: 'ocr',
+            name: 'OCR Service (DeepSeek OCR 2)',
+            icon: <Database className="w-4 h-4" />,
+            description: 'Segreteria virtuale: lettura documenti',
+            checkFn: async () => {
+                const start = performance.now();
+                const res = await fetch('/api/ocr/extract');
+                if (!res.ok) throw new Error("OCR non disponibile");
+                const data = await res.json();
+                if (!data.available) throw new Error(data.message || "Modello non installato");
                 return { status: 'ok', latency: Math.round(performance.now() - start) };
             }
         }

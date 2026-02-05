@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+/* @Codex */
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ key: string }> }
 ) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+
     try {
         const { key } = await params;
         const result = await dbServer.select().from(settings).where(eq(settings.key, key)).get();
@@ -26,6 +32,10 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ key: string }> }
 ) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+
     try {
         const { key } = await params;
         const body = await request.json();

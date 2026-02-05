@@ -3,8 +3,14 @@ import { dbServer } from '@/lib/db-server';
 import { conversations } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function GET() {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const data = await dbServer.select().from(conversations).orderBy(desc(conversations.updatedAt));
         return NextResponse.json(data);
@@ -14,6 +20,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await request.json();
         await dbServer.insert(conversations).values({

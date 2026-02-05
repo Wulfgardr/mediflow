@@ -1,17 +1,26 @@
 import { NextResponse } from 'next/server';
+/* @Codex */
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { validateLocalTarget } from '@/lib/local-target';
 
 export async function POST(req: Request) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(req);
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await req.json();
         const targetUrl = req.headers.get('x-target-url');
 
-        if (!targetUrl) {
-            return NextResponse.json({ error: "Missing x-target-url header" }, { status: 400 });
+        /* @Codex */
+        const validation = validateLocalTarget(targetUrl);
+        if (!validation.ok) {
+            return NextResponse.json({ error: `Target not allowed: ${validation.reason}` }, { status: 400 });
         }
 
-        console.log(`[Proxy] Forwarding AI request to ${targetUrl}`);
+        console.log(`[Proxy] Forwarding AI request to ${validation.url.toString()}`);
 
-        const res = await fetch(targetUrl, {
+        const res = await fetch(validation.url.toString(), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

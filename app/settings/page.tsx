@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/db';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import DataSeeder from '@/components/data-seeder';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
@@ -10,6 +10,245 @@ import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
 import DiagnosticHub from '@/components/diagnostic-hub';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';
+
+// --- Model Selector Component ---
+interface ModelSelectorProps {
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+    color: 'emerald' | 'purple' | 'blue';
+    value: string;
+    onChange: (val: string) => void;
+    recommended: { name: string; desc: string }[];
+    provider: string;
+}
+
+function ModelSelector({ label, description, icon, color, value, onChange, recommended, provider }: ModelSelectorProps) {
+    const [installedModels, setInstalledModels] = useState<string[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [loading, setLoading] = useState(false);
+    const [isPulling, setIsPulling] = useState(false);
+    const [pullProgress, setPullProgress] = useState(0);
+    const [pullStatus, setPullStatus] = useState("");
+    const [showCustom, setShowCustom] = useState(false);
+
+    // Initial check
+    useEffect(() => {
+        if (provider === 'ollama') {
+            checkInstalled();
+        }
+    }, [provider]);
+
+    const checkInstalled = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/ai/models');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.models) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    setInstalledModels(data.models.map((m: any) => m.name));
+                }
+            }
+        } catch (e) {
+            console.error("Failed to list models", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePull = async (modelName: string) => {
+        if (!confirm(`Vuoi scaricare il modello '${modelName}'? \nPotrebbe richiedere diversi GB e tempo a seconda della connessione.`)) return;
+
+        setIsPulling(true);
+        setPullProgress(0);
+        setPullStatus("Inizializzazione download...");
+
+        try {
+            const response = await fetch('/api/ai/pull', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: modelName })
+            });
+
+            if (!response.ok) throw new Error("Download failed to start");
+            if (!response.body) throw new Error("No response body");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+
+                        if (data.status) setPullStatus(data.status);
+                        if (data.total && data.completed) {
+                            const p = Math.round((data.completed / data.total) * 100);
+                            setPullProgress(p);
+                        }
+                        if (data.error) throw new Error(data.error);
+                    } catch (e) {
+                        // ignore partial
+                        console.warn("Parse error", e);
+                    }
+                }
+            }
+
+            alert(`Modello ${modelName} installato con successo!`);
+            await checkInstalled();
+            onChange(modelName); // Auto select
+
+        } catch (e) {
+            console.error(e);
+            alert(`Errore durante il download: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        } finally {
+            setIsPulling(false);
+            setPullProgress(0);
+            setPullStatus("");
+        }
+    };
+
+    const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
+
+    const colorClasses = {
+        emerald: { bg: 'bg-emerald-50/50', border: 'border-emerald-100', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', title: 'text-emerald-900' },
+        purple: { bg: 'bg-purple-50/50', border: 'border-purple-100', iconBg: 'bg-purple-100', iconText: 'text-purple-600', title: 'text-purple-900' },
+        blue: { bg: 'bg-blue-50/50', border: 'border-blue-100', iconBg: 'bg-blue-100', iconText: 'text-blue-600', title: 'text-blue-900' }
+    };
+    const c = colorClasses[color];
+
+    return (
+        <div className={`p-4 rounded-xl border ${c.bg} ${c.border}`}>
+            <div className="flex items-start gap-3 mb-3">
+                <div className={`p-2 rounded-lg ${c.iconBg} ${c.iconText}`}>
+                    {icon}
+                </div>
+                <div>
+                    <h4 className={`text-sm font-bold ${c.title}`}>{label}</h4>
+                    <p className="text-[10px] text-gray-500">{description}</p>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                {!showCustom ? (
+                    <div className="grid gap-2">
+                        {recommended.map((model) => {
+                            const installed = isInstalled(model.name);
+                            const selected = value === model.name;
+
+                            return (
+                                <div
+                                    key={model.name}
+                                    onClick={() => onChange(model.name)}
+                                    className={`
+                                        relative group flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all
+                                        ${selected
+                                            ? 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500 z-10'
+                                            : 'bg-white/60 border-gray-200 hover:border-gray-300 hover:bg-white'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'}`}>
+                                            {selected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-gray-800">{model.name}</span>
+                                            <span className="text-[10px] text-gray-500">{model.desc}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {installed ? (
+                                            <span className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                                <Check className="w-3 h-3" /> Installato
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handlePull(model.name);
+                                                }}
+                                                disabled={isPulling}
+                                                className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+                                            >
+                                                {isPulling && value === model.name ? ( // Only show spinner if this specific one is related? Or just global blocking
+                                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                                ) : <Download className="w-3 h-3" />}
+                                                Scarica
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Pull Progress Overlay */}
+                                    {isPulling && !installed && ( // Just show global overlay or specific?
+                                        // Actually we handle one pull at a time globally for simplicity
+                                        null
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        <button
+                            onClick={() => setShowCustom(true)}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline text-center mt-1"
+                        >
+                            Usa un modello personalizzato
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <input
+                            type="text"
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            className="w-full text-xs border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-2"
+                            placeholder="es. llama3"
+                            autoFocus
+                        />
+                        <button
+                            onClick={() => setShowCustom(false)}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline"
+                        >
+                            Torna ai consigliati
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Global Pull Status */}
+            {isPulling && (
+                <div className="mt-3 p-3 bg-white rounded-lg border border-indigo-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-2">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            Scaricamento in corso...
+                        </span>
+                        <span className="text-xs font-mono text-indigo-600">{pullProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className="bg-indigo-500 h-full transition-all duration-300"
+                            style={{ width: `${pullProgress}%` }}
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 truncate">{pullStatus}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 export default function SettingsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,19 +267,21 @@ export default function SettingsPage() {
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     // --- AI Config State ---
+    const [hardwareProfile, setHardwareProfile] = useState<'low' | 'medium' | 'high' | 'custom'>('custom');
     const [aiConfig, setAiConfig] = useState({
-        provider: 'ollama', // 'ollama' | 'mlx'
-        model: '',
+        provider: 'ollama',
+        model_clinical: '', // MedGemma
+        model_reasoning: '', // Qwen
+        model_ocr: '', // DeepSeek OCR 2
         url: ''
     });
     const [isSavingAi, setIsSavingAi] = useState(false);
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
-    // --- System Status (MLX) ---
-    const [mlxStatus, setMlxStatus] = useState<{ status: string, cpu?: number, memory?: number }>({ status: 'unknown' });
-    const [isMlxLoading, setIsMlxLoading] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isDockerApp, setIsDockerApp] = useState(false);
+    // @Codex
+    const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
     // Load initial data
     useEffect(() => {
@@ -48,48 +289,28 @@ export default function SettingsPage() {
         loadAiConfig();
     }, []);
 
-    // Poll MLX status if selected
+    // @Codex
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (aiConfig.provider === 'mlx') {
-            fetchMlxStatus();
-            interval = setInterval(fetchMlxStatus, 3000);
-        } else {
-            // Check Ollama connectivity simply
-            const checkOllama = async () => {
-                try {
-                    // We use the proxy 'health' check or just try to ping
-                    // Since we can't easily ping localhost:11434 from browser due to CORS if not configured,
-                    // we use our own AIService ping logic but targeted.
-                    // Simplified: assume status unknown unless verified by Test.
-                    // Or auto-run test quietly? No, expensive.
-                    // Just check if we can reach our own proxy which connects to it.
-                    // For now, let's just leave it to "Test Diagnostico" but show a label.
-                } catch { }
-            };
-            checkOllama();
-        }
-        return () => clearInterval(interval);
-    }, [aiConfig.provider]);
+        const checkOllama = async () => {
+            try {
+                // Placeholder for future lightweight health check
+            } catch { }
+        };
+        checkOllama();
+    }, []);
 
-    const fetchMlxStatus = async () => {
+    // @Codex
+    const openNativeApp = async () => {
+        if (nativeLaunchState === 'loading') return;
+        setNativeLaunchState('loading');
         try {
-            const res = await fetch('/api/system/mlx');
-            if (res.ok) setMlxStatus(await res.json());
-        } catch (e) { console.error("MLX Status error", e); }
-    };
-
-    const toggleMlxProcess = async () => {
-        setIsMlxLoading(true);
-        try {
-            const method = mlxStatus.status === 'online' ? 'DELETE' : 'POST';
-            await fetch('/api/system/mlx', { method });
-            await new Promise(r => setTimeout(r, 1000)); // wait for startup
-            await fetchMlxStatus();
-        } catch {
-            alert("Errore nel controllo del processo");
-        } finally {
-            setIsMlxLoading(false);
+            const res = await fetch('/api/system/native', { method: 'POST' });
+            if (!res.ok) throw new Error('Launch failed');
+            setNativeLaunchState('success');
+            window.setTimeout(() => setNativeLaunchState('idle'), 2000);
+        } catch (e) {
+            console.error("Native app launch failed", e);
+            setNativeLaunchState('error');
         }
     };
 
@@ -144,36 +365,75 @@ export default function SettingsPage() {
 
     const loadAiConfig = async () => {
         try {
-            const provider = await db.settings.get('aiProvider');
-            const model = await db.settings.get('aiModel');
+            // @Codex
+            const safeGet = async (key: string) => {
+                try {
+                    return await db.settings.get(key);
+                } catch {
+                    return undefined;
+                }
+            };
 
-            // Smart URL loading: try generic, fallback to legacy ollama if provider is ollama
-            const genericUrl = await db.settings.get('aiUrl');
-            const legacyUrl = await db.settings.get('ollamaUrl');
+            const hardware = await safeGet('hardwareProfile');
 
-            const currentProvider = provider?.value || 'ollama';
+            // Task Based Models
+            const modelClinical = await safeGet('aiModel_clinical');
+            const modelReasoning = await safeGet('aiModel_reasoning');
+            const modelOcr = await safeGet('aiModel_ocr');
+            const legacyModel = await safeGet('aiModel');
+
+            // Smart URL loading
+            const genericUrl = await safeGet('aiUrl');
+            const legacyUrl = await safeGet('ollamaUrl');
+
+            // @Codex
+            const currentProvider = 'ollama';
             let currentUrl = genericUrl?.value;
+            if (!currentUrl) currentUrl = legacyUrl?.value;
+            if (!currentUrl || currentUrl.includes(':8080')) currentUrl = "http://127.0.0.1:11434/v1";
 
-            if (!currentUrl && currentProvider === 'ollama') {
-                currentUrl = legacyUrl?.value;
-            }
-            // If still empty, use defaults BUT do not overwrite state if user hasn't saved yet? 
-            // Actually, if DB is empty, we must show default.
-            if (!currentUrl) {
-                // Default to Ollama (127.0.0.1) as Plan A
-                currentUrl = currentProvider === 'mlx' ? "http://127.0.0.1:8080/v1" : "http://127.0.0.1:11434/v1";
-            }
+            // Determine models (migrate legacy if needed)
+            /* @Codex */
+            const medGemmaDefault = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
+            const qwenDefault = "qwen2.5:32b";
+            const ocrDefault = "deepseek-ocr";
 
-            // Ensure we are using the SAVED model if exists, otherwise default
-            const currentModel = model?.value || (currentProvider === 'mlx' ? "mlx-community/medgemma-1.5-4b-it-bf16" : "hf.co/unsloth/medgemma-1.5-4b-it-GGUF");
-
+            setHardwareProfile(hardware?.value || 'custom');
             setAiConfig({
-                provider: currentProvider,
-                model: currentModel,
+                provider: 'ollama',
+                model_clinical: modelClinical?.value || legacyModel?.value || medGemmaDefault,
+                model_reasoning: modelReasoning?.value || qwenDefault,
+                model_ocr: modelOcr?.value || ocrDefault,
                 url: currentUrl
             });
         } catch (e) {
             console.error("Failed to load AI config:", e);
+        }
+    };
+
+    const applyHardwareProfile = (profile: 'low' | 'medium' | 'high') => {
+        setHardwareProfile(profile);
+        if (profile === 'low') {
+            // Low RAM: Use smallest models
+            setAiConfig(prev => ({
+                ...prev,
+                model_clinical: 'hf.co/unsloth/medgemma-2b-GGUF',  // hypothetical lighter model
+                model_reasoning: 'qwen2.5:7b'
+            }));
+        } else if (profile === 'medium') {
+            // 16-32GB: Standard setup
+            setAiConfig(prev => ({
+                ...prev,
+                model_clinical: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF',
+                model_reasoning: 'qwen2.5:14b'
+            }));
+        } else if (profile === 'high') {
+            // >32GB: Max power
+            setAiConfig(prev => ({
+                ...prev,
+                model_clinical: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF',
+                model_reasoning: 'qwen2.5:32b'
+            }));
         }
     };
 
@@ -221,13 +481,20 @@ export default function SettingsPage() {
     const saveAiConfig = async () => {
         setIsSavingAi(true);
         try {
-            await db.settings.put({ key: 'aiProvider', value: aiConfig.provider });
-            await db.settings.put({ key: 'aiModel', value: aiConfig.model });
+            // @Codex
+            // Web UI does not override aiProvider to avoid clobbering native-only choices.
+            await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
+
+            // Save specific task models
+            await db.settings.put({ key: 'aiModel_clinical', value: aiConfig.model_clinical });
+            await db.settings.put({ key: 'aiModel_reasoning', value: aiConfig.model_reasoning });
+            await db.settings.put({ key: 'aiModel_ocr', value: aiConfig.model_ocr });
+
+            // Legacy sync for backward compatibility (Clinical = Main)
+            await db.settings.put({ key: 'aiModel', value: aiConfig.model_clinical });
+
             await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
-            // Legacy sync for backward compatibility
-            if (aiConfig.provider === 'ollama') {
-                await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
-            }
+            await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
 
             setAiTestStatus('idle'); // Reset test status on save
         } catch (e) {
@@ -251,27 +518,56 @@ export default function SettingsPage() {
             // However, AIService constructor is not exported or we can just use new?
             // Exported class, so yes.
             const service = new AIService(
-                aiConfig.provider as any,
+                'ollama',
                 aiConfig.url,
-                aiConfig.model
+                aiConfig.model_clinical // Test clinical model by default
             );
 
             // Add timeout to prevent hanging (60s for cold start)
-            const timeoutPromise = new Promise((_, reject) =>
+            const timeoutPromise = new Promise<{ status: string; message?: string; models?: unknown[] }>((_, reject) =>
                 setTimeout(() => reject(new Error("Timeout connessione (60s) - Il modello potrebbe richiedere tempo per caricarsi")), 60000)
             );
 
             const health = await Promise.race([
                 service.getHealth(),
                 timeoutPromise
-            ]) as any;
+            ]);
 
-            setAiHealth({ ...health, models: health.models || [] }); // types adaptation if needed
-            setAiTestStatus(health.status === 'ok' ? 'success' : 'error');
-        } catch (e: any) {
+            // Deep verification of models
+            const installedModels = (health.models as string[]) || [];
+            const missingModels: string[] = [];
+
+            // Helper to clean model names for comparison (remove tags if needed, or loosely match)
+            // Ollama often returns full names like "qwen2.5:32b" or "medgemma:latest"
+            const isMissing = (target: string) => {
+                if (!target) return false;
+                // Loose match: check if target is substring of any installed, or vice versa
+                // But exact match is better for "qwen2.5:7b" vs "qwen2.5:32b"
+                return !installedModels.some(m => m === target || m.startsWith(target + ":"));
+            };
+
+            if (isMissing(aiConfig.model_clinical)) missingModels.push(aiConfig.model_clinical);
+            if (isMissing(aiConfig.model_reasoning)) missingModels.push(aiConfig.model_reasoning);
+            if (isMissing(aiConfig.model_ocr)) missingModels.push(aiConfig.model_ocr);
+
+            if (missingModels.length > 0) {
+                const msg = `Ollama è attivo, ma mancano i modelli configurati: ${missingModels.join(', ')}. Scaricali utilizzando i pulsanti sopra.`;
+                setAiHealth({
+                    status: 'error',
+                    message: msg,
+                    models: installedModels
+                });
+                setAiTestStatus('error');
+            } else {
+                setAiHealth({ ...health, status: health.status as 'ok' | 'error', message: health.message || '', models: installedModels });
+                setAiTestStatus(health.status === 'ok' ? 'success' : 'error');
+            }
+
+        } catch (e) {
             console.error(e);
             setAiTestStatus('error');
-            setAiHealth({ status: 'error', message: e.message || "Errore imprevisto", models: [] });
+            const msg = e instanceof Error ? e.message : "Errore imprevisto";
+            setAiHealth({ status: 'error', message: msg, models: [] });
         }
     };
 
@@ -348,173 +644,191 @@ export default function SettingsPage() {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Configurazione AI</h2>
-                            <p className="text-xs text-gray-500">Scegli il provider AI locale.</p>
+                            <p className="text-xs text-gray-500">Gestisci i modelli del &ldquo;Team Clinico Virtuale&rdquo;.</p>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        {/* Provider Selector */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Provider
+                    <div className="space-y-6">
+                        {/* 1. Hardware Profile Selector */}
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                <Cpu className="w-4 h-4" />
+                                Profilo Hardware
                             </label>
-                            <div className="space-y-4">
-                                {/* Ollama Main Option */}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div
-                                    onClick={() => setAiConfig({
-                                        ...aiConfig,
-                                        provider: 'ollama',
-                                        url: "http://127.0.0.1:11434/v1",
-                                        model: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
-                                    })}
+                                    onClick={() => applyHardwareProfile('low')}
                                     className={cn(
-                                        "p-4 rounded-xl border flex items-center justify-between transition-all cursor-pointer",
-                                        aiConfig.provider === 'ollama'
-                                            ? "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200"
-                                            : "bg-white border-gray-200 hover:bg-gray-50"
+                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        hardwareProfile === 'low'
+                                            ? "bg-white border-green-500 ring-2 ring-green-100 shadow-sm"
+                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
                                     )}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn("p-2 rounded-lg", aiConfig.provider === 'ollama' ? "bg-indigo-100 text-indigo-600" : "bg-gray-100 text-gray-500")}>
-                                            <Bot className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-gray-800 dark:text-gray-200">Ollama (Locale)</p>
-                                            <p className="text-xs text-gray-500">Consigliato per stabilità e compatibilità universale.</p>
-                                        </div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-bold uppercase text-green-700">Light</span>
+                                        {hardwareProfile === 'low' && <CheckCircle className="w-3 h-3 text-green-600" />}
                                     </div>
-                                    {aiConfig.provider === 'ollama' && <CheckCircle className="w-5 h-5 text-indigo-600" />}
+                                    <p className="text-xs font-bold text-gray-800">&lt; 16GB RAM</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Usa solo modelli molto compressi (Q4_K_M).</p>
+                                </div>
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                    Per utilizzare questa funzione è necessaria una connessione Internet attiva e una chiave API configurata se non si usano modelli locali.
+                                </p>
+                                <p className="text-xs text-gray-400 mt-2">
+                                    Nota: Il &quot;Profilo Hardware&quot; sovrascrive i modelli selezionati. Imposta su &quot;Personalizzato&quot; per scegliere manualmente.
+                                </p>
+
+                                <div
+                                    onClick={() => applyHardwareProfile('medium')}
+                                    className={cn(
+                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        hardwareProfile === 'medium'
+                                            ? "bg-white border-indigo-500 ring-2 ring-indigo-100 shadow-sm"
+                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-bold uppercase text-indigo-700">Balanced</span>
+                                        {hardwareProfile === 'medium' && <CheckCircle className="w-3 h-3 text-indigo-600" />}
+                                    </div>
+                                    <p className="text-xs font-bold text-gray-800">16-32GB RAM</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">MedGemma (Default) + Qwen 14B.</p>
                                 </div>
 
-                                {/* Advanced Toggle */}
-                                <div className="flex items-center gap-2 pt-2">
+                                <div
+                                    onClick={() => applyHardwareProfile('high')}
+                                    className={cn(
+                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        hardwareProfile === 'high'
+                                            ? "bg-white border-purple-500 ring-2 ring-purple-100 shadow-sm"
+                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-bold uppercase text-purple-700">Pro</span>
+                                        {hardwareProfile === 'high' && <CheckCircle className="w-3 h-3 text-purple-600" />}
+                                    </div>
+                                    <p className="text-xs font-bold text-gray-800">&gt; 32GB RAM</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">MedGemma + Qwen 32B (Full Reasoning).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Task Assignment with Model Selector */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                                <Bot className="w-4 h-4" />
+                                Ruoli del Team AI
+                            </h3>
+
+                            <ModelSelector
+                                label="Radiologo & Clinico"
+                                description="Per referti, analisi immagini e terminologia medica stretto."
+                                icon={<Bot className="w-5 h-5" />}
+                                color="emerald"
+                                value={aiConfig.model_clinical}
+                                onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
+                                recommended={[
+                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Bilanciato)" },
+                                    { name: "hf.co/unsloth/medgemma-2b-GGUF", desc: "MedGemma 2B (Veloce)" },
+                                    { name: "llama3.2:3b", desc: "Llama 3.2 3B (Generalista)" }
+                                ]}
+                                provider={aiConfig.provider}
+                            />
+
+                            <ModelSelector
+                                label="Internista (Reasoning)"
+                                description="Per riassunti narrativi, chat complesse e “Second Opinion”."
+                                icon={<Cpu className="w-5 h-5" />}
+                                color="purple"
+                                value={aiConfig.model_reasoning}
+                                onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
+                                recommended={[
+                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Potente, 24GB+ RAM)" },
+                                    { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Ottimo, 16GB RAM)" },
+                                    { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
+                                    { name: "deepseek-r1:14b", desc: "DeepSeek R1 14B (Reasoning)" }
+                                ]}
+                                provider={aiConfig.provider}
+                            />
+
+                            <ModelSelector
+                                label="Segreteria (OCR)"
+                                description="Per importare documenti cartacei, referti scannerizzati e note."
+                                icon={<Upload className="w-5 h-5" />}
+                                color="blue"
+                                value={aiConfig.model_ocr}
+                                onChange={(val) => setAiConfig({ ...aiConfig, model_ocr: val })}
+                                recommended={[
+                                    { name: "deepseek-ocr", desc: "DeepSeek OCR 2 (Consigliato)" },
+                                    { name: "minicpm-v:8b-2.6", desc: "MiniCPM-V 8B (Alternativo)" },
+                                    { name: "llava:13b", desc: "LLaVA 13B (Vision Generalista)" }
+                                ]}
+                                provider={aiConfig.provider}
+                            />
+                        </div>
+
+                        {/* 3. Provider & Infrastructure */}
+                        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                            {/* ... infrastructure settings remain similar ... */}
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs font-medium text-gray-500 uppercase">
+                                    Infrastruttura
+                                </label>
+                                <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
                                         id="advancedFit"
                                         checked={showAdvanced}
                                         onChange={(e) => setShowAdvanced(e.target.checked)}
-                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3"
                                     />
-                                    <label htmlFor="advancedFit" className="text-xs font-medium text-gray-500 cursor-pointer select-none">
-                                        Mostra opzioni sperimentali (MLX / Custom)
+                                    <label htmlFor="advancedFit" className="text-[10px] font-medium text-gray-400 cursor-pointer select-none">
+                                        Avanzate
                                     </label>
                                 </div>
-
-                                {/* MLX / Advanced Option */}
-                                {showAdvanced && (
-                                    <>
-                                        <div
-                                            onClick={() => setAiConfig({
-                                                ...aiConfig,
-                                                provider: 'mlx',
-                                                url: "http://127.0.0.1:8080/v1",
-                                                model: "mlx-community/medgemma-1.5-4b-it-bf16"
-                                            })}
-                                            className={cn(
-                                                "mt-2 p-4 rounded-xl border flex items-center justify-between transition-all cursor-pointer",
-                                                aiConfig.provider === 'mlx'
-                                                    ? "bg-orange-50 border-orange-200 ring-1 ring-orange-200"
-                                                    : "bg-white/50 border-gray-200 opacity-80 hover:opacity-100"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn("p-2 rounded-lg", aiConfig.provider === 'mlx' ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500")}>
-                                                    <Cpu className="w-6 h-6" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-gray-800 dark:text-gray-200">Apple MLX (Beta)</p>
-                                                    <p className="text-xs text-gray-500">Motore sperimentale per Apple Silicon.</p>
-                                                </div>
-                                            </div>
-                                            {aiConfig.provider === 'mlx' && <CheckCircle className="w-5 h-5 text-orange-600" />}
-                                        </div>
-
-                                        {/* Docker Internal Host Option */}
-                                        <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="dockerMode"
-                                                    checked={isDockerApp}
-                                                    onChange={(e) => {
-                                                        const newVal = e.target.checked;
-                                                        setIsDockerApp(newVal);
-                                                        // Auto-update URL if Ollama is selected
-                                                        if (aiConfig.provider === 'ollama') {
-                                                            setAiConfig(prev => ({
-                                                                ...prev,
-                                                                url: newVal
-                                                                    ? "http://host.docker.internal:11434/v1"
-                                                                    : "http://127.0.0.1:11434/v1"
-                                                            }));
-                                                        }
-                                                    }}
-                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <label htmlFor="dockerMode" className="text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-                                                    L&apos;App sta girando dentro Docker?
-                                                    <span className="block text-[10px] text-gray-400 font-normal">
-                                                        Seleziona se usi Docker Dashboard per avviare l&apos;app (cambia localhost in host.docker.internal).
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Nome Modello
-                            </label>
-                            <input
-                                type="text"
-                                value={aiConfig.model}
-                                onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
-                                placeholder="es. medgemma"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 p-2.5 text-sm"
-                            />
-                            {/* MLX Status & Control */}
-                            {aiConfig.provider === 'mlx' && (
-                                <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn("w-3 h-3 rounded-full animate-pulse", mlxStatus.status === 'online' ? "bg-green-500" : "bg-red-500")} />
-                                        <div>
-                                            <p className="text-xs font-bold text-gray-700 uppercase">Motore Neurale (PM2)</p>
-                                            <p className="text-[10px] text-gray-400 font-mono">
-                                                STATUS: {mlxStatus.status}
-                                                {mlxStatus.memory && ` | MEM: ${Math.round(mlxStatus.memory / 1024 / 1024)}MB`}
-                                            </p>
-                                        </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                                    Provider AI: <span className="ml-2 font-semibold text-gray-800">Ollama (Locale)</span>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={aiConfig.url}
+                                    onChange={(e) => setAiConfig({ ...aiConfig, url: e.target.value })}
+                                    placeholder="http://127.0.0.1:11434/v1"
+                                    className="w-full text-sm rounded-lg border-gray-300 py-2 font-mono text-xs"
+                                />
+                            </div>
+
+                            {showAdvanced && (
+                                <div className="mt-3 pt-2 border-t border-dashed border-gray-200">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="dockerMode"
+                                            checked={isDockerApp}
+                                            onChange={(e) => {
+                                                const newVal = e.target.checked;
+                                                setIsDockerApp(newVal);
+                                                setAiConfig(prev => ({
+                                                    ...prev,
+                                                    url: newVal
+                                                        ? "http://host.docker.internal:11434/v1"
+                                                        : "http://127.0.0.1:11434/v1"
+                                                }));
+                                            }}
+                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3"
+                                        />
+                                        <label htmlFor="dockerMode" className="text-xs text-gray-500 cursor-pointer">
+                                            Docker Internal Host (se l&apos;app è in container)
+                                        </label>
                                     </div>
-                                    <button
-                                        onClick={toggleMlxProcess}
-                                        disabled={isMlxLoading}
-                                        className={cn(
-                                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm",
-                                            mlxStatus.status === 'online'
-                                                ? "bg-white border border-red-200 text-red-600 hover:bg-red-50"
-                                                : "bg-indigo-600 text-white hover:bg-indigo-700"
-                                        )}
-                                    >
-                                        {isMlxLoading ? "..." : (mlxStatus.status === 'online' ? "Arresta" : "Avvia Motore")}
-                                    </button>
                                 </div>
                             )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                URL Server AI
-                            </label>
-                            <input
-                                type="text"
-                                value={aiConfig.url}
-                                onChange={(e) => setAiConfig({ ...aiConfig, url: e.target.value })}
-                                placeholder={aiConfig.provider === 'mlx' ? "http://127.0.0.1:8080/v1" : "http://127.0.0.1:11434/v1"}
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 p-2.5 text-sm font-mono"
-                            />
                         </div>
 
                         <div className="pt-2 flex items-center gap-3">
@@ -532,12 +846,11 @@ export default function SettingsPage() {
                                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
                             >
                                 <RefreshCw className={cn("w-4 h-4", aiTestStatus === 'testing' && "animate-spin")} />
-                                Test Diagnostico
+                                Test Connessione
                             </button>
                         </div>
                         <p className="text-[10px] text-gray-400 italic">
-                            Se l&apos;AI consuma troppa CPU:
-                            {aiConfig.provider === 'ollama' ? ' Riavvia Docker (`docker restart ollama`).' : ' Premi Ctrl+C nel terminale MLX.'}
+                            Se l&apos;AI consuma troppa CPU: riavvia Ollama (`docker restart ollama`).
                         </p>
 
                         {/* Detailed Diagnostic Panel */}
@@ -555,24 +868,6 @@ export default function SettingsPage() {
 
                                 <div className="pl-7 space-y-1 text-xs">
                                     <p className="opacity-90">{aiHealth.message}</p>
-
-                                    {aiHealth.models.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t border-black/5">
-                                            <p className="font-semibold mb-1 opacity-70">Modelli installati su Ollama:</p>
-                                            <div className="flex flex-wrap gap-1">
-                                                {aiHealth.models.map(m => (
-                                                    <span key={m} className={cn(
-                                                        "px-1.5 py-0.5 rounded text-[10px] border",
-                                                        (m.includes(aiConfig.model) || aiConfig.model.includes(m))
-                                                            ? "bg-green-100 border-green-300 font-bold"
-                                                            : "bg-white/50 border-black/10"
-                                                    )}>
-                                                        {m}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -587,7 +882,7 @@ export default function SettingsPage() {
                         {aiTestStatus === 'error' && (
                             <div className="flex items-center gap-2 text-red-600 text-xs bg-red-50 p-2 rounded-lg border border-red-100">
                                 <AlertTriangle className="w-4 h-4" />
-                                Impossibile connettersi. Controlla che {aiConfig.provider === 'mlx' ? 'il motore sia avviato' : 'Ollama sia attivo'}.
+                                Impossibile connettersi. Controlla che Ollama sia attivo.
                             </div>
                         )}
                     </div>
@@ -652,7 +947,7 @@ export default function SettingsPage() {
                                         <span>{progress}%</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 progress-bar-width" data-progress={progress}></div>
                                     </div>
                                     <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
                                 </div>
@@ -680,6 +975,24 @@ export default function SettingsPage() {
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2">Sistema & Manutenzione</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Ambulatory Management */}
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl p-6 border border-blue-100 dark:border-blue-800/30 flex flex-col justify-between">
+                            <div className="flex items-start gap-4 mb-4">
+                                <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+                                    <Building2 className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">Ambulatori</h3>
+                                    <p className="text-xs text-gray-500 mt-1">Gestisci sedi e cambi contesto.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-end">
+                                <a href="/settings/ambulatories" className="text-sm font-medium text-blue-600 hover:underline">
+                                    Apri Gestione &rarr;
+                                </a>
+                            </div>
+                        </div>
+
                         {/* Developer Tools */}
                         <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-2xl p-6 border border-amber-100 dark:border-amber-800/30 flex flex-col justify-between">
                             <div className="flex items-start gap-4 mb-4">
@@ -696,6 +1009,34 @@ export default function SettingsPage() {
                             </div>
                         </div>
 
+                        {/* @Codex: Native app launcher */}
+                        <div className="bg-slate-50/50 dark:bg-slate-900/10 rounded-2xl p-6 border border-slate-100 dark:border-slate-800/30 flex flex-col justify-between">
+                            <div className="flex items-start gap-4 mb-4">
+                                <div className="p-2.5 bg-slate-100 text-slate-600 rounded-xl shrink-0">
+                                    <Cpu className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">App nativa</h3>
+                                    <p className="text-xs text-gray-500 mt-1">Apri rapidamente MediFlow su macOS.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <button
+                                    onClick={openNativeApp}
+                                    disabled={nativeLaunchState === 'loading'}
+                                    className="text-sm font-medium text-slate-700 hover:text-slate-900 disabled:text-slate-400"
+                                >
+                                    {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
+                                </button>
+                                {nativeLaunchState === 'success' && (
+                                    <span className="text-xs text-green-600">Aperta</span>
+                                )}
+                                {nativeLaunchState === 'error' && (
+                                    <span className="text-xs text-red-600">Errore</span>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Danger Zone */}
                         <div className="bg-red-50/50 dark:bg-red-900/10 rounded-2xl p-6 border border-red-100 dark:border-red-800/30">
                             <div className="flex items-start gap-4 mb-6">
@@ -705,6 +1046,23 @@ export default function SettingsPage() {
                                 <div>
                                     <h3 className="font-bold text-gray-800 dark:text-gray-100">Zona Pericolo</h3>
                                     <p className="text-xs text-gray-500 mt-1">Azioni irreversibili che influenzano l&apos;account.</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-yellow-50 dark:bg-yellow-900/10 border-l-4 border-yellow-400 p-4 mb-6">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Provider locale consigliato: Ollama.
+                                        </p>
+                                        <p className="text-sm text-yellow-700 dark:text-yellow-200">
+                                            Modificando queste impostazioni potresti interrompere il collegamento con l&apos;AI.
+                                            Assicurati che il server Ollama sia attivo su <code>{aiConfig.url || "localhost:11434"}</code>.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 

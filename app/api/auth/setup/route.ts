@@ -3,12 +3,15 @@ import { dbServer } from '@/lib/db-server';
 import { users, settings } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+/* @Codex */
+import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
 
 export async function POST(request: Request) {
     try {
         const existingUsers = await dbServer.select().from(users).limit(1);
         if (existingUsers.length > 0) {
-            return NextResponse.json({ error: "Setup already completed" }, { status: 403 });
+            /* @Codex */
+            return NextResponse.json({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, { status: 403 });
         }
 
         const body = await request.json();
@@ -21,8 +24,9 @@ export async function POST(request: Request) {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Transaction-like insertion (SQLite doesn't support strict transactions in HTTP stateless easily without extensive logic, but sequential is fine here)
+        const userId = uuidv4();
         await dbServer.insert(users).values({
-            id: uuidv4(),
+            id: userId,
             username,
             displayName,
             ambulatoryName,
@@ -41,7 +45,16 @@ export async function POST(request: Request) {
             await dbServer.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } });
         }
 
-        return NextResponse.json({ success: true });
+        /* @Codex */
+        const session = createSession({ id: userId, username, role: 'admin' });
+        const response = NextResponse.json({ success: true });
+        response.cookies.set(SESSION_COOKIE_NAME, session.id, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: false,
+            path: '/'
+        });
+        return response;
     } catch (error) {
         console.error("Setup error:", error);
         return NextResponse.json({ error: "Setup failed" }, { status: 500 });

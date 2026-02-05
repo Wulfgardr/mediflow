@@ -1,0 +1,94 @@
+<!-- Codex: created 2026-02-01 -->
+# Agent Attribution
+
+This log tracks contributions by non-Antigravity agents.
+Entries are additive and minimal.
+
+## 2026-02-01 Codex
+- Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md
+- Added this attribution log: docs/agent-attribution.md
+- Added local API auth helper for native endpoints: lib/local-api-auth.ts
+- Added v1 API types for native client contracts: lib/api/v1/types.ts
+- Added read-only v1 patients endpoints: app/api/v1/patients/route.ts
+- Added read-only v1 patient detail endpoint: app/api/v1/patients/[id]/route.ts
+- Added native SwiftUI macOS prototype scaffold: native/MediFlowMac/Package.swift
+- Added native SwiftUI views and models: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Added native SwiftUI app entry point: native/MediFlowMac/Sources/MediFlowMac/MediFlowMacApp.swift
+- Added native models and API client: native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift
+- Added native API client: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added native patient detail view: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added local API TLS proxy script: scripts/local-api-tls-proxy.mjs
+- Added local TLS setup doc: docs/local-api-tls.md
+- Added v1 ambulatories endpoint: app/api/v1/ambulatories/route.ts
+- Added native settings UI for TLS/token/base URL: native/MediFlowMac/Sources/MediFlowMac/Views/SettingsView.swift
+- Added native Keychain token store: native/MediFlowMac/Sources/MediFlowMac/Services/KeychainService.swift
+- Added native settings store: native/MediFlowMac/Sources/MediFlowMac/Services/SettingsStore.swift
+- Added native local API settings constants: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPISettings.swift
+- Updated native API client for HTTPS + pinning: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Updated native content view for settings and errors: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Updated native patient detail error handling: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Updated API v1 types with ambulatories: lib/api/v1/types.ts
+- Added TLS proxy npm script: package.json
+- Updated native models with ambulatories: native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift
+- Added ambulatory selection and reload flow: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Added connection test in settings: native/MediFlowMac/Sources/MediFlowMac/Views/SettingsView.swift
+- Updated settings store to validate/save for testing: native/MediFlowMac/Sources/MediFlowMac/Services/SettingsStore.swift
+- Updated local API client for ambulatory filtering and test: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added selected ambulatory persistence: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPISettings.swift
+- Added ambulatory filtering to v1 patients endpoint: app/api/v1/patients/route.ts
+- Added automated native setup script: scripts/native-setup.sh
+- Added native setup guide: docs/native-setup.md
+- Added bootstrap config loader: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIBootstrap.swift
+- Updated settings store to auto-apply bootstrap: native/MediFlowMac/Sources/MediFlowMac/Services/SettingsStore.swift
+- Added macOS menu bar commands and settings scene: native/MediFlowMac/Sources/MediFlowMac/MediFlowMacApp.swift
+- Added native app bundle builder: scripts/build-native-app.sh
+- Added double-click launcher script: scripts/Launch_MediFlowMac.command
+- Added native launch guide: docs/native-launch.md
+- Ignored Swift build/app bundle outputs: .gitignore
+- Redesigned patient detail UI with structured sections: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added v1 clinical endpoints for patients (entries/therapies/checkups): app/api/v1/patients/[id]/entries/route.ts
+- Added v1 clinical endpoints for patients (entries/therapies/checkups): app/api/v1/patients/[id]/therapies/route.ts
+- Added v1 clinical endpoints for patients (entries/therapies/checkups): app/api/v1/patients/[id]/checkups/route.ts
+- Added clinical DTOs in v1 types: lib/api/v1/types.ts
+- Extended patient summary with ADI/archived flags: app/api/v1/patients/route.ts
+- Extended native models for clinical sections: native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift
+- Extended native API client for clinical data: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added tag view for list badges: native/MediFlowMac/Sources/MediFlowMac/Views/TagView.swift
+- Improved patient list with badges and update recency: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Added clinical sections to patient detail view: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Fixed SwiftUI accent color usage: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Cleaned Keychain query warning: native/MediFlowMac/Sources/MediFlowMac/Services/KeychainService.swift
+- Updated TLS pinning to avoid deprecated API: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Fixed SwiftUI accent color fallback for older toolchains: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added native crypto service for PIN-based encryption: native/MediFlowMac/Sources/MediFlowMac/Services/CryptoService.swift
+- Added native security session with PIN unlock: native/MediFlowMac/Sources/MediFlowMac/Services/SecuritySession.swift
+- Added native lock screen view: native/MediFlowMac/Sources/MediFlowMac/Views/LockScreenView.swift
+- Added native new patient form: native/MediFlowMac/Sources/MediFlowMac/Views/NewPatientView.swift
+- Added native tools view (AI/Farmaci/ICD): native/MediFlowMac/Sources/MediFlowMac/Views/ToolsView.swift
+- Updated native app entry for security session + lock command: native/MediFlowMac/Sources/MediFlowMac/MediFlowMacApp.swift
+- Updated native content view for unlock + new patient + tools: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Updated patient detail to decrypt encrypted fields: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Expanded native API client (auth, settings, AI, drugs, ICD, create patient): native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added v1 patients POST with ambulatory assignment: app/api/v1/patients/route.ts
+- Added ADR for native security and modules: docs/adr/0002-native-security-and-modules.md
+- Added v1 POST endpoints for patient entries: app/api/v1/patients/[id]/entries/route.ts
+- Added v1 POST endpoints for patient therapies: app/api/v1/patients/[id]/therapies/route.ts
+- Added v1 POST endpoints for patient checkups: app/api/v1/patients/[id]/checkups/route.ts
+- Added AI settings resolver for native client: native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift
+- Updated tools view to reuse AI settings resolver: native/MediFlowMac/Sources/MediFlowMac/Views/ToolsView.swift
+- Added drug search field view: native/MediFlowMac/Sources/MediFlowMac/Views/DrugSearchField.swift
+- Added ICD search field view: native/MediFlowMac/Sources/MediFlowMac/Views/ICDSearchField.swift
+- Added native new entry view: native/MediFlowMac/Sources/MediFlowMac/Views/NewEntryView.swift
+- Added native new therapy view: native/MediFlowMac/Sources/MediFlowMac/Views/NewTherapyView.swift
+- Added native new checkup view: native/MediFlowMac/Sources/MediFlowMac/Views/NewCheckupView.swift
+- Expanded native patient detail with AI + create actions: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Expanded native API client for write operations and AI config: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added ADR for native write and clinical tools: docs/adr/0003-native-write-clinical-ai.md
+- Fixed SwiftPM tools-version header order: native/MediFlowMac/Package.swift
+
+## 2026-02-02 Codex
+- Fixed ForEach id typo in new entry view: native/MediFlowMac/Sources/MediFlowMac/Views/NewEntryView.swift
+- Added native AI control panel UI and diagnostics: native/MediFlowMac/Sources/MediFlowMac/Views/AIControlPanelView.swift
+- Added AI control tab and reasoning chat option: native/MediFlowMac/Sources/MediFlowMac/Views/ToolsView.swift
+- Extended native AI settings resolver for reasoning/OCR: native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift
+- Added native API client support for AI settings, models, OCR, MLX control: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift

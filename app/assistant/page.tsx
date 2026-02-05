@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Sparkles, AlertTriangle, Paperclip, X, FileText, Plus, MessageSquare, Archive, ArchiveRestore, Activity, Trash2, Cpu, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { db, Conversation, Message as DbMessage } from '@/lib/db';
+import { db, Conversation, Message as DbMessage, Patient } from '@/lib/db';
 
 import ReactMarkdown from 'react-markdown';
 import { fileToBase64, isImageFile, isTextDocument, extractTextFromFile } from '@/lib/ai/file-parsers';
@@ -34,12 +34,12 @@ export default function AssistantPage() {
 
     // Sidebar Data
     const [conversationsList, setConversationsList] = useState<Conversation[]>([]);
-    const [patientsList, setPatientsList] = useState<any[]>([]);
+    const [patientsList, setPatientsList] = useState<Patient[]>([]);
 
     // Helper to refresh conversations list from DB
     const refreshConversations = async () => {
         const convs = await db.conversations.toArray();
-        setConversationsList(convs.sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+        setConversationsList(convs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
     };
 
     useEffect(() => {
@@ -52,7 +52,6 @@ export default function AssistantPage() {
         // Poll every 5 seconds for updates (poor man's live query)
         const interval = setInterval(loadData, 5000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const conversations = conversationsList;
@@ -97,9 +96,10 @@ export default function AssistantPage() {
     const loadMessages = async (conversationId: string) => {
         const allMessages = await db.messages.toArray();
         const stored = allMessages
-            .filter((m: any) => m.conversationId === conversationId)
+            .filter((m) => m.conversationId === conversationId)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        setMessages(stored);
+        setMessages(stored as unknown as UIMessage[]);
     };
 
     const startNewChat = async () => {
@@ -265,7 +265,7 @@ export default function AssistantPage() {
             const { AIPrompts } = await import('@/lib/ai-prompts');
             const { buildPatientContext, findAndBuildSmartContext } = await import('@/lib/ai-context');
 
-            const service = await AIService.create();
+            const service = await AIService.create('reasoning');
 
             // 1. Build Context
             let contextString = "";
@@ -498,6 +498,7 @@ export default function AssistantPage() {
                             Performance Monitor
                         </div>
                         {messages.filter(m => m.role === 'assistant').slice(-1).map(lastMsg => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             let meta: any = {};
                             try {
                                 if (lastMsg.metadata) meta = JSON.parse(lastMsg.metadata);
@@ -560,11 +561,12 @@ export default function AssistantPage() {
                     )}
 
                     {messages.map((msg) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         let meta: any = {};
                         try {
                             if (msg.metadata) meta = JSON.parse(msg.metadata);
-                        } catch (e) {
-                            // console.error("Error parsing message metadata", e);
+                        } catch {
+                            // ignore error
                         }
 
                         return (

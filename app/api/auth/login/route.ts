@@ -3,6 +3,8 @@ import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+/* @Codex */
+import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
 
 export async function POST(request: Request) {
     try {
@@ -27,7 +29,9 @@ export async function POST(request: Request) {
         // If they reload, they must login again to decrypt the key. 
         // This is arguably more secure than a persistent cookie for a medical app.
 
-        return NextResponse.json({
+        /* @Codex */
+        const session = createSession({ id: user.id, username: user.username, role: user.role || 'user' });
+        const response = NextResponse.json({
             success: true,
             id: user.id,
             username: user.username,
@@ -37,7 +41,13 @@ export async function POST(request: Request) {
             encryptedMasterKey: user.encryptedMasterKey,
             salt: user.salt
         });
-
+        response.cookies.set(SESSION_COOKIE_NAME, session.id, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: false,
+            path: '/'
+        });
+        return response;
     } catch (error) {
         console.error("Login error:", error);
         return NextResponse.json({ error: "Login failed" }, { status: 500 });

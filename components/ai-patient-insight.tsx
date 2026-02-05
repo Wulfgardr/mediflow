@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle, X } from 'lucide-react';
-import { db, Patient } from '@/lib/db';
+import { Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
+/* @Codex */
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -14,8 +16,19 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
+    /* @Codex */
+    const [modelLabel, setModelLabel] = useState<string>("");
 
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    /* @Codex */
+    useEffect(() => {
+        const loadModels = async () => {
+            const models = await getAiModelLabels();
+            setModelLabel(models.clinical);
+        };
+        loadModels();
+    }, []);
 
     const generateInsight = async () => {
         setIsGenerating(true);
@@ -27,88 +40,20 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
         abortControllerRef.current = controller;
 
         try {
-            // Import dynamically to ensure safe execution in client
-            const { AIService } = await import('@/lib/ai-service');
-            const { buildPatientContext } = await import('@/lib/ai-context');
-            const ai = await AIService.create();
-            const providerName = ai.provider === 'mlx' ? 'Apple MLX' : 'Ollama';
-            setProgress(`Connessione a ${providerName}...`);
-
-            if (!await ai.ping()) {
-                throw new Error(`AI non risponde. Verifica che ${providerName} sia attivo.`);
-            }
-
-            if (controller.signal.aborted) return;
-
-            setProgress("Analisi contesto clinico...");
-            const contextData = await buildPatientContext(patient.id!);
-
-            const prompt = `Sei un assistente medico. Analizza questi dati e rispondi in modo COMPLETO ma CONCISO.
-
-FORMATO RICHIESTO:
-**Riassunto clinico:** (max 2 righe)
-
-**Punti di attenzione:**
-1. [punto 1]
-2. [punto 2]
-3. [punto 3]
-
-**Prossima mossa:** [azione specifica]
-
-REGOLE IMPORTANTI:
-- NON lasciare frasi incomplete o troncate
-- Completa sempre ogni frase
-- Sii breve ma esaustivo
-- Niente introduzioni ("Ecco l'analisi...")
-
-DATI PAZIENTE:
-${contextData}`;
-
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            if (controller.signal.aborted) return;
-
-
-            setProgress("Generazione insight...");
-
-            // Use generate for a single prompt-response flow
-            // Note: Service has internal timeout, but we can't easily cancel internal fetch from here 
-            // unless we modify Service to accept signal. 
-            // However, the proxy fix (aborting upstream) means if we unmount or if we could signal the service, it works.
-            // Ideally passing signal to generate() would be best. 
-            // But for now, let's assume if we ignore the result and the proxy keeps going?
-            // Wait, we updated the proxy to handle CLIENT abort. 
-            // But client fetch in OllamaService needs to receive THIS signal.
-            // Since we didn't update OllamaService.generate to accept a signal argument, we can't fully "Kill" the fetch from here yet.
-            // But we can at least stop the UI waiting.
-            // TODO: Update OllamaService to accept signal? 
-            // Let's rely on global timeout for now or just UI reset.
-            // Actually, best effort: let's just reset UI.
-
-            const content = await ai.generate(prompt, controller.signal, 1024);
-
-            if (controller.signal.aborted) return;
-
-            if (!content) throw new Error("Risposta vuota dal provider AI");
-
-            // Clean thinking tokens if present (for reasoning models)
-            let cleanContent = content.replace(/<unused94>[\s\S]*?(<unused95>|$)/, '').trim();
-            cleanContent = cleanContent.replace(/^Plan:\s*/i, '');
-
-            // Fallback: IF cleaning removed everything (model failure/truncation), keep original or throw
-            if (!cleanContent && content.length > 0) {
-                console.warn("AI Content cleaned to empty. Using raw content fallback.");
-                cleanContent = content; // Better than nothing? Or maybe throw error?
-                // Let's use content but add a warning prefix
-                cleanContent = `[⚠️ AI Output Raw]: ${content}`;
-            }
-
-            if (!cleanContent) throw new Error("L'AI ha generato una risposta vuota o non valida.");
-
-            // Save to DB
-            await db.patients.update(patient.id!, {
-                aiSummary: cleanContent,
-                updatedAt: new Date()
+            const info = await regeneratePatientSummary(patient.id!, {
+                signal: controller.signal,
+                onStage: (stage, modelInfo) => {
+                    if (modelInfo?.model) setModelLabel(modelInfo.model);
+                    if (stage === 'connect') setProgress("Connessione al modello...");
+                    if (stage === 'context') setProgress("Analisi contesto clinico...");
+                    if (stage === 'generate') setProgress("Generazione insight...");
+                    if (stage === 'save') setProgress("Salvataggio...");
+                }
             });
+
+            if (controller.signal.aborted) return;
+
+            if (!info) throw new Error("Risposta vuota dal provider AI");
 
             // Force refresh to show new data
             setTimeout(() => {
@@ -193,7 +138,12 @@ ${contextData}`;
                     <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-md shadow-indigo-200 dark:shadow-none">
                         <Sparkles className="w-5 h-5" />
                     </div>
-                    <h3 className="font-bold text-xl text-gray-800 dark:text-white">AI Patient Insight</h3>
+                    <div>
+                        <h3 className="font-bold text-xl text-gray-800 dark:text-white">AI Patient Insight</h3>
+                        {modelLabel && (
+                            <p className="text-[10px] text-gray-500">Modello: {modelLabel}</p>
+                        )}
+                    </div>
                 </div>
 
                 <button

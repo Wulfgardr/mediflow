@@ -2,8 +2,14 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
+/* @Codex */
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function POST(request: Request) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await request.json();
         const { key, value } = body;

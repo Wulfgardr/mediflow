@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // --- Users (Auth) ---
@@ -14,6 +14,18 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+// --- Ambulatories (Multi-Tenant) ---
+export const ambulatories = sqliteTable('ambulatories', {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    address: text('address'),
+    parentId: text('parent_id'), // Hierarchy
+    type: text('type').default('live'), // 'live' | 'test'
+    description: text('description'),
+    isDefault: integer('is_default', { mode: 'boolean' }).default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Patients ---
 export const patients = sqliteTable('patients', {
     id: text('id').primaryKey(),
@@ -26,11 +38,22 @@ export const patients = sqliteTable('patients', {
     caregiver: text('caregiver'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
+    documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
+
+// --- Patient <-> Ambulatory (Many-to-Many) ---
+export const patientsToAmbulatories = sqliteTable('patients_to_ambulatories', {
+    patientId: text('patient_id').references(() => patients.id, { onDelete: 'cascade' }).notNull(),
+    ambulatoryId: text('ambulatory_id').references(() => ambulatories.id, { onDelete: 'cascade' }).notNull(),
+    assignedAt: integer('assigned_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({
+    pk: primaryKey({ columns: [t.patientId, t.ambulatoryId] }),
+}));
 
 // --- Clinical Entries ---
 export const entries = sqliteTable('entries', {
@@ -100,6 +123,8 @@ export const attachments = sqliteTable('attachments', {
     size: integer('size').notNull(),
     path: text('path').notNull(),
     data: text('data'), // Base64 content
+    /* @Codex */
+    summarySnapshot: text('summary_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

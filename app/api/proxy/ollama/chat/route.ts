@@ -1,11 +1,18 @@
 
 import { NextResponse } from 'next/server';
+/* @Codex */
+import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { validateLocalTarget } from '@/lib/local-target';
 
 /**
  * Proxy for Ollama Chat API
  * Addresses CORS and Mixed Content issues by routing requests through Next.js server.
  */
 export async function POST(req: Request) {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
     try {
         const body = await req.json();
 
@@ -18,10 +25,15 @@ export async function POST(req: Request) {
         // Let's assume standard localhost for now as fallback.
 
         const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+        /* @Codex */
+        const validation = validateLocalTarget(OLLAMA_URL);
+        if (!validation.ok) {
+            return NextResponse.json({ error: `Ollama URL not allowed: ${validation.reason}` }, { status: 400 });
+        }
 
-        console.log(`[Proxy] Forwarding chat request to ${OLLAMA_URL}/api/chat`);
+        console.log(`[Proxy] Forwarding chat request to ${validation.url.toString()}/api/chat`);
 
-        const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+        const res = await fetch(`${validation.url.toString()}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

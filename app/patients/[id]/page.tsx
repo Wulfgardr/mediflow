@@ -8,6 +8,7 @@ import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
+import DocumentInsightsPanel from '@/components/document-insights-panel';
 
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
@@ -211,6 +212,9 @@ export default function PatientDetailPage() {
 
                     {/* NEW AI Insight Location */}
                     <AIPatientInsight patient={patient} />
+
+                    {/* Document Insights - Archivio Intelligente */}
+                    <DocumentInsightsPanel patient={patient} />
 
                     {/* Quick Scales Widget */}
                     <div className="glass-panel p-6">
