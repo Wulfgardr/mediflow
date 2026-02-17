@@ -18,9 +18,6 @@ struct NewEntryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuova voce clinica")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Dettagli") {
                     Picker("Tipo", selection: $entryType) {

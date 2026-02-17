@@ -164,7 +164,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
                 <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl border border-gray-100 dark:border-white/10 p-4 text-center">
                     <Pill className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">Nessun farmaco trovato nel database.</p>
-                    <p className="text-xs text-gray-400 mt-1">Prova a cercare per principio attivo o usa l'inserimento manuale (Galenico).</p>
+                    <p className="text-xs text-gray-400 mt-1">Prova a cercare per principio attivo o usa l&apos;inserimento manuale (Galenico).</p>
                 </div>
             )}
         </div>

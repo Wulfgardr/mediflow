@@ -20,7 +20,13 @@ export type PatientDetail = {
     address: string | null;
     phone: string | null;
     caregiver: string | null;
+    /* @Codex */
+    exemptions: string | null;
     notes: string | null;
+    /* @Codex */
+    aiSummary: string | null;
+    /* @Codex */
+    documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
     ambulatoryId: string | null;
@@ -64,4 +70,30 @@ export type CheckupSummary = {
     title: string;
     status: string;
     createdAt: string | null;
+};
+
+/* @Codex */
+export type DrugSummary = {
+    aic: string;
+    name: string;
+    activePrinciple: string | null;
+    company: string | null;
+    packaging: string | null;
+    class: string | null;
+    price: number | null;
+    atc: string | null;
+};
+
+/* @Codex */
+export type ExemptionSummary = {
+    code: string;
+    description: string;
+    type: string | null;
+    source: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    isPharma: boolean | null;
+    isSpecialist: boolean | null;
+    isNational: boolean | null;
+    updatedAt: string | null;
 };

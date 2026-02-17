@@ -1,10 +1,12 @@
 'use client';
 
-import { useForm, useFieldArray, Control, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
+import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar } from 'lucide-react';
+import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
+/* @Codex */
+import ExemptionSelector from '@/components/exemption-selector';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 
 import { patientSchema, PatientFormValues } from '@/lib/schemas';
@@ -194,6 +196,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
         birthDate: (defaultValues.birthDate instanceof Date && !isNaN(defaultValues.birthDate.getTime()))
             ? defaultValues.birthDate.toISOString().split('T')[0]
             : defaultValues.birthDate,
+        /* @Codex */
+        exemptions: Array.isArray(defaultValues.exemptions) ? defaultValues.exemptions : [],
         checkups: defaultValues.checkups?.map((c: any) => ({
             ...c,
             date: (c.date instanceof Date && !isNaN(c.date.getTime())) ? c.date.toISOString().split('T')[0] : c.date
@@ -206,6 +210,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
         defaultValues: formattedDefaults || {
             isAdi: false,
             monitoringProfile: 'taken_in_charge',
+            /* @Codex */
+            exemptions: [],
             diagnoses: [],
             checkups: [],
             statusReason: ''
@@ -345,6 +351,27 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     Prossimi Controlli
                 </h3>
                 <CheckupsFieldArray register={register} control={control} errors={errors} watch={watch} remove={() => { }} append={() => { }} />
+            </div>
+
+            {/* @Codex */}
+            <div className="glass-panel p-6 space-y-4 relative z-30 dark:bg-[#161b22] dark:border-[#30363d]">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+                    <Ticket className="w-5 h-5 text-indigo-500" />
+                    Codici Esenzione
+                </h3>
+                <Controller
+                    name="exemptions"
+                    control={control}
+                    render={({ field }) => (
+                        <ExemptionSelector
+                            value={Array.isArray(field.value) ? field.value : []}
+                            onChange={field.onChange}
+                        />
+                    )}
+                />
+                <p className="text-xs text-gray-500 dark:text-[#8b949e]">
+                    Seleziona i codici da associare al paziente: verranno salvati in modo cifrato nella scheda.
+                </p>
             </div>
 
             {/* Clinical Profile Section */}

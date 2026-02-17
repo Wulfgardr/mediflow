@@ -81,12 +81,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 displayName: formData.displayName,
                 ambulatoryName: formData.ambulatoryName,
                 pin: formData.pin,
-                username: formData.username,
-                // We need to pass the real password too if we want separate login credential.
-                // But the interface in `security-provider` only passes `pin` back to `setup`.
-                // I'll overload the data object passed to onComplete.
-                // @ts-ignore
-                password: formData.password
+                username: formData.username
             });
         } catch (e) {
             console.error(e);

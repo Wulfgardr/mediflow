@@ -7,6 +7,13 @@ import { cookies } from 'next/headers';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
+/* @Codex */
+function normalizeExemptionsValue(value: unknown): string | null {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 export async function GET() {
     /* @Codex */
     const session = await requireSession();
@@ -78,6 +85,8 @@ export async function POST(request: Request) {
             birthDate: body.birthDate ? new Date(body.birthDate) : null,
             address: body.address,
             phone: body.phone,
+            /* @Codex */
+            exemptions: normalizeExemptionsValue(body.exemptions),
             notes: body.notes || null,
             isAdi: body.isAdi || false,
             ambulatoryId: ambulatoryId || null,

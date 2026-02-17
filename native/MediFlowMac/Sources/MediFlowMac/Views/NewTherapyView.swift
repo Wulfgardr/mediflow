@@ -19,9 +19,6 @@ struct NewTherapyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuova terapia")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Farmaco") {
                     TextField("Nome farmaco", text: $drugName)

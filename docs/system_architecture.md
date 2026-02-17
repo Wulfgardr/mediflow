@@ -1,6 +1,7 @@
-# 🏥 Architettura di MediFlow
+# Architettura di MediFlow (sintesi operativa)
 
-Come funziona sotto il cofano. Utile se vuoi capire il codice o contribuire.
+Panoramica tecnica rapida per capire componenti, topologia e flussi principali.
+Per il dettaglio end-to-end usa anche `docs/walkthrough.md`.
 
 ---
 
@@ -70,7 +71,7 @@ Il server vede solo stringhe cifrate. Non ha la chiave.
 
 ## AI: due modelli che collaborano
 
-| Modello | Porta | Task |
+| Modello | Porta | Ruolo |
 | --- | --- | --- |
 | **MedGemma 4B** | 11434 (Ollama) | Analisi clinica, sintesi, supporto decisionale |
 | **DeepSeek-OCR 3B** | 11434 (Ollama) | Lettura documenti, estrazione testo da PDF/immagini |
@@ -89,7 +90,7 @@ Tutto avviene in locale. Zero chiamate esterne.
 
 ---
 
-## API endpoints
+## Endpoint API
 
 | Endpoint | Cosa fa |
 | --- | --- |

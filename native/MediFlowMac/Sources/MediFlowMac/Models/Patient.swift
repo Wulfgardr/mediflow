@@ -21,7 +21,13 @@ struct PatientDetail: Identifiable, Decodable {
     let address: String?
     let phone: String?
     let caregiver: String?
+    /* @Codex */
+    let exemptions: String?
     let notes: String?
+    /* @Codex */
+    let aiSummary: String?
+    /* @Codex */
+    let documentInsights: String?
     let isAdi: Bool?
     let isArchived: Bool?
     let ambulatoryId: String?

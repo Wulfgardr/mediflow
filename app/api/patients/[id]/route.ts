@@ -5,6 +5,14 @@ import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
+/* @Codex */
+function normalizeExemptionsForUpdate(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     /* @Codex */
     const session = await requireSession();
@@ -28,9 +36,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     try {
         const { id } = await params;
         const body = await request.json();
+        const normalizedExemptions = normalizeExemptionsForUpdate(body.exemptions);
         await dbServer.update(patients)
             .set({
                 ...body,
+                /* @Codex */
+                exemptions: normalizedExemptions,
                 updatedAt: new Date(),
                 birthDate: body.birthDate ? new Date(body.birthDate) : undefined
             })

@@ -36,6 +36,8 @@ export const patients = sqliteTable('patients', {
     address: text('address'),
     phone: text('phone'),
     caregiver: text('caregiver'),
+    /* @Codex */
+    exemptions: text('exemptions'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
@@ -138,4 +140,18 @@ export const drugs = sqliteTable('drugs', {
     class: text('class'),
     price: integer('price'), // stored as cents or float? using integer for simplicity or check import logic
     atc: text('atc'),
+});
+
+/* @Codex */
+export const exemptions = sqliteTable('exemptions', {
+    code: text('code').primaryKey(),
+    description: text('description').notNull(),
+    type: text('type'),
+    source: text('source'),
+    startDate: integer('start_date', { mode: 'timestamp' }),
+    endDate: integer('end_date', { mode: 'timestamp' }),
+    isPharma: integer('is_pharma', { mode: 'boolean' }),
+    isSpecialist: integer('is_specialist', { mode: 'boolean' }),
+    isNational: integer('is_national', { mode: 'boolean' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
