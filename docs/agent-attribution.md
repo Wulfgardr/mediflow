@@ -92,3 +92,45 @@ Entries are additive and minimal.
 - Added AI control tab and reasoning chat option: native/MediFlowMac/Sources/MediFlowMac/Views/ToolsView.swift
 - Extended native AI settings resolver for reasoning/OCR: native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift
 - Added native API client support for AI settings, models, OCR, MLX control: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+
+## 2026-02-06 Codex
+- Added reusable floating glass panel window with traffic-light controls and collapse/expand motion: native/MediFlowMac/Sources/MediFlowMac/Views/GlassPanelWindow.swift
+- Applied floating panel shell to settings/new-patient sheets: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Redesigned patient detail into conceptual islands and added dedicated AI Studio sheet: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewPatientView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewEntryView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewTherapyView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewCheckupView.swift
+- Tuned motion/transparency for floating panels and patient concept islands, including reduce-motion fallbacks: native/MediFlowMac/Sources/MediFlowMac/Views/GlassPanelWindow.swift
+- Tuned backdrop drift, island reveal timing, hover lift, and reduced decorative glass density: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/schema.ts
+- Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/db-server.ts
+- Added explicit migration for exemptions table and patient field: drizzle/0001_exemptions_lookup.sql
+- Added local exemptions API (search, count, import, clear) with session/token auth: app/api/exemptions/route.ts
+- Added exemptions importer/parser for TXT pipelines and stats helpers: lib/exemption-importer.ts
+- Added settings UI manager for drag-and-drop exemptions catalog updates: components/settings/exemption-db-manager.tsx
+- Added patient-form exemptions selector with searchable code lookup: components/exemption-selector.tsx
+- Added web patient form/storage wiring for encrypted exemptions codes: components/patient-form.tsx
+- Added exemptions visibility in patient detail web card: app/patients/[id]/page.tsx
+- Added API contract propagation for patient exemptions in web/native v1 endpoints and types: app/api/v1/patients/[id]/route.ts
+- Added native model/payload/detail rendering support for patient exemptions: native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift
+- Added ADR for exemptions catalog architecture and patient mapping: docs/adr/0004-exemptions-catalog.md
+- Improved exemptions selector UX to detect empty catalog and prompt import from settings: components/exemption-selector.tsx
+- Added ADR for full web/native parity on shared local API contract: docs/adr/0005-web-native-functional-parity.md
+- Added versioned v1 drugs API (search/count/import/clear): app/api/v1/drugs/route.ts
+- Added versioned v1 exemptions API (search/filter/count/import/clear): app/api/v1/exemptions/route.ts
+- Extended shared v1 DTOs for drugs and exemptions: lib/api/v1/types.ts
+- Updated native API client to use v1 drugs endpoint and added v1 exemptions search method: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Fixed async session guard in native launcher API route (tsc blocker): app/api/system/native/route.ts
+- Added v1 patient update/delete operations with ambulatory relation sync: app/api/v1/patients/[id]/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/entries/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/therapies/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/checkups/route.ts
+- Added v1 entry item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/entries/[entryId]/route.ts
+- Added v1 therapy item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/therapies/[therapyId]/route.ts
+- Added v1 checkup item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/checkups/[checkupId]/route.ts
+- Extended native API client with update/delete methods for patient, entry, therapy, and checkup: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Extended native API client list methods with v1 filters (entries/therapies/checkups): native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added native patient-detail filters (type/status) for entries, therapies, and checkups: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added native patient-detail row actions (edit/delete) for entries, therapies, and checkups: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added native edit sheets for entry, therapy, and checkup wired to v1 update endpoints: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift

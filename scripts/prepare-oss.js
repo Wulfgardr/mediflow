@@ -1,3 +1,5 @@
+/* @Codex */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const path = require('path');
 
@@ -45,7 +47,6 @@ function copyRecursive(src, dest) {
         // Only replace text in text files
         if (src.endsWith('.ts') || src.endsWith('.tsx') || src.endsWith('.js') || src.endsWith('.json') || src.endsWith('.md')) {
             let text = content.toString('utf8');
-            const original = text;
             for (const rep of REPLACEMENTS) {
                 text = text.replace(rep.from, rep.to);
             }

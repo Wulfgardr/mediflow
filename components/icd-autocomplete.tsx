@@ -147,7 +147,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
             {isOpen && results.length === 0 && query.length > 1 && (
                 <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-100 dark:border-white/10 p-3 text-center text-xs text-gray-400 italic">
-                    Nessuna corrispondenza. Prova a cercare in Inglese (es. "Amyloid").
+                    Nessuna corrispondenza. Prova a cercare in Inglese (es. &quot;Amyloid&quot;).
                 </div>
             )}
         </div>

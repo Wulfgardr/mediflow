@@ -6,6 +6,8 @@ import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Ser
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import DataSeeder from '@/components/data-seeder';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
+/* @Codex */
+import ExemptionDbManager from '@/components/settings/exemption-db-manager';
 import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
 import DiagnosticHub from '@/components/diagnostic-hub';
@@ -967,6 +969,9 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* @Codex */}
+                <ExemptionDbManager />
 
                 {/* --- System & Maintenance Section --- */}
                 <div className="md:col-span-2 space-y-6">

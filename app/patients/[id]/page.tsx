@@ -3,7 +3,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useParams } from 'next/navigation';
-import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info, Ticket } from 'lucide-react';
 import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
@@ -39,6 +39,9 @@ export default function PatientDetailPage() {
     if (!patient) {
         return <div className="p-8 text-center text-gray-500">Caricamento cartella paziente...</div>;
     }
+
+    /* @Codex */
+    const exemptionCodes = Array.isArray(patient.exemptions) ? patient.exemptions : [];
 
     return (
         <div className="space-y-8">
@@ -126,6 +129,31 @@ export default function PatientDetailPage() {
                                 <Info className="w-4 h-4 mt-0.5 text-amber-500 dark:text-amber-400 shrink-0" />
                                 <div className="flex-1">
                                     <PrivacyBlur>{patient.notes}</PrivacyBlur>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* @Codex */}
+                        {exemptionCodes.length > 0 && (
+                            <div className="mt-3 p-3 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
+                                    <Ticket className="w-3.5 h-3.5" />
+                                    Esenzioni associate
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {exemptionCodes.slice(0, 10).map((code) => (
+                                        <span
+                                            key={code}
+                                            className="font-mono text-xs px-2 py-1 rounded-md bg-white dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-200"
+                                        >
+                                            {code}
+                                        </span>
+                                    ))}
+                                    {exemptionCodes.length > 10 && (
+                                        <span className="text-xs text-indigo-600 dark:text-indigo-300 px-2 py-1">
+                                            +{exemptionCodes.length - 10} altri
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         )}

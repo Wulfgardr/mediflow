@@ -12,6 +12,35 @@ enum AIModelTask: String {
     case ocr
 }
 
+/* @Codex */
+struct AIRuntimeTaskConfig: Identifiable {
+    let task: AIModelTask
+    let provider: String
+    let baseURL: String
+    let model: String
+
+    var id: String { task.rawValue }
+
+    var title: String {
+        switch task {
+        case .clinical: return "Clinica"
+        case .reasoning: return "Reasoning"
+        case .ocr: return "OCR"
+        }
+    }
+}
+
+/* @Codex */
+struct AIRuntimeSnapshot {
+    let clinical: AIRuntimeTaskConfig
+    let reasoning: AIRuntimeTaskConfig
+    let ocr: AIRuntimeTaskConfig
+
+    var all: [AIRuntimeTaskConfig] {
+        [clinical, reasoning, ocr]
+    }
+}
+
 enum AISettingsResolver {
     /* @Codex */
     static func resolveProvider() async -> String {
@@ -98,6 +127,31 @@ enum AISettingsResolver {
         let model = modelValue ?? modelLegacy ?? defaultModel
 
         return AIConfig(baseURL: baseURL, model: model)
+    }
+
+    /* @Codex */
+    static func resolveRuntimeSnapshot() async throws -> AIRuntimeSnapshot {
+        async let clinical = resolveRuntimeTask(for: .clinical)
+        async let reasoning = resolveRuntimeTask(for: .reasoning)
+        async let ocr = resolveRuntimeTask(for: .ocr)
+
+        return try await AIRuntimeSnapshot(
+            clinical: clinical,
+            reasoning: reasoning,
+            ocr: ocr
+        )
+    }
+
+    /* @Codex */
+    private static func resolveRuntimeTask(for task: AIModelTask) async throws -> AIRuntimeTaskConfig {
+        let provider = await resolveProvider(for: task)
+        let config = try await resolveConfig(for: task)
+        return AIRuntimeTaskConfig(
+            task: task,
+            provider: provider,
+            baseURL: config.baseURL,
+            model: config.model
+        )
     }
 
     /* @Codex */

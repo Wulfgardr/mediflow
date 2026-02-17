@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +20,13 @@ function parseLimit(value: string | null): number | null {
     return Math.min(parsed, 100);
 }
 
+/* @Codex */
+function parseDateParam(value: string | null): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -28,13 +35,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const { searchParams } = new URL(request.url);
         const limit = parseLimit(searchParams.get('limit'));
+        const status = searchParams.get('status')?.trim();
+        const dateFrom = parseDateParam(searchParams.get('dateFrom'));
+        const dateTo = parseDateParam(searchParams.get('dateTo'));
 
-        let query = dbServer.select().from(checkups).where(eq(checkups.patientId, id)).orderBy(desc(checkups.date));
-        if (limit) {
-            query = query.limit(limit);
-        }
+        const filters = [eq(checkups.patientId, id)];
+        if (status) filters.push(eq(checkups.status, status));
+        if (dateFrom) filters.push(gte(checkups.date, dateFrom));
+        if (dateTo) filters.push(lte(checkups.date, dateTo));
+        const whereClause = filters.length > 1 ? and(...filters) : filters[0];
 
-        const rows = await query;
+        const rows = limit
+            ? await dbServer.select().from(checkups).where(whereClause).orderBy(desc(checkups.date)).limit(limit)
+            : await dbServer.select().from(checkups).where(whereClause).orderBy(desc(checkups.date));
+
         const result: CheckupSummary[] = rows.map((checkup) => ({
             id: checkup.id,
             patientId: checkup.patientId,

@@ -34,6 +34,8 @@ export interface Patient {
     deletionReason?: string;
     aiSummary?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
+    /* @Codex */
+    exemptions?: string[];
     notes?: string;
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
@@ -82,7 +84,8 @@ export interface ClinicalEntry {
 
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
-    patients: ['address', 'phone', 'caregiver', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
+    /* @Codex */
+    patients: ['address', 'phone', 'caregiver', 'exemptions', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
     entries: ['content', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
@@ -215,7 +218,10 @@ class ApiTable<T> {
     }
 
     async delete(id: string): Promise<void> {
-        await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+            throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
+        }
     }
 
     async bulkDelete(ids: string[]): Promise<void> {
@@ -238,10 +244,33 @@ class ApiTable<T> {
     }
 
     async clear(): Promise<void> {
-        // Optimization: Send DELETE to root endpoint to wipe table
-        // Backend must support DELETE /api/resource for "delete all"
         const res = await fetch(this.endpoint, { method: 'DELETE' });
-        if (!res.ok) throw new Error("Failed to clear table");
+        if (res.ok) return;
+
+        // @Codex: fallback for resources that expose only item-level DELETE.
+        if (res.status !== 404 && res.status !== 405) {
+            throw new Error(`Failed to clear table: ${res.status} ${res.statusText}`);
+        }
+
+        const items = await this.toArray();
+        const ids = items
+            .map((item) => this.getItemIdentifier(item))
+            .filter((value): value is string => Boolean(value));
+
+        if (items.length > 0 && ids.length !== items.length) {
+            throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
+        }
+
+        await Promise.all(ids.map((id) => this.delete(id)));
+    }
+
+    /* @Codex */
+    private getItemIdentifier(item: unknown): string | null {
+        if (!item || typeof item !== 'object') return null;
+
+        const record = item as Record<string, unknown>;
+        const candidate = record.id ?? record.key ?? record.code ?? record.aic;
+        return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : null;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -252,6 +281,10 @@ class ApiTable<T> {
         if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt);
         if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
         if (obj.date) obj.date = new Date(obj.date);
+        /* @Codex */
+        if (obj.startDate) obj.startDate = new Date(obj.startDate);
+        /* @Codex */
+        if (obj.endDate) obj.endDate = new Date(obj.endDate);
         return obj;
     }
 
@@ -319,6 +352,8 @@ class MedicalApiClient {
     checkups: ApiTable<Checkup>;
     attachments: ApiTable<Attachment>;
     drugs: ApiTable<AifaDrug>;
+    /* @Codex */
+    exemptions: ApiTable<ExemptionCode>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings: ApiTable<any>;
     patientsToAmbulatories: ApiTable<PatientAmbulatory>;
@@ -335,6 +370,8 @@ class MedicalApiClient {
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
         this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey);
         this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
+        /* @Codex */
+        this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
@@ -439,6 +476,20 @@ export interface AifaDrug {
     class?: string;
     price?: number;
     atc?: string;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export interface ExemptionCode {
+    code: string;
+    description: string;
+    type?: string;
+    source?: string;
+    startDate?: Date;
+    endDate?: Date;
+    isPharma?: boolean;
+    isSpecialist?: boolean;
+    isNational?: boolean;
     updatedAt?: Date;
 }
 

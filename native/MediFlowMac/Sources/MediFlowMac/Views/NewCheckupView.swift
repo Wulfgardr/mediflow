@@ -15,9 +15,6 @@ struct NewCheckupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuovo appuntamento")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Dettagli") {
                     TextField("Titolo", text: $title)

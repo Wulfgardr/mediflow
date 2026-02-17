@@ -64,6 +64,8 @@ struct AIControlPanelView: View {
     @State private var missingModels: [String] = []
     @State private var ocrStatus: OCRModelStatus?
     @State private var mlxStatus: MLXStatus?
+    /* @Codex */
+    @State private var runtimeSnapshot: AIRuntimeSnapshot?
     @State private var didLoad = false
     @State private var previousProvider: Provider = .ollama
 
@@ -201,6 +203,17 @@ struct AIControlPanelView: View {
                             Text("MLX: \(mlxStatus.status ?? "sconosciuto")")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+
+                        /* @Codex */
+                        if let runtimeSnapshot {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Runtime effettivo")
+                                    .font(.caption.weight(.semibold))
+                                ForEach(runtimeSnapshot.all) { item in
+                                    RuntimeTaskRow(item: item)
+                                }
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -383,6 +396,7 @@ struct AIControlPanelView: View {
         missingModels = []
         ocrStatus = nil
         mlxStatus = nil
+        runtimeSnapshot = nil
         defer { isTesting = false }
 
         do {
@@ -395,9 +409,14 @@ struct AIControlPanelView: View {
             }
 
             /* @Codex */
-            let effectiveProvider = await AISettingsResolver.resolveProvider()
-            let resolvedConfig = try await AISettingsResolver.resolveClinicalConfig()
+            let snapshot = try await AISettingsResolver.resolveRuntimeSnapshot()
+            runtimeSnapshot = snapshot
+            let effectiveProvider = snapshot.clinical.provider
+            let resolvedConfig = snapshot.clinical
             let shouldFallbackToOllama = (provider == .mlx && effectiveProvider == "ollama") || provider == .apple
+
+            let ollamaTasks = snapshot.all.filter { $0.provider == "ollama" }
+            let mlxTasks = snapshot.all.filter { $0.provider == "mlx" }
 
             if provider == .apple {
                 testMessage = "Apple Intelligence sperimentale, uso Ollama."
@@ -405,27 +424,40 @@ struct AIControlPanelView: View {
                 testMessage = "MLX non attivo, uso Ollama."
             }
 
-            if effectiveProvider == "ollama" {
-                let models = try await LocalAPIClient.shared.listAIModels(baseURL: resolvedConfig.baseURL)
+            if !ollamaTasks.isEmpty {
+                /* @Codex */
+                let probeBaseURL = ollamaTasks.first?.baseURL ?? resolvedConfig.baseURL
+                let models = try await LocalAPIClient.shared.listAIModels(baseURL: probeBaseURL)
                 let modelNames = models.map { $0.name }
                 /* @Codex */
+                let requiredModels = Array(Set(ollamaTasks.map { $0.model }))
                 let fallbackRequired = shouldFallbackToOllama
-                    ? ["hf.co/unsloth/medgemma-1.5-4b-it-GGUF", "qwen2.5:32b", "deepseek-ocr"]
-                    : nil
+                    ? Array(Set(requiredModels + ["hf.co/unsloth/medgemma-1.5-4b-it-GGUF", "qwen2.5:32b", "deepseek-ocr"]))
+                    : requiredModels
                 missingModels = missingModelsList(from: modelNames, required: fallbackRequired)
                 let base = missingModels.isEmpty ? "Ollama raggiungibile e modelli presenti." : "Ollama raggiungibile, alcuni modelli mancano."
                 testMessage = testMessage == nil ? base : "\(testMessage!) \(base)"
-                testSuccess = missingModels.isEmpty
-            } else {
-                _ = try await LocalAPIClient.shared.aiChat(prompt: "ping", model: modelClinical, baseURL: resolvedConfig.baseURL, maxTokens: 16, temperature: 0.2)
+            }
+
+            if !mlxTasks.isEmpty {
+                for task in mlxTasks {
+                    _ = try await LocalAPIClient.shared.aiChat(prompt: "ping", model: task.model, baseURL: task.baseURL, maxTokens: 16, temperature: 0.2)
+                }
                 testMessage = testMessage ?? "MLX operativo."
-                testSuccess = true
             }
 
             mlxStatus = try? await LocalAPIClient.shared.fetchMLXStatus()
 
             ocrStatus = try? await LocalAPIClient.shared.checkOCRStatus()
+            testSuccess = missingModels.isEmpty && (ocrStatus?.available ?? true)
+            if let ocrStatus, !ocrStatus.available {
+                let suffix = " OCR non disponibile."
+                testMessage = testMessage == nil ? suffix.trimmingCharacters(in: .whitespaces) : "\(testMessage!)\(suffix)"
+            }
         } catch {
+            /* @Codex */
+            let nsError = error as NSError
+            print("[AI Diagnostics] Error type=\(type(of: error)) domain=\(nsError.domain) code=\(nsError.code) desc=\(nsError.localizedDescription)")
             testMessage = diagnosticErrorMessage(error)
             testSuccess = false
         }
@@ -497,6 +529,15 @@ struct AIControlPanelView: View {
         if let apiError = error as? LocalAPIError {
             return apiError.localizedDescription
         }
+        /* @Codex */
+        if error is DecodingError {
+            return "Formato risposta non valido dal provider AI."
+        }
+        /* @Codex */
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain && (nsError.code == 3840 || nsError.code == 4864) {
+            return "Formato risposta non valido dal provider AI."
+        }
         if let urlError = error as? URLError {
             switch urlError.code {
             case .cancelled, .secureConnectionFailed, .serverCertificateUntrusted:
@@ -526,6 +567,22 @@ struct AIControlPanelView: View {
                     || normalizedCandidate == "\(normalizedModel):latest"
                     || normalizedCandidate.hasPrefix("\(normalizedModel):")
             }
+        }
+    }
+}
+
+/* @Codex */
+private struct RuntimeTaskRow: View {
+    let item: AIRuntimeTaskConfig
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(item.title): \(item.provider.uppercased()) · \(item.model)")
+                .font(.caption)
+                .fontWeight(.semibold)
+            Text(item.baseURL)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 }
