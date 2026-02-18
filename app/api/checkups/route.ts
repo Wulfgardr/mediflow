@@ -50,7 +50,11 @@ export async function POST(request: Request) {
             patientId: body.patientId,
             date: new Date(body.date),
             title: body.title,
+            /* @Codex */
+            notes: body.notes ?? null,
             status: body.status || 'pending',
+            /* @Codex */
+            source: body.source ?? 'manual',
             createdAt: new Date()
         });
 

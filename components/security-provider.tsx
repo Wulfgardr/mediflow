@@ -360,7 +360,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             <AuthHealthScreen
                 health={authHealth}
                 onRetry={() => checkAuthStatus()}
-                onRepair={repairFromLegacy}
+                onRepair={authHealth.hasSession ? repairFromLegacy : undefined}
                 isRepairing={isRepairing}
             />
         );

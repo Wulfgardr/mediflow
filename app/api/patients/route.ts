@@ -14,6 +14,13 @@ function normalizeExemptionsValue(value: unknown): string | null {
     return null;
 }
 
+/* @Codex */
+function normalizeDiagnosesValue(value: unknown): string | null {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 export async function GET() {
     /* @Codex */
     const session = await requireSession();
@@ -86,7 +93,15 @@ export async function POST(request: Request) {
             address: body.address,
             phone: body.phone,
             /* @Codex */
+            caregiver: body.caregiver ?? null,
+            /* @Codex */
             exemptions: normalizeExemptionsValue(body.exemptions),
+            /* @Codex */
+            diagnoses: normalizeDiagnosesValue(body.diagnoses),
+            /* @Codex */
+            monitoringProfile: typeof body.monitoringProfile === 'string' ? body.monitoringProfile : null,
+            /* @Codex */
+            statusReason: typeof body.statusReason === 'string' ? body.statusReason : null,
             notes: body.notes || null,
             isAdi: body.isAdi || false,
             ambulatoryId: ambulatoryId || null,
