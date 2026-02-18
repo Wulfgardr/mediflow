@@ -138,6 +138,8 @@ Una PR è considerata conclusa quando:
 - `npm run build` passa
 - (consigliato) `npx tsc --noEmit` passa
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
+- Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
+  (CTA/pulsante, label comprensibile, percorso utente verificabile).
 - Se cambiano comportamenti/contratti, documentazione aggiornata:
   - README / ARCHITECTURE / ADR (quando appropriato)
 

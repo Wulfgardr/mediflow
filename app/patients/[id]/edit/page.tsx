@@ -233,7 +233,7 @@ export default function EditPatientPage() {
                             className="px-4 py-2 text-blue-600 font-medium hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 flex items-center gap-2"
                         >
                             <Download className="w-4 h-4" />
-                            JSON
+                            Export FHIR
                         </button>
 
                         {!patient.isArchived ? (
