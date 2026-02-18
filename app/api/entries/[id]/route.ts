@@ -23,12 +23,21 @@ export async function PUT(
         const body = await request.json() as unknown;
         const updateData: { type?: string; date?: Date; content?: string } = {};
 
+        const existing = await dbServer.select({ id: entries.id }).from(entries).where(eq(entries.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+
         if (body && typeof body === 'object') {
             const payload = body as Record<string, unknown>;
             if (typeof payload.type === 'string') updateData.type = payload.type;
             if (typeof payload.content === 'string') updateData.content = payload.content;
 
+            const hasDate = Object.prototype.hasOwnProperty.call(payload, 'date');
             const parsedDate = parseDate(payload.date);
+            if (hasDate && parsedDate === undefined) {
+                return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+            }
             if (parsedDate) updateData.date = parsedDate;
         }
 
@@ -53,6 +62,10 @@ export async function DELETE(
 
     try {
         const { id } = await params;
+        const existing = await dbServer.select({ id: entries.id }).from(entries).where(eq(entries.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
         await dbServer.delete(entries).where(eq(entries.id, id));
         return NextResponse.json({ success: true });
     } catch (error) {

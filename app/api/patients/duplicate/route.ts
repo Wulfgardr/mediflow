@@ -1,10 +1,12 @@
 import { dbServer } from '@/lib/db-server';
-import { patients, patientsToAmbulatories } from '@/lib/schema';
+import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -12,14 +14,33 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const { patientIds, targetAmbulatoryId } = await request.json();
+        const body = await request.json() as Record<string, unknown>;
+        const patientIds = normalizeIdList(body.patientIds);
+        const targetAmbulatoryId = normalizeId(body.targetAmbulatoryId);
 
-        if (!patientIds || !Array.isArray(patientIds) || !targetAmbulatoryId) {
+        if (patientIds.length === 0 || !targetAmbulatoryId) {
             return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+        }
+
+        const target = await dbServer
+            .select({ id: ambulatories.id })
+            .from(ambulatories)
+            .where(eq(ambulatories.id, targetAmbulatoryId))
+            .get();
+        if (!target) {
+            return NextResponse.json({ error: 'Target ambulatory not found' }, { status: 404 });
         }
 
         // Fetch original patients
         const originals = await dbServer.select().from(patients).where(inArray(patients.id, patientIds));
+        const originalIds = new Set(originals.map((item) => item.id));
+        const missingPatientIds = patientIds.filter((id) => !originalIds.has(id));
+        if (missingPatientIds.length > 0) {
+            return NextResponse.json(
+                { error: 'Some patients were not found', missingPatientIds },
+                { status: 404 }
+            );
+        }
 
         let count = 0;
         for (const p of originals) {
@@ -33,11 +54,8 @@ export async function POST(request: Request) {
             await dbServer.insert(patients).values({
                 id: newId,
                 ...data,
-                firstName: `${p.firstName} (Clone)`, // Optional: mark as clone? User said "Duplicate", maybe exact copy preferred.
-                // Let's keep exact copy but maybe append (Clone) if same context? 
-                // But for Test environment, usually exact copy is desired to simulate.
-                // Reverting to exact copy:
-                // firstName: p.firstName,
+                /* @Codex */
+                firstName: p.firstName,
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 ambulatoryId: targetAmbulatoryId // Set primary ownership too for compat
@@ -47,7 +65,7 @@ export async function POST(request: Request) {
             await dbServer.insert(patientsToAmbulatories).values({
                 patientId: newId,
                 ambulatoryId: targetAmbulatoryId
-            });
+            }).onConflictDoNothing();
             count++;
         }
 
