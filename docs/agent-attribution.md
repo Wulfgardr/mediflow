@@ -10,6 +10,8 @@ Entries are additive and minimal.
 - Realigned canonical read-order in `docs/README.md` to match boot-sequence precedence (`README` then `AGENTS`)
 - Added explicit `FSE2` roadmap reference in canonical docs map: `docs/README.md`, `README.md`
 - Fixed `PLANS.md` metadata date to reflect today's update (`2026-02-18`)
+- Updated visible release headers from `0.3.0` to `0.3.1` in `README.md` and `docs/ROADMAP.md`
+- Added comprehensive `0.3.1` changelog entry with 2026-02-17/2026-02-18 timeline and OpenHospital tribute framing: `CHANGELOG.md`
 - Marked `docs/product_roadmap.md` as deprecated alias to `docs/ROADMAP.md`
 - Clarified canonical product roadmap note in `docs/ROADMAP.md`
 - Added `SECONDARY` status label to `docs/ARCHITETTURA.md`

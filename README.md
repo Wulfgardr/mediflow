@@ -1,4 +1,4 @@
-# 🏥 MediFlow v0.3.0
+# 🏥 MediFlow v0.3.1
 
 > **Una cartella clinica fatta da un medico, per i medici.**  
 > Funziona offline, rispetta la privacy, usa l'AI in locale.  
