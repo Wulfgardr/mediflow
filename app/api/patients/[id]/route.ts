@@ -13,6 +13,14 @@ function normalizeExemptionsForUpdate(value: unknown): string | null | undefined
     return null;
 }
 
+/* @Codex */
+function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     /* @Codex */
     const session = await requireSession();
@@ -37,11 +45,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const body = await request.json();
         const normalizedExemptions = normalizeExemptionsForUpdate(body.exemptions);
+        /* @Codex */
+        const normalizedDiagnoses = normalizeDiagnosesForUpdate(body.diagnoses);
         await dbServer.update(patients)
             .set({
                 ...body,
                 /* @Codex */
                 exemptions: normalizedExemptions,
+                /* @Codex */
+                diagnoses: normalizedDiagnoses,
+                /* @Codex */
+                monitoringProfile: typeof body.monitoringProfile === 'string'
+                    ? body.monitoringProfile
+                    : body.monitoringProfile === null
+                        ? null
+                        : undefined,
+                /* @Codex */
+                statusReason: typeof body.statusReason === 'string'
+                    ? body.statusReason
+                    : body.statusReason === null
+                        ? null
+                        : undefined,
                 updatedAt: new Date(),
                 birthDate: body.birthDate ? new Date(body.birthDate) : undefined
             })

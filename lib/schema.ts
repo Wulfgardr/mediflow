@@ -38,6 +38,12 @@ export const patients = sqliteTable('patients', {
     caregiver: text('caregiver'),
     /* @Codex */
     exemptions: text('exemptions'),
+    /* @Codex */
+    diagnoses: text('diagnoses'),
+    /* @Codex */
+    monitoringProfile: text('monitoring_profile'),
+    /* @Codex */
+    statusReason: text('status_reason'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
@@ -72,7 +78,15 @@ export const therapies = sqliteTable('therapies', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     drugName: text('drug_name').notNull(),
+    /* @Codex */
+    activePrinciple: text('active_principle'),
     dosage: text('dosage').notNull(),
+    /* @Codex */
+    motivation: text('motivation'),
+    /* @Codex */
+    diagnosisCode: text('diagnosis_code'),
+    /* @Codex */
+    diagnosisName: text('diagnosis_name'),
     status: text('status').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }),
@@ -85,7 +99,11 @@ export const checkups = sqliteTable('checkups', {
     patientId: text('patient_id').references(() => patients.id).notNull(),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     title: text('title').notNull(),
+    /* @Codex */
+    notes: text('notes'),
     status: text('status').default('pending'),
+    /* @Codex */
+    source: text('source'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

@@ -229,17 +229,23 @@ class ApiTable<T> {
     }
 
     async bulkPut(items: T[]): Promise<void> {
-        // Optimization: Send as single batch if supported by backend
-        // For 'drugs' specifically we added array support in POST
-        if (this.tableName === 'drugs' || items.length > 50) {
+        // Optimization: send as single batch only where backend supports it.
+        if (this.tableName === 'drugs') {
             const res = await fetch(this.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(items) // Encryption skipped for now on bulk to simplify, assuming public data like drugs
+                body: JSON.stringify(items)
             });
             if (!res.ok) throw new Error("Failed to bulk add items");
-        } else {
-            await Promise.all(items.map(item => this.put(item)));
+            return;
+        }
+
+        /* @Codex */
+        // Keep encryption path active for all other tables and avoid request storms on large imports.
+        const chunkSize = 25;
+        for (let i = 0; i < items.length; i += chunkSize) {
+            const chunk = items.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(item => this.put(item)));
         }
     }
 
