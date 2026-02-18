@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+/* @Codex */
+import typography from '@tailwindcss/typography';
 
 const config: Config = {
     darkMode: 'class', // Enable class-based dark mode
@@ -24,7 +26,7 @@ const config: Config = {
         },
     },
     plugins: [
-        require('@tailwindcss/typography'),
+        typography,
     ],
 };
 export default config;

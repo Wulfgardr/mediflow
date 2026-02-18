@@ -68,7 +68,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-gray-800">
-                                {isDelete ? 'Elimina Paziente' : isExport ? 'Esporta Dati Clinici' : 'Archivia Paziente'}
+                                {isDelete ? 'Elimina Paziente' : isExport ? 'Export FHIR (pre-check FSE)' : 'Archivia Paziente'}
                             </h3>
                             <p className="text-gray-500 text-sm">
                                 {patientName}
@@ -96,6 +96,21 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                         rows={3}
                                         placeholder="Es. Errore di inserimento, duplicato..."
                                     />
+                                </div>
+                            </div>
+                        ) : isExport ? (
+                            <div className="space-y-3">
+                                <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-start gap-2 border border-blue-100">
+                                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <p>
+                                        Verrà generato un file <strong>FHIR JSON</strong> con pre-check FSE (errori bloccanti, warning confermabili), contenente:
+                                        <ul className="list-disc ml-4 mt-1 opacity-80">
+                                            <li>Anagrafica Paziente</li>
+                                            <li>Storia Diagnostica</li>
+                                            <li>Note e Visite</li>
+                                            <li>Terapie e Valutazioni</li>
+                                        </ul>
+                                    </p>
                                 </div>
                             </div>
                         ) : (
@@ -137,23 +152,6 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                             </div>
                         )}
 
-                        {isExport && (
-                            <div className="space-y-3">
-                                <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-start gap-2 border border-blue-100">
-                                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                                    <p>
-                                        Verrà generato un file <strong>JSON FHIR-compliant</strong> contenente:
-                                        <ul className="list-disc ml-4 mt-1 opacity-80">
-                                            <li>Anagrafica Paziente</li>
-                                            <li>Storia Diagnostica</li>
-                                            <li>Note e Visite</li>
-                                            <li>Terapie e Valutazioni</li>
-                                        </ul>
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
                         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
                             <button
                                 type="button"
@@ -176,7 +174,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 {isSubmitting ? 'Elaborazione...' : (
                                     <>
                                         {isDelete ? <Trash2 className="w-4 h-4" /> : isExport ? <Check className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                                        {isDelete ? 'Sposta nel Cestino' : isExport ? 'Scarica JSON' : 'Archivia'}
+                                        {isDelete ? 'Sposta nel Cestino' : isExport ? 'Scarica FHIR JSON' : 'Archivia'}
                                     </>
                                 )}
                             </button>

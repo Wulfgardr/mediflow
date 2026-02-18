@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db, Therapy } from '@/lib/db';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,10 @@ import { AifaDrug } from '@/lib/db';
 
 const therapySchema = z.object({
     drugName: z.string().min(2, "Il nome del farmaco è richiesto"),
+    /* @Codex */
+    aic: z.string().optional(),
+    /* @Codex */
+    atc: z.string().optional(),
     activePrinciple: z.string().optional(),
     dosage: z.string().min(1, "La posologia è richiesta"),
     motivation: z.string().optional(),
@@ -59,6 +63,10 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
         setEditingId(therapy.id);
         setIsAdding(true);
         setValue('drugName', therapy.drugName);
+        /* @Codex */
+        setValue('aic', therapy.aic || '');
+        /* @Codex */
+        setValue('atc', therapy.atc || '');
         setValue('activePrinciple', therapy.activePrinciple);
         setValue('dosage', therapy.dosage);
         setValue('motivation', therapy.motivation);
@@ -120,7 +128,6 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const currentDiagnoses = (patient as any).diagnoses || [];
                         await db.patients.update(patientId, {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             diagnoses: [...currentDiagnoses, {
                                 code: selectedDiagnosis.code,
                                 description: selectedDiagnosis.title,
@@ -178,7 +185,16 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                             <input
                                 type="checkbox"
                                 checked={isGalenic}
-                                onChange={(e) => setIsGalenic(e.target.checked)}
+                                onChange={(e) => {
+                                    const next = e.target.checked;
+                                    setIsGalenic(next);
+                                    if (next) {
+                                        /* @Codex */
+                                        setValue('aic', '');
+                                        /* @Codex */
+                                        setValue('atc', '');
+                                    }
+                                }}
                                 className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
                             />
                             <Beaker className="w-4 h-4" />
@@ -201,6 +217,10 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                         <DrugAutocomplete
                                             onSelect={(drug: AifaDrug) => {
                                                 setValue('drugName', drug.name);
+                                                /* @Codex */
+                                                setValue('aic', drug.aic);
+                                                /* @Codex */
+                                                setValue('atc', drug.atc || '');
                                                 setValue('activePrinciple', drug.activePrinciple);
                                             }}
                                             placeholder="Cerca per Nome o Principio Attivo..."
@@ -272,6 +292,10 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                 </p>
                             </div>
                         </div>
+                        {/* @Codex */}
+                        <input type="hidden" {...register('aic')} />
+                        {/* @Codex */}
+                        <input type="hidden" {...register('atc')} />
                         <div className="flex justify-end pt-2 gap-2">
                             <button type="button" onClick={cancelEditing} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">Annulla</button>
                             <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
@@ -296,7 +320,9 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                     <div className="flex items-center gap-2">
                                         <h4 className="font-bold text-gray-800 dark:text-white text-lg">{t.drugName}</h4>
                                         {t.activePrinciple && <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300 rounded-full font-mono">{t.activePrinciple}</span>}
+                                        {t.atc && <span className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded-full font-mono">ATC: {t.atc}</span>}
                                     </div>
+                                    {t.aic && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 font-mono">AIC: {t.aic}</p>}
                                     <p className="text-indigo-600 dark:text-indigo-300 font-medium mt-1">{t.dosage}</p>
 
                                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

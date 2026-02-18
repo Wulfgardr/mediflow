@@ -36,6 +36,14 @@ export const patients = sqliteTable('patients', {
     address: text('address'),
     phone: text('phone'),
     caregiver: text('caregiver'),
+    /* @Codex */
+    exemptions: text('exemptions'),
+    /* @Codex */
+    diagnoses: text('diagnoses'),
+    /* @Codex */
+    monitoringProfile: text('monitoring_profile'),
+    /* @Codex */
+    statusReason: text('status_reason'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
@@ -70,10 +78,38 @@ export const therapies = sqliteTable('therapies', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     drugName: text('drug_name').notNull(),
+    /* @Codex */
+    aic: text('aic'),
+    /* @Codex */
+    atc: text('atc'),
+    /* @Codex */
+    activePrinciple: text('active_principle'),
     dosage: text('dosage').notNull(),
+    /* @Codex */
+    motivation: text('motivation'),
+    /* @Codex */
+    diagnosisCode: text('diagnosis_code'),
+    /* @Codex */
+    diagnosisName: text('diagnosis_name'),
     status: text('status').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const observations = sqliteTable('observations', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    codeSystem: text('code_system').notNull(),
+    code: text('code').notNull(),
+    display: text('display').notNull(),
+    unitSystem: text('unit_system').notNull(),
+    unitCode: text('unit_code').notNull(),
+    value: text('value').notNull(),
+    notes: text('notes'),
+    observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
+    source: text('source').default('manual'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
@@ -83,7 +119,11 @@ export const checkups = sqliteTable('checkups', {
     patientId: text('patient_id').references(() => patients.id).notNull(),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     title: text('title').notNull(),
+    /* @Codex */
+    notes: text('notes'),
     status: text('status').default('pending'),
+    /* @Codex */
+    source: text('source'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
@@ -138,4 +178,18 @@ export const drugs = sqliteTable('drugs', {
     class: text('class'),
     price: integer('price'), // stored as cents or float? using integer for simplicity or check import logic
     atc: text('atc'),
+});
+
+/* @Codex */
+export const exemptions = sqliteTable('exemptions', {
+    code: text('code').primaryKey(),
+    description: text('description').notNull(),
+    type: text('type'),
+    source: text('source'),
+    startDate: integer('start_date', { mode: 'timestamp' }),
+    endDate: integer('end_date', { mode: 'timestamp' }),
+    isPharma: integer('is_pharma', { mode: 'boolean' }),
+    isSpecialist: integer('is_specialist', { mode: 'boolean' }),
+    isNational: integer('is_national', { mode: 'boolean' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });

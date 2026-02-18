@@ -2,6 +2,7 @@
 // Replaces Dexie DB with Fetch calls
 
 import { encryptData, decryptData } from './security';
+import { notifyDbChange } from './live-query';
 
 // Document insight from OCR + AI synthesis
 export interface DocumentInsight {
@@ -34,6 +35,8 @@ export interface Patient {
     deletionReason?: string;
     aiSummary?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
+    /* @Codex */
+    exemptions?: string[];
     notes?: string;
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
@@ -82,10 +85,13 @@ export interface ClinicalEntry {
 
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
-    patients: ['address', 'phone', 'caregiver', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
+    /* @Codex */
+    patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
     entries: ['content', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
+    /* @Codex */
+    observations: ['notes'],
     conversations: ['title'],
     messages: ['content', 'reasoning'],
     /* @Codex */
@@ -137,7 +143,7 @@ class ApiTable<T> {
     }
 
     async toArray(): Promise<T[]> {
-        const res = await fetch(this.endpoint);
+        const res = await fetch(this.endpoint, { cache: 'no-store' });
         /* @Codex */
         if (res.status === 401 || res.status === 403) return [];
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
@@ -177,14 +183,20 @@ class ApiTable<T> {
     }
 
     async get(id: string): Promise<T | undefined> {
-        const res = await fetch(`${this.endpoint}/${id}`);
+        const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store' });
         if (res.status === 404) return undefined;
         if (!res.ok) throw new Error(`Failed to fetch item ${id}`);
         const item = this.reviveDates(await res.json());
         return await this.decryptItem(item);
     }
 
-    async add(item: T): Promise<string> {
+    /* @Codex */
+    private emitChange() {
+        notifyDbChange();
+    }
+
+    /* @Codex */
+    async add(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
         const encryptedItem = await this.encryptItem(item);
         const res = await fetch(this.endpoint, {
             method: 'POST',
@@ -196,15 +208,18 @@ class ApiTable<T> {
             throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
         }
         const data = await res.json();
+        if (!options?.suppressNotify) this.emitChange();
         return data.id;
     }
 
     // Alias for Dexie compatibility (Upsert-like behavior)
-    async put(item: T): Promise<string> {
-        return this.add(item);
+    /* @Codex */
+    async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
+        return this.add(item, options);
     }
 
-    async update(id: string, changes: Partial<T>): Promise<void> {
+    /* @Codex */
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
         const encryptedChanges = await this.encryptItem(changes as T, true);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
@@ -212,36 +227,81 @@ class ApiTable<T> {
             body: JSON.stringify(encryptedChanges)
         });
         if (!res.ok) throw new Error("Failed to update item");
+        if (!options?.suppressNotify) this.emitChange();
     }
 
-    async delete(id: string): Promise<void> {
-        await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+    /* @Codex */
+    async delete(id: string, options?: { suppressNotify?: boolean }): Promise<void> {
+        const res = await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+            throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
+        }
+        if (!options?.suppressNotify) this.emitChange();
     }
 
     async bulkDelete(ids: string[]): Promise<void> {
-        await Promise.all(ids.map(id => this.delete(id)));
+        if (ids.length === 0) return;
+        await Promise.all(ids.map(id => this.delete(id, { suppressNotify: true })));
+        this.emitChange();
     }
 
     async bulkPut(items: T[]): Promise<void> {
-        // Optimization: Send as single batch if supported by backend
-        // For 'drugs' specifically we added array support in POST
-        if (this.tableName === 'drugs' || items.length > 50) {
+        if (items.length === 0) return;
+
+        // Optimization: send as single batch only where backend supports it.
+        if (this.tableName === 'drugs') {
             const res = await fetch(this.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(items) // Encryption skipped for now on bulk to simplify, assuming public data like drugs
+                body: JSON.stringify(items)
             });
             if (!res.ok) throw new Error("Failed to bulk add items");
-        } else {
-            await Promise.all(items.map(item => this.put(item)));
+            this.emitChange();
+            return;
         }
+
+        /* @Codex */
+        // Keep encryption path active for all other tables and avoid request storms on large imports.
+        const chunkSize = 25;
+        for (let i = 0; i < items.length; i += chunkSize) {
+            const chunk = items.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(item => this.put(item, { suppressNotify: true })));
+        }
+        this.emitChange();
     }
 
     async clear(): Promise<void> {
-        // Optimization: Send DELETE to root endpoint to wipe table
-        // Backend must support DELETE /api/resource for "delete all"
         const res = await fetch(this.endpoint, { method: 'DELETE' });
-        if (!res.ok) throw new Error("Failed to clear table");
+        if (res.ok) {
+            this.emitChange();
+            return;
+        }
+
+        // @Codex: fallback for resources that expose only item-level DELETE.
+        if (res.status !== 404 && res.status !== 405) {
+            throw new Error(`Failed to clear table: ${res.status} ${res.statusText}`);
+        }
+
+        const items = await this.toArray();
+        const ids = items
+            .map((item) => this.getItemIdentifier(item))
+            .filter((value): value is string => Boolean(value));
+
+        if (items.length > 0 && ids.length !== items.length) {
+            throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
+        }
+
+        await Promise.all(ids.map((id) => this.delete(id, { suppressNotify: true })));
+        if (ids.length > 0) this.emitChange();
+    }
+
+    /* @Codex */
+    private getItemIdentifier(item: unknown): string | null {
+        if (!item || typeof item !== 'object') return null;
+
+        const record = item as Record<string, unknown>;
+        const candidate = record.id ?? record.key ?? record.code ?? record.aic;
+        return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : null;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -252,6 +312,12 @@ class ApiTable<T> {
         if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt);
         if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
         if (obj.date) obj.date = new Date(obj.date);
+        /* @Codex */
+        if (obj.startDate) obj.startDate = new Date(obj.startDate);
+        /* @Codex */
+        if (obj.endDate) obj.endDate = new Date(obj.endDate);
+        /* @Codex */
+        if (obj.observedAt) obj.observedAt = new Date(obj.observedAt);
         return obj;
     }
 
@@ -314,11 +380,15 @@ class MedicalApiClient {
     ambulatories: ApiTable<Ambulatory>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
+    /* @Codex */
+    observations: ApiTable<Observation>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
     checkups: ApiTable<Checkup>;
     attachments: ApiTable<Attachment>;
     drugs: ApiTable<AifaDrug>;
+    /* @Codex */
+    exemptions: ApiTable<ExemptionCode>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings: ApiTable<any>;
     patientsToAmbulatories: ApiTable<PatientAmbulatory>;
@@ -330,11 +400,15 @@ class MedicalApiClient {
         // ... (existing)
         this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
         this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
+        /* @Codex */
+        this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
         this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
         this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey);
         this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
+        /* @Codex */
+        this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
@@ -373,6 +447,10 @@ export async function importRawDatabase(jsonString: string) {
         if (data.therapies && Array.isArray(data.therapies)) {
             await db.therapies.bulkPut(data.therapies);
         }
+        /* @Codex */
+        if (data.observations && Array.isArray(data.observations)) {
+            await db.observations.bulkPut(data.observations);
+        }
         if (data.settings && Array.isArray(data.settings)) {
             await db.settings.bulkPut(data.settings);
         }
@@ -409,13 +487,35 @@ export interface Checkup {
     patientId: string;
     date: Date;
     title: string;
-    type: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
-    value: number;
+    /* @Codex */
+    type?: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
+    /* @Codex */
+    value?: number;
     maxValue?: number;
     unit?: string;
     notes?: string;
+    /* @Codex */
+    status?: 'pending' | 'completed' | 'cancelled';
+    /* @Codex */
+    source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
     updatedAt?: Date;
+}
+
+/* @Codex */
+export interface Observation {
+    id: string;
+    patientId: string;
+    codeSystem: 'LOINC';
+    code: string;
+    display: string;
+    unitSystem: 'UCUM';
+    unitCode: string;
+    value: number | string;
+    notes?: string;
+    observedAt: Date;
+    source?: 'manual' | 'ai_suggestion';
+    createdAt: Date;
 }
 
 export interface Attachment {
@@ -442,16 +542,35 @@ export interface AifaDrug {
     updatedAt?: Date;
 }
 
+/* @Codex */
+export interface ExemptionCode {
+    code: string;
+    description: string;
+    type?: string;
+    source?: string;
+    startDate?: Date;
+    endDate?: Date;
+    isPharma?: boolean;
+    isSpecialist?: boolean;
+    isNational?: boolean;
+    updatedAt?: Date;
+}
+
 export interface Therapy {
     id: string;
     patientId: string;
     drugName: string;
+    /* @Codex */
+    aic?: string;
+    /* @Codex */
+    atc?: string;
     activePrinciple?: string;
     dosage: string;
     motivation?: string;
     diagnosisCode?: string;
     diagnosisName?: string;
-    status: 'active' | 'suspended' | 'interrupted' | 'completed';
+    /* @Codex */
+    status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate?: Date;
     createdAt: Date;

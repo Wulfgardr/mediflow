@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Activity, Brain, Ruler, Users, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
 

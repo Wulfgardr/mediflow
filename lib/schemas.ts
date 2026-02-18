@@ -24,6 +24,8 @@ export const patientSchema = z.object({
     address: z.string().optional(),
     phone: z.string().optional(),
     caregiver: z.string().optional(),
+    /* @Codex */
+    exemptions: z.array(z.string().min(1)).optional().default([]),
     notes: z.string().optional(),
     isAdi: z.boolean().default(false),
     monitoringProfile: z.enum(['taken_in_charge', 'extemporaneous']).default('taken_in_charge'),

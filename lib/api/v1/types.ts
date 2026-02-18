@@ -20,7 +20,19 @@ export type PatientDetail = {
     address: string | null;
     phone: string | null;
     caregiver: string | null;
+    /* @Codex */
+    exemptions: string | null;
+    /* @Codex */
+    diagnoses: string | null;
+    /* @Codex */
+    monitoringProfile: string | null;
+    /* @Codex */
+    statusReason: string | null;
     notes: string | null;
+    /* @Codex */
+    aiSummary: string | null;
+    /* @Codex */
+    documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
     ambulatoryId: string | null;
@@ -50,7 +62,15 @@ export type TherapySummary = {
     id: string;
     patientId: string;
     drugName: string;
+    /* @Codex */
+    aic: string | null;
+    /* @Codex */
+    atc: string | null;
+    activePrinciple: string | null;
     dosage: string;
+    motivation: string | null;
+    diagnosisCode: string | null;
+    diagnosisName: string | null;
     status: string;
     startDate: string;
     endDate: string | null;
@@ -62,6 +82,50 @@ export type CheckupSummary = {
     patientId: string;
     date: string;
     title: string;
+    notes: string | null;
     status: string;
+    source: string | null;
     createdAt: string | null;
+};
+
+/* @Codex */
+export type ObservationSummary = {
+    id: string;
+    patientId: string;
+    codeSystem: string;
+    code: string;
+    display: string;
+    unitSystem: string;
+    unitCode: string;
+    value: string;
+    notes: string | null;
+    observedAt: string;
+    source: string | null;
+    createdAt: string | null;
+};
+
+/* @Codex */
+export type DrugSummary = {
+    aic: string;
+    name: string;
+    activePrinciple: string | null;
+    company: string | null;
+    packaging: string | null;
+    class: string | null;
+    price: number | null;
+    atc: string | null;
+};
+
+/* @Codex */
+export type ExemptionSummary = {
+    code: string;
+    description: string;
+    type: string | null;
+    source: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    isPharma: boolean | null;
+    isSpecialist: boolean | null;
+    isNational: boolean | null;
+    updatedAt: string | null;
 };

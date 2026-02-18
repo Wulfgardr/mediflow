@@ -1,7 +1,8 @@
 # 🏥 MediFlow v0.3.0
 
-> **Una cartella clinica fatta da un medico, per i medici.**
-> Funziona offline, rispetta la privacy, usa l'AI in locale. Niente cloud, niente abbonamenti, niente sorprese.
+> **Una cartella clinica fatta da un medico, per i medici.**  
+> Funziona offline, rispetta la privacy, usa l'AI in locale.  
+> Niente cloud, niente abbonamenti, niente sorprese.
 
 ---
 
@@ -13,73 +14,113 @@ Ho costruito MediFlow perché ero stanco. Stanco di software lenti, stanco di do
 Volevo qualcosa di **veloce, bello e blindato**.
 Così l'ho programmato.
 
+---
+
 ## 🌟 Perché MediFlow?
 
-1. **I Dati sono TUOI**: Tutto vive sul tuo Mac, in un singolo file cifrato. Se stacchi internet, funziona uguale.
-2. **Privacy Totale**: Usiamo crittografia militare (AES-256). Senza il PIN, nemmeno io posso leggere i tuoi dati.
-3. **Intelligenza Artificiale, ma Privata**: Ho integrato modelli AI (come DeepSeek e MedGemma) che girano *dentro* il tuo computer. Leggono i PDF, fanno l'OCR dei referti e ti danno sintesi cliniche senza mai inviare un solo byte a server esterni.
-4. **Semplice**: L'interfaccia non sembra un software degli anni '90. È pulita, moderna e pensata per chi lavora.
+1. **I dati sono tuoi**: tutto vive in locale (Mac = home base), in un file SQLite cifrato. Se stacchi internet, funziona uguale.
+2. **Privacy totale**: cifratura *zero-knowledge* (AES-256-GCM). Senza il PIN, nessuno legge i dati (nemmeno io).
+3. **AI, ma privata**: modelli locali (Ollama) per OCR e sintesi cliniche. Nessun dato paziente viene inviato a servizi esterni per default.
+4. **Semplice**: interfaccia pulita e clinica (zero fronzoli). Pensata per lavorare.
 
 ---
 
 ## 📚 Documentazione
 
-Ho riorganizzato tutto per non farti perdere tempo. Scegli la tua strada:
+### 🩺 Per il medico
 
-### 🩺 Per il Medico
+Vuoi solo installarlo e usarlo?
+- Manuale operativo: `docs/MANUALE.md`
 
-Vuoi solo sapere come installarlo, come si usa e come gestire i pazienti?
-👉 **[Leggi il MANUALE OPERATIVO](docs/MANUALE.md)**
-*(Include: Installazione, Primo Avvio, Gestione Pazienti, FAQ)*
+### 🧑‍💻 Per sviluppatori / contributori
 
-### 🛠 Per lo Sviluppatore / Nerd
+Inizia da qui (ordine consigliato):
 
-Vuoi capire come gira sotto il cofano, vedere il codice, o modificare l'app?
-👉 **[Leggi l'ARCHITETTURA](docs/ARCHITETTURA.md)**
-*(Include: Stack Next.js, Crittografia, Docker, AI Pipeline)*
+1. **Indice canonico della documentazione (cosa e' fonte di verita')**
+   - `docs/README.md`
 
-### ⚖️ Compliance & Privacy
+2. **Visione e confini dell'architettura**
+   - `ARCHITECTURE.md`
 
-GDPR, sicurezza dei dati e interoperabilità (FHIR R4).
-👉 **[Leggi COMPLIANCE](docs/COMPLIANCE.md)**
+3. **Sicurezza (policy, redaction, scanning, disclosure)**
+   - `SECURITY.md`
 
-### 🍏 Per chi vuole l'App Nativa
+4. **Come contribuire e come avviare il progetto**
+   - `CONTRIBUTING.md`
 
-Stiamo costruendo un client nativo per macOS (SwiftUI) per un'esperienza ancora più integrata.
-👉 **[Leggi la GUIDA NATIVE](docs/NATIVE.md)**
+5. **Decisioni architetturali (ADR)**
+   - `docs/adr/`
 
-### 🗺 Il Futuro
+6. **Piano di lavoro in corso (engineering plan, non product roadmap)**
+   - `PLANS.md`
 
-Dove stiamo andando? Cosa arriverà dopo?
-👉 **[Guarda la ROADMAP](docs/ROADMAP.md)**
+7. **Walkthrough end-to-end (web + native + servizi locali)**
+   - `docs/walkthrough.md`
+
+8. **Approfondimenti tecnici**
+   - `docs/ARCHITETTURA.md`
+   - `docs/system_architecture.md`
+   - `docs/FSE2-terminology-roadmap.md`
+
+### ⚖️ Compliance & privacy
+
+GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
+- `docs/COMPLIANCE.md`
+
+### 🍏 Client nativo macOS
+
+- `docs/NATIVE.md`
+- `docs/native-setup.md`
+- `docs/native-launch.md`
+- `docs/local-api-tls.md`
+
+### 🗺 Roadmap prodotto
+
+- `docs/ROADMAP.md`
 
 ---
 
-## 🚀 Installazione Rapida (Docker)
+## 🚀 Installazione rapida (macOS, local-first)
 
-Se sai cos'è Docker, ecco il riassunto brutale:
+### Prerequisiti (minimi)
+
+- Node.js (consigliato: **v20+**)
+- Docker Desktop (**opzionale**, solo per ICD-11)
+- Ollama (**opzionale**, solo per AI/OCR)
+
+### Avvio "tutto-in-uno"
 
 ```bash
-# 1. Clona
-git clone https://github.com/tuouser/mediflow
+git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
 
-# 2. Avvia
+npm install
 ./Start_MediFlow.command
 ```
 
-Vai su `http://localhost:3000`. Finito.
-*La prima volta ci metterà un po' a scaricare i modelli AI.*
+Apri: `http://localhost:3000`
+
+> Nota: lo script prova ad avviare (se presenti) Ollama e ICD-11 via Docker.  
+> Se non li hai, MediFlow funziona comunque (con feature ridotte).
+
+### Verifiche rapide (per dev)
+
+```bash
+npm run lint
+npm run build
+```
 
 ---
 
-## ⚖️ Note Legali & GDPR
+## ⚖️ Note legali & GDPR
 
-Questo è un progetto open source rilasciato con licenza MIT.
-È pensato per essere **Privacy by Design**, ma l'uso in ambiente clinico reale richiede che tu faccia le tue valutazioni di conformità (DPIA, ecc.) come Titolare del Trattamento.
+MediFlow è un progetto open source rilasciato con licenza MIT.
 
-**I dati non lasciano mai il tuo dispositivo.** Questa è la garanzia tecnica. La garanzia legale la costruisci tu usandolo con responsabilità.
+È progettato per essere **Privacy by Design**, ma l'uso in ambiente clinico reale richiede che tu faccia le tue valutazioni di conformità (DPIA, registro trattamenti, misure organizzative, ecc.) come Titolare del Trattamento.
+
+**I dati, per impostazione predefinita, non lasciano mai il tuo dispositivo.**  
+La garanzia tecnica è qui. La garanzia legale la costruisci tu usandolo con responsabilità.
 
 ---
 
-*Fatto con ❤️ (e tanta caffeina) in Italia.*
+Fatto in Italia. ☕

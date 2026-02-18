@@ -4,6 +4,43 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-02-18 Codex
+- Added canonical documentation index: `docs/README.md`
+- Updated developer doc entrypoint in `README.md` to reference canonical docs order
+- Realigned canonical read-order in `docs/README.md` to match boot-sequence precedence (`README` then `AGENTS`)
+- Added explicit `FSE2` roadmap reference in canonical docs map: `docs/README.md`, `README.md`
+- Fixed `PLANS.md` metadata date to reflect today's update (`2026-02-18`)
+- Marked `docs/product_roadmap.md` as deprecated alias to `docs/ROADMAP.md`
+- Clarified canonical product roadmap note in `docs/ROADMAP.md`
+- Added `SECONDARY` status label to `docs/ARCHITETTURA.md`
+- Added `SECONDARY` status label to `docs/system_architecture.md`
+- Added `CANONICAL` status label to `docs/walkthrough.md`
+- Added `LEGACY` status label to `docs/index.html` embedded architecture page
+- Extended `docs/README.md` with `CANONICAL/SECONDARY/LEGACY` convention and status matrix
+- Realigned developer docs read-order in `README.md` to match canonical source precedence
+- Hardened web patient update/delete route with explicit field whitelist and relation sync: `app/api/patients/[id]/route.ts`
+- Added canonical status normalization helper and applied it to web/v1 therapies + checkups routes: `lib/status-normalization.ts`
+- Aligned native status handling and picker values to canonical contract with legacy fallback rendering: `native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/entries/[id]/route.ts`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/therapies/[id]/route.ts`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/checkups/[id]/route.ts`
+- Hardened ambulatories create/update/delete APIs with explicit validation and default conflict handling: `app/api/ambulatories/route.ts`
+- Hardened ambulatories create/update/delete APIs with explicit validation and default conflict handling: `app/api/ambulatories/[id]/route.ts`
+- Added shared ID normalization helper for bulk patient operations: `lib/patient-bulk-validation.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/assign/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/unassign/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/move/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/duplicate/route.ts`
+- Enforced single-default invariant on ambulatory creation and validated parent linkage on create: `app/api/ambulatories/route.ts`
+- Added guarded ambulatory delete semantics (linked-patient conflict + default fallback rules): `app/api/ambulatories/[id]/route.ts`
+- Added ADR 0006 for terminology plugin strategy and FSE profile validation path: `docs/adr/0006-terminology-plugin-and-fse-profiles.md`
+- Added terminology contract endpoints and static pilot resolver (systems/search/resolve): `app/api/v1/terminology/*`, `lib/terminology.ts`
+- Added AIC+ATC first-class therapy support across schema, web/v1 APIs, and native contracts: `lib/schema.ts`, `app/api/therapies/*`, `app/api/v1/patients/[id]/therapies/*`, `native/MediFlowMac/Sources/MediFlowMac/*`
+- Added observations thin slice (`LOINC + UCUM`) across schema, web APIs/UI, v1 APIs, FHIR export, and native client contracts: `lib/schema.ts`, `app/api/observations/*`, `components/observation-manager.tsx`, `app/api/v1/patients/[id]/observations/*`, `lib/fhir/*`, `native/MediFlowMac/Sources/MediFlowMac/*`
+- Added shared FSE validation library and web export pre-check flow (`error` blocks, `warning` confirm): `lib/fse-validation.ts`, `app/api/fse/validate-patient/route.ts`, `app/patients/[id]/edit/page.tsx`
+- Added discoverability guardrail in Definition of Done and aligned export UI labels to explicit `FHIR/FSE` wording: `CONTRIBUTING.md`, `app/patients/[id]/edit/page.tsx`, `components/patient-action-modal.tsx`
+- Added `Export FHIR` CTA in patient detail page with same pre-check FSE flow used by edit page; fixed export modal to show only export-specific content: `app/patients/[id]/page.tsx`, `components/patient-action-modal.tsx`
+
 ## 2026-02-01 Codex
 - Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md
 - Added this attribution log: docs/agent-attribution.md
@@ -92,3 +129,45 @@ Entries are additive and minimal.
 - Added AI control tab and reasoning chat option: native/MediFlowMac/Sources/MediFlowMac/Views/ToolsView.swift
 - Extended native AI settings resolver for reasoning/OCR: native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift
 - Added native API client support for AI settings, models, OCR, MLX control: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+
+## 2026-02-06 Codex
+- Added reusable floating glass panel window with traffic-light controls and collapse/expand motion: native/MediFlowMac/Sources/MediFlowMac/Views/GlassPanelWindow.swift
+- Applied floating panel shell to settings/new-patient sheets: native/MediFlowMac/Sources/MediFlowMac/ContentView.swift
+- Redesigned patient detail into conceptual islands and added dedicated AI Studio sheet: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewPatientView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewEntryView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewTherapyView.swift
+- Removed duplicate form titles now managed by panel header chrome: native/MediFlowMac/Sources/MediFlowMac/Views/NewCheckupView.swift
+- Tuned motion/transparency for floating panels and patient concept islands, including reduce-motion fallbacks: native/MediFlowMac/Sources/MediFlowMac/Views/GlassPanelWindow.swift
+- Tuned backdrop drift, island reveal timing, hover lift, and reduced decorative glass density: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/schema.ts
+- Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/db-server.ts
+- Added explicit migration for exemptions table and patient field: drizzle/0001_exemptions_lookup.sql
+- Added local exemptions API (search, count, import, clear) with session/token auth: app/api/exemptions/route.ts
+- Added exemptions importer/parser for TXT pipelines and stats helpers: lib/exemption-importer.ts
+- Added settings UI manager for drag-and-drop exemptions catalog updates: components/settings/exemption-db-manager.tsx
+- Added patient-form exemptions selector with searchable code lookup: components/exemption-selector.tsx
+- Added web patient form/storage wiring for encrypted exemptions codes: components/patient-form.tsx
+- Added exemptions visibility in patient detail web card: app/patients/[id]/page.tsx
+- Added API contract propagation for patient exemptions in web/native v1 endpoints and types: app/api/v1/patients/[id]/route.ts
+- Added native model/payload/detail rendering support for patient exemptions: native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift
+- Added ADR for exemptions catalog architecture and patient mapping: docs/adr/0004-exemptions-catalog.md
+- Improved exemptions selector UX to detect empty catalog and prompt import from settings: components/exemption-selector.tsx
+- Added ADR for full web/native parity on shared local API contract: docs/adr/0005-web-native-functional-parity.md
+- Added versioned v1 drugs API (search/count/import/clear): app/api/v1/drugs/route.ts
+- Added versioned v1 exemptions API (search/filter/count/import/clear): app/api/v1/exemptions/route.ts
+- Extended shared v1 DTOs for drugs and exemptions: lib/api/v1/types.ts
+- Updated native API client to use v1 drugs endpoint and added v1 exemptions search method: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Fixed async session guard in native launcher API route (tsc blocker): app/api/system/native/route.ts
+- Added v1 patient update/delete operations with ambulatory relation sync: app/api/v1/patients/[id]/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/entries/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/therapies/route.ts
+- Added v1 filters for entries/therapies/checkups list endpoints (type/status/dateFrom/dateTo): app/api/v1/patients/[id]/checkups/route.ts
+- Added v1 entry item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/entries/[entryId]/route.ts
+- Added v1 therapy item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/therapies/[therapyId]/route.ts
+- Added v1 checkup item endpoint with GET/PUT/DELETE: app/api/v1/patients/[id]/checkups/[checkupId]/route.ts
+- Extended native API client with update/delete methods for patient, entry, therapy, and checkup: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Extended native API client list methods with v1 filters (entries/therapies/checkups): native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
+- Added native patient-detail filters (type/status) for entries, therapies, and checkups: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added native patient-detail row actions (edit/delete) for entries, therapies, and checkups: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift
+- Added native edit sheets for entry, therapy, and checkup wired to v1 update endpoints: native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift

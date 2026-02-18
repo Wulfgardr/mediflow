@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { X, UserPlus, Users, Search, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 
 // Simple Modal Implementation since we might not have a full UI library installed

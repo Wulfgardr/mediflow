@@ -110,10 +110,22 @@ struct AIToolView: View {
             case .reasoning:
                 config = try await AISettingsResolver.resolveReasoningConfig()
             }
-            let raw = try await LocalAPIClient.shared.aiChat(prompt: prompt, model: config.model, baseURL: config.baseURL)
+            /* @Codex */
+            let guardedPrompt = """
+            Rispondi solo con output finale in italiano.
+            Non includere tag <think>, <unused94>, <unused95> o ragionamento interno.
+
+            \(prompt)
+            """
+            let raw = try await LocalAPIClient.shared.aiChat(prompt: guardedPrompt, model: config.model, baseURL: config.baseURL)
             /* @Codex */
             let cleaned = cleanAIResponse(raw)
-            response = "Modello: \(config.model)\n\n" + cleaned
+            if cleaned.isEmpty {
+                errorMessage = "Risposta vuota dal modello."
+                response = "Modello: \(config.model)\n\n[Nessun contenuto utile generato]"
+            } else {
+                response = "Modello: \(config.model)\n\n" + cleaned
+            }
         } catch {
             errorMessage = "Errore AI: verifica Ollama/MLX"
         }
@@ -121,17 +133,39 @@ struct AIToolView: View {
 
     /* @Codex */
     private func cleanAIResponse(_ value: String) -> String {
-        var output = value
-        if let range = output.range(of: "<unused94>") {
-            if let end = output.range(of: "<unused95>") {
-                output.removeSubrange(range.lowerBound..<end.upperBound)
-            } else {
-                output.removeSubrange(range.lowerBound..<output.endIndex)
-            }
-        }
+        var output = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !output.isEmpty else { return "" }
+
+        output = removePairedBlocks(in: output, startMarker: "<unused94>", endMarker: "<unused95>")
+        output = removePairedBlocks(in: output, startMarker: "<think>", endMarker: "</think>")
+        output = output.replacingOccurrences(of: "<unused94>", with: "")
+        output = output.replacingOccurrences(of: "<unused95>", with: "")
         output = output.replacingOccurrences(of: "<think>", with: "")
         output = output.replacingOccurrences(of: "</think>", with: "")
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        output = output.replacingOccurrences(of: "```thinking", with: "")
+        output = output.replacingOccurrences(of: "```", with: "")
+        output = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !output.isEmpty {
+            return output
+        }
+
+        return value
+            .replacingOccurrences(of: "<unused94>", with: "")
+            .replacingOccurrences(of: "<unused95>", with: "")
+            .replacingOccurrences(of: "<think>", with: "")
+            .replacingOccurrences(of: "</think>", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /* @Codex */
+    private func removePairedBlocks(in text: String, startMarker: String, endMarker: String) -> String {
+        var result = text
+        while let start = result.range(of: startMarker),
+              let end = result.range(of: endMarker, range: start.lowerBound..<result.endIndex) {
+            result.removeSubrange(start.lowerBound..<end.upperBound)
+        }
+        return result
     }
 }
 

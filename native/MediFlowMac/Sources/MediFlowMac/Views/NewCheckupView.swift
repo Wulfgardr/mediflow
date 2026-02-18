@@ -15,16 +15,13 @@ struct NewCheckupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuovo appuntamento")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Dettagli") {
                     TextField("Titolo", text: $title)
                     DatePicker("Data", selection: $date, displayedComponents: .date)
                     Picker("Stato", selection: $status) {
                         Text("In attesa").tag("pending")
-                        Text("Completato").tag("done")
+                        Text("Completato").tag("completed")
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db, Ambulatory, Patient } from '@/lib/db';
 import { Search, UserPlus, FileText, Archive, Copy, Scissors, Activity, RefreshCw, Users, Building2 } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
 import { usePatientClipboard } from '@/hooks/use-patient-clipboard';
+import { notifyDbChange } from '@/lib/live-query';
 
 function useCookie(name: string) {
     const [value, setValue] = useState<string | null>(null);
@@ -213,7 +214,7 @@ export default function PatientList() {
                         const success = await paste(currentAmbulatoryId, !!isTest);
                         if (success) {
                             if (clipboard.operation === 'cut') setSelectedIds(new Set());
-                            window.location.reload();
+                            notifyDbChange(); // @Codex
                         }
                     }
                 }
@@ -244,7 +245,7 @@ export default function PatientList() {
             setSelectedIds(new Set());
             setShowMoveModal(false);
             setTargetAmbulatory('');
-            window.location.reload();
+            notifyDbChange(); // @Codex
         } catch (error) {
             console.error(error);
             alert("Errore durante lo spostamento");

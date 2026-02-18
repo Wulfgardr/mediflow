@@ -54,3 +54,6 @@ next-env.d.ts
 # logs
 .pm2/
 logs/
+
+# private alignment guides (never publish to OSS repo)
+docs/private/

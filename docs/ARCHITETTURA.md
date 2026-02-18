@@ -1,34 +1,41 @@
-# 🛠 Architettura di MediFlow
+# Architettura MediFlow (Deep Dive)
 
-> **Sotto il cofano: Stack, Sicurezza e Data Flow.**
-> Documentazione tecnica per sviluppatori e contributori.
+> [!NOTE]
+> **Stato documento: SECONDARY (deep dive tecnico).**
+> Per confini stabili e decisioni architetturali prevale `ARCHITECTURE.md`.
+> Per il flusso operativo end-to-end prevale `docs/walkthrough.md`.
+
+> Stack tecnico, sicurezza e flusso dati.
+> Documento tecnico per sviluppatori e contributori.
+
+Per confini stabili e decisioni di alto livello, consulta prima `ARCHITECTURE.md`.
 
 ---
 
-## 1. Visione d'Insieme
+## 1. Visione d'insieme
 
 MediFlow non è una semplice web app. È un **sistema ibrido locale** progettato per la massima privacy e persistenza dei dati.
 
-### Topologia Ibrida
+### Topologia ibrida locale
 
 Il sistema è composto da tre layer che convivono sul `localhost` del medico:
 
 ```mermaid
 graph TD
     subgraph "Layer 1: Interfaccia (Frontend)"
-        Native[🖥️ App Nativa macOS]
-        Web[🌐 Web App (Next.js)]
+        Native[App nativa macOS]
+        Web[Web app Next.js]
     end
 
     subgraph "Layer 2: Core & Dati (Backend Locale)"
-        Proxy["🔒 TLS Proxy (:3443)"]
-        NextAPI["⚙️ Next.js Server (:3000)"]
-        DB[(💾 SQLite: medical.db)]
+        Proxy["TLS Proxy (:3443)"]
+        NextAPI["Next.js Server (:3000)"]
+        DB[(SQLite: medical.db)]
     end
 
     subgraph "Layer 3: Motori AI (Servizi)"
-        Ollama["🧠 Ollama (AI + OCR)"]
-        ICD["🏥 ICD-11 Docker (:8888)"]
+        Ollama["Ollama (AI + OCR)"]
+        ICD["ICD-11 Docker (:8888)"]
     end
 
     Native -->|HTTPS| Proxy
@@ -44,19 +51,19 @@ graph TD
     style Ollama fill:#ff9900,stroke:#333
 ```
 
-1. **Layer Interfaccia**: L'utente usa il browser (Chrome/Safari) o l'App Nativa (SwiftUI).
+1. **Layer Interfaccia**: l'utente usa browser (Chrome/Safari) o app nativa (SwiftUI).
 2. **Layer Core**: Next.js gestisce la logica, le API e parla con il database SQLite.
 3. **Layer Servizi**: Container Docker e processi locali forniscono l'intelligenza (AI) e gli standard (ICD-11).
 
 ---
 
-## 2. Lo Stack Tecnico
+## 2. Stack tecnico
 
 Una selezione pragmatica per performance e mantenibilità.
 
-| Ruolo | Tecnologia | Versione | Perché? |
+| Ruolo | Tecnologia | Versione | Perché |
 | :--- | :--- | :--- | :--- |
-| **Frontend** | React / Next.js | 16 / 15 | Standard industriale, veloce, component-based. |
+| **Frontend** | React / Next.js | 16 / 15 | Standard industriale, rapido, component-based. |
 | **UI** | Tailwind CSS | v4 | Styling rapido e consistente. |
 | **Database** | SQLite | 3.x | File singolo, zero config, perfetto per local-first. |
 | **ORM** | Drizzle | Ultima | Type-safe, leggero, ottime migrazioni. |
@@ -65,11 +72,11 @@ Una selezione pragmatica per performance e mantenibilità.
 
 ---
 
-## 3. Sicurezza e Crittografia (Zero-Knowledge)
+## 3. Sicurezza e crittografia (Zero-Knowledge)
 
 La sicurezza è il pilastro fondamentale. **Nessun dato chiaro tocca mai il disco.**
 
-### Il Protocollo
+### Protocollo di cifratura
 
 1. **PIN Utente**: L'unica chiave che non viene mai salvata.
 2. **Master Key (AES-256)**: Generata al setup, cifrata con il PIN.
@@ -109,7 +116,7 @@ sequenceDiagram
 
 ## 4. Pipeline AI & OCR
 
-Non mandiamo PDF a ChatGPT. Facciamo tutto in casa.
+La pipeline documentale resta locale: nessun upload a servizi cloud per default.
 
 ### Flusso Documentale
 
@@ -136,7 +143,7 @@ Principali tabelle in `lib/schema.ts`:
 
 ---
 
-## 6. API v1 (Per Client Nativo)
+## 6. API v1 (per client nativo)
 
 Questi endpoint restituiscono solo JSON puro (niente HTML/React Server Components) e sono ottimizzati per Swift.
 
@@ -150,7 +157,7 @@ Questi endpoint restituiscono solo JSON puro (niente HTML/React Server Component
 
 ---
 
-## 7. Prossimi Passi (Roadmap Web)
+## 7. Prossimi passi (engineering)
 
 * [ ] Backup automatico schedulato.
 * [ ] Export GDPR-compliant (JSON/CSV leggibile).

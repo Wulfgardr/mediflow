@@ -1,22 +1,53 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { useParams } from 'next/navigation';
-import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info, Ticket, Download } from 'lucide-react';
 import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
+/* @Codex */
+import ObservationManager from '@/components/observation-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
+import PatientActionModal from '@/components/patient-action-modal';
+import { useState } from 'react';
 
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
 
+/* @Codex */
+type ValidationSummary = {
+    total: number;
+    withErrors: number;
+    withWarnings: number;
+    errorCount: number;
+    warningCount: number;
+};
+
+/* @Codex */
+type ValidatePatientExportResponse = {
+    patientId: string;
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    therapyMedication: ValidationSummary;
+    observationVitals: ValidationSummary;
+};
+
+/* @Codex */
+function buildValidationMessage(validation: ValidatePatientExportResponse): string {
+    return [
+        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
+        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
+    ].join('\n');
+}
+
 export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
@@ -39,6 +70,52 @@ export default function PatientDetailPage() {
     if (!patient) {
         return <div className="p-8 text-center text-gray-500">Caricamento cartella paziente...</div>;
     }
+
+    /* @Codex */
+    const exemptionCodes = Array.isArray(patient.exemptions) ? patient.exemptions : [];
+
+    /* @Codex */
+    const handleExportConfirm = async () => {
+        try {
+            const validationResponse = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(id)}`);
+            if (!validationResponse.ok) {
+                throw new Error('Validation pre-check failed');
+            }
+            const validation = await validationResponse.json() as ValidatePatientExportResponse;
+
+            if (validation.hasErrors) {
+                alert(`Esportazione bloccata: risolvi gli errori di validazione FSE prima del download.\n\n${buildValidationMessage(validation)}`);
+                return;
+            }
+
+            if (validation.hasWarnings) {
+                const proceed = confirm(
+                    `Sono presenti warning di validazione FSE.\n\n${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                );
+                if (!proceed) return;
+            }
+
+            const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
+            const bundle = await generatePatientBundle(id);
+
+            const jsonString = JSON.stringify(bundle, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patient-${patient.lastName}-${patient.firstName}-fhir.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert("Esportazione FHIR completata con successo!");
+        } catch (error) {
+            console.error("Export failed", error);
+            alert("Errore durante l'esportazione.");
+        }
+    };
 
     return (
         <div className="space-y-8">
@@ -130,6 +207,31 @@ export default function PatientDetailPage() {
                             </div>
                         )}
 
+                        {/* @Codex */}
+                        {exemptionCodes.length > 0 && (
+                            <div className="mt-3 p-3 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
+                                    <Ticket className="w-3.5 h-3.5" />
+                                    Esenzioni associate
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {exemptionCodes.slice(0, 10).map((code) => (
+                                        <span
+                                            key={code}
+                                            className="font-mono text-xs px-2 py-1 rounded-md bg-white dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-200"
+                                        >
+                                            {code}
+                                        </span>
+                                    ))}
+                                    {exemptionCodes.length > 10 && (
+                                        <span className="text-xs text-indigo-600 dark:text-indigo-300 px-2 py-1">
+                                            +{exemptionCodes.length - 10} altri
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
 
 
 
@@ -138,6 +240,14 @@ export default function PatientDetailPage() {
                     </div>
 
                     <div className="flex flex-col gap-3 min-w-[200px]">
+                        <button
+                            onClick={() => setIsExportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+                        >
+                            <Download className="w-4 h-4" />
+                            Export FHIR
+                        </button>
+
                         <button
                             onClick={async () => {
                                 // Filter 'scale' type entries for the scales section
@@ -197,6 +307,8 @@ export default function PatientDetailPage() {
 
                     {/* Therapies Section */}
                     <TherapyManager patientId={id} />
+                    {/* @Codex */}
+                    <ObservationManager patientId={id} />
 
                     <div className="space-y-6">
                         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
@@ -300,6 +412,14 @@ export default function PatientDetailPage() {
                     </div>
                 </div>
             </div>
+
+            <PatientActionModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                onConfirm={async () => handleExportConfirm()}
+                patientName={`${patient.firstName} ${patient.lastName}`}
+                actionType="export"
+            />
         </div>
     );
 }
