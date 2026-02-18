@@ -60,6 +60,7 @@ Inizia da qui (ordine consigliato):
 8. **Approfondimenti tecnici**
    - `docs/ARCHITETTURA.md`
    - `docs/system_architecture.md`
+   - `docs/FSE2-terminology-roadmap.md`
 
 ### ⚖️ Compliance & privacy
 

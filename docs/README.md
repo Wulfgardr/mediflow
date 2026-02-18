@@ -6,8 +6,8 @@ Ultimo aggiornamento: 2026-02-18
 
 ## Ordine di lettura consigliato
 
-1. `AGENTS.md`
-2. `README.md`
+1. `README.md`
+2. `AGENTS.md`
 3. `ARCHITECTURE.md`
 4. `SECURITY.md`
 5. `CONTRIBUTING.md`
@@ -33,6 +33,7 @@ Ultimo aggiornamento: 2026-02-18
 | Decisioni architetturali | `docs/adr/*.md` | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Piano engineering a breve termine | `PLANS.md` | `CANONICAL` | 2-6 settimane, operativo. |
 | Roadmap prodotto | `docs/ROADMAP.md` | `CANONICAL` | Direzione prodotto/versioni, separata da `PLANS.md`. |
+| Roadmap terminologie/FSE | `docs/FSE2-terminology-roadmap.md` | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Walkthrough end-to-end | `docs/walkthrough.md` | `CANONICAL` | Mappa operativa web + native + servizi locali. |
 | Deep dive tecnico architettura | `docs/ARCHITETTURA.md` | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | `docs/system_architecture.md` | `SECONDARY` | Versione compatta/rapida. |
