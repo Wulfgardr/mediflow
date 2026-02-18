@@ -14,6 +14,7 @@ Entries are additive and minimal.
 - Added `CANONICAL` status label to `docs/walkthrough.md`
 - Added `LEGACY` status label to `docs/index.html` embedded architecture page
 - Extended `docs/README.md` with `CANONICAL/SECONDARY/LEGACY` convention and status matrix
+- Realigned developer docs read-order in `README.md` to match canonical source precedence
 - Hardened web patient update/delete route with explicit field whitelist and relation sync: `app/api/patients/[id]/route.ts`
 - Added canonical status normalization helper and applied it to web/v1 therapies + checkups routes: `lib/status-normalization.ts`
 - Aligned native status handling and picker values to canonical contract with legacy fallback rendering: `native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift`
