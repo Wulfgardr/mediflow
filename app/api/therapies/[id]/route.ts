@@ -31,6 +31,10 @@ export async function PUT(
         const updateData: {
             drugName?: string;
             /* @Codex */
+            aic?: string | null;
+            /* @Codex */
+            atc?: string | null;
+            /* @Codex */
             activePrinciple?: string | null;
             dosage?: string;
             /* @Codex */
@@ -48,6 +52,18 @@ export async function PUT(
             const payload = body as Record<string, unknown>;
 
             if (typeof payload.drugName === 'string') updateData.drugName = payload.drugName;
+            /* @Codex */
+            if (payload.aic === null || payload.aic === '') {
+                updateData.aic = null;
+            } else if (typeof payload.aic === 'string') {
+                updateData.aic = payload.aic;
+            }
+            /* @Codex */
+            if (payload.atc === null || payload.atc === '') {
+                updateData.atc = null;
+            } else if (typeof payload.atc === 'string') {
+                updateData.atc = payload.atc;
+            }
             /* @Codex */
             if (payload.activePrinciple === null || payload.activePrinciple === '') {
                 updateData.activePrinciple = null;

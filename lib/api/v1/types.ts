@@ -62,6 +62,10 @@ export type TherapySummary = {
     id: string;
     patientId: string;
     drugName: string;
+    /* @Codex */
+    aic: string | null;
+    /* @Codex */
+    atc: string | null;
     activePrinciple: string | null;
     dosage: string;
     motivation: string | null;

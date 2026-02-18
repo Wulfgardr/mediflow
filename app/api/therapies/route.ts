@@ -54,6 +54,10 @@ export async function POST(request: Request) {
             patientId: body.patientId,
             drugName: body.drugName,
             /* @Codex */
+            aic: typeof body.aic === 'string' ? body.aic : null,
+            /* @Codex */
+            atc: typeof body.atc === 'string' ? body.atc : null,
+            /* @Codex */
             activePrinciple: body.activePrinciple ?? null,
             dosage: body.dosage,
             /* @Codex */

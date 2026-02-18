@@ -1672,6 +1672,10 @@ private struct EditTherapyView: View {
         do {
             let payload = UpdateTherapyPayload(
                 drugName: trimmedDrugName,
+                /* @Codex */
+                aic: therapy.aic,
+                /* @Codex */
+                atc: therapy.atc,
                 dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
                 status: status,
                 startDate: startDate,

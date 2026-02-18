@@ -42,6 +42,10 @@ export async function GET(
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
+            /* @Codex */
+            aic: therapy.aic ?? null,
+            /* @Codex */
+            atc: therapy.atc ?? null,
             activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,
             motivation: therapy.motivation ?? null,
@@ -91,6 +95,22 @@ export async function PUT(
         }
 
         const nextDrugName = typeof body.drugName === 'string' ? body.drugName : undefined;
+        const hasAic = Object.prototype.hasOwnProperty.call(body, 'aic');
+        const nextAic = hasAic
+            ? (typeof body.aic === 'string'
+                ? body.aic
+                : body.aic === null || body.aic === ''
+                    ? null
+                    : undefined)
+            : undefined;
+        const hasAtc = Object.prototype.hasOwnProperty.call(body, 'atc');
+        const nextAtc = hasAtc
+            ? (typeof body.atc === 'string'
+                ? body.atc
+                : body.atc === null || body.atc === ''
+                    ? null
+                    : undefined)
+            : undefined;
         const hasActivePrinciple = Object.prototype.hasOwnProperty.call(body, 'activePrinciple');
         const nextActivePrinciple = hasActivePrinciple
             ? (typeof body.activePrinciple === 'string'
@@ -136,6 +156,8 @@ export async function PUT(
 
         if (
             nextDrugName === undefined &&
+            nextAic === undefined &&
+            nextAtc === undefined &&
             nextActivePrinciple === undefined &&
             nextDosage === undefined &&
             nextMotivation === undefined &&
@@ -151,6 +173,8 @@ export async function PUT(
         await dbServer.update(therapies)
             .set({
                 drugName: nextDrugName,
+                aic: nextAic,
+                atc: nextAtc,
                 activePrinciple: nextActivePrinciple,
                 dosage: nextDosage,
                 motivation: nextMotivation,

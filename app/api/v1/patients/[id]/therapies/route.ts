@@ -62,6 +62,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
+            /* @Codex */
+            aic: therapy.aic ?? null,
+            /* @Codex */
+            atc: therapy.atc ?? null,
             activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,
             motivation: therapy.motivation ?? null,
@@ -98,6 +102,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             id: newId,
             patientId: id,
             drugName: body.drugName,
+            /* @Codex */
+            aic: typeof body.aic === 'string' ? body.aic : null,
+            /* @Codex */
+            atc: typeof body.atc === 'string' ? body.atc : null,
             /* @Codex */
             activePrinciple: body.activePrinciple ?? null,
             dosage: body.dosage,
