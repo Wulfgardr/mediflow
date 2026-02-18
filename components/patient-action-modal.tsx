@@ -98,6 +98,21 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                     />
                                 </div>
                             </div>
+                        ) : isExport ? (
+                            <div className="space-y-3">
+                                <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-start gap-2 border border-blue-100">
+                                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <p>
+                                        Verrà generato un file <strong>FHIR JSON</strong> con pre-check FSE (errori bloccanti, warning confermabili), contenente:
+                                        <ul className="list-disc ml-4 mt-1 opacity-80">
+                                            <li>Anagrafica Paziente</li>
+                                            <li>Storia Diagnostica</li>
+                                            <li>Note e Visite</li>
+                                            <li>Terapie e Valutazioni</li>
+                                        </ul>
+                                    </p>
+                                </div>
+                            </div>
                         ) : (
                             <div className="space-y-3">
                                 <div className="p-3 bg-amber-50 text-amber-800 text-sm rounded-lg flex items-start gap-2 border border-amber-100">
@@ -134,23 +149,6 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                         />
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {isExport && (
-                            <div className="space-y-3">
-                                <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-start gap-2 border border-blue-100">
-                                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                                    <p>
-                                        Verrà generato un file <strong>FHIR JSON</strong> con pre-check FSE (errori bloccanti, warning confermabili), contenente:
-                                        <ul className="list-disc ml-4 mt-1 opacity-80">
-                                            <li>Anagrafica Paziente</li>
-                                            <li>Storia Diagnostica</li>
-                                            <li>Note e Visite</li>
-                                            <li>Terapie e Valutazioni</li>
-                                        </ul>
-                                    </p>
-                                </div>
                             </div>
                         )}
 

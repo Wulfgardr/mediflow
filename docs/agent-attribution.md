@@ -36,6 +36,7 @@ Entries are additive and minimal.
 - Added observations thin slice (`LOINC + UCUM`) across schema, web APIs/UI, v1 APIs, FHIR export, and native client contracts: `lib/schema.ts`, `app/api/observations/*`, `components/observation-manager.tsx`, `app/api/v1/patients/[id]/observations/*`, `lib/fhir/*`, `native/MediFlowMac/Sources/MediFlowMac/*`
 - Added shared FSE validation library and web export pre-check flow (`error` blocks, `warning` confirm): `lib/fse-validation.ts`, `app/api/fse/validate-patient/route.ts`, `app/patients/[id]/edit/page.tsx`
 - Added discoverability guardrail in Definition of Done and aligned export UI labels to explicit `FHIR/FSE` wording: `CONTRIBUTING.md`, `app/patients/[id]/edit/page.tsx`, `components/patient-action-modal.tsx`
+- Added `Export FHIR` CTA in patient detail page with same pre-check FSE flow used by edit page; fixed export modal to show only export-specific content: `app/patients/[id]/page.tsx`, `components/patient-action-modal.tsx`
 
 ## 2026-02-01 Codex
 - Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md
