@@ -41,13 +41,21 @@ export async function POST(request: Request) {
             id: newId,
             patientId: body.patientId,
             drugName: body.drugName,
+            /* @Codex */
+            activePrinciple: body.activePrinciple ?? null,
             dosage: body.dosage,
+            /* @Codex */
+            motivation: body.motivation ?? null,
+            /* @Codex */
+            diagnosisCode: body.diagnosisCode ?? null,
+            /* @Codex */
+            diagnosisName: body.diagnosisName ?? null,
             status: body.status || 'active',
             startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,
             createdAt: new Date()
         });
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {
         console.error("API POST /therapies error:", error);
         return NextResponse.json({ error: `Create Failed: ${error instanceof Error ? error.message : String(error)}` }, { status: 500 });

@@ -53,7 +53,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
+            activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,
+            motivation: therapy.motivation ?? null,
+            diagnosisCode: therapy.diagnosisCode ?? null,
+            diagnosisName: therapy.diagnosisName ?? null,
             status: therapy.status,
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
@@ -80,7 +84,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             id: newId,
             patientId: id,
             drugName: body.drugName,
+            /* @Codex */
+            activePrinciple: body.activePrinciple ?? null,
             dosage: body.dosage,
+            /* @Codex */
+            motivation: body.motivation ?? null,
+            /* @Codex */
+            diagnosisCode: body.diagnosisCode ?? null,
+            /* @Codex */
+            diagnosisName: body.diagnosisName ?? null,
             status: body.status || 'active',
             startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,

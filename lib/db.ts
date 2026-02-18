@@ -85,7 +85,7 @@ export interface ClinicalEntry {
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
-    patients: ['address', 'phone', 'caregiver', 'exemptions', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
+    patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
     entries: ['content', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
@@ -452,11 +452,17 @@ export interface Checkup {
     patientId: string;
     date: Date;
     title: string;
-    type: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
-    value: number;
+    /* @Codex */
+    type?: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
+    /* @Codex */
+    value?: number;
     maxValue?: number;
     unit?: string;
     notes?: string;
+    /* @Codex */
+    status?: 'pending' | 'completed' | 'cancelled';
+    /* @Codex */
+    source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
     updatedAt?: Date;
 }
