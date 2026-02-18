@@ -1,6 +1,6 @@
 'use client';
 
-import { DependencyList, useEffect, useState } from 'react';
+import { DependencyList, useEffect, useRef, useState } from 'react';
 
 /* @Codex */
 type DbChangeListener = () => void;
@@ -27,8 +27,13 @@ export function useLiveQuery<T, TDefault = undefined>(
     deps?: DependencyList,
     defaultResult?: TDefault
 ): T | TDefault | undefined {
+    const querierRef = useRef(querier);
     const [result, setResult] = useState<T | TDefault | undefined>(defaultResult);
     const [revision, setRevision] = useState(0);
+
+    useEffect(() => {
+        querierRef.current = querier;
+    }, [querier]);
 
     useEffect(() => subscribeDbChanges(() => {
         setRevision((previous) => previous + 1);
@@ -39,7 +44,7 @@ export function useLiveQuery<T, TDefault = undefined>(
 
         const runQuery = async () => {
             try {
-                const value = await querier();
+                const value = await querierRef.current();
                 if (!cancelled) setResult(value);
             } catch (error) {
                 console.error('useLiveQuery failed', error);
@@ -52,7 +57,7 @@ export function useLiveQuery<T, TDefault = undefined>(
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [querier, revision, ...(deps ?? [])]);
+    }, [revision, ...(deps ?? [])]);
 
     return result;
 }
