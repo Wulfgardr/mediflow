@@ -1,7 +1,13 @@
 import { Bundle } from 'fhir/r4';
 import { db } from '../db';
 import { toFhirPatient } from './patient-adapter';
-import { toFhirCondition, toFhirEncounter, toFhirMedicationStatement, toFhirObservation } from './clinical-adapter';
+import {
+    toFhirCondition,
+    toFhirEncounter,
+    toFhirMedicationStatement,
+    toFhirObservation,
+    toFhirStructuredObservation,
+} from './clinical-adapter';
 
 export async function generatePatientBundle(patientId: string): Promise<Bundle> {
     const patient = await db.patients.get(patientId);
@@ -11,6 +17,8 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
     const entries = await db.entries.filter((e: any) => e.patientId === patientId).toArray();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const therapies = await db.therapies.filter((t: any) => t.patientId === patientId).toArray();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const observations = await db.observations.filter((o: any) => o.patientId === patientId).toArray();
 
     const bundle: Bundle = {
         resourceType: "Bundle",
@@ -55,6 +63,13 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
 
         bundle.entry?.push({
             resource: toFhirMedicationStatement(t, patientId)
+        });
+    });
+
+    // 5. Structured Observations (LOINC + UCUM)
+    observations.forEach((o) => {
+        bundle.entry?.push({
+            resource: toFhirStructuredObservation(o, patientId)
         });
     });
 

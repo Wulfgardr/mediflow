@@ -12,10 +12,10 @@ Ultimo aggiornamento: 2026-02-17
 ## Focus corrente (prossime 2-6 settimane)
 
 ### 0b) Terminologie cliniche e compliance FSE 2.0 (ADR 0006)
-- [ ] Portare `ATC` a first-class nei flussi terapia (`AIC + ATC` coerenti su web/native API).
-- [ ] Introdurre contratto minimo `terminology` su `/api/v1` (systems/search/resolve).
-- [ ] Introdurre validazione documentale pilota FSE (`error` + `warning`) prima dell'export.
-- [ ] Avviare thin slice osservazioni con `LOINC + UCUM` su un percorso clinico verticale.
+- [x] Portare `ATC` a first-class nei flussi terapia (`AIC + ATC` coerenti su web/native API).
+- [x] Introdurre contratto minimo `terminology` su `/api/v1` (systems/search/resolve).
+- [x] Introdurre validazione documentale pilota FSE (`error` + `warning`) prima dell'export.
+- [x] Avviare thin slice osservazioni con `LOINC + UCUM` su un percorso clinico verticale.
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
 - [ ] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).

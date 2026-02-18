@@ -122,6 +122,32 @@ actor LocalAPIClient {
         return try decoder.decode([CheckupSummary].self, from: data)
     }
 
+    /* @Codex */
+    func fetchObservations(
+        patientId: String,
+        limit: Int? = nil,
+        code: String? = nil,
+        dateFrom: Date? = nil,
+        dateTo: Date? = nil
+    ) async throws -> [ObservationSummary] {
+        var queryItems: [URLQueryItem] = []
+        if let limit { queryItems.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let code, !code.isEmpty { queryItems.append(URLQueryItem(name: "code", value: code)) }
+        if let dateFrom { queryItems.append(URLQueryItem(name: "dateFrom", value: iso8601String(from: dateFrom))) }
+        if let dateTo { queryItems.append(URLQueryItem(name: "dateTo", value: iso8601String(from: dateTo))) }
+
+        let request = try makeRequest(
+            path: "patients/\(patientId)/observations",
+            queryItems: queryItems
+        )
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([ObservationSummary].self, from: data)
+    }
+
     func createPatient(payload: CreatePatientPayload) async throws -> String {
         let request = try makeRequest(path: "patients", method: "POST", body: payload)
         let (data, response) = try await session.data(for: request)
@@ -207,6 +233,29 @@ actor LocalAPIClient {
     /* @Codex */
     func deleteCheckup(patientId: String, checkupId: String) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/checkups/\(checkupId)", method: "DELETE")
+        let (_, response) = try await session.data(for: request)
+        try validate(response: response)
+    }
+
+    /* @Codex */
+    func createObservation(patientId: String, payload: CreateObservationPayload) async throws -> String {
+        let request = try makeRequest(path: "patients/\(patientId)/observations", method: "POST", body: payload)
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response)
+        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        return result.id
+    }
+
+    /* @Codex */
+    func updateObservation(patientId: String, observationId: String, payload: UpdateObservationPayload) async throws {
+        let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "PUT", body: payload)
+        let (_, response) = try await session.data(for: request)
+        try validate(response: response)
+    }
+
+    /* @Codex */
+    func deleteObservation(patientId: String, observationId: String) async throws {
+        let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "DELETE")
         let (_, response) = try await session.data(for: request)
         try validate(response: response)
     }
@@ -659,6 +708,32 @@ struct UpdateCheckupPayload: Encodable {
     let date: Date?
     let title: String?
     let status: String?
+}
+
+/* @Codex */
+struct CreateObservationPayload: Encodable {
+    let codeSystem: String
+    let code: String
+    let display: String
+    let unitSystem: String
+    let unitCode: String
+    let value: String
+    let notes: String?
+    let observedAt: Date
+    let source: String?
+}
+
+/* @Codex */
+struct UpdateObservationPayload: Encodable {
+    let codeSystem: String?
+    let code: String?
+    let display: String?
+    let unitSystem: String?
+    let unitCode: String?
+    let value: String?
+    let notes: String?
+    let observedAt: Date?
+    let source: String?
 }
 
 struct CreatePatientResponse: Decodable {

@@ -3,12 +3,38 @@
 import { db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, Trash2, Archive, Download, AlertTriangle, ShieldAlert, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
+
+/* @Codex */
+type ValidationSummary = {
+    total: number;
+    withErrors: number;
+    withWarnings: number;
+    errorCount: number;
+    warningCount: number;
+};
+
+/* @Codex */
+type ValidatePatientExportResponse = {
+    patientId: string;
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    therapyMedication: ValidationSummary;
+    observationVitals: ValidationSummary;
+};
+
+/* @Codex */
+function buildValidationMessage(validation: ValidatePatientExportResponse): string {
+    return [
+        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
+        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
+    ].join('\n');
+}
 
 export default function EditPatientPage() {
     const router = useRouter();
@@ -79,6 +105,24 @@ export default function EditPatientPage() {
 
         if (actionType === 'export') {
             try {
+                const validationResponse = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(id)}`);
+                if (!validationResponse.ok) {
+                    throw new Error('Validation pre-check failed');
+                }
+                const validation = await validationResponse.json() as ValidatePatientExportResponse;
+
+                if (validation.hasErrors) {
+                    alert(`Esportazione bloccata: risolvi gli errori di validazione FSE prima del download.\n\n${buildValidationMessage(validation)}`);
+                    return;
+                }
+
+                if (validation.hasWarnings) {
+                    const proceed = confirm(
+                        `Sono presenti warning di validazione FSE.\n\n${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                    );
+                    if (!proceed) return;
+                }
+
                 // Dynamic import for bundle generator
                 const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
                 const bundle = await generatePatientBundle(id);

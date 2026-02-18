@@ -84,3 +84,19 @@ struct CheckupSummary: Identifiable, Decodable {
     let status: String
     let createdAt: Date?
 }
+
+/* @Codex */
+struct ObservationSummary: Identifiable, Decodable {
+    let id: String
+    let patientId: String
+    let codeSystem: String
+    let code: String
+    let display: String
+    let unitSystem: String
+    let unitCode: String
+    let value: String
+    let notes: String?
+    let observedAt: Date
+    let source: String?
+    let createdAt: Date?
+}
