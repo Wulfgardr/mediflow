@@ -2,6 +2,62 @@
 import SwiftUI
 
 /* @Codex */
+private func normalizedTherapyStatus(_ status: String) -> String {
+    switch status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "active":
+        return "active"
+    case "suspended", "paused":
+        return "suspended"
+    case "completed", "stopped", "interrupted":
+        return "completed"
+    default:
+        return "active"
+    }
+}
+
+/* @Codex */
+private func normalizedCheckupStatus(_ status: String) -> String {
+    switch status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "pending":
+        return "pending"
+    case "completed", "done":
+        return "completed"
+    case "cancelled", "canceled":
+        return "cancelled"
+    default:
+        return "pending"
+    }
+}
+
+/* @Codex */
+private func therapyStatusLabel(for status: String) -> String {
+    switch normalizedTherapyStatus(status) {
+    case "active":
+        return "Attiva"
+    case "suspended":
+        return "Sospesa"
+    case "completed":
+        return "Completata"
+    default:
+        return status.capitalized
+    }
+}
+
+/* @Codex */
+private func checkupStatusLabel(for status: String) -> String {
+    switch normalizedCheckupStatus(status) {
+    case "pending":
+        return "In attesa"
+    case "completed":
+        return "Completato"
+    case "cancelled":
+        return "Annullato"
+    default:
+        return status.capitalized
+    }
+}
+
+/* @Codex */
 struct PatientDetailView: View {
     let patientId: String
 
@@ -967,10 +1023,7 @@ struct PatientDetailView: View {
             ("Tutti", "all"),
             ("Attiva", "active"),
             ("Sospesa", "suspended"),
-            ("Interrotta", "interrupted"),
-            ("Completata", "completed"),
-            ("Paused", "paused"),
-            ("Stopped", "stopped")
+            ("Completata", "completed")
         ]
     }
 
@@ -979,7 +1032,7 @@ struct PatientDetailView: View {
         [
             ("Tutti", "all"),
             ("In attesa", "pending"),
-            ("Completato", "done"),
+            ("Completato", "completed"),
             ("Annullato", "cancelled")
         ]
     }
@@ -1295,7 +1348,7 @@ private struct TherapyRowView: View {
                     Text(therapy.drugName)
                         .font(.headline)
                     Spacer()
-                    TagView(text: therapy.status.capitalized, tone: tone(for: therapy.status))
+                    TagView(text: therapyStatusLabel(for: therapy.status), tone: tone(for: therapy.status))
                 }
                 Text(therapy.dosage)
                     .font(.callout)
@@ -1335,8 +1388,8 @@ private struct TherapyRowView: View {
     private func tone(for status: String) -> Color {
         switch status.lowercased() {
         case "active": return .green
-        case "paused": return .orange
-        case "stopped": return .red
+        case "suspended", "paused": return .orange
+        case "completed", "stopped", "interrupted": return .red
         default: return .secondary
         }
     }
@@ -1368,7 +1421,7 @@ private struct CheckupRowView: View {
                     Text(checkup.title)
                         .font(.headline)
                     Spacer()
-                    TagView(text: checkup.status.capitalized, tone: tone(for: checkup.status))
+                    TagView(text: checkupStatusLabel(for: checkup.status), tone: tone(for: checkup.status))
                 }
                 Text(dateFormatter.string(from: checkup.date))
                     .font(.callout)
@@ -1397,7 +1450,7 @@ private struct CheckupRowView: View {
     private func tone(for status: String) -> Color {
         switch status.lowercased() {
         case "pending": return .orange
-        case "done": return .green
+        case "completed", "done": return .green
         case "cancelled": return .red
         default: return .secondary
         }
@@ -1543,7 +1596,7 @@ private struct EditTherapyView: View {
         self.onSaved = onSaved
         _drugName = State(initialValue: therapy.drugName)
         _dosage = State(initialValue: therapy.dosage)
-        _status = State(initialValue: therapy.status)
+        _status = State(initialValue: normalizedTherapyStatus(therapy.status))
         _startDate = State(initialValue: therapy.startDate)
         _includeEndDate = State(initialValue: therapy.endDate != nil)
         _endDate = State(initialValue: therapy.endDate ?? Date())
@@ -1599,10 +1652,7 @@ private struct EditTherapyView: View {
         [
             ("Attiva", "active"),
             ("Sospesa", "suspended"),
-            ("Interrotta", "interrupted"),
-            ("Completata", "completed"),
-            ("Paused", "paused"),
-            ("Stopped", "stopped")
+            ("Completata", "completed")
         ]
     }
 
@@ -1656,7 +1706,7 @@ private struct EditCheckupView: View {
         self.onSaved = onSaved
         _title = State(initialValue: checkup.title)
         _date = State(initialValue: checkup.date)
-        _status = State(initialValue: checkup.status)
+        _status = State(initialValue: normalizedCheckupStatus(checkup.status))
     }
 
     var body: some View {
@@ -1667,7 +1717,7 @@ private struct EditCheckupView: View {
                     DatePicker("Data", selection: $date, displayedComponents: .date)
                     Picker("Stato", selection: $status) {
                         Text("In attesa").tag("pending")
-                        Text("Completato").tag("done")
+                        Text("Completato").tag("completed")
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)

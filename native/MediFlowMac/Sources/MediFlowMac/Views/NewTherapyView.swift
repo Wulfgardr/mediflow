@@ -37,8 +37,8 @@ struct NewTherapyView: View {
                 Section("Stato") {
                     Picker("Stato", selection: $status) {
                         Text("Attiva").tag("active")
-                        Text("Sospesa").tag("paused")
-                        Text("Terminata").tag("stopped")
+                        Text("Sospesa").tag("suspended")
+                        Text("Terminata").tag("completed")
                     }
                     .pickerStyle(.segmented)
                 }

@@ -514,7 +514,8 @@ export interface Therapy {
     motivation?: string;
     diagnosisCode?: string;
     diagnosisName?: string;
-    status: 'active' | 'suspended' | 'interrupted' | 'completed';
+    /* @Codex */
+    status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate?: Date;
     createdAt: Date;

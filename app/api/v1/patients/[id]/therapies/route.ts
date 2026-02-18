@@ -2,10 +2,16 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
+/* @Codex */
+import {
+    normalizeTherapyStatus,
+    parseTherapyStatus,
+    therapyStatusFilterValues,
+} from '@/lib/status-normalization';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -36,11 +42,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { searchParams } = new URL(request.url);
         const limit = parseLimit(searchParams.get('limit'));
         const status = searchParams.get('status')?.trim();
+        /* @Codex */
+        const statusFilterValues = status ? therapyStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
 
         const filters = [eq(therapies.patientId, id)];
-        if (status) filters.push(eq(therapies.status, status));
+        /* @Codex */
+        if (statusFilterValues) filters.push(inArray(therapies.status, statusFilterValues));
         if (dateFrom) filters.push(gte(therapies.startDate, dateFrom));
         if (dateTo) filters.push(lte(therapies.startDate, dateTo));
         const whereClause = filters.length > 1 ? and(...filters) : filters[0];
@@ -58,7 +67,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             motivation: therapy.motivation ?? null,
             diagnosisCode: therapy.diagnosisCode ?? null,
             diagnosisName: therapy.diagnosisName ?? null,
-            status: therapy.status,
+            status: normalizeTherapyStatus(therapy.status),
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
             createdAt: toIsoString(therapy.createdAt)
@@ -78,6 +87,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     try {
         const { id } = await params;
         const body = await request.json();
+        /* @Codex */
+        const normalizedStatus = body.status === undefined ? 'active' : parseTherapyStatus(body.status);
+        if (body.status !== undefined && !normalizedStatus) {
+            return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
+        }
         const newId = body.id || uuidv4();
 
         await dbServer.insert(therapies).values({
@@ -93,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             diagnosisCode: body.diagnosisCode ?? null,
             /* @Codex */
             diagnosisName: body.diagnosisName ?? null,
-            status: body.status || 'active',
+            status: normalizedStatus ?? 'active',
             startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,
             createdAt: new Date()

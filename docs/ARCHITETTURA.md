@@ -1,5 +1,10 @@
 # Architettura MediFlow (Deep Dive)
 
+> [!NOTE]
+> **Stato documento: SECONDARY (deep dive tecnico).**
+> Per confini stabili e decisioni architetturali prevale `ARCHITECTURE.md`.
+> Per il flusso operativo end-to-end prevale `docs/walkthrough.md`.
+
 > Stack tecnico, sicurezza e flusso dati.
 > Documento tecnico per sviluppatori e contributori.
 

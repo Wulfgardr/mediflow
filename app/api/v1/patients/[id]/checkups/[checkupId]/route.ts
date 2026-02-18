@@ -5,6 +5,8 @@ import { checkups } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -42,7 +44,7 @@ export async function GET(
             date: toIsoString(checkup.date) ?? new Date(0).toISOString(),
             title: checkup.title,
             notes: checkup.notes ?? null,
-            status: checkup.status ?? 'pending',
+            status: normalizeCheckupStatus(checkup.status),
             source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt),
         };
@@ -87,7 +89,15 @@ export async function PUT(
                     ? null
                     : undefined)
             : undefined;
-        const nextStatus = typeof body.status === 'string' ? body.status : undefined;
+        /* @Codex */
+        let nextStatus: string | undefined;
+        if (typeof body.status === 'string') {
+            const parsedStatus = parseCheckupStatus(body.status);
+            if (!parsedStatus) {
+                return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
+            }
+            nextStatus = parsedStatus;
+        }
         const hasSource = Object.prototype.hasOwnProperty.call(body, 'source');
         const nextSource = hasSource
             ? (typeof body.source === 'string'
