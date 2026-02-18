@@ -30,6 +30,11 @@ Entries are additive and minimal.
 - Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/duplicate/route.ts`
 - Enforced single-default invariant on ambulatory creation and validated parent linkage on create: `app/api/ambulatories/route.ts`
 - Added guarded ambulatory delete semantics (linked-patient conflict + default fallback rules): `app/api/ambulatories/[id]/route.ts`
+- Added ADR 0006 for terminology plugin strategy and FSE profile validation path: `docs/adr/0006-terminology-plugin-and-fse-profiles.md`
+- Added terminology contract endpoints and static pilot resolver (systems/search/resolve): `app/api/v1/terminology/*`, `lib/terminology.ts`
+- Added AIC+ATC first-class therapy support across schema, web/v1 APIs, and native contracts: `lib/schema.ts`, `app/api/therapies/*`, `app/api/v1/patients/[id]/therapies/*`, `native/MediFlowMac/Sources/MediFlowMac/*`
+- Added observations thin slice (`LOINC + UCUM`) across schema, web APIs/UI, v1 APIs, FHIR export, and native client contracts: `lib/schema.ts`, `app/api/observations/*`, `components/observation-manager.tsx`, `app/api/v1/patients/[id]/observations/*`, `lib/fhir/*`, `native/MediFlowMac/Sources/MediFlowMac/*`
+- Added shared FSE validation library and web export pre-check flow (`error` blocks, `warning` confirm): `lib/fse-validation.ts`, `app/api/fse/validate-patient/route.ts`, `app/patients/[id]/edit/page.tsx`
 
 ## 2026-02-01 Codex
 - Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md

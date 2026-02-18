@@ -1,4 +1,4 @@
-import { Diagnosis, ClinicalEntry, Therapy } from '../db';
+import { Diagnosis, ClinicalEntry, Therapy, Observation as ClinicalObservation } from '../db';
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
 
 export function toFhirCondition(diagnosis: Diagnosis, patientId: string): Condition {
@@ -80,5 +80,39 @@ export function toFhirMedicationStatement(therapy: Therapy, patientId: string): 
             text: therapy.dosage
         }],
         note: therapy.motivation ? [{ text: therapy.motivation }] : undefined
+    };
+}
+
+/* @Codex */
+export function toFhirStructuredObservation(observation: ClinicalObservation, patientId: string): Observation {
+    const numericValue = Number(observation.value);
+    const isNumeric = Number.isFinite(numericValue);
+
+    return {
+        resourceType: "Observation",
+        id: `obs-structured-${observation.id}`,
+        status: "final",
+        code: {
+            coding: [
+                {
+                    system: "http://loinc.org",
+                    code: observation.code,
+                    display: observation.display,
+                }
+            ],
+            text: observation.display,
+        },
+        subject: { reference: `Patient/${patientId}` },
+        effectiveDateTime: new Date(observation.observedAt).toISOString(),
+        valueQuantity: isNumeric
+            ? {
+                value: numericValue,
+                system: "http://unitsofmeasure.org",
+                code: observation.unitCode,
+                unit: observation.unitCode,
+            }
+            : undefined,
+        valueString: isNumeric ? undefined : String(observation.value),
+        note: observation.notes ? [{ text: observation.notes }] : undefined,
     };
 }

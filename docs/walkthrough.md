@@ -166,6 +166,7 @@ sequenceDiagram
 
 Percorso: `app/api/*`  
 Usata dal client web tramite `lib/db.ts`.
+Include pre-check FSE per export paziente: `app/api/fse/validate-patient/route.ts`.
 
 ### API v1 per client nativo
 
@@ -186,6 +187,8 @@ Endpoint principali:
 - `app/api/v1/patients/[id]/therapies/[therapyId]/route.ts`
 - `app/api/v1/patients/[id]/checkups/route.ts`
 - `app/api/v1/patients/[id]/checkups/[checkupId]/route.ts`
+- `app/api/v1/patients/[id]/observations/route.ts`
+- `app/api/v1/patients/[id]/observations/[observationId]/route.ts`
 - `app/api/v1/drugs/route.ts`
 - `app/api/v1/exemptions/route.ts`
 

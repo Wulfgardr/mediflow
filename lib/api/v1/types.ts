@@ -89,6 +89,22 @@ export type CheckupSummary = {
 };
 
 /* @Codex */
+export type ObservationSummary = {
+    id: string;
+    patientId: string;
+    codeSystem: string;
+    code: string;
+    display: string;
+    unitSystem: string;
+    unitCode: string;
+    value: string;
+    notes: string | null;
+    observedAt: string;
+    source: string | null;
+    createdAt: string | null;
+};
+
+/* @Codex */
 export type DrugSummary = {
     aic: string;
     name: string;
