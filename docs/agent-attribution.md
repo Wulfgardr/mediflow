@@ -4,6 +4,17 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-02-18 Codex
+- Added canonical documentation index: `docs/README.md`
+- Updated developer doc entrypoint in `README.md` to reference canonical docs order
+- Marked `docs/product_roadmap.md` as deprecated alias to `docs/ROADMAP.md`
+- Clarified canonical product roadmap note in `docs/ROADMAP.md`
+- Added `SECONDARY` status label to `docs/ARCHITETTURA.md`
+- Added `SECONDARY` status label to `docs/system_architecture.md`
+- Added `CANONICAL` status label to `docs/walkthrough.md`
+- Added `LEGACY` status label to `docs/index.html` embedded architecture page
+- Extended `docs/README.md` with `CANONICAL/SECONDARY/LEGACY` convention and status matrix
+
 ## 2026-02-01 Codex
 - Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md
 - Added this attribution log: docs/agent-attribution.md

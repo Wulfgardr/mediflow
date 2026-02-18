@@ -36,26 +36,29 @@ Vuoi solo installarlo e usarlo?
 
 Inizia da qui (ordine consigliato):
 
-1. **Come contribuire e come avviare il progetto**
+1. **Indice canonico della documentazione (cosa e' fonte di verita')**
+   - `docs/README.md`
+
+2. **Come contribuire e come avviare il progetto**
    - `CONTRIBUTING.md`
 
-2. **Visione e confini dell'architettura**
+3. **Visione e confini dell'architettura**
    - `ARCHITECTURE.md`
 
-3. **Walkthrough end-to-end (web + native + servizi locali)**
+4. **Walkthrough end-to-end (web + native + servizi locali)**
    - `docs/walkthrough.md`
 
-4. **Approfondimenti tecnici**
+5. **Approfondimenti tecnici**
    - `docs/ARCHITETTURA.md`
    - `docs/system_architecture.md`
 
-5. **Decisioni architetturali (ADR)**
+6. **Decisioni architetturali (ADR)**
    - `docs/adr/`
 
-6. **Piano di lavoro in corso (engineering plan, non product roadmap)**
+7. **Piano di lavoro in corso (engineering plan, non product roadmap)**
    - `PLANS.md`
 
-7. **Sicurezza (policy, redaction, scanning, disclosure)**
+8. **Sicurezza (policy, redaction, scanning, disclosure)**
    - `SECURITY.md`
 
 ### ⚖️ Compliance & privacy

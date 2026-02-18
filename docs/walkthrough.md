@@ -1,5 +1,9 @@
 # Walkthrough MediFlow (Web + Native)
 
+> [!IMPORTANT]
+> **Stato documento: CANONICAL (walkthrough operativo end-to-end).**
+> Se altri documenti tecnici secondari divergono su dettagli di flusso, prevale questo file.
+
 Questo documento raccoglie la vista end-to-end del progetto: web app Next.js, backend locale con SQLite, servizi AI/OCR e client nativo macOS. Serve per onboarding, manutenzione e lettura rapida dei flussi principali.
 
 ---

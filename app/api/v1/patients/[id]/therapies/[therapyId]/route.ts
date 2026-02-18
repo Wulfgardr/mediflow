@@ -5,6 +5,8 @@ import { therapies } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -45,7 +47,7 @@ export async function GET(
             motivation: therapy.motivation ?? null,
             diagnosisCode: therapy.diagnosisCode ?? null,
             diagnosisName: therapy.diagnosisName ?? null,
-            status: therapy.status,
+            status: normalizeTherapyStatus(therapy.status),
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
             createdAt: toIsoString(therapy.createdAt),
@@ -122,7 +124,15 @@ export async function PUT(
                     ? null
                     : undefined)
             : undefined;
-        const nextStatus = typeof body.status === 'string' ? body.status : undefined;
+        /* @Codex */
+        let nextStatus: string | undefined;
+        if (typeof body.status === 'string') {
+            const parsedStatus = parseTherapyStatus(body.status);
+            if (!parsedStatus) {
+                return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
+            }
+            nextStatus = parsedStatus;
+        }
 
         if (
             nextDrugName === undefined &&

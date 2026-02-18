@@ -1,3 +1,8 @@
+> [!WARNING]
+> Documento storico mantenuto per compatibilita'.
+> La roadmap prodotto canonica e aggiornata e': `docs/ROADMAP.md`.
+> Aggiorna solo `docs/ROADMAP.md`.
+
 # 🗺️ Roadmap di MediFlow
 
 > **Dove siamo**: v0.3.0 — Funziona l'OCR, funziona l'AI, i documenti vengono letti e sintetizzati.

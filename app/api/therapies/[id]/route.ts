@@ -4,6 +4,8 @@ import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { parseTherapyStatus } from '@/lib/status-normalization';
 
 function parseDate(value: unknown): Date | undefined {
     if (value === null || value === undefined || value === '') return undefined;
@@ -66,7 +68,13 @@ export async function PUT(
             } else if (typeof payload.diagnosisName === 'string') {
                 updateData.diagnosisName = payload.diagnosisName;
             }
-            if (typeof payload.status === 'string') updateData.status = payload.status;
+            if (typeof payload.status === 'string') {
+                const parsedStatus = parseTherapyStatus(payload.status);
+                if (!parsedStatus) {
+                    return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
+                }
+                updateData.status = parsedStatus;
+            }
 
             const parsedStartDate = parseDate(payload.startDate);
             if (parsedStartDate) updateData.startDate = parsedStartDate;

@@ -5,6 +5,8 @@ import { eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -23,7 +25,11 @@ export async function GET(request: Request) {
         }
 
         const data = await query.orderBy(desc(checkups.date));
-        return NextResponse.json(data);
+        const normalizedData = data.map((checkup) => ({
+            ...checkup,
+            status: normalizeCheckupStatus(checkup.status),
+        }));
+        return NextResponse.json(normalizedData);
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch checkups" }, { status: 500 });
     }
@@ -36,6 +42,12 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        /* @Codex */
+        const normalizedStatus = body.status === undefined ? 'pending' : parseCheckupStatus(body.status);
+        if (body.status !== undefined && !normalizedStatus) {
+            return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
+        }
+
         // Allow client to generate ID or generate it here. 
         // ApiTable shim might send an ID if it's "add" with specific ID, but usually it relies on return.
         // However, if the client sends an ID, we should respect it or overwrite. 
@@ -52,7 +64,7 @@ export async function POST(request: Request) {
             title: body.title,
             /* @Codex */
             notes: body.notes ?? null,
-            status: body.status || 'pending',
+            status: normalizedStatus ?? 'pending',
             /* @Codex */
             source: body.source ?? 'manual',
             createdAt: new Date()

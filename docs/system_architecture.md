@@ -1,5 +1,10 @@
 # Architettura di MediFlow (sintesi operativa)
 
+> [!NOTE]
+> **Stato documento: SECONDARY (sintesi rapida).**
+> La visione architetturale stabile resta `ARCHITECTURE.md`.
+> Il walkthrough operativo canonico resta `docs/walkthrough.md`.
+
 Panoramica tecnica rapida per capire componenti, topologia e flussi principali.
 Per il dettaglio end-to-end usa anche `docs/walkthrough.md`.
 

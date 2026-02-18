@@ -21,7 +21,7 @@ struct NewCheckupView: View {
                     DatePicker("Data", selection: $date, displayedComponents: .date)
                     Picker("Stato", selection: $status) {
                         Text("In attesa").tag("pending")
-                        Text("Completato").tag("done")
+                        Text("Completato").tag("completed")
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)

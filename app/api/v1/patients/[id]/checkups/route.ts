@@ -2,10 +2,16 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
+/* @Codex */
+import {
+    checkupStatusFilterValues,
+    normalizeCheckupStatus,
+    parseCheckupStatus,
+} from '@/lib/status-normalization';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -36,11 +42,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { searchParams } = new URL(request.url);
         const limit = parseLimit(searchParams.get('limit'));
         const status = searchParams.get('status')?.trim();
+        /* @Codex */
+        const statusFilterValues = status ? checkupStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
 
         const filters = [eq(checkups.patientId, id)];
-        if (status) filters.push(eq(checkups.status, status));
+        /* @Codex */
+        if (statusFilterValues) filters.push(inArray(checkups.status, statusFilterValues));
         if (dateFrom) filters.push(gte(checkups.date, dateFrom));
         if (dateTo) filters.push(lte(checkups.date, dateTo));
         const whereClause = filters.length > 1 ? and(...filters) : filters[0];
@@ -55,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             date: toIsoString(checkup.date) ?? new Date(0).toISOString(),
             title: checkup.title,
             notes: checkup.notes ?? null,
-            status: checkup.status ?? 'pending',
+            status: normalizeCheckupStatus(checkup.status),
             source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt)
         }));
@@ -74,6 +83,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     try {
         const { id } = await params;
         const body = await request.json();
+        /* @Codex */
+        const normalizedStatus = body.status === undefined ? 'pending' : parseCheckupStatus(body.status);
+        if (body.status !== undefined && !normalizedStatus) {
+            return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
+        }
         const newId = body.id || uuidv4();
 
         await dbServer.insert(checkups).values({
@@ -83,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             title: body.title,
             /* @Codex */
             notes: body.notes ?? null,
-            status: body.status || 'pending',
+            status: normalizedStatus ?? 'pending',
             /* @Codex */
             source: body.source ?? 'manual',
             createdAt: new Date()
