@@ -4,7 +4,7 @@ import { ClinicalEntry, Attachment, db } from '@/lib/db';
 import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
 

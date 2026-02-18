@@ -1,6 +1,6 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { useParams } from 'next/navigation';
 import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info, Ticket } from 'lucide-react';

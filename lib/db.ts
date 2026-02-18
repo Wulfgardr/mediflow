@@ -2,6 +2,7 @@
 // Replaces Dexie DB with Fetch calls
 
 import { encryptData, decryptData } from './security';
+import { notifyDbChange } from './live-query';
 
 // Document insight from OCR + AI synthesis
 export interface DocumentInsight {
@@ -142,7 +143,7 @@ class ApiTable<T> {
     }
 
     async toArray(): Promise<T[]> {
-        const res = await fetch(this.endpoint);
+        const res = await fetch(this.endpoint, { cache: 'no-store' });
         /* @Codex */
         if (res.status === 401 || res.status === 403) return [];
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
@@ -182,14 +183,20 @@ class ApiTable<T> {
     }
 
     async get(id: string): Promise<T | undefined> {
-        const res = await fetch(`${this.endpoint}/${id}`);
+        const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store' });
         if (res.status === 404) return undefined;
         if (!res.ok) throw new Error(`Failed to fetch item ${id}`);
         const item = this.reviveDates(await res.json());
         return await this.decryptItem(item);
     }
 
-    async add(item: T): Promise<string> {
+    /* @Codex */
+    private emitChange() {
+        notifyDbChange();
+    }
+
+    /* @Codex */
+    async add(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
         const encryptedItem = await this.encryptItem(item);
         const res = await fetch(this.endpoint, {
             method: 'POST',
@@ -201,15 +208,18 @@ class ApiTable<T> {
             throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
         }
         const data = await res.json();
+        if (!options?.suppressNotify) this.emitChange();
         return data.id;
     }
 
     // Alias for Dexie compatibility (Upsert-like behavior)
-    async put(item: T): Promise<string> {
-        return this.add(item);
+    /* @Codex */
+    async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
+        return this.add(item, options);
     }
 
-    async update(id: string, changes: Partial<T>): Promise<void> {
+    /* @Codex */
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
         const encryptedChanges = await this.encryptItem(changes as T, true);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
@@ -217,20 +227,27 @@ class ApiTable<T> {
             body: JSON.stringify(encryptedChanges)
         });
         if (!res.ok) throw new Error("Failed to update item");
+        if (!options?.suppressNotify) this.emitChange();
     }
 
-    async delete(id: string): Promise<void> {
+    /* @Codex */
+    async delete(id: string, options?: { suppressNotify?: boolean }): Promise<void> {
         const res = await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
         if (!res.ok) {
             throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
         }
+        if (!options?.suppressNotify) this.emitChange();
     }
 
     async bulkDelete(ids: string[]): Promise<void> {
-        await Promise.all(ids.map(id => this.delete(id)));
+        if (ids.length === 0) return;
+        await Promise.all(ids.map(id => this.delete(id, { suppressNotify: true })));
+        this.emitChange();
     }
 
     async bulkPut(items: T[]): Promise<void> {
+        if (items.length === 0) return;
+
         // Optimization: send as single batch only where backend supports it.
         if (this.tableName === 'drugs') {
             const res = await fetch(this.endpoint, {
@@ -239,6 +256,7 @@ class ApiTable<T> {
                 body: JSON.stringify(items)
             });
             if (!res.ok) throw new Error("Failed to bulk add items");
+            this.emitChange();
             return;
         }
 
@@ -247,13 +265,17 @@ class ApiTable<T> {
         const chunkSize = 25;
         for (let i = 0; i < items.length; i += chunkSize) {
             const chunk = items.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(item => this.put(item)));
+            await Promise.all(chunk.map(item => this.put(item, { suppressNotify: true })));
         }
+        this.emitChange();
     }
 
     async clear(): Promise<void> {
         const res = await fetch(this.endpoint, { method: 'DELETE' });
-        if (res.ok) return;
+        if (res.ok) {
+            this.emitChange();
+            return;
+        }
 
         // @Codex: fallback for resources that expose only item-level DELETE.
         if (res.status !== 404 && res.status !== 405) {
@@ -269,7 +291,8 @@ class ApiTable<T> {
             throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
         }
 
-        await Promise.all(ids.map((id) => this.delete(id)));
+        await Promise.all(ids.map((id) => this.delete(id, { suppressNotify: true })));
+        if (ids.length > 0) this.emitChange();
     }
 
     /* @Codex */

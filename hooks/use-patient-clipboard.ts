@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { notifyDbChange } from '@/lib/live-query';
 // import { toast } from '@/components/ui/use-toast'; // Assuming toast exists, or use console for now
 
 export type ClipboardOperation = 'copy' | 'cut';
@@ -74,6 +75,7 @@ export function usePatientClipboard() {
 
             // Success
             // toast({ title: "Incollato con successo", description: `${clipboard.patientIds.length} pazienti processati.` });
+            notifyDbChange(); // @Codex
             clear();
             return true;
         } catch (error) {

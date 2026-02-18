@@ -6,7 +6,7 @@ import { Upload, FileText, X, Eye, Loader2 } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
 import { extractPatientDataSmart, extractDocumentTextForSummary } from '@/lib/pdf-service';
 /* @Codex */

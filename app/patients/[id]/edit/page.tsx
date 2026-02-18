@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, Archive, Download, AlertTriangle, ShieldAlert, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import PatientForm from '@/components/patient-form';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
 
