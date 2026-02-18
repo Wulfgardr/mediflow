@@ -509,6 +509,10 @@ export interface Therapy {
     id: string;
     patientId: string;
     drugName: string;
+    /* @Codex */
+    aic?: string;
+    /* @Codex */
+    atc?: string;
     activePrinciple?: string;
     dosage: string;
     motivation?: string;

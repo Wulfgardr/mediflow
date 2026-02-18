@@ -57,7 +57,19 @@ struct TherapySummary: Identifiable, Decodable {
     let id: String
     let patientId: String
     let drugName: String
+    /* @Codex */
+    let aic: String?
+    /* @Codex */
+    let atc: String?
+    /* @Codex */
+    let activePrinciple: String?
     let dosage: String
+    /* @Codex */
+    let motivation: String?
+    /* @Codex */
+    let diagnosisCode: String?
+    /* @Codex */
+    let diagnosisName: String?
     let status: String
     let startDate: Date
     let endDate: Date?

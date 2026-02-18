@@ -88,6 +88,10 @@ struct NewTherapyView: View {
         do {
             let payload = CreateTherapyPayload(
                 drugName: trimmedName,
+                /* @Codex */
+                aic: selectedDrug?.aic,
+                /* @Codex */
+                atc: selectedDrug?.atc,
                 dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
                 status: status,
                 startDate: startDate,

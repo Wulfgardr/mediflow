@@ -79,6 +79,10 @@ export const therapies = sqliteTable('therapies', {
     patientId: text('patient_id').references(() => patients.id).notNull(),
     drugName: text('drug_name').notNull(),
     /* @Codex */
+    aic: text('aic'),
+    /* @Codex */
+    atc: text('atc'),
+    /* @Codex */
     activePrinciple: text('active_principle'),
     dosage: text('dosage').notNull(),
     /* @Codex */

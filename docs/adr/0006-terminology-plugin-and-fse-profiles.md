@@ -2,7 +2,7 @@
 # ADR 0006: Terminology plugin unificato + profili documentali FSE/EDS
 
 Date: 2026-02-18  
-Status: Proposed
+Status: Accepted
 
 ---
 
@@ -47,7 +47,7 @@ Proporre Opzione 2:
 - payload canonico unico per qualsiasi codice clinico,
 - profili documentali FSE/EDS configurabili e validazione pre-export.
 
-La decisione resta `Proposed` finche non viene approvata dal Lead Architect.
+Decisione approvata dal Lead Architect il 2026-02-18.
 
 ## Conseguenze
 
@@ -61,4 +61,3 @@ La decisione resta `Proposed` finche non viene approvata dal Lead Architect.
 2. Aggiungere supporto `LOINC + UCUM` per un singolo percorso osservazioni (vitali).
 3. Introdurre validatore locale su un profilo documentale pilota (`error` / `warning`).
 4. Esporre il minimo contratto `/api/v1/terminology/*` necessario al pilot.
-

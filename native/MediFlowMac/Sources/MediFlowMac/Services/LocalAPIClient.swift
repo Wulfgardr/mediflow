@@ -625,6 +625,10 @@ struct UpdateEntryPayload: Encodable {
 
 struct CreateTherapyPayload: Encodable {
     let drugName: String
+    /* @Codex */
+    let aic: String?
+    /* @Codex */
+    let atc: String?
     let dosage: String
     let status: String
     let startDate: Date
@@ -634,6 +638,10 @@ struct CreateTherapyPayload: Encodable {
 /* @Codex */
 struct UpdateTherapyPayload: Encodable {
     let drugName: String?
+    /* @Codex */
+    let aic: String?
+    /* @Codex */
+    let atc: String?
     let dosage: String?
     let status: String?
     let startDate: Date?

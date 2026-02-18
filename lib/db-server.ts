@@ -88,4 +88,16 @@ try {
 } catch (error) {
     console.warn('[MediFlow] Exemptions schema check skipped:', error);
 }
+/* @Codex */
+try {
+    const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
+    if (!therapyColumns.includes('aic')) {
+        sqlite.prepare("ALTER TABLE therapies ADD COLUMN aic TEXT").run();
+    }
+    if (!therapyColumns.includes('atc')) {
+        sqlite.prepare("ALTER TABLE therapies ADD COLUMN atc TEXT").run();
+    }
+} catch (error) {
+    console.warn('[MediFlow] Therapies schema check skipped:', error);
+}
 export const dbServer = drizzle(sqlite);
