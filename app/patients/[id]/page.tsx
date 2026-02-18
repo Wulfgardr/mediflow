@@ -7,6 +7,8 @@ import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartH
 import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
+/* @Codex */
+import ObservationManager from '@/components/observation-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 
@@ -225,6 +227,8 @@ export default function PatientDetailPage() {
 
                     {/* Therapies Section */}
                     <TherapyManager patientId={id} />
+                    {/* @Codex */}
+                    <ObservationManager patientId={id} />
 
                     <div className="space-y-6">
                         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">

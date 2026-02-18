@@ -100,4 +100,28 @@ try {
 } catch (error) {
     console.warn('[MediFlow] Therapies schema check skipped:', error);
 }
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS observations (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            code_system TEXT NOT NULL,
+            code TEXT NOT NULL,
+            display TEXT NOT NULL,
+            unit_system TEXT NOT NULL,
+            unit_code TEXT NOT NULL,
+            value TEXT NOT NULL,
+            notes TEXT,
+            observed_at INTEGER NOT NULL,
+            source TEXT DEFAULT 'manual',
+            created_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
+} catch (error) {
+    console.warn('[MediFlow] Observations schema check skipped:', error);
+}
 export const dbServer = drizzle(sqlite);

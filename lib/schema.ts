@@ -97,6 +97,22 @@ export const therapies = sqliteTable('therapies', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const observations = sqliteTable('observations', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    codeSystem: text('code_system').notNull(),
+    code: text('code').notNull(),
+    display: text('display').notNull(),
+    unitSystem: text('unit_system').notNull(),
+    unitCode: text('unit_code').notNull(),
+    value: text('value').notNull(),
+    notes: text('notes'),
+    observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
+    source: text('source').default('manual'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),
