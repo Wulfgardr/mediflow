@@ -54,7 +54,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             patientId: checkup.patientId,
             date: toIsoString(checkup.date) ?? new Date(0).toISOString(),
             title: checkup.title,
+            notes: checkup.notes ?? null,
             status: checkup.status ?? 'pending',
+            source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt)
         }));
 
@@ -79,7 +81,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             patientId: id,
             date: new Date(body.date),
             title: body.title,
+            /* @Codex */
+            notes: body.notes ?? null,
             status: body.status || 'pending',
+            /* @Codex */
+            source: body.source ?? 'manual',
             createdAt: new Date()
         });
 

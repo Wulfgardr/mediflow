@@ -40,7 +40,11 @@ export async function GET(
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
+            activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,
+            motivation: therapy.motivation ?? null,
+            diagnosisCode: therapy.diagnosisCode ?? null,
+            diagnosisName: therapy.diagnosisName ?? null,
             status: therapy.status,
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
@@ -85,12 +89,48 @@ export async function PUT(
         }
 
         const nextDrugName = typeof body.drugName === 'string' ? body.drugName : undefined;
+        const hasActivePrinciple = Object.prototype.hasOwnProperty.call(body, 'activePrinciple');
+        const nextActivePrinciple = hasActivePrinciple
+            ? (typeof body.activePrinciple === 'string'
+                ? body.activePrinciple
+                : body.activePrinciple === null || body.activePrinciple === ''
+                    ? null
+                    : undefined)
+            : undefined;
         const nextDosage = typeof body.dosage === 'string' ? body.dosage : undefined;
+        const hasMotivation = Object.prototype.hasOwnProperty.call(body, 'motivation');
+        const nextMotivation = hasMotivation
+            ? (typeof body.motivation === 'string'
+                ? body.motivation
+                : body.motivation === null || body.motivation === ''
+                    ? null
+                    : undefined)
+            : undefined;
+        const hasDiagnosisCode = Object.prototype.hasOwnProperty.call(body, 'diagnosisCode');
+        const nextDiagnosisCode = hasDiagnosisCode
+            ? (typeof body.diagnosisCode === 'string'
+                ? body.diagnosisCode
+                : body.diagnosisCode === null || body.diagnosisCode === ''
+                    ? null
+                    : undefined)
+            : undefined;
+        const hasDiagnosisName = Object.prototype.hasOwnProperty.call(body, 'diagnosisName');
+        const nextDiagnosisName = hasDiagnosisName
+            ? (typeof body.diagnosisName === 'string'
+                ? body.diagnosisName
+                : body.diagnosisName === null || body.diagnosisName === ''
+                    ? null
+                    : undefined)
+            : undefined;
         const nextStatus = typeof body.status === 'string' ? body.status : undefined;
 
         if (
             nextDrugName === undefined &&
+            nextActivePrinciple === undefined &&
             nextDosage === undefined &&
+            nextMotivation === undefined &&
+            nextDiagnosisCode === undefined &&
+            nextDiagnosisName === undefined &&
             nextStatus === undefined &&
             nextStartDate === undefined &&
             !hasEndDate
@@ -101,7 +141,11 @@ export async function PUT(
         await dbServer.update(therapies)
             .set({
                 drugName: nextDrugName,
+                activePrinciple: nextActivePrinciple,
                 dosage: nextDosage,
+                motivation: nextMotivation,
+                diagnosisCode: nextDiagnosisCode,
+                diagnosisName: nextDiagnosisName,
                 status: nextStatus,
                 startDate: nextStartDate,
                 endDate: hasEndDate ? nextEndDate : undefined

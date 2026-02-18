@@ -41,7 +41,9 @@ export async function GET(
             patientId: checkup.patientId,
             date: toIsoString(checkup.date) ?? new Date(0).toISOString(),
             title: checkup.title,
+            notes: checkup.notes ?? null,
             status: checkup.status ?? 'pending',
+            source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt),
         };
 
@@ -77,9 +79,31 @@ export async function PUT(
         }
 
         const nextTitle = typeof body.title === 'string' ? body.title : undefined;
+        const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
+        const nextNotes = hasNotes
+            ? (typeof body.notes === 'string'
+                ? body.notes
+                : body.notes === null || body.notes === ''
+                    ? null
+                    : undefined)
+            : undefined;
         const nextStatus = typeof body.status === 'string' ? body.status : undefined;
+        const hasSource = Object.prototype.hasOwnProperty.call(body, 'source');
+        const nextSource = hasSource
+            ? (typeof body.source === 'string'
+                ? body.source
+                : body.source === null || body.source === ''
+                    ? null
+                    : undefined)
+            : undefined;
 
-        if (nextDate === undefined && nextTitle === undefined && nextStatus === undefined) {
+        if (
+            nextDate === undefined &&
+            nextTitle === undefined &&
+            nextNotes === undefined &&
+            nextStatus === undefined &&
+            nextSource === undefined
+        ) {
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
@@ -87,7 +111,9 @@ export async function PUT(
             .set({
                 date: nextDate,
                 title: nextTitle,
+                notes: nextNotes,
                 status: nextStatus,
+                source: nextSource,
             })
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)));
 

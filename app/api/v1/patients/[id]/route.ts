@@ -20,6 +20,14 @@ function normalizeExemptionsForUpdate(value: unknown): string | null | undefined
     return null;
 }
 
+/* @Codex */
+function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -43,6 +51,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             caregiver: patient.caregiver ?? null,
             /* @Codex */
             exemptions: patient.exemptions ?? null,
+            /* @Codex */
+            diagnoses: patient.diagnoses ?? null,
+            /* @Codex */
+            monitoringProfile: patient.monitoringProfile ?? null,
+            /* @Codex */
+            statusReason: patient.statusReason ?? null,
             notes: patient.notes ?? null,
             /* @Codex */
             aiSummary: patient.aiSummary ?? null,
@@ -77,6 +91,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }
 
         const normalizedExemptions = normalizeExemptionsForUpdate(body.exemptions);
+        /* @Codex */
+        const normalizedDiagnoses = normalizeDiagnosesForUpdate(body.diagnoses);
         const updateValues: Partial<typeof patients.$inferInsert> = {
             firstName: typeof body.firstName === 'string' ? body.firstName : undefined,
             lastName: typeof body.lastName === 'string' ? body.lastName : undefined,
@@ -85,6 +101,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             phone: typeof body.phone === 'string' ? body.phone : undefined,
             caregiver: typeof body.caregiver === 'string' ? body.caregiver : undefined,
             notes: typeof body.notes === 'string' ? body.notes : undefined,
+            /* @Codex */
+            monitoringProfile: typeof body.monitoringProfile === 'string'
+                ? body.monitoringProfile
+                : body.monitoringProfile === null
+                    ? null
+                    : undefined,
+            /* @Codex */
+            statusReason: typeof body.statusReason === 'string'
+                ? body.statusReason
+                : body.statusReason === null
+                    ? null
+                    : undefined,
             aiSummary: typeof body.aiSummary === 'string' ? body.aiSummary : undefined,
             documentInsights: typeof body.documentInsights === 'string' ? body.documentInsights : undefined,
             isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
@@ -104,6 +132,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
         if (normalizedExemptions !== undefined) {
             updateValues.exemptions = normalizedExemptions;
+        }
+        /* @Codex */
+        if (normalizedDiagnoses !== undefined) {
+            updateValues.diagnoses = normalizedDiagnoses;
         }
 
         await dbServer.update(patients).set(updateValues).where(eq(patients.id, id));

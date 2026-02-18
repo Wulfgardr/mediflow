@@ -23,7 +23,15 @@ export async function PUT(
         const body = await request.json() as unknown;
         const updateData: {
             drugName?: string;
+            /* @Codex */
+            activePrinciple?: string | null;
             dosage?: string;
+            /* @Codex */
+            motivation?: string | null;
+            /* @Codex */
+            diagnosisCode?: string | null;
+            /* @Codex */
+            diagnosisName?: string | null;
             status?: string;
             startDate?: Date;
             endDate?: Date | null;
@@ -33,7 +41,31 @@ export async function PUT(
             const payload = body as Record<string, unknown>;
 
             if (typeof payload.drugName === 'string') updateData.drugName = payload.drugName;
+            /* @Codex */
+            if (payload.activePrinciple === null || payload.activePrinciple === '') {
+                updateData.activePrinciple = null;
+            } else if (typeof payload.activePrinciple === 'string') {
+                updateData.activePrinciple = payload.activePrinciple;
+            }
             if (typeof payload.dosage === 'string') updateData.dosage = payload.dosage;
+            /* @Codex */
+            if (payload.motivation === null || payload.motivation === '') {
+                updateData.motivation = null;
+            } else if (typeof payload.motivation === 'string') {
+                updateData.motivation = payload.motivation;
+            }
+            /* @Codex */
+            if (payload.diagnosisCode === null || payload.diagnosisCode === '') {
+                updateData.diagnosisCode = null;
+            } else if (typeof payload.diagnosisCode === 'string') {
+                updateData.diagnosisCode = payload.diagnosisCode;
+            }
+            /* @Codex */
+            if (payload.diagnosisName === null || payload.diagnosisName === '') {
+                updateData.diagnosisName = null;
+            } else if (typeof payload.diagnosisName === 'string') {
+                updateData.diagnosisName = payload.diagnosisName;
+            }
             if (typeof payload.status === 'string') updateData.status = payload.status;
 
             const parsedStartDate = parseDate(payload.startDate);

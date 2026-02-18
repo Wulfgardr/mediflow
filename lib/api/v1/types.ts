@@ -22,6 +22,12 @@ export type PatientDetail = {
     caregiver: string | null;
     /* @Codex */
     exemptions: string | null;
+    /* @Codex */
+    diagnoses: string | null;
+    /* @Codex */
+    monitoringProfile: string | null;
+    /* @Codex */
+    statusReason: string | null;
     notes: string | null;
     /* @Codex */
     aiSummary: string | null;
@@ -56,7 +62,11 @@ export type TherapySummary = {
     id: string;
     patientId: string;
     drugName: string;
+    activePrinciple: string | null;
     dosage: string;
+    motivation: string | null;
+    diagnosisCode: string | null;
+    diagnosisName: string | null;
     status: string;
     startDate: string;
     endDate: string | null;
@@ -68,7 +78,9 @@ export type CheckupSummary = {
     patientId: string;
     date: string;
     title: string;
+    notes: string | null;
     status: string;
+    source: string | null;
     createdAt: string | null;
 };
 
