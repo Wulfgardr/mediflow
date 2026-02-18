@@ -14,6 +14,21 @@ Entries are additive and minimal.
 - Added `CANONICAL` status label to `docs/walkthrough.md`
 - Added `LEGACY` status label to `docs/index.html` embedded architecture page
 - Extended `docs/README.md` with `CANONICAL/SECONDARY/LEGACY` convention and status matrix
+- Hardened web patient update/delete route with explicit field whitelist and relation sync: `app/api/patients/[id]/route.ts`
+- Added canonical status normalization helper and applied it to web/v1 therapies + checkups routes: `lib/status-normalization.ts`
+- Aligned native status handling and picker values to canonical contract with legacy fallback rendering: `native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/entries/[id]/route.ts`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/therapies/[id]/route.ts`
+- Hardened web item routes with 404 + stricter date/status validation: `app/api/checkups/[id]/route.ts`
+- Hardened ambulatories create/update/delete APIs with explicit validation and default conflict handling: `app/api/ambulatories/route.ts`
+- Hardened ambulatories create/update/delete APIs with explicit validation and default conflict handling: `app/api/ambulatories/[id]/route.ts`
+- Added shared ID normalization helper for bulk patient operations: `lib/patient-bulk-validation.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/assign/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/unassign/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/move/route.ts`
+- Hardened bulk patient assign/unassign/move/duplicate APIs with strict payload and existence validation: `app/api/patients/duplicate/route.ts`
+- Enforced single-default invariant on ambulatory creation and validated parent linkage on create: `app/api/ambulatories/route.ts`
+- Added guarded ambulatory delete semantics (linked-patient conflict + default fallback rules): `app/api/ambulatories/[id]/route.ts`
 
 ## 2026-02-01 Codex
 - Added ADR for native macOS client approach: docs/adr/0001-native-macos-client.md

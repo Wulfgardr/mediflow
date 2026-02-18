@@ -23,6 +23,11 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as unknown;
+        const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+
         const updateData: {
             drugName?: string;
             /* @Codex */
@@ -76,13 +81,20 @@ export async function PUT(
                 updateData.status = parsedStatus;
             }
 
+            const hasStartDate = Object.prototype.hasOwnProperty.call(payload, 'startDate');
             const parsedStartDate = parseDate(payload.startDate);
+            if (hasStartDate && parsedStartDate === undefined) {
+                return NextResponse.json({ error: 'Invalid startDate' }, { status: 400 });
+            }
             if (parsedStartDate) updateData.startDate = parsedStartDate;
 
             if (payload.endDate === null || payload.endDate === '') {
                 updateData.endDate = null;
             } else {
                 const parsedEndDate = parseDate(payload.endDate);
+                if (Object.prototype.hasOwnProperty.call(payload, 'endDate') && parsedEndDate === undefined) {
+                    return NextResponse.json({ error: 'Invalid endDate' }, { status: 400 });
+                }
                 if (parsedEndDate) updateData.endDate = parsedEndDate;
             }
         }
@@ -108,6 +120,10 @@ export async function DELETE(
 
     try {
         const { id } = await params;
+        const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
         await dbServer.delete(therapies).where(eq(therapies.id, id));
         return NextResponse.json({ success: true });
     } catch (error) {

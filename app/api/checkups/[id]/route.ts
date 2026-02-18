@@ -18,6 +18,10 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as unknown;
+        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
         const updateData: {
             date?: Date;
             title?: string;
@@ -90,6 +94,10 @@ export async function DELETE(
 
     try {
         const { id } = await params;
+        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
         await dbServer.delete(checkups).where(eq(checkups.id, id));
         return NextResponse.json({ success: true });
     } catch (error) {
