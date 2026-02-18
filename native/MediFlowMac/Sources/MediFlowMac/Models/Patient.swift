@@ -21,7 +21,13 @@ struct PatientDetail: Identifiable, Decodable {
     let address: String?
     let phone: String?
     let caregiver: String?
+    /* @Codex */
+    let exemptions: String?
     let notes: String?
+    /* @Codex */
+    let aiSummary: String?
+    /* @Codex */
+    let documentInsights: String?
     let isAdi: Bool?
     let isArchived: Bool?
     let ambulatoryId: String?
@@ -51,7 +57,19 @@ struct TherapySummary: Identifiable, Decodable {
     let id: String
     let patientId: String
     let drugName: String
+    /* @Codex */
+    let aic: String?
+    /* @Codex */
+    let atc: String?
+    /* @Codex */
+    let activePrinciple: String?
     let dosage: String
+    /* @Codex */
+    let motivation: String?
+    /* @Codex */
+    let diagnosisCode: String?
+    /* @Codex */
+    let diagnosisName: String?
     let status: String
     let startDate: Date
     let endDate: Date?
@@ -64,5 +82,21 @@ struct CheckupSummary: Identifiable, Decodable {
     let date: Date
     let title: String
     let status: String
+    let createdAt: Date?
+}
+
+/* @Codex */
+struct ObservationSummary: Identifiable, Decodable {
+    let id: String
+    let patientId: String
+    let codeSystem: String
+    let code: String
+    let display: String
+    let unitSystem: String
+    let unitCode: String
+    let value: String
+    let notes: String?
+    let observedAt: Date
+    let source: String?
     let createdAt: Date?
 }

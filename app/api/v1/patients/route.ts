@@ -7,6 +7,20 @@ import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { v4 as uuidv4 } from 'uuid';
 import type { PatientSummary } from '@/lib/api/v1/types';
 
+/* @Codex */
+function normalizeExemptionsValue(value: unknown): string | null {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
+/* @Codex */
+function normalizeDiagnosesValue(value: unknown): string | null {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return null;
+}
+
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
@@ -69,6 +83,14 @@ export async function POST(request: Request) {
             address: body.address ?? null,
             phone: body.phone ?? null,
             caregiver: body.caregiver ?? null,
+            /* @Codex */
+            exemptions: normalizeExemptionsValue(body.exemptions),
+            /* @Codex */
+            diagnoses: normalizeDiagnosesValue(body.diagnoses),
+            /* @Codex */
+            monitoringProfile: typeof body.monitoringProfile === 'string' ? body.monitoringProfile : null,
+            /* @Codex */
+            statusReason: typeof body.statusReason === 'string' ? body.statusReason : null,
             notes: body.notes ?? null,
             isAdi: body.isAdi ?? false,
             isArchived: body.isArchived ?? false,

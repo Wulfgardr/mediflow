@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, Activity, Settings, PlusCircle, ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical, Plus, Building2, CornerDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// import { useLiveQuery } from 'dexie-react-hooks';
+// import { useLiveQuery } from '@/lib/live-query';
 // import { db } from '@/lib/db';
 import { NewVisitModal } from '@/components/new-visit-modal';
 import { AddAmbulatoryModal } from '@/components/add-ambulatory-modal';
@@ -18,7 +18,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useSecurity } from '@/components/security-provider';
 
 import { db, Ambulatory } from '@/lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 
 // Helper to read cookie
 function useCookie(name: string) {

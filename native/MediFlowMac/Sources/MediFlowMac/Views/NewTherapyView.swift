@@ -19,9 +19,6 @@ struct NewTherapyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuova terapia")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Farmaco") {
                     TextField("Nome farmaco", text: $drugName)
@@ -40,8 +37,8 @@ struct NewTherapyView: View {
                 Section("Stato") {
                     Picker("Stato", selection: $status) {
                         Text("Attiva").tag("active")
-                        Text("Sospesa").tag("paused")
-                        Text("Terminata").tag("stopped")
+                        Text("Sospesa").tag("suspended")
+                        Text("Terminata").tag("completed")
                     }
                     .pickerStyle(.segmented)
                 }
@@ -91,6 +88,10 @@ struct NewTherapyView: View {
         do {
             let payload = CreateTherapyPayload(
                 drugName: trimmedName,
+                /* @Codex */
+                aic: selectedDrug?.aic,
+                /* @Codex */
+                atc: selectedDrug?.atc,
                 dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
                 status: status,
                 startDate: startDate,

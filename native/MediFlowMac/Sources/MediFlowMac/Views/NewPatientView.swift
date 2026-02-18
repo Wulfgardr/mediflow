@@ -24,9 +24,6 @@ struct NewPatientView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nuovo paziente")
-                .font(.title2.weight(.semibold))
-
             Form {
                 Section("Anagrafica") {
                     TextField("Nome", text: $firstName)
@@ -102,6 +99,8 @@ struct NewPatientView: View {
                 address: encryptedAddress,
                 phone: encryptedPhone,
                 caregiver: encryptedCaregiver,
+                /* @Codex */
+                exemptions: nil,
                 notes: encryptedNotes,
                 isAdi: isAdi,
                 isArchived: isArchived,

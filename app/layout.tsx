@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Sidebar } from '@/components/sidebar';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { ThemeProvider } from '@/components/theme-provider';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'MediFlow - Personal Medical Record',
@@ -23,7 +20,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="it" suppressHydrationWarning>
-      <body className={cn(inter.className, "antialiased overflow-x-hidden")} suppressHydrationWarning>
+      {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
+      <body className={cn("antialiased overflow-x-hidden")} suppressHydrationWarning>
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
           <SecurityProvider>
             <LockScreen />

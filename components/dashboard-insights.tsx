@@ -1,6 +1,6 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { Activity, Brain, Users, FileText, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import Link from 'next/link';

@@ -111,14 +111,28 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(settings: settings)
-                .environmentObject(security)
+            GlassPanelWindow(
+                title: "Impostazioni MediFlow",
+                subtitle: "Configurazione app, AI stack e diagnostica",
+                minSize: CGSize(width: 980, height: 700),
+                expandedSize: CGSize(width: 1220, height: 860)
+            ) {
+                SettingsView(settings: settings)
+                    .environmentObject(security)
+            }
         }
         .sheet(isPresented: $showingNewPatient) {
-            NewPatientView(ambulatoryId: viewModel.selectedAmbulatoryId) {
-                Task { await viewModel.loadInitial() }
+            GlassPanelWindow(
+                title: "Nuovo paziente",
+                subtitle: "Scheda anagrafica e contatti",
+                minSize: CGSize(width: 620, height: 640),
+                expandedSize: CGSize(width: 760, height: 820)
+            ) {
+                NewPatientView(ambulatoryId: viewModel.selectedAmbulatoryId) {
+                    Task { await viewModel.loadInitial() }
+                }
+                .environmentObject(security)
             }
-            .environmentObject(security)
         }
         .task {
             if security.isUnlocked {

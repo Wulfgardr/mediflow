@@ -20,7 +20,7 @@ function isLocalRequest(request: Request): boolean {
 
 export async function POST(request: Request) {
     /* @Codex */
-    const session = requireSession();
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();
 

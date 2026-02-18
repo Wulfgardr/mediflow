@@ -19,7 +19,8 @@ while true; do
         saw_running=1
     else
         if [ "$saw_running" -eq 1 ]; then
-            response=$(osascript -e 'button returned of (display dialog "L'app nativa MediFlow si e chiusa. Vuoi riaprirla?" buttons {"Non ora", "Riapri"} default button "Riapri" with icon note)')
+            # @Codex
+            response=$(osascript -e "button returned of (display dialog \"L'app nativa MediFlow si e chiusa. Vuoi riaprirla?\" buttons {\"Non ora\", \"Riapri\"} default button \"Riapri\" with icon note)")
             if [ "$response" = "Riapri" ]; then
                 if [ -d "$APP_PATH" ]; then
                     open "$APP_PATH"

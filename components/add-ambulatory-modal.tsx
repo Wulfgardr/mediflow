@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { X, Building2, Plus, Loader2, CornerDownRight } from 'lucide-react';
 import { db, Ambulatory } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 
 interface AddAmbulatoryModalProps {
     isOpen: boolean;

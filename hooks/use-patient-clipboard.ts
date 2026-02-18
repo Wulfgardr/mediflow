@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { notifyDbChange } from '@/lib/live-query';
 // import { toast } from '@/components/ui/use-toast'; // Assuming toast exists, or use console for now
 
 export type ClipboardOperation = 'copy' | 'cut';
@@ -41,8 +42,7 @@ export function usePatientClipboard() {
             //    b. If Operation is CUT -> LINK (Assign API) + UNLINK OLD (Unassign API)
 
             let endpoint = '';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let body: any = { patientIds: clipboard.patientIds, targetAmbulatoryId };
+            const body = { patientIds: clipboard.patientIds, targetAmbulatoryId };
 
             if (isTestEnvironment) {
                 // CLONE
@@ -75,6 +75,7 @@ export function usePatientClipboard() {
 
             // Success
             // toast({ title: "Incollato con successo", description: `${clipboard.patientIds.length} pazienti processati.` });
+            notifyDbChange(); // @Codex
             clear();
             return true;
         } catch (error) {

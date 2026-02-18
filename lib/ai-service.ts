@@ -43,9 +43,9 @@ export class AIService {
 
     static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
         /* @Codex */
-        let provider: AIProvider = 'ollama';
+        const provider: AIProvider = 'ollama';
 
-        let defaultUrl = "http://127.0.0.1:11434";
+        const defaultUrl = "http://127.0.0.1:11434";
 
         // Try reading generic 'aiUrl' first, then 'ollamaUrl' as fallback
         const genericUrl = await db.settings.get('aiUrl');

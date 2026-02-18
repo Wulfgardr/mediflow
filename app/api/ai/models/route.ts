@@ -35,7 +35,16 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: `Ollama Error: ${response.statusText}` }, { status: response.status });
         }
         const data = await response.json();
-        return NextResponse.json(data);
+        /* @Codex */
+        // Return a stable, minimal contract across web/native clients.
+        const rawModels = Array.isArray(data?.models) ? data.models : [];
+        const models = rawModels
+            .map((model: any) => ({
+                name: typeof model?.name === 'string' ? model.name : '',
+                size: typeof model?.size === 'number' ? model.size : null,
+            }))
+            .filter((model: { name: string }) => model.name.length > 0);
+        return NextResponse.json({ models });
     } catch (error) {
         console.error("Failed to fetch models:", error);
         return NextResponse.json({ error: "Failed to connect to AI provider" }, { status: 500 });

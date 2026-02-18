@@ -1,13 +1,17 @@
-# MediFlow Walkthrough (Web + Native)
+# Walkthrough MediFlow (Web + Native)
 
-Questo documento consolida il quadro completo del progetto: web app Next.js, backend locale con SQLite, servizi AI/OCR, e client nativo macOS. E' pensato come guida di comprensione end-to-end per onboarding e manutenzione.
+> [!IMPORTANT]
+> **Stato documento: CANONICAL (walkthrough operativo end-to-end).**
+> Se altri documenti tecnici secondari divergono su dettagli di flusso, prevale questo file.
+
+Questo documento raccoglie la vista end-to-end del progetto: web app Next.js, backend locale con SQLite, servizi AI/OCR e client nativo macOS. Serve per onboarding, manutenzione e lettura rapida dei flussi principali.
 
 ---
 
-## Scope e obiettivi
+## Scopo e obiettivi
 
 - Fornire una visione unica dell'architettura e dei flussi principali.
-- Mappare i file chiave e le responsabilita' dei moduli.
+- Mappare i file chiave e le responsabilità dei moduli.
 - Evidenziare il contratto API tra web e client macOS.
 - Spiegare sicurezza, cifratura e trasporto locale.
 
@@ -78,7 +82,7 @@ graph TB
 - **Frontend**: Next.js App Router, React, Tailwind.
 - **API**: Route handlers in `app/api/*`.
 - **DB**: SQLite locale (`medical.db`) con Drizzle (`lib/schema.ts`, `lib/db-server.ts`).
-- **Client DB**: `lib/db.ts` e' la facade (fetch REST + cifratura per-campo).
+- **Client DB**: `lib/db.ts` è la facciata (fetch REST + cifratura per campo).
 
 ### Directory principali
 
@@ -162,6 +166,7 @@ sequenceDiagram
 
 Percorso: `app/api/*`  
 Usata dal client web tramite `lib/db.ts`.
+Include pre-check FSE per export paziente: `app/api/fse/validate-patient/route.ts`.
 
 ### API v1 per client nativo
 
@@ -172,13 +177,20 @@ Usata da `LocalAPIClient` nel Mac. Richiede token:
 Authorization: Bearer <MEDIFLOW_LOCAL_API_TOKEN>
 ```
 
-Implementata in:
+Endpoint principali:
 - `app/api/v1/ambulatories/route.ts`
 - `app/api/v1/patients/route.ts`
 - `app/api/v1/patients/[id]/route.ts`
 - `app/api/v1/patients/[id]/entries/route.ts`
+- `app/api/v1/patients/[id]/entries/[entryId]/route.ts`
 - `app/api/v1/patients/[id]/therapies/route.ts`
+- `app/api/v1/patients/[id]/therapies/[therapyId]/route.ts`
 - `app/api/v1/patients/[id]/checkups/route.ts`
+- `app/api/v1/patients/[id]/checkups/[checkupId]/route.ts`
+- `app/api/v1/patients/[id]/observations/route.ts`
+- `app/api/v1/patients/[id]/observations/[observationId]/route.ts`
+- `app/api/v1/drugs/route.ts`
+- `app/api/v1/exemptions/route.ts`
 
 Tipi condivisi:
 - `lib/api/v1/types.ts`
@@ -260,7 +272,7 @@ sequenceDiagram
 
 ---
 
-## File map (rapido)
+## Mappa file (rapida)
 
 | Area | File chiave |
 | --- | --- |
@@ -289,7 +301,7 @@ sequenceDiagram
 
 ---
 
-## Limitazioni note (attuali)
+## Limitazioni attuali
 
 - Editing pazienti via native non completo (solo creazione).  
 - Offline sync non presente.  
@@ -304,4 +316,3 @@ sequenceDiagram
 2) Autodiscovery locale (Bonjour)  
 3) Cache locale offline in Swift  
 4) Target iOS/iPadOS
-

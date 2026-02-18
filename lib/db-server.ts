@@ -21,12 +21,107 @@ if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
 
 const sqlite = new Database(dbPath);
 /* @Codex */
-try {
-    const columns = sqlite.prepare("PRAGMA table_info(attachments)").all().map((col: any) => col.name);
-    if (!columns.includes('summary_snapshot')) {
-        sqlite.prepare("ALTER TABLE attachments ADD COLUMN summary_snapshot TEXT").run();
+type TableInfoRow = { name: string };
+/* @Codex */
+function ensureColumn(table: string, columnName: string, columnSql: string) {
+    const columns = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as TableInfoRow[]).map((col) => col.name);
+    if (!columns.includes(columnName)) {
+        sqlite.prepare(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`).run();
     }
+}
+/* @Codex */
+try {
+    ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
 } catch (error) {
     console.warn('[MediFlow] Attachments schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureColumn('patients', 'exemptions', 'exemptions TEXT');
+    /* @Codex */
+    ensureColumn('patients', 'diagnoses', 'diagnoses TEXT');
+    /* @Codex */
+    ensureColumn('patients', 'monitoring_profile', 'monitoring_profile TEXT');
+    /* @Codex */
+    ensureColumn('patients', 'status_reason', 'status_reason TEXT');
+} catch (error) {
+    console.warn('[MediFlow] Patients schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureColumn('checkups', 'notes', 'notes TEXT');
+    /* @Codex */
+    ensureColumn('checkups', 'source', 'source TEXT');
+} catch (error) {
+    console.warn('[MediFlow] Checkups schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureColumn('therapies', 'active_principle', 'active_principle TEXT');
+    /* @Codex */
+    ensureColumn('therapies', 'motivation', 'motivation TEXT');
+    /* @Codex */
+    ensureColumn('therapies', 'diagnosis_code', 'diagnosis_code TEXT');
+    /* @Codex */
+    ensureColumn('therapies', 'diagnosis_name', 'diagnosis_name TEXT');
+} catch (error) {
+    console.warn('[MediFlow] Therapies schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS exemptions (
+            code TEXT PRIMARY KEY NOT NULL,
+            description TEXT NOT NULL,
+            type TEXT,
+            source TEXT,
+            start_date INTEGER,
+            end_date INTEGER,
+            is_pharma INTEGER,
+            is_specialist INTEGER,
+            is_national INTEGER,
+            updated_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS exemptions_code_idx ON exemptions(code)").run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS exemptions_type_idx ON exemptions(type)").run();
+} catch (error) {
+    console.warn('[MediFlow] Exemptions schema check skipped:', error);
+}
+/* @Codex */
+try {
+    const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
+    if (!therapyColumns.includes('aic')) {
+        sqlite.prepare("ALTER TABLE therapies ADD COLUMN aic TEXT").run();
+    }
+    if (!therapyColumns.includes('atc')) {
+        sqlite.prepare("ALTER TABLE therapies ADD COLUMN atc TEXT").run();
+    }
+} catch (error) {
+    console.warn('[MediFlow] Therapies schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS observations (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            code_system TEXT NOT NULL,
+            code TEXT NOT NULL,
+            display TEXT NOT NULL,
+            unit_system TEXT NOT NULL,
+            unit_code TEXT NOT NULL,
+            value TEXT NOT NULL,
+            notes TEXT,
+            observed_at INTEGER NOT NULL,
+            source TEXT DEFAULT 'manual',
+            created_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
+    sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
+} catch (error) {
+    console.warn('[MediFlow] Observations schema check skipped:', error);
 }
 export const dbServer = drizzle(sqlite);

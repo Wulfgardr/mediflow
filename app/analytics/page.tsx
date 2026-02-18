@@ -1,6 +1,6 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { useState, useMemo } from 'react';
 import { ArrowLeft, Users, Activity, Clock, Filter } from 'lucide-react';

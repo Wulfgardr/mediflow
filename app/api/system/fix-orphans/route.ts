@@ -8,7 +8,40 @@ import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/s
 
 export const dynamic = 'force-dynamic';
 
+/* @Codex */
 export async function GET() {
+    /* @Codex */
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
+
+    try {
+        const defaults = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
+        const targetAmb = defaults[0] ?? (await dbServer.select().from(ambulatories).limit(1))[0] ?? null;
+
+        const allPatients = await dbServer.select({ id: patients.id }).from(patients);
+        const allLinks = await dbServer.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories);
+        const linkedPids = new Set(allLinks.map(l => l.pid));
+        const orphanCount = allPatients.filter(p => !linkedPids.has(p.id)).length;
+
+        return NextResponse.json({
+            success: true,
+            dryRun: true,
+            totalPatients: allPatients.length,
+            orphanCount,
+            targetAmbulatoryId: targetAmb?.id ?? null,
+            targetAmbulatoryName: targetAmb?.name ?? null,
+            willCreateDefaultAmbulatory: !targetAmb
+        });
+    } catch (error) {
+        console.error("Fix Orphan Dry-Run Error:", error);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return NextResponse.json({ error: String(error), details: (error as any)?.message }, { status: 500 });
+    }
+}
+
+/* @Codex */
+export async function POST() {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();

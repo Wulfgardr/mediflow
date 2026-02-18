@@ -1,9 +1,11 @@
 import { dbServer } from '@/lib/db-server';
-import { patientsToAmbulatories } from '@/lib/schema';
+import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -11,10 +13,34 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const { patientIds, ambulatoryId } = await request.json();
+        const body = await request.json() as Record<string, unknown>;
+        const patientIds = normalizeIdList(body.patientIds);
+        const ambulatoryId = normalizeId(body.ambulatoryId);
 
-        if (!patientIds || !Array.isArray(patientIds) || !ambulatoryId) {
+        if (patientIds.length === 0 || !ambulatoryId) {
             return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+        }
+
+        const target = await dbServer
+            .select({ id: ambulatories.id })
+            .from(ambulatories)
+            .where(eq(ambulatories.id, ambulatoryId))
+            .get();
+        if (!target) {
+            return NextResponse.json({ error: 'Ambulatory not found' }, { status: 404 });
+        }
+
+        const existingPatients = await dbServer
+            .select({ id: patients.id })
+            .from(patients)
+            .where(inArray(patients.id, patientIds));
+        const existingIds = new Set(existingPatients.map((item) => item.id));
+        const missingPatientIds = patientIds.filter((id) => !existingIds.has(id));
+        if (missingPatientIds.length > 0) {
+            return NextResponse.json(
+                { error: 'Some patients were not found', missingPatientIds },
+                { status: 404 }
+            );
         }
 
         // Delete the link
@@ -26,7 +52,7 @@ export async function POST(request: Request) {
                 )
             );
 
-        return NextResponse.json({ success: true, count: patientIds.length });
+        return NextResponse.json({ success: true, count: patientIds.length, ambulatoryId });
     } catch (error) {
         console.error("Unassign patients error:", error);
         return NextResponse.json({ error: "Failed to unlink patients" }, { status: 500 });

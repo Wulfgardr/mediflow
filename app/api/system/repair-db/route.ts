@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
+/* @Codex */
+import { requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -15,7 +17,12 @@ const timestamp = () => {
 };
 
 /* @Codex */
-export async function POST() {
+export async function POST(request: Request) {
+    /* @Codex */
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
+
     try {
         const dbPath = resolveDataPath('medical.db');
         const legacyDbPath = path.join(process.cwd(), 'medical.db');
@@ -36,7 +43,10 @@ export async function POST() {
 
         fs.copyFileSync(legacyDbPath, dbPath);
 
-        return NextResponse.json({ success: true, dbPath, backupPath });
+        return NextResponse.json({
+            success: true,
+            backupCreated: Boolean(backupPath)
+        });
     } catch (error) {
         console.error('[MediFlow] Repair DB failed:', error);
         return NextResponse.json({ success: false, error: 'Repair failed.' }, { status: 500 });
