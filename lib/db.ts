@@ -89,6 +89,8 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     entries: ['content', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
+    /* @Codex */
+    observations: ['notes'],
     conversations: ['title'],
     messages: ['content', 'reasoning'],
     /* @Codex */
@@ -291,6 +293,8 @@ class ApiTable<T> {
         if (obj.startDate) obj.startDate = new Date(obj.startDate);
         /* @Codex */
         if (obj.endDate) obj.endDate = new Date(obj.endDate);
+        /* @Codex */
+        if (obj.observedAt) obj.observedAt = new Date(obj.observedAt);
         return obj;
     }
 
@@ -353,6 +357,8 @@ class MedicalApiClient {
     ambulatories: ApiTable<Ambulatory>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
+    /* @Codex */
+    observations: ApiTable<Observation>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
     checkups: ApiTable<Checkup>;
@@ -371,6 +377,8 @@ class MedicalApiClient {
         // ... (existing)
         this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
         this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
+        /* @Codex */
+        this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
         this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
@@ -415,6 +423,10 @@ export async function importRawDatabase(jsonString: string) {
         }
         if (data.therapies && Array.isArray(data.therapies)) {
             await db.therapies.bulkPut(data.therapies);
+        }
+        /* @Codex */
+        if (data.observations && Array.isArray(data.observations)) {
+            await db.observations.bulkPut(data.observations);
         }
         if (data.settings && Array.isArray(data.settings)) {
             await db.settings.bulkPut(data.settings);
@@ -465,6 +477,22 @@ export interface Checkup {
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
     updatedAt?: Date;
+}
+
+/* @Codex */
+export interface Observation {
+    id: string;
+    patientId: string;
+    codeSystem: 'LOINC';
+    code: string;
+    display: string;
+    unitSystem: 'UCUM';
+    unitCode: string;
+    value: number | string;
+    notes?: string;
+    observedAt: Date;
+    source?: 'manual' | 'ai_suggestion';
+    createdAt: Date;
 }
 
 export interface Attachment {
