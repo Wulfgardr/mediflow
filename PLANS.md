@@ -5,7 +5,7 @@ Per la roadmap prodotto, vedi: `docs/ROADMAP.md`.
 
 > Aggiorna questo file ogni volta che cambiano priorità o sequenza.
 
-Ultimo aggiornamento: 2026-02-17
+Ultimo aggiornamento: 2026-02-18
 
 ---
 

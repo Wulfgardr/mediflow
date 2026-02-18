@@ -7,6 +7,9 @@ Entries are additive and minimal.
 ## 2026-02-18 Codex
 - Added canonical documentation index: `docs/README.md`
 - Updated developer doc entrypoint in `README.md` to reference canonical docs order
+- Realigned canonical read-order in `docs/README.md` to match boot-sequence precedence (`README` then `AGENTS`)
+- Added explicit `FSE2` roadmap reference in canonical docs map: `docs/README.md`, `README.md`
+- Fixed `PLANS.md` metadata date to reflect today's update (`2026-02-18`)
 - Marked `docs/product_roadmap.md` as deprecated alias to `docs/ROADMAP.md`
 - Clarified canonical product roadmap note in `docs/ROADMAP.md`
 - Added `SECONDARY` status label to `docs/ARCHITETTURA.md`
