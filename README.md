@@ -39,27 +39,27 @@ Inizia da qui (ordine consigliato):
 1. **Indice canonico della documentazione (cosa e' fonte di verita')**
    - `docs/README.md`
 
-2. **Come contribuire e come avviare il progetto**
-   - `CONTRIBUTING.md`
-
-3. **Visione e confini dell'architettura**
+2. **Visione e confini dell'architettura**
    - `ARCHITECTURE.md`
 
-4. **Walkthrough end-to-end (web + native + servizi locali)**
-   - `docs/walkthrough.md`
+3. **Sicurezza (policy, redaction, scanning, disclosure)**
+   - `SECURITY.md`
 
-5. **Approfondimenti tecnici**
-   - `docs/ARCHITETTURA.md`
-   - `docs/system_architecture.md`
+4. **Come contribuire e come avviare il progetto**
+   - `CONTRIBUTING.md`
 
-6. **Decisioni architetturali (ADR)**
+5. **Decisioni architetturali (ADR)**
    - `docs/adr/`
 
-7. **Piano di lavoro in corso (engineering plan, non product roadmap)**
+6. **Piano di lavoro in corso (engineering plan, non product roadmap)**
    - `PLANS.md`
 
-8. **Sicurezza (policy, redaction, scanning, disclosure)**
-   - `SECURITY.md`
+7. **Walkthrough end-to-end (web + native + servizi locali)**
+   - `docs/walkthrough.md`
+
+8. **Approfondimenti tecnici**
+   - `docs/ARCHITETTURA.md`
+   - `docs/system_architecture.md`
 
 ### ⚖️ Compliance & privacy
 
