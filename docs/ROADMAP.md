@@ -1,7 +1,7 @@
 # 🗺 Roadmap di MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.3.0 (Corrente) — Febbraio 2026
+> v0.3.1 (Corrente) — Febbraio 2026
 > Fonte roadmap prodotto canonica (vedi anche `docs/README.md` per mappa completa documenti).
 
 ---
