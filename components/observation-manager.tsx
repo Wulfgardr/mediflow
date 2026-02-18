@@ -2,7 +2,7 @@
 
 /* @Codex */
 import { useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
 import { Activity, Droplets, Plus, Trash2 } from 'lucide-react';
 import { db } from '@/lib/db';
