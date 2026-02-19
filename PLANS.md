@@ -86,7 +86,7 @@ Ordine di consegna consigliato (incrementale):
 
 ## Parking lot (idee, non impegnate)
 
-- [ ] Prototipo sync local-only (Mac home base <-> client iOS/iPad): discovery + pairing + cache + riconciliazione.
+- [ ] Prototipo sync local-only (computer home base <-> client iOS/iPad): discovery + pairing + cache + riconciliazione.
 - [ ] Moduli clinici aggiuntivi (scale, report, interazioni) dopo stabilizzazione della base.
 
 ---

@@ -172,7 +172,7 @@ Include pre-check FSE per export paziente: `app/api/fse/validate-patient/route.t
 ### API v1 per client nativo
 
 Percorso: `app/api/v1/*`  
-Usata da `LocalAPIClient` nel Mac. Richiede token:
+Usata da `LocalAPIClient` nel client nativo macOS. Richiede token:
 
 ```
 Authorization: Bearer <MEDIFLOW_LOCAL_API_TOKEN>
