@@ -6,8 +6,11 @@ Entries are additive and minimal.
 
 ## 2026-02-19 Codex
 - Added ADR for strict web/macOS parity as explicit release gate (same functions, fields, flexibility, operational autonomy): `docs/adr/0007-strict-web-native-parity-gate.md`
+- Superseded ADR 0007 and marked status accordingly: `docs/adr/0007-strict-web-native-parity-gate.md`
+- Added ADR for operational cadence `web-first + parity sweep periodici` on macOS: `docs/adr/0008-web-first-with-parity-sweeps.md`
 - Added canonical baseline parity matrix for core modules (API/UI/campi/flessibilita/indipendenza) with gap inventory and exit criteria: `docs/parity-matrix.md`
-- Updated active engineering plan to reference ADR 0007 and marked `P0` parity matrix as completed: `PLANS.md`
+- Updated parity matrix with explicit operating cadence and ADR 0008 reference: `docs/parity-matrix.md`
+- Updated active engineering plan to reference ADR 0008 and marked `P0` parity matrix as completed: `PLANS.md`
 - Registered parity matrix as canonical source in docs index and updated metadata date: `docs/README.md`
 
 ## 2026-02-18 Codex
