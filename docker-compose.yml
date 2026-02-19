@@ -1,5 +1,5 @@
 # Docker Compose - MediFlow (Minimal)
-# Solo servizi essenziali. L'app Next.js e Ollama girano nativamente sul Mac.
+# Solo servizi essenziali. L'app Next.js e Ollama girano nativamente sul computer.
 
 services:
   # ICD-11 API (WHO Classification)

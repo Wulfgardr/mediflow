@@ -6,7 +6,7 @@ Per usare ICD-11 in MediFlow (e ridurre l'uso di ICD-9 legacy), avvia il contain
 
 - **Docker Desktop** installato e in esecuzione.
 
-  - [Scarica Docker Desktop per Mac (Apple Silicon / Intel)](https://www.docker.com/products/docker-desktop/)
+  - [Scarica Docker Desktop (Apple Silicon / Intel)](https://www.docker.com/products/docker-desktop/)
   - *Importante: Dopo l'installazione, apri l'app "Docker" e attendi che si avvii.*
 
 ## Avvio rapido
