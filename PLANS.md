@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa `docs/ROADMAP.md`.
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-02-18
+Ultimo aggiornamento: 2026-02-19
 
 ---
 
@@ -45,6 +45,23 @@ Ultimo aggiornamento: 2026-02-18
 - [ ] Definire e mantenere una matrice capability-by-capability (view/add/edit/delete/filter) per pazienti, diario clinico, terapie, appuntamenti, farmaci, esenzioni.
 - [ ] Rendere `/api/v1/*` il contratto locale canonico per le funzioni condivise tra client.
 - [ ] Chiudere i gap CRUD nativa rispetto al web, senza introdurre storage duplicato o percorsi separati per i dati.
+
+#### 5a) Sequenza esecutiva parity (step-by-step)
+- [ ] `P0` Baseline parity matrix versionata (web vs macOS) sui 6 moduli core, distinguendo chiaramente `contratto API` vs `UI disponibile`.
+- [ ] `P1` Pazienti native: completare `edit/delete/archive/search/sort` e filtri stato (`attivi/archiviati`) in UI macOS.
+- [ ] `P2` Esenzioni native: aggiungere selector/search su `/api/v1/exemptions` e salvataggio in create/update paziente.
+- [ ] `P3` Osservazioni native: esporre in UI macOS il CRUD `LOINC + UCUM` già disponibile a contratto (`/api/v1/patients/:id/observations`).
+- [ ] `P4` Diario clinico: allineare semantica delete web/native (soft delete + restore + reason) per evitare drift comportamentale.
+- [ ] `P5` Cataloghi farmaci/esenzioni: definire la minima operabilità native in Settings (import/clear/stato) senza storage duplicato.
+- [ ] `P6` Chiusura parity: smoke test manuale capability-by-capability su web/native + aggiornamento `docs/walkthrough.md`.
+
+Ordine di consegna consigliato (incrementale):
+1. `P0` + `P1`
+2. `P2`
+3. `P3`
+4. `P4`
+5. `P5`
+6. `P6`
 
 ### 6) Hardening: coerenza API <-> UI
 - [ ] Garantire che ogni chiamata `ApiTable.update/delete()` abbia una route backend corrispondente (es. `PUT/DELETE /api/<resource>/:id`).
