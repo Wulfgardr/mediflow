@@ -240,15 +240,18 @@ sequenceDiagram
     API->>DB: Salva documentInsights cifrato
     API-->>UI: Esito + dati
 ```
+
 ---
 ## 5. Superfici API e protezione
+
 | Superficie | Consumer | Auth | Trasporto | Scopo |
 | --- | --- | --- | --- | --- |
-| `/api/auth/*` | Web UI, bootstrap native | credenziali + session cookie | HTTP localhost | setup/login/check/logout |
-| `/api/*` | Web UI | session cookie server | HTTP localhost | CRUD web + proxy locali |
-| `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | contratto stabile native |
-| `/api/proxy/ai/*` | Web UI (e tool native via backend) | sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
-| `/api/icd/proxy` | Web UI | sessione + allowlist localhost | HTTP localhost | lookup ICD-11 |
+| `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
+| `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
+| `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
+| `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
+| `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
+
 ---
 ## 6. Mappa file autorevoli per i flussi
 - Schema e topologia DB: `lib/schema.ts`
