@@ -1,6 +1,6 @@
 # MediFlow v0.3.1
 
-> Cartella clinica local-first, progettata da un medico per il lavoro clinico reale.
+> Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
 > Offline, privata, veloce.
 
 ---
@@ -16,7 +16,7 @@ Qui l'obiettivo è l'opposto: lavorare bene, in locale, con controllo pieno dei 
 
 ## Cosa garantisce
 
-1. **Dati sotto controllo**: tutto resta sul tuo Mac (SQLite cifrato), anche senza connessione.
+1. **Dati sotto controllo**: tutto resta sul tuo computer (SQLite cifrato), anche senza connessione.
 2. **Privacy reale**: cifratura *zero-knowledge* (AES-256-GCM). Senza PIN i dati non sono leggibili.
 3. **AI locale**: OCR e sintesi cliniche via modelli locali (Ollama), senza egress verso servizi esterni di default.
 4. **Focus operativo**: interfaccia clinica pulita, pensata per fare in fretta e con meno attrito.
@@ -78,7 +78,7 @@ GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
 
 ---
 
-## Installazione rapida (macOS)
+## Installazione rapida (computer)
 
 ### Prerequisiti (minimi)
 
