@@ -9,6 +9,10 @@ coerente con il percorso di compliance verso Fascicolo Sanitario Elettronico 2.0
 Questa roadmap non sostituisce la normativa nazionale/regionale: definisce il piano
 tecnico di MediFlow per supportare i requisiti documentali in modo incrementale.
 
+Chiave di lettura: percorso pragmatico ispirato a pratiche mature open source
+(incluso il lavoro su OpenHospital), adattato ai vincoli MediFlow
+local-first e zero-knowledge.
+
 ---
 
 ## Vincoli non negoziabili (già decisi)
@@ -61,7 +65,7 @@ Ogni valore codificato salvato in MediFlow deve usare un payload canonico:
 
 ## Matrice pratica (documento -> codifiche)
 
-Questa matrice e' guida tecnica di prodotto; i vincoli puntuali dipendono dal profilo
+Questa matrice è guida tecnica di prodotto; i vincoli puntuali dipendono dal profilo
 documentale FSE/EDS specifico (nazionale o regionale).
 
 | Area clinica/documento | Codifica primaria | Codifiche utili aggiuntive | Note implementative |

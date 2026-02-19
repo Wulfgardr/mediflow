@@ -2,9 +2,10 @@
 # TLS locale per MediFlow
 
 Questa guida configura un proxy HTTPS locale davanti a `http://localhost:3000`.
-Serve per usare il client macOS con HTTPS + pinning.
+Serve al client macOS per usare HTTPS con certificate pinning.
 
-## 1) Genera certificato self-signed
+## 1) Genera un certificato self-signed
+
 Esempio con OpenSSL:
 
 ```bash
@@ -22,13 +23,14 @@ export MEDIFLOW_HTTP_TARGET="http://127.0.0.1:3000"
 node scripts/local-api-tls-proxy.mjs
 ```
 
-Il proxy ascolta su `https://localhost:3443` e inoltra verso il server HTTP.
+Il proxy ascolta su `https://localhost:3443` e inoltra al server HTTP locale.
 
 ## 3) Calcola il fingerprint SHA256
+
 Il pin del client macOS usa la SHA256 del certificato in formato DER.
 
 ```bash
 openssl x509 -in ./certs/local-api.crt -outform der | shasum -a 256
 ```
 
-Copia l'hash esadecimale risultante nelle impostazioni del client macOS.
+Copia l'hash esadecimale nelle impostazioni del client macOS.

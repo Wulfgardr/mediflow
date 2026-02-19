@@ -5,8 +5,8 @@
 > Per confini stabili e decisioni architetturali prevale `ARCHITECTURE.md`.
 > Per il flusso operativo end-to-end prevale `docs/walkthrough.md`.
 
-> Stack tecnico, sicurezza e flusso dati.
-> Documento tecnico per sviluppatori e contributori.
+> Stack tecnico, sicurezza e flussi dati.
+> Documento per chi deve implementare, mantenere o estendere MediFlow.
 
 Per confini stabili e decisioni di alto livello, consulta prima `ARCHITECTURE.md`.
 
@@ -14,7 +14,7 @@ Per confini stabili e decisioni di alto livello, consulta prima `ARCHITECTURE.md
 
 ## 1. Visione d'insieme
 
-MediFlow non è una semplice web app. È un **sistema ibrido locale** progettato per la massima privacy e persistenza dei dati.
+MediFlow non è una semplice web app: è un **sistema ibrido locale** pensato per privacy, affidabilità e continuità operativa.
 
 ### Topologia ibrida locale
 

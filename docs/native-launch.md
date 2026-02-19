@@ -3,13 +3,13 @@
 
 ## Avvio con doppio click (consigliato)
 
-1) Avvia la web app se non e' gia' attiva:
+1) Avvia la web app, se non è già attiva:
 
 ```bash
 ./Start_MediFlow.command
 ```
 
-2) Doppio click su:
+2) Fai doppio click su:
 
 ```
 ./scripts/Launch_MediFlowMac.command

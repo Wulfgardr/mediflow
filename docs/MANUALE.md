@@ -1,58 +1,53 @@
-# 🩺 Manuale Operativo MediFlow
+# Manuale Operativo MediFlow
 
-> **Guida rapida per usare la cartella clinica senza impazzire.**
+> Guida pratica per partire in pochi minuti.
 
 ---
 
-## 🚀 1. Installazione e Avvio
-
-Non serve chiamare un tecnico. Se sai usare il mouse, puoi farcela.
+## 1. Installazione e avvio
 
 ### Requisiti
 
-* Un Mac recente (con chip M1, M2, M3...).
-* **Docker Desktop** installato (è un programma che fa girare "i motori" sotto il cofano).
-* Circa 15GB di spazio libero (per l'Intelligenza Artificiale).
+* Un Mac recente (M1/M2/M3 o successivi).
+* **Docker Desktop** (solo per i servizi opzionali come ICD-11).
+* Circa 15GB liberi se usi i modelli AI locali.
 
-### Come partire
+### Avvio rapido
 
 1. Apri la cartella `mediflow` che hai scaricato.
 2. Fai doppio click su `Start_MediFlow.command`.
-3. Si aprirà una finestra nera (Terminale): **non chiuderla**. È il cuore del sistema.
-4. Dopo un po', si aprirà automaticamente il tuo browser su questa pagina:
+3. Si apre il Terminale: **non chiuderlo** mentre usi l'app.
+4. Dopo l'avvio, apri:
     `http://localhost:3000`
 
-> **Nota**: La prima volta ci metterà un po' perché deve scaricare i "cervelli" dell'AI. Vai a prenderti un caffè.
+> La prima esecuzione può richiedere più tempo per il download dei modelli AI.
 
 ---
 
-## 🔐 2. Sicurezza e PIN
+## 2. Sicurezza e PIN
 
 Al primo avvio ti chiederò di creare un **Profilo Medico** e un **PIN**.
 
-### Regola d'oro del PIN
+### Regola d'oro
 
-**Non dimenticarlo.** Scrivilo su carta, mettilo in cassaforte, tatuatelo (scherzo, ma quasi).
-
-MediFlow usa il tuo PIN per mescolare digitalmente tutti i dati.
+Il PIN è la chiave che protegge i dati.
 
 * **Se perdi il PIN, perdi i dati.**
 * Non c'è "recupero password" via email.
 * Non c'è un server centrale che può aiutarti.
 
-È l'unico modo per garantirti che nemmeno io (o un hacker, o la polizia) possiamo leggere le tue cartelle senza il tuo permesso.
+Questo è il prezzo di una privacy forte: controllo totale, ma nessuna backdoor.
 
 ---
 
-## 🗂 3. Ambulatori e Pazienti
+## 3. Ambulatori e pazienti
 
 ### Ambulatori Multipli
 
-Lavori in più studi? O magari fai guardia medica e studio privato?
-Puoi creare diversi "Ambulatori" (es. "Studio Roma", "Guardia Medica").
+Puoi creare più ambulatori (es. "Studio Roma", "Guardia Medica").
 
-* Ogni ambulatorio ha il suo colore.
-* I pazienti sono assegnati a un ambulatorio, così non fai confusione.
+* Ogni ambulatorio ha un colore.
+* I pazienti possono essere assegnati in modo esplicito.
 
 ### Scheda Paziente
 
@@ -64,63 +59,63 @@ Puoi creare diversi "Ambulatori" (es. "Studio Roma", "Guardia Medica").
 
 ---
 
-## 🤖 4. Usare l'AI (Senza internet)
+## 4. AI locale (senza internet)
 
-Questa è la parte magica. MediFlow ha un'intelligenza artificiale integrata che legge per te.
+MediFlow può leggere documenti clinici e produrre sintesi direttamente in locale.
 
 ### Caricare un documento
 
 1. Vai nella scheda di un paziente.
 2. Clicca su **"Carica Documento"** (PDF o foto).
-3. Aspetta qualche secondo.
+3. Attendi l'elaborazione.
 
 ### Cosa succede?
 
-1. **Lettura (OCR)**: Il sistema legge il testo, anche se è una foto storta fatta col cellulare.
-2. **Sintesi**: L'AI analizza il testo e ti crea un riassunto clinico.
+1. **OCR**: estrae testo da PDF o immagine.
+2. **Sintesi clinica**: produce un riassunto strutturato.
     * *Esempio*: Invece di leggere 10 pagine di referto ospedaliero, vedrai: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
-3. **Archiviazione**: Il documento originale e il riassunto sono salvati per sempre.
+3. **Archiviazione**: documento e sintesi restano associati al paziente.
 
-> **Tranquillo**: Tutto questo calcolo avviene sul tuo Mac. Nessun dato viene inviato a Google, OpenAI o altri. Privacy totale.
+> L'elaborazione avviene sul tuo Mac. Nessun dato paziente viene inviato a servizi cloud di default.
 
 ---
 
-## 💊 5. Terapie e ICD-11
+## 5. Terapie e ICD-11
 
 ### Terapie
 
-Puoi aggiungere farmaci. Il sistema cercherà di ricordarsi cosa prende il paziente e generare l'elenco aggiornato da stampare o inviare.
+Puoi aggiungere farmaci e mantenere una lista terapie aggiornata.
 
 ### Diagnosi (ICD-11)
 
-Usiamo lo standard mondiale dell'OMS (ICD-11).
+Le diagnosi usano lo standard OMS ICD-11.
 
-* Scrivi "Diabete" e ti suggerirà i codici corretti (es. `5A10`).
-* Serve per essere precisi e pronti per il futuro fascicolo sanitario.
+* Inserisci una diagnosi e ottieni suggerimenti codificati (es. `5A10`).
+* Risultato: più precisione clinica e migliore interoperabilità.
 
 ---
 
-## 🍏 6. App Nativa (Sperimentale)
+## 6. App nativa (sperimentale)
 
-Sei un utente Mac avanzato? Puoi provare la nostra applicazione nativa sperimentale.
+Se lavori su Mac, puoi usare anche il client nativo.
 
-* **Vantaggi**: Più veloce, si apre nel Dock, ha il blocco schermo con PIN integrato.
+* **Vantaggi**: avvio rapido, integrazione macOS, lock screen con PIN.
 * **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale.
-* **Nota**: È ancora in fase di sviluppo ("Alpha"). Se qualcosa non va, torna a usare il browser.
+* **Nota**: è in fase alpha. In caso di problemi puoi sempre usare l'interfaccia web.
 
 ---
 
-## ❓ FAQ (Domande Frequenti)
+## FAQ
 
 **Posso usarlo su iPad?**
-Stiamo lavorando a un'app dedicata. Per ora, devi usare il Mac.
+Stiamo lavorando ai client dedicati. Per ora il Mac è l'home base.
 
 **Se mi si rompe il computer?**
 I dati sono nel file `medical.db`.
-Vai nelle Impostazioni e fai **"Esporta Backup"** regolarmente. Salva quel file su una chiavetta USB. Se il computer muore, reinstalli MediFlow su uno nuovo, importi il backup, rimetti il PIN ed è come non fosse successo nulla.
+Usa **Esporta Backup** regolarmente e conserva il file in una posizione sicura (es. disco esterno). In caso di guasto, reinstalli MediFlow e ripristini backup + PIN.
 
 **È a norma GDPR?**
-Tecnicamente sì (cifratura, dati locali). Legalmente, dipende da come gestisci tu il computer (password del Mac, chi accede allo studio, ecc.). Usalo con buonsenso professionale.
+MediFlow implementa misure tecniche forti (cifratura, local-first). La conformità legale completa dipende anche dalle tue misure organizzative e operative.
 
 ---
-*Serve altro aiuto? Chiedi a Leo.*
+Per supporto, apri una issue o consulta la documentazione tecnica.

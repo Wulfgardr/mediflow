@@ -4,16 +4,17 @@
 > **Stato documento: CANONICAL (walkthrough operativo end-to-end).**
 > Se altri documenti tecnici secondari divergono su dettagli di flusso, prevale questo file.
 
-Questo documento raccoglie la vista end-to-end del progetto: web app Next.js, backend locale con SQLite, servizi AI/OCR e client nativo macOS. Serve per onboarding, manutenzione e lettura rapida dei flussi principali.
+Questo documento offre la vista end-to-end del progetto: web app Next.js, backend locale SQLite, servizi AI/OCR e client nativo macOS.
+Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
 ---
 
 ## Scopo e obiettivi
 
-- Fornire una visione unica dell'architettura e dei flussi principali.
-- Mappare i file chiave e le responsabilità dei moduli.
-- Evidenziare il contratto API tra web e client macOS.
-- Spiegare sicurezza, cifratura e trasporto locale.
+- Dare una mappa unica dell'architettura e dei flussi principali.
+- Chiarire file chiave e responsabilità dei moduli.
+- Esplicitare il contratto API tra web e client macOS.
+- Riassumere sicurezza, cifratura e trasporto locale.
 
 Se serve il dettaglio di singoli moduli, consulta anche:
 - `docs/system_architecture.md`

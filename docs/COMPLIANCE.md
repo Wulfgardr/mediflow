@@ -1,41 +1,39 @@
-# ⚖️ Compliance & Interoperabilità
+# Compliance e interoperabilità
 
-> **GDPR, Privacy e Standard Dati (FHIR).**
-> Come MediFlow ti aiuta a dormire sonni tranquilli (legalmente e tecnicamente).
+> GDPR, privacy e standard clinici in pratica.
 
 ---
 
-## 1. GDPR & Privacy
+## 1. GDPR e privacy
 
-MediFlow è progettato secondo il principio **Privacy by Design**.
-Tuttavia, come medico, tu sei il **Titolare del Trattamento** (Data Controller). Il software è lo strumento.
+MediFlow segue il principio **Privacy by Design**.
+Nel contesto clinico, il medico resta il **Titolare del Trattamento**: il software è uno strumento, non un sostituto delle responsabilità.
 
 ### Misure Tecniche di Sicurezza
 
-Per aiutarti a rispettare gli obblighi del GDPR (Art. 32), abbiamo implementato:
+Per supportare gli obblighi GDPR (Art. 32), MediFlow implementa:
 
-1. **Cifratura At-Rest (AES-256)**: Se ti rubano il computer, il disco rigido è illeggibile senza il PIN.
-2. **Zero-Knowledge**: Il PIN non è salvato da nessuna parte. Non c'è una "backdoor" per recuperare i dati.
-3. **Minimizzazione**: Il software non raccoglie telemetria. Nessun dato va a terze parti.
-4. **Local-First**: I dati risiedono fisicamente nel tuo studio (sul tuo Mac). Non ci sono server cloud in California o altrove.
+1. **Cifratura at-rest (AES-256)**: senza PIN i dati non sono leggibili.
+2. **Zero-knowledge**: il PIN non viene salvato e non esistono backdoor di recupero.
+3. **Minimizzazione**: niente telemetria e nessun egress di default verso terze parti.
+4. **Local-first**: i dati restano sul dispositivo del professionista.
 
 ### Strumenti per i Diritti dell'Interessato
 
-Il GDPR garantisce ai pazienti certi diritti. Ecco come soddisfarli:
+Il GDPR garantisce diritti specifici ai pazienti. In MediFlow:
 
-* **Diritto all'Oblio (Art. 17)**: Puoi eliminare un paziente. Il sistema usa una "cancellazione sicura" (dopo 30 giorni nel cestino per sicurezza).
-* **Portabilità dei Dati (Art. 20)**: Puoi esportare l'intera storia clinica di un paziente in un formato standard (vedi sotto "FHIR").
+* **Diritto all'oblio (Art. 17)**: puoi eliminare un paziente con workflow controllato.
+* **Portabilità dei dati (Art. 20)**: puoi esportare la storia clinica in formato interoperabile.
 
 ---
 
 ## 2. Interoperabilità (FHIR R4)
 
-Non vogliamo che i tuoi dati siano "prigionieri" di MediFlow.
-Per questo adottiamo lo standard mondiale **HL7 FHIR (Fast Healthcare Interoperability Resources)**.
+MediFlow adotta **HL7 FHIR R4** per evitare lock-in e facilitare integrazione/export.
 
 ### Export FHIR
 
-Quando clicchi "Esporta Dati Clinici" nella scheda paziente, generiamo un pacchetto JSON compatibile con lo standard FHIR R4.
+Con l'export clinico viene generato un pacchetto JSON compatibile FHIR R4.
 
 **Cosa contiene il pacchetto?**
 
@@ -45,14 +43,13 @@ Quando clicchi "Esporta Dati Clinici" nella scheda paziente, generiamo un pacche
 * **MedicationStatement**: Le terapie prescritte.
 * **Observation**: Note e parametri rilevati.
 
-Questo significa che un domani potrai importare questi dati in qualsiasi altro software ospedaliero o regionale moderno, senza perdere nulla.
+Obiettivo: mantenere i dati riusabili anche fuori da MediFlow.
 
 ---
 
-## 3. Standard Diagnostici (ICD-11)
+## 3. Standard diagnostici (ICD-11)
 
-Abbandoniamo le descrizioni "in testo libero" per le diagnosi.
-MediFlow integra il motore ufficiale dell'**OMS (Check WHO ICD-API)**.
+Le diagnosi non restano solo testo libero: MediFlow integra ICD-11 via API OMS locale.
 
-* **Precisione**: Ogni diagnosi ha un codice univoco (es. `5A10` per Diabete Mellito tipo 1).
-* **Futuro**: Il Fascicolo Sanitario Elettronico (FSE 2.0) richiederà sempre più dati strutturati. Noi siamo già pronti.
+* **Precisione clinica**: ogni diagnosi ha codice univoco (es. `5A10`).
+* **Interoperabilità futura**: più dati strutturati, meno ambiguità nei flussi FSE.

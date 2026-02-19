@@ -1,6 +1,6 @@
 # Documentazione MediFlow — Indice Canonico
 
-Questo file e' il punto di ingresso unico per capire dove leggere e dove aggiornare la documentazione.
+Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
 Ultimo aggiornamento: 2026-02-18
 
@@ -11,15 +11,15 @@ Ultimo aggiornamento: 2026-02-18
 3. `ARCHITECTURE.md`
 4. `SECURITY.md`
 5. `CONTRIBUTING.md`
-6. `docs/adr/` (partendo dai piu recenti)
+6. `docs/adr/` (partendo dai più recenti)
 7. `PLANS.md`
 8. `docs/walkthrough.md`
 
 ## Convenzione stato documenti
 
-- `CANONICAL`: fonte di verita' da aggiornare quando cambia un tema.
-- `SECONDARY`: approfondimento o sintesi; se diverge dal canonico, non prevale.
-- `LEGACY`: materiale storico/visuale utile per consultazione, non per decisioni.
+- `CANONICAL`: fonte di verità da aggiornare quando cambia un tema.
+- `SECONDARY`: approfondimento o sintesi; utile, ma non prevale se in conflitto.
+- `LEGACY`: materiale storico/visuale; consultabile, non decisionale.
 
 ## Fonte autorevole per tema
 
@@ -38,18 +38,18 @@ Ultimo aggiornamento: 2026-02-18
 | Deep dive tecnico architettura | `docs/ARCHITETTURA.md` | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | `docs/system_architecture.md` | `SECONDARY` | Versione compatta/rapida. |
 | Setup client macOS e TLS locale | `docs/NATIVE.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/local-api-tls.md` | `CANONICAL` | Materiale operativo nativo. |
-| Compliance/GDPR/FHIR | `docs/COMPLIANCE.md` | `CANONICAL` | Quadro compliance e interoperabilita'. |
+| Compliance/GDPR/FHIR | `docs/COMPLIANCE.md` | `CANONICAL` | Quadro compliance e interoperabilità. |
 | Manuale utente medico | `docs/MANUALE.md` | `CANONICAL` | Uso prodotto lato clinico. |
 
 ## File sovrapposti o secondari
 
-- `docs/product_roadmap.md`: alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva e' `docs/ROADMAP.md`.
-- `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verita' per decisioni architetturali.
+- `docs/product_roadmap.md`: alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva è `docs/ROADMAP.md`.
+- `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verità per decisioni architetturali.
 - `docs/private/openhospital-alignment/*`: workspace operativo privato locale. Le decisioni persistenti vanno riallineate su `PLANS.md` e/o ADR pubblici.
 
 ## Regole rapide di mantenimento
 
 1. Una decisione duratura deve finire in ADR.
-2. Un cambio di priorita' a breve finisce in `PLANS.md`.
+2. Un cambio di priorità a breve finisce in `PLANS.md`.
 3. Un cambio di direzione prodotto finisce in `docs/ROADMAP.md`.
 4. Se due file dicono cose diverse, prevale la fonte canonica indicata sopra.

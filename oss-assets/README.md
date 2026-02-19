@@ -1,66 +1,63 @@
 # MediFlow (Presentation)
 
-Hello there! My name is Leo, I am a physician from Italy and I work in the Community Care setting. The idea of managing patient data, therapies, and clinical notes without relying on internet connectivity or third-party cloud services is what led me to create MediFlow.
+Hi, I am Leo, a community care physician from Italy.
+MediFlow started from a practical need: manage clinical data, therapies and notes with full local control, without cloud dependency by default.
 
-MediFlow is a comprehensive, local-first medical record management system designed for **reliability**, **privacy**, and **speed**. It empowers medical professionals and allows to shift the focus from managing IT issues to patient care.
+MediFlow is a local-first medical record system focused on **privacy**, **speed** and **clinical usability**.
+The base product is in Italian (AIFA references, local workflows), but the architecture is modular and open to adaptation.
 
-The software "base" is in Italian but feel free to branch, modify, suggest and so much more. I am a newbie in the development world and I am always open to learning and improving. Don't forget that this application is made from the Italian point of view (AIFA for medication references, etc.) and many features and upcoming changes are tied to my everyday clinical practice. Yet this product is made with modularity in mind. Feel free to reach out for any suggestions! Open Source for the win!
+MediFlow also draws inspiration from mature open-source healthcare projects (including OpenHospital), adapted to its own local-first and zero-knowledge direction.
 
 ![MediFlow Screenshot](screenshot.png)
 
 ## Core Philosophy
 
-* **🔒 Privacy First**: Your patient data never leaves your device unless you explicitly export it. We use IndexedDB for robust, encrypted-at-rest local storage.
-* **⚡ Speed & Fluidity**: Built with a "Zero-Lag" philosophy. Every interaction is immediate, thanks to the local-first architecture.
-* **🏥 Clinical Effectiveness**: Tools designed by doctors, for doctors. From smart ICD-11 coding to automatic PDF therapy printing.
+* **Privacy First**: patient data stays on device unless explicitly exported.
+* **Speed by Design**: local-first architecture keeps interactions immediate.
+* **Clinical Focus**: tools built around real daily workflows.
 
 ---
 
-## ⚖️ Compliance & GDPR (Work in Progress)
+## Compliance & GDPR (Work in Progress)
 
-**Primum non nocere (First, do no harm) applies to data too.**
+The project follows **Privacy by Design** and **Data Minimization** principles:
 
-This application is designed following the principles of **Privacy by Design** and **Data Minimization**, implementing state-of-the-art technical best practices for data protection:
+* **Local-first architecture**
+* **Encryption at rest**
+* **Zero-knowledge key handling**
 
-* **Local-First Architecture**: Data resides *exclusively* in the user's browser (IndexedDB).
-* **AES-GCM Encryption**: Sensitive data (notes, diary) is encrypted at rest using a Master Key derived from your PIN.
-* **Zero-Knowledge**: Keys never leave the device.
-
-However, full compliance with **GDPR** (EU Regulation 2016/679) is a complex process involving legal and organizational aspects beyond just technology.
-
-* **Best Effort**: Adherence to GDPR standards is currently a "Best Effort" goal.
-* **Professional Use**: requires specific legal validation by the Data Controller (the Doctor/Clinic).
-* **Tools Provided**: The app provides tools (Audit Log, Export, Secure Deletion) to facilitate compliance, but does not substitute specialized legal advice.
+Full GDPR compliance also depends on legal and organizational processes outside software scope.
+MediFlow provides technical controls and workflows, but does not replace legal validation by the Data Controller.
 
 ---
 
-## 🚀 Key Features (v0.3.0)
+## Key Features (v0.3.x)
 
-### 1. Onboarding & Security
+### 1. Onboarding and Security
 
 A new **Onboarding Wizard** guides you through the initial setup:
 
-* **Privacy Acceptance**: Explicit disclaimer about the local-hosted nature of the data.
-* **Profile Setup**: Dynamic configuration of Doctor and Clinic names for printouts and UI.
-* **Secure PIN**: Mandatory setup of a PIN to encrypt the Master Key.
+* **Privacy acceptance** flow
+* **Doctor/clinic profile setup**
+* **Mandatory secure PIN** for key protection
 
-### 2. Data Integrity (Backup & Restore)
+### 2. Data Integrity (Backup and Restore)
 
-* **Export**: Full encrypted backup to `.mediflow` JSON file (includes security salt/keys).
-* **Import**: Restore capability to migrate data between devices (Destructive operation).
+* **Export**: encrypted backup to `.mediflow` JSON.
+* **Import**: restore flow for device migration (destructive operation).
 
-### 3. AI & ICD Integration
+### 3. AI and ICD Integration
 
-* **ICD-11 & ICD-9**: Dual coding support.
-* **Local AI (Ollama)**: Integration with local LLMs for clinical summaries without data leaks.
+* **ICD-11 and ICD-9** support.
+* **Local AI (Ollama)** for summaries/OCR without cloud egress by default.
 
 ---
 
-## 📐 Process Architecture
+## Process Architecture
 
 ### System Orchestration (Docker)
 
-How the containers interact in the "All-in-One" deployment:
+Container interactions in the all-in-one deployment:
 
 ```mermaid
 graph TD
@@ -81,9 +78,9 @@ graph TD
     Volume["Ollama Models (Volume)"] -.-> Ollama
 ```
 
-### Security & Privacy Cycle
+### Security and Privacy Cycle
 
-The "Local-First" data flow ensuring privacy:
+Local-first flow used for data protection:
 
 ```mermaid
 graph LR
@@ -100,12 +97,12 @@ graph LR
 
 ---
 
-## 🛠 Technical Overview
+## Technical Overview
 
-* **Stack**: Next.js 15, Tailwind CSS v4, Dexie.js.
-* **Architecture**: "All-in-One" Docker orchestration (App + ICD-API + Ollama) for easy deployment.
+* **Stack**: Next.js, Tailwind CSS, local services.
+* **Architecture**: local hybrid model (app + local APIs/services).
 
-## 🚀 Getting Started (Developers)
+## Getting Started (Developers)
 
 1. **Clone**: `git clone https://github.com/Wulfgardr/mediflow.git`
 2. **Install**: `npm install`
