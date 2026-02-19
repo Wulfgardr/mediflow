@@ -17,7 +17,7 @@ Per la versione attiva consulta `docs/ROADMAP.md`.
 Quello che c'è e funziona oggi:
 
 - **Database serio**: Addio IndexedDB, ora uso SQLite. I dati stanno in un file `.db` che posso backuppare.
-- **AI locale vera**: MedGemma gira su Ollama, niente cloud. I dati paziente non escono mai dal Mac.
+- **AI locale vera**: MedGemma gira su Ollama, niente cloud. I dati paziente non escono mai dal computer.
 - **OCR con DeepSeek**: Carico un PDF o una foto di un referto → viene letto e estratto il testo.
 - **Archivio Intelligente**: Ogni documento caricato viene riassunto dall'AI. Vedo gli ultimi 3 nella scheda paziente.
 - **ICD-11**: Le diagnosi usano lo standard WHO ufficiale, non più il vecchio ICD-9.
@@ -60,7 +60,7 @@ Il sogno:
 
 - **App desktop vera**: Non più browser, ma finestra dedicata (Tauri o Electron).
 - **App iOS**: Consultare i pazienti dal telefono.
-- **Sync locale**: Mac e iPhone si sincronizzano via Wi-Fi, senza passare da cloud.
+- **Sync locale**: Computer e iPhone si sincronizzano via Wi-Fi, senza passare da cloud.
 
 ---
 

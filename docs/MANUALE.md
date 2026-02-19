@@ -8,7 +8,7 @@
 
 ### Requisiti
 
-* Un Mac recente (M1/M2/M3 o successivi).
+* Un computer recente (consigliato: Apple Silicon M1/M2/M3 o successivi).
 * **Docker Desktop** (solo per i servizi opzionali come ICD-11).
 * Circa 15GB liberi se usi i modelli AI locali.
 
@@ -76,7 +76,7 @@ MediFlow può leggere documenti clinici e produrre sintesi direttamente in local
     * *Esempio*: Invece di leggere 10 pagine di referto ospedaliero, vedrai: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
 3. **Archiviazione**: documento e sintesi restano associati al paziente.
 
-> L'elaborazione avviene sul tuo Mac. Nessun dato paziente viene inviato a servizi cloud di default.
+> L'elaborazione avviene sul tuo computer. Nessun dato paziente viene inviato a servizi cloud di default.
 
 ---
 
@@ -108,7 +108,7 @@ Se lavori su Mac, puoi usare anche il client nativo.
 ## FAQ
 
 **Posso usarlo su iPad?**
-Stiamo lavorando ai client dedicati. Per ora il Mac è l'home base.
+Stiamo lavorando ai client dedicati. Per ora il computer principale è l'home base.
 
 **Se mi si rompe il computer?**
 I dati sono nel file `medical.db`.

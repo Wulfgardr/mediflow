@@ -308,7 +308,7 @@ export default function ServiceArchitecturePanel() {
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                         <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">NATIVO</span>
-                        <span>= Sul tuo Mac</span>
+                        <span>= Sul tuo computer</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded">DOCKER</span>
