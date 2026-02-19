@@ -1,7 +1,8 @@
 # ARCHITECTURE — MediFlow
 
 Questo documento descrive l'**architettura stabile ad alto livello** di MediFlow.
-Dovrebbe cambiare raramente. Per i dettagli implementativi, vedi:
+Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazione.
+Per il resto:
 
 - `docs/walkthrough.md` (end-to-end, web + native)
 - `docs/ARCHITETTURA.md` e `docs/system_architecture.md` (deep dive)
@@ -28,14 +29,14 @@ Dovrebbe cambiare raramente. Per i dettagli implementativi, vedi:
 
 MediFlow è un **sistema ibrido locale**:
 
-- Un'applicazione Next.js fornisce:
+- L'app Next.js fornisce:
   - web UI
   - route API locali
   - accesso al database SQLite locale
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
   - ICD-11 Docker API per ricerca diagnosi (localhost)
-- Un client nativo macOS SwiftUI comunica con lo stesso backend tramite proxy HTTPS locale.
+- Il client nativo macOS (SwiftUI) usa lo stesso backend via proxy HTTPS locale.
 
 ### Porte locali (default)
 
@@ -62,7 +63,7 @@ ENC:<iv_b64>:<cipher_b64>
 
 ### Confini di autenticazione
 
-MediFlow espone due superfici API principali:
+MediFlow espone due superfici API:
 
 - **Web API** (`/api/*`):
   - usata dalla UI browser
@@ -76,7 +77,7 @@ MediFlow espone due superfici API principali:
 
 ### Proxy verso servizi locali
 
-Ogni endpoint proxy che inoltra richieste a servizi locali deve:
+Ogni endpoint proxy verso servizi locali deve:
 - essere **allowlisted** (solo localhost)
 - evitare SSRF e target remoti
 - trattare ogni risposta come input non fidato
@@ -143,7 +144,7 @@ flowchart TB
 ## Come si cambiano le scelte architetturali
 
 - Per ogni modifica non banale, scrivi un ADR in `docs/adr/`.
-- Mantieni ADR brevi e concreti (problema -> opzioni -> trade-off -> decisione -> thin slice).
+- Mantieni gli ADR brevi e concreti (problema -> opzioni -> trade-off -> decisione -> thin slice).
 - Aggiorna:
   - `ARCHITECTURE.md` solo se cambiano visione stabile o confini
-  - `docs/walkthrough.md` se cambia il flusso dati reale
+  - `docs/walkthrough.md` se cambia il flusso reale end-to-end

@@ -1,17 +1,18 @@
 > [!WARNING]
-> Documento storico mantenuto per compatibilita'.
-> La roadmap prodotto canonica e aggiornata e': `docs/ROADMAP.md`.
+> Documento storico mantenuto per compatibilità.
+> La roadmap prodotto canonica e aggiornata è: `docs/ROADMAP.md`.
 > Aggiorna solo `docs/ROADMAP.md`.
 
-# 🗺️ Roadmap di MediFlow
+# Roadmap MediFlow (storica)
 
-> **Dove siamo**: v0.3.0 — Funziona l'OCR, funziona l'AI, i documenti vengono letti e sintetizzati.
+> Snapshot storico pre-riordino roadmap.
 
-Questa è la lista di cosa ho già fatto e cosa voglio fare. È un progetto personale nato dalla frustrazione di usare software sanitario lento e macchinoso. Se hai idee, apri una issue.
+Questa versione è mantenuta solo come riferimento storico.
+Per la versione attiva consulta `docs/ROADMAP.md`.
 
 ---
 
-## ✅ Fatto (v0.3.0)
+## Fatto (v0.3.0)
 
 Quello che c'è e funziona oggi:
 
@@ -25,7 +26,7 @@ Quello che c'è e funziona oggi:
 
 ---
 
-## � Prossimo (v0.4.0)
+## Prossimo (v0.4.0)
 
 Cose che mi servono per usarlo davvero ogni giorno:
 
@@ -63,4 +64,4 @@ Il sogno:
 
 ---
 
-*Aggiornato: Febbraio 2026*
+Aggiornato: Febbraio 2026 (documento storico)

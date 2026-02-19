@@ -1,9 +1,9 @@
 # PLANS — MediFlow (Piano Engineering Attivo)
 
-Questo è il **piano engineering operativo** (settimane), non la roadmap prodotto.
-Per la roadmap prodotto, vedi: `docs/ROADMAP.md`.
+Questo è il **piano operativo engineering** (orizzonte settimane), non la roadmap prodotto.
+Per direzione prodotto e release narrative, usa `docs/ROADMAP.md`.
 
-> Aggiorna questo file ogni volta che cambiano priorità o sequenza.
+> Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
 Ultimo aggiornamento: 2026-02-18
 

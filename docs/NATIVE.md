@@ -1,41 +1,38 @@
-# 🍎 Sviluppo Nativo (macOS)
+# Sviluppo Nativo (macOS)
 
-> **Guida per nerd Apple & Sviluppatori.**
-> Il client nativo SwiftUI di MediFlow completa l'esperienza con performance e integrazione OS.
-
----
-
-## 🚀 Stato del Progetto: "Alpha Avanzata"
-
-L'app nativa non è più solo un lettore. Ora supporta:
-
-* **Lettura e Scrittura**: Puoi creare pazienti, visite, terapie e controlli.
-* **AI Control Panel**: Un pannello dedicato per monitorare e chattare con l'AI (Ollama) direttamente.
-* **Sicurezza Completa**: Lock Screen con PIN, cifratura AES-256 in memoria, e Certificate Pinning.
+> Guida tecnica del client SwiftUI di MediFlow.
 
 ---
 
-## 🛠 Requisiti e Setup Rapido
+## Stato del progetto
+
+Il client nativo non è più solo in lettura. Oggi supporta:
+
+* **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
+* **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
+* **Sicurezza**: lock screen con PIN, cifratura in memoria e certificate pinning.
+
+---
+
+## Requisiti e setup rapido
 
 1. **Xcode 15+** (Swift 5.9).
 2. **Node.js 20+**.
 3. **Mkcert** (per HTTPS locale).
 
-### Il "Quick Start" (Script Magico)
+### Quick start
 
-Non impazzire con i comandi manuali. Abbiamo creato layout automatici.
-
-**Opzione A: Launcher (Per uso rapido)**
+**Opzione A: launcher rapido**
 
 ```bash
 ./scripts/Launch_MediFlowMac.command
 ```
 
-* Avvia Next.js (Server)
-* Avvia il Proxy TLS
-* Lancia l'App macOS compilata (se esiste)
+* avvia Next.js
+* avvia proxy TLS
+* lancia app macOS compilata (se presente)
 
-**Opzione B: Setup Sviluppatore (Per chi tocca il codice)**
+**Opzione B: setup sviluppatore**
 
 1. Prepara l'ambiente:
 
@@ -43,7 +40,7 @@ Non impazzire con i comandi manuali. Abbiamo creato layout automatici.
     ./scripts/native-setup.sh
     ```
 
-    *(Genera certificati, config, e controlla le porte)*
+    *(Genera certificati, config e controlla le porte.)*
 
 2. Apri il progetto in Xcode:
 
@@ -53,40 +50,40 @@ Non impazzire con i comandi manuali. Abbiamo creato layout automatici.
 
 ---
 
-## 📱 Features Ntive (Cosa c'è di nuovo)
+## Funzionalità principali
 
 ### 1. Lock Screen & Sicurezza
 
-L'app parte bloccata.
+L'app parte bloccata:
 
 * Devi inserire il **PIN** (lo stesso della web app).
 * Il PIN deriva la **Master Key** in RAM.
-* Se l'app va in background o chiudi il coperchio, si blocca e "dimentica" la chiave per sicurezza.
+* Se l'app va in background (o il Mac si sospende), la chiave viene scaricata.
 
 ### 2. AI Control Panel & Tools
 
-Nel tab "Strumenti" (Tools) trovi il pannello di controllo AI.
+Nel tab `Strumenti` trovi il pannello AI.
 
 * **Stato Modelli**: Vedi se MedGemma/DeepSeek sono carichi in memoria.
-* **Chat di Ragionamento**: Puoi parlare direttamente con l'AI per testare prompt o chiedere consulti rapidi (bypassando la cartella clinica).
+* **Chat tecnica**: puoi testare prompt o fare troubleshooting locale.
 * **Gestione Farmaci/ICD**: Strumenti rapidi per cercare codici senza aprire un paziente.
 
 ### 3. Editor Full-Feature
 
-L'interfaccia di inserimento (Nuovo Paziente, Nuova Visita) è nativa SwiftUI.
+I form di inserimento (Nuovo Paziente, Nuova Visita) sono nativi SwiftUI.
 
 * Usa i componenti di sistema (Date Picker, Menu).
-* È molto più veloce del web.
+* Performance e interazione sono più immediate rispetto al browser.
 
 ---
 
-## 🔗 Architettura Client-Server
+## Architettura client-server
 
-Il client Swift parla con Next.js tramite un **Bridge TLS Privato**.
+Il client Swift comunica con Next.js tramite bridge TLS locale.
 
-* **Server**: `https://localhost:3443` (Proxy verso :3000).
-* **API**: `/api/v1/*` (Endpoint ottimizzati per JSON puro).
-* **Auth**: Token Bearer + PIN Session.
+* **Server**: `https://localhost:3443` (proxy verso `:3000`)
+* **API**: `/api/v1/*`
+* **Auth**: Bearer token + sessione PIN
 
 ```mermaid
 graph LR
@@ -95,15 +92,15 @@ graph LR
     Next --> DB[(SQLite)]
 ```
 
-### Struttura nel Codice (`native/MediFlowMac`)
+### Struttura codice (`native/MediFlowMac`)
 
-* `Services/LocalAPIClient.swift`: Il cuore della comunicazione. Gestisce i `URLSession` pinnati.
-* `Services/SecuritySession.swift`: Gestisce il ciclo di vita della chiave crittografica.
-* `Views/AIControlPanelView.swift`: La dashboard per governare Ollama.
+* `Services/LocalAPIClient.swift`: comunicazione HTTP/TLS con pinning.
+* `Services/SecuritySession.swift`: ciclo di vita chiavi in memoria.
+* `Views/AIControlPanelView.swift`: controllo runtime AI locale.
 
 ---
 
-## 📝 Come Contribuire
+## Come contribuire
 
 Se vuoi aggiungere una vista:
 

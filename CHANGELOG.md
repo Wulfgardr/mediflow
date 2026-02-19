@@ -1,6 +1,6 @@
 # Changelog
 
-Tutti i cambiamenti notevoli a questo progetto saranno documentati in questo file.
+Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,10 +9,10 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### ✨ Aggiunto
 
-- **Terminology v1 (thin slice)**: Nuovi endpoint versionati `/api/v1/terminology` (`systems`, `search`, `resolve`) per codifiche cliniche estendibili.
+- **Terminology v1 (thin slice)**: endpoint versionati `/api/v1/terminology` (`systems`, `search`, `resolve`) per codifiche cliniche estendibili.
 - **Osservazioni cliniche (LOINC + UCUM)**: Primo percorso verticale completo su schema, API web/v1 e contratti client native.
 - **Pre-check export FSE**: Validazione documentale pre-export con semantica `error` (bloccante) e `warning` (confermabile).
-- **Export FHIR più visibile**: CTA esplicita nella scheda paziente, con labeling utente più chiaro.
+- **Export FHIR più visibile**: CTA esplicita in scheda paziente e labeling utente più chiaro.
 
 ### 🧪 Migliorato
 
@@ -40,7 +40,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 ### 🗓 Timeline (ieri e oggi)
 
 - **2026-02-17**: snapshot di sicurezza pre-riordino (`0fb40c1`) per congelare lo stato prima degli interventi strutturali.
-- **2026-02-18**: delivery della thin slice terminologie/FSE, hardening API, ottimizzazioni live query, UX export FHIR/FSE e riordino documentazione strategica.
+- **2026-02-18**: delivery di thin slice terminologie/FSE, hardening API, ottimizzazioni live query, UX export FHIR/FSE e riordino documentazione strategica.
 
 ## [0.3.0] - 2026-01-21
 

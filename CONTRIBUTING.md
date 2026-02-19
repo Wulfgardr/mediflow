@@ -1,7 +1,7 @@
 # Contribuire a MediFlow
 
-Grazie per l'interesse in MediFlow. Questo progetto gestisce **dati sanitari**, quindi
-ogni contributo deve rispettare vincoli rigorosi di privacy e sicurezza.
+Grazie per l'interesse in MediFlow.
+Qui si lavora su **dati sanitari**: privacy e sicurezza non sono opzionali.
 
 ---
 
@@ -11,7 +11,7 @@ ogni contributo deve rispettare vincoli rigorosi di privacy e sicurezza.
   Non committare dati reali di pazienti, screenshot, log, database esportati o campioni "anonimizzati ma reversibili".
 - **Local-first di default.**
   Non introdurre egress cloud (telemetria, chiamate AI remote, sync) se non richiesto esplicitamente e documentato.
-- Preferisci **diff piccoli e revisionabili**. Evita grandi refactor "per pulizia".
+- Preferisci **diff piccoli e revisionabili**. Evita refactor ampi "per pulizia".
 
 Se vuoi cambiare confini di sicurezza, scrivi prima un ADR (vedi sotto).
 
@@ -76,7 +76,7 @@ npx tsc --noEmit
 - Client nativo macOS: `native/`
 - Script: `scripts/`
 
-Documentazione tecnica approfondita:
+Documentazione tecnica:
 - `docs/walkthrough.md`
 - `docs/system_architecture.md`
 - `docs/ARCHITETTURA.md`
@@ -96,7 +96,7 @@ Linee guida:
   - route API in lettura/scrittura sui nuovi campi
   - interfacce client (`lib/db.ts`) allineate
 
-> Tip: la repo usa `drizzle.config.ts` (SQLite file nella directory dati di MediFlow).
+> Nota: la repo usa `drizzle.config.ts` (SQLite file nella directory dati di MediFlow).
 > Se hai dubbi sui comandi drizzle-kit, consulta la documentazione Drizzle ORM.
 
 ---

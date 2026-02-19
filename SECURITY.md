@@ -2,7 +2,7 @@
 
 MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
 
-Questo documento descrive i confini di sicurezza del progetto e le aspettative per i contributori.
+Questo documento definisce confini di sicurezza e aspettative minime per chi contribuisce.
 
 ---
 
@@ -26,7 +26,7 @@ Assumiamo che:
 - Un attaccante possa leggere log, crash report o screenshot.
 - Il traffico localhost resti sensibile; per i client native evitare HTTP plain quando possibile.
 
-Non puntiamo ancora a difenderci da:
+Non copriamo ancora:
 
 - host OS completamente compromesso (malware con keylogging + accesso memoria)
 - attacchi mirati su dispositivo fisico mentre app sbloccata
@@ -62,7 +62,7 @@ MediFlow espone due superfici API:
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
 
-Regole:
+Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
 - Mantenere `/api/v1/*` stabile e retrocompatibile.
 
@@ -76,7 +76,7 @@ Regole:
 ## Proxy verso servizi locali (sicurezza SSRF)
 
 Alcuni endpoint inoltrano richieste a servizi locali (es. Ollama).
-Regole:
+Regole minime:
 
 - Permettere solo target **localhost / 127.0.0.1**.
 - Permettere solo porte previste.
@@ -100,7 +100,7 @@ I dati sanitari non devono trapelare dai log.
 - status code / classi di errore
 - identificatori redatti (es. prime 6 chars di un id)
 
-Se aggiungi nuovi log:
+Se aggiungi log:
 - assumi che possano finire in crash report
 - mantienili minimi e azionabili
 

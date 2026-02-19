@@ -22,7 +22,7 @@ Il client macOS lo legge automaticamente al primo avvio.
 
 ## Variabili opzionali
 
-- `MEDIFLOW_LOCAL_API_TOKEN` (se vuoi token per l'API)
+- `MEDIFLOW_LOCAL_API_TOKEN` (token per API locale)
 - `MEDIFLOW_TLS_CERT_DIR` / `MEDIFLOW_TLS_CERT_PATH` / `MEDIFLOW_TLS_KEY_PATH`
 - `MEDIFLOW_TLS_PORT` (default 3443)
 - `MEDIFLOW_HTTP_TARGET` (default http://127.0.0.1:3000)

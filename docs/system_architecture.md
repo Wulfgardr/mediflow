@@ -5,16 +5,16 @@
 > La visione architetturale stabile resta `ARCHITECTURE.md`.
 > Il walkthrough operativo canonico resta `docs/walkthrough.md`.
 
-Panoramica tecnica rapida per capire componenti, topologia e flussi principali.
-Per il dettaglio end-to-end usa anche `docs/walkthrough.md`.
+Panoramica tecnica rapida di componenti, topologia e flussi principali.
+Per il dettaglio completo usa `docs/walkthrough.md`.
 
 ---
 
 ## Principi base
 
-1. **Offline first**: Tutto gira in locale. Niente server remoti.
-2. **Privacy by design**: I dati sensibili vengono cifrati prima di toccare il disco.
-3. **AI locale**: I modelli girano su Ollama, nessuna chiamata a cloud esterni.
+1. **Offline first**: tutto gira in locale, senza dipendenze cloud obbligatorie.
+2. **Privacy by design**: i dati sensibili vengono cifrati prima della persistenza.
+3. **AI locale**: i modelli girano su Ollama, senza invio dati a servizi esterni di default.
 
 ---
 
