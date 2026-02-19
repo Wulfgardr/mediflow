@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-02-18
+Ultimo aggiornamento: 2026-02-19
 
 ## Ordine di lettura consigliato
 
@@ -32,6 +32,7 @@ Ultimo aggiornamento: 2026-02-18
 | Workflow di contribuzione | `CONTRIBUTING.md` | `CANONICAL` | Definition of Done e routine verifica. |
 | Decisioni architetturali | `docs/adr/*.md` | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Piano engineering a breve termine | `PLANS.md` | `CANONICAL` | 2-6 settimane, operativo. |
+| Matrice parity web/macOS | `docs/parity-matrix.md` | `CANONICAL` | Gate capability-by-capability (funzioni/campi/flessibilita/autonomia). |
 | Roadmap prodotto | `docs/ROADMAP.md` | `CANONICAL` | Direzione prodotto/versioni, separata da `PLANS.md`. |
 | Roadmap terminologie/FSE | `docs/FSE2-terminology-roadmap.md` | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Walkthrough end-to-end | `docs/walkthrough.md` | `CANONICAL` | Mappa operativa web + native + servizi locali. |
