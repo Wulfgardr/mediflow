@@ -56,6 +56,7 @@ Inizia da qui (ordine consigliato):
    - `docs/walkthrough.md`
 
 8. **Approfondimenti tecnici**
+   - `docs/topologia-dati-flussi.md`
    - `docs/ARCHITETTURA.md`
    - `docs/system_architecture.md`
    - `docs/FSE2-terminology-roadmap.md`

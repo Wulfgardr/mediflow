@@ -5,6 +5,7 @@ Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazion
 Per il resto:
 
 - `docs/walkthrough.md` (end-to-end, web + native)
+- `docs/topologia-dati-flussi.md` (topologia dati + percorsi digitali end-to-end)
 - `docs/ARCHITETTURA.md` e `docs/system_architecture.md` (deep dive)
 - `docs/adr/` (decisioni architetturali)
 
@@ -88,23 +89,23 @@ Ogni endpoint proxy verso servizi locali deve:
 
 ```mermaid
 flowchart TB
-  subgraph Client
-    Web[Web UI (Browser)]
-    Mac[Native macOS (SwiftUI)]
+  subgraph "Client"
+    Web["Web UI (Browser)"]
+    Mac["Native macOS (SwiftUI)"]
   end
 
-  subgraph Transport
-    TLS[TLS Proxy :3443]
+  subgraph "Transport"
+    TLS["TLS Proxy :3443"]
   end
 
-  subgraph Backend
-    Next[Next.js :3000 (UI + API)]
-    DB[(SQLite medical.db)]
+  subgraph "Backend"
+    Next["Next.js :3000 (UI + API)"]
+    DB[("SQLite medical.db")]
   end
 
-  subgraph Services
-    Ollama[Ollama :11434]
-    ICD[ICD-11 Docker :8888]
+  subgraph "Services"
+    Ollama["Ollama :11434"]
+    ICD["ICD-11 Docker :8888"]
   end
 
   Web -->|HTTP| Next
@@ -148,3 +149,4 @@ flowchart TB
 - Aggiorna:
   - `ARCHITECTURE.md` solo se cambiano visione stabile o confini
   - `docs/walkthrough.md` se cambia il flusso reale end-to-end
+  - `docs/topologia-dati-flussi.md` se cambiano percorsi dati, trust boundaries o superfici API
