@@ -1,15 +1,21 @@
 # Topologia Dati e Flussi - MediFlow
+
 > [!IMPORTANT]
 > **Stato documento: CANONICAL (topologia dati e percorsi digitali end-to-end).**
 > Per principi stabili e confini, prevale `ARCHITECTURE.md`.
 > Per policy di sicurezza e redazione, prevale `SECURITY.md`.
+
 Questo documento mappa in modo operativo:
+
 - dove nasce il dato
 - dove viene cifrato/decifrato
 - dove viene persistito
 - quali controlli di sicurezza lo proteggono
+
 ---
+
 ## 1. Topologia end-to-end (componenti + confini)
+
 ```mermaid
 flowchart TB
   subgraph "Client Layer"
@@ -55,8 +61,11 @@ flowchart TB
   NativeUI --> NativeCfg
   TLSProxy --> TLSCert
 ```
+
 ---
+
 ## 2. Topologia del dato a riposo
+
 ```mermaid
 flowchart LR
   Plain["Dato clinico in chiaro"] --> Encrypt["Cifratura client-side AES-256-GCM"]
@@ -69,9 +78,13 @@ flowchart LR
   EMK --> MK["Master key in RAM"]
   MK --> Encrypt
 ```
+
 Note operative: il PIN non viene salvato, la master key resta in RAM di sessione e i campi sensibili persistono cifrati.
+
 ---
+
 ## 3. Topologia relazionale del database (schema principale)
+
 ```mermaid
 erDiagram
     AMBULATORIES ||--o{ PATIENTS : "default owner"
@@ -162,9 +175,13 @@ erDiagram
         text content "ENC"
     }
 ```
+
 ---
+
 ## 4. Flussi operativi principali
+
 ### 4.1 Setup/login e attivazione chiavi (web)
+
 ```mermaid
 sequenceDiagram
     participant Clinician as Medico
@@ -182,7 +199,9 @@ sequenceDiagram
     AuthAPI-->>Browser: encryptedMasterKey + salt
     Browser->>Browser: Deriva KEK e decifra MasterKey in RAM
 ```
+
 ### 4.2 Scrittura clinica via web (`/api/*`)
+
 ```mermaid
 sequenceDiagram
     participant UI as Web UI
@@ -196,7 +215,9 @@ sequenceDiagram
     DB-->>API: OK
     API-->>UI: JSON response
 ```
+
 ### 4.3 Lettura/scrittura via client nativo (`/api/v1/*`)
+
 ```mermaid
 sequenceDiagram
     participant NativeUI as SwiftUI
@@ -217,7 +238,9 @@ sequenceDiagram
     TLS-->>Client: JSON
     Client-->>NativeUI: DTO
 ```
+
 ### 4.4 Pipeline documento -> OCR -> sintesi -> storage
+
 ```mermaid
 sequenceDiagram
     participant Clinician as Medico
@@ -242,6 +265,7 @@ sequenceDiagram
 ```
 
 ---
+
 ## 5. Superfici API e protezione
 
 | Superficie | Consumer | Auth | Trasporto | Scopo |
@@ -253,7 +277,9 @@ sequenceDiagram
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
 ---
+
 ## 6. Mappa file autorevoli per i flussi
+
 - Schema e topologia DB: `lib/schema.ts`
 - Accesso DB server: `lib/db-server.ts`
 - Facade web + cifratura client: `lib/db.ts`
@@ -263,8 +289,11 @@ sequenceDiagram
 - Controllo token locale: `lib/local-api-auth.ts`, `lib/local-api-token.ts`
 - Proxy TLS locale: `scripts/local-api-tls-proxy.mjs`
 - Pipeline OCR/sintesi: `lib/ocr-service.ts`, `lib/document-synthesis-service.ts`
+
 ---
+
 ## 7. Invarianti operativi da non rompere
+
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
 - `/api/v1/*` resta versionata e compatibile per client native.
