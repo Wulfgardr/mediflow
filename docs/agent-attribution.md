@@ -5,6 +5,9 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-02-19 Codex
+- Fixed Mermaid compatibility in `ARCHITECTURE.md` by quoting graph labels/subgraph titles and preserving the same architecture mapping.
+- Added canonical data topology and end-to-end flow mapping with Mermaid diagrams (system topology, data-at-rest path, ER model, auth/web/native/OCR sequences): `docs/topologia-dati-flussi.md`
+- Linked the new canonical topology/flows document from primary doc indexes: `docs/README.md`, `README.md`, `docs/walkthrough.md`, `ARCHITECTURE.md`
 - Added ADR for strict web/macOS parity as explicit release gate (same functions, fields, flexibility, operational autonomy): `docs/adr/0007-strict-web-native-parity-gate.md`
 - Superseded ADR 0007 and marked status accordingly: `docs/adr/0007-strict-web-native-parity-gate.md`
 - Added ADR for operational cadence `web-first + parity sweep periodici` on macOS: `docs/adr/0008-web-first-with-parity-sweeps.md`
