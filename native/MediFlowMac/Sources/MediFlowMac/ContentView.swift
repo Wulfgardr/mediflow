@@ -2,12 +2,28 @@
 import SwiftUI
 
 struct ContentView: View {
+    private enum PatientViewMode: String, CaseIterable {
+        case active
+        case archived
+    }
+
+    private enum PatientSortMode: String, CaseIterable {
+        case recent
+        case alpha
+    }
+
     @StateObject private var viewModel = PatientsViewModel()
     @StateObject private var settings = SettingsStore.shared
     @EnvironmentObject private var security: SecuritySession
     @State private var selectedPatientId: PatientSummary.ID?
     @State private var showingSettings = false
     @State private var showingNewPatient = false
+    /* @Codex */
+    @State private var patientSearchQuery = ""
+    /* @Codex */
+    @State private var patientViewMode: PatientViewMode = .active
+    /* @Codex */
+    @State private var patientSortMode: PatientSortMode = .recent
 
     var body: some View {
         Group {
@@ -36,11 +52,39 @@ struct ContentView: View {
                         }
 
                         Section("Pazienti") {
+                            /* @Codex */
+                            VStack(alignment: .leading, spacing: 8) {
+                                Picker("Stato pazienti", selection: $patientViewMode) {
+                                    Text("Attivi").tag(PatientViewMode.active)
+                                    Text("Archiviati").tag(PatientViewMode.archived)
+                                }
+                                .pickerStyle(.segmented)
+
+                                HStack(spacing: 10) {
+                                    TextField("Cerca nome, cognome o CF", text: $patientSearchQuery)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Picker("Ordina", selection: $patientSortMode) {
+                                        Text("Recenti").tag(PatientSortMode.recent)
+                                        Text("A-Z").tag(PatientSortMode.alpha)
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                            }
+
                             if viewModel.isLoadingPatients {
                                 ProgressView("Caricamento...")
                             }
 
-                            ForEach(viewModel.patients) { patient in
+                            /* @Codex */
+                            if !viewModel.isLoadingPatients && filteredPatients.isEmpty {
+                                Text("Nessun paziente corrispondente ai filtri.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            /* @Codex */
+                            ForEach(filteredPatients) { patient in
                                 HStack(alignment: .top, spacing: 12) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("\(patient.lastName) \(patient.firstName)")
@@ -144,9 +188,72 @@ struct ContentView: View {
                 Task { await viewModel.loadInitial() }
             }
         }
+        /* @Codex */
+        .onChange(of: patientSearchQuery) { _ in
+            syncSelectedPatientIfHidden()
+        }
+        /* @Codex */
+        .onChange(of: patientViewMode) { _ in
+            syncSelectedPatientIfHidden()
+        }
+        /* @Codex */
+        .onChange(of: patientSortMode) { _ in
+            syncSelectedPatientIfHidden()
+        }
         .onChange(of: viewModel.selectedAmbulatoryId) { _ in
             selectedPatientId = nil
             Task { await viewModel.loadPatients() }
+        }
+    }
+
+    /* @Codex */
+    private var filteredPatients: [PatientSummary] {
+        let query = patientSearchQuery
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let terms = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+        let statusFiltered = viewModel.patients.filter { patient in
+            switch patientViewMode {
+            case .active:
+                return patient.isArchived != true
+            case .archived:
+                return patient.isArchived == true
+            }
+        }
+
+        let searchFiltered = statusFiltered.filter { patient in
+            guard !terms.isEmpty else { return true }
+            let searchableText = "\(patient.lastName) \(patient.firstName) \(patient.taxCode)".lowercased()
+            return terms.allSatisfy { searchableText.contains($0) }
+        }
+
+        switch patientSortMode {
+        case .alpha:
+            return searchFiltered.sorted { lhs, rhs in
+                let lastNameOrder = lhs.lastName.localizedCaseInsensitiveCompare(rhs.lastName)
+                if lastNameOrder != .orderedSame { return lastNameOrder == .orderedAscending }
+                let firstNameOrder = lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName)
+                if firstNameOrder != .orderedSame { return firstNameOrder == .orderedAscending }
+                return lhs.taxCode.localizedCaseInsensitiveCompare(rhs.taxCode) == .orderedAscending
+            }
+        case .recent:
+            return searchFiltered.sorted { lhs, rhs in
+                let lhsDate = lhs.updatedAt ?? Date.distantPast
+                let rhsDate = rhs.updatedAt ?? Date.distantPast
+                if lhsDate != rhsDate { return lhsDate > rhsDate }
+                let lastNameOrder = lhs.lastName.localizedCaseInsensitiveCompare(rhs.lastName)
+                if lastNameOrder != .orderedSame { return lastNameOrder == .orderedAscending }
+                return lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName) == .orderedAscending
+            }
+        }
+    }
+
+    /* @Codex */
+    private func syncSelectedPatientIfHidden() {
+        guard let selectedPatientId else { return }
+        if !filteredPatients.contains(where: { $0.id == selectedPatientId }) {
+            self.selectedPatientId = nil
         }
     }
 

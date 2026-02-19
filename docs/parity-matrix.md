@@ -17,8 +17,14 @@ Nei moduli core, web app e app macOS devono avere:
 
 Riferimenti:
 - `docs/adr/0005-web-native-functional-parity.md`
-- `docs/adr/0007-strict-web-native-parity-gate.md`
+- `docs/adr/0008-web-first-with-parity-sweeps.md`
 - `PLANS.md` (sezione 5 e 5a)
+
+## Cadenza operativa
+
+- Modalita ordinaria: `web-first` (sviluppo principale sulla web app).
+- Modalita convergenza: `parity sweep` dedicati su macOS.
+- Regola: il gap puo esistere temporaneamente, ma deve essere tracciato qui e chiuso nelle wave di parity.
 
 ## Legenda
 

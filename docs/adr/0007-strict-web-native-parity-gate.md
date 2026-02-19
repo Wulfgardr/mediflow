@@ -2,7 +2,9 @@
 # ADR 0007: Strict web/native parity come release gate operativo
 
 Date: 2026-02-19  
-Status: Accepted
+Status: Superseded
+
+Superseded by: `docs/adr/0008-web-first-with-parity-sweeps.md`
 
 ---
 

@@ -45,7 +45,8 @@ Ultimo aggiornamento: 2026-02-19
 - [ ] Definire e mantenere una matrice capability-by-capability (view/add/edit/delete/filter) per pazienti, diario clinico, terapie, appuntamenti, farmaci, esenzioni.
 - [ ] Rendere `/api/v1/*` il contratto locale canonico per le funzioni condivise tra client.
 - [ ] Chiudere i gap CRUD nativa rispetto al web, senza introdurre storage duplicato o percorsi separati per i dati.
-- [ ] Applicare il parity gate ADR 0007: stessa funzione, stessi campi, stessa flessibilita, stessa autonomia operativa tra web e macOS.
+- [ ] Applicare il modello ADR 0008: delivery web-first + parity sweep periodici su macOS, con backlog gap sempre esplicito.
+- [ ] Garantire per i moduli core il target parity: stessa funzione, stessi campi, stessa flessibilita, stessa autonomia operativa tra web e macOS.
 
 #### 5a) Sequenza esecutiva parity (step-by-step)
 - [x] `P0` Baseline parity matrix versionata (web vs macOS) sui 6 moduli core, distinguendo chiaramente `contratto API` vs `UI disponibile`. (`docs/parity-matrix.md`)
