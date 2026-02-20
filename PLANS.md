@@ -51,6 +51,9 @@ Ultimo aggiornamento: 2026-02-20
 #### 5a) Sequenza esecutiva parity (step-by-step)
 - [x] `P0` Baseline parity matrix versionata (web vs macOS) sui 6 moduli core, distinguendo chiaramente `contratto API` vs `UI disponibile`. (`docs/parity-matrix.md`)
 - [ ] `P0b` Stabilizzare harness smoke parity (web Playwright + native XCTest/Xcode + click-map macOS) su ambiente isolato/VM.
+- [x] `P0b.a` Introdurre runner unificato parity smoke + report artifacts (`scripts/parity-smoke.sh`, `docs/parity-smoke.md`).
+- [x] `P0b.b` Definire checklist click-map macOS per run manuali ripetibili (`docs/parity-click-map-macos.md`).
+- [ ] `P0b.c` Eseguire run VM "strict" (web+native required) con Playwright disponibile e checklist compilata.
 - [x] `P1` Pazienti native: completare `edit/delete/archive/search/sort` e filtri stato (`attivi/archiviati`) in UI macOS.
 - [ ] `P2` Esenzioni native: aggiungere selector/search su `/api/v1/exemptions` e salvataggio in create/update paziente.
 - [ ] `P3` Osservazioni native: esporre in UI macOS il CRUD `LOINC + UCUM` già disponibile a contratto (`/api/v1/patients/:id/observations`).

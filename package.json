@@ -10,6 +10,8 @@
     "lint": "eslint",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
+    "prepare:oss": "node scripts/prepare-oss.js",
+    "test:parity:smoke": "bash scripts/parity-smoke.sh",
     "e2e:web": "npx playwright test e2e/web-smoke.spec.ts",
     "e2e:smoke": "bash scripts/e2e-smoke.sh"
   },

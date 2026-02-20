@@ -16,6 +16,7 @@
 /test-results
 /tmp-e2e-data
 /tmp-native-derived-data
+/tmp-parity-smoke
 
 # next.js
 /.next/

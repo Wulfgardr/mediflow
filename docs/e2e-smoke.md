@@ -62,3 +62,12 @@ Per i run parity completi, combina:
 
 1. `npm run e2e:smoke` (web)
 2. `npm run test:native` oppure `npm run test:native:xcode` (macOS)
+
+Oppure usa il runner unificato:
+
+```bash
+npm run test:parity:smoke
+```
+
+Dettagli:
+- [docs/parity-smoke.md](./parity-smoke.md)

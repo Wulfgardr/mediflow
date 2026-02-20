@@ -103,9 +103,16 @@ Per debugging test:
 3. Native click-map manuale (finche UI test non e completa):
    - apri app con `./scripts/Launch_MediFlowMac.command`
    - verifica punti chiave parity da `docs/parity-matrix.md`
+   - compila checklist `docs/parity-click-map-macos.md`
 4. Aggiorna esito in PR/notes:
    - cosa e stato verificato
    - cosa non e stato verificato e perche
+
+Comando aggregato (raccomandato per `P0b`):
+
+```bash
+npm run test:parity:smoke
+```
 
 ---
 

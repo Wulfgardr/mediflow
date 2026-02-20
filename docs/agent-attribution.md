@@ -5,6 +5,9 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-02-20 Codex
+- Added private-only OSS export playbook documenting private/public repo model, filtering rules, markdown reference sanitization, and release checklist: `docs/private/oss-export-playbook.md`
+- Added OSS export hardening workflow with npm entrypoint and docs: `package.json`, `CONTRIBUTING.md`
+- Enhanced OSS preparation script with path-based exclusions and markdown reference sanitization (broken private refs downgraded to ` (private)`), plus `.mjs` wrapper alignment to single source logic: `scripts/prepare-oss.js`, `scripts/prepare-oss.mjs`
 - Strengthened documentation cross-reference system: made `docs/README.md` the explicit consult-policy map, upgraded `docs/markdown-index.md` to a full descriptive inventory (including ADR 0009), and added maintenance rules for `.md` changes: `AGENTS.md`, `README.md`, `docs/README.md`, `docs/markdown-index.md`, `CONTRIBUTING.md`
 - Added/normalized internal doc links across canonical technical/operational guides to improve agent navigation between architecture, security, parity, native setup/testing, and planning docs: `ARCHITECTURE.md`, `SECURITY.md`, `PLANS.md`, `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `docs/ARCHITETTURA.md`, `docs/system_architecture.md`, `docs/NATIVE.md`, `docs/native-testing.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/e2e-smoke.md`, `docs/local-api-tls.md`, `docs/icd-local-setup.md`, `docs/COMPLIANCE.md`, `docs/FSE2-terminology-roadmap.md`, `docs/parity-matrix.md`, `docs/ROADMAP.md`, `docs/product_roadmap.md`, `docs/MANUALE.md`
 - Added web smoke E2E scaffolding with Playwright config and first unlock/setup + navigation flow: `playwright.config.ts`, `e2e/web-smoke.spec.ts`
@@ -15,6 +18,8 @@ Entries are additive and minimal.
 - Added first native XCTest suite for patient filter/sort parity semantics in SwiftPM test target: `native/MediFlowMac/Package.swift`, `native/MediFlowMac/Tests/MediFlowMacTests/PatientsFilteringTests.swift`
 - Added native testing runner script and npm commands for `swift test` / `xcodebuild test`: `scripts/native-test.sh`, `package.json`
 - Added ADR and canonical guide for macOS testing strategy (XCTest/Xcode-first): `docs/adr/0009-native-testing-strategy-xcode-xctest.md`, `docs/native-testing.md`
+- Added unified parity smoke runner with lane gating and artifact summary output: `scripts/parity-smoke.sh`
+- Added manual click-map checklist and parity smoke runbook for macOS/web combined sweeps: `docs/parity-click-map-macos.md`, `docs/parity-smoke.md`
 - Added operational guide for smoke harness and VM execution model: `docs/e2e-smoke.md`
 - Updated canonical docs index and parity plan sequencing with smoke-harness stabilization item: `docs/README.md`, `PLANS.md`
 

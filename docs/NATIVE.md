@@ -63,12 +63,15 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 La strategia testing ufficiale e documentata in:
 
 - [docs/native-testing.md](./native-testing.md)
+- [docs/parity-smoke.md](./parity-smoke.md)
+- [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
 
 Comandi rapidi:
 
 ```bash
 npm run test:native
 npm run test:native:xcode
+npm run test:parity:smoke
 ```
 
 ---

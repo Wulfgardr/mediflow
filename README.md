@@ -71,6 +71,8 @@ GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
 
 - [docs/NATIVE.md](./docs/NATIVE.md)
 - [docs/native-testing.md](./docs/native-testing.md)
+- [docs/parity-smoke.md](./docs/parity-smoke.md)
+- [docs/parity-click-map-macos.md](./docs/parity-click-map-macos.md)
 - [docs/native-setup.md](./docs/native-setup.md)
 - [docs/native-launch.md](./docs/native-launch.md)
 - [docs/local-api-tls.md](./docs/local-api-tls.md)

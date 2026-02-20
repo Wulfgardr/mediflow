@@ -20,6 +20,8 @@ Riferimenti:
 - [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
 - [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
 - [PLANS.md](../PLANS.md) (sezione 5 e 5a)
+- [docs/parity-smoke.md](./parity-smoke.md)
+- [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
 
 ## Cadenza operativa
 
@@ -48,7 +50,7 @@ Riferimenti:
 
 ## Gap principali da chiudere
 
-1. Pazienti su macOS: consolidare smoke VM sulle nuove azioni `edit/delete/archive` e toolbar/context-menu.
+1. Pazienti su macOS: consolidare smoke VM sulle nuove azioni `edit/delete/archive` e toolbar/context-menu (checklist: `docs/parity-click-map-macos.md`).
 2. Esenzioni su macOS: selector + search + save in create/update paziente.
 3. Osservazioni su macOS: UI CRUD LOINC+UCUM gia presente a contratto.
 4. Diario clinico: allineare semantica delete (soft delete + restore + reason) tra web e macOS.
