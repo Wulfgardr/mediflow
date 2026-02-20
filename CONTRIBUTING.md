@@ -55,6 +55,12 @@ npm run lint
 npm run build
 ```
 
+Per visualizzare anche warning non bloccanti:
+
+```bash
+npm run lint:full
+```
+
 ### Type checking (consigliato)
 
 Questo repository non espone ancora uno script dedicato; puoi eseguire:

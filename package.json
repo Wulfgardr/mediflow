@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
-    "lint": "eslint",
+    "lint": "eslint --quiet",
+    "lint:full": "eslint",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "prepare:oss": "node scripts/prepare-oss.js",
@@ -46,6 +47,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/fhir": "^0.0.41",

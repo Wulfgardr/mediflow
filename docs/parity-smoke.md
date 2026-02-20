@@ -67,6 +67,8 @@ MEDIFLOW_PARITY_RUN_WEB=0 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode bash scripts/parit
 
 ## Note operative
 
-- Se Playwright non e installato, la lane web puo fallire: usa `MEDIFLOW_PARITY_REQUIRE_WEB=0` per non bloccare run native.
+- Se Playwright non e installato:
+  - con `MEDIFLOW_PARITY_REQUIRE_WEB=0` la lane web viene marcata `SKIPPED`
+  - con `MEDIFLOW_PARITY_REQUIRE_WEB=1` la lane web fallisce (`FAIL`)
 - La lane native usa `scripts/native-test.sh`; per dettagli vedi:
   - `docs/native-testing.md`

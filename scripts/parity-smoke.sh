@@ -25,9 +25,32 @@ WEB_STATUS="SKIPPED"
 NATIVE_STATUS="SKIPPED"
 EXIT_CODE=0
 
+has_playwright_test() {
+  node -e "require.resolve('@playwright/test/package.json')" >/dev/null 2>&1
+}
+
 run_web_lane() {
   if [[ "$RUN_WEB" != "1" ]]; then
     WEB_STATUS="SKIPPED"
+    return 0
+  fi
+
+  if ! has_playwright_test; then
+    mkdir -p "$(dirname "$WEB_LOG")"
+    cat >"$WEB_LOG" <<EOF
+Missing dependency: @playwright/test
+Install when network is available:
+  npm install -D @playwright/test
+  npx playwright install chromium
+EOF
+
+    if [[ "$REQUIRE_WEB" == "1" ]]; then
+      WEB_STATUS="FAIL"
+      EXIT_CODE=1
+    else
+      WEB_STATUS="SKIPPED"
+      echo "Web lane skipped: @playwright/test not available (REQUIRE_WEB=0)."
+    fi
     return 0
   fi
 

@@ -37,17 +37,17 @@ async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const lockHeading = page.getByRole('heading', { name: 'MediFlow Sicurezza' });
   if (!(await isVisible(lockHeading))) return;
 
-  await page.getByPlaceholder('Inserisci PIN').fill(pin);
-  await page.getByRole('button', { name: /Sblocca/i }).click();
+  await page.locator('input[placeholder="Inserisci PIN"]:not([disabled])').first().fill(pin);
+  await page.locator('button:not([disabled])', { hasText: 'Sblocca' }).first().click();
 }
 
 async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<void> {
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
   if (!(await isVisible(setupHeading))) return;
 
-  await page.getByPlaceholder('Inserisci PIN').fill(pin);
-  await page.getByPlaceholder('Conferma PIN').fill(pin);
-  await page.getByRole('button', { name: 'Imposta PIN' }).click();
+  await page.locator('input[placeholder="Inserisci PIN"]:not([disabled])').first().fill(pin);
+  await page.locator('input[placeholder="Conferma PIN"]:not([disabled])').first().fill(pin);
+  await page.locator('button:not([disabled])', { hasText: 'Imposta PIN' }).first().click();
 }
 
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {

@@ -20,6 +20,8 @@ Entries are additive and minimal.
 - Added ADR and canonical guide for macOS testing strategy (XCTest/Xcode-first): `docs/adr/0009-native-testing-strategy-xcode-xctest.md`, `docs/native-testing.md`
 - Added unified parity smoke runner with lane gating and artifact summary output: `scripts/parity-smoke.sh`
 - Added manual click-map checklist and parity smoke runbook for macOS/web combined sweeps: `docs/parity-click-map-macos.md`, `docs/parity-smoke.md`
+- Improved parity smoke behavior when Playwright is missing: web lane is now `SKIPPED` (or `FAIL` only in strict mode) with explicit log artifact: `scripts/parity-smoke.sh`
+- Split lint scripts into quiet default and full-warning mode: `package.json`
 - Added operational guide for smoke harness and VM execution model: `docs/e2e-smoke.md`
 - Updated canonical docs index and parity plan sequencing with smoke-harness stabilization item: `docs/README.md`, `PLANS.md`
 
