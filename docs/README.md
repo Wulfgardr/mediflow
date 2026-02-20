@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-02-19
+Ultimo aggiornamento: 2026-02-20
 
 ## Ordine di lettura consigliato
 
@@ -37,6 +37,7 @@ Ultimo aggiornamento: 2026-02-19
 | Roadmap terminologie/FSE | `docs/FSE2-terminology-roadmap.md` | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Walkthrough end-to-end | `docs/walkthrough.md` | `CANONICAL` | Mappa operativa web + native + servizi locali. |
 | Topologia dati e flussi | `docs/topologia-dati-flussi.md` | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries). |
+| Indice completo Markdown repo | `docs/markdown-index.md` | `CANONICAL` | Elenco navigabile di tutti i `.md` tracciati nel repository. |
 | Deep dive tecnico architettura | `docs/ARCHITETTURA.md` | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | `docs/system_architecture.md` | `SECONDARY` | Versione compatta/rapida. |
 | Setup client macOS e TLS locale | `docs/NATIVE.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/local-api-tls.md` | `CANONICAL` | Materiale operativo nativo. |
