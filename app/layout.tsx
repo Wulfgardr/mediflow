@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 };
 
 import { SecurityProvider } from '@/components/security-provider';
-import { LockScreen } from '@/components/lock-screen';
 
 export default function RootLayout({
   children,
@@ -24,7 +23,7 @@ export default function RootLayout({
       <body className={cn("antialiased overflow-x-hidden")} suppressHydrationWarning>
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
           <SecurityProvider>
-            <LockScreen />
+            {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}
             <PrivacyProvider>
               <div className="flex">
                 <Sidebar />
