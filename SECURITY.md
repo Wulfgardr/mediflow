@@ -2,7 +2,7 @@
 
 MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
 
-Qui troverai i confini di sicurezza e aspettative minime per chi contribuisca, risulta fondamentale conoscere un minimo gli argomenti in questa pagina, forse ancora di più delle competenze tecniche..
+Qui troverai i confini di sicurezza e aspettative minime per chi contribuisca, risulta fondamentale conoscere un minimo gli argomenti in questa pagina, forse ancora più delle competenze informatiche.
 
 ---
 
