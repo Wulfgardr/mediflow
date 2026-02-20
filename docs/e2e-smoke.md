@@ -35,9 +35,10 @@ npm run e2e:smoke
 Lo script:
 
 1. usa un data dir isolato (`MEDIFLOW_DATA_DIR=./tmp-e2e-data`)
-2. avvia Next.js (`npm run dev`)
-3. attende readiness su `http://127.0.0.1:3000`
-4. esegue il test Playwright `e2e/web-smoke.spec.ts`
+2. prepara credenziali deterministiche per smoke (`admin` + `E2E_PIN`, default `1234`)
+3. avvia Next.js (`npm run dev`)
+4. attende readiness su `http://127.0.0.1:3000`
+5. esegue il test Playwright `e2e/web-smoke.spec.ts`
 
 Output utili:
 

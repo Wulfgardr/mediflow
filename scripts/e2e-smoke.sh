@@ -23,6 +23,9 @@ if ! node -e "require.resolve('@playwright/test/package.json')" >/dev/null 2>&1;
   exit 1
 fi
 
+echo "Preparing deterministic auth state in $E2E_DATA_DIR ..."
+node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
+
 DEV_PID=""
 
 cleanup() {

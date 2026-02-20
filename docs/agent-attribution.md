@@ -24,6 +24,7 @@ Entries are additive and minimal.
 - Split lint scripts into quiet default and full-warning mode: `package.json`
 - Added operational guide for smoke harness and VM execution model: `docs/e2e-smoke.md`
 - Updated canonical docs index and parity plan sequencing with smoke-harness stabilization item: `docs/README.md`, `PLANS.md`
+- Stabilized web smoke auth determinism by adding E2E DB bootstrap (known admin/PIN), wiring it into smoke runner, hardening lock-screen locators, and removing duplicated lock overlay mount from root layout: `scripts/prepare-e2e-db.mjs`, `scripts/e2e-smoke.sh`, `e2e/web-smoke.spec.ts`, `app/layout.tsx`, `docs/e2e-smoke.md`
 
 ## 2026-02-19 Codex
 - Added full repository Markdown index (all tracked `.md`) for GitHub navigation fallback and linked it from canonical doc entrypoints: `docs/markdown-index.md`, `README.md`, `docs/README.md`
