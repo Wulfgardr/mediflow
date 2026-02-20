@@ -2,11 +2,12 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (sintesi rapida).**
-> La visione architetturale stabile resta `ARCHITECTURE.md`.
-> Il walkthrough operativo canonico resta `docs/walkthrough.md`.
+> La visione architetturale stabile resta [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
 
 Panoramica tecnica rapida di componenti, topologia e flussi principali.
-Per il dettaglio completo usa `docs/walkthrough.md`.
+Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
+Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
 
 ---
 

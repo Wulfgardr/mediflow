@@ -17,10 +17,11 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 - Riassumere sicurezza, cifratura e trasporto locale.
 
 Se serve il dettaglio di singoli moduli, consulta anche:
-- `docs/topologia-dati-flussi.md`
-- `docs/system_architecture.md`
-- `docs/native-setup.md`
-- `docs/native-launch.md`
+- [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
+- [docs/system_architecture.md](./system_architecture.md)
+- [docs/native-setup.md](./native-setup.md)
+- [docs/native-launch.md](./native-launch.md)
+- [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md)
 
 ---
 

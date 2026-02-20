@@ -2,13 +2,14 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (deep dive tecnico).**
-> Per confini stabili e decisioni architetturali prevale `ARCHITECTURE.md`.
-> Per il flusso operativo end-to-end prevale `docs/walkthrough.md`.
+> Per confini stabili e decisioni architetturali prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Per il flusso operativo end-to-end prevale [docs/walkthrough.md](./walkthrough.md).
 
 > Stack tecnico, sicurezza e flussi dati.
 > Documento per chi deve implementare, mantenere o estendere MediFlow.
 
-Per confini stabili e decisioni di alto livello, consulta prima `ARCHITECTURE.md`.
+Per confini stabili e decisioni di alto livello, consulta prima [ARCHITECTURE.md](../ARCHITECTURE.md).
+Per orientarti nella documentazione completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
 
 ---
 

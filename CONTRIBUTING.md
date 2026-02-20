@@ -77,9 +77,11 @@ npx tsc --noEmit
 - Script: `scripts/`
 
 Documentazione tecnica:
-- `docs/walkthrough.md`
-- `docs/system_architecture.md`
-- `docs/ARCHITETTURA.md`
+- [docs/README.md](./docs/README.md) (mappa canonica documentazione)
+- [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
+- [docs/walkthrough.md](./docs/walkthrough.md)
+- [docs/system_architecture.md](./docs/system_architecture.md)
+- [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
 
 ---
 
@@ -142,6 +144,9 @@ Una PR è considerata conclusa quando:
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
 - Se cambiano comportamenti/contratti, documentazione aggiornata:
   - README / ARCHITECTURE / ADR (quando appropriato)
+- Se aggiungi/rimuovi/rinomini `.md`, aggiorna anche:
+  - `docs/README.md` (se cambia ownership o priorità)
+  - `docs/markdown-index.md` (lista + sintesi file)
 
 ---
 

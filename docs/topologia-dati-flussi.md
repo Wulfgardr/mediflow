@@ -2,8 +2,8 @@
 
 > [!IMPORTANT]
 > **Stato documento: CANONICAL (topologia dati e percorsi digitali end-to-end).**
-> Per principi stabili e confini, prevale `ARCHITECTURE.md`.
-> Per policy di sicurezza e redazione, prevale `SECURITY.md`.
+> Per principi stabili e confini, prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Per policy di sicurezza e redazione, prevale [SECURITY.md](../SECURITY.md).
 
 Questo documento mappa in modo operativo:
 
@@ -11,6 +11,11 @@ Questo documento mappa in modo operativo:
 - dove viene cifrato/decifrato
 - dove viene persistito
 - quali controlli di sicurezza lo proteggono
+
+Riferimenti rapidi:
+- [docs/walkthrough.md](./walkthrough.md)
+- [docs/README.md](./README.md)
+- [docs/markdown-index.md](./markdown-index.md)
 
 ---
 

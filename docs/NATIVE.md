@@ -2,6 +2,14 @@
 
 > Guida tecnica del client SwiftUI di MediFlow.
 
+Riferimenti correlati:
+
+- [docs/README.md](./README.md) (mappa canonica documentazione)
+- [docs/markdown-index.md](./markdown-index.md) (indice completo markdown)
+- [docs/walkthrough.md](./walkthrough.md) (flusso end-to-end)
+- [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
+- [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
+
 ---
 
 ## Stato del progetto
@@ -54,7 +62,7 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 
 La strategia testing ufficiale e documentata in:
 
-- `docs/native-testing.md`
+- [docs/native-testing.md](./native-testing.md)
 
 Comandi rapidi:
 

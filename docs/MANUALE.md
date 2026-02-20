@@ -2,6 +2,11 @@
 
 > Guida pratica per partire in pochi minuti.
 
+Riferimenti utili:
+- [README.md](../README.md) (onboarding rapido progetto)
+- [docs/COMPLIANCE.md](./COMPLIANCE.md) (quadro privacy/GDPR/FHIR)
+- [docs/ROADMAP.md](./ROADMAP.md) (direzione prodotto)
+
 ---
 
 ## 1. Installazione e avvio

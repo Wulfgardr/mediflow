@@ -8,7 +8,12 @@ in ambiente isolato.
 
 - Web: smoke test automatizzato con Playwright (`e2e/web-smoke.spec.ts`).
 - macOS: testing tracciato separatamente nel playbook native:
-  - `docs/native-testing.md`
+  - [docs/native-testing.md](./native-testing.md)
+
+Riferimenti correlati:
+- [docs/parity-matrix.md](./parity-matrix.md)
+- [PLANS.md](../PLANS.md)
+- [docs/README.md](./README.md)
 
 ## Prerequisiti
 

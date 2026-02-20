@@ -4,10 +4,11 @@ Questo documento descrive l'**architettura stabile ad alto livello** di MediFlow
 Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazione.
 Per il resto:
 
-- `docs/walkthrough.md` (end-to-end, web + native)
-- `docs/topologia-dati-flussi.md` (topologia dati + percorsi digitali end-to-end)
-- `docs/ARCHITETTURA.md` e `docs/system_architecture.md` (deep dive)
-- `docs/adr/` (decisioni architetturali)
+- [docs/walkthrough.md](./docs/walkthrough.md) (end-to-end, web + native)
+- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (topologia dati + percorsi digitali end-to-end)
+- [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md) e [docs/system_architecture.md](./docs/system_architecture.md) (deep dive)
+- [docs/adr/](./docs/adr/README.md) (decisioni architetturali)
+- [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa canonica + inventario completo)
 
 ---
 
@@ -147,6 +148,7 @@ flowchart TB
 - Per ogni modifica non banale, scrivi un ADR in `docs/adr/`.
 - Mantieni gli ADR brevi e concreti (problema -> opzioni -> trade-off -> decisione -> thin slice).
 - Aggiorna:
-  - `ARCHITECTURE.md` solo se cambiano visione stabile o confini
-  - `docs/walkthrough.md` se cambia il flusso reale end-to-end
-  - `docs/topologia-dati-flussi.md` se cambiano percorsi dati, trust boundaries o superfici API
+  - [ARCHITECTURE.md](./ARCHITECTURE.md) solo se cambiano visione stabile o confini
+  - [docs/walkthrough.md](./docs/walkthrough.md) se cambia il flusso reale end-to-end
+  - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) se cambiano percorsi dati, trust boundaries o superfici API
+  - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) quando cambiano ownership o mappa documentale

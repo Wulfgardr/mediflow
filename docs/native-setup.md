@@ -6,6 +6,12 @@ Questo script automatizza:
 - avvio proxy TLS
 - creazione config per il client macOS
 
+Riferimenti correlati:
+- [docs/NATIVE.md](./NATIVE.md)
+- [docs/local-api-tls.md](./local-api-tls.md)
+- [docs/native-launch.md](./native-launch.md)
+- [docs/native-testing.md](./native-testing.md)
+
 ## Uso
 
 ```bash

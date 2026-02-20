@@ -16,10 +16,10 @@ Nei moduli core, web app e app macOS devono avere:
 4. capacita di lavorare in modo indipendente (stesso DB condiviso, nessun storage duplicato)
 
 Riferimenti:
-- `docs/adr/0005-web-native-functional-parity.md`
-- `docs/adr/0008-web-first-with-parity-sweeps.md`
-- `docs/adr/0009-native-testing-strategy-xcode-xctest.md`
-- `PLANS.md` (sezione 5 e 5a)
+- [docs/adr/0005-web-native-functional-parity.md](./adr/0005-web-native-functional-parity.md)
+- [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
+- [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
+- [PLANS.md](../PLANS.md) (sezione 5 e 5a)
 
 ## Cadenza operativa
 

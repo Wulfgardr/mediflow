@@ -6,6 +6,16 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
+## Riferimenti correlati
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
+- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dato e trust boundaries)
+- [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
+- [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
+- [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
+
+---
+
 ## Principi di sicurezza fondamentali
 
 - **Local-first di default**: nessuna uscita cloud se non esplicitamente implementata e documentata.
@@ -69,7 +79,7 @@ Regole minime:
 ### Trasporto
 
 - Web UI usa HTTP su localhost.
-- Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi `docs/local-api-tls.md`).
+- Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
 
 ---
 

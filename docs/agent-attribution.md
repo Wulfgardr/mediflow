@@ -5,6 +5,8 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-02-20 Codex
+- Strengthened documentation cross-reference system: made `docs/README.md` the explicit consult-policy map, upgraded `docs/markdown-index.md` to a full descriptive inventory (including ADR 0009), and added maintenance rules for `.md` changes: `AGENTS.md`, `README.md`, `docs/README.md`, `docs/markdown-index.md`, `CONTRIBUTING.md`
+- Added/normalized internal doc links across canonical technical/operational guides to improve agent navigation between architecture, security, parity, native setup/testing, and planning docs: `ARCHITECTURE.md`, `SECURITY.md`, `PLANS.md`, `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `docs/ARCHITETTURA.md`, `docs/system_architecture.md`, `docs/NATIVE.md`, `docs/native-testing.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/e2e-smoke.md`, `docs/local-api-tls.md`, `docs/icd-local-setup.md`, `docs/COMPLIANCE.md`, `docs/FSE2-terminology-roadmap.md`, `docs/parity-matrix.md`, `docs/ROADMAP.md`, `docs/product_roadmap.md`, `docs/MANUALE.md`
 - Added web smoke E2E scaffolding with Playwright config and first unlock/setup + navigation flow: `playwright.config.ts`, `e2e/web-smoke.spec.ts`
 - Added isolated smoke orchestrator script (`MEDIFLOW_DATA_DIR` scoped) and npm commands for repeatable local/VM runs: `scripts/e2e-smoke.sh`, `package.json`, `.gitignore`
 - Added macOS accessibility identifiers for parity click-path automation in patient list and patient detail surfaces: `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift`

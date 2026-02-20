@@ -28,56 +28,56 @@ Qui l'obiettivo è l'opposto: lavorare bene, in locale, con controllo pieno dei 
 ### 🩺 Per il medico
 
 Vuoi solo installarlo e usarlo?
-- Manuale operativo: `docs/MANUALE.md`
+- Manuale operativo: [docs/MANUALE.md](./docs/MANUALE.md)
 
 ### 🧑‍💻 Per sviluppatori / contributori
 
 Inizia da qui (ordine consigliato):
 
 1. **Indice canonico della documentazione (cosa è fonte di verità)**
-   - `docs/README.md`
+   - [docs/README.md](./docs/README.md)
+   - [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown + sintesi)
 
 2. **Visione e confini dell'architettura**
-   - `ARCHITECTURE.md`
+   - [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 3. **Sicurezza (policy, redaction, scanning, disclosure)**
-   - `SECURITY.md`
+   - [SECURITY.md](./SECURITY.md)
 
 4. **Come contribuire e come avviare il progetto**
-   - `CONTRIBUTING.md`
+   - [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 5. **Decisioni architetturali (ADR)**
-   - `docs/adr/`
+   - [docs/adr/](./docs/adr/README.md)
 
 6. **Piano di lavoro in corso (engineering plan, non product roadmap)**
-   - `PLANS.md`
+   - [PLANS.md](./PLANS.md)
 
 7. **Walkthrough end-to-end (web + native + servizi locali)**
-   - `docs/walkthrough.md`
+   - [docs/walkthrough.md](./docs/walkthrough.md)
 
 8. **Approfondimenti tecnici**
-   - `docs/markdown-index.md` (indice completo di tutti i `.md` della repo)
-   - `docs/topologia-dati-flussi.md`
-   - `docs/ARCHITETTURA.md`
-   - `docs/system_architecture.md`
-   - `docs/FSE2-terminology-roadmap.md`
+   - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md)
+   - [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
+   - [docs/system_architecture.md](./docs/system_architecture.md)
+   - [docs/FSE2-terminology-roadmap.md](./docs/FSE2-terminology-roadmap.md)
 
 ### ⚖️ Compliance & privacy
 
 GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
-- `docs/COMPLIANCE.md`
+- [docs/COMPLIANCE.md](./docs/COMPLIANCE.md)
 
 ### 🍏 Client nativo macOS
 
-- `docs/NATIVE.md`
-- `docs/native-testing.md`
-- `docs/native-setup.md`
-- `docs/native-launch.md`
-- `docs/local-api-tls.md`
+- [docs/NATIVE.md](./docs/NATIVE.md)
+- [docs/native-testing.md](./docs/native-testing.md)
+- [docs/native-setup.md](./docs/native-setup.md)
+- [docs/native-launch.md](./docs/native-launch.md)
+- [docs/local-api-tls.md](./docs/local-api-tls.md)
 
 ### 🗺 Roadmap prodotto
 
-- `docs/ROADMAP.md`
+- [docs/ROADMAP.md](./docs/ROADMAP.md)
 
 ---
 

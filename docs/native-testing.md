@@ -13,16 +13,16 @@ usando strumenti Apple-native (SwiftPM, XCTest, Xcode/xcodebuild), mantenendo
 la parity con la web app senza forzare tool browser-centrici sul client Swift.
 
 Riferimenti:
-- `docs/adr/0008-web-first-with-parity-sweeps.md`
-- `docs/adr/0009-native-testing-strategy-xcode-xctest.md`
-- `PLANS.md` (sezione `P0b`)
-- `docs/parity-matrix.md`
+- [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
+- [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
+- [PLANS.md](../PLANS.md) (sezione `P0b`)
+- [docs/parity-matrix.md](./parity-matrix.md)
 
 ---
 
 ## Decisione operativa
 
-1. Web app: smoke E2E con Playwright (`docs/e2e-smoke.md`).
+1. Web app: smoke E2E con Playwright ([docs/e2e-smoke.md](./e2e-smoke.md)).
 2. App macOS: test automatici con XCTest (SwiftPM/Xcode).
 3. Parity sweep: usare entrambi i binari nello stesso ciclo di verifica.
 

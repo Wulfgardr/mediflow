@@ -1,7 +1,7 @@
 # PLANS — MediFlow (Piano Engineering Attivo)
 
 Questo è il **piano operativo engineering** (orizzonte settimane), non la roadmap prodotto.
-Per direzione prodotto e release narrative, usa `docs/ROADMAP.md`.
+Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
@@ -94,9 +94,11 @@ Ordine di consegna consigliato (incrementale):
 
 ## Riferimenti
 
-- Regole source-of-truth: `AGENTS.md`
-- Visione architetturale: `ARCHITECTURE.md`
-- Contributi / verify loop: `CONTRIBUTING.md`
-- Policy sicurezza: `SECURITY.md`
-- ADR: `docs/adr/`
-- Walkthrough tecnico: `docs/walkthrough.md`
+- Regole source-of-truth: [AGENTS.md](./AGENTS.md)
+- Mappa documentale canonica: [docs/README.md](./docs/README.md)
+- Inventario markdown completo: [docs/markdown-index.md](./docs/markdown-index.md)
+- Visione architetturale: [ARCHITECTURE.md](./ARCHITECTURE.md)
+- Contributi / verify loop: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Policy sicurezza: [SECURITY.md](./SECURITY.md)
+- ADR: [docs/adr/](./docs/adr/README.md)
+- Walkthrough tecnico: [docs/walkthrough.md](./docs/walkthrough.md)
