@@ -38,9 +38,11 @@ Ultimo aggiornamento: 2026-02-20
 | Walkthrough end-to-end | `docs/walkthrough.md` | `CANONICAL` | Mappa operativa web + native + servizi locali. |
 | Topologia dati e flussi | `docs/topologia-dati-flussi.md` | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries). |
 | Indice completo Markdown repo | `docs/markdown-index.md` | `CANONICAL` | Elenco navigabile di tutti i `.md` tracciati nel repository. |
+| Testing app macOS | `docs/native-testing.md` | `CANONICAL` | Strategia e workflow ufficiale test native (XCTest/Xcode). |
+| Smoke test interattivi | `docs/e2e-smoke.md` | `SECONDARY` | Harness operativo per run E2E isolati e uso in VM. |
 | Deep dive tecnico architettura | `docs/ARCHITETTURA.md` | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | `docs/system_architecture.md` | `SECONDARY` | Versione compatta/rapida. |
-| Setup client macOS e TLS locale | `docs/NATIVE.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/local-api-tls.md` | `CANONICAL` | Materiale operativo nativo. |
+| Setup client macOS e TLS locale | `docs/NATIVE.md`, `docs/native-testing.md`, `docs/native-setup.md`, `docs/native-launch.md`, `docs/local-api-tls.md` | `CANONICAL` | Materiale operativo nativo. |
 | Compliance/GDPR/FHIR | `docs/COMPLIANCE.md` | `CANONICAL` | Quadro compliance e interoperabilità. |
 | Manuale utente medico | `docs/MANUALE.md` | `CANONICAL` | Uso prodotto lato clinico. |
 

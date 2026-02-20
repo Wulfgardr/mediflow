@@ -202,15 +202,19 @@ struct PatientDetailView: View {
             Button("Nuova voce") {
                 showingNewEntry = true
             }
+            .accessibilityIdentifier("patient-detail-new-entry-button")
             Button("Nuova terapia") {
                 showingNewTherapy = true
             }
+            .accessibilityIdentifier("patient-detail-new-therapy-button")
             Button("Nuovo appuntamento") {
                 showingNewCheckup = true
             }
+            .accessibilityIdentifier("patient-detail-new-checkup-button")
             Button("AI Studio") {
                 showingAIStudio = true
             }
+            .accessibilityIdentifier("patient-detail-ai-studio-button")
         }
         .sheet(isPresented: $showingNewEntry) {
             GlassPanelWindow(
@@ -389,6 +393,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-entry-filter")
                 Spacer()
             }
             if let entriesErrorMessage {
@@ -428,6 +433,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-therapy-filter")
                 Spacer()
             }
             if let therapiesErrorMessage {
@@ -466,6 +472,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-checkup-filter")
                 Spacer()
             }
             if let checkupsErrorMessage {

@@ -13,6 +13,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MediFlowMac"
+        ),
+        .testTarget(
+            name: "MediFlowMacTests",
+            dependencies: ["MediFlowMac"]
         )
     ]
 )

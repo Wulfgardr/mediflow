@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:native": "bash scripts/native-test.sh",
+    "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
+    "e2e:web": "npx playwright test e2e/web-smoke.spec.ts",
+    "e2e:smoke": "bash scripts/e2e-smoke.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

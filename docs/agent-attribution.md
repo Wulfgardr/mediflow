@@ -4,6 +4,18 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-02-20 Codex
+- Added web smoke E2E scaffolding with Playwright config and first unlock/setup + navigation flow: `playwright.config.ts`, `e2e/web-smoke.spec.ts`
+- Added isolated smoke orchestrator script (`MEDIFLOW_DATA_DIR` scoped) and npm commands for repeatable local/VM runs: `scripts/e2e-smoke.sh`, `package.json`, `.gitignore`
+- Added macOS accessibility identifiers for parity click-path automation in patient list and patient detail surfaces: `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/PatientDetailView.swift`
+- Added macOS patient parity actions (`edit/archive/delete`) with toolbar + context-menu flows and dedicated edit form wired to `/api/v1/patients/:id`: `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/EditPatientView.swift`
+- Extracted patient list filter/sort logic into testable Swift module and wired ContentView to shared helper: `native/MediFlowMac/Sources/MediFlowMac/PatientsFiltering.swift`, `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`
+- Added first native XCTest suite for patient filter/sort parity semantics in SwiftPM test target: `native/MediFlowMac/Package.swift`, `native/MediFlowMac/Tests/MediFlowMacTests/PatientsFilteringTests.swift`
+- Added native testing runner script and npm commands for `swift test` / `xcodebuild test`: `scripts/native-test.sh`, `package.json`
+- Added ADR and canonical guide for macOS testing strategy (XCTest/Xcode-first): `docs/adr/0009-native-testing-strategy-xcode-xctest.md`, `docs/native-testing.md`
+- Added operational guide for smoke harness and VM execution model: `docs/e2e-smoke.md`
+- Updated canonical docs index and parity plan sequencing with smoke-harness stabilization item: `docs/README.md`, `PLANS.md`
+
 ## 2026-02-19 Codex
 - Added full repository Markdown index (all tracked `.md`) for GitHub navigation fallback and linked it from canonical doc entrypoints: `docs/markdown-index.md`, `README.md`, `docs/README.md`
 - Fixed Mermaid compatibility in `ARCHITECTURE.md` by quoting graph labels/subgraph titles and preserving the same architecture mapping.

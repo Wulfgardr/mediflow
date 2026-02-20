@@ -70,6 +70,7 @@ GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
 ### 🍏 Client nativo macOS
 
 - `docs/NATIVE.md`
+- `docs/native-testing.md`
 - `docs/native-setup.md`
 - `docs/native-launch.md`
 - `docs/local-api-tls.md`

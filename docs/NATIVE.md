@@ -28,9 +28,9 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 ./scripts/Launch_MediFlowMac.command
 ```
 
-* avvia Next.js
-* avvia proxy TLS
-* lancia app macOS compilata (se presente)
+* configura TLS locale
+* compila il client nativo
+* apre la app macOS
 
 **Opzione B: setup sviluppatore**
 
@@ -45,8 +45,23 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 2. Apri il progetto in Xcode:
 
     ```bash
-    open native/MediFlowMac.xcodeproj
+    open native/MediFlowMac/Package.swift
     ```
+
+---
+
+## Testing nativo (Xcode-first)
+
+La strategia testing ufficiale e documentata in:
+
+- `docs/native-testing.md`
+
+Comandi rapidi:
+
+```bash
+npm run test:native
+npm run test:native:xcode
+```
 
 ---
 
