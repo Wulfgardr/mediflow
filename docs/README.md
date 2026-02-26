@@ -24,6 +24,7 @@ Documenti da consultare **al bisogno**:
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity web/macOS: [docs/parity-matrix.md](./parity-matrix.md)
 - Setup/testing nativo: [docs/NATIVE.md](./NATIVE.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](./native-launch.md), [docs/native-testing.md](./native-testing.md), [docs/parity-smoke.md](./parity-smoke.md), [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
+- Tooling documentale Apple (MCP): [docs/apple-docs-mcp.md](./apple-docs-mcp.md)
 - Compliance e roadmap: [docs/COMPLIANCE.md](./COMPLIANCE.md), [docs/ROADMAP.md](./ROADMAP.md), [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md)
 
 ## Ordine di lettura consigliato

@@ -48,6 +48,7 @@ Ultimo aggiornamento: 2026-03-03
 | [docs/e2e-smoke.md](./e2e-smoke.md) | Harness smoke test web Playwright in ambiente isolato. | Per verifica rapida web in CI/VM. |
 | [docs/parity-smoke.md](./parity-smoke.md) | Runner parity unificato web+native con artifacts e gating. | Per esecuzioni `P0b` e smoke consolidati. |
 | [docs/parity-click-map-macos.md](./parity-click-map-macos.md) | Checklist click-path macOS capability-by-capability. | Per validazione manuale parity UI su app native. |
+| [docs/apple-docs-mcp.md](./apple-docs-mcp.md) | Guida integrazione del tooling MCP per consultare docs Apple durante sviluppo native. | Quando servono riferimenti API ufficiali Apple in task SwiftUI/network/security/testing. |
 | [docs/icd-local-setup.md](./icd-local-setup.md) | Setup locale container ICD-11. | Quando si lavora su diagnostica ICD. |
 
 ## Prodotto, compliance e contesto clinico

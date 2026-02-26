@@ -15,6 +15,11 @@ Entries are additive and minimal.
 - Updated canonical documentation map with source-of-truth ownership for Linear+Codex workflow and refreshed metadata date: `docs/README.md`
 - Updated full markdown inventory with the new playbook entry and refreshed metadata date: `docs/markdown-index.md`
 
+## 2026-02-26 Codex
+- Added Apple docs MCP developer integration guide with project guardrails (dev-only, no PHI/PII in queries), version pinning, MCP config snippet, and MediFlow-oriented workflow/templates: `docs/apple-docs-mcp.md`
+- Added npm smoke-check command for the pinned Apple docs MCP server version: `package.json`
+- Registered the new guide in canonical document maps/indexes and refreshed metadata dates: `docs/README.md`, `docs/markdown-index.md`
+
 ## 2026-02-20 Codex
 - Added private-only OSS export playbook documenting private/public repo model, filtering rules, markdown reference sanitization, and release checklist: `docs/private/oss-export-playbook.md`
 - Added OSS export hardening workflow with npm entrypoint and docs: `package.json`, `CONTRIBUTING.md`
