@@ -15,6 +15,9 @@ Entries are additive and minimal.
 - Updated canonical documentation map with source-of-truth ownership for Linear+Codex workflow and refreshed metadata date: `docs/README.md`
 - Updated full markdown inventory with the new playbook entry and refreshed metadata date: `docs/markdown-index.md`
 
+## 2026-02-27 Codex
+- Extended Apple Docs MCP integration guide with Codex-native setup commands (`codex mcp add/list/get/remove`) and troubleshooting note for network/proxy resolution failures: `docs/apple-docs-mcp.md`
+
 ## 2026-02-26 Codex
 - Added Apple docs MCP developer integration guide with project guardrails (dev-only, no PHI/PII in queries), version pinning, MCP config snippet, and MediFlow-oriented workflow/templates: `docs/apple-docs-mcp.md`
 - Added npm smoke-check command for the pinned Apple docs MCP server version: `package.json`

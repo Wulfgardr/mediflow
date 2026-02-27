@@ -57,6 +57,30 @@ Inserire nel file di configurazione MCP del client usato (Cursor/Claude Desktop/
 }
 ```
 
+## Setup rapido Codex (consigliato)
+
+Per integrare il server direttamente in Codex (CLI/Desktop):
+
+```bash
+codex mcp add apple-docs -- npx -y @kimsungwhee/apple-docs-mcp@1.0.23
+```
+
+Verifica configurazione:
+
+```bash
+codex mcp list
+codex mcp get apple-docs
+```
+
+Rimozione (se serve):
+
+```bash
+codex mcp remove apple-docs
+```
+
+Nota operativa:
+- Se compare `ENOTFOUND registry.npmjs.org` durante i test, e un problema di rete/proxy locale, non di MediFlow.
+
 ---
 
 ## Guardrail sicurezza (obbligatori)
@@ -92,4 +116,3 @@ Riferimenti policy:
 - "Explain security-scoped bookmarks for App Sandbox and persistent folder access in macOS apps."
 - "Show URLSession certificate/public key pinning approaches for local HTTPS endpoints."
 - "Show XCTest patterns for SwiftUI view model behavior tests."
-
