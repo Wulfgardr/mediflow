@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-03-03 Codex
+- Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
 - Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`
 - Added `@linear/import` execution guide in the playbook (CLI flow, prompt choices, project-wise import runbook): `docs/linear-codex-playbook.md`
 - Added seed-to-LinearCSV converter script and npm command for repeatable imports: `scripts/prepare-linear-import.mjs`, `package.json`

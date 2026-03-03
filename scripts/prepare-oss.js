@@ -26,7 +26,13 @@ const TO_EXCLUDE_BY_NAME = [
 const TO_EXCLUDE_BY_PATH = [
     'AGENTS.md',
     'docs/agent-attribution.md',
-    'docs/private'
+    'docs/private',
+    'docs/linear-codex-playbook.md',
+    'docs/linear-seed-issues.csv',
+    'docs/linear-import-open.linear.csv',
+    'docs/linear-import-open.mf-core-q2.linear.csv',
+    'docs/linear-import-open.mf-parity-q2.linear.csv',
+    'docs/linear-import-open.mf-fse-q2.linear.csv'
 ];
 
 const REPLACEMENTS = [
