@@ -14,6 +14,9 @@ Entries are additive and minimal.
 - Generated import-ready CSV artifacts (all + per project stream): `docs/linear-import-open.linear.csv`, `docs/linear-import-open.mf-core-q2.linear.csv`, `docs/linear-import-open.mf-parity-q2.linear.csv`, `docs/linear-import-open.mf-fse-q2.linear.csv`
 - Updated canonical documentation map with source-of-truth ownership for Linear+Codex workflow and refreshed metadata date: `docs/README.md`
 - Updated full markdown inventory with the new playbook entry and refreshed metadata date: `docs/markdown-index.md`
+- Added structural Codex MCP validation script for apple-docs (`codex mcp get` + version pin enforcement) and wired it to npm scripts: `scripts/codex-mcp-apple-docs-validate.sh`, `package.json`
+- Added robust runtime smoke script for apple-docs-mcp with bounded startup timeout (prevents hanging checks) and wired it as the project test entrypoint: `scripts/mcp-apple-docs-smoke.mjs`, `package.json`
+- Updated Apple Docs MCP guide to document dual validation levels (`validate` vs runtime smoke) for repeatable cross-project setup: `docs/apple-docs-mcp.md`
 
 ## 2026-02-27 Codex
 - Extended Apple Docs MCP integration guide with Codex-native setup commands (`codex mcp add/list/get/remove`) and troubleshooting note for network/proxy resolution failures: `docs/apple-docs-mcp.md`

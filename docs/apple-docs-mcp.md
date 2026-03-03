@@ -37,8 +37,12 @@ Per ridurre drift, usare un pin esplicito:
 Smoke check locale:
 
 ```bash
+npm run mcp:apple-docs:validate
 npm run mcp:apple-docs:test
 ```
+
+- `mcp:apple-docs:validate`: verifica setup strutturale in Codex (server presente + versione pin).
+- `mcp:apple-docs:test`: smoke runtime con timeout controllato (evita processi appesi).
 
 ---
 
@@ -80,6 +84,7 @@ codex mcp remove apple-docs
 
 Nota operativa:
 - Se compare `ENOTFOUND registry.npmjs.org` durante i test, e un problema di rete/proxy locale, non di MediFlow.
+- `mcp:apple-docs:test` chiude automaticamente dopo la finestra di smoke e considera il test valido se il server resta vivo oltre la soglia di startup.
 
 ---
 
