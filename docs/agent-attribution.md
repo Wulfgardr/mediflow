@@ -4,6 +4,16 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-03 Codex
+- Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`
+- Added `@linear/import` execution guide in the playbook (CLI flow, prompt choices, project-wise import runbook): `docs/linear-codex-playbook.md`
+- Added seed-to-LinearCSV converter script and npm command for repeatable imports: `scripts/prepare-linear-import.mjs`, `package.json`
+- Added automated import runner for `@linear/import` using `expect` to process all project CSV streams in sequence (`LINEAR_API_KEY` + optional team/project overrides): `scripts/linear-import-all.sh`, `package.json`
+- Added direct GraphQL importer (`linear:import:api`) to bypass interactive CLI limitations and import CSV backlog into target Linear team/project with dedupe + auto-label creation: `scripts/linear-import-via-api.mjs`, `package.json`
+- Generated import-ready CSV artifacts (all + per project stream): `docs/linear-import-open.linear.csv`, `docs/linear-import-open.mf-core-q2.linear.csv`, `docs/linear-import-open.mf-parity-q2.linear.csv`, `docs/linear-import-open.mf-fse-q2.linear.csv`
+- Updated canonical documentation map with source-of-truth ownership for Linear+Codex workflow and refreshed metadata date: `docs/README.md`
+- Updated full markdown inventory with the new playbook entry and refreshed metadata date: `docs/markdown-index.md`
+
 ## 2026-02-20 Codex
 - Added private-only OSS export playbook documenting private/public repo model, filtering rules, markdown reference sanitization, and release checklist: `docs/private/oss-export-playbook.md`
 - Added OSS export hardening workflow with npm entrypoint and docs: `package.json`, `CONTRIBUTING.md`

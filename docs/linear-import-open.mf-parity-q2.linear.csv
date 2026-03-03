@@ -1,0 +1,7 @@
+Title,Description,Priority,Status,Assignee,Labels,Estimate,Created,Started,Completed,Archived
+P0b.c parity run strict in VM,Eseguire run web+native required con checklist compilata.,High,Backlog,,"parity, testing, native, web, project/mf-parity-q2, source/linear-seed",,,,,
+P2 Esenzioni native selector/search/save,Chiudere gap mapping esenzioni create/update paziente.,High,Backlog,,"parity, native, exemptions, project/mf-parity-q2, source/linear-seed",,,,,
+P3 Osservazioni native CRUD LOINC+UCUM,UI macOS su contratto gia disponibile.,High,Backlog,,"parity, native, observations, project/mf-parity-q2, source/linear-seed",,,,,
+P4 Allineare delete diario (soft/restore/reason),Semantica identica web/native su delete/restore.,High,Backlog,,"parity, entries, project/mf-parity-q2, source/linear-seed",,,,,
+P5 Operabilita cataloghi in Settings macOS,Import/clear/stato minimo senza storage duplicato.,Medium,Backlog,,"parity, native, catalogs, project/mf-parity-q2, source/linear-seed",,,,,
+P6 Chiusura parity + update walkthrough,Smoke capability-by-capability e update docs canoniche.,High,Backlog,,"parity, docs, project/mf-parity-q2, source/linear-seed",,,,,
