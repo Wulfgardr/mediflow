@@ -25,6 +25,9 @@ Entries are additive and minimal.
 - Documented the patient concurrency runbook and wired it into the canonical docs/testing workflow: `docs/patient-concurrency-tests.md`, `docs/README.md`, `docs/markdown-index.md`, `CONTRIBUTING.md`
 - Added an OpenAPI anti-drift guard with tracked undocumented-route policy, breaking overrides, and CI wiring for `/api/v1`: `scripts/check-openapi-drift.mjs`, `docs/openapi/contract-policy.json`, `.github/workflows/openapi-contract-guard.yml`
 
+## 2026-03-11 Codex
+- Deferred server-side `pdfjs-dist` loading behind a runtime loader with minimal Node shims to avoid Turbopack build warnings about optional `canvas` polyfills: `lib/pdfjs-server.ts`, `app/api/pdf-extract/route.ts`
+
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
 - Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`

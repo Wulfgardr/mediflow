@@ -1,8 +1,9 @@
 
 import { NextResponse } from 'next/server';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { loadPdfJsServer } from '@/lib/pdfjs-server';
 
 /**
  * Server-Side PDF Text Extraction API
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
+        const pdfjsLib = await loadPdfJsServer();
         const formData = await req.formData();
         const file = formData.get('file') as File | null;
 
