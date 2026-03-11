@@ -42,6 +42,10 @@ Entries are additive and minimal.
 - Added robust runtime smoke script for apple-docs-mcp with bounded startup timeout (prevents hanging checks) and wired it as the project test entrypoint: `scripts/mcp-apple-docs-smoke.mjs`, `package.json`
 - Updated Apple Docs MCP guide to document dual validation levels (`validate` vs runtime smoke) for repeatable cross-project setup: `docs/apple-docs-mcp.md`
 
+## 2026-03-11 Codex
+- Added patient-side cleanup actions for Smart Archive (`remove single` + `clear all`) with immediate persistence and AI summary refresh after archive changes: `components/document-insights-panel.tsx`
+- Aligned AI context building so an explicitly emptied Smart Archive no longer falls back to stale attachment summaries for the same patient: `lib/ai-context.ts`
+
 ## 2026-02-27 Codex
 - Extended Apple Docs MCP integration guide with Codex-native setup commands (`codex mcp add/list/get/remove`) and troubleshooting note for network/proxy resolution failures: `docs/apple-docs-mcp.md`
 

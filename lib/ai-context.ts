@@ -70,51 +70,70 @@ export async function buildPatientContext(patientId: string): Promise<string> {
         })
         .join("\n");
 
-    // 3. Fetch Recent Attachments (Summaries)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allAttachments = await db.attachments.filter((a: any) => a.patientId === patient.id).toArray();
-    const attachments = allAttachments
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 3);
-
-    const docsContext = attachments
-        .filter(a => a.summarySnapshot)
-        .map(a => `[DOC ${a.name}]: ${a.summarySnapshot}`)
-        .join("\n");
-
     /* @Codex */
-    let insightsContext = "";
-    if (patient.documentInsights) {
+    const hasExplicitArchive = patient.documentInsights !== undefined && patient.documentInsights !== null;
+    let archiveInsights: Array<{
+        fileName?: string;
+        summary?: string;
+        quality?: { level?: string };
+        extractedData?: { diagnoses?: Array<{ system?: string; code?: string }> };
+    }> = [];
+
+    if (hasExplicitArchive) {
         try {
             const rawInsights = typeof patient.documentInsights === 'string'
                 ? JSON.parse(patient.documentInsights)
                 : patient.documentInsights;
 
             if (Array.isArray(rawInsights)) {
-                insightsContext = rawInsights
-                    .slice(0, 3)
-                    .map((insight) => {
-                        const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
-                        const summary = insight?.summary ?? "";
-                        const quality = insight?.quality?.level
-                            ? `[${String(insight.quality.level).toUpperCase()}] `
-                            : "";
-                        const diagnoses = Array.isArray(insight?.extractedData?.diagnoses)
-                            ? insight.extractedData.diagnoses
-                                .map((item: { system?: string; code?: string }) => `${item.system} ${item.code}`)
-                                .join(', ')
-                            : "";
-                        const codes = diagnoses ? ` | ICD: ${diagnoses}` : "";
-                        return summary ? `- ${quality}${summary}${fileName}${codes}` : "";
-                    })
-                    .filter(Boolean)
-                    .join("\n");
+                archiveInsights = rawInsights.slice(0, 3);
             }
         } catch {
-            insightsContext = "";
+            archiveInsights = [];
         }
     }
+
+    let docsContext = "";
+    if (hasExplicitArchive) {
+        docsContext = archiveInsights
+            .map((insight) => {
+                const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
+                const summary = insight?.summary ?? "";
+                return summary ? `[DOC${fileName}]: ${summary}` : "";
+            })
+            .filter(Boolean)
+            .join("\n");
+    } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allAttachments = await db.attachments.filter((a: any) => a.patientId === patient.id).toArray();
+        const attachments = allAttachments
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 3);
+
+        docsContext = attachments
+            .filter((attachment) => attachment.summarySnapshot)
+            .map((attachment) => `[DOC ${attachment.name}]: ${attachment.summarySnapshot}`)
+            .join("\n");
+    }
+
+    const insightsContext = archiveInsights
+        .map((insight) => {
+            const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
+            const summary = insight?.summary ?? "";
+            const quality = insight?.quality?.level
+                ? `[${String(insight.quality.level).toUpperCase()}] `
+                : "";
+            const diagnoses = Array.isArray(insight?.extractedData?.diagnoses)
+                ? insight.extractedData.diagnoses
+                    .map((item) => `${item.system} ${item.code}`)
+                    .join(', ')
+                : "";
+            const codes = diagnoses ? ` | ICD: ${diagnoses}` : "";
+            return summary ? `- ${quality}${summary}${fileName}${codes}` : "";
+        })
+        .filter(Boolean)
+        .join("\n");
 
     return `
 --- CONTESTO PAZIENTE (ID: ${patient.id}) ---
