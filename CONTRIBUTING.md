@@ -69,6 +69,16 @@ Questo repository non espone ancora uno script dedicato; puoi eseguire:
 npx tsc --noEmit
 ```
 
+### Test concorrenza pazienti
+
+Per verificare i conflitti cross-client su `patients.version`:
+
+```bash
+npm run test:concurrency:patients
+```
+
+Runbook: [docs/patient-concurrency-tests.md](./docs/patient-concurrency-tests.md)
+
 ---
 
 ## Mappa progetto
@@ -127,6 +137,13 @@ Per `/api/v1/*` vale ADR 0010 (`spec-first` OpenAPI):
 - cambi breaking o deprecazioni richiedono ADR/update ADR prima del merge e non
   vanno introdotti come modifica silenziosa a `v1`
 
+Se cambi la concorrenza ottimistica dei pazienti (`patients.version`, compare-on-write,
+payload `409 VERSION_CONFLICT`), esegui anche:
+
+```bash
+npm run test:concurrency:patients
+```
+
 ---
 
 ## Processo ADR (obbligatorio per cambi non banali)
@@ -151,6 +168,7 @@ Una PR è considerata conclusa quando:
 - `npm run lint` passa
 - `npm run build` passa
 - (consigliato) `npx tsc --noEmit` passa
+- se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).

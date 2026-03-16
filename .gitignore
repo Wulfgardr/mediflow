@@ -15,6 +15,7 @@
 /playwright-report
 /test-results
 /tmp-e2e-data
+/tmp-concurrency-data
 /tmp-native-derived-data
 /tmp-parity-smoke
 

@@ -46,6 +46,7 @@ Ultimo aggiornamento: 2026-03-16
 | [docs/local-api-tls.md](./local-api-tls.md) | TLS proxy locale e trasporto sicuro per native API. | Per debug networking/certificate pinning. |
 | [docs/native-testing.md](./native-testing.md) | Strategia canonica test macOS (SwiftPM/XCTest/Xcode). | Per piani test e parity sweep. |
 | [docs/e2e-smoke.md](./e2e-smoke.md) | Harness smoke test web Playwright in ambiente isolato. | Per verifica rapida web in CI/VM. |
+| [docs/patient-concurrency-tests.md](./patient-concurrency-tests.md) | Suite smoke isolata per conflitti di scrittura pazienti tra lane web e `/api/v1`. | Quando tocchi `patients.version`, compare-on-write o payload `409 VERSION_CONFLICT`. |
 | [docs/parity-smoke.md](./parity-smoke.md) | Runner parity unificato web+native con artifacts e gating. | Per esecuzioni `P0b` e smoke consolidati. |
 | [docs/parity-click-map-macos.md](./parity-click-map-macos.md) | Checklist click-path macOS capability-by-capability. | Per validazione manuale parity UI su app native. |
 | [docs/apple-docs-mcp.md](./apple-docs-mcp.md) | Guida integrazione del tooling MCP per consultare docs Apple durante sviluppo native. | Quando servono riferimenti API ufficiali Apple in task SwiftUI/network/security/testing. |

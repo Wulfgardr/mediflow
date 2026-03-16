@@ -14,6 +14,8 @@ Entries are additive and minimal.
 - Propagated patient `version` handling and conflict-aware mutation flows through the web data facade, edit UI, automation-side patient writers, and seed cleanup path: `lib/db.ts`, `app/patients/[id]/edit/page.tsx`, `lib/ai-summary-service.ts`, `lib/document-synthesis-service.ts`, `components/therapy-manager.tsx`, `lib/seeder.ts`
 - Extended native macOS patient contracts and mutation client handling to require `version` and surface structured local API conflicts: `native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift`, `native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift`, `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/EditPatientView.swift`
 - Expanded the canonical `/api/v1` OpenAPI slice to document patient mutation requests, `version` fields, and PHI-safe conflict metadata for compare-on-write semantics: `docs/openapi/mediflow-v1.yaml`
+- Added an isolated cross-client patient concurrency suite with deterministic auth/bootstrap, explicit `update/update` + `update/delete` stale-version scenarios, JSON reporting, and npm entrypoints: `scripts/patient-concurrency.test.mjs`, `scripts/patient-concurrency-smoke.sh`, `package.json`
+- Documented the patient concurrency runbook and wired it into the canonical docs/testing workflow: `docs/patient-concurrency-tests.md`, `docs/README.md`, `docs/markdown-index.md`, `CONTRIBUTING.md`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

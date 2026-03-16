@@ -11,6 +11,8 @@
     "mcp:apple-docs:test": "node scripts/mcp-apple-docs-smoke.mjs",
     "lint": "eslint --quiet",
     "lint:full": "eslint",
+    "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
+    "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "prepare:oss": "node scripts/prepare-oss.js",
