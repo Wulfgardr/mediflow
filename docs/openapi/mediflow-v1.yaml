@@ -1,12 +1,14 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.0.0
-  summary: Thin-slice baseline for the stable `/api/v1` contract.
+  version: 1.1.0
+  summary: Patient read contract plus optimistic-concurrency mutations for the stable `/api/v1` surface.
   description: |
-    Initial OpenAPI baseline for the client-facing local API defined by ADR 0010.
-    Scope is intentionally limited to the stable read-only patient paths:
-    `GET /api/v1/patients` and `GET /api/v1/patients/{id}`.
+    OpenAPI contract for the client-facing local API defined by ADR 0010.
+    Current thin slice covers stable patient reads plus compare-on-write patient
+    mutations on `PUT /api/v1/patients/{id}` and `DELETE /api/v1/patients/{id}`.
+    Patient creation already exists in the implementation but remains out of this
+    documented slice until a follow-up spec increment.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -14,7 +16,7 @@ servers:
     description: Direct local development endpoint.
 tags:
   - name: Patients
-    description: Stable patient read contract shared across web/native flows.
+    description: Stable patient read contract plus compare-on-write patient mutations shared across web/native flows.
 paths:
   /api/v1/patients:
     get:
@@ -74,6 +76,103 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Patients
+      operationId: updatePatient
+      summary: Update patient detail
+      description: |
+        Updates a patient using optimistic concurrency. Clients MUST send the last
+        observed `version`. The server atomically compares it and returns `409`
+        with PHI-safe metadata when the record changed or disappeared.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMutationRequest'
+            examples:
+              archivePatient:
+                value:
+                  version: 7
+                  isArchived: true
+              updateDemographics:
+                value:
+                  version: 7
+                  firstName: Mario
+                  lastName: Rossi
+                  phone: "+39 333 1234567"
+      responses:
+        '200':
+          description: Patient updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Patients
+      operationId: deletePatient
+      summary: Delete patient
+      description: |
+        Deletes a patient using optimistic concurrency. Clients MUST send the last
+        observed `version`. The server returns `409` with PHI-safe metadata when
+        the record changed or disappeared before the delete could commit.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDeleteRequest'
+            examples:
+              deletePatient:
+                value:
+                  version: 7
+      responses:
+        '200':
+          description: Patient deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
@@ -82,6 +181,19 @@ components:
       bearerFormat: opaque-token
       description: "Local API token expected in `Authorization: Bearer <token>`."
   responses:
+    BadRequest:
+      description: Request payload is invalid or missing required mutation metadata.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missingVersion:
+              value:
+                error: Version is required
+            noFields:
+              value:
+                error: No valid fields to update
     Unauthorized:
       description: Missing or invalid local API token.
       content:
@@ -102,6 +214,41 @@ components:
             notFound:
               value:
                 error: Not found
+    PatientVersionConflict:
+      description: |
+        Compare-on-write conflict. The payload exposes only PHI-safe metadata so
+        clients can refresh, inspect the version delta, and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PatientVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: patient
+                recordId: patient_123
+                expectedVersion: 7
+                currentVersion: 8
+                currentUpdatedAt: '2026-03-16T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: patient_123
+                  version: 8
+                  updatedAt: '2026-03-16T10:15:00.000Z'
+                  isArchived: false
+            deletedElsewhere:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: patient
+                recordId: patient_123
+                expectedVersion: 7
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
     InternalServerError:
       description: Unexpected server-side failure.
       content:
@@ -132,6 +279,7 @@ components:
         - firstName
         - lastName
         - taxCode
+        - version
       properties:
         id:
           type: string
@@ -154,6 +302,9 @@ components:
           type:
             - boolean
             - 'null'
+        version:
+          type: integer
+          minimum: 1
         updatedAt:
           type:
             - string
@@ -167,6 +318,7 @@ components:
         - firstName
         - lastName
         - taxCode
+        - version
       properties:
         id:
           type: string
@@ -229,6 +381,9 @@ components:
           type:
             - boolean
             - 'null'
+        version:
+          type: integer
+          minimum: 1
         ambulatoryId:
           type:
             - string
@@ -243,3 +398,162 @@ components:
             - string
             - 'null'
           format: date-time
+    PatientMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial patient update payload. At least one field other than `version`
+        must be provided.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        firstName:
+          type: string
+        lastName:
+          type: string
+        taxCode:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        address:
+          type:
+            - string
+            - 'null'
+        phone:
+          type:
+            - string
+            - 'null'
+        caregiver:
+          type:
+            - string
+            - 'null'
+        exemptions:
+          type:
+            - string
+            - 'null'
+        diagnoses:
+          type:
+            - string
+            - 'null'
+        monitoringProfile:
+          type:
+            - string
+            - 'null'
+        statusReason:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        aiSummary:
+          type:
+            - string
+            - 'null'
+        documentInsights:
+          type:
+            - string
+            - 'null'
+        isAdi:
+          type: boolean
+        isArchived:
+          type: boolean
+        ambulatoryId:
+          type:
+            - string
+            - 'null'
+    PatientDeleteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+    MutationSuccessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          const: true
+    PatientConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - updatedAt
+        - isArchived
+      description: PHI-safe server snapshot for the currently stored patient row.
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+    PatientVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: patient
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/PatientConflictSnapshot'
+            - type: 'null'

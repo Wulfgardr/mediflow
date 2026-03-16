@@ -44,6 +44,8 @@ try {
     ensureColumn('patients', 'monitoring_profile', 'monitoring_profile TEXT');
     /* @Codex */
     ensureColumn('patients', 'status_reason', 'status_reason TEXT');
+    /* @Codex */
+    ensureColumn('patients', 'version', 'version INTEGER NOT NULL DEFAULT 1');
 } catch (error) {
     console.warn('[MediFlow] Patients schema check skipped:', error);
 }

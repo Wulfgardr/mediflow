@@ -9,6 +9,7 @@ struct PatientSummary: Identifiable, Decodable {
     let taxCode: String
     let isAdi: Bool?
     let isArchived: Bool?
+    let version: Int
     let updatedAt: Date?
 }
 
@@ -30,6 +31,7 @@ struct PatientDetail: Identifiable, Decodable {
     let documentInsights: String?
     let isAdi: Bool?
     let isArchived: Bool?
+    let version: Int
     let ambulatoryId: String?
     let createdAt: Date?
     let updatedAt: Date?

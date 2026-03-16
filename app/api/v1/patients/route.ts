@@ -56,6 +56,8 @@ export async function GET(request: Request) {
             taxCode: patient.taxCode,
             isAdi: patient.isAdi ?? null,
             isArchived: patient.isArchived ?? null,
+            /* @Codex */
+            version: patient.version,
             updatedAt: toIsoString(patient.updatedAt)
         }));
 
@@ -94,6 +96,8 @@ export async function POST(request: Request) {
             notes: body.notes ?? null,
             isAdi: body.isAdi ?? false,
             isArchived: body.isArchived ?? false,
+            /* @Codex */
+            version: 1,
             ambulatoryId: body.ambulatoryId ?? null,
             createdAt: new Date(),
             updatedAt: new Date()

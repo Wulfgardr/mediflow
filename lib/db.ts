@@ -3,6 +3,8 @@
 
 import { encryptData, decryptData } from './security';
 import { notifyDbChange } from './live-query';
+/* @Codex */
+import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
 
 // Document insight from OCR + AI synthesis
 export interface DocumentInsight {
@@ -41,6 +43,8 @@ export interface Patient {
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
     ambulatoryId?: string;
+    /* @Codex */
+    version?: number;
 }
 
 export interface PatientAmbulatory {
@@ -191,6 +195,11 @@ class ApiTable<T> {
     }
 
     /* @Codex */
+    private buildVersionConflictError(payload: PatientVersionConflictPayload): ApiConflictError {
+        return new ApiConflictError(payload);
+    }
+
+    /* @Codex */
     private emitChange() {
         notifyDbChange();
     }
@@ -220,20 +229,46 @@ class ApiTable<T> {
 
     /* @Codex */
     async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
+        /* @Codex */
+        const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
+        if (this.tableName === 'patients' && typeof maybeVersion !== 'number') {
+            throw new Error('Missing required version for patient update');
+        }
+
         const encryptedChanges = await this.encryptItem(changes as T, true);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(encryptedChanges)
         });
-        if (!res.ok) throw new Error("Failed to update item");
+        if (!res.ok) {
+            const payload = await res.json().catch(() => null);
+            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+                throw this.buildVersionConflictError(payload);
+            }
+            throw new Error("Failed to update item");
+        }
         if (!options?.suppressNotify) this.emitChange();
     }
 
     /* @Codex */
-    async delete(id: string, options?: { suppressNotify?: boolean }): Promise<void> {
-        const res = await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+    async delete(id: string, options?: { suppressNotify?: boolean; version?: number }): Promise<void> {
+        if (this.tableName === 'patients' && typeof options?.version !== 'number') {
+            throw new Error('Missing required version for patient delete');
+        }
+
+        const init: RequestInit = { method: 'DELETE' };
+        if (typeof options?.version === 'number') {
+            init.headers = { 'Content-Type': 'application/json' };
+            init.body = JSON.stringify({ version: options.version });
+        }
+
+        const res = await fetch(`${this.endpoint}/${id}`, init);
         if (!res.ok) {
+            const payload = await res.json().catch(() => null);
+            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+                throw this.buildVersionConflictError(payload);
+            }
             throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
         }
         if (!options?.suppressNotify) this.emitChange();
@@ -291,7 +326,16 @@ class ApiTable<T> {
             throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
         }
 
-        await Promise.all(ids.map((id) => this.delete(id, { suppressNotify: true })));
+        await Promise.all(items.map((item) => {
+            const id = this.getItemIdentifier(item);
+            if (!id) {
+                throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
+            }
+            const version = this.tableName === 'patients'
+                ? this.getPatientVersion(item)
+                : undefined;
+            return this.delete(id, { suppressNotify: true, version });
+        }));
         if (ids.length > 0) this.emitChange();
     }
 
@@ -302,6 +346,13 @@ class ApiTable<T> {
         const record = item as Record<string, unknown>;
         const candidate = record.id ?? record.key ?? record.code ?? record.aic;
         return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : null;
+    }
+
+    /* @Codex */
+    private getPatientVersion(item: unknown): number | undefined {
+        if (this.tableName !== 'patients' || !item || typeof item !== 'object') return undefined;
+        const record = item as Record<string, unknown>;
+        return typeof record.version === 'number' ? record.version : undefined;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -425,6 +476,17 @@ class MedicalApiClient {
 }
 
 export const db = new MedicalApiClient();
+
+/* @Codex */
+export class ApiConflictError extends Error {
+    readonly payload: PatientVersionConflictPayload;
+
+    constructor(payload: PatientVersionConflictPayload) {
+        super('Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova.');
+        this.name = 'ApiConflictError';
+        this.payload = payload;
+    }
+}
 
 export async function exportRawDatabase() {
     console.warn("Export raw database not yet implemented for SQLite adapter");

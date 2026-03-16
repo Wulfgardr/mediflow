@@ -103,6 +103,7 @@ final class PatientsFilteringTests: XCTestCase {
             taxCode: taxCode,
             isAdi: false,
             isArchived: archived,
+            version: 1,
             updatedAt: updatedAt
         )
     }

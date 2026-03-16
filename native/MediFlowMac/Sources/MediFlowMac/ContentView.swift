@@ -336,6 +336,7 @@ struct ContentView: View {
             try await LocalAPIClient.shared.updatePatient(
                 id: patient.id,
                 payload: UpdatePatientPayload(
+                    version: patient.version,
                     firstName: nil,
                     lastName: nil,
                     taxCode: nil,
@@ -369,7 +370,7 @@ struct ContentView: View {
     private func deletePatient(_ patient: PatientSummary) async {
         pendingDeletePatient = nil
         do {
-            try await LocalAPIClient.shared.deletePatient(id: patient.id)
+            try await LocalAPIClient.shared.deletePatient(id: patient.id, expectedVersion: patient.version)
             await viewModel.loadPatients()
             if selectedPatientId == patient.id {
                 selectedPatientId = nil

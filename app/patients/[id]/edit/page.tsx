@@ -1,6 +1,6 @@
 'use client';
 
-import { db } from '@/lib/db';
+import { ApiConflictError, db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
@@ -36,6 +36,13 @@ function buildValidationMessage(validation: ValidatePatientExportResponse): stri
     ].join('\n');
 }
 
+/* @Codex */
+function messageFromError(error: unknown, fallback: string): string {
+    if (error instanceof ApiConflictError) return error.message;
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
+}
+
 export default function EditPatientPage() {
     const router = useRouter();
     const params = useParams();
@@ -52,12 +59,19 @@ export default function EditPatientPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {
+        if (!patient || typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
+
         try {
             const { statusReason, checkups, ...cleanData } = data;
+            const patientVersion = patient.version;
 
             await db.patients.update(id, {
                 ...cleanData,
                 birthDate: new Date(cleanData.birthDate),
+                version: patientVersion,
                 updatedAt: new Date(),
             });
 
@@ -93,7 +107,7 @@ export default function EditPatientPage() {
             router.push(`/patients/${id}`);
         } catch (error) {
             console.error("Failed to update patient", error);
-            alert("Errore durante l'aggiornamento.");
+            alert(messageFromError(error, "Errore durante l'aggiornamento."));
         }
     };
 
@@ -102,6 +116,11 @@ export default function EditPatientPage() {
 
     const handleAction = async (data: ActionData) => {
         if (!patient) return;
+        if (typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
+        const patientVersion = patient.version;
 
         if (actionType === 'export') {
             try {
@@ -148,24 +167,42 @@ export default function EditPatientPage() {
         }
 
         if (actionType === 'delete') {
-            await db.patients.delete(id);
-            router.push('/'); // Redirect to dashboard
+            try {
+                await db.patients.delete(id, { version: patientVersion });
+                router.push('/'); // Redirect to dashboard
+            } catch (error) {
+                alert(messageFromError(error, "Errore durante l'eliminazione."));
+            }
         } else { // This is for archive
-            await db.patients.update(id, {
-                isArchived: true,
-                updatedAt: new Date()
-            });
-            router.push('/'); // Redirect to dashboard
+            try {
+                await db.patients.update(id, {
+                    isArchived: true,
+                    version: patientVersion,
+                    updatedAt: new Date()
+                });
+                router.push('/'); // Redirect to dashboard
+            } catch (error) {
+                alert(messageFromError(error, "Errore durante l'archiviazione."));
+            }
         }
     };
 
     const handleRestore = async () => {
         if (!confirm("Sei sicuro di voler ripristinare questo paziente tra quelli attivi?")) return;
+        if (!patient || typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
 
-        await db.patients.update(id, {
-            isArchived: false,
-            updatedAt: new Date()
-        });
+        try {
+            await db.patients.update(id, {
+                isArchived: false,
+                version: patient.version,
+                updatedAt: new Date()
+            });
+        } catch (error) {
+            alert(messageFromError(error, "Errore durante il ripristino."));
+        }
         // Stay on page but refresh UI (automatic via liveQuery)
     };
 

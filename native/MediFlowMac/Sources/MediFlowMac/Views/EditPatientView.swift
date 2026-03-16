@@ -119,6 +119,7 @@ struct EditPatientView: View {
             try await LocalAPIClient.shared.updatePatient(
                 id: patient.id,
                 payload: UpdatePatientPayload(
+                    version: patient.version,
                     firstName: trimmed(firstName),
                     lastName: trimmed(lastName),
                     taxCode: trimmed(taxCode).uppercased(),

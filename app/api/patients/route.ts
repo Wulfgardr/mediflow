@@ -104,6 +104,8 @@ export async function POST(request: Request) {
             statusReason: typeof body.statusReason === 'string' ? body.statusReason : null,
             notes: body.notes || null,
             isAdi: body.isAdi || false,
+            /* @Codex */
+            version: 1,
             ambulatoryId: ambulatoryId || null,
             updatedAt: new Date(),
             createdAt: new Date()

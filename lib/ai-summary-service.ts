@@ -70,6 +70,12 @@ export async function regeneratePatientSummary(
         const info = ai.getModelInfo();
         options.onStage?.('connect', info);
 
+        /* @Codex */
+        const patient = await db.patients.get(patientId);
+        if (!patient?.version) {
+            throw new Error('Missing patient version for summary regeneration.');
+        }
+
         const contextData = await buildPatientContext(patientId);
         options.onStage?.('context', info);
 
@@ -86,6 +92,7 @@ export async function regeneratePatientSummary(
         options.onStage?.('save', info);
         await db.patients.update(patientId, {
             aiSummary: cleaned,
+            version: patient.version,
             updatedAt: new Date()
         });
 

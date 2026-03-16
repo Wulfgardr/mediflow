@@ -133,7 +133,8 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                 description: selectedDiagnosis.title,
                                 system: 'ICD-11',
                                 date: new Date()
-                            }] as any
+                            }] as any,
+                            version: patient.version
                         });
                     }
                 }

@@ -136,6 +136,7 @@ export async function synthesizeDocument(
     // Save back to patient
     await db.patients.update(patientId, {
         documentInsights: existingInsights,
+        version: patient.version,
         updatedAt: new Date()
     });
 

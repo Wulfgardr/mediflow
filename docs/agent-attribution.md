@@ -10,6 +10,10 @@ Entries are additive and minimal.
 - Added an OpenAPI maintenance runbook to keep the spec synchronized with ongoing `/api/v1` development: `docs/openapi/README.md`
 - Updated contributor workflow and DoD so `/api/v1` changes require same-diff contract documentation or explicit `no contract impact`: `CONTRIBUTING.md`
 - Marked the OpenAPI strategy as accepted and linked ADR/spec/runbook from the canonical docs map, active engineering plan, and markdown inventory: `docs/adr/0010-openapi-spec-first-for-api-v1.md`, `docs/README.md`, `PLANS.md`, `docs/markdown-index.md`
+- Added patient optimistic concurrency with `patients.version`, compare-on-write update/delete guards, and shared PHI-safe `409 VERSION_CONFLICT` payloads across web and `/api/v1` routes: `lib/schema.ts`, `lib/db-server.ts`, `drizzle/0004_patients_version_concurrency.sql`, `lib/patient-concurrency.ts`, `app/api/patients/[id]/route.ts`, `app/api/v1/patients/[id]/route.ts`
+- Propagated patient `version` handling and conflict-aware mutation flows through the web data facade, edit UI, automation-side patient writers, and seed cleanup path: `lib/db.ts`, `app/patients/[id]/edit/page.tsx`, `lib/ai-summary-service.ts`, `lib/document-synthesis-service.ts`, `components/therapy-manager.tsx`, `lib/seeder.ts`
+- Extended native macOS patient contracts and mutation client handling to require `version` and surface structured local API conflicts: `native/MediFlowMac/Sources/MediFlowMac/Models/Patient.swift`, `native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift`, `native/MediFlowMac/Sources/MediFlowMac/ContentView.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/EditPatientView.swift`
+- Expanded the canonical `/api/v1` OpenAPI slice to document patient mutation requests, `version` fields, and PHI-safe conflict metadata for compare-on-write semantics: `docs/openapi/mediflow-v1.yaml`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

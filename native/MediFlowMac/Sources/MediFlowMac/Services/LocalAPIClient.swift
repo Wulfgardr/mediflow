@@ -160,15 +160,19 @@ actor LocalAPIClient {
     /* @Codex */
     func updatePatient(id: String, payload: UpdatePatientPayload) async throws {
         let request = try makeRequest(path: "patients/\(id)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await session.data(for: request)
+        try validatePatientMutation(data: data, response: response)
     }
 
     /* @Codex */
-    func deletePatient(id: String) async throws {
-        let request = try makeRequest(path: "patients/\(id)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+    func deletePatient(id: String, expectedVersion: Int) async throws {
+        let request = try makeRequest(
+            path: "patients/\(id)",
+            method: "DELETE",
+            body: DeletePatientPayload(version: expectedVersion)
+        )
+        let (data, response) = try await session.data(for: request)
+        try validatePatientMutation(data: data, response: response)
     }
 
     func createEntry(patientId: String, payload: CreateEntryPayload) async throws -> String {
@@ -539,6 +543,22 @@ actor LocalAPIClient {
         }
     }
 
+    /* @Codex */
+    private func validatePatientMutation(data: Data, response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        if (200...299).contains(httpResponse.statusCode) {
+            return
+        }
+        if httpResponse.statusCode == 409,
+           let payload = try? JSONDecoder().decode(PatientVersionConflictPayload.self, from: data),
+           payload.code == "VERSION_CONFLICT" {
+            throw LocalAPIError.versionConflict(payload)
+        }
+        throw URLError(.badServerResponse)
+    }
+
     private func currentBaseURL() throws -> URL {
         let baseURLString = LocalAPISettings.loadBaseURLString()
         guard let url = URL(string: baseURLString) else {
@@ -556,6 +576,8 @@ enum LocalAPIError: LocalizedError {
     case insecureTransport
     /* @Codex */
     case invalidAIModelsPayload
+    /* @Codex */
+    case versionConflict(PatientVersionConflictPayload)
 
     var errorDescription: String? {
         switch self {
@@ -566,6 +588,9 @@ enum LocalAPIError: LocalizedError {
         /* @Codex */
         case .invalidAIModelsPayload:
             return "Risposta modelli AI non valida."
+        /* @Codex */
+        case .versionConflict:
+            return "Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova."
         }
     }
 }
@@ -643,6 +668,7 @@ struct CreatePatientPayload: Encodable {
 
 /* @Codex */
 struct UpdatePatientPayload: Encodable {
+    let version: Int
     let firstName: String?
     let lastName: String?
     let taxCode: String?
@@ -657,6 +683,11 @@ struct UpdatePatientPayload: Encodable {
     let isAdi: Bool?
     let isArchived: Bool?
     let ambulatoryId: String?
+}
+
+/* @Codex */
+struct DeletePatientPayload: Encodable {
+    let version: Int
 }
 
 struct CreateEntryPayload: Encodable {
@@ -754,6 +785,27 @@ struct AuthErrorResponse: Decodable {
     let error: String?
     let code: String?
     let message: String?
+}
+
+/* @Codex */
+struct PatientVersionConflictPayload: Decodable {
+    let error: String
+    let code: String
+    let entity: String
+    let recordId: String
+    let expectedVersion: Int
+    let currentVersion: Int?
+    let currentUpdatedAt: String?
+    let currentState: String
+    let currentSnapshot: PatientConflictSnapshot?
+}
+
+/* @Codex */
+struct PatientConflictSnapshot: Decodable {
+    let id: String
+    let version: Int
+    let updatedAt: String?
+    let isArchived: Bool?
 }
 
 /* @Codex */

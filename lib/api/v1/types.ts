@@ -8,6 +8,8 @@ export type PatientSummary = {
     taxCode: string;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
+    version: number;
     updatedAt: string | null;
 };
 
@@ -35,6 +37,8 @@ export type PatientDetail = {
     documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
+    version: number;
     ambulatoryId: string | null;
     createdAt: string | null;
     updatedAt: string | null;

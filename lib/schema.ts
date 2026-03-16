@@ -49,6 +49,8 @@ export const patients = sqliteTable('patients', {
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
