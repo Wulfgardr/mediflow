@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-02-20
+Ultimo aggiornamento: 2026-03-16
 
 ---
 
@@ -28,8 +28,8 @@ Ultimo aggiornamento: 2026-02-20
 - [ ] Coprire con test di scenari write concorrenti web/native.
 
 ### 2) Stabilizzazione contratto locale `/api/v1` (T02)
-- [ ] Definire strategia OpenAPI (`spec-first` vs `source annotations`) per la superficie `v1`.
-- [ ] Pubblicare baseline OpenAPI per endpoint `v1` stabili.
+- [x] Definire strategia OpenAPI (`spec-first` vs `source annotations`) per la superficie `v1`. (`docs/adr/0010-openapi-spec-first-for-api-v1.md`)
+- [ ] Pubblicare baseline OpenAPI per endpoint `v1` stabili. (thin slice iniziale: `docs/openapi/mediflow-v1.yaml`)
 - [ ] Aggiungere contract checks per prevenire drift non documentato.
 
 ### 3) Audit minimo ad alto valore (T03)

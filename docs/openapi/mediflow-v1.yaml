@@ -1,0 +1,245 @@
+openapi: 3.1.0
+info:
+  title: MediFlow Local API v1
+  version: 1.0.0
+  summary: Thin-slice baseline for the stable `/api/v1` contract.
+  description: |
+    Initial OpenAPI baseline for the client-facing local API defined by ADR 0010.
+    Scope is intentionally limited to the stable read-only patient paths:
+    `GET /api/v1/patients` and `GET /api/v1/patients/{id}`.
+servers:
+  - url: https://127.0.0.1:3443
+    description: Local HTTPS endpoint for native clients via TLS proxy.
+  - url: http://127.0.0.1:3000
+    description: Direct local development endpoint.
+tags:
+  - name: Patients
+    description: Stable patient read contract shared across web/native flows.
+paths:
+  /api/v1/patients:
+    get:
+      tags:
+        - Patients
+      operationId: listPatients
+      summary: List patients
+      description: Returns patient summaries ordered by most recently updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ambulatoryId
+          in: query
+          required: false
+          description: Filter patients assigned to a specific ambulatory.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient summaries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/patients/{id}:
+    get:
+      tags:
+        - Patients
+      operationId: getPatient
+      summary: Get patient detail
+      description: Returns the full stable patient payload for a specific patient id.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token
+      description: "Local API token expected in `Authorization: Bearer <token>`."
+  responses:
+    Unauthorized:
+      description: Missing or invalid local API token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                error: Unauthorized
+    NotFound:
+      description: Requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error: Not found
+    InternalServerError:
+      description: Unexpected server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            patientListFailure:
+              value:
+                error: Failed to fetch patients
+            patientDetailFailure:
+              value:
+                error: Failed to fetch patient
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    PatientSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - firstName
+        - lastName
+        - taxCode
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        taxCode:
+          type: string
+        isAdi:
+          type:
+            - boolean
+            - 'null'
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PatientDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - firstName
+        - lastName
+        - taxCode
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        taxCode:
+          type: string
+        address:
+          type:
+            - string
+            - 'null'
+        phone:
+          type:
+            - string
+            - 'null'
+        caregiver:
+          type:
+            - string
+            - 'null'
+        exemptions:
+          type:
+            - string
+            - 'null'
+        diagnoses:
+          type:
+            - string
+            - 'null'
+        monitoringProfile:
+          type:
+            - string
+            - 'null'
+        statusReason:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        aiSummary:
+          type:
+            - string
+            - 'null'
+        documentInsights:
+          type:
+            - string
+            - 'null'
+        isAdi:
+          type:
+            - boolean
+            - 'null'
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+        ambulatoryId:
+          type:
+            - string
+            - 'null'
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time

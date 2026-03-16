@@ -121,6 +121,12 @@ Se aggiungi un nuovo endpoint:
 - evita leakage di campi cifrati nei log
 - mantieni contratti stabili per i client native
 
+Per `/api/v1/*` vale ADR 0010 (`spec-first` OpenAPI):
+- ogni PR con impatto contrattuale deve aggiornare la spec OpenAPI nello stesso diff
+  oppure dichiarare esplicitamente `no contract impact`
+- cambi breaking o deprecazioni richiedono ADR/update ADR prima del merge e non
+  vanno introdotti come modifica silenziosa a `v1`
+
 ---
 
 ## Processo ADR (obbligatorio per cambi non banali)
@@ -148,6 +154,8 @@ Una PR è considerata conclusa quando:
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
+- Se cambia `/api/v1/*`, la documentazione contrattuale (spec OpenAPI o nota esplicita
+  `no contract impact`) deve stare nello stesso diff.
 - Se cambiano comportamenti/contratti, documentazione aggiornata:
   - README / ARCHITECTURE / ADR (quando appropriato)
 - Se aggiungi/rimuovi/rinomini `.md`, aggiorna anche:

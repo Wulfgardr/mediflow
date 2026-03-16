@@ -4,6 +4,13 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-16 Codex
+- Added ADR for `/api/v1` OpenAPI governance choosing a single `spec-first` strategy, with ownership/review/versioning rules and thin-slice follow-up: `docs/adr/0010-openapi-spec-first-for-api-v1.md`
+- Published the first OpenAPI thin-slice baseline for stable read-only patient endpoints under the new canonical `/api/v1` contract source: `docs/openapi/mediflow-v1.yaml`
+- Added an OpenAPI maintenance runbook to keep the spec synchronized with ongoing `/api/v1` development: `docs/openapi/README.md`
+- Updated contributor workflow and DoD so `/api/v1` changes require same-diff contract documentation or explicit `no contract impact`: `CONTRIBUTING.md`
+- Marked the OpenAPI strategy as accepted and linked ADR/spec/runbook from the canonical docs map, active engineering plan, and markdown inventory: `docs/adr/0010-openapi-spec-first-for-api-v1.md`, `docs/README.md`, `PLANS.md`, `docs/markdown-index.md`
+
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
 - Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`

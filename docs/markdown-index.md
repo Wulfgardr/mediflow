@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-03-03
+Ultimo aggiornamento: 2026-03-16
 
 ## Come usare questo indice
 
@@ -68,6 +68,7 @@ Ultimo aggiornamento: 2026-03-03
 | --- | --- | --- |
 | [docs/agent-attribution.md](./agent-attribution.md) | Registro contributi agent (Codex, altri). | Quando si aggiungono cambi non banali da agent. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
+| [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
 
 ## ADR (decisioni architetturali)
 
@@ -84,6 +85,7 @@ Ultimo aggiornamento: 2026-03-03
 | [docs/adr/0007-strict-web-native-parity-gate.md](./adr/0007-strict-web-native-parity-gate.md) | Gate parity stretta (poi superseded). |
 | [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md) | Modello operativo web-first + parity sweep. |
 | [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md) | Strategia test macOS con XCTest/Xcode separata dal web runner. |
+| [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md) | Strategia spec-first OpenAPI e governance/versioning del contratto `/api/v1`. |
 
 ## Checklist manutenzione indice
 
