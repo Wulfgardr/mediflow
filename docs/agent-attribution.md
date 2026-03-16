@@ -16,6 +16,7 @@ Entries are additive and minimal.
 - Expanded the canonical `/api/v1` OpenAPI slice to document patient mutation requests, `version` fields, and PHI-safe conflict metadata for compare-on-write semantics: `docs/openapi/mediflow-v1.yaml`
 - Added an isolated cross-client patient concurrency suite with deterministic auth/bootstrap, explicit `update/update` + `update/delete` stale-version scenarios, JSON reporting, and npm entrypoints: `scripts/patient-concurrency.test.mjs`, `scripts/patient-concurrency-smoke.sh`, `package.json`
 - Documented the patient concurrency runbook and wired it into the canonical docs/testing workflow: `docs/patient-concurrency-tests.md`, `docs/README.md`, `docs/markdown-index.md`, `CONTRIBUTING.md`
+- Added an OpenAPI anti-drift guard with tracked undocumented-route policy, breaking overrides, and CI wiring for `/api/v1`: `scripts/check-openapi-drift.mjs`, `docs/openapi/contract-policy.json`, `.github/workflows/openapi-contract-guard.yml`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

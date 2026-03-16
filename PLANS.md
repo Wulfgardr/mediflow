@@ -23,14 +23,14 @@ Ultimo aggiornamento: 2026-03-16
 - [ ] Definire preflight restore (compatibilità schema/versione, integrità, ownership) prima della fase scripting completa.
 
 ### 1) Integrità dati e concorrenza esplicita (T04)
-- [ ] Introdurre semantica di optimistic concurrency (`version`) su entità cliniche prioritarie.
-- [ ] Applicare compare-on-write a livello API e standardizzare risposta conflitto (`409` + metadata snapshot).
-- [ ] Coprire con test di scenari write concorrenti web/native.
+- [x] Introdurre semantica di optimistic concurrency (`version`) su entità cliniche prioritarie.
+- [x] Applicare compare-on-write a livello API e standardizzare risposta conflitto (`409` + metadata snapshot).
+- [x] Coprire con test di scenari write concorrenti web/native.
 
 ### 2) Stabilizzazione contratto locale `/api/v1` (T02)
 - [x] Definire strategia OpenAPI (`spec-first` vs `source annotations`) per la superficie `v1`. (`docs/adr/0010-openapi-spec-first-for-api-v1.md`)
-- [ ] Pubblicare baseline OpenAPI per endpoint `v1` stabili. (thin slice iniziale: `docs/openapi/mediflow-v1.yaml`)
-- [ ] Aggiungere contract checks per prevenire drift non documentato.
+- [x] Pubblicare baseline OpenAPI per endpoint `v1` stabili. (thin slice iniziale: `docs/openapi/mediflow-v1.yaml`)
+- [x] Aggiungere contract checks per prevenire drift non documentato.
 
 ### 3) Audit minimo ad alto valore (T03)
 - [ ] Definire tassonomia eventi audit (auth + CRUD sensibili + settings admin).

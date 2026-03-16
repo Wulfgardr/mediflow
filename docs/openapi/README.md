@@ -45,6 +45,7 @@ File/aree da considerare sensibili:
 - `app/api/v1/*`
 - `lib/api/v1/types.ts`
 - client/model consumer native collegati a `/api/v1`
+- `docs/openapi/contract-policy.json` per eccezioni di coverage e override breaking
 
 Domanda guida per la review:
 
@@ -65,6 +66,16 @@ Se la risposta e `si`, la spec va aggiornata.
    - spec aggiornata
    - oppure `no contract impact`
 5. Se il cambio e breaking o deprecante, aggiorna prima ADR/PLANS/Linear.
+6. Esegui `npm run check:openapi:drift` per verificare coverage, drift e breaking.
+
+## Registro eccezioni e override
+
+- `docs/openapi/contract-policy.json` elenca gli endpoint implementati ma ancora
+  fuori dalla slice OpenAPI pubblicata; una nuova operation `/api/v1` deve stare
+  o nella spec o in questo registro
+- `breakingOverrides` nello stesso file e il punto unico per deroghe intenzionali:
+  ogni voce deve citare il change esatto bloccato dal guard e il Linear issue che
+  la giustifica
 
 ## Versioning semplice
 
@@ -96,6 +107,8 @@ La baseline iniziale copre:
 
 - `GET /api/v1/patients`
 - `GET /api/v1/patients/{id}`
+- `PUT /api/v1/patients/{id}`
+- `DELETE /api/v1/patients/{id}`
 
 L'estensione agli altri endpoint `v1` va fatta per moduli stabili, senza
 gonfiare la spec in un unico passaggio.
