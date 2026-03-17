@@ -5,6 +5,13 @@ import { encryptData, decryptData } from './security';
 import { notifyDbChange } from './live-query';
 /* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
+/* @Codex */
+import {
+    BACKUP_COLLECTIONS,
+    type BackupCollectionName,
+    type BackupDataset,
+    serializeBackupArtifact,
+} from './backup-artifact';
 
 // Document insight from OCR + AI synthesis
 /* @Codex */
@@ -509,37 +516,48 @@ export class ApiConflictError extends Error {
 }
 
 export async function exportRawDatabase() {
-    console.warn("Export raw database not yet implemented for SQLite adapter");
-    return new Blob(["SQLite Backup Not Implemented"], { type: "text/plain" });
+    const fetchRawCollection = async <T>(endpoint: string): Promise<T[]> => {
+        const response = await fetch(endpoint, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`Failed to export ${endpoint}: ${response.status} ${response.statusText}`);
+        }
+        return await response.json() as T[];
+    };
+
+    const exportEndpoints: Record<BackupCollectionName, string> = {
+        ambulatories: '/api/ambulatories',
+        attachments: '/api/attachments',
+        conversations: '/api/conversations',
+        drugs: '/api/drugs',
+        entries: '/api/entries',
+        exemptions: '/api/exemptions?all=1',
+        messages: '/api/messages',
+        observations: '/api/observations',
+        patients: '/api/patients',
+        checkups: '/api/checkups',
+        therapies: '/api/therapies',
+    };
+
+    const snapshots = await Promise.all(
+        BACKUP_COLLECTIONS.map(async (collection) => [collection, await fetchRawCollection(exportEndpoints[collection])] as const)
+    );
+    const payload = Object.fromEntries(snapshots) as BackupDataset;
+    return await serializeBackupArtifact(payload);
 }
 
 export async function importRawDatabase(jsonString: string) {
-    try {
-        const data = JSON.parse(jsonString);
+    const response = await fetch('/api/system/backup-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonString,
+    });
 
-        if (data.patients && Array.isArray(data.patients)) {
-            await db.patients.bulkPut(data.patients);
-        }
-        if (data.entries && Array.isArray(data.entries)) {
-            await db.entries.bulkPut(data.entries);
-        }
-        if (data.checkups && Array.isArray(data.checkups)) {
-            await db.checkups.bulkPut(data.checkups);
-        }
-        if (data.therapies && Array.isArray(data.therapies)) {
-            await db.therapies.bulkPut(data.therapies);
-        }
-        /* @Codex */
-        if (data.observations && Array.isArray(data.observations)) {
-            await db.observations.bulkPut(data.observations);
-        }
-        if (data.settings && Array.isArray(data.settings)) {
-            await db.settings.bulkPut(data.settings);
-        }
-        console.log("Import completed");
-    } catch (e) {
-        console.error("Import failed", e);
-        throw e;
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const errorMessage = typeof payload?.error === 'string'
+            ? payload.error
+            : `Restore failed: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
     }
 }
 

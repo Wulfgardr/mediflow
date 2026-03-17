@@ -20,7 +20,7 @@ export default function BackupRestoreUI() {
 
             const a = document.createElement('a');
             a.href = url;
-            a.download = `mediflow-backup-${new Date().toISOString().slice(0, 10)}.mediflow`;
+            a.download = `mediflow-backup-v1-${new Date().toISOString().slice(0, 10)}.mediflow`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -77,9 +77,9 @@ export default function BackupRestoreUI() {
                     Backup
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-4">
-                    Scarica una copia cifrata di tutti i tuoi dati. Il file <code>.mediflow</code> contiene tutto il database e le chiavi di sicurezza.
+                    Scarica un artifact <code>.mediflow</code> v1 con manifest e checksum. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
                     <br />
-                    <span className="font-bold text-amber-600 dark:text-amber-500">Nota:</span> Conserverai lo stesso PIN del momento in cui hai fatto il backup.
+                    <span className="font-bold text-amber-600 dark:text-amber-500">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
                 <button
                     onClick={handleExport}
@@ -99,14 +99,14 @@ export default function BackupRestoreUI() {
                 <div className="mt-2 mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg flex gap-3 text-sm text-amber-800 dark:text-amber-200">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
-                        Caricare un backup <strong>sovrascriverà tutti i dati attuali</strong>.
-                        Assicurati di ricordare il PIN che usavi quando hai creato quel backup, altrimenti non potrai sbloccare i dati.
+                        Caricare un backup <strong>sovrascriverà i dati supportati dal restore</strong>.
+                        Il file viene verificato prima della scrittura e rifiutato se il manifest non coincide.
                     </p>
                 </div>
 
                 <label className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] hover:bg-gray-50 dark:hover:bg-[#21262d] text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors cursor-pointer w-fit">
                     {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    Seleziona file .mediflow
+                    Seleziona file .mediflow v1
                     <input
                         type="file"
                         accept=".mediflow,.json"
