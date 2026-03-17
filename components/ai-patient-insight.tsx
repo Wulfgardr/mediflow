@@ -7,6 +7,8 @@ import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
+/* @Codex */
+import { splitInsightDiagnostics } from '@/lib/patient-insight';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -29,6 +31,10 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
         parsedInsight.nextSteps.length ||
         parsedInsight.gaps.length
     );
+    /* @Codex */
+    const diagnostics = splitInsightDiagnostics(patient.aiSummary || '');
+    /* @Codex */
+    const hasDiagnostics = Boolean(diagnostics.sourcesMarkdown || diagnostics.limitsMarkdown);
 
     /* @Codex */
     useEffect(() => {
@@ -114,7 +120,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 <div>
                     <h3 className="font-bold text-gray-800 dark:text-white">Genera Patient Insight</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                        Usa l&apos;intelligenza artificiale per ottenere un quadro clinico breve e i prossimi passi suggeriti.
+                        Usa l&apos;intelligenza artificiale per ottenere un quadro clinico breve, citabile e orientato all&apos;azione.
                     </p>
                 </div>
 
@@ -269,14 +275,38 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
             ) : (
                 <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 prose-headings:text-indigo-900 dark:prose-headings:text-indigo-300 prose-strong:text-indigo-700 dark:prose-strong:text-indigo-400 leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-indigo-50/50 dark:border-indigo-500/10">
                     <PrivacyBlur>
-                        <ReactMarkdown>{parsedInsight.fallbackMarkdown}</ReactMarkdown>
+                        <ReactMarkdown>{diagnostics.mainMarkdown || parsedInsight.fallbackMarkdown}</ReactMarkdown>
                     </PrivacyBlur>
                 </div>
             )}
 
+            {hasDiagnostics && (
+                <details className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
+                    <summary className="cursor-pointer text-sm font-semibold text-amber-800 dark:text-amber-200">
+                        Fonti e avvisi AI
+                    </summary>
+                    <div className="mt-3 space-y-3 text-sm text-amber-950 dark:text-amber-100">
+                        {diagnostics.sourcesMarkdown && (
+                            <div className="prose prose-sm max-w-none">
+                                <PrivacyBlur intensity="sm">
+                                    <ReactMarkdown>{diagnostics.sourcesMarkdown}</ReactMarkdown>
+                                </PrivacyBlur>
+                            </div>
+                        )}
+                        {diagnostics.limitsMarkdown && (
+                            <div className="prose prose-sm max-w-none">
+                                <PrivacyBlur intensity="sm">
+                                    <ReactMarkdown>{diagnostics.limitsMarkdown}</ReactMarkdown>
+                                </PrivacyBlur>
+                            </div>
+                        )}
+                    </div>
+                </details>
+            )}
+
             <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center gap-2 text-[10px] text-gray-400">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Generato da IA locale. Verificare sempre le informazioni.</span>
+                <span>Generato da IA locale. Apri “Fonti e avvisi AI” per citazioni e limiti di supporto.</span>
             </div>
         </div>
     );

@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
-import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils'; // Ensure these are exported from utils
+import { db, type Diagnosis, type DocumentInsight } from '@/lib/db';
+import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
     summary: string;
@@ -7,197 +7,337 @@ export interface PatientContext {
     patientName?: string;
 }
 
-/**
- * Builds a text context for a specific patient ID.
- * Fetches: Profile, Recent Diary Entries, Active Therapies, Recent Attachments.
- */
-export async function buildPatientContext(patientId: string): Promise<string> {
-    const patient = await db.patients.get(patientId);
-    if (!patient) return "";
+/* @Codex */
+export interface PatientInsightSourceRef {
+    id: string;
+    section: string;
+    label: string;
+    promptLine: string;
+}
 
-    // Calculate Age
-    let age = "N/A";
-    if (patient.birthDate) {
-        age = (new Date().getFullYear() - new Date(patient.birthDate).getFullYear()).toString();
-    } else if (patient.taxCode) {
-        const estYear = estimateBirthYearFromTaxCode(patient.taxCode);
-        if (estYear) age = calculateAge(estYear).toString();
+/* @Codex */
+export interface PatientInsightContextSnapshot {
+    prompt: string;
+    sourceRefs: PatientInsightSourceRef[];
+    limitations: string[];
+    patientName: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
+const MAX_ENTRIES = 5;
+const MAX_THERAPIES = 5;
+const MAX_OBSERVATIONS = 5;
+const MAX_CHECKUPS = 5;
+const MAX_DIAGNOSES = 5;
+const MAX_DOCUMENTS = 6;
+
+const CONTAMINATED_NOTE_MARKERS = [
+    '**quadro attuale:**',
+    '**attenzioni:**',
+    '**prossimi passi:**',
+    '**gap da chiarire:**',
+    '**fonti usate per i claim:**',
+    '**limiti noti:**',
+    '**riassunto clinico:**',
+];
+
+function compactText(value: string | null | undefined, maxChars = 220): string {
+    const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (normalized.length <= maxChars) return normalized;
+    return `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}...`;
+}
+
+function formatDate(value: unknown): string {
+    if (!value) return '';
+    const parsed = value instanceof Date ? value : new Date(value as string | number);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('it-IT');
+}
+
+function compareDatesDesc(left: unknown, right: unknown): number {
+    const leftTime = new Date(left as string | number | Date).getTime();
+    const rightTime = new Date(right as string | number | Date).getTime();
+    return rightTime - leftTime;
+}
+
+function buildAge(birthDate?: Date, taxCode?: string): string {
+    if (birthDate) {
+        return (new Date().getFullYear() - new Date(birthDate).getFullYear()).toString();
     }
 
-    // 1. Fetch Latest Clinical Entries (Diary)
-    // 1. Fetch Latest Clinical Entries (Diary)
+    if (taxCode) {
+        const estimatedYear = estimateBirthYearFromTaxCode(taxCode);
+        if (estimatedYear) return calculateAge(estimatedYear).toString();
+    }
+
+    return 'N/A';
+}
+
+function parseDiagnoses(value: unknown): Diagnosis[] {
+    if (Array.isArray(value)) return value as Diagnosis[];
+    if (typeof value !== 'string' || value.trim().length === 0) return [];
+
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed as Diagnosis[] : [];
+    } catch {
+        return [];
+    }
+}
+
+function parseDocumentInsights(value: unknown): DocumentInsight[] {
+    if (Array.isArray(value)) return value as DocumentInsight[];
+    if (typeof value !== 'string' || value.trim().length === 0) return [];
+
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
+    } catch {
+        return [];
+    }
+}
+
+function isNarrativeNoteContaminated(value: string | null | undefined): boolean {
+    const raw = value ?? '';
+    const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!normalized) return false;
+
+    return CONTAMINATED_NOTE_MARKERS.some((marker) => normalized.includes(marker))
+        || /\[(?:s\d+|dati-incompleti)(?:,\s*(?:s\d+|dati-incompleti))*\]/i.test(raw);
+}
+
+function normalizeEvidenceLine(line: string): string {
+    return line.replace(/^-\s+/, '').trim();
+}
+
+function createSourceRefs(
+    section: string,
+    lines: string[],
+    nextIndex: number,
+): { refs: PatientInsightSourceRef[]; nextIndex: number } {
+    const refs = lines
+        .map(normalizeEvidenceLine)
+        .filter((line) => line.length > 0)
+        .map((promptLine, offset) => ({
+            id: `S${nextIndex + offset}`,
+            section,
+            label: `${section}: ${compactText(promptLine, 160)}`,
+            promptLine,
+        }));
+
+    return {
+        refs,
+        nextIndex: nextIndex + refs.length,
+    };
+}
+
+function renderSourceRefs(refs: PatientInsightSourceRef[]): string {
+    return refs.map((ref) => `[${ref.id}] ${ref.promptLine}`).join('\n');
+}
+
+/* @Codex */
+export async function buildPatientInsightContext(patientId: string): Promise<PatientInsightContextSnapshot> {
+    const patient = await db.patients.get(patientId);
+    if (!patient) {
+        return {
+            prompt: '',
+            sourceRefs: [],
+            limitations: ['Paziente non trovato nel database locale.'],
+            patientName: { firstName: '', lastName: '' },
+        };
+    }
+
+    const age = buildAge(patient.birthDate, patient.taxCode);
+    const diagnoses = parseDiagnoses(patient.diagnoses)
+        .sort((left, right) => compareDatesDesc(left.date, right.date))
+        .slice(0, MAX_DIAGNOSES);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allEntries = await db.entries.filter((e: any) => e.patientId === patient.id).toArray();
+    const allEntries = await db.entries.filter((entry: any) => entry.patientId === patient.id).toArray();
     const entries = allEntries
         .filter((entry) => !entry.deletedAt && entry.content?.trim())
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5);
+        .sort((left: any, right: any) => compareDatesDesc(left.date, right.date))
+        .slice(0, MAX_ENTRIES);
 
-    const diaryContext = entries
-        .map(e => `[${e.date.toLocaleDateString()}] ${e.type.toUpperCase()}: ${e.content}`)
-        .join("\n");
-
-    // 2. Fetch Active Therapies
     const therapies = await db.therapies
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((t: any) => t.patientId === patient.id && t.status === 'active')
+        .filter((therapy: any) => therapy.patientId === patient.id && therapy.status === 'active')
         .toArray();
+    therapies.sort((left, right) => compareDatesDesc(left.startDate, right.startDate));
 
-    const therapyContext = therapies
-        .map(t => `- ${t.drugName} ${t.dosage}`)
-        .join("\n");
-
-    /* @Codex */
     const observations = await db.observations
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((observation: any) => observation.patientId === patient.id)
         .toArray();
+    observations.sort((left, right) => compareDatesDesc(left.observedAt, right.observedAt));
 
-    /* @Codex */
-    const observationsContext = observations
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((a: any, b: any) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
-        .slice(0, 5)
-        .map((observation) => {
-            const note = observation.notes ? ` (${observation.notes})` : "";
-            return `- [${observation.observedAt.toLocaleDateString()}] ${observation.display}: ${observation.value} ${observation.unitCode}${note}`;
-        })
-        .join("\n");
-
-    /* @Codex */
     const checkups = await db.checkups
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((checkup: any) => checkup.patientId === patient.id && checkup.status !== 'completed' && checkup.status !== 'cancelled')
         .toArray();
+    checkups.sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
 
-    /* @Codex */
-    const checkupsContext = checkups
+    const attachments = await db.attachments
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 5)
-        .map((checkup) => `- [${checkup.date.toLocaleDateString()}] ${checkup.title}${checkup.notes ? ` (${checkup.notes})` : ""}`)
-        .join("\n");
+        .filter((attachment: any) => attachment.patientId === patient.id)
+        .toArray();
+    attachments.sort((left, right) => compareDatesDesc(left.createdAt, right.createdAt));
 
-    /* @Codex */
-    const diagnoses = (() => {
-        if (!patient.diagnoses) return [];
-        if (Array.isArray(patient.diagnoses)) return patient.diagnoses;
-        if (typeof patient.diagnoses !== 'string') return [];
-        try {
-            const parsed = JSON.parse(patient.diagnoses);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    })();
-
-    /* @Codex */
-    const diagnosesContext = diagnoses
-        .map((diagnosis) => {
-            const system = diagnosis?.system || 'ICD';
-            const code = diagnosis?.code || 'N/A';
-            const description = diagnosis?.description || 'Descrizione assente';
-            return `- ${system} ${code}: ${description}`;
-        })
-        .join("\n");
-
-    /* @Codex */
-    const hasExplicitArchive = patient.documentInsights !== undefined && patient.documentInsights !== null;
-    let archiveInsights: Array<{
-        fileName?: string;
-        summary?: string;
-        quality?: { level?: string };
-        extractedData?: { diagnoses?: Array<{ system?: string; code?: string }> };
-    }> = [];
-
-    if (hasExplicitArchive) {
-        try {
-            const rawInsights = typeof patient.documentInsights === 'string'
-                ? JSON.parse(patient.documentInsights)
-                : patient.documentInsights;
-
-            if (Array.isArray(rawInsights)) {
-                archiveInsights = rawInsights.slice(0, 3);
-            }
-        } catch {
-            archiveInsights = [];
-        }
-    }
-
-    let docsContext = "";
-    if (hasExplicitArchive) {
-        docsContext = archiveInsights
-            .map((insight) => {
-                const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
-                const summary = insight?.summary ?? "";
-                return summary ? `[DOC${fileName}]: ${summary}` : "";
-            })
-            .filter(Boolean)
-            .join("\n");
-    } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allAttachments = await db.attachments.filter((a: any) => a.patientId === patient.id).toArray();
-        const attachments = allAttachments
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 3);
-
-        docsContext = attachments
-            .filter((attachment) => attachment.summarySnapshot)
-            .map((attachment) => `[DOC ${attachment.name}]: ${attachment.summarySnapshot}`)
-            .join("\n");
-    }
-
-    const insightsContext = archiveInsights
+    const archiveSummaries = parseDocumentInsights(patient.documentInsights)
+        .sort((left, right) => compareDatesDesc(left.date, right.date))
         .map((insight) => {
-            const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
-            const summary = insight?.summary ?? "";
-            const quality = insight?.quality?.level
-                ? `[${String(insight.quality.level).toUpperCase()}] `
-                : "";
-            const diagnoses = Array.isArray(insight?.extractedData?.diagnoses)
-                ? insight.extractedData.diagnoses
-                    .map((item) => `${item.system} ${item.code}`)
-                    .join(', ')
-                : "";
-            const codes = diagnoses ? ` | ICD: ${diagnoses}` : "";
-            return summary ? `- ${quality}${summary}${fileName}${codes}` : "";
+            const fileName = compactText(insight.fileName, 80);
+            const summary = compactText(insight.summary, 260);
+            if (!summary) return '';
+            return fileName ? `${fileName}: ${summary}` : summary;
         })
-        .filter(Boolean)
-        .join("\n");
+        .filter(Boolean);
 
-    return `
---- CONTESTO PAZIENTE (ID: ${patient.id}) ---
-DATIGRAFICI: ${patient.lastName} ${patient.firstName} (Età: ${age})
-CF: ${patient.taxCode || 'N/A'}
+    const attachmentSummaries = attachments
+        .filter((attachment) => attachment.summarySnapshot?.trim())
+        .map((attachment) => {
+            const fileName = compactText(attachment.name, 80);
+            const summary = compactText(attachment.summarySnapshot, 260);
+            if (!summary) return '';
+            return fileName ? `${fileName}: ${summary}` : summary;
+        })
+        .filter(Boolean);
 
-[TERAPIA ATTIVA]
-${therapyContext || "Nessuna terapia registrata."}
+    const seenDocuments = new Set<string>();
+    const documentLines = [...archiveSummaries, ...attachmentSummaries]
+        .filter((line) => {
+            const key = line.toLowerCase();
+            if (seenDocuments.has(key)) return false;
+            seenDocuments.add(key);
+            return true;
+        })
+        .slice(0, MAX_DOCUMENTS)
+        .map((line) => `- ${line}`);
 
-[NOTE IN SCHEDA]
-${patient.notes || "Nessuna nota strutturata in scheda."}
+    const limitations: string[] = [];
+    const patientNotes = typeof patient.notes === 'string' ? patient.notes.trim() : '';
+    const allowNarrativeNotes = patientNotes.length > 0 && !isNarrativeNoteContaminated(patientNotes);
+    if (patientNotes.length > 0 && !allowNarrativeNotes) {
+        limitations.push('Le note narrative della scheda sono state escluse dal contesto AI per possibili residui di output automatico.');
+    }
 
-[DIAGNOSI ICD]
-${diagnosesContext || "Nessuna diagnosi codificata registrata."}
+    const profileLines = [
+        `- Anagrafica clinica: ${patient.lastName} ${patient.firstName}, eta ${age}, CF ${patient.taxCode || 'N/A'}.`,
+        `- ADI: ${patient.isAdi ? 'si' : 'no'}.`,
+        patient.monitoringProfile ? `- Profilo monitoraggio: ${patient.monitoringProfile}.` : '',
+        allowNarrativeNotes ? `- Note scheda: ${compactText(patientNotes, 220)}` : '',
+    ].filter(Boolean);
 
-[OSSERVAZIONI RECENTI]
-${observationsContext || "Nessuna osservazione recente."}
+    const diagnosisLines = diagnoses
+        .map((diagnosis) => {
+            const when = formatDate(diagnosis.date);
+            const detail = `${diagnosis.system || 'ICD'} ${diagnosis.code}: ${compactText(diagnosis.description, 140)}`;
+            return `- ${when ? `${detail} (${when})` : detail}`;
+        });
 
-[PROSSIMI CONTROLLI]
-${checkupsContext || "Nessun controllo pendente."}
+    const therapyLines = therapies
+        .slice(0, MAX_THERAPIES)
+        .map((therapy) => {
+            const indication = therapy.diagnosisName ? `; indicazione ${compactText(therapy.diagnosisName, 80)}` : '';
+            return `- ${compactText(therapy.drugName, 80)} ${compactText(therapy.dosage, 60)}${indication}`;
+        });
 
-[STORIA CLINICA RECENTE (Ultime 5 note)]
-${diaryContext || "Nessuna nota recente."}
+    const observationLines = observations
+        .slice(0, MAX_OBSERVATIONS)
+        .map((observation) => {
+            const note = observation.notes ? `; note ${compactText(observation.notes, 90)}` : '';
+            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode} [${formatDate(observation.observedAt)}]${note}`;
+        });
 
-[DOCUMENTI RECENTI]
-${docsContext || "Nessun documento analizzato."}
+    const checkupLines = checkups
+        .slice(0, MAX_CHECKUPS)
+        .map((checkup) => {
+            const note = checkup.notes ? `; note ${compactText(checkup.notes, 90)}` : '';
+            return `- ${formatDate(checkup.date)}: ${compactText(checkup.title, 120)}${note}`;
+        });
 
-[ARCHIVIO INTELLIGENTE]
-${insightsContext || "Nessuna sintesi disponibile."}
---- FINE CONTESTO ---
-Usa queste informazioni per rispondere alla richiesta dell'utente.
-`;
+    const diaryLines = entries
+        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(entry.content, 220)}`);
+
+    let nextIndex = 1;
+    const profileRefs = createSourceRefs('Profilo strutturato', profileLines, nextIndex);
+    nextIndex = profileRefs.nextIndex;
+    const diagnosisRefs = createSourceRefs('Diagnosi codificate', diagnosisLines, nextIndex);
+    nextIndex = diagnosisRefs.nextIndex;
+    const therapyRefs = createSourceRefs('Terapie attive', therapyLines, nextIndex);
+    nextIndex = therapyRefs.nextIndex;
+    const observationRefs = createSourceRefs('Osservazioni recenti', observationLines, nextIndex);
+    nextIndex = observationRefs.nextIndex;
+    const checkupRefs = createSourceRefs('Controlli pendenti', checkupLines, nextIndex);
+    nextIndex = checkupRefs.nextIndex;
+    const diaryRefs = createSourceRefs('Diario clinico recente', diaryLines, nextIndex);
+    nextIndex = diaryRefs.nextIndex;
+    const documentRefs = createSourceRefs('Documenti recenti', documentLines, nextIndex);
+
+    const sourceRefs = [
+        ...profileRefs.refs,
+        ...diagnosisRefs.refs,
+        ...therapyRefs.refs,
+        ...observationRefs.refs,
+        ...checkupRefs.refs,
+        ...diaryRefs.refs,
+        ...documentRefs.refs,
+    ];
+
+    const prompt = [
+        `--- CONTESTO PAZIENTE (ID: ${patient.id}) ---`,
+        `DATI BASE: ${patient.lastName} ${patient.firstName} | Eta: ${age} | CF: ${patient.taxCode || 'N/A'}`,
+        '',
+        'REGOLE HARD:',
+        '- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].',
+        '- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.',
+        '- Non inventare fonti, nomi di persona o dettagli non presenti.',
+        '',
+        '[PROFILO STRUTTURATO]',
+        renderSourceRefs(profileRefs.refs) || 'Nessuna informazione strutturata disponibile.',
+        '',
+        '[DIAGNOSI CODIFICATE]',
+        renderSourceRefs(diagnosisRefs.refs) || 'Nessuna diagnosi codificata registrata.',
+        '',
+        '[TERAPIE ATTIVE]',
+        renderSourceRefs(therapyRefs.refs) || 'Nessuna terapia attiva registrata.',
+        '',
+        '[OSSERVAZIONI RECENTI]',
+        renderSourceRefs(observationRefs.refs) || 'Nessuna osservazione recente.',
+        '',
+        '[CONTROLLI PENDENTI]',
+        renderSourceRefs(checkupRefs.refs) || 'Nessun controllo pendente.',
+        '',
+        '[DIARIO CLINICO RECENTE]',
+        renderSourceRefs(diaryRefs.refs) || 'Nessuna nota recente.',
+        '',
+        '[DOCUMENTI RECENTI]',
+        renderSourceRefs(documentRefs.refs) || 'Nessun documento analizzato.',
+        '--- FINE CONTESTO ---',
+        'Usa solo queste informazioni per rispondere alla richiesta dell\'utente.',
+    ].join('\n');
+
+    return {
+        prompt,
+        sourceRefs,
+        limitations,
+        patientName: {
+            firstName: patient.firstName,
+            lastName: patient.lastName,
+        },
+    };
+}
+
+/**
+ * Builds an assistant-safe text context for a specific patient ID.
+ */
+export async function buildPatientContext(patientId: string): Promise<string> {
+    const context = await buildPatientInsightContext(patientId);
+    return context.prompt;
 }
 
 /**
@@ -208,24 +348,20 @@ export async function findAndBuildSmartContext(text: string): Promise<PatientCon
     const allPatients = await db.patients.toArray();
     const cleanText = text.toLowerCase();
 
-    // Split text into words to match against names
-    // This is simple but effective for "Contini" or "Mario Rossi"
-    const potentialMatches = allPatients.filter(p => {
-        const fName = p.firstName.toLowerCase();
-        const lName = p.lastName.toLowerCase();
-        return cleanText.includes(lName) || cleanText.includes(fName + " " + lName) || cleanText.includes(lName + " " + fName);
+    const potentialMatches = allPatients.filter((patient) => {
+        const firstName = patient.firstName.toLowerCase();
+        const lastName = patient.lastName.toLowerCase();
+        return cleanText.includes(lastName) || cleanText.includes(`${firstName} ${lastName}`) || cleanText.includes(`${lastName} ${firstName}`);
     });
 
-    // We accept a match if it's unique OR if we have a very strong match (Surname)
-    // For safety, let's stick to unique matches to avoid leaking wrong data.
     if (potentialMatches.length === 1) {
-        const ctx = await buildPatientContext(potentialMatches[0].id!);
+        const context = await buildPatientContext(potentialMatches[0].id!);
         return {
             found: true,
-            summary: ctx,
-            patientName: `${potentialMatches[0].lastName} ${potentialMatches[0].firstName}`
+            summary: context,
+            patientName: `${potentialMatches[0].lastName} ${potentialMatches[0].firstName}`,
         };
     }
 
-    return { found: false, summary: "" };
+    return { found: false, summary: '' };
 }

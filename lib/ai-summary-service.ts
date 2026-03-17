@@ -3,6 +3,12 @@
 
 import { db } from '@/lib/db';
 import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+/* @Codex */
+import {
+    sanitizeInsightMarkdown,
+    splitInsightDiagnostics,
+    finalizePatientInsight,
+} from '@/lib/patient-insight';
 
 export type SummaryStage = 'connect' | 'context' | 'generate' | 'save';
 
@@ -25,22 +31,23 @@ OBIETTIVO:
 - proporre prossimi passi prudenti, verificabili e non inventati
 
 FORMATO OBBLIGATORIO IN MARKDOWN:
-**Quadro attuale:** max 2 frasi brevi.
+**Quadro attuale:** max 2 frasi brevi, ognuna chiusa con [Sx] o [DATI-INCOMPLETI].
 
 **Attenzioni:**
-- massimo 2 bullet
+- massimo 2 bullet, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
 
 **Prossimi passi:**
-- massimo 3 bullet operativi
+- massimo 3 bullet operativi, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
 
 **Gap da chiarire:**
-- massimo 2 bullet solo se davvero utili
+- massimo 2 bullet solo se davvero utili, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
 
 REGOLE IMPORTANTI:
-- massimo 120 parole totali
+- massimo 140 parole totali
 - niente introduzioni o conclusioni
 - niente ripetizioni o narrativa superflua
-- non inventare diagnosi, esami o terapie
+- non inventare diagnosi, esami, terapie o fonti
+- usa solo i riferimenti [Sx] presenti nel contesto
 - se non emerge un'azione chiara, scrivi "monitoraggio clinico" nei prossimi passi
 - privilegia problemi attivi, diagnosi codificate, terapie in corso, controlli pendenti, osservazioni recenti e documenti recenti
 
@@ -90,7 +97,8 @@ function parseList(section: string): string[] {
 }
 
 export function parsePatientInsight(content: string): ParsedPatientInsight {
-    const fallbackMarkdown = cleanAIResponse(content);
+    const diagnostics = splitInsightDiagnostics(content);
+    const fallbackMarkdown = diagnostics.mainMarkdown || sanitizeInsightMarkdown(content);
     const summarySection = extractSection(fallbackMarkdown, ['Quadro attuale', 'Riassunto clinico']);
     const nextStepsSection = extractSection(fallbackMarkdown, ['Prossimi passi', 'Prossima mossa']);
     const alertsSection = extractSection(fallbackMarkdown, ['Attenzioni', 'Punti di attenzione']);
@@ -104,6 +112,9 @@ export function parsePatientInsight(content: string): ParsedPatientInsight {
         fallbackMarkdown,
     };
 }
+
+/* @Codex */
+export { sanitizeInsightMarkdown } from '@/lib/patient-insight';
 
 /* @Codex */
 export async function getAiModelLabels() {
@@ -131,27 +142,31 @@ export async function regeneratePatientSummary(
 
     const task = (async () => {
         const { AIService } = await import('@/lib/ai-service');
-        const { buildPatientContext } = await import('@/lib/ai-context');
+        const { buildPatientInsightContext } = await import('@/lib/ai-context');
 
         const ai = await AIService.create('clinical');
         const info = ai.getModelInfo();
         options.onStage?.('connect', info);
 
-        /* @Codex */
         const patient = await db.patients.get(patientId);
         if (!patient?.version) {
             throw new Error('Missing patient version for summary regeneration.');
         }
 
-        const contextData = await buildPatientContext(patientId);
+        const contextData = await buildPatientInsightContext(patientId);
         options.onStage?.('context', info);
 
-        const prompt = SUMMARY_PROMPT + contextData;
+        const prompt = SUMMARY_PROMPT + contextData.prompt;
 
         options.onStage?.('generate', info);
-        const content = await ai.generate(prompt, options.signal, 384);
+        const content = await ai.generate(prompt, options.signal, 512);
 
-        const cleaned = cleanAIResponse(content);
+        const cleaned = finalizePatientInsight({
+            content,
+            sourceRefs: contextData.sourceRefs,
+            limitations: contextData.limitations,
+            patientName: contextData.patientName,
+        });
         if (!cleaned) {
             throw new Error("L'AI ha generato una risposta vuota o non valida.");
         }
@@ -172,20 +187,4 @@ export async function regeneratePatientSummary(
     } finally {
         inflight.delete(patientId);
     }
-}
-
-/* @Codex */
-function cleanAIResponse(content: string): string {
-    let cleanContent = content.replace(/<unused94>[\s\S]*?(<unused95>|$)/, '').trim();
-    cleanContent = cleanContent.replace(/^Plan:\s*/i, '');
-    cleanContent = cleanContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    cleanContent = cleanContent.replace(/\r/g, '');
-    cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n');
-    cleanContent = cleanContent.replace(/(?:^|\n)(\*\*[^*]+\*\*:)\s*\1/g, '\n$1');
-
-    if (!cleanContent && content.length > 0) {
-        cleanContent = `[⚠️ AI Output Raw]: ${content}`;
-    }
-
-    return cleanContent.trim();
 }
