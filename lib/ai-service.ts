@@ -71,10 +71,10 @@ export class AIService {
 
         // Defaults if DB is empty
         /* @Codex */
-        const defaultClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
+        const defaultClinical = "qwen2.5:32b";
         const defaultOcr = "deepseek-ocr"; // DeepSeek-OCR 3B via Ollama
         /* @Codex */
-        const defaultReasoning = "qwen2.5:32b"; // Assuming Qwen is generally available or user will configure
+        const defaultReasoning = "qwen2.5:32b";
 
         let model = "";
 

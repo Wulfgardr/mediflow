@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     try {
         if (query) {
             const results = await dbServer.select().from(drugs)
-                .where(sql`${drugs.name} LIKE ${`%${query}%`}`)
+                .where(sql`${drugs.name} LIKE ${`%${query}%`} OR ${drugs.activePrinciple} LIKE ${`%${query}%`} OR ${drugs.aic} LIKE ${`%${query}%`}`)
                 .limit(50);
             return NextResponse.json(results);
         }

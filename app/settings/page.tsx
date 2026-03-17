@@ -272,8 +272,8 @@ export default function SettingsPage() {
     const [hardwareProfile, setHardwareProfile] = useState<'low' | 'medium' | 'high' | 'custom'>('custom');
     const [aiConfig, setAiConfig] = useState({
         provider: 'ollama',
-        model_clinical: '', // MedGemma
-        model_reasoning: '', // Qwen
+        model_clinical: '', // Qwen text-first
+        model_reasoning: '', // Qwen reasoning
         model_ocr: '', // DeepSeek OCR 2
         url: ''
     });
@@ -396,14 +396,13 @@ export default function SettingsPage() {
 
             // Determine models (migrate legacy if needed)
             /* @Codex */
-            const medGemmaDefault = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
             const qwenDefault = "qwen2.5:32b";
             const ocrDefault = "deepseek-ocr";
 
             setHardwareProfile(hardware?.value || 'custom');
             setAiConfig({
                 provider: 'ollama',
-                model_clinical: modelClinical?.value || legacyModel?.value || medGemmaDefault,
+                model_clinical: modelClinical?.value || legacyModel?.value || qwenDefault,
                 model_reasoning: modelReasoning?.value || qwenDefault,
                 model_ocr: modelOcr?.value || ocrDefault,
                 url: currentUrl
@@ -419,21 +418,21 @@ export default function SettingsPage() {
             // Low RAM: Use smallest models
             setAiConfig(prev => ({
                 ...prev,
-                model_clinical: 'hf.co/unsloth/medgemma-2b-GGUF',  // hypothetical lighter model
+                model_clinical: 'qwen2.5:7b',
                 model_reasoning: 'qwen2.5:7b'
             }));
         } else if (profile === 'medium') {
             // 16-32GB: Standard setup
             setAiConfig(prev => ({
                 ...prev,
-                model_clinical: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF',
+                model_clinical: 'qwen2.5:14b',
                 model_reasoning: 'qwen2.5:14b'
             }));
         } else if (profile === 'high') {
             // >32GB: Max power
             setAiConfig(prev => ({
                 ...prev,
-                model_clinical: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF',
+                model_clinical: 'qwen2.5:32b',
                 model_reasoning: 'qwen2.5:32b'
             }));
         }
@@ -696,7 +695,7 @@ export default function SettingsPage() {
                                         {hardwareProfile === 'medium' && <CheckCircle className="w-3 h-3 text-indigo-600" />}
                                     </div>
                                     <p className="text-xs font-bold text-gray-800">16-32GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">MedGemma (Default) + Qwen 14B.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 14B per sintesi e reasoning.</p>
                                 </div>
 
                                 <div
@@ -713,7 +712,7 @@ export default function SettingsPage() {
                                         {hardwareProfile === 'high' && <CheckCircle className="w-3 h-3 text-purple-600" />}
                                     </div>
                                     <p className="text-xs font-bold text-gray-800">&gt; 32GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">MedGemma + Qwen 32B (Full Reasoning).</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 32B per tutte le superfici text-only.</p>
                                 </div>
                             </div>
                         </div>
@@ -727,15 +726,16 @@ export default function SettingsPage() {
 
                             <ModelSelector
                                 label="Radiologo & Clinico"
-                                description="Per referti, analisi immagini e terminologia medica stretto."
+                                description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
                                 icon={<Bot className="w-5 h-5" />}
                                 color="emerald"
                                 value={aiConfig.model_clinical}
                                 onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
                                 recommended={[
-                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Bilanciato)" },
-                                    { name: "hf.co/unsloth/medgemma-2b-GGUF", desc: "MedGemma 2B (Veloce)" },
-                                    { name: "llama3.2:3b", desc: "Llama 3.2 3B (Generalista)" }
+                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Default consigliato)" },
+                                    { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Bilanciato)" },
+                                    { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
+                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Fallback legacy)" }
                                 ]}
                                 provider={aiConfig.provider}
                             />

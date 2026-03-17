@@ -110,7 +110,7 @@ enum AISettingsResolver {
             modelKey = "aiModel_clinical"
             defaultModel = provider == "mlx"
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                : "qwen2.5:32b"
         case .reasoning:
             modelKey = "aiModel_reasoning"
             /* @Codex */

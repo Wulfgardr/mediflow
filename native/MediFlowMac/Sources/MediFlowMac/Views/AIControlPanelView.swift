@@ -270,12 +270,20 @@ struct AIControlPanelView: View {
     private var clinicalSuggestions: [ModelSuggestion] {
         [
             ModelSuggestion(
-                name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
-                description: "MedGemma 1.5 4B (Bilanciato)"
+                name: "qwen2.5:32b",
+                description: "Qwen 2.5 32B (Default consigliato)"
             ),
             ModelSuggestion(
-                name: "hf.co/unsloth/medgemma-2b-GGUF",
-                description: "MedGemma 2B (Veloce)"
+                name: "qwen2.5:14b",
+                description: "Qwen 2.5 14B (Bilanciato)"
+            ),
+            ModelSuggestion(
+                name: "qwen2.5:7b",
+                description: "Qwen 2.5 7B (Leggero)"
+            ),
+            ModelSuggestion(
+                name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
+                description: "MedGemma 1.5 4B (Fallback legacy)"
             ),
             ModelSuggestion(
                 name: "mlx-community/medgemma-1.5-4b-it-bf16",
@@ -344,7 +352,7 @@ struct AIControlPanelView: View {
             /* @Codex */
             let defaultClinical = provider == .mlx
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                : "qwen2.5:32b"
             modelClinical = modelClinicalValue ?? modelLegacy ?? defaultClinical
 
             /* @Codex */
@@ -432,7 +440,7 @@ struct AIControlPanelView: View {
                 /* @Codex */
                 let requiredModels = Array(Set(ollamaTasks.map { $0.model }))
                 let fallbackRequired = shouldFallbackToOllama
-                    ? Array(Set(requiredModels + ["hf.co/unsloth/medgemma-1.5-4b-it-GGUF", "qwen2.5:32b", "deepseek-ocr"]))
+                    ? Array(Set(requiredModels + ["qwen2.5:32b", "qwen2.5:14b", "deepseek-ocr"]))
                     : requiredModels
                 missingModels = missingModelsList(from: modelNames, required: fallbackRequired)
                 let base = missingModels.isEmpty ? "Ollama raggiungibile e modelli presenti." : "Ollama raggiungibile, alcuni modelli mancano."
@@ -500,7 +508,7 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-2b-GGUF"
+                modelClinical = "qwen2.5:7b"
                 modelReasoning = "qwen2.5:7b"
             }
         case .medium:
@@ -508,7 +516,7 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                modelClinical = "qwen2.5:14b"
                 modelReasoning = "qwen2.5:14b"
             }
         case .high:
@@ -516,7 +524,7 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                modelClinical = "qwen2.5:32b"
                 modelReasoning = "qwen2.5:32b"
             }
         case .custom:

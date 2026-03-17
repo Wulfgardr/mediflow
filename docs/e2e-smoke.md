@@ -36,9 +36,13 @@ Lo script:
 
 1. usa un data dir isolato (`MEDIFLOW_DATA_DIR=./tmp-e2e-data`)
 2. prepara credenziali deterministiche per smoke (`admin` + `E2E_PIN`, default `1234`)
-3. avvia Next.js (`npm run dev`)
-4. attende readiness su `http://127.0.0.1:3000`
-5. esegue il test Playwright `e2e/web-smoke.spec.ts`
+3. resetta il DB smoke locale per evitare contaminazione tra run
+4. avvia Next.js su una porta dedicata (`E2E_BASE_URL`, default `http://127.0.0.1:3100`) e su un `distDir` separato (`.next-e2e`)
+5. attende readiness su `/api/auth/check` della stessa istanza
+6. esegue i test Playwright smoke (`e2e/web-smoke.spec.ts`, `e2e/document-import.spec.ts`)
+
+Nota:
+- l'uso di `E2E_BASE_URL` evita collisioni con un eventuale server locale gia attivo su `:3000`
 
 Output utili:
 

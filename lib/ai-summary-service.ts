@@ -46,7 +46,7 @@ export async function getAiModelLabels() {
     const modelOcr = await db.settings.get('aiModel_ocr');
 
     return {
-        clinical: modelClinical?.value || legacyModel?.value || 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF',
+        clinical: modelClinical?.value || legacyModel?.value || 'qwen2.5:32b',
         ocr: modelOcr?.value || 'deepseek-ocr'
     };
 }

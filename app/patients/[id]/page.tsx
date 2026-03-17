@@ -11,6 +11,8 @@ import TherapyManager from '@/components/therapy-manager';
 import ObservationManager from '@/components/observation-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
+/* @Codex */
+import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
 import PatientActionModal from '@/components/patient-action-modal';
 import { useState } from 'react';
 
@@ -73,6 +75,8 @@ export default function PatientDetailPage() {
 
     /* @Codex */
     const exemptionCodes = Array.isArray(patient.exemptions) ? patient.exemptions : [];
+    /* @Codex */
+    const diagnosisItems = Array.isArray(patient.diagnoses) ? patient.diagnoses : [];
 
     /* @Codex */
     const handleExportConfirm = async () => {
@@ -196,6 +200,23 @@ export default function PatientDetailPage() {
                         </div>
 
                         {/* Diagnoses / ICD */}
+                        {diagnosisItems.length > 0 && (
+                            <div className="mt-3 rounded-xl border border-rose-100 bg-rose-50/70 p-3 dark:border-rose-900/30 dark:bg-rose-900/20">
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                                    Diagnosi in scheda
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {diagnosisItems.map((diagnosis) => (
+                                        <span
+                                            key={`${diagnosis.system}-${diagnosis.code}`}
+                                            className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-200"
+                                        >
+                                            {diagnosis.system} {diagnosis.code} · {diagnosis.description}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
 
                         {(patient.notes) && (
@@ -321,6 +342,9 @@ export default function PatientDetailPage() {
 
                 {/* Sidebar / Stats Column */}
                 <div className="space-y-6">
+
+                    {/* @Codex */}
+                    <PatientSmartImportPanel patient={patient} entries={entries} />
 
                     {/* NEW AI Insight Location */}
                     <AIPatientInsight patient={patient} />

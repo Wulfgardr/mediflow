@@ -92,6 +92,19 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
+## AI locale e import clinico guidato
+
+I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
+devono rispettare queste regole aggiuntive:
+
+- usare solo servizi locali allowlisted (`localhost`, `127.0.0.1`)
+- trattare l'output del modello come **non fidato** finche un operatore non lo conferma
+- non eseguire import silenziosi da testo libero verso diagnosi o terapie
+- mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
+
+L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
+(es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
+
 ---
 
 ## Logging e redazione
@@ -101,6 +114,8 @@ I dati sanitari non devono trapelare dai log.
 ### Non loggare
 - campi paziente decifrati
 - testo OCR grezzo
+- testo note/diario usato nei prompt AI
+- suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)
 - token, PIN, chiavi o salt
 

@@ -90,7 +90,7 @@ L'app parte bloccata:
 
 Nel tab `Strumenti` trovi il pannello AI.
 
-* **Stato Modelli**: Vedi se MedGemma/DeepSeek sono carichi in memoria.
+* **Stato Modelli**: Vedi se Qwen/DeepSeek sono carichi in memoria.
 * **Chat tecnica**: puoi testare prompt o fare troubleshooting locale.
 * **Gestione Farmaci/ICD**: Strumenti rapidi per cercare codici senza aprire un paziente.
 

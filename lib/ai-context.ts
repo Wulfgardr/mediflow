@@ -47,6 +47,29 @@ export async function buildPatientContext(patientId: string): Promise<string> {
         .map(t => `- ${t.drugName} ${t.dosage}`)
         .join("\n");
 
+    /* @Codex */
+    const diagnoses = (() => {
+        if (!patient.diagnoses) return [];
+        if (Array.isArray(patient.diagnoses)) return patient.diagnoses;
+        if (typeof patient.diagnoses !== 'string') return [];
+        try {
+            const parsed = JSON.parse(patient.diagnoses);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    })();
+
+    /* @Codex */
+    const diagnosesContext = diagnoses
+        .map((diagnosis) => {
+            const system = diagnosis?.system || 'ICD';
+            const code = diagnosis?.code || 'N/A';
+            const description = diagnosis?.description || 'Descrizione assente';
+            return `- ${system} ${code}: ${description}`;
+        })
+        .join("\n");
+
     // 3. Fetch Recent Attachments (Summaries)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allAttachments = await db.attachments.filter((a: any) => a.patientId === patient.id).toArray();
@@ -74,7 +97,16 @@ export async function buildPatientContext(patientId: string): Promise<string> {
                     .map((insight) => {
                         const fileName = insight?.fileName ? ` (${insight.fileName})` : "";
                         const summary = insight?.summary ?? "";
-                        return summary ? `- ${summary}${fileName}` : "";
+                        const quality = insight?.quality?.level
+                            ? `[${String(insight.quality.level).toUpperCase()}] `
+                            : "";
+                        const diagnoses = Array.isArray(insight?.extractedData?.diagnoses)
+                            ? insight.extractedData.diagnoses
+                                .map((item: { system?: string; code?: string }) => `${item.system} ${item.code}`)
+                                .join(', ')
+                            : "";
+                        const codes = diagnoses ? ` | ICD: ${diagnoses}` : "";
+                        return summary ? `- ${quality}${summary}${fileName}${codes}` : "";
                     })
                     .filter(Boolean)
                     .join("\n");
@@ -91,6 +123,9 @@ CF: ${patient.taxCode || 'N/A'}
 
 [TERAPIA ATTIVA]
 ${therapyContext || "Nessuna terapia registrata."}
+
+[DIAGNOSI ICD]
+${diagnosesContext || "Nessuna diagnosi codificata registrata."}
 
 [STORIA CLINICA RECENTE (Ultime 5 note)]
 ${diaryContext || "Nessuna nota recente."}

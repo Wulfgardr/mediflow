@@ -1,3 +1,4 @@
+import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -11,6 +12,12 @@ export interface ExtractedPatientData {
     diagnosis?: string;
     medications?: string[];
     notes?: string;
+    diagnoses?: DocumentDiagnosisSuggestion[];
+    documentSummary?: string;
+    documentQuality?: {
+        level: DocumentQualityLevel;
+        reason?: string;
+    };
     rawText: string;
     source: 'ai' | 'regex' | 'hybrid';  // Track extraction method
     confidence: number;  // 0-1 confidence score

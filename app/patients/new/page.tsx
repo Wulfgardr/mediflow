@@ -3,15 +3,37 @@
 import { useState } from 'react';
 import { db } from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
+import type { ExtractedPatientData } from '@/lib/pdf-service';
+
+/* @Codex */
+type ImportedPatientDraft = {
+    firstName?: string;
+    lastName?: string;
+    taxCode?: string;
+    birthDate?: Date;
+    address?: string;
+    notes?: string;
+    diagnoses?: {
+        code: string;
+        description: string;
+        system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+        date: Date;
+    }[];
+};
 
 export default function NewPatientPage() {
     const router = useRouter();
-    const [importedData, setImportedData] = useState<Record<string, unknown> | null>(null);
+    const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
+    /* @Codex */
+    const [importMeta, setImportMeta] = useState<{
+        quality?: { level: string; reason?: string };
+        diagnosisCount: number;
+    } | null>(null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {
@@ -76,20 +98,64 @@ export default function NewPatientPage() {
             </div>
 
             <PdfImporter onDataExtracted={(data) => {
+                const imported = data as ExtractedPatientData;
+                /* @Codex */
                 setImportedData({
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    taxCode: data.taxCode,
-                    birthDate: data.birthDate,
-                    address: data.address,
-                    notes: data.notes
+                    firstName: imported.firstName,
+                    lastName: imported.lastName,
+                    taxCode: imported.taxCode,
+                    birthDate: imported.birthDate,
+                    address: imported.address,
+                    notes: imported.documentSummary || imported.notes,
+                    diagnoses: (imported.diagnoses || []).map((diagnosis) => ({
+                        code: diagnosis.code,
+                        description: diagnosis.description,
+                        system: diagnosis.system,
+                        date: new Date()
+                    }))
+                });
+                setImportMeta({
+                    quality: imported.documentQuality,
+                    diagnosisCount: imported.diagnoses?.length || 0
                 });
             }} />
 
+            {/* @Codex */}
+            {importMeta && (
+                <div className={`mb-6 rounded-2xl border p-4 ${importMeta.quality?.level === 'red'
+                    ? 'border-red-200 bg-red-50'
+                    : importMeta.quality?.level === 'green'
+                        ? 'border-emerald-200 bg-emerald-50'
+                        : 'border-amber-200 bg-amber-50'
+                    }`}>
+                    <div className="flex items-start gap-3">
+                        {importMeta.quality?.level === 'red' ? (
+                            <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600 shrink-0" />
+                        ) : (
+                            <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600 shrink-0" />
+                        )}
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold text-gray-800">
+                                Import documentale completato
+                            </p>
+                            <p className="text-sm text-gray-700">
+                                {importMeta.diagnosisCount > 0
+                                    ? `Ho precompilato ${importMeta.diagnosisCount} diagnosi ICD nel form. Verificale e rimuovi quelle non corrette prima di salvare.`
+                                    : 'Non sono state precompilate diagnosi ICD esplicite dal documento.'}
+                            </p>
+                            {importMeta.quality?.reason && (
+                                <p className="text-xs text-gray-600">
+                                    Qualita documento: {importMeta.quality.reason}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <PatientForm
                 onSubmit={onSubmit}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                defaultValues={(importedData as any) || undefined}
+                defaultValues={importedData || undefined}
                 key={importedData ? 'loaded' : 'empty'}
             />
         </div>

@@ -7,16 +7,36 @@ import { notifyDbChange } from './live-query';
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
 
 // Document insight from OCR + AI synthesis
+/* @Codex */
+export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
+
+/* @Codex */
+export interface DocumentDiagnosisSuggestion {
+    code: string;
+    description: string;
+    system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+    evidence?: string;
+    confidence?: 'high' | 'medium' | 'low';
+}
+
 export interface DocumentInsight {
     id: string;
     date: Date;
     fileName: string;
     rawMarkdown: string;  // DeepSeek-OCR output
-    summary: string;      // MedGemma synthesis
+    summary: string;      // Qwen synthesis on top of OCR text
+    quality?: {
+        level: DocumentQualityLevel;
+        reason?: string;
+    };
     extractedData?: {
         diagnosis?: string;
         medications?: string[];
         labs?: Record<string, string>;
+        diagnoses?: DocumentDiagnosisSuggestion[];
+    };
+    autofill?: {
+        appliedDiagnoses?: string[];
     };
 }
 

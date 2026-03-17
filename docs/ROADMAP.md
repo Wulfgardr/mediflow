@@ -12,7 +12,7 @@ Le fondamenta sono solide e usabili in produzione locale.
 
 * **Database solido**: migrazione completa a SQLite cifrato.
 * **Privacy Totale**: Cifratura Zero-Knowledge attiva. Nemmeno io leggo i tuoi dati.
-* **AI Locale**: Integrazione di MedGemma (sintesi) e DeepSeek (OCR) via Ollama.
+* **AI Locale**: Integrazione di Qwen text-only (sintesi/insight) e DeepSeek OCR via Ollama.
 * **ICD-11**: Diagnosi standardizzate OMS.
 * **Multi-ambulatorio**: gestione sedi con identificazione visiva rapida.
 

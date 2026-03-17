@@ -16,6 +16,7 @@ Ultimo aggiornamento: 2026-03-16
 - [x] Introdurre contratto minimo `terminology` su `/api/v1` (systems/search/resolve).
 - [x] Introdurre validazione documentale pilota FSE (`error` + `warning`) prima dell'export.
 - [x] Avviare thin slice osservazioni con `LOINC + UCUM` su un percorso clinico verticale.
+- [x] Introdurre smart import reviewable nel profilo paziente da note/diario/documenti per diagnosi ICD-11 e terapie, mantenendo l'autofill automatico limitato ai soli ICD espliciti (ADR 0012).
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
 - [ ] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).

@@ -214,8 +214,29 @@ Tipi condivisi:
 
 1) Utente carica PDF/immagine  
 2) OCR via DeepSeek-OCR (Ollama)  
-3) Sintesi via MedGemma  
-4) Salvataggio in `patients.documentInsights` (ultimi 3)
+3) Analisi testuale e sintesi via Qwen (`qwen2.5:32b` di default)  
+4) Estrazione prudente di eventuali diagnosi con codice ICD esplicito  
+5) Salvataggio in `patients.documentInsights` (ultimi 3) e autofill deduplicato su `patients.diagnoses`
+
+### Smart Import reviewable nel profilo paziente
+
+Nel profilo paziente il web client espone anche una CTA persistente di smart import
+quando esistono fonti utili (`patient.notes`, diario clinico, `documentInsights`,
+summary di allegati).
+
+Il flusso:
+
+1) raccoglie le fonti cliniche locali gia presenti  
+2) le invia al modello clinico locale piu capace configurato  
+3) produce suggerimenti reviewable per:
+   - diagnosi candidate con match ICD-11 locale
+   - terapie candidate con match catalogo AIFA/ATC o fallback manuale
+4) applica solo gli elementi confermati dall'operatore su `patients.diagnoses`
+   e `therapies`, con dedupe esplicito
+
+Vincolo: l'autofill automatico dei documenti non cambia e resta limitato ai soli
+ICD espliciti previsti da ADR 0011; patologie free-text e terapie richiedono sempre
+review umana in questa slice.
 
 ---
 

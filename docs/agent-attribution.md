@@ -5,6 +5,13 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-03-16 Codex
+- Added operator-reviewed smart import from patient notes/diary/document insights into ICD-11 diagnosis and therapy suggestions, with local ICD/AIFA matching, dedupe-aware apply flow, and persistent patient-profile CTA: `lib/patient-smart-import-service.ts`, `components/patient-smart-import-panel.tsx`, `app/patients/[id]/page.tsx`, `app/api/drugs/route.ts`
+- Added ADR for the new smart-import guardrails and updated canonical security/plan/walkthrough/topology docs to record the web-only, suggestion-first flow with no automatic free-text import: `docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md`, `SECURITY.md`, `PLANS.md`, `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `docs/markdown-index.md`
+- Added ADR for the OCR-first AI pipeline decision, consolidating Qwen as the default text-only clinical model and limiting ICD autofill to explicit document codes: `docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md`
+- Reworked document synthesis into a structured OCR-first analysis flow (`summary`, quality, ICD suggestions) with prudent diagnosis autofill on patient records and context propagation to AI Patient Insight: `lib/document-synthesis-service.ts`, `lib/ai-context.ts`, `lib/db.ts`, `components/document-insights-panel.tsx`
+- Added an explicit review path on new-patient document import: Qwen-derived ICD suggestions are prefilled into the patient form and surfaced with quality guidance before save: `components/pdf-importer.tsx`, `app/patients/new/page.tsx`, `lib/pdf-service.ts`, `lib/document-synthesis-service.ts`
+- Realigned web and macOS AI defaults/UI presets toward `qwen2.5:32b` for text-only tasks while keeping `deepseek-ocr` separate for OCR: `lib/ai-service.ts`, `lib/ai-summary-service.ts`, `lib/ai-engine.ts`, `app/settings/page.tsx`, `native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift`, `native/MediFlowMac/Sources/MediFlowMac/Views/AIControlPanelView.swift`
+- Updated canonical documentation and indexing for the new OCR-first + Qwen flow: `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `docs/markdown-index.md`
 - Added ADR for `/api/v1` OpenAPI governance choosing a single `spec-first` strategy, with ownership/review/versioning rules and thin-slice follow-up: `docs/adr/0010-openapi-spec-first-for-api-v1.md`
 - Published the first OpenAPI thin-slice baseline for stable read-only patient endpoints under the new canonical `/api/v1` contract source: `docs/openapi/mediflow-v1.yaml`
 - Added an OpenAPI maintenance runbook to keep the spec synchronized with ongoing `/api/v1` development: `docs/openapi/README.md`

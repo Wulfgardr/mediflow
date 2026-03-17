@@ -261,13 +261,38 @@ sequenceDiagram
     OCR->>LLM: Richiesta OCR multimodale
     LLM-->>OCR: Testo estratto
     OCR-->>API: OCR markdown
-    API->>Synth: Genera sintesi clinica
-    Synth->>LLM: Prompt MedGemma
-    LLM-->>Synth: Sintesi
-    Synth-->>API: Summary
-    API->>DB: Salva documentInsights cifrato
+    API->>Synth: Analisi clinica strutturata
+    Synth->>LLM: Prompt Qwen text-only
+    LLM-->>Synth: Summary + quality + ICD espliciti
+    Synth-->>API: Insight + autofill prudente
+    API->>DB: Salva documentInsights cifrato + aggiorna diagnosi
     API-->>UI: Esito + dati
 ```
+
+### 4.5 Profilo paziente -> smart import reviewable
+
+```mermaid
+sequenceDiagram
+    participant Clinician as Medico
+    participant UI as Web UI
+    participant AI as AIService
+    participant ICD as ICD local proxy
+    participant Drugs as AIFA local catalog
+    participant DB as SQLite
+    Clinician->>UI: Avvia smart import dal profilo paziente
+    UI->>DB: Legge note, diario, documentInsights, terapie/diagnosi correnti
+    UI->>AI: Prompt strutturato con fonti locali
+    AI-->>UI: Suggerimenti reviewable (diagnosi + terapie)
+    UI->>ICD: Match locale ICD-11 per diagnosi free-text
+    UI->>Drugs: Match locale farmaci/AIC/ATC
+    UI-->>Clinician: Mostra proposte con evidenze e selezione esplicita
+    Clinician->>UI: Conferma solo i suggerimenti validi
+    UI->>DB: Aggiorna diagnoses + therapies con dedupe
+```
+
+Nota operativa: questo flusso non sostituisce ADR 0011. L'autofill automatico
+resta limitato ai soli ICD espliciti nei documenti; diagnosi free-text e terapie
+richiedono sempre conferma umana in questa thin slice.
 
 ---
 

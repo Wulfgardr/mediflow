@@ -1,7 +1,7 @@
 /**
  * OCR Service - Document Intelligence Layer
  * 
- * Uses DeepSeek-OCR (via Ollama) or MedGemma for intelligent document extraction.
+ * Uses DeepSeek-OCR (via Ollama) for first-pass document understanding.
  * Part of the "Virtual Secretariat" in MediFlow's Clinical AI Team.
  */
 

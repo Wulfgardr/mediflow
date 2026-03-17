@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
 import { extractPatientDataSmart, ExtractedPatientData } from '@/lib/pdf-service';
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
@@ -59,6 +59,27 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         try {
             // Use smart extraction (AI-first with regex fallback)
             const data = await extractPatientDataSmart(file);
+
+            /* @Codex */
+            if (!patientId && data.rawText) {
+                setIsSynthesizing(true);
+                /* @Codex */
+                setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen2.5:32b'})...`);
+                try {
+                    const analysis = await analyzeDocumentContent(data.rawText);
+                    data.diagnoses = analysis.diagnoses;
+                    data.documentQuality = analysis.quality;
+                    data.documentSummary = analysis.summary;
+                    if (!data.notes && analysis.summary) {
+                        data.notes = analysis.summary;
+                    }
+                } catch (analysisError) {
+                    console.error('Document analysis error:', analysisError);
+                } finally {
+                    setIsSynthesizing(false);
+                }
+            }
+
             setExtractionSource(data.source);
             onDataExtracted(data);
             setSuccess(true);
@@ -67,7 +88,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             if (saveToArchive && patientId && data.rawText) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'medgemma'})...`);
+                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen2.5:32b'})...`);
                 try {
                     await synthesizeDocument(data.rawText, file.name, patientId);
                     setArchiveSaved(true);
@@ -77,8 +98,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 } catch (synthErr) {
                     console.error('Synthesis error:', synthErr);
                     // Don't fail the whole operation, just note the archive wasn't saved
+                } finally {
+                    setIsSynthesizing(false);
                 }
-                setIsSynthesizing(false);
             }
         } catch (err) {
             console.error(err);
@@ -152,6 +174,11 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                             {getSourceBadge()}
                         </div>
                         <p className="text-xs text-green-700">Controlla i campi compilati qui sotto.</p>
+                        {!patientId && (
+                            <p className="text-xs text-green-700">
+                                Le eventuali diagnosi ICD esplicite sono state precompilate nel form per revisione.
+                            </p>
+                        )}
 
                         {/* Archive status indicator */}
                         {patientId && (

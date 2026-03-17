@@ -3,7 +3,7 @@
 
 import OpenAI from 'openai';
 
-export const DEFAULT_MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
+export const DEFAULT_MODEL = "qwen2.5:32b";
 
 export async function getAiEngine(): Promise<OpenAI> {
     throw new Error("Legacy AI Engine is deprecated. Use AIService.");
