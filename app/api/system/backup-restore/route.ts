@@ -107,10 +107,42 @@ function chunk<T>(items: T[], size: number): T[][] {
     return chunks;
 }
 
-async function insertRows<T extends Record<string, unknown>>(runner: InsertRunner, table: InsertableTable, rows: T[]): Promise<void> {
+/* @Codex */
+const DATE_FIELDS = new Set([
+    'assignedAt',
+    'birthDate',
+    'createdAt',
+    'date',
+    'endDate',
+    'observedAt',
+    'startDate',
+    'updatedAt',
+]);
+
+function normalizeDateValue(value: unknown): unknown {
+    if (value === null || value === undefined || value === '') return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'string' || typeof value === 'number') {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? value : parsed;
+    }
+    return value;
+}
+
+function normalizeInsertRow<T extends Record<string, unknown>>(row: T): T {
+    const normalized: Record<string, unknown> = { ...row };
+    for (const field of DATE_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(normalized, field)) {
+            normalized[field] = normalizeDateValue(normalized[field]);
+        }
+    }
+    return normalized as T;
+}
+
+function insertRows<T extends Record<string, unknown>>(runner: InsertRunner, table: InsertableTable, rows: T[]): void {
     if (rows.length === 0) return;
     for (const group of chunk(rows, 250)) {
-        await runner.insert(table).values(group);
+        runner.insert(table).values(group.map(normalizeInsertRow)).run();
     }
 }
 
@@ -142,70 +174,71 @@ export async function POST(request: Request) {
         const body = await request.json();
         const artifact = await parseBackupArtifact(body);
 
-        await dbServer.transaction(async (tx) => {
+        // @Codex better-sqlite3 transactions are synchronous; promise callbacks break restore execution.
+        dbServer.transaction((tx) => {
             for (const collection of CLEAR_ORDER) {
-                await tx.delete(TABLE_LOOKUP[collection]);
+                tx.delete(TABLE_LOOKUP[collection]).run();
             }
-            await tx.delete(TABLES.patientsToAmbulatories);
+            tx.delete(TABLES.patientsToAmbulatories).run();
 
             for (const collection of INSERT_ORDER) {
                 if (collection === 'patients') {
-                    await insertRows(tx, TABLE_LOOKUP.patients, artifact.payload.patients);
+                    insertRows(tx, TABLE_LOOKUP.patients, artifact.payload.patients);
                     continue;
                 }
 
                 if (collection === 'ambulatories') {
-                    await insertRows(tx, TABLE_LOOKUP.ambulatories, artifact.payload.ambulatories);
+                    insertRows(tx, TABLE_LOOKUP.ambulatories, artifact.payload.ambulatories);
                     continue;
                 }
 
                 if (collection === 'drugs') {
-                    await insertRows(tx, TABLE_LOOKUP.drugs, artifact.payload.drugs);
+                    insertRows(tx, TABLE_LOOKUP.drugs, artifact.payload.drugs);
                     continue;
                 }
 
                 if (collection === 'exemptions') {
-                    await insertRows(tx, TABLE_LOOKUP.exemptions, artifact.payload.exemptions);
+                    insertRows(tx, TABLE_LOOKUP.exemptions, artifact.payload.exemptions);
                     continue;
                 }
 
                 if (collection === 'conversations') {
-                    await insertRows(tx, TABLE_LOOKUP.conversations, artifact.payload.conversations);
+                    insertRows(tx, TABLE_LOOKUP.conversations, artifact.payload.conversations);
                     continue;
                 }
 
                 if (collection === 'entries') {
-                    await insertRows(tx, TABLE_LOOKUP.entries, artifact.payload.entries);
+                    insertRows(tx, TABLE_LOOKUP.entries, artifact.payload.entries);
                     continue;
                 }
 
                 if (collection === 'therapies') {
-                    await insertRows(tx, TABLE_LOOKUP.therapies, artifact.payload.therapies);
+                    insertRows(tx, TABLE_LOOKUP.therapies, artifact.payload.therapies);
                     continue;
                 }
 
                 if (collection === 'checkups') {
-                    await insertRows(tx, TABLE_LOOKUP.checkups, artifact.payload.checkups);
+                    insertRows(tx, TABLE_LOOKUP.checkups, artifact.payload.checkups);
                     continue;
                 }
 
                 if (collection === 'observations') {
-                    await insertRows(tx, TABLE_LOOKUP.observations, artifact.payload.observations);
+                    insertRows(tx, TABLE_LOOKUP.observations, artifact.payload.observations);
                     continue;
                 }
 
                 if (collection === 'attachments') {
-                    await insertRows(tx, TABLE_LOOKUP.attachments, artifact.payload.attachments);
+                    insertRows(tx, TABLE_LOOKUP.attachments, artifact.payload.attachments);
                     continue;
                 }
 
                 if (collection === 'messages') {
-                    await insertRows(tx, TABLE_LOOKUP.messages, artifact.payload.messages);
+                    insertRows(tx, TABLE_LOOKUP.messages, artifact.payload.messages);
                 }
             }
 
             const patientLinks = derivePatientLinks(artifact.payload.patients);
-            await insertRows(tx, TABLES.patientsToAmbulatories, patientLinks);
+            insertRows(tx, TABLES.patientsToAmbulatories, patientLinks);
         });
 
         return NextResponse.json({

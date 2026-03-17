@@ -9,7 +9,7 @@ import {
     parseBackupArtifact,
     serializeBackupArtifact,
     stableStringify,
-} from './backup-artifact.ts';
+} from './backup-artifact';
 
 const basePayload = {
     ambulatories: [
