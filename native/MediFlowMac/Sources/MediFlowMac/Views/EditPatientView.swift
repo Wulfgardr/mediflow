@@ -17,6 +17,8 @@ struct EditPatientView: View {
     @State private var address = ""
     @State private var phone = ""
     @State private var caregiver = ""
+    /* @Codex */
+    @State private var exemptionCodes: [String] = []
     @State private var notes = ""
     @State private var isAdi: Bool
     @State private var isArchived: Bool
@@ -62,6 +64,11 @@ struct EditPatientView: View {
                     TextField("Indirizzo", text: $address)
                     TextField("Telefono", text: $phone)
                     TextField("Caregiver", text: $caregiver)
+                }
+
+                /* @Codex */
+                Section("Esenzioni") {
+                    ExemptionSearchField(selectedCodes: $exemptionCodes)
                 }
 
                 Section("Note") {
@@ -114,6 +121,7 @@ struct EditPatientView: View {
             let encryptedAddress = try security.encryptString(trimmed(address))
             let encryptedPhone = try security.encryptString(trimmed(phone))
             let encryptedCaregiver = try security.encryptString(trimmed(caregiver))
+            let encryptedExemptions = try security.encryptString(ExemptionCodesCodec.encode(exemptionCodes))
             let encryptedNotes = try security.encryptString(trimmed(notes))
 
             try await LocalAPIClient.shared.updatePatient(
@@ -127,7 +135,7 @@ struct EditPatientView: View {
                     address: encryptedAddress,
                     phone: encryptedPhone,
                     caregiver: encryptedCaregiver,
-                    exemptions: nil,
+                    exemptions: encryptedExemptions,
                     notes: encryptedNotes,
                     aiSummary: nil,
                     documentInsights: nil,
@@ -157,6 +165,7 @@ struct EditPatientView: View {
         address = decryptOrPlain(patient.address)
         phone = decryptOrPlain(patient.phone)
         caregiver = decryptOrPlain(patient.caregiver)
+        exemptionCodes = ExemptionCodesCodec.decode(decryptOrPlain(patient.exemptions))
         notes = decryptOrPlain(patient.notes)
     }
 

@@ -2,7 +2,7 @@
 # Matrice Parity Web <-> macOS (Core)
 
 Stato documento: CANONICAL (parity operativa web/native)  
-Ultimo aggiornamento: 2026-02-20
+Ultimo aggiornamento: 2026-03-17
 
 ---
 
@@ -46,15 +46,15 @@ Riferimenti:
 | Terapie | FULL | FULL | PARTIAL (CRUD base, campi clinici ridotti) | PARTIAL | PARTIAL | FULL | PARTIAL |
 | Appuntamenti (checkups) | FULL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
 | Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | PARTIAL (search) | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
-| Esenzioni (catalogo + patient mapping) | FULL | FULL | MISSING (solo visualizzazione codici paziente) | MISSING | MISSING | MISSING | MISSING |
+| Esenzioni (catalogo + patient mapping) | FULL | FULL | PARTIAL (selector/search/save in create/edit; catalogo settings ancora mancante) | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
 
 ## Gap principali da chiudere
 
 1. Pazienti su macOS: consolidare smoke VM sulle nuove azioni `edit/delete/archive` e toolbar/context-menu (checklist: `docs/parity-click-map-macos.md`).
-2. Esenzioni su macOS: selector + search + save in create/update paziente.
+2. Esenzioni su macOS: completare il catalogo in Settings e la gestione operativa del catalogo stesso.
 3. Osservazioni su macOS: UI CRUD LOINC+UCUM gia presente a contratto.
 4. Diario clinico: allineare semantica delete (soft delete + restore + reason) tra web e macOS.
-5. Cataloghi farmaci/esenzioni: minima operabilita parity in Settings macOS.
+5. Cataloghi farmaci/esenzioni: minima operabilita parity in Settings macOS, con esenzioni patient mapping gia attivo ma catalogo ancora da chiudere.
 
 ## Regole di uscita (parity gate)
 

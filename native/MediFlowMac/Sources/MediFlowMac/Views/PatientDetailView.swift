@@ -957,7 +957,8 @@ struct PatientDetailView: View {
     /* @Codex */
     @ViewBuilder
     private func exemptionCodesBlock(raw: String?) -> some View {
-        let codes = parseExemptionCodes(raw)
+        let decrypted = decryptOrPlain(raw)
+        let codes = decrypted == "[Dati cifrati]" ? [] : ExemptionCodesCodec.decode(decrypted)
 
         if codes.isEmpty {
             Text("Nessun codice esenzione registrato.")
@@ -981,18 +982,6 @@ struct PatientDetailView: View {
     }
 
     /* @Codex */
-    private func parseExemptionCodes(_ raw: String?) -> [String] {
-        guard let payload = decryptOrPlain(raw),
-              let data = payload.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
-            return []
-        }
-
-        return decoded
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
-            .filter { !$0.isEmpty }
-    }
-
     private func ageText(from date: Date?) -> String {
         guard let date else { return "n/d" }
         let years = Calendar.current.dateComponents([.year], from: date, to: Date()).year
