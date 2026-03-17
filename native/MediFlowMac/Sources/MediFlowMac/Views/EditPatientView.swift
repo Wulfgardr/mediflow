@@ -121,7 +121,8 @@ struct EditPatientView: View {
             let encryptedAddress = try security.encryptString(trimmed(address))
             let encryptedPhone = try security.encryptString(trimmed(phone))
             let encryptedCaregiver = try security.encryptString(trimmed(caregiver))
-            let encryptedExemptions = try security.encryptString(ExemptionCodesCodec.encode(exemptionCodes))
+            let exemptionsPayload = ExemptionCodesCodec.encode(exemptionCodes) ?? "[]"
+            let encryptedExemptions = try security.encryptString(exemptionsPayload)
             let encryptedNotes = try security.encryptString(trimmed(notes))
 
             try await LocalAPIClient.shared.updatePatient(
