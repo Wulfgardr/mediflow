@@ -1,7 +1,7 @@
 # Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.3.1 (Corrente) — Febbraio 2026
+> v0.4.0 (Corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
 ---
@@ -18,7 +18,18 @@ Le fondamenta sono solide e usabili in produzione locale.
 
 ---
 
-## In corso (v0.4.0)
+## Fatto (v0.4.0)
+
+Base tecnica più solida, con flussi documentali e contratti locali molto più espliciti.
+
+* **API locale più governata**: baseline OpenAPI `/api/v1`, guard anti-drift e concorrenza ottimistica sui pazienti.
+* **Import clinico più utile**: pipeline OCR-first strutturata e smart import reviewable verso diagnosi ICD-11 e terapie.
+* **Archivio intelligente più operabile**: pulizia per singolo documento o completa, con riallineamento dell'insight AI.
+* **Parity/testing più leggibili**: smoke harness, click-map macOS e runbook più espliciti per sweep web/native.
+
+---
+
+## In corso (v0.5.0)
 
 Priorità per consolidare sicurezza, continuità operativa e UX.
 

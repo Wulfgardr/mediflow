@@ -5,6 +5,36 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-17
+
+### ✨ Aggiunto
+
+- **Smart import reviewable nel profilo paziente**: suggerimenti locali e confermabili per diagnosi ICD-11 e terapie a partire da note, diario clinico e documenti già analizzati.
+- **Pipeline documentale OCR-first strutturata**: archivio intelligente con sintesi, qualità documento e autofill prudente delle sole diagnosi ICD esplicite.
+- **Contratto `/api/v1` esplicito**: baseline OpenAPI versionata e guard anti-drift per mantenere stabile la superficie condivisa tra web e client native.
+- **Concorrenza esplicita sui pazienti**: `version`, compare-on-write e risposta `409 VERSION_CONFLICT` coerente su web e `/api/v1`.
+
+### 🧪 Migliorato
+
+- **Verifiche parity e qualità**: smoke harness web/macOS, click-map macOS e suite dedicata per conflitti di scrittura cross-client.
+- **Operabilità documentale**: l'Archivio Intelligente ora può essere ripulito per singolo documento o completamente, con refresh coerente di `AI Patient Insight`.
+- **Tooling di progetto**: playbook Linear/Codex, import backlog automatizzato e controllo più esplicito del flusso OSS/private.
+
+### 🐛 Risolto
+
+- **Warning build `pdfjs-dist/canvas`**: caricamento server-side differito per eliminare il rumore in `next build` senza introdurre dipendenze extra.
+- **Drift di review/stato**: riallineati branch, worktree e issue principali per ridurre falsi `In Review` o `Done` non supportati da `main`.
+
+### 🔒 Hardening
+
+- **Contract checks** su `/api/v1` per prevenire modifiche non documentate o breaking change silenziosi.
+- **Integrity guardrails** su write path paziente con semantica conflict-aware e payload PHI-safe.
+
+### 📚 Documentazione
+
+- **Walkthrough e mappe canoniche aggiornate** per flusso OCR-first, smart import reviewable, parity sweep e governance OpenAPI.
+- **Indice markdown e playbook operativi** estesi per rendere ricostruibile il lavoro tra Git, Linear, docs e repo OSS.
+
 ## [0.3.1] - 2026-02-18
 
 ### ✨ Aggiunto

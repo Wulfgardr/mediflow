@@ -1,4 +1,4 @@
-# MediFlow v0.3.1
+# MediFlow v0.4.0
 
 > Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
 > Offline, privata, veloce.
