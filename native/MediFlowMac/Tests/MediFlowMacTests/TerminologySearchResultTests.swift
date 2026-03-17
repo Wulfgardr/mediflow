@@ -4,7 +4,7 @@ import XCTest
 
 /* @Codex */
 final class TerminologySearchResultTests: XCTestCase {
-    func testTerminologySearchResultDecodesAndExposesStableIdentity() throws {
+    func testTerminologySearchItemDecodesAndExposesStableIdentity() throws {
         let data = """
         [
             {
@@ -17,7 +17,7 @@ final class TerminologySearchResultTests: XCTestCase {
         ]
         """.data(using: .utf8)!
 
-        let results = try JSONDecoder().decode([TerminologySearchResult].self, from: data)
+        let results = try JSONDecoder().decode([TerminologySearchItem].self, from: data)
 
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results.first?.id, "LOINC:8480-6")

@@ -104,7 +104,7 @@ struct ObservationSummary: Identifiable, Decodable {
 }
 
 /* @Codex */
-struct TerminologySearchResult: Identifiable, Decodable {
+struct TerminologySearchItem: Identifiable, Decodable {
     let system: String
     let code: String
     let display: String
