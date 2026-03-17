@@ -671,6 +671,10 @@ actor LocalAPIClient {
         }
         return url
     }
+
+    private func parseAuthDate(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
 }
 
 enum LocalAPIError: LocalizedError, Equatable {
@@ -1052,6 +1056,8 @@ struct AuthErrorResponse: Decodable {
     let message: String?
     let lockedUntil: String?
     let remainingAttempts: Int?
+    let failedLoginAttempts: Int?
+    let retryAfterSeconds: Int?
 }
 
 /* @Codex */

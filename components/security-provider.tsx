@@ -33,6 +33,44 @@ interface SecurityContextType {
     updateUser: (data: Partial<User>) => void;
 }
 
+/* @Codex */
+type LoginFailurePayload = {
+    error?: string;
+    code?: string;
+    message?: string;
+    lockedUntil?: string;
+    remainingAttempts?: number;
+    retryAfterSeconds?: number;
+};
+
+/* @Codex */
+function formatLockedUntil(lockedUntil?: string) {
+    if (!lockedUntil) return 'Accesso temporaneamente bloccato. Riprova più tardi.';
+    const date = new Date(lockedUntil);
+    if (Number.isNaN(date.getTime())) return 'Accesso temporaneamente bloccato. Riprova più tardi.';
+    return `Accesso bloccato fino alle ${new Intl.DateTimeFormat('it-IT', {
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date)}.`;
+}
+
+/* @Codex */
+function formatLoginFailure(payload: LoginFailurePayload | null, status: number) {
+    if (payload?.code === 'AUTH_LOCKED') {
+        return payload.message || formatLockedUntil(payload.lockedUntil);
+    }
+    if (payload?.code === 'INVALID_CREDENTIALS') {
+        if (payload.message) return payload.message;
+        if (typeof payload.remainingAttempts === 'number' && payload.remainingAttempts > 0) {
+            return `PIN non valido. Tentativi rimasti: ${payload.remainingAttempts}.`;
+        }
+        return 'PIN non valido.';
+    }
+    if (status === 423) return formatLockedUntil(payload?.lockedUntil);
+    if (status === 401) return 'PIN non valido.';
+    return payload?.message || payload?.error || 'Errore durante il login.';
+}
+
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
@@ -255,8 +293,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (!res.ok) {
-                const payload = await res.json().catch(() => null);
-                setAuthErrorMessage(payload?.message || payload?.error || 'PIN non valido.');
+                const payload = await res.json().catch(() => null) as LoginFailurePayload | null;
+                setAuthErrorMessage(formatLoginFailure(payload, res.status));
                 return false;
             }
 

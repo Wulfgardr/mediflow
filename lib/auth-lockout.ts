@@ -23,11 +23,26 @@ export type LockoutFailureResult = {
     isLocked: boolean;
 };
 
+export type AuthFailureResponse = {
+    status: 401 | 423;
+    body: {
+        error: string;
+        code: string;
+        message: string;
+        remainingAttempts?: number;
+        retryAfterSeconds?: number;
+        lockedUntil?: string;
+    };
+    retryAfterSeconds?: number;
+};
+
 export type AuthFailurePayload = {
     error: string;
     code: string;
+    message: string;
     remainingAttempts?: number;
     failedLoginAttempts?: number;
+    retryAfterSeconds?: number;
     lockedUntil?: string;
 };
 
@@ -43,6 +58,11 @@ export function isLockoutActive(state: LockoutState, now: Date = new Date()): Da
     const lockedUntil = normalizeLockoutDate(state.lockedUntil);
     if (!lockedUntil) return null;
     return lockedUntil.getTime() > now.getTime() ? lockedUntil : null;
+}
+
+/* @Codex */
+export function getRetryAfterSeconds(lockedUntil: Date, now: Date = new Date()): number {
+    return Math.max(1, Math.ceil((lockedUntil.getTime() - now.getTime()) / 1000));
 }
 
 /* @Codex */
@@ -91,13 +111,62 @@ export function recordFailedLogin(state: LockoutState, now: Date = new Date()): 
 }
 
 /* @Codex */
+export function createInvalidCredentialsResponse(remainingAttempts?: number): AuthFailureResponse {
+    const message = typeof remainingAttempts === 'number' && remainingAttempts > 0
+        ? `PIN non valido. Tentativi rimasti: ${remainingAttempts}.`
+        : 'PIN non valido.';
+
+    return {
+        status: 401,
+        body: {
+            error: 'Invalid credentials',
+            code: AUTH_INVALID_CREDENTIALS_CODE,
+            message,
+            ...(typeof remainingAttempts === 'number' ? { remainingAttempts } : {}),
+        },
+    };
+}
+
+/* @Codex */
+export function createLockoutResponse(lockedUntil: Date, now: Date = new Date()): AuthFailureResponse {
+    const retryAfterSeconds = getRetryAfterSeconds(lockedUntil, now);
+    const retryAfterMinutes = Math.max(Math.ceil(retryAfterSeconds / 60), 1);
+    return {
+        status: 423,
+        body: {
+            error: 'Account temporarily locked',
+            code: AUTH_LOCKED_CODE,
+            message: `Troppi tentativi falliti. Riprova tra ${retryAfterMinutes} minuti.`,
+            retryAfterSeconds,
+            lockedUntil: lockedUntil.toISOString(),
+        },
+        retryAfterSeconds,
+    };
+}
+
+/* @Codex */
+export function createFailureResponseFromResult(
+    result: Pick<LockoutFailureResult, 'lockedUntil' | 'remainingAttempts'>,
+    now: Date = new Date(),
+): AuthFailureResponse {
+    if (result.lockedUntil) {
+        return createLockoutResponse(result.lockedUntil, now);
+    }
+    return createInvalidCredentialsResponse(result.remainingAttempts);
+}
+
+/* @Codex */
+export function getActiveLockoutResponse(state: LockoutState, now: Date = new Date()): AuthFailureResponse | null {
+    const lockedUntil = isLockoutActive(state, now);
+    return lockedUntil ? createLockoutResponse(lockedUntil, now) : null;
+}
+
+/* @Codex */
 export function createInvalidCredentialsPayload(
     result?: Pick<LockoutFailureResult, 'remainingAttempts' | 'failedLoginAttempts'>,
 ): AuthFailurePayload {
     return {
-        error: 'Invalid credentials',
-        code: AUTH_INVALID_CREDENTIALS_CODE,
-        remainingAttempts: result?.remainingAttempts,
+        ...createInvalidCredentialsResponse(result?.remainingAttempts).body,
         failedLoginAttempts: result?.failedLoginAttempts,
     };
 }
@@ -108,10 +177,7 @@ export function createLockedPayload(
     failedLoginAttempts: number = AUTH_LOCKOUT_MAX_FAILURES,
 ): AuthFailurePayload {
     return {
-        error: 'Account temporarily locked',
-        code: AUTH_LOCKED_CODE,
+        ...createLockoutResponse(lockedUntil).body,
         failedLoginAttempts,
-        remainingAttempts: 0,
-        lockedUntil: lockedUntil.toISOString(),
     };
 }

@@ -26,7 +26,8 @@ export function LockScreen() {
                 setPin('');
             }
         } catch (err) {
-            setError('Errore durante il login');
+            setError(err instanceof Error ? err.message : 'Errore durante il login');
+            setPin('');
         } finally {
             setLoading(false);
         }

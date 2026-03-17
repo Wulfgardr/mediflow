@@ -39,7 +39,7 @@ Ultimo aggiornamento: 2026-03-17
 - [x] Assicurare attribuzione attore coerente per chiamate web/native.
 
 ### 4) Hardening auth prima di RBAC completo (T01)
-- [ ] Definire policy lockout/failed attempts e uniformare regole session/token tra web e native.
+- [x] Definire policy lockout/failed attempts e uniformare regole session/token tra web e native. (`docs/adr/0017-auth-lockout-policy.md`)
 - [ ] Eseguire RBAC granulare in fase successiva, dopo i controlli base sopra.
 
 ### 5) Parità funzionale web/native (mandato)

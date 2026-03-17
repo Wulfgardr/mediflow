@@ -1,9 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    AUTH_INVALID_CREDENTIALS_CODE,
+    AUTH_LOCKED_CODE,
     AUTH_LOCKOUT_DURATION_MS,
     AUTH_LOCKOUT_MAX_FAILURES,
     AUTH_LOCKOUT_WINDOW_MS,
+    createFailureResponseFromResult,
+    createInvalidCredentialsResponse,
+    createLockoutResponse,
+    getActiveLockoutResponse,
     isLockoutActive,
     recordFailedLogin,
     resetLockoutState,
@@ -68,6 +74,19 @@ test('recordFailedLogin locks the account at the threshold', () => {
     );
 });
 
+test('isLockoutActive returns the lock expiry when still active', () => {
+    const now = new Date('2026-03-17T10:00:00.000Z');
+    const lockedUntil = new Date(now.getTime() + 60_000);
+    assert.equal(
+        isLockoutActive({
+            failedLoginAttempts: AUTH_LOCKOUT_MAX_FAILURES,
+            firstFailedLoginAt: now,
+            lockedUntil,
+        }, now)?.toISOString(),
+        lockedUntil.toISOString(),
+    );
+});
+
 test('isLockoutActive ignores expired locks', () => {
     const now = new Date('2026-03-17T10:00:00.000Z');
     assert.equal(
@@ -78,4 +97,57 @@ test('isLockoutActive ignores expired locks', () => {
         }, now),
         null,
     );
+});
+
+test('createInvalidCredentialsResponse returns 401 with standard code', () => {
+    const response = createInvalidCredentialsResponse(2);
+
+    assert.equal(response.status, 401);
+    assert.equal(response.body.code, AUTH_INVALID_CREDENTIALS_CODE);
+    assert.equal(response.body.remainingAttempts, 2);
+    assert.match(response.body.message, /Tentativi rimasti: 2/);
+    assert.equal(response.retryAfterSeconds, undefined);
+});
+
+test('createFailureResponseFromResult returns 423 once the threshold is hit', () => {
+    const now = new Date('2026-03-17T10:00:00.000Z');
+    const lockedUntil = new Date(now.getTime() + AUTH_LOCKOUT_DURATION_MS);
+    const response = createFailureResponseFromResult(
+        {
+            lockedUntil,
+            remainingAttempts: 0,
+        },
+        now,
+    );
+
+    assert.equal(response.status, 423);
+    assert.equal(response.body.code, AUTH_LOCKED_CODE);
+    assert.match(response.body.message, /Riprova tra 15 minuti/);
+    assert.equal(response.body.retryAfterSeconds, AUTH_LOCKOUT_DURATION_MS / 1000);
+    assert.equal(response.body.lockedUntil, lockedUntil.toISOString());
+});
+
+test('getActiveLockoutResponse returns 423 for already locked accounts', () => {
+    const now = new Date('2026-03-17T10:00:00.000Z');
+    const lockedUntil = new Date(now.getTime() + 30_000);
+    const response = getActiveLockoutResponse(
+        {
+            failedLoginAttempts: AUTH_LOCKOUT_MAX_FAILURES,
+            firstFailedLoginAt: new Date(now.getTime() - 60_000),
+            lockedUntil,
+        },
+        now,
+    );
+
+    assert.equal(response?.status, 423);
+    assert.equal(response?.body.code, AUTH_LOCKED_CODE);
+    assert.equal(response?.body.retryAfterSeconds, 30);
+});
+
+test('createLockoutResponse rounds retry-after up to the next second', () => {
+    const now = new Date('2026-03-17T10:00:00.000Z');
+    const response = createLockoutResponse(new Date(now.getTime() + 1_500), now);
+
+    assert.equal(response.retryAfterSeconds, 2);
+    assert.equal(response.body.code, AUTH_LOCKED_CODE);
 });
