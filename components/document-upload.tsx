@@ -75,7 +75,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                         }
 
                         if (rawText) {
-                            setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen2.5:32b'})...`);
+                            setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                             const insight = await synthesizeDocument(rawText, file.name, patientId);
                             summary = insight.summary;
                             shouldRefreshSummary = true;

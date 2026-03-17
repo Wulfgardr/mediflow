@@ -28,6 +28,12 @@ Entries are additive and minimal.
 ## 2026-03-11 Codex
 - Deferred server-side `pdfjs-dist` loading behind a runtime loader with minimal Node shims to avoid Turbopack build warnings about optional `canvas` polyfills: `lib/pdfjs-server.ts`, `app/api/pdf-extract/route.ts`
 
+## 2026-03-17 Codex
+- Hardened Smart Import therapy parsing for WUL-79 by adding atomic therapy hints from notes, explicit suggestion states (`active|transition|uncertain|inactive`), stronger brand/principle-active AIFA matching on noisy strings, and targeted Playwright coverage for multi-therapy notes with blocked review-only suggestions: `lib/patient-smart-import-service.ts`, `components/patient-smart-import-panel.tsx`, `e2e/smart-import.spec.ts`
+- Added ADR 0013 to persist the new default text-only model choice (`qwen3.5:35b-a3b`) while keeping MedGemma as a specialist manual option, and updated ADR 0011 to keep the OCR-first pipeline accepted while delegating the default-model choice to ADR 0013: `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`, `docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md`
+- Updated canonical walkthrough and markdown index to reflect the new default model and ADR supersession chain: `docs/walkthrough.md`, `docs/markdown-index.md`
+- Added a one-time legacy AI settings upgrade toward `qwen3.5:35b-a3b`, tightened Patient Insight prompts/output, and promoted proactive next-step suggestions in the patient screen: `lib/ai-models.ts`, `lib/ai-service.ts`, `lib/ai-summary-service.ts`, `lib/ai-context.ts`, `components/ai-patient-insight.tsx`, `app/settings/page.tsx`, `app/patients/[id]/page.tsx`
+
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
 - Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`

@@ -5,6 +5,7 @@ import { searchICDHybrid } from './icd-service';
 import { notifyDbChange } from './live-query';
 
 export type SmartImportConfidence = 'high' | 'medium' | 'low';
+export type TherapySuggestionState = 'active' | 'transition' | 'uncertain' | 'inactive';
 
 export interface SmartImportEvidence {
     sourceKind: 'patient-notes' | 'clinical-entry' | 'document-insight' | 'attachment-summary';
@@ -37,6 +38,8 @@ export interface TherapySmartImportSuggestion {
     activePrinciple?: string;
     dosage?: string;
     motivation?: string;
+    therapyState: TherapySuggestionState;
+    reviewNote?: string;
     confidence: SmartImportConfidence;
     evidence: SmartImportEvidence;
     matchType: 'catalog' | 'manual' | 'none';
@@ -84,6 +87,8 @@ interface ParsedAiTherapy {
     activePrinciple?: string;
     dosage?: string;
     motivation?: string;
+    therapyState?: TherapySuggestionState;
+    reviewNote?: string;
     confidence: SmartImportConfidence;
     evidence: string;
     sourceId?: string;
@@ -100,6 +105,28 @@ export interface ApplySmartImportResult {
     appliedDiagnosisIds: string[];
     appliedTherapyIds: string[];
 }
+
+const MAX_SMART_IMPORT_DIAGNOSES = 5;
+const MAX_SMART_IMPORT_THERAPIES = 10;
+const THERAPY_HINT_LIMIT = 14;
+const DOSAGE_TOKEN_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/i;
+const DOSAGE_TOKEN_GLOBAL_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/gi;
+const THERAPY_SECTION_HINTS = [
+    'terapia',
+    'terapia domiciliare',
+    'farmaco',
+    'farmaci',
+    'posologia',
+    'prescr',
+    'assume',
+    'medicazione',
+    'schema terapeutico',
+];
+const DRUG_QUERY_STOPWORDS = new Set([
+    'al', 'alla', 'alle', 'con', 'da', 'del', 'della', 'dopo', 'fare', 'giorno', 'giorni',
+    'mattino', 'mezza', 'ogni', 'per', 'poi', 'pranzo', 'prima', 'sera', 'volta', 'volte',
+    'verificare', 'confermare', 'dose', 'dosi', 'ore', 'uno', 'una', 'due', 'tre', 'quattro',
+]);
 
 const SMART_IMPORT_PROMPT = `Sei un assistente clinico locale per MediFlow.
 
@@ -126,6 +153,8 @@ Restituisci SOLO JSON valido con questa forma:
       "activePrinciple": "principio attivo se disponibile",
       "dosage": "posologia se disponibile",
       "motivation": "indicazione/contesto clinico se disponibile",
+      "therapyState": "active|transition|uncertain|inactive",
+      "reviewNote": "motivo breve se la terapia e in transizione/incerta/non applicabile subito",
       "confidence": "high|medium|low",
       "evidence": "breve evidenza testuale locale",
       "sourceId": "id della fonte usata"
@@ -137,9 +166,14 @@ Regole:
 - Non inventare dati non supportati dalle fonti.
 - Non proporre diagnosi o terapie gia presenti nella scheda se equivalenti.
 - Per le diagnosi free-text NON inventare codici ICD: usa label + icdQuery.
-- Escludi negazioni, ipotesi non confermate, familiarita e terapie chiaramente sospese/concluse.
-- Preferisci condizioni attive/rilevanti e terapie attive o presumibilmente correnti.
-- Massimo 5 diagnosi e massimo 5 terapie.
+- Escludi negazioni e familiarita.
+- Per le terapie restituisci SEMPRE un oggetto per ogni farmaco distinto: non fondere piu farmaci nella stessa entry.
+- Se il contesto include "therapyCandidateHints", usali per mantenere atomiche le terapie anche quando una nota contiene liste o posologie miste.
+- Non scartare automaticamente transizioni terapeutiche o elementi "da verificare": restituiscili con therapyState="transition" o "uncertain" e reviewNote esplicita.
+- Usa therapyState="active" solo quando la terapia appare plausibilmente corrente e applicabile.
+- Segna therapyState="inactive" solo per terapie chiaramente sospese/interrotte/concluse.
+- Preferisci condizioni attive/rilevanti.
+- Massimo 5 diagnosi e massimo 10 terapie.
 
 CONTESTO STRUTTURATO:
 `;
@@ -167,6 +201,105 @@ function trimSnippet(value: string, maxLength = 260): string {
     const normalized = value.replace(/\s+/g, ' ').trim();
     if (normalized.length <= maxLength) return normalized;
     return `${normalized.slice(0, maxLength - 1).trim()}...`;
+}
+
+function normalizeTherapyState(value: unknown): TherapySuggestionState | undefined {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'active' || normalized === 'transition' || normalized === 'uncertain' || normalized === 'inactive') {
+        return normalized;
+    }
+    return undefined;
+}
+
+function splitSourceClauses(content: string): string[] {
+    return content
+        .replace(/\r/g, '\n')
+        .split(/[\n;•\u2022|]+/)
+        .flatMap((part) => part.split(/(?<=[.!?])\s+/))
+        .map((part) => part.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+}
+
+function isTherapyLikeClause(clause: string): boolean {
+    const normalized = normalizeText(clause);
+    if (!normalized) return false;
+    if (THERAPY_SECTION_HINTS.some((hint) => normalized.includes(hint))) {
+        return true;
+    }
+
+    return DOSAGE_TOKEN_REGEX.test(clause)
+        && tokenize(clause).some((token) => token.length >= 4 && !DRUG_QUERY_STOPWORDS.has(token));
+}
+
+function splitTherapyCandidateClause(clause: string): string[] {
+    const compact = clause.replace(/\s+/g, ' ').trim();
+    const transitionParts = compact
+        .split(/\b(?:poi|quindi|successivamente)\b/i)
+        .map((part) => part.trim())
+        .filter(Boolean);
+    const baseParts = transitionParts.length > 1 ? transitionParts : [compact];
+
+    return baseParts.flatMap((part) => {
+        const commaParts = part
+            .split(/,(?!\d)/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (commaParts.length > 1 && commaParts.filter(isTherapyLikeClause).length >= 2) {
+            return commaParts;
+        }
+
+        return [part];
+    });
+}
+
+/* @Codex */
+function splitPromptSourceSegments(content: string, maxSegments = 4): string[] {
+    const segments = content
+        .replace(/\r/g, '\n')
+        .split(/[\n;•\u2022]+/)
+        .map((part) => part.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+
+    if (segments.length <= 1) {
+        return [content.replace(/\s+/g, ' ').trim()];
+    }
+
+    return segments.slice(0, maxSegments);
+}
+
+function buildTherapyCandidateHints(sources: SmartImportSourceRecord[]): Array<{ sourceId: string; label: string; excerpt: string }> {
+    const seen = new Set<string>();
+    const hints: Array<{ sourceId: string; label: string; excerpt: string }> = [];
+
+    for (const source of sources) {
+        const clauses = splitSourceClauses(source.content);
+        for (const clause of clauses) {
+            if (!isTherapyLikeClause(clause)) continue;
+
+            for (const candidate of splitTherapyCandidateClause(clause)) {
+                const excerpt = trimSnippet(candidate, 180);
+                if (!excerpt) continue;
+
+                const key = `${source.id}:${normalizeText(excerpt)}`;
+                if (seen.has(key)) continue;
+
+                seen.add(key);
+                hints.push({
+                    sourceId: source.id,
+                    label: source.label,
+                    excerpt,
+                });
+
+                if (hints.length >= THERAPY_HINT_LIMIT) {
+                    return hints;
+                }
+            }
+        }
+    }
+
+    return hints;
 }
 
 function extractJsonBlock(response: string): string | null {
@@ -237,11 +370,14 @@ function buildSourceRecords(
     const records: SmartImportSourceRecord[] = [];
 
     if (patient.notes?.trim()) {
-        records.push({
-            id: 'patient-notes',
-            kind: 'patient-notes',
-            label: 'Note paziente',
-            content: trimSnippet(patient.notes, 900),
+        /* @Codex */
+        splitPromptSourceSegments(patient.notes, 6).forEach((segment, index) => {
+            records.push({
+                id: `patient-notes:${index + 1}`,
+                kind: 'patient-notes',
+                label: index === 0 ? 'Note paziente' : `Note paziente · segmento ${index + 1}`,
+                content: trimSnippet(segment, 900),
+            });
         });
     }
 
@@ -250,12 +386,17 @@ function buildSourceRecords(
         .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
         .slice(0, 6)
         .forEach((entry) => {
-            records.push({
-                id: `entry:${entry.id}`,
-                kind: 'clinical-entry',
-                label: `${entry.type.toUpperCase()} ${new Date(entry.date).toLocaleDateString('it-IT')}`,
-                date: normalizeDate(entry.date),
-                content: trimSnippet(entry.content, 650),
+            /* @Codex */
+            splitPromptSourceSegments(entry.content, 4).forEach((segment, index) => {
+                records.push({
+                    id: `entry:${entry.id}:${index + 1}`,
+                    kind: 'clinical-entry',
+                    label: index === 0
+                        ? `${entry.type.toUpperCase()} ${new Date(entry.date).toLocaleDateString('it-IT')}`
+                        : `${entry.type.toUpperCase()} ${new Date(entry.date).toLocaleDateString('it-IT')} · segmento ${index + 1}`,
+                    date: normalizeDate(entry.date),
+                    content: trimSnippet(segment, 650),
+                });
             });
         });
 
@@ -271,6 +412,10 @@ function buildSourceRecords(
                     .map((item) => `${item.system} ${item.code} ${item.description}`)
                     .join(' | ')
                 : '';
+            /* @Codex */
+            const extractedMedications = Array.isArray(insight.extractedData?.medications)
+                ? insight.extractedData.medications.join(' | ')
+                : '';
 
             records.push({
                 id: `insight:${insight.id}`,
@@ -278,7 +423,7 @@ function buildSourceRecords(
                 label: `Documento ${fileName || 'analizzato'}`,
                 date: normalizeDate(insight.date),
                 content: trimSnippet(
-                    [insight.summary, extractedDiagnoses].filter(Boolean).join('\n'),
+                    [insight.summary, extractedDiagnoses, extractedMedications].filter(Boolean).join('\n'),
                     900,
                 ),
             });
@@ -308,6 +453,7 @@ function buildStructuredPrompt(
     currentTherapies: Therapy[],
     sources: SmartImportSourceRecord[]
 ): string {
+    const therapyCandidateHints = buildTherapyCandidateHints(sources);
     const payload = {
         patientId: patient.id,
         currentDiagnoses: currentDiagnoses.map((diagnosis) => ({
@@ -324,6 +470,7 @@ function buildStructuredPrompt(
                 aic: therapy.aic,
                 atc: therapy.atc,
             })),
+        therapyCandidateHints,
         sources: sources.map((source) => ({
             id: source.id,
             kind: source.kind,
@@ -361,7 +508,7 @@ function parseAiPayload(response: string): ParsedAiPayload {
                     explicitCode: typeof record.explicitCode === 'string' ? record.explicitCode.trim().toUpperCase() : undefined,
                     confidence: normalizeConfidence(record.confidence),
                 });
-                if (diagnoses.length >= 5) break;
+                if (diagnoses.length >= MAX_SMART_IMPORT_DIAGNOSES) break;
             }
         }
 
@@ -382,18 +529,44 @@ function parseAiPayload(response: string): ParsedAiPayload {
                     activePrinciple: typeof record.activePrinciple === 'string' ? record.activePrinciple.trim() : undefined,
                     dosage: typeof record.dosage === 'string' ? record.dosage.trim() : undefined,
                     motivation: typeof record.motivation === 'string' ? record.motivation.trim() : undefined,
+                    therapyState: normalizeTherapyState(record.therapyState),
+                    reviewNote: typeof record.reviewNote === 'string' ? record.reviewNote.trim() : undefined,
                     evidence,
                     sourceId: typeof record.sourceId === 'string' ? record.sourceId.trim() : undefined,
                     confidence: normalizeConfidence(record.confidence),
                 });
-                if (therapies.length >= 5) break;
+                if (therapies.length >= MAX_SMART_IMPORT_THERAPIES) break;
             }
         }
 
-        return { diagnoses, therapies };
+        return { diagnoses, therapies: dedupeParsedTherapies(therapies) };
     } catch {
         return { diagnoses: [], therapies: [] };
     }
+}
+
+function normalizeParsedTherapyKey(therapy: Pick<ParsedAiTherapy, 'drugMention' | 'activePrinciple' | 'dosage' | 'therapyState'>): string {
+    return [
+        normalizeText(therapy.drugMention || ''),
+        normalizeText(therapy.activePrinciple || ''),
+        normalizeText(therapy.dosage || ''),
+        therapy.therapyState || 'active',
+    ].join('|');
+}
+
+function dedupeParsedTherapies(therapies: ParsedAiTherapy[]): ParsedAiTherapy[] {
+    const seen = new Set<string>();
+    const deduped: ParsedAiTherapy[] = [];
+
+    for (const therapy of therapies) {
+        const key = normalizeParsedTherapyKey(therapy);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(therapy);
+        if (deduped.length >= MAX_SMART_IMPORT_THERAPIES) break;
+    }
+
+    return deduped;
 }
 
 function overlapScore(candidate: string, tokens: string[]): number {
@@ -482,6 +655,46 @@ async function searchDrugCatalog(query: string): Promise<AifaDrug[]> {
     return Array.isArray(payload) ? payload as AifaDrug[] : [];
 }
 
+function sanitizeDrugSearchText(value: string): string {
+    return value
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(DOSAGE_TOKEN_GLOBAL_REGEX, ' ')
+        .replace(/\b(?:x|die|bid|tid|ore|mattino|sera|pranzo|colazione|giorno|giorni|settimana|settimane|verificare|confermare|dose|dosi|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/gi, ' ')
+        .replace(/[,:]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function buildDrugSearchTerms(suggestion: ParsedAiTherapy): string[] {
+    const terms = new Set<string>();
+    const sources = [suggestion.activePrinciple, suggestion.drugQuery, suggestion.drugMention];
+
+    for (const source of sources) {
+        if (!source?.trim()) continue;
+
+        const raw = source.replace(/\s+/g, ' ').trim();
+        const cleaned = sanitizeDrugSearchText(raw);
+        const segments = [raw, cleaned, ...raw.split(/\s*\/\s*|\s*\+\s*|,(?!\d)|\b(?:poi|quindi|successivamente)\b/i)];
+
+        for (const segment of segments) {
+            const compact = sanitizeDrugSearchText(segment);
+            if (compact.length >= 2) {
+                terms.add(compact);
+            }
+        }
+
+        const tokens = tokenize(cleaned).filter((token) => token.length >= 4 && !DRUG_QUERY_STOPWORDS.has(token));
+        for (const token of tokens) {
+            terms.add(token);
+        }
+        if (tokens.length >= 2) {
+            terms.add(tokens.slice(0, 2).join(' '));
+        }
+    }
+
+    return Array.from(terms).sort((left, right) => right.length - left.length);
+}
+
 function rankDrugMatch(
     candidate: AifaDrug,
     drugQuery: string,
@@ -492,19 +705,74 @@ function rankDrugMatch(
     const principleTokens = uniqueTokens(tokenize(activePrinciple || ''));
     const mentionTokens = uniqueTokens(tokenize(drugMention));
     const candidateName = `${candidate.name} ${candidate.activePrinciple || ''} ${candidate.packaging || ''}`;
+    const normalizedMention = normalizeText(sanitizeDrugSearchText(drugMention));
+    const normalizedQuery = normalizeText(sanitizeDrugSearchText(drugQuery));
+    const normalizedPrinciple = normalizeText(sanitizeDrugSearchText(activePrinciple || ''));
+    const normalizedCandidateName = normalizeText(candidate.name || '');
+    const normalizedCandidatePrinciple = normalizeText(candidate.activePrinciple || '');
 
     let score = overlapScore(candidateName, queryTokens) * 5;
     score += overlapScore(candidateName, principleTokens) * 7;
     score += overlapScore(candidateName, mentionTokens) * 4;
 
-    if (activePrinciple && candidate.activePrinciple && normalizeText(candidate.activePrinciple) === normalizeText(activePrinciple)) {
-        score += 18;
+    if (normalizedPrinciple && normalizedCandidatePrinciple === normalizedPrinciple) {
+        score += 24;
     }
-    if (normalizeText(candidate.name).includes(normalizeText(drugMention))) {
+    if (normalizedMention && normalizedCandidateName === normalizedMention) {
+        score += 26;
+    } else if (normalizedMention && normalizedCandidateName.includes(normalizedMention)) {
+        score += 12;
+    }
+    if (normalizedQuery && normalizedCandidatePrinciple.includes(normalizedQuery)) {
+        score += 12;
+    }
+    if (normalizedPrinciple && normalizedCandidateName.includes(normalizedPrinciple)) {
         score += 10;
     }
 
     return score;
+}
+
+function classifyTherapyState(
+    suggestion: ParsedAiTherapy,
+): TherapySuggestionState {
+    if (suggestion.therapyState && suggestion.therapyState !== 'active') {
+        return suggestion.therapyState;
+    }
+
+    const probe = normalizeText([
+        suggestion.drugMention,
+        suggestion.drugQuery,
+        suggestion.activePrinciple,
+        suggestion.dosage,
+        suggestion.motivation,
+        suggestion.reviewNote,
+        suggestion.evidence,
+    ].filter(Boolean).join(' '));
+
+    if (
+        /switch|passa a|passare a|sostit|transizion|scal|titol|sospend(?:ere|e).*(iniz|pass|switch|sostit)/.test(probe)
+    ) {
+        return 'transition';
+    }
+
+    if (/da verificare|da confermare|incert|non chiar|dubb|valutar|\?/.test(probe)) {
+        return 'uncertain';
+    }
+
+    if (/sospes|interrott|stop|terminat|conclus|discontinuat/.test(probe)) {
+        return 'inactive';
+    }
+
+    return suggestion.therapyState || 'active';
+}
+
+function buildTherapyBlockedReason(state: TherapySuggestionState, reviewNote: string | undefined): string | undefined {
+    if (state === 'active') return undefined;
+    if (reviewNote) return reviewNote;
+    if (state === 'transition') return 'Transizione terapeutica da confermare prima dell\'import';
+    if (state === 'uncertain') return 'Terapia citata come incerta o da verificare';
+    return 'Terapia non attiva nelle fonti correnti';
 }
 
 async function resolveTherapySuggestion(
@@ -512,9 +780,10 @@ async function resolveTherapySuggestion(
     sourceMap: Map<string, SmartImportSourceRecord>
 ): Promise<TherapySmartImportSuggestion> {
     const source = sourceMap.get(suggestion.sourceId || '') || sourceMap.values().next().value as SmartImportSourceRecord | undefined;
-    const searchTerms = uniqueTokens([suggestion.activePrinciple, suggestion.drugQuery, suggestion.drugMention].filter(Boolean) as string[]);
+    const searchTerms = buildDrugSearchTerms(suggestion);
     let match: TherapySmartImportSuggestion['match'];
     let matchType: TherapySmartImportSuggestion['matchType'] = 'none';
+    const therapyState = classifyTherapyState(suggestion);
 
     for (const term of searchTerms) {
         const candidates = await searchDrugCatalog(term);
@@ -527,7 +796,7 @@ async function resolveTherapySuggestion(
             }))
             .sort((left, right) => right.score - left.score);
 
-        if (ranked[0] && ranked[0].score >= 8) {
+        if (ranked[0] && ranked[0].score >= 7) {
             match = {
                 aic: ranked[0].candidate.aic,
                 name: ranked[0].candidate.name,
@@ -544,6 +813,9 @@ async function resolveTherapySuggestion(
         matchType = 'manual';
     }
 
+    const blockedReason = buildTherapyBlockedReason(therapyState, suggestion.reviewNote)
+        || (matchType === 'none' ? 'Nessun match farmaco affidabile' : undefined);
+
     return {
         id: `therapy:${suggestion.drugMention}:${suggestion.dosage || ''}:${suggestion.activePrinciple || ''}`,
         drugMention: suggestion.drugMention,
@@ -551,6 +823,8 @@ async function resolveTherapySuggestion(
         activePrinciple: suggestion.activePrinciple,
         dosage: suggestion.dosage,
         motivation: suggestion.motivation,
+        therapyState,
+        reviewNote: suggestion.reviewNote,
         confidence: suggestion.confidence,
         evidence: {
             sourceKind: source?.kind || 'patient-notes',
@@ -561,8 +835,8 @@ async function resolveTherapySuggestion(
         },
         matchType,
         match,
-        canApply: matchType !== 'none',
-        blockedReason: matchType === 'none' ? 'Nessun match farmaco affidabile' : undefined,
+        canApply: therapyState === 'active' && matchType !== 'none',
+        blockedReason,
     };
 }
 

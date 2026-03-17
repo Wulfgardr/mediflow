@@ -271,16 +271,19 @@ export default function PatientDetailPage() {
 
                         <button
                             onClick={async () => {
-                                // Filter 'scale' type entries for the scales section
-                                const scaleEntries = entries?.filter(e => e.type === 'scale') || [];
+                                /* @Codex */
+                                const nonScaleEntries = entries?.filter((entry) => entry.type !== 'scale' && !entry.deletedAt) || [];
+                                /* @Codex */
+                                const scaleEntries = entries?.filter((entry) => entry.type === 'scale' && !entry.deletedAt) || [];
 
-                                // Fetch therapies for the report
-                                // Fetch therapies for the report
-                                const therapies = await db.therapies.filter((t: any) => t.patientId === id).toArray();
+                                // Fetch therapies and observations for the report
+                                const therapies = await db.therapies.filter((therapy) => therapy.patientId === id).toArray();
+                                /* @Codex */
+                                const observations = await db.observations.filter((observation) => observation.patientId === id).toArray();
 
                                 import('@/lib/report-service').then(mod => {
                                     if (patient && entries) {
-                                        mod.generatePatientReport(patient, entries, scaleEntries, therapies);
+                                        mod.generatePatientReport(patient, nonScaleEntries, scaleEntries, therapies, observations);
                                     }
                                 });
                             }}
@@ -343,11 +346,11 @@ export default function PatientDetailPage() {
                 {/* Sidebar / Stats Column */}
                 <div className="space-y-6">
 
-                    {/* @Codex */}
-                    <PatientSmartImportPanel patient={patient} entries={entries} />
-
                     {/* NEW AI Insight Location */}
                     <AIPatientInsight patient={patient} />
+
+                    {/* @Codex */}
+                    <PatientSmartImportPanel patient={patient} entries={entries} />
 
                     {/* Document Insights - Archivio Intelligente */}
                     <DocumentInsightsPanel patient={patient} />

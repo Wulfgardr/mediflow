@@ -6,7 +6,7 @@ import { Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -20,6 +20,15 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     const [modelLabel, setModelLabel] = useState<string>("");
 
     const abortControllerRef = useRef<AbortController | null>(null);
+    /* @Codex */
+    const parsedInsight = parsePatientInsight(patient.aiSummary || "");
+    /* @Codex */
+    const hasStructuredInsight = Boolean(
+        parsedInsight.summary ||
+        parsedInsight.alerts.length ||
+        parsedInsight.nextSteps.length ||
+        parsedInsight.gaps.length
+    );
 
     /* @Codex */
     useEffect(() => {
@@ -105,7 +114,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 <div>
                     <h3 className="font-bold text-gray-800 dark:text-white">Genera Patient Insight</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                        Usa l&apos;intelligenza artificiale per analizzare diario, documenti e terapie e creare un riassunto clinico aggiornato.
+                        Usa l&apos;intelligenza artificiale per ottenere un quadro clinico breve e i prossimi passi suggeriti.
                     </p>
                 </div>
 
@@ -194,15 +203,73 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         <X className="w-3 h-3" /> Interrompi
                     </button>
                 </div>
+            ) : hasStructuredInsight ? (
+                <div className="space-y-4">
+                    {parsedInsight.nextSteps.length > 0 && (
+                        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-500/20 dark:bg-indigo-900/10">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                                Prossimi passi suggeriti
+                            </p>
+                            <div className="mt-3 space-y-2">
+                                {parsedInsight.nextSteps.map((step, index) => (
+                                    <div
+                                        key={`${index}-${step}`}
+                                        className="rounded-xl bg-white/80 px-3 py-2 text-sm font-medium text-indigo-950 shadow-sm dark:bg-black/20 dark:text-indigo-100"
+                                    >
+                                        {index + 1}. <PrivacyBlur intensity="sm">{step}</PrivacyBlur>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {parsedInsight.summary && (
+                        <div className="rounded-2xl border border-white/60 bg-white/60 p-4 dark:border-white/10 dark:bg-black/20">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Quadro clinico
+                            </p>
+                            <p className="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-200">
+                                <PrivacyBlur intensity="sm">{parsedInsight.summary}</PrivacyBlur>
+                            </p>
+                        </div>
+                    )}
+
+                    {parsedInsight.alerts.length > 0 && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                Attenzioni
+                            </p>
+                            <ul className="mt-2 space-y-1 text-sm text-amber-900 dark:text-amber-100">
+                                {parsedInsight.alerts.map((item, index) => (
+                                    <li key={`${index}-${item}`} className="flex gap-2">
+                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                                        <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {parsedInsight.gaps.length > 0 && (
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Gap da chiarire
+                            </p>
+                            <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-200">
+                                {parsedInsight.gaps.map((item, index) => (
+                                    <li key={`${index}-${item}`} className="flex gap-2">
+                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0" />
+                                        <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
             ) : (
                 <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 prose-headings:text-indigo-900 dark:prose-headings:text-indigo-300 prose-strong:text-indigo-700 dark:prose-strong:text-indigo-400 leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-indigo-50/50 dark:border-indigo-500/10">
                     <PrivacyBlur>
-                        <ReactMarkdown>
-                            {(patient.aiSummary || "")
-                                .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '') // Clean on render
-                                .replace(/^Plan:\s*/gim, '')
-                                .trim()}
-                        </ReactMarkdown>
+                        <ReactMarkdown>{parsedInsight.fallbackMarkdown}</ReactMarkdown>
                     </PrivacyBlur>
                 </div>
             )}

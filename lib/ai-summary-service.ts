@@ -2,6 +2,7 @@
 'use client';
 
 import { db } from '@/lib/db';
+import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 
 export type SummaryStage = 'connect' | 'context' | 'generate' | 'save';
 
@@ -16,38 +17,104 @@ interface SummaryOptions {
     onStage?: (stage: SummaryStage, info?: SummaryModelInfo) => void;
 }
 
-const SUMMARY_PROMPT = `Sei un assistente medico. Analizza questi dati e rispondi in modo COMPLETO ma CONCISO.
+const SUMMARY_PROMPT = `Sei un assistente medico locale.
 
-FORMATO RICHIESTO:
-**Riassunto clinico:** (max 2 righe)
+OBIETTIVO:
+- produrre un insight clinico breve, asciutto e orientato all'azione
+- evidenziare solo cio che aiuta la gestione pratica del paziente oggi
+- proporre prossimi passi prudenti, verificabili e non inventati
 
-**Punti di attenzione:**
-1. [punto 1]
-2. [punto 2]
-3. [punto 3]
+FORMATO OBBLIGATORIO IN MARKDOWN:
+**Quadro attuale:** max 2 frasi brevi.
 
-**Prossima mossa:** [azione specifica]
+**Attenzioni:**
+- massimo 2 bullet
+
+**Prossimi passi:**
+- massimo 3 bullet operativi
+
+**Gap da chiarire:**
+- massimo 2 bullet solo se davvero utili
 
 REGOLE IMPORTANTI:
-- NON lasciare frasi incomplete o troncate
-- Completa sempre ogni frase
-- Sii breve ma esaustivo
-- Niente introduzioni ("Ecco l'analisi...")
+- massimo 120 parole totali
+- niente introduzioni o conclusioni
+- niente ripetizioni o narrativa superflua
+- non inventare diagnosi, esami o terapie
+- se non emerge un'azione chiara, scrivi "monitoraggio clinico" nei prossimi passi
+- privilegia problemi attivi, diagnosi codificate, terapie in corso, controlli pendenti, osservazioni recenti e documenti recenti
 
 DATI PAZIENTE:
 `;
 
 const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
 
+const SECTION_TITLES = [
+    'Quadro attuale',
+    'Attenzioni',
+    'Prossimi passi',
+    'Gap da chiarire',
+    'Riassunto clinico',
+    'Punti di attenzione',
+    'Prossima mossa',
+];
+
+export interface ParsedPatientInsight {
+    summary: string;
+    alerts: string[];
+    nextSteps: string[];
+    gaps: string[];
+    fallbackMarkdown: string;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractSection(markdown: string, titles: string[]): string {
+    const startPattern = titles.map(escapeRegExp).join('|');
+    const stopPattern = SECTION_TITLES.map(escapeRegExp).join('|');
+    const regex = new RegExp(
+        `(?:^|\\n)\\*\\*(?:${startPattern})\\*\\*:?\\s*([\\s\\S]*?)(?=(?:\\n\\*\\*(?:${stopPattern})\\*\\*:?|$))`,
+        'i'
+    );
+    const match = markdown.match(regex);
+    return match?.[1]?.trim() || '';
+}
+
+function parseList(section: string): string[] {
+    return section
+        .split('\n')
+        .map((line) => line.replace(/^\s*(?:[-*]|\d+\.)\s*/, '').trim())
+        .filter(Boolean);
+}
+
+export function parsePatientInsight(content: string): ParsedPatientInsight {
+    const fallbackMarkdown = cleanAIResponse(content);
+    const summarySection = extractSection(fallbackMarkdown, ['Quadro attuale', 'Riassunto clinico']);
+    const nextStepsSection = extractSection(fallbackMarkdown, ['Prossimi passi', 'Prossima mossa']);
+    const alertsSection = extractSection(fallbackMarkdown, ['Attenzioni', 'Punti di attenzione']);
+    const gapsSection = extractSection(fallbackMarkdown, ['Gap da chiarire']);
+
+    return {
+        summary: summarySection.replace(/\n+/g, ' ').trim(),
+        alerts: parseList(alertsSection),
+        nextSteps: parseList(nextStepsSection),
+        gaps: parseList(gapsSection),
+        fallbackMarkdown,
+    };
+}
+
 /* @Codex */
 export async function getAiModelLabels() {
+    await ensureTextModelDefaultsUpgraded();
     const modelClinical = await db.settings.get('aiModel_clinical');
     const legacyModel = await db.settings.get('aiModel');
     const modelOcr = await db.settings.get('aiModel_ocr');
 
     return {
-        clinical: modelClinical?.value || legacyModel?.value || 'qwen2.5:32b',
-        ocr: modelOcr?.value || 'deepseek-ocr'
+        clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),
+        ocr: modelOcr?.value || DEFAULT_OCR_MODEL
     };
 }
 
@@ -82,7 +149,7 @@ export async function regeneratePatientSummary(
         const prompt = SUMMARY_PROMPT + contextData;
 
         options.onStage?.('generate', info);
-        const content = await ai.generate(prompt, options.signal, 1024);
+        const content = await ai.generate(prompt, options.signal, 384);
 
         const cleaned = cleanAIResponse(content);
         if (!cleaned) {
@@ -112,6 +179,9 @@ function cleanAIResponse(content: string): string {
     let cleanContent = content.replace(/<unused94>[\s\S]*?(<unused95>|$)/, '').trim();
     cleanContent = cleanContent.replace(/^Plan:\s*/i, '');
     cleanContent = cleanContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    cleanContent = cleanContent.replace(/\r/g, '');
+    cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n');
+    cleanContent = cleanContent.replace(/(?:^|\n)(\*\*[^*]+\*\*:)\s*\1/g, '\n$1');
 
     if (!cleanContent && content.length > 0) {
         cleanContent = `[⚠️ AI Output Raw]: ${content}`;

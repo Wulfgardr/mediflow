@@ -9,6 +9,7 @@ import {
     applyPatientSmartImportSelection,
     generatePatientSmartImportAnalysis,
     type PatientSmartImportAnalysis,
+    type TherapySuggestionState,
 } from '@/lib/patient-smart-import-service';
 
 interface PatientSmartImportPanelProps {
@@ -29,6 +30,20 @@ function countUsableSources(
         documentInsightCount,
         attachmentSummaryCount,
     ].reduce((total, count) => total + count, 0);
+}
+
+function therapyStateLabel(state: TherapySuggestionState): string {
+    if (state === 'transition') return 'transizione';
+    if (state === 'uncertain') return 'incerta';
+    if (state === 'inactive') return 'non attiva';
+    return 'attiva';
+}
+
+function therapyStateBadgeClasses(state: TherapySuggestionState): string {
+    if (state === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (state === 'transition') return 'border-amber-200 bg-amber-50 text-amber-700';
+    if (state === 'uncertain') return 'border-orange-200 bg-orange-50 text-orange-700';
+    return 'border-gray-200 bg-gray-50 text-gray-600';
 }
 
 export default function PatientSmartImportPanel({ patient, entries = [] }: PatientSmartImportPanelProps) {
@@ -277,6 +292,9 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                         }`}>
                                                         {therapy.matchType === 'catalog' ? 'catalogo' : therapy.matchType === 'manual' ? 'manuale' : 'nessun match'}
                                                     </span>
+                                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${therapyStateBadgeClasses(therapy.therapyState)}`}>
+                                                        {therapyStateLabel(therapy.therapyState)}
+                                                    </span>
                                                 </div>
                                                 <p className="mt-1 text-sm text-indigo-700">
                                                     {therapy.activePrinciple ? `${therapy.activePrinciple}` : 'Principio attivo da verificare'}
@@ -290,6 +308,9 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                 <p className="mt-2 text-xs text-gray-500">
                                                     <strong>{therapy.evidence.label}:</strong> <PrivacyBlur intensity="sm">{therapy.evidence.excerpt}</PrivacyBlur>
                                                 </p>
+                                                {therapy.reviewNote && therapy.reviewNote !== therapy.blockedReason && (
+                                                    <p className="mt-2 text-xs text-gray-600">{therapy.reviewNote}</p>
+                                                )}
                                                 {therapy.blockedReason && (
                                                     <p className="mt-2 text-xs text-amber-700">{therapy.blockedReason}</p>
                                                 )}
@@ -303,7 +324,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
                     <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 md:flex-row md:items-center md:justify-between">
                         <p className="text-xs text-gray-500">
-                            Seleziona solo i suggerimenti confermati. I match ICD-11 mancanti non vengono applicati.
+                            Seleziona solo i suggerimenti confermati. Le terapie in transizione o incerte restano visibili ma bloccate finche non vengono chiarite.
                         </p>
                         <button
                             onClick={applySelection}

@@ -4,6 +4,8 @@
 Date: 2026-03-16  
 Status: Accepted
 
+Update: la scelta del default text-only e stata aggiornata da `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`; la pipeline OCR-first e l'autofill prudente ICD restano validi.
+
 ---
 
 ## Problema

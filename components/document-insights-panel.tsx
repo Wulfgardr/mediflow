@@ -223,7 +223,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center gap-2 text-[10px] text-gray-400">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Sintesi generata da IA locale (DeepSeek OCR 2 + Qwen 32B). Verificare sempre.</span>
+                <span>Sintesi generata da IA locale (DeepSeek OCR 2 + Qwen 3.5 35B A3B). Verificare sempre.</span>
             </div>
         </div>
     );

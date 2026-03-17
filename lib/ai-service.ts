@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 
 export type AIProvider = 'ollama';
 
@@ -44,6 +45,7 @@ export class AIService {
     static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
         /* @Codex */
         const provider: AIProvider = 'ollama';
+        await ensureTextModelDefaultsUpgraded();
 
         const defaultUrl = "http://127.0.0.1:11434";
 
@@ -69,26 +71,15 @@ export class AIService {
         // 2. Fallback to legacy 'aiModel' (which was serving as global previously)
         const modelLegacy = await db.settings.get('aiModel');
 
-        // Defaults if DB is empty
-        /* @Codex */
-        const defaultClinical = "qwen2.5:32b";
-        const defaultOcr = "deepseek-ocr"; // DeepSeek-OCR 3B via Ollama
-        /* @Codex */
-        const defaultReasoning = "qwen2.5:32b";
-
         let model = "";
 
         if (task === 'clinical') {
-            model = modelClinical?.value || modelLegacy?.value || defaultClinical;
+            model = resolveTextModel(modelClinical?.value, modelLegacy?.value);
         } else if (task === 'ocr') {
             // OCR task: DeepSeek-OCR for document understanding
-            model = modelOcr?.value || defaultOcr;
+            model = modelOcr?.value || DEFAULT_OCR_MODEL;
         } else { // reasoning
-            model = modelReasoning?.value || defaultReasoning;
-            // "Legacy Fallback": If no specific reasoning model is set, check if legacy model is set.
-            if (!modelReasoning?.value && modelLegacy?.value) {
-                model = modelLegacy.value;
-            }
+            model = resolveTextModel(modelReasoning?.value, modelLegacy?.value);
         }
 
         console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);

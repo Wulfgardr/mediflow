@@ -64,7 +64,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             if (!patientId && data.rawText) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen2.5:32b'})...`);
+                setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                 try {
                     const analysis = await analyzeDocumentContent(data.rawText);
                     data.diagnoses = analysis.diagnoses;
@@ -88,7 +88,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             if (saveToArchive && patientId && data.rawText) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen2.5:32b'})...`);
+                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                 try {
                     await synthesizeDocument(data.rawText, file.name, patientId);
                     setArchiveSaved(true);

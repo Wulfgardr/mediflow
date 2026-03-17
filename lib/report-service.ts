@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Patient, ClinicalEntry, Therapy } from './db';
+/* @Codex */
+import { Patient, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
 export interface JsPDFWithAutoTable extends jsPDF {
@@ -11,7 +12,9 @@ export const generatePatientReport = (
     patient: Patient,
     entries: ClinicalEntry[],
     lastScales: ClinicalEntry[],
-    therapies: Therapy[] = []
+    therapies: Therapy[] = [],
+    /* @Codex */
+    observations: Observation[] = []
 ) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -48,6 +51,14 @@ export const generatePatientReport = (
 
     // --- PATIENT INFO GRID ---
     let currentY = 40;
+
+    /* @Codex */
+    const advanceSection = () => {
+        if (currentY > 250) {
+            doc.addPage();
+            currentY = 20;
+        }
+    };
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
@@ -87,8 +98,13 @@ export const generatePatientReport = (
 
     // Notes Section
     if (patient.notes) {
+        /* @Codex */
+        const noteLines = doc.splitTextToSize(patient.notes, pageWidth - 36);
+        /* @Codex */
+        const noteHeight = Math.max(16, 10 + (noteLines.length * 5));
+
         doc.setFillColor(255, 252, 235); // Light yellow bg
-        doc.roundedRect(14, currentY, pageWidth - 28, 16, 2, 2, 'F');
+        doc.roundedRect(14, currentY, pageWidth - 28, noteHeight, 2, 2, 'F');
 
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...COLORS.accent);
@@ -96,23 +112,68 @@ export const generatePatientReport = (
 
         doc.setFont("helvetica", "normal");
         doc.setTextColor(60, 60, 60);
-        doc.text(patient.notes, 18, currentY + 11, { maxWidth: pageWidth - 36 });
+        doc.text(noteLines, 18, currentY + 11);
 
-        currentY += 22;
+        currentY += noteHeight + 6;
     } else {
         currentY += 5;
     }
 
-    // --- ACTIVE THERAPY (NEW) ---
+    // --- ICD DIAGNOSES ---
+    /* @Codex */
+    const diagnoses = patient.diagnoses || [];
+
+    advanceSection();
+    doc.setFontSize(12);
+    doc.setTextColor(...COLORS.primary);
+    doc.setFont("helvetica", "bold");
+    doc.text("Diagnosi ICD", 14, currentY);
+    currentY += 2;
+
+    if (diagnoses.length > 0) {
+        const diagnosisData = diagnoses.map((diagnosis) => [
+            diagnosis.code || '-',
+            diagnosis.description || '-',
+            diagnosis.system || '-',
+            diagnosis.date ? new Date(diagnosis.date).toLocaleDateString('it-IT') : 'N/D'
+        ]);
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Codice', 'Descrizione', 'Sistema', 'Data']],
+            body: diagnosisData,
+            theme: 'striped',
+            headStyles: { fillColor: COLORS.secondary, fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 3 },
+            columnStyles: {
+                1: { cellWidth: 70 },
+                2: { cellWidth: 22 },
+                3: { cellWidth: 24 }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text("Nessuna diagnosi ICD presente.", 14, currentY + 6);
+        currentY += 12;
+    }
+
+    // --- ACTIVE THERAPY ---
+    /* @Codex */
     const activeTherapies = therapies.filter(t => t.status === 'active');
 
-    if (activeTherapies.length > 0) {
-        doc.setFontSize(12);
-        doc.setTextColor(...COLORS.primary);
-        doc.setFont("helvetica", "bold");
-        doc.text("Terapia Farmacologica Attiva", 14, currentY);
-        currentY += 2;
+    advanceSection();
+    doc.setFontSize(12);
+    doc.setTextColor(...COLORS.primary);
+    doc.setFont("helvetica", "bold");
+    doc.text("Terapia Farmacologica Attiva", 14, currentY);
+    currentY += 2;
 
+    if (activeTherapies.length > 0) {
         const therapyData = activeTherapies.map(t => [
             t.drugName,
             t.activePrinciple || '-',
@@ -135,49 +196,103 @@ export const generatePatientReport = (
             margin: { left: 14, right: 14 }
         });
 
-        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 12;
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text("Nessuna terapia attiva registrata.", 14, currentY + 6);
+        currentY += 12;
     }
 
     // --- CLINICAL DIARY ---
-    // Force page break check logic not needed as autotable handles it, but we set Y
+    advanceSection();
     doc.setFontSize(12);
     doc.setTextColor(...COLORS.primary);
     doc.setFont("helvetica", "bold");
     doc.text("Diario Clinico (Ultime Attività)", 14, currentY);
     currentY += 2;
 
-    const diaryData = entries.slice(0, 30).map(e => [ // Increased limit to 30
-        new Date(e.date).toLocaleDateString('it-IT'),
-        e.type.toUpperCase(),
-        e.content // Autotable will wrap this
-    ]);
+    /* @Codex */
+    const diaryEntries = entries.filter((entry) => entry.type !== 'scale' && !entry.deletedAt).slice(0, 30);
 
-    autoTable(doc, {
-        startY: currentY + 4,
-        head: [['Data', 'Tipo', 'Contenuto']],
-        body: diaryData,
-        theme: 'striped',
-        headStyles: { fillColor: COLORS.primary },
-        styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' }, // Enabled text wrapping
-        columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 25, fontStyle: 'bold' },
-            2: { cellWidth: 'auto' } // Auto width for content to take remaining space
-        },
-        margin: { left: 14, right: 14 }
-    });
+    if (diaryEntries.length > 0) {
+        const diaryData = diaryEntries.map(e => [
+            new Date(e.date).toLocaleDateString('it-IT'),
+            e.type.toUpperCase(),
+            e.content
+        ]);
 
-    // Get Y after diary
-    currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 12;
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Data', 'Tipo', 'Contenuto']],
+            body: diaryData,
+            theme: 'striped',
+            headStyles: { fillColor: COLORS.primary },
+            styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' }, // Enabled text wrapping
+            columnStyles: {
+                0: { cellWidth: 25 },
+                1: { cellWidth: 25, fontStyle: 'bold' },
+                2: { cellWidth: 'auto' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text("Nessun elemento nel diario clinico.", 14, currentY + 6);
+        currentY += 12;
+    }
+
+    // --- LAB OBSERVATIONS (LOINC + UCUM) ---
+    advanceSection();
+    doc.setFontSize(12);
+    doc.setTextColor(...COLORS.primary);
+    doc.setFont("helvetica", "bold");
+    doc.text("Osservazioni Codificate (LOINC + UCUM)", 14, currentY);
+    currentY += 2;
+
+    /* @Codex */
+    if (observations.length > 0) {
+        const observationData = observations.map((observation) => [
+            new Date(observation.observedAt).toLocaleDateString('it-IT'),
+            `${observation.codeSystem} ${observation.code}`,
+            observation.display || '-',
+            `${observation.value} ${observation.unitCode}`,
+            observation.notes || '-'
+        ]);
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Data', 'Codice LOINC', 'Parametro', 'Valore (UCUM)', 'Note']],
+            body: observationData,
+            theme: 'plain',
+            headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50] },
+            styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+            columnStyles: {
+                1: { cellWidth: 35 },
+                2: { cellWidth: 50 },
+                4: { cellWidth: 'auto' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text("Nessuna osservazione codificata disponibile.", 14, currentY + 6);
+        currentY += 12;
+    }
 
     // --- RECENT SCALES ---
     // Only show if there's space, otherwise new page
     if (lastScales.length > 0) {
-        // Check if we need new page
-        if (currentY > 250) {
-            doc.addPage();
-            currentY = 20;
-        }
+        advanceSection();
 
         doc.setFontSize(12);
         doc.setTextColor(...COLORS.primary);

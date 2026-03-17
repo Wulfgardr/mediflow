@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/db';
+import { DEFAULT_OCR_MODEL, DEFAULT_TEXT_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -367,6 +368,7 @@ export default function SettingsPage() {
 
     const loadAiConfig = async () => {
         try {
+            await ensureTextModelDefaultsUpgraded();
             // @Codex
             const safeGet = async (key: string) => {
                 try {
@@ -396,15 +398,12 @@ export default function SettingsPage() {
 
             // Determine models (migrate legacy if needed)
             /* @Codex */
-            const qwenDefault = "qwen2.5:32b";
-            const ocrDefault = "deepseek-ocr";
-
             setHardwareProfile(hardware?.value || 'custom');
             setAiConfig({
                 provider: 'ollama',
-                model_clinical: modelClinical?.value || legacyModel?.value || qwenDefault,
-                model_reasoning: modelReasoning?.value || qwenDefault,
-                model_ocr: modelOcr?.value || ocrDefault,
+                model_clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),
+                model_reasoning: resolveTextModel(modelReasoning?.value, legacyModel?.value),
+                model_ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
                 url: currentUrl
             });
         } catch (e) {
@@ -432,8 +431,8 @@ export default function SettingsPage() {
             // >32GB: Max power
             setAiConfig(prev => ({
                 ...prev,
-                model_clinical: 'qwen2.5:32b',
-                model_reasoning: 'qwen2.5:32b'
+                model_clinical: DEFAULT_TEXT_MODEL,
+                model_reasoning: DEFAULT_TEXT_MODEL
             }));
         }
     };
@@ -539,11 +538,11 @@ export default function SettingsPage() {
             const missingModels: string[] = [];
 
             // Helper to clean model names for comparison (remove tags if needed, or loosely match)
-            // Ollama often returns full names like "qwen2.5:32b" or "medgemma:latest"
+            // Ollama often returns full names like "qwen3.5:35b-a3b" or "medgemma:latest"
             const isMissing = (target: string) => {
                 if (!target) return false;
                 // Loose match: check if target is substring of any installed, or vice versa
-                // But exact match is better for "qwen2.5:7b" vs "qwen2.5:32b"
+                // But exact match is better for "qwen2.5:7b" vs "qwen3.5:35b-a3b"
                 return !installedModels.some(m => m === target || m.startsWith(target + ":"));
             };
 
@@ -712,7 +711,7 @@ export default function SettingsPage() {
                                         {hardwareProfile === 'high' && <CheckCircle className="w-3 h-3 text-purple-600" />}
                                     </div>
                                     <p className="text-xs font-bold text-gray-800">&gt; 32GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 32B per tutte le superfici text-only.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
                                 </div>
                             </div>
                         </div>
@@ -732,10 +731,11 @@ export default function SettingsPage() {
                                 value={aiConfig.model_clinical}
                                 onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
                                 recommended={[
-                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Default consigliato)" },
+                                    { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Default consigliato)" },
+                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
                                     { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Bilanciato)" },
                                     { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
-                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Fallback legacy)" }
+                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Specialistico medico, non default)" }
                                 ]}
                                 provider={aiConfig.provider}
                             />
@@ -748,7 +748,8 @@ export default function SettingsPage() {
                                 value={aiConfig.model_reasoning}
                                 onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
                                 recommended={[
-                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Potente, 24GB+ RAM)" },
+                                    { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Potente, default)" },
+                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
                                     { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Ottimo, 16GB RAM)" },
                                     { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
                                     { name: "deepseek-r1:14b", desc: "DeepSeek R1 14B (Reasoning)" }

@@ -29,6 +29,7 @@ export async function buildPatientContext(patientId: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allEntries = await db.entries.filter((e: any) => e.patientId === patient.id).toArray();
     const entries = allEntries
+        .filter((entry) => !entry.deletedAt && entry.content?.trim())
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 5);
@@ -45,6 +46,37 @@ export async function buildPatientContext(patientId: string): Promise<string> {
 
     const therapyContext = therapies
         .map(t => `- ${t.drugName} ${t.dosage}`)
+        .join("\n");
+
+    /* @Codex */
+    const observations = await db.observations
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((observation: any) => observation.patientId === patient.id)
+        .toArray();
+
+    /* @Codex */
+    const observationsContext = observations
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort((a: any, b: any) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
+        .slice(0, 5)
+        .map((observation) => {
+            const note = observation.notes ? ` (${observation.notes})` : "";
+            return `- [${observation.observedAt.toLocaleDateString()}] ${observation.display}: ${observation.value} ${observation.unitCode}${note}`;
+        })
+        .join("\n");
+
+    /* @Codex */
+    const checkups = await db.checkups
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((checkup: any) => checkup.patientId === patient.id && checkup.status !== 'completed' && checkup.status !== 'cancelled')
+        .toArray();
+
+    /* @Codex */
+    const checkupsContext = checkups
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5)
+        .map((checkup) => `- [${checkup.date.toLocaleDateString()}] ${checkup.title}${checkup.notes ? ` (${checkup.notes})` : ""}`)
         .join("\n");
 
     /* @Codex */
@@ -143,8 +175,17 @@ CF: ${patient.taxCode || 'N/A'}
 [TERAPIA ATTIVA]
 ${therapyContext || "Nessuna terapia registrata."}
 
+[NOTE IN SCHEDA]
+${patient.notes || "Nessuna nota strutturata in scheda."}
+
 [DIAGNOSI ICD]
 ${diagnosesContext || "Nessuna diagnosi codificata registrata."}
+
+[OSSERVAZIONI RECENTI]
+${observationsContext || "Nessuna osservazione recente."}
+
+[PROSSIMI CONTROLLI]
+${checkupsContext || "Nessun controllo pendente."}
 
 [STORIA CLINICA RECENTE (Ultime 5 note)]
 ${diaryContext || "Nessuna nota recente."}

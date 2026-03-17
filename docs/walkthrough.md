@@ -214,7 +214,7 @@ Tipi condivisi:
 
 1) Utente carica PDF/immagine  
 2) OCR via DeepSeek-OCR (Ollama)  
-3) Analisi testuale e sintesi via Qwen (`qwen2.5:32b` di default)  
+3) Analisi testuale e sintesi via Qwen (`qwen3.5:35b-a3b` di default)  
 4) Estrazione prudente di eventuali diagnosi con codice ICD esplicito  
 5) Salvataggio in `patients.documentInsights` (ultimi 3) e autofill deduplicato su `patients.diagnoses`
 
