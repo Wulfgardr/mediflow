@@ -68,12 +68,15 @@ struct PatientDetailView: View {
     @State private var entries: [EntrySummary] = []
     @State private var therapies: [TherapySummary] = []
     @State private var checkups: [CheckupSummary] = []
+    @State private var observations: [ObservationSummary] = []
     @State private var entriesErrorMessage: String?
     @State private var therapiesErrorMessage: String?
     @State private var checkupsErrorMessage: String?
+    @State private var observationsErrorMessage: String?
     @State private var showingNewEntry = false
     @State private var showingNewTherapy = false
     @State private var showingNewCheckup = false
+    @State private var showingNewObservation = false
     @State private var showingAIStudio = false
     @State private var aiPrompt = ""
     @State private var aiResponse = ""
@@ -93,11 +96,15 @@ struct PatientDetailView: View {
     /* @Codex */
     @State private var editingCheckup: CheckupSummary?
     /* @Codex */
+    @State private var editingObservation: ObservationSummary?
+    /* @Codex */
     @State private var pendingDeleteEntry: EntrySummary?
     /* @Codex */
     @State private var pendingDeleteTherapy: TherapySummary?
     /* @Codex */
     @State private var pendingDeleteCheckup: CheckupSummary?
+    /* @Codex */
+    @State private var pendingDeleteObservation: ObservationSummary?
 
     var body: some View {
         Group {
@@ -160,10 +167,16 @@ struct PatientDetailView: View {
                             }
                             .modifier(IslandMotion(index: 7, isRevealed: revealIslands))
 
+                            /* @Codex */
+                            ConceptIsland(title: "Osservazioni", subtitle: "Rilevazioni codificate LOINC + UCUM", icon: "waveform.path.ecg", accent: .pink) {
+                                observationsBlock
+                            }
+                            .modifier(IslandMotion(index: 8, isRevealed: revealIslands))
+
                             ConceptIsland(title: "AI Assist", subtitle: "Prompt contestuale e analisi", icon: "sparkles", accent: .purple) {
                                 aiInlineBlock
                             }
-                            .modifier(IslandMotion(index: 8, isRevealed: revealIslands))
+                            .modifier(IslandMotion(index: 9, isRevealed: revealIslands))
 
                             ConceptIsland(title: "Metadati", subtitle: "Tracciabilita record", icon: "tray.full", accent: .gray) {
                                 InfoGrid(rows: [
@@ -172,7 +185,7 @@ struct PatientDetailView: View {
                                     InfoRow(label: "Aggiornato il", value: formatted(date: detail.updatedAt))
                                 ])
                             }
-                            .modifier(IslandMotion(index: 9, isRevealed: revealIslands))
+                            .modifier(IslandMotion(index: 10, isRevealed: revealIslands))
                         }
                         .padding(24)
                     }
@@ -211,6 +224,11 @@ struct PatientDetailView: View {
                 showingNewCheckup = true
             }
             .accessibilityIdentifier("patient-detail-new-checkup-button")
+            /* @Codex */
+            Button("Nuova osservazione") {
+                showingNewObservation = true
+            }
+            .accessibilityIdentifier("patient-detail-new-observation-button")
             Button("AI Studio") {
                 showingAIStudio = true
             }
@@ -249,6 +267,19 @@ struct PatientDetailView: View {
                 expandedSize: CGSize(width: 760, height: 700)
             ) {
                 NewCheckupView(patientId: patientId) {
+                    Task { await loadClinicalSections() }
+                }
+            }
+        }
+        /* @Codex */
+        .sheet(isPresented: $showingNewObservation) {
+            GlassPanelWindow(
+                title: "Nuova osservazione",
+                subtitle: "Rilevazione strutturata LOINC + UCUM",
+                minSize: CGSize(width: 620, height: 620),
+                expandedSize: CGSize(width: 860, height: 820)
+            ) {
+                NewObservationView(patientId: patientId) {
                     Task { await loadClinicalSections() }
                 }
             }
@@ -314,6 +345,22 @@ struct PatientDetailView: View {
             }
         }
         /* @Codex */
+        .sheet(item: $editingObservation) { observation in
+            GlassPanelWindow(
+                title: "Modifica osservazione",
+                subtitle: "Aggiorna coding, valore e contesto clinico",
+                minSize: CGSize(width: 620, height: 620),
+                expandedSize: CGSize(width: 860, height: 820)
+            ) {
+                EditObservationView(
+                    patientId: patientId,
+                    observation: observation
+                ) {
+                    Task { await loadClinicalSections() }
+                }
+            }
+        }
+        /* @Codex */
         .alert(
             "Eliminare questa voce clinica?",
             isPresented: Binding(
@@ -356,6 +403,22 @@ struct PatientDetailView: View {
             Button("Elimina", role: .destructive) {
                 guard let checkup = pendingDeleteCheckup else { return }
                 Task { await deleteCheckup(checkup) }
+            }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            Text("L'operazione è irreversibile.")
+        }
+        /* @Codex */
+        .alert(
+            "Eliminare questa osservazione?",
+            isPresented: Binding(
+                get: { pendingDeleteObservation != nil },
+                set: { if !$0 { pendingDeleteObservation = nil } }
+            )
+        ) {
+            Button("Elimina", role: .destructive) {
+                guard let observation = pendingDeleteObservation else { return }
+                Task { await deleteObservation(observation) }
             }
             Button("Annulla", role: .cancel) {}
         } message: {
@@ -490,6 +553,32 @@ struct PatientDetailView: View {
                         onDelete: { pendingDeleteCheckup = checkup }
                     )
                     if checkup.id != checkups.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private var observationsBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let observationsErrorMessage {
+                Text(observationsErrorMessage)
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            } else if observations.isEmpty {
+                Text("Nessuna osservazione codificata.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(observations) { observation in
+                    ObservationRowView(
+                        observation: observation,
+                        onEdit: { editingObservation = observation },
+                        onDelete: { pendingDeleteObservation = observation }
+                    )
+                    if observation.id != observations.last?.id {
                         Divider()
                     }
                 }
@@ -646,9 +735,11 @@ struct PatientDetailView: View {
         entries = []
         therapies = []
         checkups = []
+        observations = []
         entriesErrorMessage = nil
         therapiesErrorMessage = nil
         checkupsErrorMessage = nil
+        observationsErrorMessage = nil
 
         do {
             detail = try await LocalAPIClient.shared.fetchPatient(id: patientId)
@@ -709,6 +800,17 @@ struct PatientDetailView: View {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile caricare gli appuntamenti.")
         }
 
+        do {
+            observations = try await LocalAPIClient.shared.fetchObservations(
+                patientId: patientId,
+                limit: 50
+            )
+            observationsErrorMessage = nil
+        } catch {
+            observations = []
+            observationsErrorMessage = message(for: error, fallback: "Impossibile caricare le osservazioni.")
+        }
+
         updateAIPromptIfNeeded()
     }
 
@@ -745,6 +847,18 @@ struct PatientDetailView: View {
             await loadClinicalSections()
         } catch {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'appuntamento.")
+        }
+    }
+
+    /* @Codex */
+    @MainActor
+    private func deleteObservation(_ observation: ObservationSummary) async {
+        pendingDeleteObservation = nil
+        do {
+            try await LocalAPIClient.shared.deleteObservation(patientId: patientId, observationId: observation.id)
+            await loadClinicalSections()
+        } catch {
+            observationsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'osservazione.")
         }
     }
 
