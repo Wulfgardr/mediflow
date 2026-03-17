@@ -26,6 +26,7 @@ interface SecurityContextType {
     isLocked: boolean;
     requiresSetup: boolean;
     user: User | null;
+    authErrorMessage: string | null;
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
     lock: () => void;
@@ -39,6 +40,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [requiresSetup, setRequiresSetup] = useState<boolean | null>(null); // null = loading
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
     /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
@@ -50,6 +52,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const lock = () => {
         setIsLocked(true);
+        setAuthErrorMessage(null);
         // @Codex - clear server session when locking
         void fetch('/api/auth/logout', { method: 'POST' });
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
@@ -244,13 +247,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (pin: string): Promise<boolean> => {
         try {
+            setAuthErrorMessage(null);
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: 'admin', password: pin })
             });
 
-            if (!res.ok) return false;
+            if (!res.ok) {
+                const payload = await res.json().catch(() => null);
+                setAuthErrorMessage(payload?.message || payload?.error || 'PIN non valido.');
+                return false;
+            }
 
             const data = await res.json();
             const { encryptedMasterKey, salt, ...userData } = data;
@@ -272,6 +280,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setUser(userData);
             setIsAuthenticated(true);
             setIsLocked(false);
+            setAuthErrorMessage(null);
 
             // Persist session
             await saveSession(masterKey, userData);
@@ -280,6 +289,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         } catch (e) {
             console.error("Login failed", e);
+            setAuthErrorMessage('Errore durante il login.');
             return false;
         }
     };
@@ -387,6 +397,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             isLocked,
             requiresSetup: false,
             user,
+            authErrorMessage,
             login,
             setupPin,
             lock,

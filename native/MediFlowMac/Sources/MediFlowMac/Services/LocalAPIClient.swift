@@ -1050,6 +1050,8 @@ struct AuthErrorResponse: Decodable {
     let error: String?
     let code: String?
     let message: String?
+    let lockedUntil: String?
+    let remainingAttempts: Int?
 }
 
 /* @Codex */

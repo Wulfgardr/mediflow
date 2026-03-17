@@ -32,6 +32,14 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
 }
 /* @Codex */
 try {
+    ensureColumn('users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
+    ensureColumn('users', 'first_failed_login_at', 'first_failed_login_at INTEGER');
+    ensureColumn('users', 'locked_until', 'locked_until INTEGER');
+} catch (error) {
+    console.warn('[MediFlow] Users schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
 } catch (error) {
     console.warn('[MediFlow] Attachments schema check skipped:', error);

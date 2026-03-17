@@ -11,6 +11,12 @@ export const users = sqliteTable('users', {
     passwordHash: text('password_hash').notNull(),
     encryptedMasterKey: text('encrypted_master_key').notNull(),
     salt: text('salt').notNull(),
+    /* @Codex */
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    /* @Codex */
+    firstFailedLoginAt: integer('first_failed_login_at', { mode: 'timestamp' }),
+    /* @Codex */
+    lockedUntil: integer('locked_until', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

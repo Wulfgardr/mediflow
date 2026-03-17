@@ -19,6 +19,7 @@
 /tmp-native-derived-data
 /tmp-parity-smoke
 /tmp-audit-test
+/tmp-auth-lockout-test
 
 # next.js
 /.next/

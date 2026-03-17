@@ -84,6 +84,9 @@ final class SecuritySession: ObservableObject {
             healthIssue = nil
             scheduleAutoLock()
             return true
+        } catch let error as AuthFlowError {
+            errorMessage = error.localizedDescription
+            return false
         } catch {
             if let localError = error as? LocalAPIError {
                 errorMessage = localError.localizedDescription
