@@ -172,6 +172,7 @@ Controlli consigliati prima di release o merge rilevanti:
 npm run lint
 npm run build
 npm audit
+npm run check:never-regress
 npx tsc --noEmit
 ```
 

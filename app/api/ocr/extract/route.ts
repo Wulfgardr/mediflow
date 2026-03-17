@@ -5,6 +5,7 @@ import { settings } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { validateLocalTarget } from '@/lib/local-target';
 
 /**
  * POST /api/ocr/extract
@@ -76,8 +77,17 @@ export async function GET(request: NextRequest) {
         const baseUrl = (configuredUrl || 'http://127.0.0.1:11434')
             .replace(/\/v1\/?$/, '')
             .replace(/\/$/, '');
+        /* @Codex */
+        const validation = validateLocalTarget(baseUrl);
+        if (!validation.ok) {
+            return NextResponse.json({
+                available: false,
+                model: configuredModel,
+                message: `Configured OCR endpoint not allowed: ${validation.reason}`
+            });
+        }
 
-        const res = await fetch(`${baseUrl}/api/tags`);
+        const res = await fetch(`${validation.url.toString().replace(/\/$/, '')}/api/tags`);
         if (!res.ok) {
             return NextResponse.json({
                 available: false,

@@ -3,8 +3,8 @@ import 'server-only';
 
 import { URL } from 'url';
 
-const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost']);
-const ALLOWED_PORTS = new Set(['11434', '8080']);
+const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', 'host.docker.internal']);
+const ALLOWED_PORTS = new Set(['11434', '8080', '8888']);
 
 export function validateLocalTarget(rawUrl: string | null | undefined): { ok: true; url: URL } | { ok: false; reason: string } {
     if (!rawUrl) return { ok: false, reason: 'Missing target URL' };

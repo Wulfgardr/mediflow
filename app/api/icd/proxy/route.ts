@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { validateLocalTarget } from '@/lib/local-target';
 
 const ICD_LOCAL_URL = process.env.ICD_BASE_URL || 'http://127.0.0.1:8888';
 
@@ -8,6 +9,12 @@ export async function GET(request: NextRequest) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    /* @Codex */
+    const validation = validateLocalTarget(ICD_LOCAL_URL);
+    if (!validation.ok) {
+        return NextResponse.json({ error: `ICD URL not allowed: ${validation.reason}` }, { status: 400 });
+    }
+    const baseUrl = validation.url.toString().replace(/\/$/, '');
 
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
@@ -20,7 +27,7 @@ export async function GET(request: NextRequest) {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
             // Check a known valid endpoint instead of root, with required headers
-            const checkUrl = `${ICD_LOCAL_URL}/icd/release/11/2024-01/mms`;
+            const checkUrl = `${baseUrl}/icd/release/11/2024-01/mms`;
 
             const res = await fetch(checkUrl, {
                 method: 'HEAD',
@@ -50,7 +57,7 @@ export async function GET(request: NextRequest) {
     try {
         // Use the MMS Linearization specific endpoint (2024-01) to ensure we get valid billing codes (theCode).
         // Foundation search (/icd/entity/search) often lacks codes.
-        const targetUrl = `${ICD_LOCAL_URL}/icd/release/11/2024-01/mms/search?q=${encodeURIComponent(query)}&includeKeywordResult=true&useaperiodic=false`;
+        const targetUrl = `${baseUrl}/icd/release/11/2024-01/mms/search?q=${encodeURIComponent(query)}&includeKeywordResult=true&useaperiodic=false`;
 
         const res = await fetch(targetUrl, {
             headers: {

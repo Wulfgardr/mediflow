@@ -19,7 +19,7 @@ Ultimo aggiornamento: 2026-03-17
 - [x] Introdurre smart import reviewable nel profilo paziente da note/diario/documenti per diagnosi ICD-11 e terapie, mantenendo l'autofill automatico limitato ai soli ICD espliciti (ADR 0012).
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
-- [ ] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).
+- [x] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).
 - [x] Definire artifact backup v1 con manifest e metadati di integrità.
 - [x] Definire preflight restore (compatibilità schema/versione, integrità, ownership) prima della fase scripting completa.
 

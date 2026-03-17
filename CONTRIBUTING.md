@@ -77,6 +77,19 @@ Per verificare drift e breaking change non autorizzati sulla superficie `/api/v1
 npm run check:openapi:drift
 ```
 
+### Never-regress guard
+
+Per bloccare regressioni sui guardrail minimi di sicurezza:
+
+```bash
+npm run check:never-regress
+```
+
+Il guard fallisce se trova:
+- credenziali di default hardcoded nel runtime
+- endpoint runtime non locali o telemetry default-on
+- rotture delle invarianti zero-knowledge minime
+
 ### Test concorrenza pazienti
 
 Per verificare i conflitti cross-client su `patients.version`:
@@ -179,6 +192,7 @@ Una PR è considerata conclusa quando:
 - `npm run lint` passa
 - `npm run build` passa
 - (consigliato) `npx tsc --noEmit` passa
+- `npm run check:never-regress` passa
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
