@@ -18,6 +18,9 @@ export const generatePatientReport = (
 ) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const topMargin = 20;
+    const bottomMargin = 18;
 
     // --- STYLING CONSTANTS ---
     const COLORS = {
@@ -53,10 +56,54 @@ export const generatePatientReport = (
     let currentY = 40;
 
     /* @Codex */
-    const advanceSection = () => {
-        if (currentY > 250) {
+    const ensureSpace = (minimumHeight: number) => {
+        if (currentY + minimumHeight > pageHeight - bottomMargin) {
             doc.addPage();
-            currentY = 20;
+            currentY = topMargin;
+        }
+    };
+
+    /* @Codex */
+    const startSection = (title: string, minimumHeight: number = 24) => {
+        ensureSpace(minimumHeight);
+        doc.setFontSize(12);
+        doc.setTextColor(...COLORS.primary);
+        doc.setFont("helvetica", "bold");
+        doc.text(title, 14, currentY);
+        currentY += 2;
+    };
+
+    /* @Codex */
+    const renderEmptyState = (message: string) => {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text(message, 14, currentY + 6);
+        currentY += 12;
+    };
+
+    /* @Codex */
+    const formatDate = (value: Date | string | undefined) => {
+        if (!value) return 'N/D';
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? 'N/D' : date.toLocaleDateString('it-IT');
+    };
+
+    /* @Codex */
+    const parseDiagnoses = (value: unknown) => {
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        if (typeof value !== 'string' || value.trim().length === 0) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
         }
     };
 
@@ -103,6 +150,7 @@ export const generatePatientReport = (
         /* @Codex */
         const noteHeight = Math.max(16, 10 + (noteLines.length * 5));
 
+        ensureSpace(noteHeight + 10);
         doc.setFillColor(255, 252, 235); // Light yellow bg
         doc.roundedRect(14, currentY, pageWidth - 28, noteHeight, 2, 2, 'F');
 
@@ -121,57 +169,44 @@ export const generatePatientReport = (
 
     // --- ICD DIAGNOSES ---
     /* @Codex */
-    const diagnoses = patient.diagnoses || [];
+    const diagnoses = parseDiagnoses(patient.diagnoses);
 
-    advanceSection();
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.primary);
-    doc.setFont("helvetica", "bold");
-    doc.text("Diagnosi ICD", 14, currentY);
-    currentY += 2;
+    startSection("Diagnosi ICD", 28);
 
     if (diagnoses.length > 0) {
         const diagnosisData = diagnoses.map((diagnosis) => [
+            diagnosis.system || '-',
             diagnosis.code || '-',
             diagnosis.description || '-',
-            diagnosis.system || '-',
-            diagnosis.date ? new Date(diagnosis.date).toLocaleDateString('it-IT') : 'N/D'
+            formatDate(diagnosis.date)
         ]);
 
         autoTable(doc, {
             startY: currentY + 4,
-            head: [['Codice', 'Descrizione', 'Sistema', 'Data']],
+            head: [['Sistema', 'Codice', 'Descrizione', 'Data']],
             body: diagnosisData,
             theme: 'striped',
             headStyles: { fillColor: COLORS.secondary, fontStyle: 'bold' },
             styles: { fontSize: 8, cellPadding: 3 },
             columnStyles: {
-                1: { cellWidth: 70 },
-                2: { cellWidth: 22 },
-                3: { cellWidth: 24 }
+                0: { cellWidth: 24 },
+                1: { cellWidth: 28 },
+                3: { cellWidth: 24 },
+                2: { cellWidth: 'auto' }
             },
             margin: { left: 14, right: 14 }
         });
 
         currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
     } else {
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...COLORS.lightText);
-        doc.text("Nessuna diagnosi ICD presente.", 14, currentY + 6);
-        currentY += 12;
+        renderEmptyState("Nessuna diagnosi ICD presente.");
     }
 
     // --- ACTIVE THERAPY ---
     /* @Codex */
     const activeTherapies = therapies.filter(t => t.status === 'active');
 
-    advanceSection();
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.primary);
-    doc.setFont("helvetica", "bold");
-    doc.text("Terapia Farmacologica Attiva", 14, currentY);
-    currentY += 2;
+    startSection("Terapia Farmacologica Attiva", 24);
 
     if (activeTherapies.length > 0) {
         const therapyData = activeTherapies.map(t => [
@@ -198,20 +233,11 @@ export const generatePatientReport = (
 
         currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
     } else {
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...COLORS.lightText);
-        doc.text("Nessuna terapia attiva registrata.", 14, currentY + 6);
-        currentY += 12;
+        renderEmptyState("Nessuna terapia attiva registrata.");
     }
 
     // --- CLINICAL DIARY ---
-    advanceSection();
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.primary);
-    doc.setFont("helvetica", "bold");
-    doc.text("Diario Clinico (Ultime Attività)", 14, currentY);
-    currentY += 2;
+    startSection("Diario Clinico (Ultime Attività)", 24);
 
     /* @Codex */
     const diaryEntries = entries.filter((entry) => entry.type !== 'scale' && !entry.deletedAt).slice(0, 30);
@@ -240,68 +266,53 @@ export const generatePatientReport = (
 
         currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
     } else {
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...COLORS.lightText);
-        doc.text("Nessun elemento nel diario clinico.", 14, currentY + 6);
-        currentY += 12;
+        renderEmptyState("Nessun elemento nel diario clinico.");
     }
 
     // --- LAB OBSERVATIONS (LOINC + UCUM) ---
-    advanceSection();
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.primary);
-    doc.setFont("helvetica", "bold");
-    doc.text("Osservazioni Codificate (LOINC + UCUM)", 14, currentY);
-    currentY += 2;
+    startSection("Osservazioni Codificate (LOINC + UCUM)", 30);
 
     /* @Codex */
     if (observations.length > 0) {
         const observationData = observations.map((observation) => [
-            new Date(observation.observedAt).toLocaleDateString('it-IT'),
-            `${observation.codeSystem} ${observation.code}`,
+            formatDate(observation.observedAt),
+            observation.codeSystem || '-',
+            observation.code || '-',
             observation.display || '-',
-            `${observation.value} ${observation.unitCode}`,
+            observation.value || '-',
+            observation.unitCode || '-',
             observation.notes || '-'
         ]);
 
         autoTable(doc, {
             startY: currentY + 4,
-            head: [['Data', 'Codice LOINC', 'Parametro', 'Valore (UCUM)', 'Note']],
+            head: [['Data', 'Sistema', 'Codice LOINC', 'Parametro', 'Valore', 'Unità UCUM', 'Note']],
             body: observationData,
             theme: 'plain',
             headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50] },
             styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
             columnStyles: {
-                1: { cellWidth: 35 },
-                2: { cellWidth: 50 },
-                4: { cellWidth: 'auto' }
+                0: { cellWidth: 22 },
+                1: { cellWidth: 18 },
+                2: { cellWidth: 26 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 18 },
+                6: { cellWidth: 'auto' },
             },
             margin: { left: 14, right: 14 }
         });
 
         currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
     } else {
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...COLORS.lightText);
-        doc.text("Nessuna osservazione codificata disponibile.", 14, currentY + 6);
-        currentY += 12;
+        renderEmptyState("Nessuna osservazione codificata disponibile.");
     }
 
     // --- RECENT SCALES ---
-    // Only show if there's space, otherwise new page
+    startSection("Valutazioni Recenti (Scale)", 24);
+
     if (lastScales.length > 0) {
-        advanceSection();
-
-        doc.setFontSize(12);
-        doc.setTextColor(...COLORS.primary);
-        doc.setFont("helvetica", "bold");
-        doc.text("Valutazioni Recenti (Scale)", 14, currentY);
-        currentY += 2;
-
         const scaleData = lastScales.map(s => [
-            new Date(s.date).toLocaleDateString('it-IT'),
+            formatDate(s.date),
             s.metadata?.title || 'Scala',
             s.metadata?.score || '-',
             s.metadata?.interpretation || '-'
@@ -319,6 +330,8 @@ export const generatePatientReport = (
             tableLineColor: [200, 200, 200],
             tableLineWidth: 0.1,
         });
+    } else {
+        renderEmptyState("Nessuna valutazione recente disponibile.");
     }
 
     // Save
