@@ -81,6 +81,19 @@ Regole minime:
 - Web UI usa HTTP su localhost.
 - Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
 
+### Lockout autenticazione PIN
+
+La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/adr/0017-auth-lockout-policy.md).
+
+- Si applica a `/api/auth/login`, condiviso tra lock screen web e unlock macOS.
+- Soglia: `5` tentativi falliti nella stessa finestra di `15 minuti`.
+- Durata lockout: `15 minuti`.
+- Reset completo su login valido; se la finestra precedente scade, il conteggio riparte da `1`.
+- Contratto risposta:
+  - `401 AUTH_INVALID_CREDENTIALS` finché il lockout non è attivo
+  - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
+- Il bearer token `/api/v1` già bootstrapato non introduce una policy separata: il controllo avviene sul PIN condiviso prima dell'emissione della sessione web o dell'unlock native.
+
 ---
 
 ## Proxy verso servizi locali (sicurezza SSRF)
