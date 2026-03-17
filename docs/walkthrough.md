@@ -203,6 +203,22 @@ Endpoint principali:
 Tipi condivisi:
 - `lib/api/v1/types.ts`
 
+### Backup e restore artifact v1
+
+La voce `Backup` in `app/settings/page.tsx` usa `components/backup-restore-ui.tsx`
+per esportare un artifact JSON `.mediflow` v1 con manifest e checksum.
+
+Flusso:
+
+1) il client web legge le collezioni supportate via API locale
+2) costruisce un artifact con manifest, counts e checksum `sha256`
+3) il restore invia il file a `app/api/system/backup-restore/route.ts`
+4) il server valida format, versione, scope, checksum e riferimenti interni
+5) il server svuota le tabelle supportate e reinserisce i record direttamente in SQLite
+
+Nota: `patients.ambulatoryId` viene re-materializzato anche nella relazione
+`patients_to_ambulatories`; le preferenze non esportabili restano follow-up.
+
 ---
 
 ## AI e OCR

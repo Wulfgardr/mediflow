@@ -20,8 +20,8 @@ Ultimo aggiornamento: 2026-03-16
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
 - [ ] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).
-- [ ] Definire artifact backup v1 con manifest e metadati di integrità.
-- [ ] Definire preflight restore (compatibilità schema/versione, integrità, ownership) prima della fase scripting completa.
+- [x] Definire artifact backup v1 con manifest e metadati di integrità.
+- [x] Definire preflight restore (compatibilità schema/versione, integrità, ownership) prima della fase scripting completa.
 
 ### 1) Integrità dati e concorrenza esplicita (T04)
 - [x] Introdurre semantica di optimistic concurrency (`version`) su entità cliniche prioritarie.
