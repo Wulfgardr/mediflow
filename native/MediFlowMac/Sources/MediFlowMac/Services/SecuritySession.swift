@@ -46,7 +46,7 @@ final class SecuritySession: ObservableObject {
             requiresSetup = !status.isSetup
         } catch {
             /* @Codex */
-            if let urlError = error as? URLError, urlError.code == .cancelled {
+            if case LocalAPIError.transport(.tlsHandshakeFailed) = error {
                 healthIssue = AuthHealthIssue(
                     title: "Handshake TLS fallito",
                     message: "Il certificato locale e il PIN TLS non coincidono. Rigenera la configurazione locale e riprova.",
@@ -85,7 +85,11 @@ final class SecuritySession: ObservableObject {
             scheduleAutoLock()
             return true
         } catch {
-            errorMessage = "PIN non valido"
+            if let localError = error as? LocalAPIError {
+                errorMessage = localError.localizedDescription
+            } else {
+                errorMessage = "PIN non valido"
+            }
             return false
         }
     }
@@ -122,10 +126,10 @@ final class SecuritySession: ObservableObject {
                     errorMessage = "Setup già completato. Inserisci il PIN esistente."
                 }
                 return unlocked
-            case .httpStatus:
-                errorMessage = error.localizedDescription
-                return false
             }
+        } catch let error as LocalAPIError {
+            errorMessage = error.localizedDescription
+            return false
         } catch {
             errorMessage = "Setup fallito"
             return false
@@ -147,7 +151,11 @@ final class SecuritySession: ObservableObject {
             await refreshSetupStatus()
             return true
         } catch {
-            errorMessage = "Ripristino fallito"
+            if let localError = error as? LocalAPIError {
+                errorMessage = localError.localizedDescription
+            } else {
+                errorMessage = "Ripristino fallito"
+            }
             return false
         }
     }
