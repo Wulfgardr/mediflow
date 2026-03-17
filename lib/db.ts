@@ -12,6 +12,8 @@ import {
     type BackupDataset,
     serializeBackupArtifact,
 } from './backup-artifact';
+/* @Codex */
+import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 
 // Document insight from OCR + AI synthesis
 /* @Codex */
@@ -515,6 +517,17 @@ export class ApiConflictError extends Error {
     }
 }
 
+/* @Codex */
+export class BackupRestorePreflightError extends Error {
+    readonly preflight: BackupRestorePreflightResult;
+
+    constructor(message: string, preflight: BackupRestorePreflightResult) {
+        super(message);
+        this.name = 'BackupRestorePreflightError';
+        this.preflight = preflight;
+    }
+}
+
 export async function exportRawDatabase() {
     const fetchRawCollection = async <T>(endpoint: string): Promise<T[]> => {
         const response = await fetch(endpoint, { cache: 'no-store' });
@@ -557,6 +570,12 @@ export async function importRawDatabase(jsonString: string) {
         const errorMessage = typeof payload?.error === 'string'
             ? payload.error
             : `Restore failed: ${response.status} ${response.statusText}`;
+        if (payload?.preflight && typeof payload.preflight === 'object') {
+            throw new BackupRestorePreflightError(
+                errorMessage,
+                payload.preflight as BackupRestorePreflightResult,
+            );
+        }
         throw new Error(errorMessage);
     }
 }

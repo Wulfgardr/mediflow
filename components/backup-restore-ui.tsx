@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
-import { exportRawDatabase, importRawDatabase } from '@/lib/db';
+import { BackupRestorePreflightError, exportRawDatabase, importRawDatabase } from '@/lib/db';
 import { useSecurity } from './security-provider';
 
 export default function BackupRestoreUI() {
     const { isAuthenticated, lock } = useSecurity();
     const [isLoading, setIsLoading] = useState(false);
-    const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+    const [status, setStatus] = useState<{
+        type: 'success' | 'error' | 'info';
+        message: string;
+        preflight?: BackupRestorePreflightError['preflight'];
+    } | null>(null);
 
     const handleExport = async () => {
         setIsLoading(true);
@@ -60,7 +64,11 @@ export default function BackupRestoreUI() {
 
         } catch (err) {
             console.error(err);
-            setStatus({ type: 'error', message: 'Errore durante il ripristino. Il file potrebbe essere corrotto.' });
+            const preflight = err instanceof BackupRestorePreflightError ? err.preflight : undefined;
+            const message = err instanceof Error
+                ? err.message
+                : 'Errore durante il ripristino. Il file potrebbe essere corrotto.';
+            setStatus({ type: 'error', message, preflight });
         } finally {
             setIsLoading(false);
             e.target.value = '';
@@ -124,7 +132,33 @@ export default function BackupRestoreUI() {
                     } border`}>
                     {status.type === 'success' && <CheckCircle className="w-5 h-5" />}
                     {status.type === 'error' && <AlertTriangle className="w-5 h-5" />}
-                    <p className="font-medium">{status.message}</p>
+                    <div className="space-y-3">
+                        <p className="font-medium">{status.message}</p>
+                        {status.preflight && (
+                            <div className="space-y-3 text-sm">
+                                <div className="rounded-lg border border-current/15 bg-white/50 px-3 py-2">
+                                    <p className="font-semibold">Preflight restore</p>
+                                    <p>
+                                        Data dir: <code>{status.preflight.target.dataDir ?? 'n/d'}</code>
+                                    </p>
+                                    <p>
+                                        Database target: <code>{status.preflight.target.dbPath ?? 'n/d'}</code>
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    {status.preflight.checks.map((check) => (
+                                        <div key={check.id} className="rounded-lg border border-current/15 bg-white/50 px-3 py-2">
+                                            <p className="font-semibold">
+                                                {check.status === 'pass' ? 'PASS' : 'FAIL'} · <code>{check.id}</code>
+                                            </p>
+                                            <p>{check.message}</p>
+                                            {check.remediation && <p className="opacity-80">{check.remediation}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

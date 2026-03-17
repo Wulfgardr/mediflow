@@ -12,6 +12,7 @@
     "lint": "eslint --quiet",
     "lint:full": "eslint",
     "check:openapi:drift": "node scripts/check-openapi-drift.mjs",
+    "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
     "test:audit": "bash scripts/audit-test.sh",

@@ -18,11 +18,10 @@ import {
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 import {
     BACKUP_COLLECTIONS,
-    BackupArtifactError,
     type BackupArtifact,
     type BackupCollectionName,
-    parseBackupArtifact,
 } from '@/lib/backup-artifact';
+import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -172,7 +171,13 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const artifact = await parseBackupArtifact(body);
+        const { artifact, result: preflight } = await runBackupRestorePreflight(body);
+        if (!preflight.ok || !artifact) {
+            return NextResponse.json(
+                { success: false, error: preflight.error ?? 'Restore preflight failed.', preflight },
+                { status: 412 },
+            );
+        }
 
         // @Codex better-sqlite3 transactions are synchronous; promise callbacks break restore execution.
         dbServer.transaction((tx) => {
@@ -251,7 +256,7 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('[MediFlow] Backup restore failed:', error);
         const message = error instanceof Error ? error.message : 'Restore failed.';
-        const status = error instanceof BackupArtifactError ? 400 : 500;
+        const status = error instanceof SyntaxError ? 400 : 500;
         return NextResponse.json({ success: false, error: message }, { status });
     }
 }
