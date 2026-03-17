@@ -96,6 +96,7 @@ struct NewPatientView: View {
             let encryptedAddress = try security.encryptString(address)
             let encryptedPhone = try security.encryptString(phone)
             let encryptedCaregiver = try security.encryptString(caregiver)
+            // @Codex Persist an explicit empty list when the user clears every exemption.
             let exemptionsPayload = ExemptionCodesCodec.encode(exemptionCodes) ?? "[]"
             let encryptedExemptions = try security.encryptString(exemptionsPayload)
             let encryptedNotes = try security.encryptString(notes)
