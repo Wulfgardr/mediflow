@@ -5,7 +5,7 @@ import { settings } from '@/lib/schema';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
-import { auditContextFromSession, listChangedFields, requestIdFromRequest, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromSession, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -38,9 +38,9 @@ export async function POST(request: Request) {
                 subjectRef: key,
                 sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request),
-                redactedMetadata: {
+                redactedMetadata: withAuditContextMetadata(context, {
                     changedFields: listChangedFields(body, ['key']),
-                },
+                }),
             });
         } catch (error) {
             console.error('Audit settings write failed:', error);

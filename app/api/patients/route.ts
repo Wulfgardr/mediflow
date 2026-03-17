@@ -11,6 +11,7 @@ import {
     auditContextFromSession,
     listChangedFields,
     requestIdFromRequest,
+    withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/audit';
 
@@ -47,7 +48,7 @@ async function recordPatientAuditEvent(
             subjectRef,
             sourceSurface: context.sourceSurface,
             requestId: requestIdFromRequest(request),
-            redactedMetadata,
+            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
         });
     } catch (error) {
         console.error('[MediFlow] Patient audit write failed:', error);

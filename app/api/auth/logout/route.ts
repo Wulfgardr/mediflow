@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { deleteSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/server-session';
 /* @Codex */
-import { auditContextFromSession, requestIdFromRequest, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 import { requireSession } from '@/lib/server-auth';
 
 export async function POST(request: Request) {
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
                 subjectRef: session.id,
                 sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request),
+                redactedMetadata: withAuditContextMetadata(context, null),
             });
         } catch (error) {
             console.error('Audit logout write failed:', error);

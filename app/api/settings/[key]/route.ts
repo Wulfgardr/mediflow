@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
-import { auditContextFromSession, listChangedFields, requestIdFromRequest, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromSession, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 
 export async function GET(
     request: Request,
@@ -63,9 +63,9 @@ export async function PUT(
                 subjectRef: key,
                 sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request),
-                redactedMetadata: {
+                redactedMetadata: withAuditContextMetadata(context, {
                     changedFields: listChangedFields(body),
-                },
+                }),
             });
         } catch (error) {
             console.error('Audit settings write failed:', error);
