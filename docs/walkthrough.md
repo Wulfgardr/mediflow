@@ -180,6 +180,11 @@ Usata da `LocalAPIClient` nel client nativo macOS. Richiede token:
 Authorization: Bearer <MEDIFLOW_LOCAL_API_TOKEN>
 ```
 
+Bootstrap token lato macOS:
+- ordine canonico `Keychain -> native-config.json -> local-api-token`
+- fallback secondari ammessi solo se il token nel Portachiavi non esiste; errori Keychain restano espliciti
+- `LocalAPIClient` prefligge il bootstrap secure-first prima della rete sugli endpoint autenticati; vedi ADR 0014
+
 Endpoint principali:
 - `app/api/v1/ambulatories/route.ts`
 - `app/api/v1/patients/route.ts`

@@ -7,10 +7,12 @@ actor LocalAPIClient {
 
     private let delegate = LocalAPISessionDelegate()
     private let session: URLSession
+    private let tokenProvider: LocalAPITokenProvider
 
-    init() {
+    init(tokenProvider: LocalAPITokenProvider = .shared, session: URLSession? = nil) {
+        self.tokenProvider = tokenProvider
         let configuration = URLSessionConfiguration.ephemeral
-        self.session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        self.session = session ?? URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
     func fetchPatients(ambulatoryId: String?) async throws -> [PatientSummary] {
@@ -272,7 +274,7 @@ actor LocalAPIClient {
 
     /* @Codex */
     func checkAuthStatus() async throws -> AuthCheckResponse {
-        let request = try makeRootRequest(path: "auth/check")
+        let request = try makeRootRequest(path: "auth/check", requiresAuth: false)
         let (data, response) = try await session.data(for: request)
         guard response is HTTPURLResponse else {
             throw URLError(.badServerResponse)
@@ -282,7 +284,7 @@ actor LocalAPIClient {
 
     func login(pin: String) async throws -> AuthLoginResponse {
         let payload = AuthLoginRequest(username: "admin", password: pin)
-        let request = try makeRootRequest(path: "auth/login", method: "POST", body: payload)
+        let request = try makeRootRequest(path: "auth/login", method: "POST", body: payload, requiresAuth: false)
         let (data, response) = try await session.data(for: request)
         try validate(response: response)
         return try JSONDecoder().decode(AuthLoginResponse.self, from: data)
@@ -297,7 +299,7 @@ actor LocalAPIClient {
             displayName: displayName,
             ambulatoryName: ambulatoryName
         )
-        let request = try makeRootRequest(path: "auth/setup", method: "POST", body: payload)
+        let request = try makeRootRequest(path: "auth/setup", method: "POST", body: payload, requiresAuth: false)
         /* @Codex */
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -480,7 +482,13 @@ actor LocalAPIClient {
         return formatter.string(from: date)
     }
 
-    private func makeRequest(path: String, method: String = "GET", body: Encodable? = nil, queryItems: [URLQueryItem] = []) throws -> URLRequest {
+    private func makeRequest(
+        path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        queryItems: [URLQueryItem] = [],
+        requiresAuth: Bool = true
+    ) throws -> URLRequest {
         let baseURL = try currentBaseURL()
         let url = baseURL.appendingPathComponent(path)
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -499,11 +507,19 @@ actor LocalAPIClient {
             encoder.dateEncodingStrategy = .iso8601
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
-        applyAuth(to: &request)
+        if requiresAuth {
+            try applyAuth(to: &request)
+        }
         return request
     }
 
-    private func makeRootRequest(path: String, method: String = "GET", body: Encodable? = nil, queryItems: [URLQueryItem] = []) throws -> URLRequest {
+    private func makeRootRequest(
+        path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        queryItems: [URLQueryItem] = [],
+        requiresAuth: Bool = true
+    ) throws -> URLRequest {
         let baseURL = try currentBaseURL()
         let rootURL = baseURL.deletingLastPathComponent()
         let url = rootURL.appendingPathComponent(path)
@@ -523,14 +539,21 @@ actor LocalAPIClient {
             encoder.dateEncodingStrategy = .iso8601
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
-        applyAuth(to: &request)
+        if requiresAuth {
+            try applyAuth(to: &request)
+        }
         return request
     }
 
-    private func applyAuth(to request: inout URLRequest) {
+    private func applyAuth(to request: inout URLRequest) throws {
         /* @Codex */
-        if let token = LocalAPITokenProvider.shared.token(), !token.isEmpty {
+        switch tokenProvider.resolveToken() {
+        case .resolved(let token, _):
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        case .failure(.notFound):
+            throw LocalAPIError.missingAPIToken
+        case .failure(let failure):
+            throw LocalAPIError.incompleteAPITokenBootstrap(failure)
         }
     }
 
@@ -571,9 +594,11 @@ actor LocalAPIClient {
     }
 }
 
-enum LocalAPIError: LocalizedError {
+enum LocalAPIError: LocalizedError, Equatable {
     case invalidBaseURL
     case insecureTransport
+    case missingAPIToken
+    case incompleteAPITokenBootstrap(LocalAPITokenBootstrapFailure)
     /* @Codex */
     case invalidAIModelsPayload
     /* @Codex */
@@ -585,6 +610,10 @@ enum LocalAPIError: LocalizedError {
             return "Base URL non valida."
         case .insecureTransport:
             return "Trasporto non sicuro: HTTPS richiesto."
+        case .missingAPIToken:
+            return "Token API locale assente."
+        case .incompleteAPITokenBootstrap(let failure):
+            return failure.localizedDescription
         /* @Codex */
         case .invalidAIModelsPayload:
             return "Risposta modelli AI non valida."
@@ -788,7 +817,7 @@ struct AuthErrorResponse: Decodable {
 }
 
 /* @Codex */
-struct PatientVersionConflictPayload: Decodable {
+struct PatientVersionConflictPayload: Decodable, Equatable {
     let error: String
     let code: String
     let entity: String
@@ -801,7 +830,7 @@ struct PatientVersionConflictPayload: Decodable {
 }
 
 /* @Codex */
-struct PatientConflictSnapshot: Decodable {
+struct PatientConflictSnapshot: Decodable, Equatable {
     let id: String
     let version: Int
     let updatedAt: String?
