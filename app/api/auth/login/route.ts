@@ -1,10 +1,30 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
+/* @Codex */
+import { hashAuditRef, requestIdFromRequest, writeAuditEvent } from '@/lib/audit';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 /* @Codex */
 import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+
+/* @Codex */
+function recordFailedLoginAttempt(request: Request, username: unknown): void {
+    void writeAuditEvent({
+        eventType: 'auth.login.failed',
+        outcome: 'failure',
+        actorType: 'user',
+        actorRef: hashAuditRef(typeof username === 'string' ? username : ''),
+        subjectType: 'session',
+        sourceSurface: 'web',
+        requestId: requestIdFromRequest(request),
+        redactedMetadata: {
+            reasonCode: 'invalid_credentials',
+        },
+    }).catch((error) => {
+        console.error('Audit login failure write failed:', error);
+    });
+}
 
 export async function POST(request: Request) {
     try {
@@ -14,12 +34,14 @@ export async function POST(request: Request) {
         const user = await dbServer.select().from(users).where(eq(users.username, username)).get();
 
         if (!user || !user.passwordHash) {
+            recordFailedLoginAttempt(request, username);
             return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
 
         if (!isValid) {
+            recordFailedLoginAttempt(request, username);
             return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
         }
 
@@ -31,6 +53,20 @@ export async function POST(request: Request) {
 
         /* @Codex */
         const session = createSession({ id: user.id, username: user.username, role: user.role || 'user' });
+        try {
+            await writeAuditEvent({
+                eventType: 'auth.login.succeeded',
+                outcome: 'success',
+                actorType: 'user',
+                actorRef: user.id,
+                subjectType: 'session',
+                subjectRef: session.id,
+                sourceSurface: 'web',
+                requestId: requestIdFromRequest(request),
+            });
+        } catch (error) {
+            console.error('Audit login success write failed:', error);
+        }
         const response = NextResponse.json({
             success: true,
             id: user.id,

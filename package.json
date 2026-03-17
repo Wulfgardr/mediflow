@@ -14,6 +14,7 @@
     "check:openapi:drift": "node scripts/check-openapi-drift.mjs",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
+    "test:audit": "bash scripts/audit-test.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "prepare:oss": "node scripts/prepare-oss.js",

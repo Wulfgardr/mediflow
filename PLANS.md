@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-16
+Ultimo aggiornamento: 2026-03-17
 
 ---
 
@@ -35,8 +35,8 @@ Ultimo aggiornamento: 2026-03-16
 
 ### 3) Audit minimo ad alto valore (T03)
 - [x] Definire tassonomia eventi audit (auth + CRUD sensibili + settings admin). (`docs/adr/0015-audit-taxonomy-minimum-catalog.md`)
-- [ ] Implementare write path append-only con campi PHI-safe.
-- [ ] Assicurare attribuzione attore coerente per chiamate web/native.
+- [x] Implementare write path append-only con campi PHI-safe.
+- [x] Assicurare attribuzione attore coerente per chiamate web/native.
 
 ### 4) Hardening auth prima di RBAC completo (T01)
 - [ ] Definire policy lockout/failed attempts e uniformare regole session/token tra web e native.

@@ -6,6 +6,13 @@ import { desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import {
+    auditContextFromSession,
+    listChangedFields,
+    requestIdFromRequest,
+    writeAuditEvent,
+} from '@/lib/audit';
 
 /* @Codex */
 function normalizeExemptionsValue(value: unknown): string | null {
@@ -19,6 +26,32 @@ function normalizeDiagnosesValue(value: unknown): string | null {
     if (typeof value === 'string') return value;
     if (Array.isArray(value)) return JSON.stringify(value);
     return null;
+}
+
+/* @Codex */
+async function recordPatientAuditEvent(
+    request: Request,
+    session: Awaited<ReturnType<typeof requireSession>>,
+    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
+    subjectRef: string,
+    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
+): Promise<void> {
+    try {
+        const context = auditContextFromSession(session);
+        await writeAuditEvent({
+            eventType,
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'patient',
+            subjectRef,
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata,
+        });
+    } catch (error) {
+        console.error('[MediFlow] Patient audit write failed:', error);
+    }
 }
 
 export async function GET() {
@@ -117,6 +150,12 @@ export async function POST(request: Request) {
                 .values({ patientId: newId, ambulatoryId })
                 .onConflictDoNothing();
         }
+
+        /* @Codex */
+        await recordPatientAuditEvent(request, session, 'patient.created', newId, {
+            changedFields: listChangedFields(body, ['id', 'version']),
+            resourceVersion: 1,
+        });
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

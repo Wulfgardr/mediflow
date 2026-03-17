@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
+import { ensureAuditSqliteSchema } from '@/lib/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 
 // Ensure the data directory exists in production or use project root for dev
@@ -125,5 +126,11 @@ try {
     sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
 } catch (error) {
     console.warn('[MediFlow] Observations schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureAuditSqliteSchema(sqlite);
+} catch (error) {
+    console.warn('[MediFlow] Audit schema check skipped:', error);
 }
 export const dbServer = drizzle(sqlite);

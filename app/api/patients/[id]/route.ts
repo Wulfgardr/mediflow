@@ -6,6 +6,14 @@ import { and, eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
+/* @Codex */
+import {
+    auditContextFromSession,
+    classifyPatientMutationEvent,
+    listChangedFields,
+    requestIdFromRequest,
+    writeAuditEvent,
+} from '@/lib/audit';
 
 /* @Codex */
 function normalizeExemptionsForUpdate(value: unknown): string | null | undefined {
@@ -23,6 +31,32 @@ function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined 
     return null;
 }
 
+/* @Codex */
+async function recordPatientAuditEvent(
+    request: Request,
+    session: Awaited<ReturnType<typeof requireSession>>,
+    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
+    subjectRef: string,
+    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
+): Promise<void> {
+    try {
+        const context = auditContextFromSession(session);
+        await writeAuditEvent({
+            eventType,
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'patient',
+            subjectRef,
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata,
+        });
+    } catch (error) {
+        console.error('[MediFlow] Patient audit write failed:', error);
+    }
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     /* @Codex */
     const session = await requireSession();
@@ -33,7 +67,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const patient = await dbServer.select().from(patients).where(eq(patients.id, id)).get();
         if (!patient) return NextResponse.json({ error: "Not found" }, { status: 404 });
         return NextResponse.json(patient);
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Failed to fetch patient" }, { status: 500 });
     }
 }
@@ -52,7 +86,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get();
+        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(eq(patients.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -154,8 +188,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             }
         }
 
+        /* @Codex */
+        await recordPatientAuditEvent(
+            request,
+            session,
+            classifyPatientMutationEvent(existing.isArchived ?? null, updateValues.isArchived as boolean | undefined),
+            id,
+            {
+                changedFields: listChangedFields(body, ['version']),
+                resourceVersion: expectedVersion + 1,
+            }
+        );
+
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
 }
@@ -202,8 +248,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             );
         }
 
+        /* @Codex */
+        await recordPatientAuditEvent(request, session, 'patient.deleted', id, {
+            resourceVersion: expectedVersion,
+        });
+
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Delete failed" }, { status: 500 });
     }
 }

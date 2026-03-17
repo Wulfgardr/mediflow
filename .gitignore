@@ -18,6 +18,7 @@
 /tmp-concurrency-data
 /tmp-native-derived-data
 /tmp-parity-smoke
+/tmp-audit-test
 
 # next.js
 /.next/

@@ -7,6 +7,13 @@ import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { PatientDetail } from '@/lib/api/v1/types';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
+/* @Codex */
+import {
+    classifyPatientMutationEvent,
+    listChangedFields,
+    requestIdFromRequest,
+    writeAuditEvent,
+} from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -28,6 +35,37 @@ function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined 
     if (typeof value === 'string') return value;
     if (Array.isArray(value)) return JSON.stringify(value);
     return null;
+}
+
+/* @Codex */
+const localApiAuditContext = {
+    actorType: 'system' as const,
+    actorRef: 'local-api',
+    sourceSurface: 'api' as const,
+};
+
+/* @Codex */
+async function recordPatientAuditEvent(
+    request: Request,
+    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
+    subjectRef: string,
+    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
+): Promise<void> {
+    try {
+        await writeAuditEvent({
+            eventType,
+            outcome: 'success',
+            actorType: localApiAuditContext.actorType,
+            actorRef: localApiAuditContext.actorRef,
+            subjectType: 'patient',
+            subjectRef,
+            sourceSurface: localApiAuditContext.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata,
+        });
+    } catch (error) {
+        console.error('[MediFlow] Patient audit write failed:', error);
+    }
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -94,7 +132,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get();
+        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(eq(patients.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -192,6 +230,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             }
         }
 
+        /* @Codex */
+        await recordPatientAuditEvent(
+            request,
+            classifyPatientMutationEvent(existing.isArchived ?? null, updateValues.isArchived as boolean | undefined),
+            id,
+            {
+                changedFields: listChangedFields(body, ['version']),
+                resourceVersion: expectedVersion + 1,
+            }
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id] error:', error);
@@ -240,6 +289,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
                 { status: 409 }
             );
         }
+
+        /* @Codex */
+        await recordPatientAuditEvent(request, 'patient.deleted', id, {
+            resourceVersion: expectedVersion,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -6,6 +6,12 @@ import { desc, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { v4 as uuidv4 } from 'uuid';
 import type { PatientSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import {
+    listChangedFields,
+    requestIdFromRequest,
+    writeAuditEvent,
+} from '@/lib/audit';
 
 /* @Codex */
 function normalizeExemptionsValue(value: unknown): string | null {
@@ -19,6 +25,37 @@ function normalizeDiagnosesValue(value: unknown): string | null {
     if (typeof value === 'string') return value;
     if (Array.isArray(value)) return JSON.stringify(value);
     return null;
+}
+
+/* @Codex */
+const localApiAuditContext = {
+    actorType: 'system' as const,
+    actorRef: 'local-api',
+    sourceSurface: 'api' as const,
+};
+
+/* @Codex */
+async function recordPatientAuditEvent(
+    request: Request,
+    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
+    subjectRef: string,
+    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
+): Promise<void> {
+    try {
+        await writeAuditEvent({
+            eventType,
+            outcome: 'success',
+            actorType: localApiAuditContext.actorType,
+            actorRef: localApiAuditContext.actorRef,
+            subjectType: 'patient',
+            subjectRef,
+            sourceSurface: localApiAuditContext.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata,
+        });
+    } catch (error) {
+        console.error('[MediFlow] Patient audit write failed:', error);
+    }
 }
 
 function toIsoString(value: unknown): string | null {
@@ -110,6 +147,12 @@ export async function POST(request: Request) {
                 assignedAt: new Date()
             }).onConflictDoNothing();
         }
+
+        /* @Codex */
+        await recordPatientAuditEvent(request, 'patient.created', newId, {
+            changedFields: listChangedFields(body, ['id', 'version']),
+            resourceVersion: 1,
+        });
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

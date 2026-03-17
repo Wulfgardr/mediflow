@@ -156,6 +156,23 @@ export const settings = sqliteTable('settings', {
     value: text('value').notNull(),
 });
 
+/* @Codex */
+export const auditEvents = sqliteTable('audit_events', {
+    eventId: text('event_id').primaryKey(),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    eventType: text('event_type').notNull(),
+    occurredAt: integer('occurred_at', { mode: 'timestamp' }).notNull(),
+    outcome: text('outcome').notNull(),
+    actorType: text('actor_type').notNull(),
+    actorRef: text('actor_ref').notNull(),
+    subjectType: text('subject_type').notNull(),
+    subjectRef: text('subject_ref'),
+    sourceSurface: text('source_surface').notNull(),
+    requestId: text('request_id'),
+    redactedMetadata: text('redacted_metadata'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Attachments ---
 export const attachments = sqliteTable('attachments', {
     id: text('id').primaryKey(),
