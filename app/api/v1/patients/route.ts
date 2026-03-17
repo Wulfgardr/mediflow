@@ -4,12 +4,15 @@ import { dbServer } from '@/lib/db-server';
 import { patients, patientsToAmbulatories } from '@/lib/schema';
 import { desc, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import { v4 as uuidv4 } from 'uuid';
 import type { PatientSummary } from '@/lib/api/v1/types';
 /* @Codex */
 import {
+    auditContextFromSession,
     listChangedFields,
     requestIdFromRequest,
+    withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/audit';
 
@@ -28,13 +31,6 @@ function normalizeDiagnosesValue(value: unknown): string | null {
 }
 
 /* @Codex */
-const localApiAuditContext = {
-    actorType: 'system' as const,
-    actorRef: 'local-api',
-    sourceSurface: 'api' as const,
-};
-
-/* @Codex */
 async function recordPatientAuditEvent(
     request: Request,
     eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
@@ -42,16 +38,18 @@ async function recordPatientAuditEvent(
     redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
 ): Promise<void> {
     try {
+        const session = await requireLocalApiActorSession(request);
+        const context = auditContextFromSession(session);
         await writeAuditEvent({
             eventType,
             outcome: 'success',
-            actorType: localApiAuditContext.actorType,
-            actorRef: localApiAuditContext.actorRef,
+            actorType: context.actorType,
+            actorRef: context.actorRef,
             subjectType: 'patient',
             subjectRef,
-            sourceSurface: localApiAuditContext.sourceSurface,
+            sourceSurface: context.sourceSurface,
             requestId: requestIdFromRequest(request),
-            redactedMetadata,
+            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
         });
     } catch (error) {
         console.error('[MediFlow] Patient audit write failed:', error);

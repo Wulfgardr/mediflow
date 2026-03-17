@@ -33,6 +33,17 @@ export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
 export type AuditSubjectType = 'session' | 'patient' | 'entry' | 'therapy' | 'observation' | 'settings';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
+export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
+
+export type AuditContext = {
+    actorType: AuditActorType;
+    actorRef: string;
+    sourceSurface: AuditSourceSurface;
+    authContext: AuditAuthContext;
+};
+
+/* @Codex */
+export const AUDIT_SOURCE_SURFACE_HEADER = 'x-mediflow-source-surface';
 
 export type AuditRedactedMetadata = {
     changedFields?: string[];
@@ -80,16 +91,39 @@ export type AuditRecord = {
 };
 
 /* @Codex */
-export function auditContextFromSession(session: ServerSession | null | undefined): {
-    actorType: AuditActorType;
-    actorRef: string;
-    sourceSurface: AuditSourceSurface;
-} {
-    if (session?.id === 'local-api') {
+export function auditSourceSurfaceFromRequest(
+    request: Request | null | undefined,
+    fallback: AuditSourceSurface
+): AuditSourceSurface {
+    const value = request?.headers.get(AUDIT_SOURCE_SURFACE_HEADER)?.trim().toLowerCase();
+    switch (value) {
+        case 'web':
+        case 'native':
+        case 'api':
+        case 'job':
+            return value;
+        default:
+            return fallback;
+    }
+}
+
+/* @Codex */
+export function auditContextFromSession(session: ServerSession | null | undefined): AuditContext {
+    if (session?.authChannel === 'native') {
+        return {
+            actorType: 'user',
+            actorRef: session.userId,
+            sourceSurface: 'native',
+            authContext: 'local-token',
+        };
+    }
+
+    if (session?.authChannel === 'system' || session?.id === 'local-api') {
         return {
             actorType: 'system',
             actorRef: 'local-api',
             sourceSurface: 'api',
+            authContext: 'local-token',
         };
     }
 
@@ -97,7 +131,19 @@ export function auditContextFromSession(session: ServerSession | null | undefine
         actorType: 'user',
         actorRef: session?.userId || 'anonymous',
         sourceSurface: 'web',
+        authContext: session?.userId ? 'session' : 'anonymous',
     };
+}
+
+/* @Codex */
+export function withAuditContextMetadata(
+    context: AuditContext,
+    metadata: AuditRedactedMetadata | null | undefined
+): AuditRedactedMetadata | null {
+    return sanitizeAuditMetadata({
+        ...(metadata ?? {}),
+        flags: [...(metadata?.flags ?? []), `auth:${context.authContext}`],
+    });
 }
 
 /* @Codex */

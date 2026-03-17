@@ -4,14 +4,17 @@ import { dbServer } from '@/lib/db-server';
 import { patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { PatientDetail } from '@/lib/api/v1/types';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
 /* @Codex */
 import {
+    auditContextFromSession,
     classifyPatientMutationEvent,
     listChangedFields,
     requestIdFromRequest,
+    withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/audit';
 
@@ -38,13 +41,6 @@ function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined 
 }
 
 /* @Codex */
-const localApiAuditContext = {
-    actorType: 'system' as const,
-    actorRef: 'local-api',
-    sourceSurface: 'api' as const,
-};
-
-/* @Codex */
 async function recordPatientAuditEvent(
     request: Request,
     eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
@@ -52,16 +48,18 @@ async function recordPatientAuditEvent(
     redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
 ): Promise<void> {
     try {
+        const session = await requireLocalApiActorSession(request);
+        const context = auditContextFromSession(session);
         await writeAuditEvent({
             eventType,
             outcome: 'success',
-            actorType: localApiAuditContext.actorType,
-            actorRef: localApiAuditContext.actorRef,
+            actorType: context.actorType,
+            actorRef: context.actorRef,
             subjectType: 'patient',
             subjectRef,
-            sourceSurface: localApiAuditContext.sourceSurface,
+            sourceSurface: context.sourceSurface,
             requestId: requestIdFromRequest(request),
-            redactedMetadata,
+            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
         });
     } catch (error) {
         console.error('[MediFlow] Patient audit write failed:', error);

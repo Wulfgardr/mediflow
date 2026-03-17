@@ -4,6 +4,10 @@ import CryptoKit
 
 actor LocalAPIClient {
     static let shared = LocalAPIClient()
+    /* @Codex */
+    private static let sourceSurfaceHeader = "X-MediFlow-Source-Surface"
+    /* @Codex */
+    private static let sourceSurfaceValue = "native"
 
     private let delegate = LocalAPISessionDelegate()
     private let session: URLSession
@@ -520,6 +524,8 @@ actor LocalAPIClient {
 
         var request = URLRequest(url: finalURL)
         request.httpMethod = method
+        /* @Codex */
+        request.setValue(Self.sourceSurfaceValue, forHTTPHeaderField: Self.sourceSurfaceHeader)
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let encoder = JSONEncoder()
@@ -552,6 +558,8 @@ actor LocalAPIClient {
 
         var request = URLRequest(url: finalURL)
         request.httpMethod = method
+        /* @Codex */
+        request.setValue(Self.sourceSurfaceValue, forHTTPHeaderField: Self.sourceSurfaceHeader)
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let encoder = JSONEncoder()

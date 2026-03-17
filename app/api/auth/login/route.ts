@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 /* @Codex */
-import { hashAuditRef, requestIdFromRequest, writeAuditEvent } from '@/lib/audit';
+import {
+    auditSourceSurfaceFromRequest,
+    hashAuditRef,
+    requestIdFromRequest,
+    withAuditContextMetadata,
+    writeAuditEvent,
+} from '@/lib/audit';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
@@ -10,17 +16,23 @@ import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
 
 /* @Codex */
 function recordFailedLoginAttempt(request: Request, username: unknown): void {
+    const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');
     void writeAuditEvent({
         eventType: 'auth.login.failed',
         outcome: 'failure',
         actorType: 'user',
         actorRef: hashAuditRef(typeof username === 'string' ? username : ''),
         subjectType: 'session',
-        sourceSurface: 'web',
+        sourceSurface,
         requestId: requestIdFromRequest(request),
-        redactedMetadata: {
+        redactedMetadata: withAuditContextMetadata({
+            actorType: 'user',
+            actorRef: 'anonymous',
+            sourceSurface,
+            authContext: 'anonymous',
+        }, {
             reasonCode: 'invalid_credentials',
-        },
+        }),
     }).catch((error) => {
         console.error('Audit login failure write failed:', error);
     });
@@ -52,7 +64,11 @@ export async function POST(request: Request) {
         // This is arguably more secure than a persistent cookie for a medical app.
 
         /* @Codex */
-        const session = createSession({ id: user.id, username: user.username, role: user.role || 'user' });
+        const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');
+        const session = createSession(
+            { id: user.id, username: user.username, role: user.role || 'user' },
+            sourceSurface === 'native' ? 'native' : 'web',
+        );
         try {
             await writeAuditEvent({
                 eventType: 'auth.login.succeeded',
@@ -61,8 +77,14 @@ export async function POST(request: Request) {
                 actorRef: user.id,
                 subjectType: 'session',
                 subjectRef: session.id,
-                sourceSurface: 'web',
+                sourceSurface,
                 requestId: requestIdFromRequest(request),
+                redactedMetadata: withAuditContextMetadata({
+                    actorType: 'user',
+                    actorRef: user.id,
+                    sourceSurface,
+                    authContext: 'session',
+                }, null),
             });
         } catch (error) {
             console.error('Audit login success write failed:', error);

@@ -11,19 +11,24 @@ export interface ServerSession {
     userId: string;
     username: string;
     role: string;
+    authChannel: 'web' | 'native' | 'system';
     createdAt: number;
     expiresAt: number;
 }
 
 const sessions = new Map<string, ServerSession>();
 
-export function createSession(user: { id: string; username: string; role: string }): ServerSession {
+export function createSession(
+    user: { id: string; username: string; role: string },
+    authChannel: ServerSession['authChannel'] = 'web'
+): ServerSession {
     const now = Date.now();
     const session: ServerSession = {
         id: crypto.randomBytes(32).toString('hex'),
         userId: user.id,
         username: user.username,
         role: user.role,
+        authChannel,
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS
     };
