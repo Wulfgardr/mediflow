@@ -102,3 +102,16 @@ struct ObservationSummary: Identifiable, Decodable {
     let source: String?
     let createdAt: Date?
 }
+
+/* @Codex */
+struct TerminologySearchResult: Identifiable, Decodable {
+    let system: String
+    let code: String
+    let display: String
+    let version: String?
+    let source: String
+
+    var id: String {
+        "\(system):\(code)"
+    }
+}

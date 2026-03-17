@@ -150,6 +150,25 @@ actor LocalAPIClient {
         return try decoder.decode([ObservationSummary].self, from: data)
     }
 
+    /* @Codex */
+    func searchTerminology(system: String, query: String, limit: Int = 60) async throws -> [TerminologySearchResult] {
+        let normalizedSystem = system.trimmingCharacters(in: .whitespacesAndNewlines)
+        var queryItems = [URLQueryItem(name: "system", value: normalizedSystem)]
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedQuery.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: trimmedQuery))
+        }
+        if limit > 0 {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+
+        let request = try makeRequest(path: "terminology/search", queryItems: queryItems)
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response)
+
+        return try JSONDecoder().decode([TerminologySearchResult].self, from: data)
+    }
+
     func createPatient(payload: CreatePatientPayload) async throws -> String {
         let request = try makeRequest(path: "patients", method: "POST", body: payload)
         let (data, response) = try await session.data(for: request)
