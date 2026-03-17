@@ -111,6 +111,15 @@ L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
 
 I dati sanitari non devono trapelare dai log.
 
+La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./docs/adr/0015-audit-taxonomy-minimum-catalog.md).
+
+### Audit record vs log applicativi
+
+- Gli audit record sono strutturati, versionati e append-only.
+- I log applicativi restano piu poveri e devono limitarsi a dati tecnici
+  redatti.
+- Non usare log testuali liberi come sostituto del catalogo audit.
+
 ### Non loggare
 - campi paziente decifrati
 - testo OCR grezzo
@@ -118,12 +127,27 @@ I dati sanitari non devono trapelare dai log.
 - suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)
 - token, PIN, chiavi o salt
+- prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
 
 ### Puoi loggare (preferibile)
 - conteggi (es. numero record)
 - timing (latenza)
 - status code / classi di errore
 - identificatori redatti (es. prime 6 chars di un id)
+- numeri di versione e flag booleane
+- nomi di superfici tecniche (`web`, `native`, `api`, `job`)
+
+### Audit v1
+
+Quando implementi o estendi il writer audit:
+
+- usa il catalogo `audit.v1` dell'ADR 0015
+- consenti solo `eventType`, `outcome`, `actorRef`, `subjectRef` redatto,
+  `sourceSurface`, timestamp e metadati strutturati
+- mantieni fuori dal catalogo qualsiasi testo libero, payload clinico o
+  informazione necessaria solo al rendering UI
+- se un valore puo identificare un paziente al di fuori del database locale,
+  redigilo o hashalo prima di loggare o esportare
 
 Se aggiungi log:
 - assumi che possano finire in crash report

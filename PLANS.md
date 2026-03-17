@@ -34,7 +34,7 @@ Ultimo aggiornamento: 2026-03-16
 - [x] Aggiungere contract checks per prevenire drift non documentato.
 
 ### 3) Audit minimo ad alto valore (T03)
-- [ ] Definire tassonomia eventi audit (auth + CRUD sensibili + settings admin).
+- [x] Definire tassonomia eventi audit (auth + CRUD sensibili + settings admin). (`docs/adr/0015-audit-taxonomy-minimum-catalog.md`)
 - [ ] Implementare write path append-only con campi PHI-safe.
 - [ ] Assicurare attribuzione attore coerente per chiamate web/native.
 
