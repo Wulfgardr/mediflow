@@ -283,4 +283,3 @@ Entries are additive and minimal.
 - Wired lockout messaging into the web security gate and lock screen: components/lock-screen.tsx
 - Wired lockout messaging into the native login path and error mapping: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
 - Wired lockout messaging into the native login path and error mapping: native/MediFlowMac/Sources/MediFlowMac/Services/SecuritySession.swift
-- Added persisted auth lockout policy with shared server semantics, typed local tests, and minimal web/macOS messaging alignment: lib/auth-lockout.ts, lib/auth-lockout.test.ts, app/api/auth/login/route.ts, lib/schema.ts, lib/db-server.ts, drizzle/0005_user_auth_lockout.sql, components/security-provider.tsx, components/lock-screen.tsx, native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift, native/MediFlowMac/Sources/MediFlowMac/Services/SecuritySession.swift
