@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 /* @Codex */
-import { Patient, ClinicalEntry, Therapy, Observation } from './db';
+import type { Patient, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
 export interface JsPDFWithAutoTable extends jsPDF {
