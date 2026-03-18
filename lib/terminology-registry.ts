@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { eq } from 'drizzle-orm';
 import {
     listTerminologySystems,
@@ -148,6 +146,7 @@ export function upsertTerminologyRegistryEntry(
 
 /* @Codex */
 export async function loadTerminologyRegistry(): Promise<TerminologyRegistryEntry[]> {
+    await import('server-only');
     const [{ dbServer }, { settings }] = await Promise.all([
         import('./db-server'),
         import('./schema'),
