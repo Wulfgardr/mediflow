@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-ai-context-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/ai-context.ts",
+    "lib/ai-context.test.ts",
+    "lib/ai-insight-settings.ts",
+    "lib/db.ts",
+    "lib/utils.ts"
+  ]
+}
