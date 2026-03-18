@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
     generateMasterKey,
     deriveKeyFromPin,
@@ -12,6 +12,8 @@ import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
 /* @Codex */
 import { AuthHealthScreen, AuthHealthPayload } from '@/components/auth-health-screen';
+/* @Codex */
+import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
 
 export interface User {
     id: string;
@@ -84,10 +86,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
 
-    // Inactivity Timeout
-    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
-    const activityTimerRef = useRef<NodeJS.Timeout | null>(null);
-
     const lock = () => {
         setIsLocked(true);
         setAuthErrorMessage(null);
@@ -96,14 +94,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
     };
 
-    const resetTimer = () => {
-        if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-        if (isAuthenticated && !isLocked) {
-            activityTimerRef.current = setTimeout(() => {
-                lock();
-            }, INACTIVITY_TIMEOUT_MS);
-        }
-    };
+    useInactivityLock({
+        enabled: isAuthenticated && !isLocked,
+        onTimeout: lock,
+    });
 
     // Initial check
     useEffect(() => {
@@ -113,31 +107,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
         init();
     }, []);
-
-    useEffect(() => {
-        const handleActivity = () => resetTimer();
-
-        // Listen to user events
-        if (typeof window !== 'undefined') {
-            window.addEventListener('mousemove', handleActivity);
-            window.addEventListener('keydown', handleActivity);
-            window.addEventListener('click', handleActivity);
-            window.addEventListener('touchstart', handleActivity);
-
-            resetTimer(); // Start initial timer
-        }
-
-        return () => {
-            if (typeof window !== 'undefined') {
-                window.removeEventListener('mousemove', handleActivity);
-                window.removeEventListener('keydown', handleActivity);
-                window.removeEventListener('click', handleActivity);
-                window.removeEventListener('touchstart', handleActivity);
-            }
-            if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuthenticated, isLocked]);
 
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {

@@ -23,6 +23,13 @@ async function hasSecurityOverlay(page: Page): Promise<boolean> {
 }
 
 /* @Codex */
+async function hasStableUnlockedShell(page: Page): Promise<boolean> {
+  if (await hasSecurityOverlay(page)) return false;
+  await page.waitForTimeout(750);
+  return !(await hasSecurityOverlay(page));
+}
+
+/* @Codex */
 export async function completeOnboardingIfNeeded(page: Page, pin: string): Promise<void> {
   const stepProfile = page.getByRole('heading', { name: 'Chi sei?' });
   if (!(await isVisible(stepProfile))) return;
@@ -59,7 +66,7 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   await expect(pinInput).toHaveValue(pin);
   await expect(unlockButton).toBeEnabled({ timeout: 5_000 });
   await unlockButton.click();
-  await page.waitForTimeout(300);
+  await expect(lockHeading).toBeHidden({ timeout: 5_000 });
 
   const invalidPinError = page.getByText('PIN non valido');
   if (await isVisible(invalidPinError, 500)) {
@@ -89,7 +96,7 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
   await page.waitForLoadState('domcontentloaded');
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    if (!(await hasSecurityOverlay(page))) return;
+    if (await hasStableUnlockedShell(page)) return;
 
     await completeOnboardingIfNeeded(page, pin);
     await setupPinLegacyIfNeeded(page, pin);
