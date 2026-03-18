@@ -261,6 +261,7 @@ Entries are additive and minimal.
 - Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/schema.ts
 - Added exemptions lookup table and patient exemptions field in schema + DB runtime guardrails: lib/db-server.ts
 - Added explicit migration for exemptions table and patient field: drizzle/0001_exemptions_lookup.sql
+- Added canonical GTW/FSE baseline alignment matrix against official `it-fse-support` artifacts and updated the docs map/index: docs/fse-gtw-baseline-alignment.md, docs/README.md, docs/markdown-index.md
 - Added local exemptions API (search, count, import, clear) with session/token auth: app/api/exemptions/route.ts
 - Added exemptions importer/parser for TXT pipelines and stats helpers: lib/exemption-importer.ts
 - Added settings UI manager for drag-and-drop exemptions catalog updates: components/settings/exemption-db-manager.tsx
