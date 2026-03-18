@@ -25,6 +25,103 @@ export interface ExtractedPatientData {
 
 /* @Codex */
 const OCR_PAGE_LIMIT = 5;
+/* @Codex */
+const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
+/* @Codex */
+const PERSON_PLACEHOLDER_TOKENS = new Set([
+    'NOME',
+    'COGNOME',
+    'COGNOME E NOME',
+    'NOME E COGNOME',
+    'PAZIENTE',
+    'ASSISTITO',
+    'SIG',
+    'SIG.',
+    'SIGRA',
+    'SIG.RA'
+]);
+
+/* @Codex */
+export function isPdfDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
+    return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+}
+
+/* @Codex */
+export function isImageDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
+    return file.type.startsWith('image/') || IMAGE_EXTENSION_REGEX.test(file.name || '');
+}
+
+/* @Codex */
+function sanitizePersonValue(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+
+    const normalized = value
+        .replace(/\s+/g, ' ')
+        .replace(/^[\s:;.,-]+|[\s:;.,-]+$/g, '')
+        .trim();
+
+    if (!normalized || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(normalized)) {
+        return undefined;
+    }
+
+    const upper = normalized.toUpperCase();
+    if (PERSON_PLACEHOLDER_TOKENS.has(upper)) {
+        return undefined;
+    }
+
+    const tokens = upper.split(/\s+/);
+    if (tokens.every((token) => PERSON_PLACEHOLDER_TOKENS.has(token))) {
+        return undefined;
+    }
+
+    return normalized;
+}
+
+/* @Codex */
+function extractPatientName(text: string): { firstName?: string; lastName?: string } {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    let firstName: string | undefined;
+    let lastName: string | undefined;
+
+    for (const line of lines) {
+        const nameMatch = line.match(/^nome\s*[:.]?\s*(.+)$/i);
+        if (!firstName && nameMatch) {
+            firstName = sanitizePersonValue(nameMatch[1]);
+            continue;
+        }
+
+        const surnameMatch = line.match(/^cognome\s*[:.]?\s*(.+)$/i);
+        if (!lastName && surnameMatch) {
+            lastName = sanitizePersonValue(surnameMatch[1]);
+            continue;
+        }
+
+        const fullNameMatch = line.match(/^(?:cognome\s+e\s+nome|nome\s+e\s+cognome|paziente|assistito|sig(?:nor[ae]?|\.?ra)?)\s*[:.]?\s*(.+)$/i);
+        if (fullNameMatch) {
+            const candidate = sanitizePersonValue(fullNameMatch[1]);
+            if (!candidate) continue;
+            const parts = candidate.split(/\s+/).filter(Boolean);
+            if (parts.length >= 2) {
+                lastName ||= sanitizePersonValue(parts[0]);
+                firstName ||= sanitizePersonValue(parts.slice(1).join(' '));
+            }
+        }
+    }
+
+    if (!firstName || !lastName) {
+        const cleanText = text.replace(/\s+/g, ' ');
+        const fallbackName = cleanText.match(/(?:^|\b)nome\s*[:.]?\s*([A-Za-zÀ-ÖØ-öø-ÿ' -]{2,60}?)(?=\s+(?:cognome|codice|cf|nato|nata|data|indirizzo|telefono|medico|$))/i);
+        const fallbackSurname = cleanText.match(/(?:^|\b)cognome\s*[:.]?\s*([A-Za-zÀ-ÖØ-öø-ÿ' -]{2,60}?)(?=\s+(?:nome|codice|cf|nato|nata|data|indirizzo|telefono|medico|$))/i);
+        firstName ||= sanitizePersonValue(fallbackName?.[1]);
+        lastName ||= sanitizePersonValue(fallbackSurname?.[1]);
+    }
+
+    return { firstName, lastName };
+}
 
 /**
  * Extract text from PDF (server-side via pdfjs)
@@ -196,8 +293,8 @@ function mapOcrToPatientData(
 
 /* @Codex */
 export async function extractDocumentTextForSummary(file: File): Promise<string> {
-    const isPdf = file.type === 'application/pdf';
-    const isImage = file.type.startsWith('image/');
+    const isPdf = isPdfDocumentInput(file);
+    const isImage = isImageDocumentInput(file);
 
     if (!isPdf && !isImage) {
         return "";
@@ -216,14 +313,14 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
 
 /**
  * Smart extraction: AI-OCR first, regex validation/fallback
- * Supports both PDF and images (JPG, PNG)
+ * Supports PDF and locally processable image inputs.
  */
 export async function extractPatientDataSmart(file: File): Promise<ExtractedPatientData> {
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
+    const isImage = isImageDocumentInput(file);
+    const isPdf = isPdfDocumentInput(file);
 
     if (!isImage && !isPdf) {
-        throw new Error('Unsupported file type. Use PDF or images (JPG, PNG).');
+        throw new Error("Formato non supportato. Usa un PDF o un'immagine comune elaborabile localmente.");
     }
 
     /* @Codex */
@@ -363,22 +460,9 @@ export function parsePatientData(text: string): ExtractedPatientData {
     }
 
     // 3. NAME
-    const nameRegex = /(?:nome)\s*[:\.]?\s*([a-zA-Z\s]+)/i;
-    const surnameMatch = cleanText.match(/(?:cognome)\s*[:\.]?\s*([a-zA-Z\s]+)/i);
-    const patientMatch = cleanText.match(/(?:paziente|sig|sig\.ra)\s*[:\.]?\s*([a-zA-Z\s]+)/i);
-
-    const matchName = cleanText.match(nameRegex);
-
-    if (matchName && surnameMatch) {
-        data.firstName = matchName[1].trim();
-        data.lastName = surnameMatch[1].trim();
-    } else if (patientMatch) {
-        const parts = patientMatch[1].trim().split(/\s+/);
-        if (parts.length >= 2) {
-            data.lastName = parts[0];
-            data.firstName = parts.slice(1).join(' ');
-        }
-    }
+    const extractedName = extractPatientName(text);
+    data.firstName = extractedName.firstName;
+    data.lastName = extractedName.lastName;
 
     // 4. NOTES / DIAGNOSIS (Improved with Context Window)
     // Keywords to start capture

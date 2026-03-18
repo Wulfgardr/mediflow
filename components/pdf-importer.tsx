@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
-import { extractPatientDataSmart, ExtractedPatientData } from '@/lib/pdf-service';
+import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
@@ -40,11 +40,11 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         if (acceptedFiles.length === 0) return;
 
         const file = acceptedFiles[0];
-        const isPdf = file.type === 'application/pdf';
-        const isImage = file.type.startsWith('image/');
+        const isPdf = isPdfDocumentInput(file);
+        const isImage = isImageDocumentInput(file);
 
         if (!isPdf && !isImage) {
-            setError('Formati supportati: PDF, JPG, PNG');
+            setError('Formati supportati: PDF e immagini comuni elaborabili localmente.');
             return;
         }
 
@@ -117,8 +117,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         maxFiles: 1,
         accept: {
             'application/pdf': ['.pdf'],
-            'image/jpeg': ['.jpg', '.jpeg'],
-            'image/png': ['.png']
+            'image/*': []
         }
     });
 

@@ -25,8 +25,9 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
         }
 
-        if (file.type !== 'application/pdf') {
-            return NextResponse.json({ error: "Invalid file type. Only PDF allowed." }, { status: 400 });
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+        if (!isPdf) {
+            return NextResponse.json({ error: "Invalid file type. This route extracts text from PDF only; use OCR endpoints for images." }, { status: 400 });
         }
 
         // Convert File to ArrayBuffer for pdfjs

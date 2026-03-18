@@ -200,23 +200,28 @@ export default function PatientDetailPage() {
                         </div>
 
                         {/* Diagnoses / ICD */}
-                        {diagnosisItems.length > 0 && (
-                            <div className="mt-3 rounded-xl border border-rose-100 bg-rose-50/70 p-3 dark:border-rose-900/30 dark:bg-rose-900/20">
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
-                                    Diagnosi in scheda
-                                </p>
+                        <div className="mt-3 rounded-xl border border-rose-100 bg-rose-50/70 p-3 dark:border-rose-900/30 dark:bg-rose-900/20">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                                Diagnosi in scheda
+                            </p>
+                            {diagnosisItems.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
                                     {diagnosisItems.map((diagnosis) => (
                                         <span
                                             key={`${diagnosis.system}-${diagnosis.code}`}
                                             className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-200"
+                                            title={`${diagnosis.system} ${diagnosis.code} · ${diagnosis.description}`}
                                         >
                                             {diagnosis.system} {diagnosis.code} · {diagnosis.description}
                                         </span>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <p className="text-sm text-rose-700/80 dark:text-rose-200/80">
+                                    Nessuna codifica ICD associata alla scheda.
+                                </p>
+                            )}
+                        </div>
 
 
                         {(patient.notes) && (

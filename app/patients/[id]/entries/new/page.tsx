@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { useDropzone } from 'react-dropzone';
 /* @Codex */
-import { extractPatientDataSmart, extractDocumentTextForSummary } from '@/lib/pdf-service';
+import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 /* @Codex */
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
@@ -56,8 +56,8 @@ export default function NewEntryPage() {
             for (const file of files) {
                 let summary = "Allegato alla visita";
 
-                const isPdf = file.type === 'application/pdf';
-                const isImage = file.type.startsWith('image/');
+                const isPdf = isPdfDocumentInput(file);
+                const isImage = isImageDocumentInput(file);
 
                 /* @Codex */
                 if (isPdf || isImage) {

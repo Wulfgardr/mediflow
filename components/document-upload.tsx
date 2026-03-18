@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
-import { extractPatientDataSmart, extractDocumentTextForSummary } from '@/lib/pdf-service';
+import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 /* @Codex */
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
@@ -60,8 +60,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             try {
                 // Auto-extract analysis on upload
                 let summary = "Nessuna informazione rilevante trovata.";
-                const isPdf = file.type === 'application/pdf';
-                const isImage = file.type.startsWith('image/');
+                const isPdf = isPdfDocumentInput(file);
+                const isImage = isImageDocumentInput(file);
 
                 /* @Codex */
                 /* @Codex */
