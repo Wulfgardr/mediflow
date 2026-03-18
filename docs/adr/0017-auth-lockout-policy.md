@@ -1,7 +1,7 @@
 <!-- Codex: created 2026-03-17 -->
 # ADR 0017: Policy lockout autenticazione web e macOS
 
-Date: 2026-03-17  
+Date: 2026-03-17
 Status: Accepted
 
 ## Problema
