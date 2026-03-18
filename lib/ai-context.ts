@@ -3,6 +3,8 @@ import {
     estimateAIInsightComplexityScore,
     getAIInsightRuntimeSettings,
 } from '@/lib/ai-insight-settings';
+/* @Codex */
+import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -81,30 +83,6 @@ function buildAge(birthDate?: Date, taxCode?: string): string {
     return 'N/A';
 }
 
-function parseDiagnoses(value: unknown): Diagnosis[] {
-    if (Array.isArray(value)) return value as Diagnosis[];
-    if (typeof value !== 'string' || value.trim().length === 0) return [];
-
-    try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed as Diagnosis[] : [];
-    } catch {
-        return [];
-    }
-}
-
-function parseDocumentInsights(value: unknown): DocumentInsight[] {
-    if (Array.isArray(value)) return value as DocumentInsight[];
-    if (typeof value !== 'string' || value.trim().length === 0) return [];
-
-    try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
-    } catch {
-        return [];
-    }
-}
-
 function isNarrativeNoteContaminated(value: string | null | undefined): boolean {
     const raw = value ?? '';
     const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -157,7 +135,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
     }
 
     const age = buildAge(patient.birthDate, patient.taxCode);
-    const allDiagnoses = parseDiagnoses(patient.diagnoses)
+    const allDiagnoses = parsePatientDatedRecords<Diagnosis>(patient.diagnoses)
         .sort((left, right) => compareDatesDesc(left.date, right.date));
     const diagnoses = allDiagnoses.slice(0, MAX_DIAGNOSES);
 
@@ -193,7 +171,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .toArray();
     attachments.sort((left, right) => compareDatesDesc(left.createdAt, right.createdAt));
 
-    const archiveSummaries = parseDocumentInsights(patient.documentInsights)
+    const archiveSummaries = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
         .sort((left, right) => compareDatesDesc(left.date, right.date))
         .map((insight) => {
             const fileName = compactText(insight.fileName, 80);

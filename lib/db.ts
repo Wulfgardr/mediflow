@@ -6,6 +6,8 @@ import { notifyDbChange } from './live-query';
 /* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
 /* @Codex */
+import { revivePatientStructuredFields } from './patient-structured-fields';
+/* @Codex */
 import {
     BACKUP_COLLECTIONS,
     type BackupCollectionName,
@@ -98,52 +100,6 @@ export interface Diagnosis {
     description: string;
     system: string;
     date: Date;
-}
-
-/* @Codex */
-function parseJsonField<T>(value: unknown): T | undefined {
-    if (typeof value !== 'string') return undefined;
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        return undefined;
-    }
-}
-
-/* @Codex */
-function revivePatientStructuredFields<T extends Record<string, unknown>>(item: T): T {
-    const record = item as T & {
-        exemptions?: unknown;
-        diagnoses?: unknown;
-        documentInsights?: unknown;
-    };
-
-    const exemptions = parseJsonField<unknown>(record.exemptions);
-    if (Array.isArray(exemptions)) {
-        record.exemptions = exemptions.filter((code): code is string => typeof code === 'string');
-    }
-
-    const diagnoses = parseJsonField<unknown>(record.diagnoses);
-    if (Array.isArray(diagnoses)) {
-        record.diagnoses = diagnoses
-            .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object')
-            .map((diagnosis) => ({
-                ...diagnosis,
-                date: diagnosis.date ? new Date(diagnosis.date as string | number | Date) : new Date(),
-            }));
-    }
-
-    const documentInsights = parseJsonField<unknown>(record.documentInsights);
-    if (Array.isArray(documentInsights)) {
-        record.documentInsights = documentInsights
-            .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object')
-            .map((insight) => ({
-                ...insight,
-                date: insight.date ? new Date(insight.date as string | number | Date) : new Date(),
-            }));
-    }
-
-    return item;
 }
 
 export interface ClinicalEntry {

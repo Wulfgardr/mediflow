@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./tmp-ai-context-test",
+    "outDir": "./tmp-patient-structured-fields-test",
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2020",
@@ -10,11 +10,7 @@
     "isolatedModules": false
   },
   "include": [
-    "lib/ai-context.ts",
-    "lib/ai-context.test.ts",
-    "lib/ai-insight-settings.ts",
-    "lib/db.ts",
     "lib/patient-structured-fields.ts",
-    "lib/utils.ts"
+    "lib/patient-structured-fields.test.ts"
   ]
 }
