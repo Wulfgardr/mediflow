@@ -133,17 +133,17 @@ struct EditPatientView: View {
                     firstName: trimmed(firstName),
                     lastName: trimmed(lastName),
                     taxCode: trimmed(taxCode).uppercased(),
-                    birthDate: includeBirthDate ? birthDate : nil,
-                    address: encryptedAddress,
-                    phone: encryptedPhone,
-                    caregiver: encryptedCaregiver,
-                    exemptions: encryptedExemptions,
-                    notes: encryptedNotes,
-                    aiSummary: nil,
-                    documentInsights: nil,
+                    birthDate: includeBirthDate ? .value(birthDate) : .null,
+                    address: patchField(encryptedAddress),
+                    phone: patchField(encryptedPhone),
+                    caregiver: patchField(encryptedCaregiver),
+                    exemptions: patchField(encryptedExemptions),
+                    notes: patchField(encryptedNotes),
+                    aiSummary: .omit,
+                    documentInsights: .omit,
                     isAdi: isAdi,
                     isArchived: isArchived,
-                    ambulatoryId: patient.ambulatoryId
+                    ambulatoryId: patient.ambulatoryId.map(PatchValue.value) ?? .omit
                 )
             )
 
@@ -183,5 +183,9 @@ struct EditPatientView: View {
 
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func patchField(_ value: String?) -> PatchValue<String> {
+        value.map(PatchValue.value) ?? .null
     }
 }

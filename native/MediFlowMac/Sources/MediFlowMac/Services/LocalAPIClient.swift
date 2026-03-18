@@ -815,22 +815,100 @@ struct CreatePatientPayload: Encodable {
 }
 
 /* @Codex */
+enum PatchValue<Value> {
+    case omit
+    case null
+    case value(Value)
+}
+
+/* @Codex */
 struct UpdatePatientPayload: Encodable {
     let version: Int
     let firstName: String?
     let lastName: String?
     let taxCode: String?
-    let birthDate: Date?
-    let address: String?
-    let phone: String?
-    let caregiver: String?
-    let exemptions: String?
-    let notes: String?
-    let aiSummary: String?
-    let documentInsights: String?
+    let birthDate: PatchValue<Date>
+    let address: PatchValue<String>
+    let phone: PatchValue<String>
+    let caregiver: PatchValue<String>
+    let exemptions: PatchValue<String>
+    let notes: PatchValue<String>
+    let aiSummary: PatchValue<String>
+    let documentInsights: PatchValue<String>
     let isAdi: Bool?
     let isArchived: Bool?
-    let ambulatoryId: String?
+    let ambulatoryId: PatchValue<String>
+
+    init(
+        version: Int,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        taxCode: String? = nil,
+        birthDate: PatchValue<Date> = .omit,
+        address: PatchValue<String> = .omit,
+        phone: PatchValue<String> = .omit,
+        caregiver: PatchValue<String> = .omit,
+        exemptions: PatchValue<String> = .omit,
+        notes: PatchValue<String> = .omit,
+        aiSummary: PatchValue<String> = .omit,
+        documentInsights: PatchValue<String> = .omit,
+        isAdi: Bool? = nil,
+        isArchived: Bool? = nil,
+        ambulatoryId: PatchValue<String> = .omit
+    ) {
+        self.version = version
+        self.firstName = firstName
+        self.lastName = lastName
+        self.taxCode = taxCode
+        self.birthDate = birthDate
+        self.address = address
+        self.phone = phone
+        self.caregiver = caregiver
+        self.exemptions = exemptions
+        self.notes = notes
+        self.aiSummary = aiSummary
+        self.documentInsights = documentInsights
+        self.isAdi = isAdi
+        self.isArchived = isArchived
+        self.ambulatoryId = ambulatoryId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case firstName
+        case lastName
+        case taxCode
+        case birthDate
+        case address
+        case phone
+        case caregiver
+        case exemptions
+        case notes
+        case aiSummary
+        case documentInsights
+        case isAdi
+        case isArchived
+        case ambulatoryId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(firstName, forKey: .firstName)
+        try container.encodeIfPresent(lastName, forKey: .lastName)
+        try container.encodeIfPresent(taxCode, forKey: .taxCode)
+        try container.encodePatch(birthDate, forKey: .birthDate)
+        try container.encodePatch(address, forKey: .address)
+        try container.encodePatch(phone, forKey: .phone)
+        try container.encodePatch(caregiver, forKey: .caregiver)
+        try container.encodePatch(exemptions, forKey: .exemptions)
+        try container.encodePatch(notes, forKey: .notes)
+        try container.encodePatch(aiSummary, forKey: .aiSummary)
+        try container.encodePatch(documentInsights, forKey: .documentInsights)
+        try container.encodeIfPresent(isAdi, forKey: .isAdi)
+        try container.encodeIfPresent(isArchived, forKey: .isArchived)
+        try container.encodePatch(ambulatoryId, forKey: .ambulatoryId)
+    }
 }
 
 /* @Codex */
@@ -867,13 +945,52 @@ struct CreateTherapyPayload: Encodable {
 struct UpdateTherapyPayload: Encodable {
     let drugName: String?
     /* @Codex */
-    let aic: String?
+    let aic: PatchValue<String>
     /* @Codex */
-    let atc: String?
+    let atc: PatchValue<String>
     let dosage: String?
     let status: String?
     let startDate: Date?
-    let endDate: Date?
+    let endDate: PatchValue<Date>
+
+    init(
+        drugName: String? = nil,
+        aic: PatchValue<String> = .omit,
+        atc: PatchValue<String> = .omit,
+        dosage: String? = nil,
+        status: String? = nil,
+        startDate: Date? = nil,
+        endDate: PatchValue<Date> = .omit
+    ) {
+        self.drugName = drugName
+        self.aic = aic
+        self.atc = atc
+        self.dosage = dosage
+        self.status = status
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case drugName
+        case aic
+        case atc
+        case dosage
+        case status
+        case startDate
+        case endDate
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(drugName, forKey: .drugName)
+        try container.encodePatch(aic, forKey: .aic)
+        try container.encodePatch(atc, forKey: .atc)
+        try container.encodeIfPresent(dosage, forKey: .dosage)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(startDate, forKey: .startDate)
+        try container.encodePatch(endDate, forKey: .endDate)
+    }
 }
 
 struct CreateCheckupPayload: Encodable {
@@ -1131,6 +1248,20 @@ struct AIChatResponse: Decodable {
         let message: Message
     }
     let choices: [Choice]
+}
+
+/* @Codex */
+private extension KeyedEncodingContainer {
+    mutating func encodePatch<T: Encodable>(_ value: PatchValue<T>, forKey key: Key) throws {
+        switch value {
+        case .omit:
+            break
+        case .null:
+            try encodeNil(forKey: key)
+        case .value(let wrapped):
+            try encode(wrapped, forKey: key)
+        }
+    }
 }
 
 struct AnyEncodable: Encodable {

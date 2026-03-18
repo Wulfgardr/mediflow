@@ -335,23 +335,7 @@ struct ContentView: View {
         do {
             try await LocalAPIClient.shared.updatePatient(
                 id: patient.id,
-                payload: UpdatePatientPayload(
-                    version: patient.version,
-                    firstName: nil,
-                    lastName: nil,
-                    taxCode: nil,
-                    birthDate: nil,
-                    address: nil,
-                    phone: nil,
-                    caregiver: nil,
-                    exemptions: nil,
-                    notes: nil,
-                    aiSummary: nil,
-                    documentInsights: nil,
-                    isAdi: nil,
-                    isArchived: isArchived,
-                    ambulatoryId: nil
-                )
+                payload: UpdatePatientPayload(version: patient.version, isArchived: isArchived)
             )
             await viewModel.loadPatients()
             syncSelectedPatientIfHidden()

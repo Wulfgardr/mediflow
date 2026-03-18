@@ -1783,13 +1783,13 @@ private struct EditTherapyView: View {
             let payload = UpdateTherapyPayload(
                 drugName: trimmedDrugName,
                 /* @Codex */
-                aic: therapy.aic,
+                aic: therapy.aic.map(PatchValue.value) ?? .omit,
                 /* @Codex */
-                atc: therapy.atc,
+                atc: therapy.atc.map(PatchValue.value) ?? .omit,
                 dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
                 status: status,
                 startDate: startDate,
-                endDate: includeEndDate ? endDate : nil
+                endDate: includeEndDate ? .value(endDate) : .null
             )
             try await LocalAPIClient.shared.updateTherapy(patientId: patientId, therapyId: therapy.id, payload: payload)
             onSaved()
