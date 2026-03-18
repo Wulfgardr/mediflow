@@ -3,7 +3,7 @@
  * Sistema Informativo Socio Sanitario - Regione Lombardia
  * 
  * Since no public APIs are available, this module provides utility functions
- * for quick-linking to SISS portals with patient data ready to paste.
+ * for controlled browser handoff to SISS portals with patient data ready to paste.
  */
 
 // --- SISS Portal URLs ---
@@ -50,7 +50,50 @@ async function copyToClipboard(text: string): Promise<boolean> {
 // --- Open SISS Prescrizione ---
 export interface OpenSissResult {
     success: boolean;
+    opened: boolean;
     message: string;
+}
+
+export interface SissPortalHandoffInput {
+    handoffUrl: string;
+    clipboardText: string;
+    successMessage?: string;
+}
+
+export async function completeSissPortalHandoff(input: SissPortalHandoffInput): Promise<OpenSissResult> {
+    const normalizedText = input.clipboardText.trim().toUpperCase();
+    if (!normalizedText) {
+        return {
+            success: false,
+            opened: false,
+            message: 'Codice Fiscale mancante per questo paziente.',
+        };
+    }
+
+    if (!input.handoffUrl.trim()) {
+        return {
+            success: false,
+            opened: false,
+            message: 'Portale SISS non disponibile per questa operazione.',
+        };
+    }
+
+    const copied = await copyToClipboard(normalizedText);
+    window.open(input.handoffUrl, '_blank', 'noopener,noreferrer');
+
+    if (!copied) {
+        return {
+            success: false,
+            opened: true,
+            message: `Portale SISS aperto, ma non sono riuscito a copiare il CF. Copia manualmente: ${normalizedText}`,
+        };
+    }
+
+    return {
+        success: true,
+        opened: true,
+        message: input.successMessage ?? `CF "${normalizedText}" copiato! Incollalo nel modulo SISS (Cmd+V).`,
+    };
 }
 
 /**
@@ -59,33 +102,10 @@ export interface OpenSissResult {
  * @returns Result object with success status and user-friendly message
  */
 export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
-    if (!codiceFiscale) {
-        return {
-            success: false,
-            message: "Codice Fiscale mancante per questo paziente."
-        };
-    }
-
-    // Normalize CF (uppercase, trim)
-    const normalizedCF = codiceFiscale.trim().toUpperCase();
-
-    // Copy to clipboard
-    const copied = await copyToClipboard(normalizedCF);
-
-    if (!copied) {
-        return {
-            success: false,
-            message: "Impossibile copiare il CF negli appunti. Copia manualmente: " + normalizedCF
-        };
-    }
-
-    // Open SISS in new tab
-    window.open(SISS_URLS.PRESCRIZIONE, '_blank', 'noopener,noreferrer');
-
-    return {
-        success: true,
-        message: `CF "${normalizedCF}" copiato! Incollalo nel modulo SISS (Cmd+V).`
-    };
+    return await completeSissPortalHandoff({
+        handoffUrl: SISS_URLS.PRESCRIZIONE,
+        clipboardText: codiceFiscale,
+    });
 }
 
 /**
@@ -93,27 +113,9 @@ export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenS
  * @param codiceFiscale - The patient's Codice Fiscale
  */
 export async function openSissFse(codiceFiscale: string): Promise<OpenSissResult> {
-    if (!codiceFiscale) {
-        return {
-            success: false,
-            message: "Codice Fiscale mancante per questo paziente."
-        };
-    }
-
-    const normalizedCF = codiceFiscale.trim().toUpperCase();
-    const copied = await copyToClipboard(normalizedCF);
-
-    if (!copied) {
-        return {
-            success: false,
-            message: "Impossibile copiare il CF. Copia manualmente: " + normalizedCF
-        };
-    }
-
-    window.open(SISS_URLS.FSE, '_blank', 'noopener,noreferrer');
-
-    return {
-        success: true,
-        message: `CF "${normalizedCF}" copiato! Cercalo nel FSE.`
-    };
+    return await completeSissPortalHandoff({
+        handoffUrl: SISS_URLS.FSE,
+        clipboardText: codiceFiscale,
+        successMessage: `CF "${codiceFiscale.trim().toUpperCase()}" copiato! Cercalo nel FSE.`,
+    });
 }

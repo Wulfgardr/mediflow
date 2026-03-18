@@ -306,23 +306,6 @@ export default function PatientDetailPage() {
                             Nuova Visita
                         </Link>
 
-                        <button
-                            onClick={async () => {
-                                const { openSissPrescrizione } = await import('@/lib/siss');
-                                const result = await openSissPrescrizione(patient.taxCode);
-                                if (result.success) {
-                                    // Show a simple browser alert for now (could be replaced with toast)
-                                    alert(result.message);
-                                } else {
-                                    alert("⚠️ " + result.message);
-                                }
-                            }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95"
-                            title="Apri SISS e copia CF negli appunti"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Prescrizione SISS
-                        </button>
                     </div>
                 </div>
             </div>
