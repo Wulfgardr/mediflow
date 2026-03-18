@@ -91,7 +91,6 @@ export async function POST(request: Request) {
                 423,
             );
         }
-        }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
 
@@ -132,7 +131,6 @@ export async function POST(request: Request) {
                 .set(resetLockoutState())
                 .where(eq(users.id, user.id))
                 .run();
-        }
         }
 
         // Return the encrypted key blob. 
