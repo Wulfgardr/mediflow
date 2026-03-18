@@ -1,12 +1,19 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
     generateMasterKey,
     deriveKeyFromPin,
     wrapMasterKey,
     unwrapMasterKey
 } from '@/lib/security';
+/* @Codex */
+import {
+    createPinRotationBundle,
+    formatPinChangeFailure,
+    type PinChangeFailurePayload,
+    validatePinChangeInput,
+} from '@/lib/pin-change';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
@@ -23,6 +30,7 @@ import {
 /* @Codex */
 import {
     checkAuthHealthRequest,
+    changePinRequest,
     loginWithPinRequest,
     logoutSecuritySession,
     repairLegacyDbRequest,
@@ -47,6 +55,7 @@ interface SecurityContextType {
     authErrorMessage: string | null;
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
+    changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
     lock: () => void;
     updateUser: (data: Partial<User>) => void;
 }
@@ -67,7 +76,7 @@ function formatLoginFailure(payload: LoginFailurePayload | null, status: number)
     if (payload?.code === 'AUTH_LOCKED') {
         return payload.message || formatLockedUntil(payload.lockedUntil);
     }
-    if (payload?.code === 'INVALID_CREDENTIALS') {
+    if (payload?.code === 'INVALID_CREDENTIALS' || payload?.code === 'AUTH_INVALID_CREDENTIALS') {
         if (payload.message) return payload.message;
         if (typeof payload.remainingAttempts === 'number' && payload.remainingAttempts > 0) {
             return `PIN non valido. Tentativi rimasti: ${payload.remainingAttempts}.`;
@@ -88,9 +97,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
     /* @Codex */
+    const masterKeyRef = useRef<CryptoKey | null>(null);
+    /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
+
+    /* @Codex */
+    const setActiveMasterKey = (key: CryptoKey | null) => {
+        masterKeyRef.current = key;
+        db.setKey(key);
+    };
 
     const lock = () => {
         setIsLocked(true);
@@ -165,7 +182,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 // @Codex - if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
                     clearSecuritySession();
-                    db.setKey(null);
+                    setActiveMasterKey(null);
                     setIsAuthenticated(false);
                     setIsLocked(true);
                     return;
@@ -209,7 +226,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const session = await restoreSecuritySession<User>();
             if (!session) return false;
 
-            db.setKey(session.key);
+            setActiveMasterKey(session.key);
             setUser(session.userData);
             setIsAuthenticated(true);
             setIsLocked(false);
@@ -258,7 +275,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const kek = await deriveKeyFromPin(pin, saltBytes);
             const masterKey = await unwrapMasterKey(encryptedMasterKey, kek);
 
-            db.setKey(masterKey);
+            setActiveMasterKey(masterKey);
             setUser(userData);
             setIsAuthenticated(true);
             setIsLocked(false);
@@ -277,6 +294,42 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             console.error("Login failed", e);
             setAuthErrorMessage('Errore durante il login.');
             return false;
+        }
+    };
+
+    /* @Codex */
+    const changePin = async (currentPin: string, newPin: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+        if (!isAuthenticated || isLocked) {
+            return { ok: false, message: "Sessione non disponibile. Effettua di nuovo l'accesso." };
+        }
+
+        const masterKey = masterKeyRef.current;
+        if (!masterKey) {
+            return { ok: false, message: "Chiave di sessione non disponibile. Effettua di nuovo l'accesso." };
+        }
+
+        const validationError = validatePinChangeInput(currentPin, newPin);
+        if (validationError) {
+            return { ok: false, message: validationError };
+        }
+
+        try {
+            const rotation = await createPinRotationBundle(masterKey, newPin);
+            const { response: res, payload } = await changePinRequest({
+                currentPin,
+                newPin,
+                encryptedMasterKey: rotation.encryptedMasterKey,
+                salt: rotation.salt,
+            });
+
+            if (!res.ok) {
+                return { ok: false, message: formatPinChangeFailure((payload as PinChangeFailurePayload | null) ?? null, res.status) };
+            }
+
+            return { ok: true };
+        } catch (e) {
+            console.error('Change PIN failed', e);
+            return { ok: false, message: 'Errore durante il cambio PIN.' };
         }
     };
 
@@ -324,7 +377,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Set Active
-            db.setKey(masterKey);
+            setActiveMasterKey(masterKey);
             setRequiresSetup(false);
             setIsAuthenticated(true);
             setIsLocked(false);
@@ -379,6 +432,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             authErrorMessage,
             login,
             setupPin,
+            changePin,
             lock,
             updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
         }}>

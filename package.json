@@ -31,6 +31,7 @@
     "test:terminology-registry": "bash scripts/terminology-registry-test.sh",
     "test:siss-adapter": "bash scripts/siss-adapter-test.sh",
     "test:siss-prescription": "bash scripts/siss-prescription-test.sh",
+    "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",

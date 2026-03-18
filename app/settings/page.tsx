@@ -5,7 +5,7 @@ import {
     AI_INSIGHT_MODE_OPTIONS,
     type AIInsightManualConfig,
 } from '@/lib/ai-insight-settings';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check, Shield } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -267,12 +267,18 @@ export default function SettingsPage() {
     const [progress, setProgress] = useState(0);
 
     // --- Profile State ---
-    const { user, updateUser } = useSecurity();
+    const { user, updateUser, changePin } = useSecurity();
     const [profile, setProfile] = useState({
         doctorName: '',
         clinicName: ''
     });
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    /* @Codex */
+    const [pinForm, setPinForm] = useState({ currentPin: '', newPin: '', confirmPin: '' });
+    /* @Codex */
+    const [isChangingPin, setIsChangingPin] = useState(false);
+    /* @Codex */
+    const [pinFeedback, setPinFeedback] = useState<null | { tone: 'success' | 'error'; message: string }>(null);
 
     const {
         hardwareProfile,
@@ -353,6 +359,30 @@ export default function SettingsPage() {
             alert("Errore durante il salvataggio del profilo.");
         } finally {
             setIsSavingProfile(false);
+        }
+    };
+
+    /* @Codex */
+    const handleChangePin = async () => {
+        setPinFeedback(null);
+
+        if (pinForm.newPin !== pinForm.confirmPin) {
+            setPinFeedback({ tone: 'error', message: 'La conferma del nuovo PIN non corrisponde.' });
+            return;
+        }
+
+        setIsChangingPin(true);
+        try {
+            const result = await changePin(pinForm.currentPin, pinForm.newPin);
+            if (!result.ok) {
+                setPinFeedback({ tone: 'error', message: result.message });
+                return;
+            }
+
+            setPinForm({ currentPin: '', newPin: '', confirmPin: '' });
+            setPinFeedback({ tone: 'success', message: 'PIN aggiornato con successo. Usa il nuovo PIN dal prossimo sblocco.' });
+        } finally {
+            setIsChangingPin(false);
         }
     };
 
@@ -465,6 +495,89 @@ export default function SettingsPage() {
                             >
                                 <Save className="w-4 h-4" />
                                 {isSavingProfile ? 'Salvataggio...' : 'Salva Profilo'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* --- Security Section --- */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                            <Shield className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Sicurezza</h2>
+                            <p className="text-xs text-gray-500">Ruota il PIN senza rigenerare i dati clinici.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                PIN attuale
+                            </label>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                value={pinForm.currentPin}
+                                onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
+                                placeholder="Inserisci il PIN attuale"
+                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Nuovo PIN
+                            </label>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                value={pinForm.newPin}
+                                onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
+                                placeholder="4-8 caratteri"
+                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Conferma nuovo PIN
+                            </label>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                value={pinForm.confirmPin}
+                                onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                                placeholder="Ripeti il nuovo PIN"
+                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                            />
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                            Il cambio PIN fa il re-wrap della stessa master key: i dati restano leggibili, ma dal prossimo unlock servirà il nuovo PIN.
+                        </p>
+
+                        {pinFeedback && (
+                            <div className={cn(
+                                'rounded-lg border px-3 py-2 text-xs',
+                                pinFeedback.tone === 'success'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-red-200 bg-red-50 text-red-700'
+                            )}>
+                                {pinFeedback.message}
+                            </div>
+                        )}
+
+                        <div className="pt-2">
+                            <button
+                                onClick={handleChangePin}
+                                disabled={isChangingPin}
+                                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                            >
+                                <Shield className="w-4 h-4" />
+                                {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
                             </button>
                         </div>
                     </div>

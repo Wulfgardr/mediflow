@@ -61,6 +61,20 @@ type RepairDbPayload = {
     backupCreated?: boolean;
 };
 
+type PinChangeRequestPayload = {
+    currentPin: string;
+    newPin: string;
+    encryptedMasterKey: string;
+    salt: string;
+};
+
+export type PinChangeFailurePayload = {
+    success?: boolean;
+    error?: string;
+    code?: string;
+    message?: string;
+};
+
 type JsonRequestResult<T> = {
     response: Response;
     payload: T | null;
@@ -105,6 +119,15 @@ export function loginWithPinRequest(pin: string) {
 /* @Codex */
 export function setupSecurityRequest(payload: SetupRequestPayload) {
     return requestJson<SetupResponsePayload>('/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+}
+
+/* @Codex */
+export function changePinRequest(payload: PinChangeRequestPayload) {
+    return requestJson<PinChangeFailurePayload>('/api/auth/change-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

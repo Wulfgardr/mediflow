@@ -7,13 +7,21 @@ export const SECURITY_CONFIG = {
     ITERATIONS: 100000, // PBKDF2 iterations
 };
 
+/* @Codex */
+function getCryptoApi(): Crypto {
+    if (!globalThis.crypto) {
+        throw new Error('Web Crypto API unavailable');
+    }
+    return globalThis.crypto;
+}
+
 // --- Key Management ---
 
 /**
  * Generates a random 256-bit AES-GCM key (Master Key)
  */
 export async function generateMasterKey(): Promise<CryptoKey> {
-    return window.crypto.subtle.generateKey(
+    return getCryptoApi().subtle.generateKey(
         {
             name: 'AES-GCM',
             length: 256,
@@ -28,7 +36,7 @@ export async function generateMasterKey(): Promise<CryptoKey> {
  */
 export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<CryptoKey> {
     const enc = new TextEncoder();
-    const keyMaterial = await window.crypto.subtle.importKey(
+    const keyMaterial = await getCryptoApi().subtle.importKey(
         'raw',
         enc.encode(pin),
         'PBKDF2',
@@ -36,7 +44,7 @@ export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<C
         ['deriveKey']
     );
 
-    return window.crypto.subtle.deriveKey(
+    return getCryptoApi().subtle.deriveKey(
         {
             name: 'PBKDF2',
             salt: salt as unknown as BufferSource,
@@ -54,10 +62,11 @@ export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<C
  * Encrypts the Master Key using the PIN-derived key (KEK)
  */
 export async function wrapMasterKey(masterKey: CryptoKey, kek: CryptoKey): Promise<string> {
-    const rawMasterKey = await window.crypto.subtle.exportKey('raw', masterKey);
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const cryptoApi = getCryptoApi();
+    const rawMasterKey = await cryptoApi.subtle.exportKey('raw', masterKey);
+    const iv = cryptoApi.getRandomValues(new Uint8Array(12));
 
-    const encryptedKeyBuffer = await window.crypto.subtle.encrypt(
+    const encryptedKeyBuffer = await cryptoApi.subtle.encrypt(
         { name: 'AES-GCM', iv },
         kek,
         rawMasterKey
@@ -76,17 +85,18 @@ export async function wrapMasterKey(masterKey: CryptoKey, kek: CryptoKey): Promi
  * Decrypts the Master Key using the PIN-derived key (KEK)
  */
 export async function unwrapMasterKey(encryptedMasterKeyB64: string, kek: CryptoKey): Promise<CryptoKey> {
+    const cryptoApi = getCryptoApi();
     const combined = base64ToArrayBuffer(encryptedMasterKeyB64);
     const iv = combined.slice(0, 12);
     const data = combined.slice(12);
 
-    const rawMasterKey = await window.crypto.subtle.decrypt(
+    const rawMasterKey = await cryptoApi.subtle.decrypt(
         { name: 'AES-GCM', iv: new Uint8Array(iv) },
         kek,
         data
     );
 
-    return window.crypto.subtle.importKey(
+    return cryptoApi.subtle.importKey(
         'raw',
         rawMasterKey,
         'AES-GCM',
@@ -101,12 +111,13 @@ export async function unwrapMasterKey(encryptedMasterKeyB64: string, kek: Crypto
  * Encrypts arbitrary data (string or object) using the Master Key
  */
 export async function encryptData(data: unknown, masterKey: CryptoKey): Promise<{ iv: string; data: string }> {
+    const cryptoApi = getCryptoApi();
     const json = JSON.stringify(data);
     const enc = new TextEncoder();
     const encoded = enc.encode(json);
 
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const encryptedBuffer = await window.crypto.subtle.encrypt(
+    const iv = cryptoApi.getRandomValues(new Uint8Array(12));
+    const encryptedBuffer = await cryptoApi.subtle.encrypt(
         { name: 'AES-GCM', iv },
         masterKey,
         encoded
@@ -122,11 +133,12 @@ export async function encryptData(data: unknown, masterKey: CryptoKey): Promise<
  * Decrypts data using the Master Key
  */
 export async function decryptData(encryptedData: string, ivB64: string, masterKey: CryptoKey): Promise<unknown> {
+    const cryptoApi = getCryptoApi();
     const iv = base64ToArrayBuffer(ivB64);
     const data = base64ToArrayBuffer(encryptedData);
 
     try {
-        const decryptedBuffer = await window.crypto.subtle.decrypt(
+        const decryptedBuffer = await cryptoApi.subtle.decrypt(
             { name: 'AES-GCM', iv: new Uint8Array(iv) },
             masterKey,
             data
