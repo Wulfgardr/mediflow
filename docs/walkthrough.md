@@ -208,6 +208,11 @@ Tipi condivisi:
 La voce `Backup` in `app/settings/page.tsx` usa `components/backup-restore-ui.tsx`
 per esportare un artifact JSON `.mediflow` v1 con manifest e checksum.
 
+La thin slice `WUL-30` aggiunge anche `components/backup-scheduler-ui.tsx`, che
+permette di configurare un backup automatico notturno macOS via `launchd`
+utente. Il job usa `scripts/run-scheduled-backup.mjs`, scrive un artifact `.mediflow`
+v1 nella cartella destinazione e aggiorna in `settings` lo stato dell'ultimo run.
+
 Flusso:
 
 1) il client web legge le collezioni supportate via API locale
@@ -215,6 +220,13 @@ Flusso:
 3) il restore invia il file a `app/api/system/backup-restore/route.ts`
 4) il server valida format, versione, scope, checksum e riferimenti interni
 5) il server svuota le tabelle supportate e reinserisce i record direttamente in SQLite
+
+Per il backup automatico:
+
+1) la UI salva `enabled`, orario e cartella destinazione in `settings`
+2) `app/api/system/backup-scheduler/route.ts` installa o rimuove il `LaunchAgent`
+3) `launchd` esegue il runner headless locale all'orario scelto
+4) il runner legge `medical.db`, genera l'artifact v1 e salva esito/path ultimo run
 
 Nota: `patients.ambulatoryId` viene re-materializzato anche nella relazione
 `patients_to_ambulatories`; le preferenze non esportabili restano follow-up.

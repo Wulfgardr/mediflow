@@ -305,3 +305,4 @@ Entries are additive and minimal.
 - Wired lockout messaging into the web security gate and lock screen: components/lock-screen.tsx
 - Wired lockout messaging into the native login path and error mapping: native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift
 - Wired lockout messaging into the native login path and error mapping: native/MediFlowMac/Sources/MediFlowMac/Services/SecuritySession.swift
+- Added macOS `launchd`-based nightly backup thin slice with headless runner, scheduler status/settings route, minimal settings UI, smoke coverage, and ADR 0021: docs/adr/0021-nightly-backup-via-macos-launchd.md, lib/backup-scheduler.ts, app/api/system/backup-scheduler/route.ts, scripts/run-scheduled-backup.mjs, scripts/backup-scheduler-test.sh, lib/backup-scheduler.test.ts, components/backup-scheduler-ui.tsx, app/settings/page.tsx, package.json

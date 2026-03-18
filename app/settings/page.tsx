@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai-insight-settings';
 import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
+import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
 /* @Codex */
@@ -1043,6 +1044,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <BackupSchedulerUI />
                 <BackupRestoreUI />
             </div>
         </div >
