@@ -35,12 +35,17 @@ function getDefaultState() {
       hour: 2,
       minute: 0,
       destinationDir: path.join(getDefaultDataDir(), 'backups'),
+      retentionKeepArtifacts: 14,
     },
     run: {
       lastRunAt: null,
       lastRunStatus: null,
       lastRunMessage: null,
       lastArtifactPath: null,
+      lastRetentionAt: null,
+      lastRetentionDeletedCount: null,
+      lastRetentionDeletedBytes: null,
+      lastRetentionMode: null,
     },
   };
 }
@@ -89,7 +94,9 @@ function buildDataset(db) {
 
 async function main() {
   const artifactModule = await import(new URL('../lib/backup-artifact.ts', import.meta.url));
+  const schedulerModule = await import(new URL('../lib/backup-scheduler.ts', import.meta.url));
   const { serializeBackupArtifact } = artifactModule;
+  const { applyBackupRetention, applyRetentionResultToState } = schedulerModule;
 
   const dataDir = getDefaultDataDir();
   const dbPath = path.join(dataDir, 'medical.db');
@@ -120,7 +127,7 @@ async function main() {
     fs.writeFileSync(tempPath, artifact, 'utf8');
     fs.renameSync(tempPath, finalPath);
 
-    const nextState = {
+    const backedUpState = {
       ...currentState,
       config: {
         ...currentState.config,
@@ -133,13 +140,24 @@ async function main() {
         lastArtifactPath: finalPath,
       },
     };
+    const retentionResult = applyBackupRetention(
+      {
+        destinationDir,
+        retentionKeepArtifacts: currentState.config.retentionKeepArtifacts,
+      },
+      { preservePaths: [finalPath] },
+    );
+    const nextState = applyRetentionResultToState(backedUpState, retentionResult, 'auto', createdAt);
+    nextState.run.lastRunMessage = retentionResult.deletedCount > 0
+      ? `Backup completato. Retention: rimossi ${retentionResult.deletedCount} file.`
+      : 'Backup completato.';
     saveState(db, nextState);
 
     console.log(JSON.stringify({
       ok: true,
       artifactPath: finalPath,
       createdAt: createdAt.toISOString(),
-      message: 'Backup completato.',
+      message: nextState.run.lastRunMessage,
     }));
     db.close();
   } catch (error) {

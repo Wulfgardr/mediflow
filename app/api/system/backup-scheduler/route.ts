@@ -7,9 +7,12 @@ import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-a
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
+    applyBackupRetention,
+    applyRetentionResultToState,
     getBackupSchedulerStatus,
     installBackupLaunchAgent,
     mergeBackupSchedulerConfig,
+    previewBackupRetention,
     readBackupSchedulerStateFromValue,
     runBackupSchedulerScript,
     uninstallBackupLaunchAgent,
@@ -51,6 +54,16 @@ export async function POST(request: Request) {
         const action = typeof body?.action === 'string' ? body.action : 'save';
         const currentValue = await loadSchedulerSettingValue();
         const currentState = readBackupSchedulerStateFromValue(currentValue);
+        const configPatch = body?.config && typeof body.config === 'object'
+            ? body.config as Record<string, unknown>
+            : {};
+        const draftState = mergeBackupSchedulerConfig(currentState, {
+            enabled: typeof configPatch.enabled === 'boolean' ? configPatch.enabled : currentState.config.enabled,
+            hour: configPatch.hour as number | undefined,
+            minute: configPatch.minute as number | undefined,
+            destinationDir: configPatch.destinationDir as string | undefined,
+            retentionKeepArtifacts: configPatch.retentionKeepArtifacts as number | undefined,
+        });
 
         if (action === 'run-now') {
             const result = runBackupSchedulerScript({
@@ -67,15 +80,24 @@ export async function POST(request: Request) {
             );
         }
 
-        const configPatch = body?.config && typeof body.config === 'object'
-            ? body.config as Record<string, unknown>
-            : {};
-        const nextState = mergeBackupSchedulerConfig(currentState, {
-            enabled: typeof configPatch.enabled === 'boolean' ? configPatch.enabled : currentState.config.enabled,
-            hour: configPatch.hour as number | undefined,
-            minute: configPatch.minute as number | undefined,
-            destinationDir: configPatch.destinationDir as string | undefined,
-        });
+        if (action === 'preview-retention') {
+            return NextResponse.json({
+                retention: previewBackupRetention(draftState.config),
+            });
+        }
+
+        if (action === 'apply-retention') {
+            const retention = applyBackupRetention(draftState.config);
+            const nextState = applyRetentionResultToState(draftState, retention, 'manual');
+            await saveSchedulerSettingValue(JSON.stringify(nextState));
+
+            return NextResponse.json({
+                retention,
+                status: getBackupSchedulerStatus(JSON.stringify(nextState)),
+            });
+        }
+
+        const nextState = draftState;
 
         if (nextState.config.enabled) {
             installBackupLaunchAgent(nextState);
@@ -97,7 +119,7 @@ export async function POST(request: Request) {
                 sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request),
                 redactedMetadata: withAuditContextMetadata(context, {
-                    changedFields: ['enabled', 'hour', 'minute', 'destinationDir'],
+                    changedFields: ['enabled', 'hour', 'minute', 'destinationDir', 'retentionKeepArtifacts'],
                     flags: [`action:${action}`],
                 }),
             });

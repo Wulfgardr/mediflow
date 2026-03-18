@@ -95,7 +95,7 @@ Ordine di consegna consigliato (incrementale):
 
 ## Next (dopo il focus corrente)
 
-- [ ] Continuare il filone backup dopo la thin slice `WUL-30` (`launchd` macOS + runner headless), completando retention automatica e policy sulla cartella utente selezionata.
+- [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 

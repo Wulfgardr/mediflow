@@ -11,6 +11,33 @@ mkdir -p "$OUT_DIR"
 
 MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
 
+DATA_DIR="$DATA_DIR" node --input-type=module <<'NODE'
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dataDir = process.env.DATA_DIR;
+const db = new Database(path.join(dataDir, 'medical.db'));
+db.prepare(`
+  INSERT INTO settings (key, value) VALUES (?, ?)
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value
+`).run('backupScheduler', JSON.stringify({
+  version: 1,
+  config: {
+    enabled: true,
+    hour: 2,
+    minute: 0,
+    destinationDir: path.join(dataDir, 'backups'),
+    retentionKeepArtifacts: 1,
+  },
+  run: {},
+}));
+db.close();
+NODE
+
+printf 'old artifact' > "$OUT_DIR/mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow"
+printf 'orphan temp' > "$OUT_DIR/mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp"
+printf 'keep me' > "$OUT_DIR/notes.txt"
+
 MEDIFLOW_DATA_DIR="$DATA_DIR" \
 MEDIFLOW_BACKUP_DEST_DIR="$OUT_DIR" \
 MEDIFLOW_BACKUP_FORCE=1 \
@@ -29,6 +56,15 @@ if (!result.ok) {
 }
 if (!result.artifactPath || !fs.existsSync(result.artifactPath)) {
   throw new Error('Scheduled backup artifact was not created.');
+}
+if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow'))) {
+  throw new Error('Retention did not remove the stale backup artifact.');
+}
+if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp'))) {
+  throw new Error('Retention did not remove the orphan temp file.');
+}
+if (!fs.existsSync(path.join(path.dirname(result.artifactPath), 'notes.txt'))) {
+  throw new Error('Retention removed an unrelated file.');
 }
 
 const { parseBackupArtifact } = await import(pathToFileURL(path.join(rootDir, 'lib', 'backup-artifact.ts')).href);

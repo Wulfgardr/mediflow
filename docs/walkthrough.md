@@ -212,6 +212,9 @@ La thin slice `WUL-30` aggiunge anche `components/backup-scheduler-ui.tsx`, che
 permette di configurare un backup automatico notturno macOS via `launchd`
 utente. Il job usa `scripts/run-scheduled-backup.mjs`, scrive un artifact `.mediflow`
 v1 nella cartella destinazione e aggiorna in `settings` lo stato dell'ultimo run.
+La thin slice `WUL-31` completa il lifecycle minimo con retention `keep-last-N`
+solo sui file `mediflow-backup-v1-*` generati dallo scheduler, piu anteprima
+dry-run e apply manuale dalla stessa UI.
 
 Flusso:
 
@@ -226,7 +229,8 @@ Per il backup automatico:
 1) la UI salva `enabled`, orario e cartella destinazione in `settings`
 2) `app/api/system/backup-scheduler/route.ts` installa o rimuove il `LaunchAgent`
 3) `launchd` esegue il runner headless locale all'orario scelto
-4) il runner legge `medical.db`, genera l'artifact v1 e salva esito/path ultimo run
+4) il runner legge `medical.db`, genera l'artifact v1, applica la retention sui
+   soli file scheduler-owned e salva esito/path ultimo run
 
 Nota: `patients.ambulatoryId` viene re-materializzato anche nella relazione
 `patients_to_ambulatories`; le preferenze non esportabili restano follow-up.

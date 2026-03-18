@@ -14,18 +14,45 @@ type BackupSchedulerResponse = {
             hour: number;
             minute: number;
             destinationDir: string;
+            retentionKeepArtifacts: number;
         };
         run: {
             lastRunAt: string | null;
             lastRunStatus: 'success' | 'error' | null;
             lastRunMessage: string | null;
             lastArtifactPath: string | null;
+            lastRetentionAt: string | null;
+            lastRetentionDeletedCount: number | null;
+            lastRetentionDeletedBytes: number | null;
+            lastRetentionMode: 'auto' | 'manual' | null;
         };
     };
 };
 
+type BackupRetentionPreview = {
+    destinationDir: string;
+    keepArtifacts: number;
+    artifactCount: number;
+    orphanTempCount: number;
+    deleteCount: number;
+    deleteBytes: number;
+    items: Array<{
+        path: string;
+        kind: 'artifact' | 'temp';
+        reason: 'keep-last-n' | 'orphan-temp';
+        sizeBytes: number;
+        modifiedAt: string | null;
+    }>;
+};
+
 function toTimeValue(hour: number, minute: number): string {
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatBytes(value: number): string {
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function BackupSchedulerUI() {
@@ -33,10 +60,14 @@ export default function BackupSchedulerUI() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isRunning, setIsRunning] = useState(false);
+    const [isPreviewingRetention, setIsPreviewingRetention] = useState(false);
+    const [isApplyingRetention, setIsApplyingRetention] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [enabled, setEnabled] = useState(false);
     const [time, setTime] = useState('02:00');
     const [destinationDir, setDestinationDir] = useState('');
+    const [retentionKeepArtifacts, setRetentionKeepArtifacts] = useState(14);
+    const [retentionPreview, setRetentionPreview] = useState<BackupRetentionPreview | null>(null);
 
     const load = async () => {
         setIsLoading(true);
@@ -48,6 +79,7 @@ export default function BackupSchedulerUI() {
             setEnabled(Boolean(payload.state.config.enabled));
             setTime(toTimeValue(payload.state.config.hour, payload.state.config.minute));
             setDestinationDir(payload.state.config.destinationDir);
+            setRetentionKeepArtifacts(payload.state.config.retentionKeepArtifacts);
         } catch (error) {
             const text = error instanceof Error ? error.message : 'Errore caricamento backup automatico.';
             setMessage({ type: 'error', text });
@@ -82,12 +114,14 @@ export default function BackupSchedulerUI() {
                         hour: timeParts.hour,
                         minute: timeParts.minute,
                         destinationDir,
+                        retentionKeepArtifacts,
                     },
                 }),
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload?.error || 'Salvataggio configurazione fallito.');
             setStatus(payload);
+            setRetentionPreview(null);
             setMessage({ type: 'success', text: enabled ? 'Backup automatico attivato.' : 'Backup automatico disattivato.' });
         } catch (error) {
             const text = error instanceof Error ? error.message : 'Salvataggio configurazione fallito.';
@@ -116,6 +150,75 @@ export default function BackupSchedulerUI() {
             await load();
         } finally {
             setIsRunning(false);
+        }
+    };
+
+    const previewRetention = async () => {
+        setIsPreviewingRetention(true);
+        setMessage(null);
+        try {
+            const response = await fetch('/api/system/backup-scheduler', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'preview-retention',
+                    config: {
+                        enabled,
+                        hour: timeParts.hour,
+                        minute: timeParts.minute,
+                        destinationDir,
+                        retentionKeepArtifacts,
+                    },
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload?.error || 'Anteprima retention fallita.');
+            setRetentionPreview(payload.retention);
+            setMessage({ type: 'info', text: payload.retention.deleteCount > 0 ? 'Anteprima retention aggiornata.' : 'Nessun file da rimuovere con la policy corrente.' });
+        } catch (error) {
+            const text = error instanceof Error ? error.message : 'Anteprima retention fallita.';
+            setMessage({ type: 'error', text });
+        } finally {
+            setIsPreviewingRetention(false);
+        }
+    };
+
+    const applyRetention = async () => {
+        setIsApplyingRetention(true);
+        setMessage(null);
+        try {
+            const response = await fetch('/api/system/backup-scheduler', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'apply-retention',
+                    config: {
+                        enabled,
+                        hour: timeParts.hour,
+                        minute: timeParts.minute,
+                        destinationDir,
+                        retentionKeepArtifacts,
+                    },
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload?.error || 'Pulizia retention fallita.');
+            setStatus(payload.status);
+            setRetentionPreview(null);
+            const deletedCount = payload?.retention?.deletedCount ?? 0;
+            const deletedBytes = payload?.retention?.deletedBytes ?? 0;
+            setMessage({
+                type: 'success',
+                text: deletedCount > 0
+                    ? `Retention applicata: rimossi ${deletedCount} file (${formatBytes(deletedBytes)}).`
+                    : 'Retention applicata: nessun file rimosso.',
+            });
+        } catch (error) {
+            const text = error instanceof Error ? error.message : 'Pulizia retention fallita.';
+            setMessage({ type: 'error', text });
+            await load();
+        } finally {
+            setIsApplyingRetention(false);
         }
     };
 
@@ -177,6 +280,22 @@ export default function BackupSchedulerUI() {
                         className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 bg-gray-50 p-2.5 text-sm"
                     />
                 </label>
+
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Mantieni ultimi backup
+                    <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={retentionKeepArtifacts}
+                        onChange={(event) => setRetentionKeepArtifacts(Math.max(1, Number.parseInt(event.target.value || '1', 10) || 1))}
+                        className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 bg-gray-50 p-2.5 text-sm"
+                    />
+                </label>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-[#30363d] bg-slate-50 dark:bg-[#0d1117] px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+                La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -196,6 +315,22 @@ export default function BackupSchedulerUI() {
                     {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
                     Esegui adesso
                 </button>
+                <button
+                    onClick={previewRetention}
+                    disabled={isPreviewingRetention}
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                    {isPreviewingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Anteprima retention
+                </button>
+                <button
+                    onClick={applyRetention}
+                    disabled={isApplyingRetention}
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                    {isApplyingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
+                    Applica pulizia
+                </button>
             </div>
 
             {lastRun && (
@@ -204,7 +339,33 @@ export default function BackupSchedulerUI() {
                     <p><strong>Esito:</strong> {lastRun.lastRunStatus ?? 'n/d'}</p>
                     {lastRun.lastRunMessage && <p><strong>Messaggio:</strong> {lastRun.lastRunMessage}</p>}
                     {lastRun.lastArtifactPath && <p><strong>Artifact:</strong> <code>{lastRun.lastArtifactPath}</code></p>}
+                    {lastRun.lastRetentionAt && (
+                        <p>
+                            <strong>Ultima retention:</strong> {lastRun.lastRetentionAt}
+                            {' '}({lastRun.lastRetentionMode ?? 'n/d'}, rimossi {lastRun.lastRetentionDeletedCount ?? 0} file, {formatBytes(lastRun.lastRetentionDeletedBytes ?? 0)})
+                        </p>
+                    )}
                     {status?.plistPath && <p><strong>LaunchAgent:</strong> <code>{status.plistPath}</code></p>}
+                </div>
+            )}
+
+            {retentionPreview && (
+                <div className="rounded-lg border border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117] px-4 py-3 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    <p><strong>Anteprima retention:</strong> {retentionPreview.deleteCount} file candidati, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
+                    <p><strong>Policy:</strong> mantieni ultimi {retentionPreview.keepArtifacts} artifact nella cartella {retentionPreview.destinationDir}</p>
+                    <p><strong>Inventario:</strong> {retentionPreview.artifactCount} artifact gestiti, {retentionPreview.orphanTempCount} `.tmp` orfani</p>
+                    {retentionPreview.items.length > 0 && (
+                        <div className="space-y-1">
+                            {retentionPreview.items.slice(0, 5).map((item) => (
+                                <p key={item.path}>
+                                    <code>{item.path}</code> · {item.reason === 'keep-last-n' ? 'eccede keep-last-N' : 'tmp orfano'} · {formatBytes(item.sizeBytes)}
+                                </p>
+                            ))}
+                            {retentionPreview.items.length > 5 && (
+                                <p>Altri {retentionPreview.items.length - 5} file non mostrati.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -7,14 +7,21 @@ import { spawnSync } from 'child_process';
 export const BACKUP_SCHEDULER_SETTINGS_KEY = 'backupScheduler';
 export const BACKUP_SCHEDULER_LABEL = 'dev.wulfgardr.mediflow.backup';
 export const BACKUP_SCHEDULER_STATE_VERSION = 1 as const;
+export const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14 as const;
+
+const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
+const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
+const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
 
 export type BackupSchedulerRunStatus = 'success' | 'error';
+export type BackupRetentionMode = 'auto' | 'manual';
 
 export type BackupSchedulerConfig = {
     enabled: boolean;
     hour: number;
     minute: number;
     destinationDir: string;
+    retentionKeepArtifacts: number;
 };
 
 export type BackupSchedulerRunState = {
@@ -22,6 +29,10 @@ export type BackupSchedulerRunState = {
     lastRunStatus: BackupSchedulerRunStatus | null;
     lastRunMessage: string | null;
     lastArtifactPath: string | null;
+    lastRetentionAt: string | null;
+    lastRetentionDeletedCount: number | null;
+    lastRetentionDeletedBytes: number | null;
+    lastRetentionMode: BackupRetentionMode | null;
 };
 
 export type BackupSchedulerState = {
@@ -44,6 +55,38 @@ export type BackupSchedulerScriptResult = {
     message: string;
 };
 
+export type BackupRetentionCandidate = {
+    path: string;
+    kind: 'artifact' | 'temp';
+    reason: 'keep-last-n' | 'orphan-temp';
+    sizeBytes: number;
+    modifiedAt: string | null;
+};
+
+export type BackupRetentionPreview = {
+    destinationDir: string;
+    keepArtifacts: number;
+    artifactCount: number;
+    orphanTempCount: number;
+    deleteCount: number;
+    deleteBytes: number;
+    items: BackupRetentionCandidate[];
+};
+
+export type BackupRetentionApplyResult = BackupRetentionPreview & {
+    deletedCount: number;
+    deletedBytes: number;
+};
+
+type ManagedBackupFile = {
+    path: string;
+    name: string;
+    kind: 'artifact' | 'temp';
+    sizeBytes: number;
+    modifiedAt: string | null;
+    modifiedAtMs: number;
+};
+
 function getDefaultDataDir(): string {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
@@ -61,6 +104,10 @@ function clampInteger(value: unknown, fallback: number, min: number, max: number
     return Math.min(Math.max(parsed, min), max);
 }
 
+function clampRetentionKeepArtifacts(value: unknown, fallback: number = DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS): number {
+    return clampInteger(value, fallback, 1, 365);
+}
+
 function sanitizeDestinationDir(value: unknown): string {
     if (typeof value !== 'string') return getDefaultDestinationDir();
     const trimmed = value.trim();
@@ -68,10 +115,20 @@ function sanitizeDestinationDir(value: unknown): string {
     return trimmed;
 }
 
+function sanitizeOptionalCount(value: unknown): number | null {
+    if (typeof value !== 'number' && typeof value !== 'string') return null;
+    const parsed = typeof value === 'number' ? value : Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed < 0) return null;
+    return parsed;
+}
+
 function sanitizeRunState(value: unknown): BackupSchedulerRunState {
     const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
     const lastRunStatus = record.lastRunStatus === 'success' || record.lastRunStatus === 'error'
         ? record.lastRunStatus
+        : null;
+    const lastRetentionMode = record.lastRetentionMode === 'auto' || record.lastRetentionMode === 'manual'
+        ? record.lastRetentionMode
         : null;
 
     return {
@@ -79,6 +136,10 @@ function sanitizeRunState(value: unknown): BackupSchedulerRunState {
         lastRunStatus,
         lastRunMessage: typeof record.lastRunMessage === 'string' ? record.lastRunMessage : null,
         lastArtifactPath: typeof record.lastArtifactPath === 'string' ? record.lastArtifactPath : null,
+        lastRetentionAt: typeof record.lastRetentionAt === 'string' ? record.lastRetentionAt : null,
+        lastRetentionDeletedCount: sanitizeOptionalCount(record.lastRetentionDeletedCount),
+        lastRetentionDeletedBytes: sanitizeOptionalCount(record.lastRetentionDeletedBytes),
+        lastRetentionMode,
     };
 }
 
@@ -90,12 +151,17 @@ export function getDefaultBackupSchedulerState(): BackupSchedulerState {
             hour: 2,
             minute: 0,
             destinationDir: getDefaultDestinationDir(),
+            retentionKeepArtifacts: DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS,
         },
         run: {
             lastRunAt: null,
             lastRunStatus: null,
             lastRunMessage: null,
             lastArtifactPath: null,
+            lastRetentionAt: null,
+            lastRetentionDeletedCount: null,
+            lastRetentionDeletedBytes: null,
+            lastRetentionMode: null,
         },
     };
 }
@@ -116,6 +182,7 @@ export function readBackupSchedulerStateFromValue(value: string | null | undefin
                 hour: clampInteger(config.hour, 2, 0, 23),
                 minute: clampInteger(config.minute, 0, 0, 59),
                 destinationDir: sanitizeDestinationDir(config.destinationDir),
+                retentionKeepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
             },
             run: sanitizeRunState(parsed.run),
         };
@@ -135,6 +202,136 @@ export function mergeBackupSchedulerConfig(
             hour: clampInteger(patch.hour, current.config.hour, 0, 23),
             minute: clampInteger(patch.minute, current.config.minute, 0, 59),
             destinationDir: sanitizeDestinationDir(patch.destinationDir ?? current.config.destinationDir),
+            retentionKeepArtifacts: clampRetentionKeepArtifacts(
+                patch.retentionKeepArtifacts,
+                current.config.retentionKeepArtifacts,
+            ),
+        },
+    };
+}
+
+function classifyManagedBackupFile(name: string): ManagedBackupFile['kind'] | null {
+    if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_TEMP_SUFFIX)) {
+        return 'temp';
+    }
+    if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_FILE_SUFFIX)) {
+        return 'artifact';
+    }
+    return null;
+}
+
+function listManagedBackupFiles(destinationDir: string): ManagedBackupFile[] {
+    if (!fs.existsSync(destinationDir)) return [];
+
+    const entries = fs.readdirSync(destinationDir, { withFileTypes: true });
+    return entries.flatMap((entry) => {
+        if (!entry.isFile()) return [];
+        const kind = classifyManagedBackupFile(entry.name);
+        if (!kind) return [];
+
+        const filePath = path.join(destinationDir, entry.name);
+        const stats = fs.statSync(filePath);
+        return [{
+            path: filePath,
+            name: entry.name,
+            kind,
+            sizeBytes: stats.size,
+            modifiedAt: Number.isFinite(stats.mtimeMs) ? stats.mtime.toISOString() : null,
+            modifiedAtMs: Number.isFinite(stats.mtimeMs) ? stats.mtimeMs : 0,
+        }];
+    });
+}
+
+function sortManagedBackupFiles(files: ManagedBackupFile[]): ManagedBackupFile[] {
+    return [...files].sort((left, right) => {
+        if (left.modifiedAtMs !== right.modifiedAtMs) {
+            return right.modifiedAtMs - left.modifiedAtMs;
+        }
+        return right.name.localeCompare(left.name);
+    });
+}
+
+export function previewBackupRetention(
+    config: Pick<BackupSchedulerConfig, 'destinationDir' | 'retentionKeepArtifacts'>,
+    options?: { preservePaths?: string[] },
+): BackupRetentionPreview {
+    const preservePaths = new Set((options?.preservePaths ?? []).map((value) => path.resolve(value)));
+    const managedFiles = sortManagedBackupFiles(listManagedBackupFiles(config.destinationDir));
+    const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
+    const orphanTemps = managedFiles
+        .filter((file) => file.kind === 'temp')
+        .filter((file) => !preservePaths.has(path.resolve(file.path)));
+    const staleArtifacts = artifacts
+        .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
+        .filter((file) => !preservePaths.has(path.resolve(file.path)));
+
+    const items: BackupRetentionCandidate[] = [
+        ...staleArtifacts.map((file) => ({
+            path: file.path,
+            kind: file.kind,
+            reason: 'keep-last-n' as const,
+            sizeBytes: file.sizeBytes,
+            modifiedAt: file.modifiedAt,
+        })),
+        ...orphanTemps.map((file) => ({
+            path: file.path,
+            kind: file.kind,
+            reason: 'orphan-temp' as const,
+            sizeBytes: file.sizeBytes,
+            modifiedAt: file.modifiedAt,
+        })),
+    ];
+
+    return {
+        destinationDir: config.destinationDir,
+        keepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
+        artifactCount: artifacts.length,
+        orphanTempCount: orphanTemps.length,
+        deleteCount: items.length,
+        deleteBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
+        items,
+    };
+}
+
+export function applyBackupRetention(
+    config: Pick<BackupSchedulerConfig, 'destinationDir' | 'retentionKeepArtifacts'>,
+    options?: { preservePaths?: string[] },
+): BackupRetentionApplyResult {
+    const preview = previewBackupRetention(config, options);
+
+    for (const item of preview.items) {
+        if (fs.existsSync(item.path)) {
+            fs.unlinkSync(item.path);
+        }
+    }
+
+    return {
+        ...preview,
+        deletedCount: preview.deleteCount,
+        deletedBytes: preview.deleteBytes,
+    };
+}
+
+export function applyRetentionResultToState(
+    current: BackupSchedulerState,
+    result: BackupRetentionApplyResult,
+    mode: BackupRetentionMode,
+    occurredAt = new Date(),
+): BackupSchedulerState {
+    const retainedArtifactPath = current.run.lastArtifactPath
+        && result.items.some((item) => item.path === current.run.lastArtifactPath)
+        ? null
+        : current.run.lastArtifactPath;
+
+    return {
+        ...current,
+        run: {
+            ...current.run,
+            lastArtifactPath: retainedArtifactPath,
+            lastRetentionAt: occurredAt.toISOString(),
+            lastRetentionDeletedCount: result.deletedCount,
+            lastRetentionDeletedBytes: result.deletedBytes,
+            lastRetentionMode: mode,
         },
     };
 }
