@@ -56,6 +56,7 @@ Entries are additive and minimal.
 - Implemented the fifth thin slice of ADR 0024 by extracting client-side security session persistence, restore and clear helpers out of `SecurityProvider`, while keeping auth fetches and provider state transitions in place: `lib/client-security-session.ts`, `components/security-provider.tsx`
 - Implemented the sixth thin slice of ADR 0024 by extracting the client auth API wrappers and shared auth-health payload typing out of `SecurityProvider`, while keeping provider-side state branching and crypto unwrap local: `lib/client-auth-api.ts`, `components/auth-health-screen.tsx`, `components/security-provider.tsx`
 - Implemented the seventh thin slice of ADR 0024 by extracting the AI settings controller state, load/save and health-test flows out of `SettingsPage`, while keeping the current markup and inline model selector intact: `lib/hooks/use-ai-settings-controller.ts`, `app/settings/page.tsx`
+- Added the first thin slice for `WUL-83` with a synthetic observations corpus, local benchmark runner, persisted benchmark decision (`hybrid` default / `rules` fallback), and canonical docs updates: `scripts/fixtures/clinical-facts-observation-corpus.json`, `scripts/benchmark-observation-facts.mjs`, `package.json`, `docs/clinical-facts-benchmark-observations.md`, `docs/README.md`, `docs/markdown-index.md`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
