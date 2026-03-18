@@ -159,7 +159,7 @@ export async function regeneratePatientSummary(
         const prompt = SUMMARY_PROMPT + contextData.prompt;
 
         options.onStage?.('generate', info);
-        const content = await ai.generate(prompt, options.signal, 512);
+        const content = await ai.generate(prompt, options.signal, contextData.outputMaxTokens);
 
         const cleaned = finalizePatientInsight({
             content,

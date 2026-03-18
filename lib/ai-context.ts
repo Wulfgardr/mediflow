@@ -1,4 +1,8 @@
 import { db, type Diagnosis, type DocumentInsight } from '@/lib/db';
+import {
+    estimateAIInsightComplexityScore,
+    getAIInsightRuntimeSettings,
+} from '@/lib/ai-insight-settings';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -20,6 +24,7 @@ export interface PatientInsightContextSnapshot {
     prompt: string;
     sourceRefs: PatientInsightSourceRef[];
     limitations: string[];
+    outputMaxTokens: number;
     patientName: {
         firstName: string;
         lastName: string;
@@ -31,7 +36,7 @@ const MAX_THERAPIES = 5;
 const MAX_OBSERVATIONS = 5;
 const MAX_CHECKUPS = 5;
 const MAX_DIAGNOSES = 5;
-const MAX_DOCUMENTS = 6;
+const DOCUMENT_SOURCE_SUMMARY_CHARS = 600;
 
 const CONTAMINATED_NOTE_MARKERS = [
     '**quadro attuale:**',
@@ -146,22 +151,23 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
             prompt: '',
             sourceRefs: [],
             limitations: ['Paziente non trovato nel database locale.'],
+            outputMaxTokens: 512,
             patientName: { firstName: '', lastName: '' },
         };
     }
 
     const age = buildAge(patient.birthDate, patient.taxCode);
-    const diagnoses = parseDiagnoses(patient.diagnoses)
-        .sort((left, right) => compareDatesDesc(left.date, right.date))
-        .slice(0, MAX_DIAGNOSES);
+    const allDiagnoses = parseDiagnoses(patient.diagnoses)
+        .sort((left, right) => compareDatesDesc(left.date, right.date));
+    const diagnoses = allDiagnoses.slice(0, MAX_DIAGNOSES);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allEntries = await db.entries.filter((entry: any) => entry.patientId === patient.id).toArray();
-    const entries = allEntries
+    const activeEntries = allEntries
         .filter((entry) => !entry.deletedAt && entry.content?.trim())
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((left: any, right: any) => compareDatesDesc(left.date, right.date))
-        .slice(0, MAX_ENTRIES);
+        .sort((left: any, right: any) => compareDatesDesc(left.date, right.date));
+    const entries = activeEntries.slice(0, MAX_ENTRIES);
 
     const therapies = await db.therapies
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -191,7 +197,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .sort((left, right) => compareDatesDesc(left.date, right.date))
         .map((insight) => {
             const fileName = compactText(insight.fileName, 80);
-            const summary = compactText(insight.summary, 260);
+            const summary = compactText(insight.summary, DOCUMENT_SOURCE_SUMMARY_CHARS);
             if (!summary) return '';
             return fileName ? `${fileName}: ${summary}` : summary;
         })
@@ -201,24 +207,56 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .filter((attachment) => attachment.summarySnapshot?.trim())
         .map((attachment) => {
             const fileName = compactText(attachment.name, 80);
-            const summary = compactText(attachment.summarySnapshot, 260);
+            const summary = compactText(attachment.summarySnapshot, DOCUMENT_SOURCE_SUMMARY_CHARS);
             if (!summary) return '';
             return fileName ? `${fileName}: ${summary}` : summary;
         })
         .filter(Boolean);
 
+    const limitations: string[] = [];
     const seenDocuments = new Set<string>();
-    const documentLines = [...archiveSummaries, ...attachmentSummaries]
+    const uniqueDocumentSummaries = [...archiveSummaries, ...attachmentSummaries]
         .filter((line) => {
             const key = line.toLowerCase();
             if (seenDocuments.has(key)) return false;
             seenDocuments.add(key);
             return true;
-        })
-        .slice(0, MAX_DOCUMENTS)
-        .map((line) => `- ${line}`);
+        });
 
-    const limitations: string[] = [];
+    const runtimeSettings = await getAIInsightRuntimeSettings({
+        patientComplexityScore: estimateAIInsightComplexityScore({
+            diagnoses: allDiagnoses.length,
+            entries: activeEntries.length,
+            documents: uniqueDocumentSummaries.length,
+        }),
+    });
+
+    const documentLines: string[] = [];
+    let documentContextChars = 0;
+    let omittedDocumentCount = 0;
+
+    for (const rawLine of uniqueDocumentSummaries) {
+        const line = compactText(rawLine, runtimeSettings.maxDocumentSummaryChars);
+        if (!line) continue;
+        if (documentLines.length >= runtimeSettings.maxDocuments) {
+            omittedDocumentCount += 1;
+            continue;
+        }
+
+        const promptLine = `- ${line}`;
+        if (documentLines.length > 0 && documentContextChars + promptLine.length > runtimeSettings.maxDocumentContextChars) {
+            omittedDocumentCount += 1;
+            continue;
+        }
+
+        documentLines.push(promptLine);
+        documentContextChars += promptLine.length;
+    }
+
+    if (omittedDocumentCount > 0) {
+        limitations.push(`Il contesto documentale AI e stato ridotto a ${documentLines.length} documenti per rispettare il budget configurato.`);
+    }
+
     const patientNotes = typeof patient.notes === 'string' ? patient.notes.trim() : '';
     const allowNarrativeNotes = patientNotes.length > 0 && !isNarrativeNoteContaminated(patientNotes);
     if (patientNotes.length > 0 && !allowNarrativeNotes) {
@@ -325,6 +363,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         prompt,
         sourceRefs,
         limitations,
+        outputMaxTokens: runtimeSettings.outputMaxTokens,
         patientName: {
             firstName: patient.firstName,
             lastName: patient.lastName,

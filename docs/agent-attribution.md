@@ -42,6 +42,9 @@ Entries are additive and minimal.
 - Updated canonical walkthrough and markdown index to reflect the new default model and ADR supersession chain: `docs/walkthrough.md`, `docs/markdown-index.md`
 - Added a one-time legacy AI settings upgrade toward `qwen3.5:35b-a3b`, tightened Patient Insight prompts/output, and promoted proactive next-step suggestions in the patient screen: `lib/ai-models.ts`, `lib/ai-service.ts`, `lib/ai-summary-service.ts`, `lib/ai-context.ts`, `components/ai-patient-insight.tsx`, `app/settings/page.tsx`, `app/patients/[id]/page.tsx`
 
+## 2026-03-18 Codex
+- Added the thin-slice `WUL-66` AI Patient Insight settings layer with persisted full-auto/manual budgets, isolated helper tests, settings UI wiring, runtime budget application in context/generation, and ADR/index updates without reintroducing the stacked upload/OCR branch: `lib/ai-insight-settings.ts`, `lib/ai-insight-settings.test.ts`, `scripts/ai-insight-settings-test.sh`, `tsconfig.ai-insight-settings-test.json`, `app/settings/page.tsx`, `lib/ai-context.ts`, `lib/ai-summary-service.ts`, `docs/adr/0018-ai-insight-full-auto-and-pro-settings.md`, `docs/README.md`, `docs/markdown-index.md`, `package.json`
+
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`
 - Added canonical Linear+Codex operational playbook for planning/coding/audit orchestration (MCP setup, GitHub linking, naming conventions, issue template, routine): `docs/linear-codex-playbook.md`

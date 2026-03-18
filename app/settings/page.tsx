@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/db';
 import { DEFAULT_OCR_MODEL, DEFAULT_TEXT_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+import {
+    AI_INSIGHT_MODE_OPTIONS,
+    DEFAULT_AI_INSIGHT_MANUAL_CONFIG,
+    loadAIInsightStoredSettings,
+    saveAIInsightStoredSettings,
+    type AIInsightManualConfig,
+    type AIInsightMode,
+} from '@/lib/ai-insight-settings';
 import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -278,6 +286,14 @@ export default function SettingsPage() {
         model_ocr: '', // DeepSeek OCR 2
         url: ''
     });
+    /* @Codex */
+    const [aiInsightSettings, setAiInsightSettings] = useState<{
+        mode: AIInsightMode;
+        manualConfig: AIInsightManualConfig;
+    }>({
+        mode: 'full_auto',
+        manualConfig: { ...DEFAULT_AI_INSIGHT_MANUAL_CONFIG },
+    });
     const [isSavingAi, setIsSavingAi] = useState(false);
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
@@ -397,6 +413,7 @@ export default function SettingsPage() {
             if (!currentUrl || currentUrl.includes(':8080')) currentUrl = "http://127.0.0.1:11434/v1";
 
             // Determine models (migrate legacy if needed)
+            const insightSettings = await loadAIInsightStoredSettings();
             /* @Codex */
             setHardwareProfile(hardware?.value || 'custom');
             setAiConfig({
@@ -405,6 +422,10 @@ export default function SettingsPage() {
                 model_reasoning: resolveTextModel(modelReasoning?.value, legacyModel?.value),
                 model_ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
                 url: currentUrl
+            });
+            setAiInsightSettings({
+                mode: insightSettings.mode,
+                manualConfig: insightSettings.manualConfig,
             });
         } catch (e) {
             console.error("Failed to load AI config:", e);
@@ -435,6 +456,17 @@ export default function SettingsPage() {
                 model_reasoning: DEFAULT_TEXT_MODEL
             }));
         }
+    };
+
+    /* @Codex */
+    const updateManualInsightConfig = (key: keyof AIInsightManualConfig, value: number) => {
+        setAiInsightSettings((prev) => ({
+            ...prev,
+            manualConfig: {
+                ...prev.manualConfig,
+                [key]: Number.isFinite(value) ? value : prev.manualConfig[key],
+            },
+        }));
     };
 
     // --- AIFA Handlers ---
@@ -495,6 +527,7 @@ export default function SettingsPage() {
 
             await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
             await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
+            await saveAIInsightStoredSettings(aiInsightSettings);
 
             setAiTestStatus('idle'); // Reset test status on save
         } catch (e) {
@@ -506,6 +539,16 @@ export default function SettingsPage() {
     };
 
     const [aiHealth, setAiHealth] = useState<{ status: 'ok' | 'error'; message: string; models: string[] } | null>(null);
+    /* @Codex */
+    const selectedInsightMode = AI_INSIGHT_MODE_OPTIONS.find((option) => option.value === aiInsightSettings.mode) ?? AI_INSIGHT_MODE_OPTIONS[0];
+    /* @Codex */
+    const insightRuntimePreview = aiInsightSettings.mode === 'manual'
+        ? `${aiInsightSettings.manualConfig.outputMaxTokens} token`
+        : aiInsightSettings.mode === 'balanced'
+            ? 'Preset bilanciato'
+            : aiInsightSettings.mode === 'complete'
+                ? 'Preset completo'
+                : 'Dinamico per caso';
 
     const testAiConnection = async () => {
         setAiTestStatus('testing');
@@ -771,6 +814,112 @@ export default function SettingsPage() {
                                 ]}
                                 provider={aiConfig.provider}
                             />
+                        </div>
+
+                        {/* @Codex */}
+                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-indigo-900">AI Patient Insight</h3>
+                                    <p className="text-[11px] text-indigo-800/80">
+                                        Budget del contesto e dell&apos;output per l&apos;insight clinico sintetico.
+                                    </p>
+                                </div>
+                                <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                                    {selectedInsightMode.title}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {AI_INSIGHT_MODE_OPTIONS.map((option) => {
+                                    const selected = aiInsightSettings.mode === option.value;
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
+                                            className={cn(
+                                                "rounded-lg border px-3 py-3 text-left transition-colors",
+                                                selected
+                                                    ? "border-indigo-500 bg-white shadow-sm"
+                                                    : "border-indigo-100 bg-white/70 hover:border-indigo-200"
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-gray-900">{option.title}</span>
+                                                {selected ? <CheckCircle className="h-4 w-4 text-indigo-600" /> : null}
+                                            </div>
+                                            <p className="mt-1 text-[11px] text-gray-600">{option.description}</p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 text-[11px] text-gray-600">
+                                {aiInsightSettings.mode === 'full_auto'
+                                    ? 'Full auto usa il profilo hardware corrente e la complessita del caso per scegliere il budget.'
+                                    : selectedInsightMode.description}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600">
+                                <div className="rounded-lg bg-white px-3 py-2 border border-indigo-100">
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">Profilo hardware</span>
+                                    <span className="font-semibold text-gray-800">{hardwareProfile}</span>
+                                </div>
+                                <div className="rounded-lg bg-white px-3 py-2 border border-indigo-100">
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">Budget runtime</span>
+                                    <span className="font-semibold text-gray-800">{insightRuntimePreview}</span>
+                                </div>
+                            </div>
+
+                            {aiInsightSettings.mode === 'manual' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <label className="text-xs font-medium text-gray-700">
+                                        Documenti massimi
+                                        <input
+                                            type="number"
+                                            min={2}
+                                            max={12}
+                                            value={aiInsightSettings.manualConfig.maxDocuments}
+                                            onChange={(e) => updateManualInsightConfig('maxDocuments', Number.parseInt(e.target.value, 10))}
+                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                        />
+                                    </label>
+                                    <label className="text-xs font-medium text-gray-700">
+                                        Caratteri per documento
+                                        <input
+                                            type="number"
+                                            min={120}
+                                            max={480}
+                                            value={aiInsightSettings.manualConfig.maxDocumentSummaryChars}
+                                            onChange={(e) => updateManualInsightConfig('maxDocumentSummaryChars', Number.parseInt(e.target.value, 10))}
+                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                        />
+                                    </label>
+                                    <label className="text-xs font-medium text-gray-700">
+                                        Budget contesto documenti
+                                        <input
+                                            type="number"
+                                            min={800}
+                                            max={5000}
+                                            value={aiInsightSettings.manualConfig.maxDocumentContextChars}
+                                            onChange={(e) => updateManualInsightConfig('maxDocumentContextChars', Number.parseInt(e.target.value, 10))}
+                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                        />
+                                    </label>
+                                    <label className="text-xs font-medium text-gray-700">
+                                        Output max token
+                                        <input
+                                            type="number"
+                                            min={256}
+                                            max={1200}
+                                            value={aiInsightSettings.manualConfig.outputMaxTokens}
+                                            onChange={(e) => updateManualInsightConfig('outputMaxTokens', Number.parseInt(e.target.value, 10))}
+                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                        />
+                                    </label>
+                                </div>
+                            )}
                         </div>
 
                         {/* 3. Provider & Infrastructure */}

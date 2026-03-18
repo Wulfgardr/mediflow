@@ -15,6 +15,7 @@
     "check:never-regress": "node scripts/check-never-regress.mjs",
     "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",
     "test:patient-insight": "bash scripts/patient-insight-test.sh",
+    "test:ai-insight-settings": "bash scripts/ai-insight-settings-test.sh",
     "test:auth-lockout": "bash scripts/auth-lockout-test.sh",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
