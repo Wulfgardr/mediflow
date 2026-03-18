@@ -3,28 +3,8 @@
 
 import React from 'react';
 import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
-
 /* @Codex */
-export type AuthHealthPayload = {
-    status: 'ok' | 'error';
-    isSetup?: boolean;
-    hasSession?: boolean;
-    error?: {
-        code?: string;
-        message?: string;
-    };
-    db?: {
-        dataDir?: string;
-        dbPath?: string;
-        dbExists?: boolean;
-        dbReadable?: boolean;
-        dbWritable?: boolean;
-        dbSizeBytes?: number;
-        legacyDbPath?: string;
-        legacyExists?: boolean;
-        schemaOk?: boolean;
-    };
-};
+import type { AuthHealthPayload } from '@/lib/client-auth-api';
 
 /* @Codex */
 const formatBytes = (bytes?: number) => {

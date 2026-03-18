@@ -11,7 +11,7 @@ import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
 /* @Codex */
-import { AuthHealthScreen, AuthHealthPayload } from '@/components/auth-health-screen';
+import { AuthHealthScreen } from '@/components/auth-health-screen';
 /* @Codex */
 import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
 /* @Codex */
@@ -20,6 +20,16 @@ import {
     persistSecuritySession,
     restoreSecuritySession,
 } from '@/lib/client-security-session';
+/* @Codex */
+import {
+    checkAuthHealthRequest,
+    loginWithPinRequest,
+    logoutSecuritySession,
+    repairLegacyDbRequest,
+    setupSecurityRequest,
+    type AuthHealthPayload,
+    type LoginFailurePayload,
+} from '@/lib/client-auth-api';
 
 export interface User {
     id: string;
@@ -40,16 +50,6 @@ interface SecurityContextType {
     lock: () => void;
     updateUser: (data: Partial<User>) => void;
 }
-
-/* @Codex */
-type LoginFailurePayload = {
-    error?: string;
-    code?: string;
-    message?: string;
-    lockedUntil?: string;
-    remainingAttempts?: number;
-    retryAfterSeconds?: number;
-};
 
 /* @Codex */
 function formatLockedUntil(lockedUntil?: string) {
@@ -96,7 +96,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(true);
         setAuthErrorMessage(null);
         // @Codex - clear server session when locking
-        void fetch('/api/auth/logout', { method: 'POST' });
+        logoutSecuritySession();
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
     };
 
@@ -116,19 +116,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
-            /* @Codex */
-            const res = await fetch('/api/auth/check', { cache: 'no-store' });
-            /* @Codex */
-            const text = await res.text();
-            /* @Codex */
-            let data: AuthHealthPayload | null = null;
-            if (text) {
-                try {
-                    data = JSON.parse(text) as AuthHealthPayload;
-                } catch (error) {
-                    console.warn('Auth check returned non-JSON payload', error);
-                }
-            }
+            const { response: res, payload: data } = await checkAuthHealthRequest();
             /* @Codex */
             if (!data) {
                 setAuthHealth({
@@ -203,9 +191,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (isRepairing) return;
         setIsRepairing(true);
         try {
-            const res = await fetch('/api/system/repair-db', { method: 'POST' });
+            const { response: res, payload } = await repairLegacyDbRequest();
             if (!res.ok) {
-                const payload = await res.json().catch(() => null);
                 throw new Error(payload?.error || 'Ripristino fallito');
             }
             await checkAuthStatus();
@@ -236,19 +223,26 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const login = async (pin: string): Promise<boolean> => {
         try {
             setAuthErrorMessage(null);
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'admin', password: pin })
-            });
+            const { response: res, payload } = await loginWithPinRequest(pin);
 
             if (!res.ok) {
-                const payload = await res.json().catch(() => null) as LoginFailurePayload | null;
-                setAuthErrorMessage(formatLoginFailure(payload, res.status));
+                setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
                 return false;
             }
 
-            const data = await res.json();
+            const data = payload as {
+                encryptedMasterKey: string;
+                salt: string | number[];
+                id: string;
+                username: string;
+                displayName?: string;
+                ambulatoryName?: string;
+                role: string;
+            } | null;
+            if (!data) {
+                setAuthErrorMessage('Errore durante il login.');
+                return false;
+            }
             const { encryptedMasterKey, salt, ...userData } = data;
 
             // Convert salt from B64 string
@@ -304,28 +298,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const saltB64 = btoa(String.fromCharCode(...salt));
 
             // Send to Server
-            const res = await fetch('/api/auth/setup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: 'admin',
-                    password: pin,
-                    encryptedMasterKey,
-                    salt: saltB64,
-                    displayName,
-                    ambulatoryName
-                })
+            const { response: res, payload } = await setupSecurityRequest({
+                username: 'admin',
+                password: pin,
+                encryptedMasterKey,
+                salt: saltB64,
+                displayName,
+                ambulatoryName
             });
 
             /* @Codex */
             if (!res.ok) {
-                let payload: any = null;
-                try {
-                    payload = await res.json();
-                } catch {
-                    payload = null;
-                }
-
                 if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
                     setRequiresSetup(false);
                     const success = await login(pin);
