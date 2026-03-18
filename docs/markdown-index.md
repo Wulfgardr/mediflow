@@ -97,6 +97,7 @@ Ultimo aggiornamento: 2026-03-18
 | [docs/adr/0018-ai-insight-full-auto-and-pro-settings.md](./adr/0018-ai-insight-full-auto-and-pro-settings.md) | Budget persistenti e configurabili per `AI Patient Insight`, limitati a settings web + context builder + generation runtime. |
 | [docs/adr/0019-native-patient-insight-markdown-contract.md](./adr/0019-native-patient-insight-markdown-contract.md) | Il client macOS genera e salva `AI Patient Insight` in markdown con citazioni locali, compatibile col parser web attuale. |
 | [docs/adr/0020-ai-insight-source-hierarchy-and-conflict-rules.md](./adr/0020-ai-insight-source-hierarchy-and-conflict-rules.md) | Formalizza la gerarchia delle fonti cliniche e le regole di conflitto/fallback gia applicate dal builder corrente di `AI Patient Insight`. |
+| [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./adr/0024-web-core-stabilization-before-next-version-bump.md) | Fissa la sequenza di stabilizzazione web/core prima del prossimo version bump, con helper condivisi, `typecheck` canonico e split incrementale dei god files. |
 
 ## Checklist manutenzione indice
 

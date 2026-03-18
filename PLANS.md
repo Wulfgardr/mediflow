@@ -85,6 +85,7 @@ Ordine di consegna consigliato (incrementale):
 - [ ] Garantire che ogni chiamata `ApiTable.update/delete()` abbia una route backend corrispondente (es. `PUT/DELETE /api/<resource>/:id`).
 - [ ] Allineare le interfacce TypeScript in `lib/db.ts` con lo schema SQLite in `lib/schema.ts` (evitare "campi fantasma").
 - [ ] Rimuovere/sostituire patch schema runtime con migrazioni Drizzle esplicite (evoluzione DB tracciabile).
+- [ ] Eseguire la sequenza di stabilizzazione web/core pre-version-bump fissata in [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./docs/adr/0024-web-core-stabilization-before-next-version-bump.md): helper condiviso route paziente, helper shared fields paziente, gate `typecheck`, split incrementale `SecurityProvider`/`SettingsPage`.
 
 ### 7) DX / Igiene repository
 - [ ] Aggiungere script `typecheck` (es. `tsc --noEmit`) e documentare il loop di verifica.

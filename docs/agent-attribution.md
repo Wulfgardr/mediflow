@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-18 Codex
+- Added canonical ADR for pre-version-bump web/core stabilization, fixing the maintenance sequence on disk around shared patient payload helpers, structured patient field parsing, `typecheck`, and incremental decomposition of `SecurityProvider`/`SettingsPage`: `docs/adr/0024-web-core-stabilization-before-next-version-bump.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`
+
 ## 2026-03-16 Codex
 - Added operator-reviewed smart import from patient notes/diary/document insights into ICD-11 diagnosis and therapy suggestions, with local ICD/AIFA matching, dedupe-aware apply flow, and persistent patient-profile CTA: `lib/patient-smart-import-service.ts`, `components/patient-smart-import-panel.tsx`, `app/patients/[id]/page.tsx`, `app/api/drugs/route.ts`
 - Added ADR for the new smart-import guardrails and updated canonical security/plan/walkthrough/topology docs to record the web-only, suggestion-first flow with no automatic free-text import: `docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md`, `SECURITY.md`, `PLANS.md`, `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `docs/markdown-index.md`
