@@ -11,6 +11,7 @@
     "mcp:apple-docs:test": "node scripts/mcp-apple-docs-smoke.mjs",
     "lint": "eslint --quiet",
     "lint:full": "eslint",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "check:openapi:drift": "node scripts/check-openapi-drift.mjs",
     "check:never-regress": "node scripts/check-never-regress.mjs",
     "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",

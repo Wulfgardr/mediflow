@@ -1,12 +1,12 @@
 /* @Codex */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 async function createPatient(
-  page: Parameters<typeof test>[0]['page'],
+  page: Page,
   payload: Record<string, unknown>
 ): Promise<string> {
-  return await page.evaluate(async (body) => {
+  return await page.evaluate(async (body: Record<string, unknown>) => {
     const response = await fetch('/api/patients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
