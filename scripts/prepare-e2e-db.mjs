@@ -13,6 +13,70 @@ function pickColumn(columns, candidates) {
   return candidates.find((candidate) => columns.includes(candidate)) || null;
 }
 
+function applySqlMigrations(db, projectRoot) {
+  const migrationsDir = path.join(projectRoot, 'drizzle');
+  const migrationFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort((left, right) => left.localeCompare(right));
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    for (const fileName of migrationFiles) {
+      const sql = fs
+        .readFileSync(path.join(migrationsDir, fileName), 'utf8')
+        .replace(/^-->\s+statement-breakpoint\s*$/gm, '');
+      if (sql.trim().length === 0) continue;
+      db.exec(sql);
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath) {
+  if (fs.existsSync(dbPath)) return;
+
+  if (fs.existsSync(legacyDbPath)) {
+    fs.copyFileSync(legacyDbPath, dbPath);
+    return;
+  }
+
+  const bootstrapDb = new Database(dbPath);
+  try {
+    applySqlMigrations(bootstrapDb, projectRoot);
+  } finally {
+    bootstrapDb.close();
+  }
+}
+
+function ensureDefaultAmbulatory(db, ambulatoryName) {
+  const hasAmbulatoriesTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ambulatories'")
+    .get();
+  if (!hasAmbulatoriesTable) return;
+
+  const existingDefault = db
+    .prepare('SELECT id FROM ambulatories WHERE is_default = 1 LIMIT 1')
+    .get();
+  if (existingDefault?.id) return;
+
+  const firstAmbulatory = db
+    .prepare('SELECT id FROM ambulatories ORDER BY rowid ASC LIMIT 1')
+    .get();
+  if (firstAmbulatory?.id) {
+    db.prepare('UPDATE ambulatories SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END').run(
+      firstAmbulatory.id
+    );
+    return;
+  }
+
+  db.prepare(
+    `INSERT INTO ambulatories (id, name, type, is_default, created_at)
+     VALUES (?, ?, 'live', 1, ?)`
+  ).run(webcrypto.randomUUID(), ambulatoryName, Math.floor(Date.now() / 1000));
+}
+
 async function buildKeyArtifacts(pin) {
   const encoder = new TextEncoder();
   const salt = webcrypto.getRandomValues(new Uint8Array(16));
@@ -66,6 +130,8 @@ async function main() {
   const dataDir = process.env.MEDIFLOW_DATA_DIR || process.env.MEDIFLOW_E2E_DATA_DIR;
   const pin = process.env.E2E_PIN || '1234';
   const username = process.env.E2E_USERNAME || 'admin';
+  const displayName = process.env.E2E_DISPLAY_NAME || 'Dr. E2E Smoke';
+  const ambulatoryName = process.env.E2E_AMBULATORY_NAME || 'Ambulatorio E2E';
 
   if (!dataDir) {
     throw new Error('MEDIFLOW_DATA_DIR or MEDIFLOW_E2E_DATA_DIR is required');
@@ -74,21 +140,24 @@ async function main() {
   fs.mkdirSync(dataDir, { recursive: true });
   const dbPath = path.join(dataDir, 'medical.db');
   const legacyDbPath = path.join(projectRoot, 'medical.db');
+  ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
 
-  if (!fs.existsSync(dbPath)) {
-    if (!fs.existsSync(legacyDbPath)) {
-      throw new Error(`Cannot bootstrap E2E DB: missing legacy DB at ${legacyDbPath}`);
-    }
-    fs.copyFileSync(legacyDbPath, dbPath);
-  }
-
-  const db = new Database(dbPath);
+  let db = new Database(dbPath);
   try {
-    const hasUsersTable = db
+    let hasUsersTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
       .get();
     if (!hasUsersTable) {
-      throw new Error('users table is missing in E2E database');
+      db.close();
+      fs.rmSync(dbPath, { force: true });
+      ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
+      db = new Database(dbPath);
+      hasUsersTable = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
+        .get();
+      if (!hasUsersTable) {
+        throw new Error('users table is missing in E2E database');
+      }
     }
 
     const columns = db.prepare('PRAGMA table_info(users)').all().map((row) => row.name);
@@ -98,6 +167,8 @@ async function main() {
     const encryptedMasterKeyCol = pickColumn(columns, ['encrypted_master_key', 'encryptedMasterKey']);
     const saltCol = pickColumn(columns, ['salt']);
     const roleCol = pickColumn(columns, ['role']);
+    const displayNameCol = pickColumn(columns, ['display_name', 'displayName']);
+    const ambulatoryNameCol = pickColumn(columns, ['ambulatory_name', 'ambulatoryName']);
     const createdAtCol = pickColumn(columns, ['created_at', 'createdAt']);
 
     if (!idCol || !usernameCol || !passwordHashCol || !encryptedMasterKeyCol || !saltCol) {
@@ -122,6 +193,8 @@ async function main() {
         `${saltCol} = @salt`
       ];
       if (roleCol) setClauses.push(`${roleCol} = 'admin'`);
+      if (displayNameCol) setClauses.push(`${displayNameCol} = @displayName`);
+      if (ambulatoryNameCol) setClauses.push(`${ambulatoryNameCol} = @ambulatoryName`);
 
       db.prepare(
         `UPDATE users SET ${setClauses.join(', ')} WHERE ${idCol} = @id`
@@ -130,7 +203,9 @@ async function main() {
         username,
         passwordHash,
         encryptedMasterKey,
-        salt: saltB64
+        salt: saltB64,
+        displayName,
+        ambulatoryName
       });
     } else {
       const values = {
@@ -140,6 +215,8 @@ async function main() {
         encryptedMasterKey,
         salt: saltB64,
         role: 'admin',
+        displayName,
+        ambulatoryName,
         createdAt: Math.floor(Date.now() / 1000)
       };
 
@@ -149,6 +226,14 @@ async function main() {
       if (roleCol) {
         insertColumns.push(roleCol);
         insertParams.push('@role');
+      }
+      if (displayNameCol) {
+        insertColumns.push(displayNameCol);
+        insertParams.push('@displayName');
+      }
+      if (ambulatoryNameCol) {
+        insertColumns.push(ambulatoryNameCol);
+        insertParams.push('@ambulatoryName');
       }
       if (createdAtCol) {
         insertColumns.push(createdAtCol);
@@ -160,9 +245,11 @@ async function main() {
       ).run(values);
     }
 
+    ensureDefaultAmbulatory(db, ambulatoryName);
+
     console.log(`[e2e-db] Prepared deterministic auth in ${dbPath} (username: ${username})`);
   } finally {
-    db.close();
+    db?.close();
   }
 }
 
