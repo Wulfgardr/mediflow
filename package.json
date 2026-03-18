@@ -19,6 +19,7 @@
     "test:patient-structured-fields": "bash scripts/patient-structured-fields-test.sh",
     "test:ai-context": "bash scripts/ai-context-test.sh",
     "test:report-service": "bash scripts/report-service-test.sh",
+    "test:fse-validation": "bash scripts/fse-validation-test.sh",
     "test:ai-insight-settings": "bash scripts/ai-insight-settings-test.sh",
     "test:auth-lockout": "bash scripts/auth-lockout-test.sh",
     "test:patient-write-normalization": "bash scripts/patient-write-normalization-test.sh",

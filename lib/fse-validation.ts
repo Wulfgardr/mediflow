@@ -2,15 +2,13 @@
 import 'server-only';
 
 import { and, asc, isNotNull, sql } from 'drizzle-orm';
-import { dbServer } from '@/lib/db-server';
-import { drugs } from '@/lib/schema';
 import {
     buildValidationResponse,
     normalizeTerminologySystem,
     resolveStaticTerminology,
     type FseValidationIssue,
     type FseValidationResponse,
-} from '@/lib/terminology';
+} from './terminology';
 
 /* @Codex */
 export const PROFILE_THERAPY_MEDICATION = 'therapy-medication-v1';
@@ -34,6 +32,9 @@ export type ObservationDocumentPayload = {
 };
 
 /* @Codex */
+export type TherapyAtcLookup = (code: string) => Promise<boolean>;
+
+/* @Codex */
 function asNonEmptyString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
@@ -42,6 +43,10 @@ function asNonEmptyString(value: unknown): string | null {
 
 /* @Codex */
 async function hasAtcInCatalog(code: string): Promise<boolean> {
+    const [{ dbServer }, { drugs }] = await Promise.all([
+        import('./db-server'),
+        import('./schema'),
+    ]);
     const row = await dbServer
         .select({ atc: drugs.atc })
         .from(drugs)
@@ -55,7 +60,10 @@ async function hasAtcInCatalog(code: string): Promise<boolean> {
 }
 
 /* @Codex */
-export async function validateTherapyDocument(payload: TherapyDocumentPayload): Promise<{ errors: FseValidationIssue[]; warnings: FseValidationIssue[] }> {
+export async function validateTherapyDocumentWithLookup(
+    payload: TherapyDocumentPayload,
+    hasAtcLookup: TherapyAtcLookup,
+): Promise<{ errors: FseValidationIssue[]; warnings: FseValidationIssue[] }> {
     const errors: FseValidationIssue[] = [];
     const warnings: FseValidationIssue[] = [];
 
@@ -94,7 +102,7 @@ export async function validateTherapyDocument(payload: TherapyDocumentPayload): 
                 message: 'ATC code format looks invalid',
             });
         }
-        const exists = await hasAtcInCatalog(atc);
+        const exists = await hasAtcLookup(atc);
         if (!exists) {
             warnings.push({
                 field: 'atc',
@@ -105,6 +113,11 @@ export async function validateTherapyDocument(payload: TherapyDocumentPayload): 
     }
 
     return { errors, warnings };
+}
+
+/* @Codex */
+export async function validateTherapyDocument(payload: TherapyDocumentPayload): Promise<{ errors: FseValidationIssue[]; warnings: FseValidationIssue[] }> {
+    return validateTherapyDocumentWithLookup(payload, hasAtcInCatalog);
 }
 
 /* @Codex */
@@ -179,10 +192,22 @@ function normalizePayload(payload: unknown): Record<string, unknown> {
 
 /* @Codex */
 export async function validateProfileDocument(profile: string, payload: unknown): Promise<FseValidationResponse | null> {
+    return validateProfileDocumentWithLookup(profile, payload, hasAtcInCatalog);
+}
+
+/* @Codex */
+export async function validateProfileDocumentWithLookup(
+    profile: string,
+    payload: unknown,
+    hasAtcLookup: TherapyAtcLookup,
+): Promise<FseValidationResponse | null> {
     const normalizedPayload = normalizePayload(payload);
 
     if (profile === PROFILE_THERAPY_MEDICATION) {
-        const { errors, warnings } = await validateTherapyDocument(normalizedPayload as TherapyDocumentPayload);
+        const { errors, warnings } = await validateTherapyDocumentWithLookup(
+            normalizedPayload as TherapyDocumentPayload,
+            hasAtcLookup,
+        );
         return buildValidationResponse(profile, errors, warnings);
     }
 
