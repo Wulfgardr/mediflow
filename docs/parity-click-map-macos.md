@@ -65,6 +65,32 @@ Riferimenti:
 
 ---
 
+## Scenario mirato WUL-23 - Osservazioni LOINC/UCUM
+
+- [ ] `patient-detail-new-observation-button`: apre la sheet nuova osservazione.
+- [ ] `observation-editor-loinc-picker`: selezione parametro LOINC coerente.
+- [ ] `observation-editor-ucum-picker`: selezione unità UCUM coerente.
+- [ ] `observation-editor-value-field`: inserimento valore senza errori UI.
+- [ ] `observation-editor-date-picker`: data/ora modificabile.
+- [ ] `observation-editor-notes-field`: note modificabili.
+- [ ] `observation-editor-save-button`: create salva e ricarica la lista.
+- [ ] `observation-row-<id>`: riga osservazione visibile nel detail.
+- [ ] Menu riga osservazione `Modifica`: update persiste e riappare dopo reload detail.
+- [ ] Menu riga osservazione `Elimina`: delete rimuove la riga dopo conferma/reload.
+
+---
+
+## Scenario mirato WUL-85 - Insight AI salvato da client native
+
+- [ ] `patient-detail-ai-studio-button`: apre AI Studio.
+- [ ] `patient-detail-ai-prompt-editor`: prompt clinico visibile e rigenerabile.
+- [ ] `patient-detail-ai-save-button`: `Genera e salva insight` parte senza errore.
+- [ ] `patient-detail-ai-response-output`: risposta generata visibile in studio.
+- [ ] `patient-detail-ai-saved-summary`: summary salvato visibile nell'inline block dopo reload detail.
+- [ ] `patient-detail-ai-error-message` / `patient-detail-ai-studio-error-message`: assenti nel percorso nominale.
+
+---
+
 ## Esito run (da compilare)
 
 - Data run:

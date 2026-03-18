@@ -50,6 +50,7 @@ struct ObservationRowView: View {
                 .menuStyle(.borderlessButton)
             }
         }
+        .accessibilityIdentifier("observation-row-\(observation.id)")
     }
 
     private var dateFormatter: DateFormatter {
@@ -127,6 +128,7 @@ private struct ObservationEditorView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityIdentifier("observation-editor-loinc-picker")
 
                     Picker("Unità (UCUM)", selection: $selectedUnitCode) {
                         ForEach(ucumOptions) { item in
@@ -134,21 +136,25 @@ private struct ObservationEditorView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityIdentifier("observation-editor-ucum-picker")
                 }
 
                 Section("Rilevazione") {
                     TextField("Valore", text: $value)
+                        .accessibilityIdentifier("observation-editor-value-field")
                     DatePicker(
                         "Data/Ora",
                         selection: $observedAt,
                         displayedComponents: [.date, .hourAndMinute]
                     )
+                    .accessibilityIdentifier("observation-editor-date-picker")
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Note")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextEditor(text: $notes)
                             .frame(minHeight: 140)
+                            .accessibilityIdentifier("observation-editor-notes-field")
                     }
                 }
             }
@@ -156,16 +162,19 @@ private struct ObservationEditorView: View {
             if let errorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.red)
+                    .accessibilityIdentifier("observation-editor-error-message")
             }
 
             HStack {
                 Button("Annulla") { dismiss() }
+                    .accessibilityIdentifier("observation-editor-cancel-button")
                 Spacer()
                 Button(isSaving ? "Salvataggio..." : saveButtonTitle) {
                     Task { await save() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isSaving || isLoadingOptions || loincOptions.isEmpty || ucumOptions.isEmpty || value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("observation-editor-save-button")
             }
         }
         .padding(24)

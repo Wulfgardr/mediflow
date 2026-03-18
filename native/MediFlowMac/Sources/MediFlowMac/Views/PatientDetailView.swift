@@ -623,6 +623,7 @@ struct PatientDetailView: View {
                     updateAIPromptIfNeeded(force: true)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("patient-detail-ai-refresh-context-button")
 
                 if isAILoading {
                     ProgressView()
@@ -636,6 +637,7 @@ struct PatientDetailView: View {
                 Text(aiErrorMessage)
                     .foregroundStyle(.red)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-error-message")
             }
 
             if let savedSummary, !savedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -647,10 +649,12 @@ struct PatientDetailView: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white.opacity(0.42))
                     )
+                    .accessibilityIdentifier("patient-detail-ai-saved-summary")
             } else if aiResponse.isEmpty {
                 Text("Nessuna risposta AI salvata.")
                     .foregroundStyle(.secondary)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-empty-summary")
             } else {
                 Text(aiResponse)
                     .font(.callout)
@@ -661,6 +665,7 @@ struct PatientDetailView: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white.opacity(0.42))
                     )
+                    .accessibilityIdentifier("patient-detail-ai-inline-response")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -676,6 +681,7 @@ struct PatientDetailView: View {
                     updateAIPromptIfNeeded(force: true)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("patient-detail-ai-regenerate-context-button")
             }
 
             TextEditor(text: $aiPrompt)
@@ -690,6 +696,7 @@ struct PatientDetailView: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Color.white.opacity(0.4), lineWidth: 1)
                 )
+                .accessibilityIdentifier("patient-detail-ai-prompt-editor")
 
             HStack {
                 Button(isAILoading ? "Elaborazione..." : "Genera risposta") {
@@ -697,12 +704,14 @@ struct PatientDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("patient-detail-ai-generate-button")
 
                 Button(isAILoading ? "Salvataggio..." : "Genera e salva insight") {
                     Task { await generateAndSaveInsight() }
                 }
                 .buttonStyle(.bordered)
                 .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("patient-detail-ai-save-button")
 
                 Spacer()
 
@@ -716,6 +725,7 @@ struct PatientDetailView: View {
                 Text(aiErrorMessage)
                     .foregroundStyle(.red)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-studio-error-message")
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -725,6 +735,7 @@ struct PatientDetailView: View {
                     Text(aiResponse.isEmpty ? "Nessuna risposta" : aiResponse)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
+                        .accessibilityIdentifier("patient-detail-ai-response-output")
                 }
                 .frame(minHeight: 220)
                 .background(
