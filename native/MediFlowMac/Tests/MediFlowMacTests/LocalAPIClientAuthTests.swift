@@ -147,6 +147,168 @@ final class LocalAPIClientAuthTests: XCTestCase {
         }
     }
 
+    func testFetchObservationsBuildsNativeQueryAndDecodesObservationSummary() async throws {
+        let dateFrom = Date(timeIntervalSince1970: 0)
+        let dateTo = Date(timeIntervalSince1970: 3_600)
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+
+            let url = try XCTUnwrap(request.url)
+            XCTAssertEqual(url.path, "/api/v1/patients/patient-1/observations")
+            let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+            let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
+                item.value.map { (item.name, $0) }
+            })
+            XCTAssertEqual(queryItems["limit"], "25")
+            XCTAssertEqual(queryItems["code"], "8480-6")
+            XCTAssertEqual(queryItems["dateFrom"], "1970-01-01T00:00:00Z")
+            XCTAssertEqual(queryItems["dateTo"], "1970-01-01T01:00:00Z")
+
+            let response = HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = """
+            [
+              {
+                "id": "obs-1",
+                "patientId": "patient-1",
+                "codeSystem": "LOINC",
+                "code": "8480-6",
+                "display": "Pressione sistolica",
+                "unitSystem": "UCUM",
+                "unitCode": "mm[Hg]",
+                "value": "138",
+                "notes": "Controllo domiciliare",
+                "observedAt": "2026-03-18T08:30:00Z",
+                "source": "manual",
+                "createdAt": "2026-03-18T08:31:00Z"
+              }
+            ]
+            """.data(using: .utf8)!
+            return (response, data)
+        }
+
+        let observations = try await client.fetchObservations(
+            patientId: "patient-1",
+            limit: 25,
+            code: "8480-6",
+            dateFrom: dateFrom,
+            dateTo: dateTo
+        )
+
+        XCTAssertEqual(observations.count, 1)
+        XCTAssertEqual(observations.first?.codeSystem, "LOINC")
+        XCTAssertEqual(observations.first?.unitSystem, "UCUM")
+        XCTAssertEqual(observations.first?.display, "Pressione sistolica")
+        XCTAssertEqual(observations.first?.value, "138")
+    }
+
+    func testCreateObservationUsesPostAndEncodesLoincUcumPayload() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["codeSystem"] as? String, "LOINC")
+            XCTAssertEqual(json["code"] as? String, "8480-6")
+            XCTAssertEqual(json["unitSystem"] as? String, "UCUM")
+            XCTAssertEqual(json["unitCode"] as? String, "mm[Hg]")
+            XCTAssertEqual(json["value"] as? String, "138")
+            XCTAssertEqual(json["notes"] as? String, "Controllo domiciliare")
+            XCTAssertEqual(json["source"] as? String, "manual")
+            XCTAssertEqual(json["observedAt"] as? String, "1970-01-01T00:00:00Z")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = #"{"id":"obs-1"}"#.data(using: .utf8)!
+            return (response, data)
+        }
+
+        let createdId = try await client.createObservation(
+            patientId: "patient-1",
+            payload: CreateObservationPayload(
+                codeSystem: "LOINC",
+                code: "8480-6",
+                display: "Pressione sistolica",
+                unitSystem: "UCUM",
+                unitCode: "mm[Hg]",
+                value: "138",
+                notes: "Controllo domiciliare",
+                observedAt: Date(timeIntervalSince1970: 0),
+                source: "manual"
+            )
+        )
+
+        XCTAssertEqual(createdId, "obs-1")
+    }
+
+    func testUpdateObservationUsesPutAndAllowsEmptyNotesString() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations/obs-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["value"] as? String, "135")
+            XCTAssertEqual(json["notes"] as? String, "")
+            XCTAssertEqual(json["source"] as? String, "manual")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 204,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        try await client.updateObservation(
+            patientId: "patient-1",
+            observationId: "obs-1",
+            payload: UpdateObservationPayload(
+                codeSystem: "LOINC",
+                code: "8480-6",
+                display: "Pressione sistolica",
+                unitSystem: "UCUM",
+                unitCode: "mm[Hg]",
+                value: "135",
+                notes: "",
+                observedAt: Date(timeIntervalSince1970: 0),
+                source: "manual"
+            )
+        )
+    }
+
+    func testDeleteObservationUsesDeleteRoute() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "DELETE")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations/obs-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 204,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        try await client.deleteObservation(patientId: "patient-1", observationId: "obs-1")
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> LocalAPIClient {
@@ -172,6 +334,37 @@ final class LocalAPIClientAuthTests: XCTestCase {
             ),
             session: session
         )
+    }
+
+    private func readRequestBody(from request: URLRequest) throws -> Data {
+        if let httpBody = request.httpBody {
+            return httpBody
+        }
+
+        guard let stream = request.httpBodyStream else {
+            throw URLError(.badURL)
+        }
+
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read < 0 {
+                throw stream.streamError ?? URLError(.cannotDecodeRawData)
+            }
+            if read == 0 {
+                break
+            }
+            data.append(buffer, count: read)
+        }
+
+        return data
     }
 }
 
