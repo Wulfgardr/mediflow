@@ -24,6 +24,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - **Warning build `pdfjs-dist/canvas`**: caricamento server-side differito per eliminare il rumore in `next build` senza introdurre dipendenze extra.
 - **Drift di review/stato**: riallineati branch, worktree e issue principali per ridurre falsi `In Review` o `Done` non supportati da `main`.
+- **Header diagnosi ICD in scheda paziente**: i campi JSON del paziente vengono di nuovo deserializzati correttamente lato web e l'intestazione mostra chip ICD leggibili con stato vuoto esplicito.
+- **OCR smart su immagini e input localmente supportabili**: upload, import e diario condividono ora la stessa detection documentale; immagini comuni passano nel flusso OCR senza rifiuti ambigui.
+- **Import da impegnativa più prudente**: nome e cognome non vengono più popolati con placeholder template come `NOME` e `COGNOME` quando il dato reale non è affidabile.
 
 ### 🔒 Hardening
 
