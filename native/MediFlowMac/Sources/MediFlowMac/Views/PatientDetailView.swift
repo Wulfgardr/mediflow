@@ -58,6 +58,13 @@ private func checkupStatusLabel(for status: String) -> String {
 }
 
 /* @Codex */
+private struct PatientDiagnosis: Decodable {
+    let code: String
+    let description: String
+    let system: String
+}
+
+/* @Codex */
 struct PatientDetailView: View {
     let patientId: String
 
@@ -588,7 +595,9 @@ struct PatientDetailView: View {
     }
 
     private var aiInlineBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let savedSummary = decryptOrPlain(detail?.aiSummary)
+
+        return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Contesto pronto")
                     .font(.subheadline.weight(.semibold))
@@ -629,7 +638,16 @@ struct PatientDetailView: View {
                     .font(.caption)
             }
 
-            if aiResponse.isEmpty {
+            if let savedSummary, !savedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(savedSummary)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.42))
+                    )
+            } else if aiResponse.isEmpty {
                 Text("Nessuna risposta AI salvata.")
                     .foregroundStyle(.secondary)
                     .font(.caption)
@@ -678,6 +696,12 @@ struct PatientDetailView: View {
                     Task { await runAI() }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button(isAILoading ? "Salvataggio..." : "Genera e salva insight") {
+                    Task { await generateAndSaveInsight() }
+                }
+                .buttonStyle(.bordered)
                 .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Spacer()
@@ -903,6 +927,63 @@ struct PatientDetailView: View {
         }
     }
 
+    @MainActor
+    private func generateAndSaveInsight() async {
+        if isAILoading { return }
+        guard let detail else { return }
+
+        isAILoading = true
+        aiErrorMessage = nil
+        defer { isAILoading = false }
+
+        do {
+            let provider = await AISettingsResolver.resolveProvider(for: .clinical)
+            let config = try await AISettingsResolver.resolveClinicalConfig()
+            let prompt = buildPatientInsightPrompt(detail: detail)
+            guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                aiErrorMessage = "Contesto locale insufficiente: rigenera il prompt clinico prima di salvare un insight."
+                return
+            }
+
+            aiPrompt = prompt
+            let raw = try await LocalAPIClient.shared.aiChat(
+                prompt: """
+                Rispondi solo con output finale in italiano.
+                Non includere tag <think>, <unused94>, <unused95> o ragionamento interno.
+                Mantieni il formato markdown con sezioni e cita solo [Sx] presenti nel contesto.
+                Se il supporto diretto non basta, usa [DATI-INCOMPLETI].
+
+                \(prompt)
+                """,
+                model: config.model,
+                baseURL: config.baseURL
+            )
+            let cleaned = cleanAIResponse(raw)
+            guard !cleaned.isEmpty else {
+                aiErrorMessage = "Il modello ha restituito una risposta vuota. Prova a rigenerare il contesto clinico."
+                return
+            }
+            guard let encryptedSummary = try security.encryptString(cleaned) else {
+                aiErrorMessage = "Impossibile cifrare l'insight generato in questa sessione."
+                return
+            }
+
+            try await LocalAPIClient.shared.updatePatient(
+                id: patientId,
+                payload: UpdatePatientPayload(
+                    version: detail.version,
+                    aiSummary: .value(encryptedSummary)
+                )
+            )
+
+            self.detail = try await LocalAPIClient.shared.fetchPatient(id: patientId)
+            aiResponse = "Provider: \(provider.uppercased())\nModello: \(config.model)\nEndpoint: \(config.baseURL)\n\n" + cleaned
+            updateAIPromptIfNeeded(force: true)
+        } catch {
+            aiErrorMessage = message(for: error, fallback: "Impossibile generare o salvare l'insight AI locale.")
+        }
+    }
+
     private func cleanAIResponse(_ value: String) -> String {
         /* @Codex */
         var output = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -936,58 +1017,7 @@ struct PatientDetailView: View {
             guard aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         }
         guard let detail else { return }
-
-        var lines: [String] = []
-        let age = ageText(from: detail.birthDate)
-        lines.append("Paziente: \(detail.firstName) \(detail.lastName), \(age).")
-
-        /* @Codex */
-        if let summary = decryptOrPlain(detail.aiSummary),
-           !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            lines.append("Riassunto AI corrente:")
-            lines.append(summary.trimmingCharacters(in: .whitespacesAndNewlines))
-        } else if (detail.aiSummary ?? "").hasPrefix("ENC:") {
-            /* @Codex */
-            lines.append("Riassunto AI corrente: [contenuto cifrato non decifrabile in questa sessione]")
-        }
-
-        if let notes = decryptOrPlain(detail.notes), !notes.isEmpty {
-            lines.append("Note: \(notes)")
-        }
-
-        /* @Codex */
-        let insightSummaries = extractDocumentInsightSummaries(from: detail.documentInsights)
-        if !insightSummaries.isEmpty {
-            lines.append("Documenti analizzati:")
-            for summary in insightSummaries.prefix(3) {
-                lines.append("- \(summary)")
-            }
-        }
-
-        if !entries.isEmpty {
-            lines.append("Ultime voci cliniche:")
-            for entry in entries.prefix(3) {
-                let content = decryptOrPlain(entry.content) ?? "[cifrato]"
-                lines.append("- \(formatted(date: entry.date)): \(content)")
-            }
-        }
-
-        if !therapies.isEmpty {
-            lines.append("Terapie:")
-            for therapy in therapies.prefix(3) {
-                lines.append("- \(therapy.drugName) (\(therapy.dosage)) [\(therapy.status)]")
-            }
-        }
-
-        if !checkups.isEmpty {
-            lines.append("Appuntamenti:")
-            for checkup in checkups.prefix(3) {
-                lines.append("- \(formatted(date: checkup.date)): \(checkup.title) [\(checkup.status)]")
-            }
-        }
-
-        lines.append("Fornisci un riassunto clinico sintetico e punti di attenzione.")
-        aiPrompt = lines.joined(separator: "\n")
+        aiPrompt = buildPatientInsightPrompt(detail: detail)
     }
 
     /* @Codex */
@@ -1038,6 +1068,129 @@ struct PatientDetailView: View {
             }
             return summary
         }
+    }
+
+    /* @Codex */
+    private func buildPatientInsightPrompt(detail: PatientDetail) -> String {
+        var lines: [String] = []
+        var sourceIndex = 1
+        let age = ageText(from: detail.birthDate)
+
+        func pushSource(title: String, detail: String) {
+            let cleanDetail = detail
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanTitle.isEmpty, !cleanDetail.isEmpty else { return }
+            lines.append("[S\(sourceIndex)] \(cleanTitle): \(cleanDetail)")
+            sourceIndex += 1
+        }
+
+        var chartItems = ["Paziente: \(detail.firstName) \(detail.lastName), \(age)."]
+        let exemptions = parseExemptionCodes(detail.exemptions)
+        if !exemptions.isEmpty {
+            chartItems.append("Esenzioni: \(exemptions.joined(separator: ", "))")
+        }
+        if let notes = decryptOrPlain(detail.notes), !notes.isEmpty {
+            chartItems.append("Note: \(notes)")
+        }
+        if let monitoringProfile = decryptOrPlain(detail.monitoringProfile), !monitoringProfile.isEmpty {
+            chartItems.append("Profilo monitoraggio: \(monitoringProfile)")
+        }
+        pushSource(title: "Scheda paziente", detail: chartItems.joined(separator: " | "))
+
+        let diagnoses = parseDiagnoses(detail.diagnoses)
+        diagnoses.prefix(3).forEach { diagnosis in
+            pushSource(
+                title: "Diagnosi \(diagnosis.code)",
+                detail: "\(diagnosis.description) [\(diagnosis.system)]"
+            )
+        }
+
+        therapies.prefix(3).forEach { therapy in
+            pushSource(
+                title: "Terapia \(therapy.drugName)",
+                detail: "\(therapy.dosage) [\(therapyStatusLabel(for: therapy.status))]"
+            )
+        }
+
+        checkups.prefix(3).forEach { checkup in
+            pushSource(
+                title: "Appuntamento \(formatted(date: checkup.date))",
+                detail: "\(checkup.title) [\(checkupStatusLabel(for: checkup.status))]"
+            )
+        }
+
+        observations.prefix(3).forEach { observation in
+            pushSource(
+                title: "Osservazione \(observation.display)",
+                detail: "\(observation.value) \(observation.unitCode) [\(observation.codeSystem) \(observation.code)]"
+            )
+        }
+
+        entries.prefix(3).forEach { entry in
+            if let content = decryptOrPlain(entry.content), !content.isEmpty {
+                pushSource(
+                    title: "Diario clinico \(formatted(date: entry.date))",
+                    detail: content
+                )
+            }
+        }
+
+        extractDocumentInsightSummaries(from: detail.documentInsights).prefix(2).forEach { summary in
+            pushSource(title: "Documento analizzato", detail: summary)
+        }
+
+        if sourceIndex == 1 {
+            return ""
+        }
+
+        lines.append("")
+        lines.append("Produci output finale in markdown con:")
+        lines.append("**Quadro attuale:** massimo 2 frasi brevi, ognuna chiusa con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Attenzioni:** massimo 2 bullet, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Prossimi passi:** massimo 3 bullet operativi, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Gap da chiarire:** massimo 2 bullet solo se davvero utili.")
+        lines.append("Usa solo i riferimenti [Sx] presenti sopra. Non inventare dati, diagnosi, esami o fonti.")
+
+        return lines.joined(separator: "\n")
+    }
+
+    /* @Codex */
+    private func parseExemptionCodes(_ raw: String?) -> [String] {
+        guard let payload = decryptOrPlain(raw) else { return [] }
+        if let data = payload.data(using: .utf8),
+           let codes = try? JSONDecoder().decode([String].self, from: data) {
+            return deduplicatedStrings(codes)
+        }
+
+        let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? [] : [trimmed]
+    }
+
+    /* @Codex */
+    private func parseDiagnoses(_ raw: String?) -> [PatientDiagnosis] {
+        guard let payload = decryptOrPlain(raw),
+              let data = payload.data(using: .utf8),
+              let diagnoses = try? JSONDecoder().decode([PatientDiagnosis].self, from: data) else {
+            return []
+        }
+        return diagnoses
+    }
+
+    /* @Codex */
+    private func deduplicatedStrings(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+
+        values.forEach { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !seen.contains(trimmed) else { return }
+            seen.insert(trimmed)
+            ordered.append(trimmed)
+        }
+
+        return ordered
     }
 
     private func formatted(date: Date?) -> String {

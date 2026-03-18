@@ -24,6 +24,10 @@ struct PatientDetail: Identifiable, Decodable {
     let caregiver: String?
     /* @Codex */
     let exemptions: String?
+    /* @Codex */
+    let diagnoses: String?
+    /* @Codex */
+    let monitoringProfile: String?
     let notes: String?
     /* @Codex */
     let aiSummary: String?

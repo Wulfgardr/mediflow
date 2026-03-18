@@ -95,6 +95,7 @@ Ultimo aggiornamento: 2026-03-18
 | [docs/adr/0016-backup-artifact-v1-manifest-preflight.md](./adr/0016-backup-artifact-v1-manifest-preflight.md) | Artifact backup JSON v1 con manifest, checksum e restore preflight server-side. |
 | [docs/adr/0017-auth-lockout-policy.md](./adr/0017-auth-lockout-policy.md) | Policy canonica lockout auth: `5` tentativi, finestra `15m`, blocco `15m`, codici `401/423` e messaggi coerenti web/macOS. |
 | [docs/adr/0018-ai-insight-full-auto-and-pro-settings.md](./adr/0018-ai-insight-full-auto-and-pro-settings.md) | Budget persistenti e configurabili per `AI Patient Insight`, limitati a settings web + context builder + generation runtime. |
+| [docs/adr/0019-native-patient-insight-markdown-contract.md](./adr/0019-native-patient-insight-markdown-contract.md) | Il client macOS genera e salva `AI Patient Insight` in markdown con citazioni locali, compatibile col parser web attuale. |
 
 ## Checklist manutenzione indice
 

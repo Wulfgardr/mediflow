@@ -5,6 +5,42 @@ import XCTest
 
 /* @Codex */
 final class LocalAPIContractsTests: XCTestCase {
+    func testPatientDetailDecodesInsightContextFieldsFromApiV1() throws {
+        let payload = """
+        {
+          "id": "patient-1",
+          "firstName": "Mario",
+          "lastName": "Rossi",
+          "birthDate": "1970-01-01T00:00:00Z",
+          "taxCode": "RSSMRA70A01H501U",
+          "address": null,
+          "phone": null,
+          "caregiver": null,
+          "exemptions": "[\\"E01\\"]",
+          "diagnoses": "[{\\"code\\":\\"I10\\",\\"description\\":\\"Ipertensione essenziale\\",\\"system\\":\\"ICD-10\\"}]",
+          "monitoringProfile": "Controllo PA domiciliare",
+          "notes": null,
+          "aiSummary": null,
+          "documentInsights": null,
+          "isAdi": false,
+          "isArchived": false,
+          "version": 4,
+          "ambulatoryId": null,
+          "createdAt": "2026-03-01T10:00:00Z",
+          "updatedAt": "2026-03-02T10:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let detail = try decoder.decode(PatientDetail.self, from: payload)
+
+        XCTAssertEqual(detail.diagnoses, "[{\"code\":\"I10\",\"description\":\"Ipertensione essenziale\",\"system\":\"ICD-10\"}]")
+        XCTAssertEqual(detail.monitoringProfile, "Controllo PA domiciliare")
+        XCTAssertEqual(detail.version, 4)
+    }
+
     func testUpdatePatientPayloadEncodesTriStateNullableFields() throws {
         let payload = UpdatePatientPayload(
             version: 7,
