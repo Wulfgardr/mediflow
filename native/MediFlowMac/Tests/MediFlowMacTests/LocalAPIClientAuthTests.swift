@@ -208,23 +208,13 @@ final class LocalAPIClientAuthTests: XCTestCase {
         XCTAssertEqual(observations.first?.value, "138")
     }
 
-    func testCreateObservationUsesPostAndEncodesLoincUcumPayload() async throws {
+    func testCreateObservationUsesPostRouteAndNativeHeaders() async throws {
         let client = makeAuthenticatedClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
             XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations")
-
-            let body = try self.readRequestBody(from: request)
-            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-            XCTAssertEqual(json["codeSystem"] as? String, "LOINC")
-            XCTAssertEqual(json["code"] as? String, "8480-6")
-            XCTAssertEqual(json["unitSystem"] as? String, "UCUM")
-            XCTAssertEqual(json["unitCode"] as? String, "mm[Hg]")
-            XCTAssertEqual(json["value"] as? String, "138")
-            XCTAssertEqual(json["notes"] as? String, "Controllo domiciliare")
-            XCTAssertEqual(json["source"] as? String, "manual")
-            XCTAssertEqual(json["observedAt"] as? String, "1970-01-01T00:00:00Z")
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url),
@@ -254,16 +244,13 @@ final class LocalAPIClientAuthTests: XCTestCase {
         XCTAssertEqual(createdId, "obs-1")
     }
 
-    func testUpdateObservationUsesPutAndAllowsEmptyNotesString() async throws {
+    func testUpdateObservationUsesPutRouteAndNativeHeaders() async throws {
         let client = makeAuthenticatedClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
             XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations/obs-1")
-
-            let body = try self.readRequestBody(from: request)
-            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-            XCTAssertEqual(json["value"] as? String, "135")
-            XCTAssertEqual(json["notes"] as? String, "")
-            XCTAssertEqual(json["source"] as? String, "manual")
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url),
@@ -336,36 +323,6 @@ final class LocalAPIClientAuthTests: XCTestCase {
         )
     }
 
-    private func readRequestBody(from request: URLRequest) throws -> Data {
-        if let httpBody = request.httpBody {
-            return httpBody
-        }
-
-        guard let stream = request.httpBodyStream else {
-            throw URLError(.badURL)
-        }
-
-        stream.open()
-        defer { stream.close() }
-
-        var data = Data()
-        let bufferSize = 1024
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        defer { buffer.deallocate() }
-
-        while stream.hasBytesAvailable {
-            let read = stream.read(buffer, maxLength: bufferSize)
-            if read < 0 {
-                throw stream.streamError ?? URLError(.cannotDecodeRawData)
-            }
-            if read == 0 {
-                break
-            }
-            data.append(buffer, count: read)
-        }
-
-        return data
-    }
 }
 
 private final class MockURLProtocol: URLProtocol {

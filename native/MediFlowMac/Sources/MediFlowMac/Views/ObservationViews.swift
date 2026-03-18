@@ -206,36 +206,19 @@ private struct ObservationEditorView: View {
         errorMessage = nil
         defer { isSaving = false }
 
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedValue.isEmpty else {
-            errorMessage = "Valore richiesto"
-            return
-        }
-
-        guard let selectedLoinc = loincOptions.first(where: { $0.code == selectedCode }) else {
-            errorMessage = "Seleziona un parametro LOINC valido"
-            return
-        }
-
-        guard let selectedUcum = ucumOptions.first(where: { $0.code == selectedUnitCode }) else {
-            errorMessage = "Seleziona una unità UCUM valida"
-            return
-        }
+        let draft = ObservationEditorDraft(
+            selectedCode: selectedCode,
+            selectedUnitCode: selectedUnitCode,
+            value: value,
+            observedAt: observedAt,
+            notes: notes
+        )
 
         do {
             if let observation {
-                let payload = UpdateObservationPayload(
-                    codeSystem: selectedLoinc.system,
-                    code: selectedLoinc.code,
-                    display: selectedLoinc.display,
-                    unitSystem: selectedUcum.system,
-                    unitCode: selectedUcum.code,
-                    value: trimmedValue,
-                    notes: trimmedNotes.isEmpty ? "" : trimmedNotes,
-                    observedAt: observedAt,
-                    source: "manual"
+                let payload = try draft.makeUpdatePayload(
+                    loincOptions: loincOptions,
+                    ucumOptions: ucumOptions
                 )
                 try await LocalAPIClient.shared.updateObservation(
                     patientId: patientId,
@@ -243,16 +226,9 @@ private struct ObservationEditorView: View {
                     payload: payload
                 )
             } else {
-                let payload = CreateObservationPayload(
-                    codeSystem: selectedLoinc.system,
-                    code: selectedLoinc.code,
-                    display: selectedLoinc.display,
-                    unitSystem: selectedUcum.system,
-                    unitCode: selectedUcum.code,
-                    value: trimmedValue,
-                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-                    observedAt: observedAt,
-                    source: "manual"
+                let payload = try draft.makeCreatePayload(
+                    loincOptions: loincOptions,
+                    ucumOptions: ucumOptions
                 )
                 _ = try await LocalAPIClient.shared.createObservation(
                     patientId: patientId,
@@ -262,6 +238,8 @@ private struct ObservationEditorView: View {
 
             onSaved()
             dismiss()
+        } catch let error as ObservationEditorValidationError {
+            errorMessage = error.errorDescription
         } catch {
             errorMessage = observation == nil
                 ? "Creazione osservazione fallita"
@@ -271,30 +249,14 @@ private struct ObservationEditorView: View {
 
     @MainActor
     private func ensureSelectedOptionsArePresent() {
-        if loincOptions.first(where: { $0.code == selectedCode }) == nil {
-            loincOptions.insert(
-                TerminologySearchItem(
-                    system: observation?.codeSystem ?? "LOINC",
-                    code: selectedCode,
-                    display: observation?.display ?? selectedCode,
-                    version: nil,
-                    source: "current-value"
-                ),
-                at: 0
-            )
-        }
-
-        if ucumOptions.first(where: { $0.code == selectedUnitCode }) == nil {
-            ucumOptions.insert(
-                TerminologySearchItem(
-                    system: observation?.unitSystem ?? "UCUM",
-                    code: selectedUnitCode,
-                    display: selectedUnitCode,
-                    version: nil,
-                    source: "current-value"
-                ),
-                at: 0
-            )
-        }
+        let merged = ObservationEditorDraft.mergedOptions(
+            observation: observation,
+            selectedCode: selectedCode,
+            selectedUnitCode: selectedUnitCode,
+            loincOptions: loincOptions,
+            ucumOptions: ucumOptions
+        )
+        loincOptions = merged.loinc
+        ucumOptions = merged.ucum
     }
 }
