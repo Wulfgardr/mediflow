@@ -12,14 +12,15 @@ Ultimo aggiornamento: 2026-03-18
 ## Focus corrente (prossime 2-6 settimane)
 
 ### Release gate v0.4 (web/core only)
-- [ ] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
-- [ ] Riallineare Linear sugli issue non bloccanti `0.4`, mantenendoli in `Backlog` senza mischiarli con il push release.
-- [ ] Preparare push/tag/patch notes `0.4.0` solo dopo la chiusura dei blocker web/core sopra.
+- [x] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
+- [x] Riallineare Linear sugli issue non bloccanti `0.4`, mantenendoli in `Backlog` senza mischiarli con il push release.
+- [x] Preparare push/tag/patch notes `0.4.0` solo dopo la chiusura dei blocker web/core sopra.
 
 Nota operativa:
 - il filone parity/macOS resta congelato fino al rebuild controllato della shell nativa
 - i punti `P0b` e `P2`-`P6` sotto non bloccano il push `0.4`
 - le issue native/miste restano tracciate in Linear ma fuori dal release gate corrente
+- il residuo non-macOS ancora aperto in Linear e classificato come backlog `v0.5+`, future track o integrazione esterna, quindi non rientra nel gate `0.4`
 
 ### 0b) Terminologie cliniche e compliance FSE 2.0 (ADR 0006)
 - [x] Portare `ATC` a first-class nei flussi terapia (`AIC + ATC` coerenti su web/native API).
