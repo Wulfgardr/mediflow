@@ -1,5 +1,5 @@
 <!-- Codex: created 2026-03-18 -->
-# ADR 0021: Backup automatico notturno via `launchd` su macOS
+# ADR 0022: Backup automatico notturno via `launchd` su macOS
 
 Date: 2026-03-18
 Status: Accepted

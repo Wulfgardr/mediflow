@@ -1,5 +1,5 @@
 <!-- Codex: created 2026-03-18 -->
-# ADR 0022: Retention automatica dei backup con policy `keep-last-N`
+# ADR 0023: Retention automatica dei backup con policy `keep-last-N`
 
 Date: 2026-03-18
 Status: Accepted
@@ -15,7 +15,7 @@ operativo.
 
 - MediFlow resta local-first e non introduce servizi cloud o job remoti.
 - Il backup artifact v1 e canonico via ADR 0016.
-- Lo scheduler macOS via `launchd` e canonico via ADR 0021.
+- Lo scheduler macOS via `launchd` e canonico via ADR 0022.
 - `WUL-31` richiede retention configurabile, dry-run chiaro e cleanup tracciato.
 - Non e sicuro cancellare automaticamente file arbitrari o attachment clinici.
 
