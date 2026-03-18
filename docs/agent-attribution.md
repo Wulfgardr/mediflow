@@ -44,6 +44,7 @@ Entries are additive and minimal.
 
 ## 2026-03-18 Codex
 - Added the thin-slice `WUL-66` AI Patient Insight settings layer with persisted full-auto/manual budgets, isolated helper tests, settings UI wiring, runtime budget application in context/generation, and ADR/index updates without reintroducing the stacked upload/OCR branch: `lib/ai-insight-settings.ts`, `lib/ai-insight-settings.test.ts`, `scripts/ai-insight-settings-test.sh`, `tsconfig.ai-insight-settings-test.json`, `app/settings/page.tsx`, `lib/ai-context.ts`, `lib/ai-summary-service.ts`, `docs/adr/0018-ai-insight-full-auto-and-pro-settings.md`, `docs/README.md`, `docs/markdown-index.md`, `package.json`
+- Added a read-only AX parity probe for macOS click-map verification, plus npm/docs wiring for `WUL-21` strict parity runs without performing writes on the native dataset: `scripts/native-click-map-probe.swift`, `package.json`, `docs/native-testing.md`, `docs/parity-smoke.md`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

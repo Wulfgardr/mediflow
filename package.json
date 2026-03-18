@@ -24,6 +24,7 @@
     "test:audit": "bash scripts/audit-test.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
+    "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",
     "prepare:oss": "node scripts/prepare-oss.js",
     "linear:prepare-import": "node scripts/prepare-linear-import.mjs",
     "linear:import:all": "bash scripts/linear-import-all.sh",

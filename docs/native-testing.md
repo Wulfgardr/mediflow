@@ -102,6 +102,7 @@ Per debugging test:
    - `npm run test:native`
 3. Native click-map manuale (finche UI test non e completa):
    - apri app con `./scripts/Launch_MediFlowMac.command`
+   - opzionale: esegui il probe AX read-only `npm run test:native:clickmap:probe`
    - verifica punti chiave parity da `docs/parity-matrix.md`
    - compila checklist `docs/parity-click-map-macos.md`
 4. Aggiorna esito in PR/notes:
@@ -179,3 +180,4 @@ Aggiorna:
 1. Estendere unit test a normalizzazione stati terapie/checkup.
 2. Introdurre primi integration test su `LocalAPIClient`.
 3. Preparare target XCUITest per click-path parity core (P0b/P6).
+4. Mantenere il probe AX read-only allineato agli `accessibilityIdentifier` chiave per ridurre ambiguita nei parity sweep.

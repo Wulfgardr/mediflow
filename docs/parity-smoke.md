@@ -60,6 +60,7 @@ MEDIFLOW_PARITY_RUN_WEB=0 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode bash scripts/parit
 1. Snapshot VM pulita.
 2. Esegui `bash scripts/parity-smoke.sh`.
 3. Compila manualmente click-map macOS:
+   - opzionale: `npm run test:native:clickmap:probe` per verificare in modo read-only i controlli AX chiave prima dei passaggi manuali
    - `docs/parity-click-map-macos.md`
 4. Archivia artifacts e ripristina snapshot.
 
@@ -72,3 +73,4 @@ MEDIFLOW_PARITY_RUN_WEB=0 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode bash scripts/parit
   - con `MEDIFLOW_PARITY_REQUIRE_WEB=1` la lane web fallisce (`FAIL`)
 - La lane native usa `scripts/native-test.sh`; per dettagli vedi:
   - `docs/native-testing.md`
+- Il probe AX `scripts/native-click-map-probe.swift` non sostituisce la checklist manuale e non esegue scritture: verifica solo presenza controlli chiave e apertura delle sheet parity principali.
