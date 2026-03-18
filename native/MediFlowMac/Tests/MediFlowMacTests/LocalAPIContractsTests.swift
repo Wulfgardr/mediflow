@@ -83,6 +83,22 @@ final class LocalAPIContractsTests: XCTestCase {
         XCTAssertNil(json["caregiver"])
     }
 
+    func testUpdatePatientPayloadEncodesEncryptedAiSummaryPatch() throws {
+        let payload = UpdatePatientPayload(
+            version: 9,
+            notes: .omit,
+            aiSummary: .value("ENC:summary"),
+            documentInsights: .omit
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["version"] as? Int, 9)
+        XCTAssertEqual(json["aiSummary"] as? String, "ENC:summary")
+        XCTAssertNil(json["notes"])
+        XCTAssertNil(json["documentInsights"])
+    }
+
     func testUpdateTherapyPayloadEncodesNullForClearedEndDate() throws {
         let payload = UpdateTherapyPayload(
             drugName: "Aspirina",

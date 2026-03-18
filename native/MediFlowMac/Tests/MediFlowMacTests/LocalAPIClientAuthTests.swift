@@ -147,6 +147,38 @@ final class LocalAPIClientAuthTests: XCTestCase {
         }
     }
 
+    func testUpdatePatientUsesPutRouteAndEncodesAiSummaryPatch() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 9)
+            XCTAssertEqual(json["aiSummary"] as? String, "ENC:summary")
+            XCTAssertNil(json["notes"])
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 204,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        try await client.updatePatient(
+            id: "patient-1",
+            payload: UpdatePatientPayload(
+                version: 9,
+                aiSummary: .value("ENC:summary")
+            )
+        )
+    }
+
     func testFetchObservationsBuildsNativeQueryAndDecodesObservationSummary() async throws {
         let dateFrom = Date(timeIntervalSince1970: 0)
         let dateTo = Date(timeIntervalSince1970: 3_600)
@@ -321,6 +353,37 @@ final class LocalAPIClientAuthTests: XCTestCase {
             ),
             session: session
         )
+    }
+
+    private func readRequestBody(from request: URLRequest) throws -> Data {
+        if let httpBody = request.httpBody {
+            return httpBody
+        }
+
+        guard let stream = request.httpBodyStream else {
+            throw URLError(.badURL)
+        }
+
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read < 0 {
+                throw stream.streamError ?? URLError(.cannotDecodeRawData)
+            }
+            if read == 0 {
+                break
+            }
+            data.append(buffer, count: read)
+        }
+
+        return data
     }
 
 }
