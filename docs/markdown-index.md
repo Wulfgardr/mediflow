@@ -104,6 +104,7 @@ Ultimo aggiornamento: 2026-03-18
 | [docs/adr/0022-nightly-backup-via-macos-launchd.md](./adr/0022-nightly-backup-via-macos-launchd.md) | Backup automatico notturno via `launchd` su macOS home-base, con runner headless locale e stato persistito in `settings`. |
 | [docs/adr/0023-backup-retention-policy-keep-last-n.md](./adr/0023-backup-retention-policy-keep-last-n.md) | Retention automatica dei backup scheduler-owned con policy `keep-last-N`, preview dry-run e cleanup tracciato in `settings`. |
 | [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./adr/0024-web-core-stabilization-before-next-version-bump.md) | Fissa la sequenza di stabilizzazione web/core prima del prossimo version bump, con helper condivisi, `typecheck` canonico e split incrementale dei god files. |
+| [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md) | Introduce il foundation layer locale SISS con azioni tipizzate, error taxonomy stabile, retry sui transienti e metadata audit PHI-safe. |
 
 ## Checklist manutenzione indice
 

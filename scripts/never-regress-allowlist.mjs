@@ -23,5 +23,10 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: 'https://operatorisiss.servizirl.it/',
             reason: 'Explicit, user-driven SISS portal integration is allowed and documented.',
         },
+        {
+            path: 'lib/siss-adapter.ts',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'The SISS adapter foundation preserves the documented user-driven portal handoff as an explicit transport mode.',
+        },
     ],
 };
