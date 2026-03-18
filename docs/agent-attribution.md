@@ -55,6 +55,7 @@ Entries are additive and minimal.
 - Implemented the fourth thin slice of ADR 0024 by extracting the inactivity auto-lock lifecycle from `SecurityProvider` into a dedicated client hook, preserving the existing auth/logout behavior while shrinking the provider shell, and by hardening the E2E unlock bootstrap to wait for the lock overlay to disappear before continuing: `lib/hooks/use-inactivity-lock.ts`, `components/security-provider.tsx`, `e2e/utils.ts`
 - Implemented the fifth thin slice of ADR 0024 by extracting client-side security session persistence, restore and clear helpers out of `SecurityProvider`, while keeping auth fetches and provider state transitions in place: `lib/client-security-session.ts`, `components/security-provider.tsx`
 - Implemented the sixth thin slice of ADR 0024 by extracting the client auth API wrappers and shared auth-health payload typing out of `SecurityProvider`, while keeping provider-side state branching and crypto unwrap local: `lib/client-auth-api.ts`, `components/auth-health-screen.tsx`, `components/security-provider.tsx`
+- Implemented the seventh thin slice of ADR 0024 by extracting the AI settings controller state, load/save and health-test flows out of `SettingsPage`, while keeping the current markup and inline model selector intact: `lib/hooks/use-ai-settings-controller.ts`, `app/settings/page.tsx`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

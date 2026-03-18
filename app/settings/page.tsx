@@ -1,15 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { db } from '@/lib/db';
-import { DEFAULT_OCR_MODEL, DEFAULT_TEXT_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 import {
     AI_INSIGHT_MODE_OPTIONS,
-    DEFAULT_AI_INSIGHT_MANUAL_CONFIG,
-    loadAIInsightStoredSettings,
-    saveAIInsightStoredSettings,
     type AIInsightManualConfig,
-    type AIInsightMode,
 } from '@/lib/ai-insight-settings';
 import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
@@ -21,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
 import DiagnosticHub from '@/components/diagnostic-hub';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';
+/* @Codex */
+import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -277,25 +273,22 @@ export default function SettingsPage() {
     });
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-    // --- AI Config State ---
-    const [hardwareProfile, setHardwareProfile] = useState<'low' | 'medium' | 'high' | 'custom'>('custom');
-    const [aiConfig, setAiConfig] = useState({
-        provider: 'ollama',
-        model_clinical: '', // Qwen text-first
-        model_reasoning: '', // Qwen reasoning
-        model_ocr: '', // DeepSeek OCR 2
-        url: ''
-    });
-    /* @Codex */
-    const [aiInsightSettings, setAiInsightSettings] = useState<{
-        mode: AIInsightMode;
-        manualConfig: AIInsightManualConfig;
-    }>({
-        mode: 'full_auto',
-        manualConfig: { ...DEFAULT_AI_INSIGHT_MANUAL_CONFIG },
-    });
-    const [isSavingAi, setIsSavingAi] = useState(false);
-    const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const {
+        hardwareProfile,
+        aiConfig,
+        setAiConfig,
+        aiInsightSettings,
+        setAiInsightSettings,
+        isSavingAi,
+        aiTestStatus,
+        aiHealth,
+        selectedInsightMode,
+        insightRuntimePreview,
+        applyHardwareProfile,
+        updateManualInsightConfig,
+        saveAiConfig,
+        testAiConnection,
+    } = useAiSettingsController();
 
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isDockerApp, setIsDockerApp] = useState(false);
@@ -305,17 +298,6 @@ export default function SettingsPage() {
     // Load initial data
     useEffect(() => {
         loadStats();
-        loadAiConfig();
-    }, []);
-
-    // @Codex
-    useEffect(() => {
-        const checkOllama = async () => {
-            try {
-                // Placeholder for future lightweight health check
-            } catch { }
-        };
-        checkOllama();
     }, []);
 
     // @Codex
@@ -382,93 +364,6 @@ export default function SettingsPage() {
         }
     };
 
-    const loadAiConfig = async () => {
-        try {
-            await ensureTextModelDefaultsUpgraded();
-            // @Codex
-            const safeGet = async (key: string) => {
-                try {
-                    return await db.settings.get(key);
-                } catch {
-                    return undefined;
-                }
-            };
-
-            const hardware = await safeGet('hardwareProfile');
-
-            // Task Based Models
-            const modelClinical = await safeGet('aiModel_clinical');
-            const modelReasoning = await safeGet('aiModel_reasoning');
-            const modelOcr = await safeGet('aiModel_ocr');
-            const legacyModel = await safeGet('aiModel');
-
-            // Smart URL loading
-            const genericUrl = await safeGet('aiUrl');
-            const legacyUrl = await safeGet('ollamaUrl');
-
-            // @Codex
-            const currentProvider = 'ollama';
-            let currentUrl = genericUrl?.value;
-            if (!currentUrl) currentUrl = legacyUrl?.value;
-            if (!currentUrl || currentUrl.includes(':8080')) currentUrl = "http://127.0.0.1:11434/v1";
-
-            // Determine models (migrate legacy if needed)
-            const insightSettings = await loadAIInsightStoredSettings();
-            /* @Codex */
-            setHardwareProfile(hardware?.value || 'custom');
-            setAiConfig({
-                provider: 'ollama',
-                model_clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),
-                model_reasoning: resolveTextModel(modelReasoning?.value, legacyModel?.value),
-                model_ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
-                url: currentUrl
-            });
-            setAiInsightSettings({
-                mode: insightSettings.mode,
-                manualConfig: insightSettings.manualConfig,
-            });
-        } catch (e) {
-            console.error("Failed to load AI config:", e);
-        }
-    };
-
-    const applyHardwareProfile = (profile: 'low' | 'medium' | 'high') => {
-        setHardwareProfile(profile);
-        if (profile === 'low') {
-            // Low RAM: Use smallest models
-            setAiConfig(prev => ({
-                ...prev,
-                model_clinical: 'qwen2.5:7b',
-                model_reasoning: 'qwen2.5:7b'
-            }));
-        } else if (profile === 'medium') {
-            // 16-32GB: Standard setup
-            setAiConfig(prev => ({
-                ...prev,
-                model_clinical: 'qwen2.5:14b',
-                model_reasoning: 'qwen2.5:14b'
-            }));
-        } else if (profile === 'high') {
-            // >32GB: Max power
-            setAiConfig(prev => ({
-                ...prev,
-                model_clinical: DEFAULT_TEXT_MODEL,
-                model_reasoning: DEFAULT_TEXT_MODEL
-            }));
-        }
-    };
-
-    /* @Codex */
-    const updateManualInsightConfig = (key: keyof AIInsightManualConfig, value: number) => {
-        setAiInsightSettings((prev) => ({
-            ...prev,
-            manualConfig: {
-                ...prev.manualConfig,
-                [key]: Number.isFinite(value) ? value : prev.manualConfig[key],
-            },
-        }));
-    };
-
     // --- AIFA Handlers ---
     const handleAifaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -506,111 +401,6 @@ export default function SettingsPage() {
         if (confirm("Sei sicuro di voler cancellare l'intero database farmaci?")) {
             await clearDrugDatabase();
             loadStats();
-        }
-    };
-
-    // --- AI Handlers ---
-    const saveAiConfig = async () => {
-        setIsSavingAi(true);
-        try {
-            // @Codex
-            // Web UI does not override aiProvider to avoid clobbering native-only choices.
-            await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
-
-            // Save specific task models
-            await db.settings.put({ key: 'aiModel_clinical', value: aiConfig.model_clinical });
-            await db.settings.put({ key: 'aiModel_reasoning', value: aiConfig.model_reasoning });
-            await db.settings.put({ key: 'aiModel_ocr', value: aiConfig.model_ocr });
-
-            // Legacy sync for backward compatibility (Clinical = Main)
-            await db.settings.put({ key: 'aiModel', value: aiConfig.model_clinical });
-
-            await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
-            await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
-            await saveAIInsightStoredSettings(aiInsightSettings);
-
-            setAiTestStatus('idle'); // Reset test status on save
-        } catch (e) {
-            console.error(e);
-            alert("Errore salvataggio.");
-        } finally {
-            setIsSavingAi(false);
-        }
-    };
-
-    const [aiHealth, setAiHealth] = useState<{ status: 'ok' | 'error'; message: string; models: string[] } | null>(null);
-    /* @Codex */
-    const selectedInsightMode = AI_INSIGHT_MODE_OPTIONS.find((option) => option.value === aiInsightSettings.mode) ?? AI_INSIGHT_MODE_OPTIONS[0];
-    /* @Codex */
-    const insightRuntimePreview = aiInsightSettings.mode === 'manual'
-        ? `${aiInsightSettings.manualConfig.outputMaxTokens} token`
-        : aiInsightSettings.mode === 'balanced'
-            ? 'Preset bilanciato'
-            : aiInsightSettings.mode === 'complete'
-                ? 'Preset completo'
-                : 'Dinamico per caso';
-
-    const testAiConnection = async () => {
-        setAiTestStatus('testing');
-        setAiHealth(null);
-        try {
-            // Import dynamically to avoid build issues if mixed env
-            const { AIService } = await import('@/lib/ai-service');
-            // We force create with current UI config to test WHAT IS INSERTED, not what is saved
-            // But AIService.create reads from DB. To test current UI values, we should construct directly.
-            // However, AIService constructor is not exported or we can just use new?
-            // Exported class, so yes.
-            const service = new AIService(
-                'ollama',
-                aiConfig.url,
-                aiConfig.model_clinical // Test clinical model by default
-            );
-
-            // Add timeout to prevent hanging (60s for cold start)
-            const timeoutPromise = new Promise<{ status: string; message?: string; models?: unknown[] }>((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout connessione (60s) - Il modello potrebbe richiedere tempo per caricarsi")), 60000)
-            );
-
-            const health = await Promise.race([
-                service.getHealth(),
-                timeoutPromise
-            ]);
-
-            // Deep verification of models
-            const installedModels = (health.models as string[]) || [];
-            const missingModels: string[] = [];
-
-            // Helper to clean model names for comparison (remove tags if needed, or loosely match)
-            // Ollama often returns full names like "qwen3.5:35b-a3b" or "medgemma:latest"
-            const isMissing = (target: string) => {
-                if (!target) return false;
-                // Loose match: check if target is substring of any installed, or vice versa
-                // But exact match is better for "qwen2.5:7b" vs "qwen3.5:35b-a3b"
-                return !installedModels.some(m => m === target || m.startsWith(target + ":"));
-            };
-
-            if (isMissing(aiConfig.model_clinical)) missingModels.push(aiConfig.model_clinical);
-            if (isMissing(aiConfig.model_reasoning)) missingModels.push(aiConfig.model_reasoning);
-            if (isMissing(aiConfig.model_ocr)) missingModels.push(aiConfig.model_ocr);
-
-            if (missingModels.length > 0) {
-                const msg = `Ollama è attivo, ma mancano i modelli configurati: ${missingModels.join(', ')}. Scaricali utilizzando i pulsanti sopra.`;
-                setAiHealth({
-                    status: 'error',
-                    message: msg,
-                    models: installedModels
-                });
-                setAiTestStatus('error');
-            } else {
-                setAiHealth({ ...health, status: health.status as 'ok' | 'error', message: health.message || '', models: installedModels });
-                setAiTestStatus(health.status === 'ok' ? 'success' : 'error');
-            }
-
-        } catch (e) {
-            console.error(e);
-            setAiTestStatus('error');
-            const msg = e instanceof Error ? e.message : "Errore imprevisto";
-            setAiHealth({ status: 'error', message: msg, models: [] });
         }
     };
 
