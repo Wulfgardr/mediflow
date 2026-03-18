@@ -14,6 +14,12 @@ import { LockScreen } from '@/components/lock-screen';
 import { AuthHealthScreen, AuthHealthPayload } from '@/components/auth-health-screen';
 /* @Codex */
 import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
+/* @Codex */
+import {
+    clearSecuritySession,
+    persistSecuritySession,
+    restoreSecuritySession,
+} from '@/lib/client-security-session';
 
 export interface User {
     id: string;
@@ -170,8 +176,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 setRequiresSetup(false);
                 // @Codex - if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
-                    sessionStorage.removeItem('mediflow_session_key');
-                    sessionStorage.removeItem('mediflow_user');
+                    clearSecuritySession();
                     db.setKey(null);
                     setIsAuthenticated(false);
                     setIsLocked(true);
@@ -212,37 +217,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // --- Session Persistence Helpers ---
-    const saveSession = async (key: CryptoKey, userData: User) => {
-        try {
-            const jwk = await window.crypto.subtle.exportKey('jwk', key);
-            sessionStorage.setItem('mediflow_session_key', JSON.stringify(jwk));
-            sessionStorage.setItem('mediflow_user', JSON.stringify(userData));
-        } catch (e) {
-            console.error("Failed to save session", e);
-        }
-    };
-
     const restoreSession = async (): Promise<boolean> => {
         try {
-            const jwkStr = sessionStorage.getItem('mediflow_session_key');
-            const userStr = sessionStorage.getItem('mediflow_user');
+            const session = await restoreSecuritySession<User>();
+            if (!session) return false;
 
-            if (!jwkStr || !userStr) return false;
-
-            const jwk = JSON.parse(jwkStr);
-            const key = await window.crypto.subtle.importKey(
-                'jwk',
-                jwk,
-                { name: 'AES-GCM', length: 256 },
-                true,
-                ['encrypt', 'decrypt']
-            );
-
-            const userData = JSON.parse(userStr);
-
-            db.setKey(key);
-            setUser(userData);
+            db.setKey(session.key);
+            setUser(session.userData);
             setIsAuthenticated(true);
             setIsLocked(false);
             return true;
@@ -290,7 +271,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setAuthErrorMessage(null);
 
             // Persist session
-            await saveSession(masterKey, userData);
+            try {
+                await persistSecuritySession(masterKey, userData);
+            } catch (e) {
+                console.error("Failed to save session", e);
+            }
 
             return true;
 
@@ -364,7 +349,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             // Persist
             const userData: User = { id: 'admin', username: 'admin', role: 'admin', displayName, ambulatoryName };
             setUser(userData);
-            await saveSession(masterKey, userData);
+            try {
+                await persistSecuritySession(masterKey, userData);
+            } catch (sessionError) {
+                console.error("Failed to save session", sessionError);
+            }
         } catch (e) {
             console.error("Setup failed", e);
             alert("Errore configurazione: " + e);
