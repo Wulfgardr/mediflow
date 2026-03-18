@@ -196,6 +196,19 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                     </div>
                                 )}
 
+                                {Array.isArray(insight.extractedData?.medications) && insight.extractedData.medications.length > 0 && (
+                                    <div className="mb-3 flex flex-wrap gap-2">
+                                        {insight.extractedData.medications.map((medication) => (
+                                            <span
+                                                key={`${insight.id}:${medication}`}
+                                                className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700"
+                                            >
+                                                Terapia · {medication}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {insight.quality?.reason && (
                                     <p className="mb-3 text-xs text-gray-500">
                                         Qualita documento: {insight.quality.reason}

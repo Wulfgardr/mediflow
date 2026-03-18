@@ -8,10 +8,14 @@ import type {
     Diagnosis,
     DocumentDiagnosisSuggestion,
     DocumentInsight,
-    DocumentQualityLevel
 } from './db';
 import { db } from './db';
 import { v4 as uuid } from 'uuid';
+import {
+    normalizeDiagnosisSystem,
+    parseStructuredAnalysisResponse,
+    type DocumentStructuredAnalysis,
+} from './document-synthesis-parser';
 
 const ANALYSIS_PROMPT = `Sei un assistente clinico locale. Ricevi testo OCR grezzo di un documento medico italiano.
 
@@ -22,6 +26,9 @@ Restituisci SOLO JSON valido, senza testo extra, con questa forma:
     "level": "green|yellow|red",
     "reason": "motivo sintetico della valutazione"
   },
+  "medications": [
+    "farmaco o principio attivo esplicitamente presente nel documento, con posologia se esplicita"
+  ],
   "diagnoses": [
     {
       "code": "codice ICD esplicito nel documento",
@@ -35,38 +42,22 @@ Restituisci SOLO JSON valido, senza testo extra, con questa forma:
 
 Regole:
 - Usa "green" se il contenuto OCR e chiaro e coerente, "yellow" se ambiguo o parziale, "red" se insufficiente o molto rumoroso.
+- In "medications" includi SOLO terapie o principi attivi esplicitamente presenti nel testo OCR.
+- Non inventare posologie o farmaci mancanti.
+- Ogni elemento in "medications" deve rappresentare una terapia distinta.
 - In "diagnoses" includi SOLO patologie con codice ICD esplicitamente presente nel testo OCR.
 - Non inventare o inferire codici ICD mancanti.
+- Se il documento non contiene terapie esplicite, usa "medications": [].
 - Se il documento non contiene codici ICD, usa "diagnoses": [].
 - "summary_markdown" deve essere breve, clinico, senza dati identificativi superflui.
 - Massimo 5 diagnosi.
+- Massimo 8 terapie.
 
 DOCUMENTO OCR:
 `;
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
-
-type ParsedStructuredAnalysis = {
-    summary: string;
-    quality?: {
-        level: DocumentQualityLevel;
-        reason?: string;
-    };
-    diagnoses: DocumentDiagnosisSuggestion[];
-};
-
-/* @Codex */
-export type DocumentStructuredAnalysis = ParsedStructuredAnalysis;
-
-type RawStructuredAnalysis = {
-    summary_markdown?: unknown;
-    quality?: {
-        level?: unknown;
-        reason?: unknown;
-    };
-    diagnoses?: unknown;
-};
 
 /* @Codex */
 function smartSliceText(text: string, maxChars: number): string {
@@ -108,137 +99,6 @@ function smartSliceText(text: string, maxChars: number): string {
     }
 
     return picked.join('\n');
-}
-
-/* @Codex */
-function extractJsonBlock(response: string): string | null {
-    const fenced = response.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced?.[1]) return fenced[1].trim();
-
-    const firstBrace = response.indexOf('{');
-    const lastBrace = response.lastIndexOf('}');
-    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-        return null;
-    }
-
-    return response.slice(firstBrace, lastBrace + 1).trim();
-}
-
-/* @Codex */
-function cleanSummary(summary: string): string {
-    return summary
-        .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '')
-        .replace(/<think>[\s\S]*?<\/think>/gi, '')
-        .replace(/^Plan:\s*/gim, '')
-        .trim();
-}
-
-/* @Codex */
-function normalizeQualityLevel(value: unknown): DocumentQualityLevel {
-    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (normalized === 'green' || normalized === 'yellow' || normalized === 'red') {
-        return normalized;
-    }
-    return 'yellow';
-}
-
-/* @Codex */
-function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSuggestion['system'] | null {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
-    if (normalized === 'ICD-9' || normalized === 'ICD9') return 'ICD-9';
-    if (normalized === 'ICD-10' || normalized === 'ICD10') return 'ICD-10';
-    if (normalized === 'ICD-11' || normalized === 'ICD11') return 'ICD-11';
-    return null;
-}
-
-/* @Codex */
-function normalizeDiagnosisSuggestion(value: unknown): DocumentDiagnosisSuggestion | null {
-    if (!value || typeof value !== 'object') return null;
-
-    const record = value as Record<string, unknown>;
-    const code = typeof record.code === 'string' ? record.code.trim().toUpperCase() : '';
-    const description = typeof record.description === 'string' ? record.description.trim() : '';
-    const system = normalizeDiagnosisSystem(record.system);
-
-    if (!code || !description || !system) return null;
-
-    const confidence = typeof record.confidence === 'string'
-        ? record.confidence.trim().toLowerCase()
-        : '';
-
-    return {
-        code,
-        description,
-        system,
-        evidence: typeof record.evidence === 'string' ? record.evidence.trim() : undefined,
-        confidence: confidence === 'high' || confidence === 'medium' || confidence === 'low'
-            ? confidence
-            : undefined
-    };
-}
-
-/* @Codex */
-function buildFallbackSummary(rawText: string): string {
-    const normalized = rawText
-        .split(/\n+/)
-        .map(line => line.trim())
-        .filter(Boolean)
-        .slice(0, 6)
-        .join('\n');
-
-    return normalized
-        ? `**Riassunto clinico:**\n${normalized.slice(0, 700)}`
-        : 'Documento scannerizzato. Riassunto non disponibile.';
-}
-
-/* @Codex */
-function parseStructuredAnalysis(response: string, rawMarkdown: string): ParsedStructuredAnalysis {
-    const rawJson = extractJsonBlock(response);
-    if (!rawJson) {
-        return {
-            summary: cleanSummary(response) || buildFallbackSummary(rawMarkdown),
-            quality: {
-                level: 'yellow',
-                reason: 'Risposta non strutturata dal modello clinico'
-            },
-            diagnoses: []
-        };
-    }
-
-    try {
-        const parsed = JSON.parse(rawJson) as RawStructuredAnalysis;
-        const diagnoses = Array.isArray(parsed.diagnoses)
-            ? parsed.diagnoses.map(normalizeDiagnosisSuggestion).filter((item): item is DocumentDiagnosisSuggestion => Boolean(item))
-            : [];
-
-        const summary = typeof parsed.summary_markdown === 'string'
-            ? cleanSummary(parsed.summary_markdown)
-            : '';
-
-        return {
-            summary: summary || buildFallbackSummary(rawMarkdown),
-            quality: parsed.quality
-                ? {
-                    level: normalizeQualityLevel(parsed.quality.level),
-                    reason: typeof parsed.quality.reason === 'string' ? parsed.quality.reason.trim() : undefined
-                }
-                : {
-                    level: diagnoses.length > 0 ? 'green' : 'yellow',
-                    reason: diagnoses.length > 0 ? 'Diagnosi ICD esplicite estratte' : 'Analisi completata con dati parziali'
-                },
-            diagnoses
-        };
-    } catch {
-        return {
-            summary: cleanSummary(response) || buildFallbackSummary(rawMarkdown),
-            quality: {
-                level: 'yellow',
-                reason: 'JSON del modello non valido'
-            },
-            diagnoses: []
-        };
-    }
 }
 
 /* @Codex */
@@ -333,7 +193,7 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const ai = await AIService.create('clinical');
     const sliced = smartSliceText(rawMarkdown, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(ANALYSIS_PROMPT + sliced, undefined, 1024);
-    return parseStructuredAnalysis(content, rawMarkdown);
+    return parseStructuredAnalysisResponse(content, rawMarkdown);
 }
 
 /**
@@ -368,8 +228,11 @@ export async function synthesizeDocument(
         rawMarkdown: rawMarkdown.substring(0, 3000),
         summary: analysis.summary,
         quality: analysis.quality,
-        extractedData: analysis.diagnoses.length > 0
-            ? { diagnoses: analysis.diagnoses }
+        extractedData: analysis.diagnoses.length > 0 || analysis.medications.length > 0
+            ? {
+                ...(analysis.diagnoses.length > 0 ? { diagnoses: analysis.diagnoses } : {}),
+                ...(analysis.medications.length > 0 ? { medications: analysis.medications } : {}),
+            }
             : undefined,
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
