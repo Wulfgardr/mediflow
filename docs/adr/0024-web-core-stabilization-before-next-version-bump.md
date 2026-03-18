@@ -31,12 +31,18 @@ review e la probabilita di divergenza tra comportamento, typing e documentazione
 - Le route paziente web e `/api/v1` duplicano oggi normalizzazione e write-path:
   `app/api/patients/route.ts`, `app/api/patients/[id]/route.ts`,
   `app/api/v1/patients/route.ts`, `app/api/v1/patients/[id]/route.ts`.
+- La duplicazione sui write-path non e solo teorica: oggi `PUT /api/patients/[id]`
+  tratta `birthDate === ''` come `null` e valida la data prima del salvataggio,
+  mentre `PUT /api/v1/patients/[id]` non applica esattamente la stessa semantica.
 - `lib/db.ts` e `lib/ai-context.ts` eseguono parsing separato di `diagnoses` e
   `documentInsights`, con revival parziale delle date e typing non allineato.
 - `components/security-provider.tsx` accorpa bootstrap auth, restore sessione,
   unlock crypto, inactivity lock, repair flow e shell UI.
 - `app/settings/page.tsx` continua a essere un god page con profilo utente,
   AI settings, model pull, AIFA import, diagnostica, backup e launch hooks.
+- `tsconfig.json` include ancora alberi generati `.next*`, quindi promuovere
+  `tsc --noEmit` a gate canonico richiede prima una stabilizzazione minima
+  dell'input TypeScript.
 
 ## Opzioni
 
@@ -68,16 +74,19 @@ come una sequenza di consolidamento, non come un refactor generale.
 
 La sequenza canonica e:
 
-1. Estrarre un helper puro condiviso per normalizzazione e shaping dei payload
-   paziente nelle quattro route `web` e `/api/v1`.
+1. Estrarre un helper puro server-side per la normalizzazione dei write-path
+   paziente (`POST`/`PUT`) condiviso tra route `web` e `/api/v1`, mantenendo
+   separate auth, scoping e shape delle `GET`.
 2. Estrarre un helper puro condiviso per il parsing dei campi strutturati
    paziente (`exemptions`, `diagnoses`, `documentInsights` e relativi revival di
    data) usato sia da `lib/db.ts` sia da `lib/ai-context.ts`.
-3. Formalizzare `npm run typecheck` come gate canonico del repository e inserirlo
-   nel loop operativo documentato.
-4. Continuare lo smontaggio incrementale dei god files web partendo dalla shell:
-   `SecurityProvider` e `SettingsPage`, con estrazioni mirate di controller/hook e
-   senza cambiare i contratti funzionali.
+3. Stabilizzare l'input TypeScript e solo dopo formalizzare `npm run typecheck`
+   come gate canonico del repository e inserirlo nel loop operativo documentato.
+4. Continuare lo smontaggio incrementale di `SecurityProvider` partendo da
+   `useInactivityLock` e da un piccolo modulo client auth/session, senza
+   cambiare il contratto server.
+5. Continuare lo smontaggio incrementale di `SettingsPage` partendo da un
+   controller dedicato per AI/settings, prima di separare altre card.
 
 L'obiettivo non e ridurre la complessita di dominio, ma renderla piu esplicita,
 riusabile e verificabile.
@@ -90,15 +99,20 @@ Questa ADR non include:
 - merge automatico della review queue Linear gia aperta
 - UI refresh ampio, redesign accessibilita o theme work
 - nuove dipendenze JS/TS
+- unificazione delle semantics `GET` web vs `/api/v1` sui pazienti
+- unificazione dei layer auth/session tra web e native API
 - riscritture di massa "for cleanliness"
 
 ## Conseguenze
 
 - Positivo: diminuisce il rischio di drift tra web e `/api/v1` sui pazienti.
+- Positivo: riallinea un drift gia reale sul trattamento di `birthDate` nei
+  write-path paziente.
 - Positivo: il runtime AI smette di dipendere da un parsing strutturato
   parallelo e poco tipizzato.
 - Positivo: il verify loop diventa piu esplicito e meno dipendente da memoria
-  locale o comandi ad hoc.
+  locale o comandi ad hoc, ma solo dopo aver reso stabile il perimetro del
+  `typecheck`.
 - Positivo: il cleanup dei file piu densi resta compatibile con diff piccoli.
 - Negativo: parte del debito visibile restara temporaneamente in piedi finche le
   thin slice non verranno eseguite una per volta.
@@ -107,11 +121,12 @@ Questa ADR non include:
 
 ## First Thin Slice
 
-1. Introdurre `lib/patient-structured-fields.ts` con parser/revival puri per
-   `exemptions`, `diagnoses` e `documentInsights`.
-2. Far usare quel modulo a `lib/db.ts` e `lib/ai-context.ts`, con test isolati
-   dedicati.
-3. Aggiungere `typecheck` a `package.json` come alias stabile di `tsc --noEmit`
-   e allineare [CONTRIBUTING.md](../../CONTRIBUTING.md).
-4. Solo dopo, estrarre l'helper condiviso delle route paziente e lo split minimo
-   dei concern in `SecurityProvider` / `SettingsPage`.
+1. Introdurre un helper server-side per la normalizzazione dei payload paziente
+   in scrittura (`normalizePatientCreateInput`, `normalizePatientUpdateInput` o
+   equivalente), riusabile da route `web` e `/api/v1`.
+2. Spostare su quel modulo i `POST` e `PUT` paziente, lasciando in route auth,
+   audit actor resolution, scoping e shape di risposta.
+3. Coprire con test isolati i punti di drift reali: `birthDate`, structured
+   fields `null/undefined`, `version` increment e detection di payload vuoti.
+4. Lasciare `GET`, `SecurityProvider`, `SettingsPage` e `typecheck` come thin
+   slice successive, gia ordinate da questa ADR.
