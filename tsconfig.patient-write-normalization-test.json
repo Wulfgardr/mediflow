@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-patient-write-normalization-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/patient-write-normalization.ts",
+    "lib/patient-write-normalization.test.ts",
+    "lib/schema.ts"
+  ]
+}

@@ -19,6 +19,7 @@
     "test:report-service": "bash scripts/report-service-test.sh",
     "test:ai-insight-settings": "bash scripts/ai-insight-settings-test.sh",
     "test:auth-lockout": "bash scripts/auth-lockout-test.sh",
+    "test:patient-write-normalization": "bash scripts/patient-write-normalization-test.sh",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
     "test:audit": "bash scripts/audit-test.sh",

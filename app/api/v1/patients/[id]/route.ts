@@ -9,6 +9,8 @@ import type { PatientDetail } from '@/lib/api/v1/types';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
 /* @Codex */
+import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
+/* @Codex */
 import {
     auditContextFromSession,
     classifyPatientMutationEvent,
@@ -22,22 +24,6 @@ function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-/* @Codex */
-function normalizeExemptionsForUpdate(value: unknown): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
-}
-
-/* @Codex */
-function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
 }
 
 /* @Codex */
@@ -123,7 +109,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
         /* @Codex */
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
@@ -135,68 +121,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const normalizedExemptions = normalizeExemptionsForUpdate(body.exemptions);
-        /* @Codex */
-        const normalizedDiagnoses = normalizeDiagnosesForUpdate(body.diagnoses);
-        const updateValues: Partial<typeof patients.$inferInsert> = {
-            firstName: typeof body.firstName === 'string' ? body.firstName : undefined,
-            lastName: typeof body.lastName === 'string' ? body.lastName : undefined,
-            taxCode: typeof body.taxCode === 'string' ? body.taxCode : undefined,
-            address: typeof body.address === 'string' ? body.address : undefined,
-            phone: typeof body.phone === 'string' ? body.phone : undefined,
-            caregiver: typeof body.caregiver === 'string' ? body.caregiver : undefined,
-            notes: typeof body.notes === 'string' ? body.notes : undefined,
-            /* @Codex */
-            monitoringProfile: typeof body.monitoringProfile === 'string'
-                ? body.monitoringProfile
-                : body.monitoringProfile === null
-                    ? null
-                    : undefined,
-            /* @Codex */
-            statusReason: typeof body.statusReason === 'string'
-                ? body.statusReason
-                : body.statusReason === null
-                    ? null
-                    : undefined,
-            aiSummary: typeof body.aiSummary === 'string' ? body.aiSummary : undefined,
-            documentInsights: typeof body.documentInsights === 'string' ? body.documentInsights : undefined,
-            isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
-            isArchived: typeof body.isArchived === 'boolean' ? body.isArchived : undefined,
-            ambulatoryId: typeof body.ambulatoryId === 'string'
-                ? body.ambulatoryId
-                : body.ambulatoryId === null
-                    ? null
-                    : undefined,
-            /* @Codex */
-            version: expectedVersion + 1,
-            birthDate: body.birthDate === null
-                ? null
-                : body.birthDate
-                    ? new Date(body.birthDate)
-                    : undefined,
-            updatedAt: new Date()
-        };
-
-        if (normalizedExemptions !== undefined) {
-            updateValues.exemptions = normalizedExemptions;
-        }
-        /* @Codex */
-        if (normalizedDiagnoses !== undefined) {
-            updateValues.diagnoses = normalizedDiagnoses;
-        }
-
-        /* @Codex */
-        const hasUpdatableField = Object.entries(updateValues).some(
-            ([key, value]) => key !== 'updatedAt' && key !== 'version' && value !== undefined
-        );
-        if (!hasUpdatableField) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        const normalized = normalizePatientUpdateInput(body as Record<string, unknown>, {
+            expectedVersion,
+        });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
         /* @Codex */
         const updateResult = await dbServer
             .update(patients)
-            .set(updateValues)
+            .set(normalized.values)
             .where(and(eq(patients.id, id), eq(patients.version, expectedVersion)))
             .run();
 
@@ -219,10 +154,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
         if (Object.prototype.hasOwnProperty.call(body, 'ambulatoryId')) {
             await dbServer.delete(patientsToAmbulatories).where(eq(patientsToAmbulatories.patientId, id));
-            if (typeof body.ambulatoryId === 'string' && body.ambulatoryId.trim().length > 0) {
+            const normalizedAmbulatoryId = normalized.values.ambulatoryId;
+            if (typeof normalizedAmbulatoryId === 'string' && normalizedAmbulatoryId.trim().length > 0) {
                 await dbServer.insert(patientsToAmbulatories).values({
                     patientId: id,
-                    ambulatoryId: body.ambulatoryId,
+                    ambulatoryId: normalizedAmbulatoryId,
                     assignedAt: new Date()
                 }).onConflictDoNothing();
             }
@@ -231,7 +167,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         /* @Codex */
         await recordPatientAuditEvent(
             request,
-            classifyPatientMutationEvent(existing.isArchived ?? null, updateValues.isArchived as boolean | undefined),
+            classifyPatientMutationEvent(existing.isArchived ?? null, normalized.values.isArchived as boolean | undefined),
             id,
             {
                 changedFields: listChangedFields(body, ['version']),

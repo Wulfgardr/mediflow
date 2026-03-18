@@ -6,6 +6,7 @@ Entries are additive and minimal.
 
 ## 2026-03-18 Codex
 - Added canonical ADR for pre-version-bump web/core stabilization, fixing the maintenance sequence on disk around shared patient payload helpers, structured patient field parsing, `typecheck`, and incremental decomposition of `SecurityProvider`/`SettingsPage`: `docs/adr/0024-web-core-stabilization-before-next-version-bump.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`
+- Added the first implementation slice of ADR 0024 by extracting a shared patient write-normalization helper, wiring it into web and `/api/v1` patient create/update routes, and adding an isolated test harness for payload semantics: `lib/patient-write-normalization.ts`, `lib/patient-write-normalization.test.ts`, `scripts/patient-write-normalization-test.sh`, `tsconfig.patient-write-normalization-test.json`, `app/api/patients/route.ts`, `app/api/patients/[id]/route.ts`, `app/api/v1/patients/route.ts`, `app/api/v1/patients/[id]/route.ts`, `package.json`
 
 ## 2026-03-16 Codex
 - Added operator-reviewed smart import from patient notes/diary/document insights into ICD-11 diagnosis and therapy suggestions, with local ICD/AIFA matching, dedupe-aware apply flow, and persistent patient-profile CTA: `lib/patient-smart-import-service.ts`, `components/patient-smart-import-panel.tsx`, `app/patients/[id]/page.tsx`, `app/api/drugs/route.ts`
@@ -48,6 +49,7 @@ Entries are additive and minimal.
 ## 2026-03-18 Codex
 - Added the thin-slice `WUL-66` AI Patient Insight settings layer with persisted full-auto/manual budgets, isolated helper tests, settings UI wiring, runtime budget application in context/generation, and ADR/index updates without reintroducing the stacked upload/OCR branch: `lib/ai-insight-settings.ts`, `lib/ai-insight-settings.test.ts`, `scripts/ai-insight-settings-test.sh`, `tsconfig.ai-insight-settings-test.json`, `app/settings/page.tsx`, `lib/ai-context.ts`, `lib/ai-summary-service.ts`, `docs/adr/0018-ai-insight-full-auto-and-pro-settings.md`, `docs/README.md`, `docs/markdown-index.md`, `package.json`
 - Added a read-only AX parity probe for macOS click-map verification, plus npm/docs wiring for `WUL-21` strict parity runs without performing writes on the native dataset: `scripts/native-click-map-probe.swift`, `package.json`, `docs/native-testing.md`, `docs/parity-smoke.md`
+- Implemented the first thin slice of ADR 0024 by extracting a shared patient write-normalization helper, wiring it into `POST`/`PUT` web and `/api/v1` patient routes, and adding isolated tests plus an npm runner for the drift-sensitive normalization rules: `lib/patient-write-normalization.ts`, `lib/patient-write-normalization.test.ts`, `app/api/patients/route.ts`, `app/api/patients/[id]/route.ts`, `app/api/v1/patients/route.ts`, `app/api/v1/patients/[id]/route.ts`, `scripts/patient-write-normalization-test.sh`, `tsconfig.patient-write-normalization-test.json`, `package.json`
 
 ## 2026-03-03 Codex
 - Hardened OSS export privacy filter to always exclude Linear orchestration/import artifacts from public export bundles: `scripts/prepare-oss.js`

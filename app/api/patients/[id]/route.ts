@@ -7,6 +7,8 @@ import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
 /* @Codex */
+import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
+/* @Codex */
 import {
     auditContextFromSession,
     classifyPatientMutationEvent,
@@ -15,22 +17,6 @@ import {
     withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/audit';
-
-/* @Codex */
-function normalizeExemptionsForUpdate(value: unknown): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
-}
-
-/* @Codex */
-function normalizeDiagnosesForUpdate(value: unknown): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
-}
 
 /* @Codex */
 async function recordPatientAuditEvent(
@@ -92,72 +78,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const normalizedExemptions = normalizeExemptionsForUpdate(body.exemptions);
-        /* @Codex */
-        const normalizedDiagnoses = normalizeDiagnosesForUpdate(body.diagnoses);
-        const birthDate = body.birthDate === null || body.birthDate === ''
-            ? null
-            : body.birthDate !== undefined
-                ? new Date(body.birthDate as string | number | Date)
-                : undefined;
-        if (birthDate instanceof Date && Number.isNaN(birthDate.getTime())) {
-            return NextResponse.json({ error: 'Invalid birthDate' }, { status: 400 });
-        }
-
-        const updateValues: Partial<typeof patients.$inferInsert> = {
-            firstName: typeof body.firstName === 'string' ? body.firstName : undefined,
-            lastName: typeof body.lastName === 'string' ? body.lastName : undefined,
-            taxCode: typeof body.taxCode === 'string' ? body.taxCode : undefined,
-            address: typeof body.address === 'string' ? body.address : undefined,
-            phone: typeof body.phone === 'string' ? body.phone : undefined,
-            caregiver: typeof body.caregiver === 'string' ? body.caregiver : undefined,
-            notes: typeof body.notes === 'string' ? body.notes : undefined,
-            /* @Codex */
-            monitoringProfile: typeof body.monitoringProfile === 'string'
-                ? body.monitoringProfile
-                : body.monitoringProfile === null
-                    ? null
-                    : undefined,
-            /* @Codex */
-            statusReason: typeof body.statusReason === 'string'
-                ? body.statusReason
-                : body.statusReason === null
-                    ? null
-                    : undefined,
-            aiSummary: typeof body.aiSummary === 'string' ? body.aiSummary : undefined,
-            documentInsights: typeof body.documentInsights === 'string' ? body.documentInsights : undefined,
-            isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
-            isArchived: typeof body.isArchived === 'boolean' ? body.isArchived : undefined,
-            ambulatoryId: typeof body.ambulatoryId === 'string'
-                ? body.ambulatoryId
-                : body.ambulatoryId === null
-                    ? null
-                    : undefined,
-            /* @Codex */
-            version: expectedVersion + 1,
-            birthDate,
-            updatedAt: new Date()
-        };
-
-        if (normalizedExemptions !== undefined) {
-            updateValues.exemptions = normalizedExemptions;
-        }
-        /* @Codex */
-        if (normalizedDiagnoses !== undefined) {
-            updateValues.diagnoses = normalizedDiagnoses;
-        }
-
-        const hasUpdatableField = Object.entries(updateValues).some(
-            ([key, value]) => key !== 'updatedAt' && key !== 'version' && value !== undefined
-        );
-        if (!hasUpdatableField) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        const normalized = normalizePatientUpdateInput(body, {
+            expectedVersion,
+        });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
         /* @Codex */
         const updateResult = await dbServer
             .update(patients)
-            .set(updateValues)
+            .set(normalized.values)
             .where(and(eq(patients.id, id), eq(patients.version, expectedVersion)))
             .run();
 
@@ -180,10 +111,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
         if (Object.prototype.hasOwnProperty.call(body, 'ambulatoryId')) {
             await dbServer.delete(patientsToAmbulatories).where(eq(patientsToAmbulatories.patientId, id));
-            if (typeof body.ambulatoryId === 'string' && body.ambulatoryId.trim().length > 0) {
+            const normalizedAmbulatoryId = normalized.values.ambulatoryId;
+            if (typeof normalizedAmbulatoryId === 'string' && normalizedAmbulatoryId.trim().length > 0) {
                 await dbServer.insert(patientsToAmbulatories).values({
                     patientId: id,
-                    ambulatoryId: body.ambulatoryId,
+                    ambulatoryId: normalizedAmbulatoryId,
                     assignedAt: new Date()
                 }).onConflictDoNothing();
             }
@@ -193,7 +125,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await recordPatientAuditEvent(
             request,
             session,
-            classifyPatientMutationEvent(existing.isArchived ?? null, updateValues.isArchived as boolean | undefined),
+            classifyPatientMutationEvent(existing.isArchived ?? null, normalized.values.isArchived as boolean | undefined),
             id,
             {
                 changedFields: listChangedFields(body, ['version']),
