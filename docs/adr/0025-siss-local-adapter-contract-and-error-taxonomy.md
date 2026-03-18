@@ -1,7 +1,7 @@
 <!-- Codex: created 2026-03-18 -->
 # ADR 0025: Contratto locale SISS, taxonomy errori e retry transienti
 
-Date: 2026-03-18  
+Date: 2026-03-18
 Status: Accepted
 
 ---
