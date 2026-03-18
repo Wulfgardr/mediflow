@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { auditEvents } from './schema';
 import type { ServerSession } from './server-session';
@@ -72,6 +72,7 @@ type AuditListFilters = {
     outcome?: AuditOutcome;
     subjectType?: AuditSubjectType;
     actorRef?: string;
+    occurredAfter?: Date;
 };
 
 export type AuditRecord = {
@@ -88,6 +89,16 @@ export type AuditRecord = {
     requestId: string | null;
     redactedMetadata: AuditRedactedMetadata | null;
     createdAt: string | null;
+};
+
+export type AuditSummary = {
+    totalEvents: number;
+    distinctActors: number;
+    outcomes: Record<AuditOutcome, number>;
+    sourceSurfaces: Record<AuditSourceSurface, number>;
+    subjectTypes: Record<AuditSubjectType, number>;
+    topEventTypes: Array<{ eventType: AuditEventType; count: number }>;
+    isTruncated: boolean;
 };
 
 /* @Codex */
@@ -233,6 +244,7 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
     if (filters.outcome) clauses.push(eq(auditEvents.outcome, filters.outcome));
     if (filters.subjectType) clauses.push(eq(auditEvents.subjectType, filters.subjectType));
     if (filters.actorRef) clauses.push(eq(auditEvents.actorRef, filters.actorRef));
+    if (filters.occurredAfter) clauses.push(gte(auditEvents.occurredAt, filters.occurredAfter));
 
     const whereClause = clauses.length > 1 ? and(...clauses) : clauses[0];
     const rows = whereClause
@@ -254,6 +266,54 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
         redactedMetadata: parseRedactedMetadata(row.redactedMetadata),
         createdAt: toIsoString(row.createdAt),
     }));
+}
+
+/* @Codex */
+export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false): AuditSummary {
+    const outcomes: Record<AuditOutcome, number> = {
+        success: 0,
+        failure: 0,
+        denied: 0,
+    };
+    const sourceSurfaces: Record<AuditSourceSurface, number> = {
+        web: 0,
+        native: 0,
+        api: 0,
+        job: 0,
+    };
+    const subjectTypes: Record<AuditSubjectType, number> = {
+        session: 0,
+        patient: 0,
+        entry: 0,
+        therapy: 0,
+        observation: 0,
+        settings: 0,
+    };
+    const eventTypeCounts = new Map<AuditEventType, number>();
+    const actors = new Set<string>();
+
+    for (const record of records) {
+        outcomes[record.outcome] += 1;
+        sourceSurfaces[record.sourceSurface] += 1;
+        subjectTypes[record.subjectType] += 1;
+        eventTypeCounts.set(record.eventType, (eventTypeCounts.get(record.eventType) ?? 0) + 1);
+        actors.add(record.actorRef);
+    }
+
+    const topEventTypes = Array.from(eventTypeCounts.entries())
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 5)
+        .map(([eventType, count]) => ({ eventType, count }));
+
+    return {
+        totalEvents: records.length,
+        distinctActors: actors.size,
+        outcomes,
+        sourceSurfaces,
+        subjectTypes,
+        topEventTypes,
+        isTruncated,
+    };
 }
 
 function sanitizeTokenList(values: unknown): string[] {

@@ -7,8 +7,29 @@ import {
     auditContextFromSession,
     auditSourceSurfaceFromRequest,
     sanitizeAuditMetadata,
+    summarizeAuditEvents,
     withAuditContextMetadata,
+    type AuditRecord,
 } from './audit';
+
+function buildAuditRecord(overrides: Partial<AuditRecord>): AuditRecord {
+    return {
+        schemaVersion: 1,
+        eventId: 'evt-1',
+        eventType: 'patient.updated',
+        occurredAt: '2026-03-18T10:00:00.000Z',
+        outcome: 'success',
+        actorType: 'user',
+        actorRef: 'user-1',
+        subjectType: 'patient',
+        subjectRef: 'patient-1',
+        sourceSurface: 'web',
+        requestId: 'req-1',
+        redactedMetadata: null,
+        createdAt: '2026-03-18T10:00:00.000Z',
+        ...overrides,
+    };
+}
 
 test('sanitizeAuditMetadata keeps only the PHI-safe whitelist', () => {
     const metadata = sanitizeAuditMetadata({
@@ -128,4 +149,56 @@ test('withAuditContextMetadata appends the auth context flag', () => {
             flags: ['operator', 'auth:session'],
         },
     );
+});
+
+test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
+    const summary = summarizeAuditEvents([
+        buildAuditRecord({}),
+        buildAuditRecord({
+            eventId: 'evt-2',
+            occurredAt: '2026-03-18T11:00:00.000Z',
+            outcome: 'failure',
+            requestId: 'req-2',
+            createdAt: '2026-03-18T11:00:00.000Z',
+        }),
+        buildAuditRecord({
+            eventId: 'evt-3',
+            eventType: 'auth.login.failed',
+            occurredAt: '2026-03-18T12:00:00.000Z',
+            outcome: 'denied',
+            actorRef: 'anonymous',
+            subjectType: 'session',
+            subjectRef: null,
+            sourceSurface: 'api',
+            requestId: 'req-3',
+            createdAt: '2026-03-18T12:00:00.000Z',
+        }),
+    ]);
+
+    assert.equal(summary.totalEvents, 3);
+    assert.equal(summary.distinctActors, 2);
+    assert.deepEqual(summary.outcomes, {
+        success: 1,
+        failure: 1,
+        denied: 1,
+    });
+    assert.deepEqual(summary.sourceSurfaces, {
+        web: 2,
+        native: 0,
+        api: 1,
+        job: 0,
+    });
+    assert.deepEqual(summary.subjectTypes, {
+        session: 1,
+        patient: 2,
+        entry: 0,
+        therapy: 0,
+        observation: 0,
+        settings: 0,
+    });
+    assert.deepEqual(summary.topEventTypes, [
+        { eventType: 'patient.updated', count: 2 },
+        { eventType: 'auth.login.failed', count: 1 },
+    ]);
+    assert.equal(summary.isTruncated, false);
 });
