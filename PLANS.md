@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-18
+Ultimo aggiornamento: 2026-03-19
 
 ---
 
@@ -14,13 +14,16 @@ Ultimo aggiornamento: 2026-03-18
 ### Release gate v0.4 (web/core only)
 - [x] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
 - [x] Riallineare Linear sugli issue non bloccanti `0.4`, mantenendoli in `Backlog` senza mischiarli con il push release.
-- [x] Preparare push/tag/patch notes `0.4.0` solo dopo la chiusura dei blocker web/core sopra.
+- [x] Chiudere la queue attiva non-macOS in Linear (`Todo`, `In Progress`, `In Review` a zero) lasciando solo backlog intenzionale, tracker e filone native congelato.
+- [x] Eseguire la sequenza di stabilizzazione web/core pre-version-bump fissata in [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./docs/adr/0024-web-core-stabilization-before-next-version-bump.md).
+- [ ] Completare push/tag/patch notes `0.4.0` sullo stato reale di `main`.
 
 Nota operativa:
 - il filone parity/macOS resta congelato fino al rebuild controllato della shell nativa
 - i punti `P0b` e `P2`-`P6` sotto non bloccano il push `0.4`
 - le issue native/miste restano tracciate in Linear ma fuori dal release gate corrente
-- il residuo non-macOS ancora aperto in Linear e classificato come backlog `v0.5+`, future track o integrazione esterna, quindi non rientra nel gate `0.4`
+- il residuo non-macOS ancora aperto in Linear e classificato come backlog `post-0.4`, future track o integrazione esterna, quindi non rientra nel gate `0.4`
+- i tracker macro (`WUL-35`, `WUL-37`, `WUL-39`, `WUL-41`, `WUL-42`, `WUL-74`, `WUL-75`) restano aperti come contenitori, non come delivery queue attiva
 
 ### 0b) Terminologie cliniche e compliance FSE 2.0 (ADR 0006)
 - [x] Portare `ATC` a first-class nei flussi terapia (`AIC + ATC` coerenti su web/native API).
@@ -85,10 +88,10 @@ Ordine di consegna consigliato (incrementale):
 - [ ] Garantire che ogni chiamata `ApiTable.update/delete()` abbia una route backend corrispondente (es. `PUT/DELETE /api/<resource>/:id`).
 - [ ] Allineare le interfacce TypeScript in `lib/db.ts` con lo schema SQLite in `lib/schema.ts` (evitare "campi fantasma").
 - [ ] Rimuovere/sostituire patch schema runtime con migrazioni Drizzle esplicite (evoluzione DB tracciabile).
-- [ ] Eseguire la sequenza di stabilizzazione web/core pre-version-bump fissata in [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./docs/adr/0024-web-core-stabilization-before-next-version-bump.md): helper condiviso route paziente, helper shared fields paziente, gate `typecheck`, split incrementale `SecurityProvider`/`SettingsPage`.
+- [x] Eseguire la sequenza di stabilizzazione web/core pre-version-bump fissata in [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./docs/adr/0024-web-core-stabilization-before-next-version-bump.md): helper condiviso route paziente, helper shared fields paziente, gate `typecheck`, split incrementale `SecurityProvider`/`SettingsPage`.
 
 ### 7) DX / Igiene repository
-- [ ] Aggiungere script `typecheck` (es. `tsc --noEmit`) e documentare il loop di verifica.
+- [x] Aggiungere script `typecheck` (es. `tsc --noEmit`) e documentare il loop di verifica.
 - [ ] Garantire onboarding docs autorevoli e aggiornati (README + CONTRIBUTING + ARCHITECTURE).
 
 ---
@@ -96,6 +99,7 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
+- [ ] Eseguire il pass finale di release hygiene `0.4.0`: changelog definitivo, patch notes, tag e push coerenti con `main`.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 
