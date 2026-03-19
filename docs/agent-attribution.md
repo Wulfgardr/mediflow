@@ -4,6 +4,10 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-19 Codex
+- Realigned release-hygiene documentation to the actual `main` state before the `0.4.0` push by tightening the active gate wording, switching the canonical verify loop to `npm run typecheck`, and marking ADR 0024 as accepted: `PLANS.md`, `CONTRIBUTING.md`, `docs/adr/0024-web-core-stabilization-before-next-version-bump.md`
+- Extended the release-facing documentation so `v0.4.0` explicitly records the macOS freeze/rebuild decision and keeps README/roadmap/native guides aligned with the actual post-release plan: `README.md`, `CHANGELOG.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/ROADMAP.md`, `docs/NATIVE.md`, `docs/walkthrough.md`
+
 ## 2026-03-18 Codex
 - Added canonical ADR for pre-version-bump web/core stabilization, fixing the maintenance sequence on disk around shared patient payload helpers, structured patient field parsing, `typecheck`, and incremental decomposition of `SecurityProvider`/`SettingsPage`: `docs/adr/0024-web-core-stabilization-before-next-version-bump.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`
 - Added the first implementation slice of ADR 0024 by extracting a shared patient write-normalization helper, wiring it into web and `/api/v1` patient create/update routes, and adding an isolated test harness for payload semantics: `lib/patient-write-normalization.ts`, `lib/patient-write-normalization.test.ts`, `scripts/patient-write-normalization-test.sh`, `tsconfig.patient-write-normalization-test.json`, `app/api/patients/route.ts`, `app/api/patients/[id]/route.ts`, `app/api/v1/patients/route.ts`, `app/api/v1/patients/[id]/route.ts`, `package.json`

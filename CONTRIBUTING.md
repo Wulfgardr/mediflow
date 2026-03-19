@@ -63,10 +63,10 @@ npm run lint:full
 
 ### Type checking (consigliato)
 
-Questo repository non espone ancora uno script dedicato; puoi eseguire:
+Questo repository espone uno script dedicato:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
 ```
 
 ### Contract guard OpenAPI
@@ -191,7 +191,7 @@ Una PR è considerata conclusa quando:
 
 - `npm run lint` passa
 - `npm run build` passa
-- (consigliato) `npx tsc --noEmit` passa
+- (consigliato) `npm run typecheck` passa
 - `npm run check:never-regress` passa
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa

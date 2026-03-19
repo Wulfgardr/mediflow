@@ -7,6 +7,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [0.4.0] - 2026-03-19
 
+> Nota release: dopo `v0.4.0` il filone `macOS/parity` viene sospeso e spostato in **riscrittura controllata** della shell nativa. Restano fonte di verita il contratto locale `/api/v1`, il trasporto TLS e i vincoli security/local-first; la delivery native sul vecchio client non continua oltre questo snapshot.
+
 ### ✨ Aggiunto
 
 - **Smart import reviewable nel profilo paziente**: suggerimenti locali e confermabili per diagnosi ICD-11 e terapie a partire da note, diario clinico e documenti già analizzati.
@@ -48,6 +50,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - **Walkthrough e mappe canoniche aggiornate** per flusso OCR-first, smart import reviewable, backup scheduler/retention, parity sweep e governance OpenAPI.
 - **Baseline e matrici canoniche** aggiunte per GTW/FSE, SISS certificato, benchmark clinical facts e stabilizzazione web/core pre-release.
+- **Freeze esplicito del filone macOS**: patch notes, roadmap e guide native chiariscono che la parity macOS entra in rebuild controllato dopo `v0.4.0`, senza bloccare l'evoluzione web/core.
 - **Indice markdown e playbook operativi** estesi per rendere ricostruibile il lavoro tra Git, Linear, docs e repo OSS.
 
 ## [0.3.1] - 2026-02-18

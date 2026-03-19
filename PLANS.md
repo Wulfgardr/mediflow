@@ -16,13 +16,13 @@ Ultimo aggiornamento: 2026-03-19
 - [x] Riallineare Linear sugli issue non bloccanti `0.4`, mantenendoli in `Backlog` senza mischiarli con il push release.
 - [x] Chiudere la queue attiva non-macOS in Linear (`Todo`, `In Progress`, `In Review` a zero) lasciando solo backlog intenzionale, tracker e filone native congelato.
 - [x] Eseguire la sequenza di stabilizzazione web/core pre-version-bump fissata in [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./docs/adr/0024-web-core-stabilization-before-next-version-bump.md).
-- [ ] Completare push/tag/patch notes `0.4.0` sullo stato reale di `main`.
+- [x] Completare push/tag/patch notes `0.4.0` sullo stato reale di `main`.
 
 Nota operativa:
 - il filone parity/macOS resta congelato fino al rebuild controllato della shell nativa
 - i punti `P0b` e `P2`-`P6` sotto non bloccano il push `0.4`
 - le issue native/miste restano tracciate in Linear ma fuori dal release gate corrente
-- il residuo non-macOS ancora aperto in Linear e classificato come backlog `post-0.4`, future track o integrazione esterna, quindi non rientra nel gate `0.4`
+- il residuo aperto in Linear e composto solo da backlog intenzionale `bucket/post-0.4`, macro/tracker e `bucket/frozen-native`, quindi non rientra nel gate `0.4`
 - i tracker macro (`WUL-35`, `WUL-37`, `WUL-39`, `WUL-41`, `WUL-42`, `WUL-74`, `WUL-75`) restano aperti come contenitori, non come delivery queue attiva
 
 ### 0b) Terminologie cliniche e compliance FSE 2.0 (ADR 0006)
@@ -99,7 +99,7 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
-- [ ] Eseguire il pass finale di release hygiene `0.4.0`: changelog definitivo, patch notes, tag e push coerenti con `main`.
+- [ ] Pianificare il ciclo `post-0.4`: consolidamento UI/leggibilita web, CI minima e rebuild controllato della shell macOS.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 

@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-03-18
+Ultimo aggiornamento: 2026-03-19
 
 ## Come usare questo indice
 
@@ -40,7 +40,7 @@ Ultimo aggiornamento: 2026-03-18
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/NATIVE.md](./NATIVE.md) | Guida tecnica principale client macOS SwiftUI. | Per sviluppo funzionale native. |
+| [docs/NATIVE.md](./NATIVE.md) | Guida tecnica principale del client macOS SwiftUI, ora riferita allo snapshot pre-rebuild controllato. | Per capire il client esistente, il contratto da preservare e i vincoli del prossimo rebuild native. |
 | [docs/native-setup.md](./native-setup.md) | Setup automatico ambiente client nativo. | Prima di avviare sviluppo/test native. |
 | [docs/native-launch.md](./native-launch.md) | Avvio rapido app macOS via script/launcher. | Per esecuzione operativa locale. |
 | [docs/local-api-tls.md](./local-api-tls.md) | TLS proxy locale e trasporto sicuro per native API. | Per debug networking/certificate pinning. |

@@ -7,6 +7,10 @@
 Questo documento offre la vista end-to-end del progetto: web app Next.js, backend locale SQLite, servizi AI/OCR e client nativo macOS.
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
+> [!IMPORTANT]
+> Dopo `v0.4.0` la delivery macOS e congelata per un rebuild controllato della shell nativa.
+> Le sezioni native qui sotto descrivono lo snapshot corrente e i confini da preservare (`/api/v1`, TLS locale, security/sessione), non una roadmap di estensione del client storico.
+
 ---
 
 ## Scopo e obiettivi

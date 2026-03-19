@@ -24,25 +24,30 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 * **API locale più governata**: baseline OpenAPI `/api/v1`, guard anti-drift e concorrenza ottimistica sui pazienti.
 * **Import clinico più utile**: pipeline OCR-first strutturata e smart import reviewable verso diagnosi ICD-11 e terapie.
-* **Archivio intelligente più operabile**: pulizia per singolo documento o completa, con riallineamento dell'insight AI.
-* **Parity/testing più leggibili**: smoke harness, click-map macOS e runbook più espliciti per sweep web/native.
+* **Archivio intelligente più operabile**: pulizia per singolo documento o completa, persistenza farmaci estratti e riallineamento dell'insight AI.
+* **Sicurezza e continuita operative**: audit append-only, lockout auth, cambio PIN zero-knowledge, backup artifact/preflight, scheduler notturno e retention automatica.
+* **Compliance locale piu esplicita**: terminology registry locale, baseline GTW/FSE, baseline SISS e pannello prescrizione con handoff controllato.
+* **Stabilizzazione web/core**: `typecheck` canonico, normalizzazione condivisa dei payload paziente e riduzione del carico nei file piu densi.
+
+> Nota: il filone `macOS/parity` non prosegue come delivery incrementale oltre `v0.4.0`.
+> Entra in **riscrittura controllata** della shell nativa, preservando `/api/v1`, TLS locale, cifratura e regole security/local-first.
 
 ---
 
 ## In corso (v0.5.0)
 
-Priorità per consolidare sicurezza, continuità operativa e UX.
+Priorita per consolidare UX web, finishing release e preparare il nuovo ciclo native.
 
-### Sicurezza & Compliance
+### Web e UX
 
-* [ ] **Log degli Accessi**: Chi ha visto cosa? (Essenziale per GDPR).
-* [ ] **Cambio PIN**: Al momento il PIN è eterno. Dobbiamo poterlo cambiare.
-* [ ] **Pulizia Automatica**: Policy di retention (es. cancella dati > 10 anni).
+* [ ] **Leggibilita e accessibilita**: refresh mirato di tipografia, spaziatura, contrasto e percorsi clinici piu usati.
+* [ ] **Miglioramenti export**: export FHIR/human-readable e validazione documentale piu completi.
+* [ ] **CI minima**: lint, build e controlli essenziali stabili su PR.
 
-### Usabilità
+### Native reboot
 
-* [ ] **Backup Automatico**: "Set and forget". Il backup si fa da solo ogni notte.
-* [ ] **Notifiche aggiornamenti**: segnalazione nuova release disponibile.
+* [ ] **Demolizione controllata macOS**: ricostruire la shell nativa "from the ground up" senza perdere il contratto `/api/v1`, il trasporto TLS locale e la semantica security/sessione.
+* [ ] **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
 
 ---
 
@@ -55,7 +60,7 @@ Priorità per consolidare sicurezza, continuità operativa e UX.
 
 ### Esperienza nativa
 
-* **App Mac Completa**: Abbandonare il browser per un'app 100% nativa (SwiftUI).
+* **App Mac Completa**: Nuova app 100% nativa (SwiftUI) costruita sul contratto locale gia stabilizzato.
 * **App iPad/iPhone**: Consultazione rapida in mobilità (sulla stessa rete WiFi).
 
 ---

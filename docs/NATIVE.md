@@ -2,6 +2,10 @@
 
 > Guida tecnica del client SwiftUI di MediFlow.
 
+> [!IMPORTANT]
+> Dopo `v0.4.0` il filone macOS/parity e **congelato**: la shell nativa entra in **riscrittura controllata** ("demolizione controllata").
+> Questo documento resta canonico per capire lo snapshot esistente, il contratto `/api/v1`, il trasporto TLS locale e i vincoli security da preservare nel rebuild.
+
 Riferimenti correlati:
 
 - [docs/README.md](./README.md) (mappa canonica documentazione)
@@ -14,7 +18,13 @@ Riferimenti correlati:
 
 ## Stato del progetto
 
-Il client nativo non è più solo in lettura. Oggi supporta:
+Il client nativo documentato qui non e piu la base per nuova delivery incrementale. Oggi va letto cosi:
+
+* **Snapshot operativo esistente**: il vecchio client ha gia superato il read-only e contiene CRUD clinico essenziale, tooling AI locale e lock screen con PIN.
+* **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
+* **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
+
+Lo snapshot corrente supporta comunque:
 
 * **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
 * **AI Control Panel**: monitoraggio modelli e chat tecnica locale.

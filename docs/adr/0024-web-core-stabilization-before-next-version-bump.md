@@ -2,7 +2,7 @@
 # ADR 0024: Web/core stabilization before the next version bump
 
 Date: 2026-03-18
-Status: Proposed
+Status: Accepted
 
 ## Problema
 
@@ -24,8 +24,8 @@ review e la probabilita di divergenza tra comportamento, typing e documentazione
   e manutenibilita esplicita.
 - [SECURITY.md](../../SECURITY.md) vieta espansioni non necessarie delle superfici
   dati e impone cautela sui flussi auth/session e sui campi clinici sensibili.
-- [CONTRIBUTING.md](../../CONTRIBUTING.md) gia tratta `npx tsc --noEmit` come
-  controllo consigliato, ma il repository non espone ancora uno script canonico.
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) tratta il typecheck come controllo
+  consigliato e il repository espone ora lo script canonico `npm run typecheck`.
 - [PLANS.md](../../PLANS.md) identifica gia come aperti la coerenza API <-> UI e
   l'igiene del repository (`typecheck`, allineamento interfacce/schema).
 - Le route paziente web e `/api/v1` duplicano oggi normalizzazione e write-path:
