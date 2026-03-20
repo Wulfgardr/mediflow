@@ -12,7 +12,7 @@ import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
 import {
-    auditContextFromSession,
+    auditContextFromRequest,
     classifyPatientMutationEvent,
     listChangedFields,
     requestIdFromRequest,
@@ -35,7 +35,7 @@ async function recordPatientAuditEvent(
 ): Promise<void> {
     try {
         const session = await requireLocalApiActorSession(request);
-        const context = auditContextFromSession(session);
+        const context = auditContextFromRequest(request, session);
         await writeAuditEvent({
             eventType,
             outcome: 'success',

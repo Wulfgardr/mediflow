@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { hasValidLocalApiToken } from './local-api-auth';
 import { auditEvents } from './schema';
 import type { ServerSession } from './server-session';
 
@@ -144,6 +145,32 @@ export function auditContextFromSession(session: ServerSession | null | undefine
         sourceSurface: 'web',
         authContext: session?.userId ? 'session' : 'anonymous',
     };
+}
+
+/* @Codex */
+export function auditContextFromRequest(
+    request: Request,
+    session: ServerSession | null | undefined
+): AuditContext {
+    if (hasValidLocalApiToken(request)) {
+        if (session?.userId && session.id !== 'local-api') {
+            return {
+                actorType: 'user',
+                actorRef: session.userId,
+                sourceSurface: 'native',
+                authContext: 'local-token',
+            };
+        }
+
+        return {
+            actorType: 'system',
+            actorRef: 'local-api',
+            sourceSurface: 'api',
+            authContext: 'local-token',
+        };
+    }
+
+    return auditContextFromSession(session);
 }
 
 /* @Codex */

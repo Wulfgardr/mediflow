@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { AUDIT_APPEND_ONLY_ERROR, ensureAuditSqliteSchema } from './audit-db';
 import {
     AUDIT_SOURCE_SURFACE_HEADER,
+    auditContextFromRequest,
     auditContextFromSession,
     auditSourceSurfaceFromRequest,
     sanitizeAuditMetadata,
@@ -149,6 +150,51 @@ test('withAuditContextMetadata appends the auth context flag', () => {
             flags: ['operator', 'auth:session'],
         },
     );
+});
+
+test('auditContextFromRequest marks shared routes as native only when a valid local token accompanies the session', () => {
+    const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    process.env.MEDIFLOW_LOCAL_API_TOKEN = 'test-local-token';
+
+    const request = new Request('https://127.0.0.1/api/settings', {
+        headers: {
+            Authorization: 'Bearer test-local-token',
+        },
+    });
+
+    assert.deepEqual(
+        auditContextFromRequest(request, {
+            id: 'session-1',
+            userId: 'user-1',
+            username: 'admin',
+            role: 'admin',
+            authChannel: 'web',
+            createdAt: 0,
+            expiresAt: 1,
+        }),
+        {
+            actorType: 'user',
+            actorRef: 'user-1',
+            sourceSurface: 'native',
+            authContext: 'local-token',
+        },
+    );
+
+    assert.deepEqual(
+        auditContextFromRequest(request, null),
+        {
+            actorType: 'system',
+            actorRef: 'local-api',
+            sourceSurface: 'api',
+            authContext: 'local-token',
+        },
+    );
+
+    if (previousToken === undefined) {
+        delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    } else {
+        process.env.MEDIFLOW_LOCAL_API_TOKEN = previousToken;
+    }
 });
 
 test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {

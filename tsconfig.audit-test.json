@@ -13,6 +13,9 @@
     "lib/audit.test.ts",
     "lib/audit.ts",
     "lib/audit-db.ts",
-    "lib/schema.ts"
+    "lib/schema.ts",
+    "lib/local-api-auth.ts",
+    "lib/local-api-token.ts",
+    "lib/data-dir.ts"
   ]
 }

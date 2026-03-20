@@ -3,7 +3,7 @@ import 'server-only';
 
 import crypto from 'crypto';
 import fs from 'fs';
-import { resolveDataPath } from '@/lib/data-dir';
+import { resolveDataPath } from './data-dir';
 
 const TOKEN_FILE = resolveDataPath('local-api-token');
 

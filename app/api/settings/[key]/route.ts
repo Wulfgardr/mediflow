@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
-import { auditContextFromSession, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 
 export async function GET(
     request: Request,
@@ -53,7 +53,7 @@ export async function PUT(
             .onConflictDoUpdate({ target: settings.key, set: { value } });
 
         try {
-            const context = auditContextFromSession(session);
+            const context = auditContextFromRequest(request, session);
             await writeAuditEvent({
                 eventType: 'settings.updated',
                 outcome: 'success',

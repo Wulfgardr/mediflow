@@ -11,7 +11,7 @@ import type { PatientSummary } from '@/lib/api/v1/types';
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
 import {
-    auditContextFromSession,
+    auditContextFromRequest,
     listChangedFields,
     requestIdFromRequest,
     withAuditContextMetadata,
@@ -27,7 +27,7 @@ async function recordPatientAuditEvent(
 ): Promise<void> {
     try {
         const session = await requireLocalApiActorSession(request);
-        const context = auditContextFromSession(session);
+        const context = auditContextFromRequest(request, session);
         await writeAuditEvent({
             eventType,
             outcome: 'success',
