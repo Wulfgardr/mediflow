@@ -6,6 +6,11 @@ import crypto from 'crypto';
 export const SESSION_COOKIE_NAME = 'mediflow_session';
 const SESSION_TTL_MS = Number(process.env.MEDIFLOW_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
 
+declare global {
+    // eslint-disable-next-line no-var
+    var __mediflowSessions: Map<string, ServerSession> | undefined;
+}
+
 export interface ServerSession {
     id: string;
     userId: string;
@@ -16,7 +21,8 @@ export interface ServerSession {
     expiresAt: number;
 }
 
-const sessions = new Map<string, ServerSession>();
+const sessions = globalThis.__mediflowSessions ?? new Map<string, ServerSession>();
+globalThis.__mediflowSessions = sessions;
 
 export function createSession(
     user: { id: string; username: string; role: string },

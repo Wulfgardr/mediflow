@@ -28,6 +28,8 @@ import {
     restoreSecuritySession,
 } from '@/lib/client-security-session';
 /* @Codex */
+import { notifyDbChange } from '@/lib/live-query';
+/* @Codex */
 import {
     checkAuthHealthRequest,
     changePinRequest,
@@ -107,6 +109,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const setActiveMasterKey = (key: CryptoKey | null) => {
         masterKeyRef.current = key;
         db.setKey(key);
+        notifyDbChange();
     };
 
     const lock = () => {

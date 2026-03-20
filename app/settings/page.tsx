@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
     AI_INSIGHT_MODE_OPTIONS,
     type AIInsightManualConfig,
@@ -23,7 +23,7 @@ import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller'
 interface ModelSelectorProps {
     label: string;
     description: string;
-    icon: React.ReactNode;
+    icon: ReactNode;
     color: 'emerald' | 'purple' | 'blue';
     value: string;
     onChange: (val: string) => void;
@@ -39,6 +39,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
     const [pullProgress, setPullProgress] = useState(0);
     const [pullStatus, setPullStatus] = useState("");
     const [showCustom, setShowCustom] = useState(false);
+    const [pullingModel, setPullingModel] = useState<string | null>(null);
 
     // Initial check
     useEffect(() => {
@@ -69,6 +70,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
         if (!confirm(`Vuoi scaricare il modello '${modelName}'? \nPotrebbe richiedere diversi GB e tempo a seconda della connessione.`)) return;
 
         setIsPulling(true);
+        setPullingModel(modelName);
         setPullProgress(0);
         setPullStatus("Inizializzazione download...");
 
@@ -121,6 +123,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
             alert(`Errore durante il download: ${e instanceof Error ? e.message : 'Unknown error'}`);
         } finally {
             setIsPulling(false);
+            setPullingModel(null);
             setPullProgress(0);
             setPullStatus("");
         }
@@ -129,21 +132,54 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
     const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
 
     const colorClasses = {
-        emerald: { bg: 'bg-emerald-50/50', border: 'border-emerald-100', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', title: 'text-emerald-900' },
-        purple: { bg: 'bg-purple-50/50', border: 'border-purple-100', iconBg: 'bg-purple-100', iconText: 'text-purple-600', title: 'text-purple-900' },
-        blue: { bg: 'bg-blue-50/50', border: 'border-blue-100', iconBg: 'bg-blue-100', iconText: 'text-blue-600', title: 'text-blue-900' }
+        emerald: {
+            iconBg: 'bg-emerald-100/90 dark:bg-emerald-500/15',
+            iconText: 'text-emerald-600 dark:text-emerald-200',
+            title: 'text-emerald-950 dark:text-emerald-100',
+            description: 'text-emerald-900/65 dark:text-emerald-100/70',
+            selectedCard: 'border-emerald-300/80 bg-emerald-50/70 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10',
+            selectedRadio: 'border-emerald-600 bg-emerald-600 dark:border-emerald-300 dark:bg-emerald-300',
+            selectedDot: 'bg-white dark:bg-emerald-950',
+            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
+            downloadBadge: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200 dark:hover:bg-sky-900/20',
+            progress: 'from-emerald-500 to-sky-500',
+        },
+        purple: {
+            iconBg: 'bg-violet-100/90 dark:bg-violet-500/15',
+            iconText: 'text-violet-600 dark:text-violet-200',
+            title: 'text-violet-950 dark:text-violet-100',
+            description: 'text-violet-900/65 dark:text-violet-100/70',
+            selectedCard: 'border-violet-300/80 bg-violet-50/70 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10',
+            selectedRadio: 'border-violet-600 bg-violet-600 dark:border-violet-300 dark:bg-violet-300',
+            selectedDot: 'bg-white dark:bg-violet-950',
+            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
+            downloadBadge: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-900/10 dark:text-violet-200 dark:hover:bg-violet-900/20',
+            progress: 'from-violet-500 to-indigo-500',
+        },
+        blue: {
+            iconBg: 'bg-sky-100/90 dark:bg-sky-500/15',
+            iconText: 'text-sky-600 dark:text-sky-200',
+            title: 'text-sky-950 dark:text-sky-100',
+            description: 'text-sky-900/65 dark:text-sky-100/70',
+            selectedCard: 'border-sky-300/80 bg-sky-50/70 shadow-[0_14px_28px_rgba(14,165,233,0.12)] dark:border-sky-500/20 dark:bg-sky-900/10',
+            selectedRadio: 'border-sky-600 bg-sky-600 dark:border-sky-300 dark:bg-sky-300',
+            selectedDot: 'bg-white dark:bg-sky-950',
+            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
+            downloadBadge: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200 dark:hover:bg-sky-900/20',
+            progress: 'from-sky-500 to-blue-500',
+        }
     };
     const c = colorClasses[color];
 
     return (
-        <div className={`p-4 rounded-xl border ${c.bg} ${c.border}`}>
-            <div className="flex items-start gap-3 mb-3">
-                <div className={`p-2 rounded-lg ${c.iconBg} ${c.iconText}`}>
+        <div className="apple-subsection space-y-4">
+            <div className="flex items-start gap-3">
+                <div className={`rounded-2xl p-2.5 ${c.iconBg} ${c.iconText}`}>
                     {icon}
                 </div>
-                <div>
-                    <h4 className={`text-sm font-bold ${c.title}`}>{label}</h4>
-                    <p className="text-[10px] text-gray-500">{description}</p>
+                <div className="min-w-0">
+                    <h4 className={`text-sm font-semibold ${c.title}`}>{label}</h4>
+                    <p className={`mt-1 text-[11px] leading-5 ${c.description}`}>{description}</p>
                 </div>
             </div>
 
@@ -159,26 +195,26 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
                                     key={model.name}
                                     onClick={() => onChange(model.name)}
                                     className={`
-                                        relative group flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all
+                                        relative flex items-center justify-between gap-3 rounded-[20px] border px-3.5 py-3 cursor-pointer transition-all
                                         ${selected
-                                            ? 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500 z-10'
-                                            : 'bg-white/60 border-gray-200 hover:border-gray-300 hover:bg-white'
+                                            ? `${c.selectedCard} z-10`
+                                            : 'border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20'
                                         }
                                     `}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'}`}>
-                                            {selected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? c.selectedRadio : 'border-slate-300 dark:border-white/20'}`}>
+                                            {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-gray-800">{model.name}</span>
-                                            <span className="text-[10px] text-gray-500">{model.desc}</span>
+                                        <div className="min-w-0">
+                                            <span className="block truncate text-xs font-semibold text-slate-900 dark:text-white">{model.name}</span>
+                                            <span className="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">{model.desc}</span>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-2">
                                         {installed ? (
-                                            <span className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${c.installedBadge}`}>
                                                 <Check className="w-3 h-3" /> Installato
                                             </span>
                                         ) : (
@@ -188,28 +224,22 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
                                                     handlePull(model.name);
                                                 }}
                                                 disabled={isPulling}
-                                                className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+                                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60 ${c.downloadBadge}`}
                                             >
-                                                {isPulling && value === model.name ? ( // Only show spinner if this specific one is related? Or just global blocking
+                                                {isPulling && pullingModel === model.name ? (
                                                     <RefreshCw className="w-3 h-3 animate-spin" />
                                                 ) : <Download className="w-3 h-3" />}
                                                 Scarica
                                             </button>
                                         )}
                                     </div>
-
-                                    {/* Pull Progress Overlay */}
-                                    {isPulling && !installed && ( // Just show global overlay or specific?
-                                        // Actually we handle one pull at a time globally for simplicity
-                                        null
-                                    )}
                                 </div>
                             );
                         })}
 
                         <button
                             onClick={() => setShowCustom(true)}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline text-center mt-1"
+                            className="inline-flex items-center justify-center rounded-full border border-dashed border-slate-200/70 bg-white/58 px-4 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/20 dark:hover:text-slate-200"
                         >
                             Usa un modello personalizzato
                         </button>
@@ -220,13 +250,13 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
                             type="text"
                             value={value}
                             onChange={(e) => onChange(e.target.value)}
-                            className="w-full text-xs border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-2"
+                            className={SETTINGS_INPUT_CLASS}
                             placeholder="es. llama3"
                             autoFocus
                         />
                         <button
                             onClick={() => setShowCustom(false)}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline"
+                            className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:text-slate-200"
                         >
                             Torna ai consigliati
                         </button>
@@ -236,24 +266,97 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
 
             {/* Global Pull Status */}
             {isPulling && (
-                <div className="mt-3 p-3 bg-white rounded-lg border border-indigo-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-2">
+                <div className="animate-in fade-in slide-in-from-bottom-2 rounded-[22px] border border-white/70 bg-white/78 p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-white">
                             <RefreshCw className="w-3 h-3 animate-spin" />
-                            Scaricamento in corso...
+                            Scaricamento {pullingModel ? `di ${pullingModel}` : 'in corso'}
                         </span>
-                        <span className="text-xs font-mono text-indigo-600">{pullProgress}%</span>
+                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{pullProgress}%</span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
                         <div
-                            className="bg-indigo-500 h-full transition-all duration-300"
+                            className={`h-full bg-gradient-to-r ${c.progress} transition-all duration-300`}
                             style={{ width: `${pullProgress}%` }}
                         />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 truncate">{pullStatus}</p>
+                    <p className="mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">{pullStatus}</p>
                 </div>
             )}
         </div>
+    );
+}
+
+/* @Codex */
+const SETTINGS_CARD_CLASS = 'glass-panel p-6 md:p-7';
+/* @Codex */
+const SETTINGS_SECTION_CARD_CLASS = 'apple-subsection p-5 md:p-6';
+/* @Codex */
+const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white/76 px-4 py-3 text-sm text-slate-800 shadow-[0_12px_26px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-all placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500/30';
+/* @Codex */
+const SETTINGS_LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
+/* @Codex */
+const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
+/* @Codex */
+const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
+    emerald: 'inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(5,150,105,0.22)] transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50',
+    amber: 'inline-flex items-center gap-2 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(217,119,6,0.22)] transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50',
+    indigo: 'inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(79,70,229,0.22)] transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50',
+};
+/* @Codex */
+const SETTINGS_SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
+
+/* @Codex */
+function SettingsSectionIntro({
+    kicker,
+    title,
+    description,
+}: {
+    kicker: string;
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="space-y-1">
+            <p className="section-kicker">{kicker}</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
+            <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
+        </div>
+    );
+}
+
+/* @Codex */
+function SettingsRailLink({
+    href,
+    icon,
+    label,
+    description,
+    compact = false,
+}: {
+    href: string;
+    icon: ReactNode;
+    label: string;
+    description: string;
+    compact?: boolean;
+}) {
+    return (
+        <a
+            href={href}
+            className={cn(
+                'border border-white/70 bg-white/68 text-left shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/86 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20',
+                compact
+                    ? 'inline-flex min-w-max items-center gap-2.5 rounded-full px-4 py-2.5'
+                    : 'flex items-start gap-3 rounded-[22px] px-3.5 py-3'
+            )}
+        >
+            <span className={cn('text-slate-500 dark:text-slate-300', compact ? '' : 'mt-0.5')}>{icon}</span>
+            <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-800 dark:text-white">{label}</span>
+                {!compact ? (
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</span>
+                ) : null}
+            </span>
+        </a>
     );
 }
 
@@ -435,21 +538,111 @@ export default function SettingsPage() {
         }
     };
 
+    /* @Codex */
+    const railItems = [
+        { href: '#account', label: 'Account', description: 'Profilo e accesso', icon: <User className="h-4 w-4" /> },
+        { href: '#ai', label: 'AI', description: 'Modelli, budget e runtime', icon: <Bot className="h-4 w-4" /> },
+        { href: '#data', label: 'Dati locali', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
+        { href: '#operations', label: 'Operatività', description: 'Diagnostica e strumenti', icon: <Server className="h-4 w-4" /> },
+        { href: '#backups', label: 'Backup', description: 'Schedulazione e restore', icon: <Download className="h-4 w-4" /> },
+    ];
+
     return (
         <div className="space-y-8 pb-10">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-white tracking-tight">Impostazioni</h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">
-                    Configura database, intelligenza artificiale e backup.
-                </p>
+            <div className="glass-panel liquid-hero p-6 md:p-8">
+                <div className="liquid-orb -left-10 top-0 h-32 w-32 bg-sky-300/35" />
+                <div className="liquid-orb right-4 top-6 h-28 w-28 bg-violet-300/28" />
+                <div className="liquid-orb bottom-4 left-1/3 h-24 w-24 bg-emerald-200/20" />
+
+                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-4">
+                        <div className="section-kicker">Centro di controllo</div>
+                        <div>
+                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+                                Impostazioni
+                            </h1>
+                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                                Un’unica shell per configurazione locale, AI, cataloghi, backup e manutenzione. La logica resta invariata; qui stiamo rendendo piu chiari ritmo, priorita e disposizione delle isole.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2.5">
+                            <span className="apple-chip">
+                                <Shield className="h-3.5 w-3.5 text-amber-500" />
+                                Sicurezza locale
+                            </span>
+                            <span className="apple-chip">
+                                <Bot className="h-3.5 w-3.5 text-indigo-500" />
+                                Runtime AI
+                            </span>
+                            <span className="apple-chip">
+                                <Database className="h-3.5 w-3.5 text-emerald-500" />
+                                Cataloghi offline
+                            </span>
+                            <span className="apple-chip">
+                                <Download className="h-3.5 w-3.5 text-sky-500" />
+                                Backup & restore
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="apple-subsection min-w-[210px]">
+                            <p className="section-kicker">Utente corrente</p>
+                            <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{user?.displayName || 'Admin'}</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
+                        </div>
+                        <div className="apple-subsection min-w-[210px]">
+                            <p className="section-kicker">Approccio</p>
+                            <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">Local-first</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Contenuto al centro, strumenti raccolti in famiglie operative.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Service Architecture Panel - Visual Overview */}
-            <ServiceArchitecturePanel />
+            <div className="xl:hidden">
+                <div className="glass-panel p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="section-kicker">Famiglie</p>
+                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Salti rapidi</h2>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Scorri orizzontalmente</p>
+                    </div>
+                    <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                        {railItems.map((item) => (
+                            <SettingsRailLink key={item.href} {...item} compact />
+                        ))}
+                    </div>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid gap-6 xl:grid-cols-[230px_minmax(0,1fr)]">
+                <aside className="hidden xl:block">
+                    <div className="glass-panel sticky top-6 p-4">
+                        <div className="mb-4">
+                            <p className="section-kicker">Navigazione</p>
+                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Famiglie impostazioni</h2>
+                        </div>
+                        <div className="space-y-3">
+                            {railItems.map((item) => (
+                                <SettingsRailLink key={item.href} {...item} />
+                            ))}
+                        </div>
+                    </div>
+                </aside>
+
+                <div className="space-y-10">
+                    <section id="account" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Account"
+                            title="Profilo e accesso"
+                            description="Dati personali e controllo del PIN raccolti in un’unica area, cosi le impostazioni identitarie non competono con la diagnostica o con gli strumenti di sistema."
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* --- Profile Section --- */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className={SETTINGS_CARD_CLASS}>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                             <User className="w-6 h-6" /> {/* reusing Bot icon or maybe User, let's use check-circle or similar if available, or just reuse consistent styling */}
@@ -462,7 +655,7 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className={SETTINGS_LABEL_CLASS}>
                                 Nome Medico
                             </label>
                             <input
@@ -470,12 +663,12 @@ export default function SettingsPage() {
                                 value={profile.doctorName}
                                 onChange={(e) => setProfile({ ...profile, doctorName: e.target.value })}
                                 placeholder="es. Dr. Mario Rossi"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 p-2.5 text-sm"
+                                className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className={SETTINGS_LABEL_CLASS}>
                                 Nome Ambulatorio
                             </label>
                             <input
@@ -483,7 +676,7 @@ export default function SettingsPage() {
                                 value={profile.clinicName}
                                 onChange={(e) => setProfile({ ...profile, clinicName: e.target.value })}
                                 placeholder="es. Studio Medico Centro"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 p-2.5 text-sm"
+                                className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
@@ -491,7 +684,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={saveProfile}
                                 disabled={isSavingProfile}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                                className={SETTINGS_TONED_BUTTON_CLASS.emerald}
                             >
                                 <Save className="w-4 h-4" />
                                 {isSavingProfile ? 'Salvataggio...' : 'Salva Profilo'}
@@ -501,7 +694,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* --- Security Section --- */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className={SETTINGS_CARD_CLASS}>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
                             <Shield className="w-6 h-6" />
@@ -514,7 +707,7 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className={SETTINGS_LABEL_CLASS}>
                                 PIN attuale
                             </label>
                             <input
@@ -523,12 +716,12 @@ export default function SettingsPage() {
                                 value={pinForm.currentPin}
                                 onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
                                 placeholder="Inserisci il PIN attuale"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                                className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className={SETTINGS_LABEL_CLASS}>
                                 Nuovo PIN
                             </label>
                             <input
@@ -537,12 +730,12 @@ export default function SettingsPage() {
                                 value={pinForm.newPin}
                                 onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
                                 placeholder="4-8 caratteri"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                                className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className={SETTINGS_LABEL_CLASS}>
                                 Conferma nuovo PIN
                             </label>
                             <input
@@ -551,7 +744,7 @@ export default function SettingsPage() {
                                 value={pinForm.confirmPin}
                                 onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
                                 placeholder="Ripeti il nuovo PIN"
-                                className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 p-2.5 text-sm"
+                                className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
@@ -574,7 +767,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={handleChangePin}
                                 disabled={isChangingPin}
-                                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                                className={SETTINGS_TONED_BUTTON_CLASS.amber}
                             >
                                 <Shield className="w-4 h-4" />
                                 {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
@@ -582,9 +775,18 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+                        </div>
+                    </section>
+
+                    <section id="ai" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="AI"
+                            title="Modelli, ruoli e runtime locale"
+                            description="Qui la pagina smette di essere un mosaico di box uguali e diventa una sequenza: profilo hardware, ruoli clinici, budget insight, runtime e diagnostica."
+                        />
 
                 {/* --- AI Config Section --- */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className={SETTINGS_CARD_CLASS}>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
                             <Bot className="w-6 h-6" />
@@ -595,10 +797,10 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-6">
+                        <div className="space-y-6">
                         {/* 1. Hardware Profile Selector */}
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <div className={SETTINGS_SECTION_CARD_CLASS}>
+                            <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                                 <Cpu className="w-4 h-4" />
                                 Profilo Hardware
                             </label>
@@ -607,59 +809,62 @@ export default function SettingsPage() {
                                 <div
                                     onClick={() => applyHardwareProfile('low')}
                                     className={cn(
-                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
                                         hardwareProfile === 'low'
-                                            ? "bg-white border-green-500 ring-2 ring-green-100 shadow-sm"
-                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
+                                            ? "border-emerald-300/80 bg-emerald-50/75 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
                                     )}
                                 >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold uppercase text-green-700">Light</span>
-                                        {hardwareProfile === 'low' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-200">Light</span>
+                                        {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-200" />}
                                     </div>
-                                    <p className="text-xs font-bold text-gray-800">&lt; 16GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">Usa solo modelli molto compressi (Q4_K_M).</p>
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">&lt; 16GB RAM</p>
+                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Usa solo modelli molto compressi (Q4_K_M).</p>
                                 </div>
-                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                    Per utilizzare questa funzione è necessaria una connessione Internet attiva e una chiave API configurata se non si usano modelli locali.
-                                </p>
-                                <p className="text-xs text-gray-400 mt-2">
-                                    Nota: Il &quot;Profilo Hardware&quot; sovrascrive i modelli selezionati. Imposta su &quot;Personalizzato&quot; per scegliere manualmente.
-                                </p>
 
                                 <div
                                     onClick={() => applyHardwareProfile('medium')}
                                     className={cn(
-                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
                                         hardwareProfile === 'medium'
-                                            ? "bg-white border-indigo-500 ring-2 ring-indigo-100 shadow-sm"
-                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
+                                            ? "border-indigo-300/80 bg-indigo-50/75 shadow-[0_14px_28px_rgba(79,70,229,0.12)] dark:border-indigo-500/20 dark:bg-indigo-900/10"
+                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
                                     )}
                                 >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold uppercase text-indigo-700">Balanced</span>
-                                        {hardwareProfile === 'medium' && <CheckCircle className="w-3 h-3 text-indigo-600" />}
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-700 dark:text-indigo-200">Balanced</span>
+                                        {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-200" />}
                                     </div>
-                                    <p className="text-xs font-bold text-gray-800">16-32GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 14B per sintesi e reasoning.</p>
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">16-32GB RAM</p>
+                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 14B per sintesi e reasoning.</p>
                                 </div>
 
                                 <div
                                     onClick={() => applyHardwareProfile('high')}
                                     className={cn(
-                                        "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
                                         hardwareProfile === 'high'
-                                            ? "bg-white border-purple-500 ring-2 ring-purple-100 shadow-sm"
-                                            : "bg-white border-gray-200 opacity-60 hover:opacity-100"
+                                            ? "border-violet-300/80 bg-violet-50/75 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10"
+                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
                                     )}
                                 >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold uppercase text-purple-700">Pro</span>
-                                        {hardwareProfile === 'high' && <CheckCircle className="w-3 h-3 text-purple-600" />}
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-700 dark:text-violet-200">Pro</span>
+                                        {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4 text-violet-600 dark:text-violet-200" />}
                                     </div>
-                                    <p className="text-xs font-bold text-gray-800">&gt; 32GB RAM</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">&gt; 32GB RAM</p>
+                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
                                 </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-2 md:grid-cols-2">
+                                <p className="rounded-[18px] border border-sky-200/60 bg-sky-50/80 px-3 py-2 text-xs leading-5 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200">
+                                    Per usare provider non locali serve connettivita attiva e relativa configurazione API.
+                                </p>
+                                <p className="rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-2 text-xs leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                                    Il profilo hardware sovrascrive i modelli selezionati. Passa a configurazione personalizzata se vuoi controllo manuale.
+                                </p>
                             </div>
                         </div>
 
@@ -721,7 +926,7 @@ export default function SettingsPage() {
                         </div>
 
                         {/* @Codex */}
-                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-4">
+                        <div className="rounded-[24px] border border-indigo-100/80 bg-indigo-50/45 p-4 shadow-[0_12px_24px_rgba(79,70,229,0.06)] space-y-4 dark:border-indigo-500/20 dark:bg-indigo-900/10">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <h3 className="text-sm font-bold text-indigo-900">AI Patient Insight</h3>
@@ -743,7 +948,7 @@ export default function SettingsPage() {
                                             type="button"
                                             onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
                                             className={cn(
-                                                "rounded-lg border px-3 py-3 text-left transition-colors",
+                                                "rounded-[18px] border px-3 py-3 text-left transition-colors",
                                                 selected
                                                     ? "border-indigo-500 bg-white shadow-sm"
                                                     : "border-indigo-100 bg-white/70 hover:border-indigo-200"
@@ -786,7 +991,7 @@ export default function SettingsPage() {
                                             max={12}
                                             value={aiInsightSettings.manualConfig.maxDocuments}
                                             onChange={(e) => updateManualInsightConfig('maxDocuments', Number.parseInt(e.target.value, 10))}
-                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                         />
                                     </label>
                                     <label className="text-xs font-medium text-gray-700">
@@ -797,7 +1002,7 @@ export default function SettingsPage() {
                                             max={480}
                                             value={aiInsightSettings.manualConfig.maxDocumentSummaryChars}
                                             onChange={(e) => updateManualInsightConfig('maxDocumentSummaryChars', Number.parseInt(e.target.value, 10))}
-                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                         />
                                     </label>
                                     <label className="text-xs font-medium text-gray-700">
@@ -808,7 +1013,7 @@ export default function SettingsPage() {
                                             max={5000}
                                             value={aiInsightSettings.manualConfig.maxDocumentContextChars}
                                             onChange={(e) => updateManualInsightConfig('maxDocumentContextChars', Number.parseInt(e.target.value, 10))}
-                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                         />
                                     </label>
                                     <label className="text-xs font-medium text-gray-700">
@@ -819,7 +1024,7 @@ export default function SettingsPage() {
                                             max={1200}
                                             value={aiInsightSettings.manualConfig.outputMaxTokens}
                                             onChange={(e) => updateManualInsightConfig('outputMaxTokens', Number.parseInt(e.target.value, 10))}
-                                            className="mt-1 w-full rounded-lg border-gray-300 bg-white text-sm"
+                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                         />
                                     </label>
                                 </div>
@@ -827,10 +1032,9 @@ export default function SettingsPage() {
                         </div>
 
                         {/* 3. Provider & Infrastructure */}
-                        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
-                            {/* ... infrastructure settings remain similar ... */}
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-xs font-medium text-gray-500 uppercase">
+                        <div className="apple-subsection space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <label className="section-kicker">
                                     Infrastruttura
                                 </label>
                                 <div className="flex items-center gap-2">
@@ -839,29 +1043,37 @@ export default function SettingsPage() {
                                         id="advancedFit"
                                         checked={showAdvanced}
                                         onChange={(e) => setShowAdvanced(e.target.checked)}
-                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3"
+                                        className="sr-only"
                                     />
-                                    <label htmlFor="advancedFit" className="text-[10px] font-medium text-gray-400 cursor-pointer select-none">
+                                    <label
+                                        htmlFor="advancedFit"
+                                        className={cn(
+                                            "inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors",
+                                            showAdvanced
+                                                ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/10 dark:text-indigo-200"
+                                                : "border-slate-200/70 bg-white/72 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+                                        )}
+                                    >
                                         Avanzate
                                     </label>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                                    Provider AI: <span className="ml-2 font-semibold text-gray-800">Ollama (Locale)</span>
+                                <div className="flex items-center rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                    Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama (Locale)</span>
                                 </div>
                                 <input
                                     type="text"
                                     value={aiConfig.url}
                                     onChange={(e) => setAiConfig({ ...aiConfig, url: e.target.value })}
                                     placeholder="http://127.0.0.1:11434/v1"
-                                    className="w-full text-sm rounded-lg border-gray-300 py-2 font-mono text-xs"
+                                    className={`${SETTINGS_INPUT_CLASS} font-mono text-xs`}
                                 />
                             </div>
 
                             {showAdvanced && (
-                                <div className="mt-3 pt-2 border-t border-dashed border-gray-200">
+                                <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/5">
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
@@ -877,9 +1089,9 @@ export default function SettingsPage() {
                                                         : "http://127.0.0.1:11434/v1"
                                                 }));
                                             }}
-                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3"
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 dark:border-white/10 dark:bg-white/5"
                                         />
-                                        <label htmlFor="dockerMode" className="text-xs text-gray-500 cursor-pointer">
+                                        <label htmlFor="dockerMode" className="cursor-pointer text-xs leading-5 text-slate-500 dark:text-slate-400">
                                             Docker Internal Host (se l&apos;app è in container)
                                         </label>
                                     </div>
@@ -891,7 +1103,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={saveAiConfig}
                                 disabled={isSavingAi}
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                                className={SETTINGS_TONED_BUTTON_CLASS.indigo}
                             >
                                 <Save className="w-4 h-4" />
                                 {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
@@ -899,7 +1111,7 @@ export default function SettingsPage() {
 
                             <button
                                 onClick={testAiConnection}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
+                                className={SETTINGS_SECONDARY_BUTTON_CLASS}
                             >
                                 <RefreshCw className={cn("w-4 h-4", aiTestStatus === 'testing' && "animate-spin")} />
                                 Test Connessione
@@ -912,8 +1124,10 @@ export default function SettingsPage() {
                         {/* Detailed Diagnostic Panel */}
                         {aiHealth && (
                             <div className={cn(
-                                "rounded-xl p-4 border text-sm space-y-2 animate-in slide-in-from-top-2 fade-in",
-                                aiHealth.status === 'ok' ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"
+                                "animate-in slide-in-from-top-2 fade-in rounded-[22px] border p-4 text-sm space-y-2 shadow-[0_10px_22px_rgba(15,23,42,0.04)]",
+                                aiHealth.status === 'ok'
+                                    ? "border-emerald-200/70 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200"
+                                    : "border-red-200/70 bg-red-50/80 text-red-800 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
                             )}>
                                 <div className="flex items-start gap-2 font-bold">
                                     {aiHealth.status === 'ok' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
@@ -930,22 +1144,31 @@ export default function SettingsPage() {
 
                         {/* Test Status Indicator */}
                         {aiTestStatus === 'success' && (
-                            <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 p-2 rounded-lg border border-green-100">
+                            <div className="flex items-center gap-2 rounded-[18px] border border-emerald-200/70 bg-emerald-50/80 p-3 text-xs text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200">
                                 <CheckCircle className="w-4 h-4" />
                                 Connessione a Ollama riuscita!
                             </div>
                         )}
                         {aiTestStatus === 'error' && (
-                            <div className="flex items-center gap-2 text-red-600 text-xs bg-red-50 p-2 rounded-lg border border-red-100">
+                            <div className="flex items-center gap-2 rounded-[18px] border border-red-200/70 bg-red-50/80 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200">
                                 <AlertTriangle className="w-4 h-4" />
                                 Impossibile connettersi. Controlla che Ollama sia attivo.
                             </div>
                         )}
                     </div>
                 </div>
+                    </section>
 
+                    <section id="data" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Dati locali"
+                            title="Cataloghi offline"
+                            description="Farmaci ed esenzioni vivono nello stesso dominio visivo, invece di apparire come strumenti scollegati. Qui il focus e sulla manutenzione del dato locale."
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {/* --- AIFA Database Section --- */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className={SETTINGS_CARD_CLASS}>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                             <Database className="w-6 h-6" />
@@ -967,7 +1190,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="space-y-6">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-center justify-between">
+                        <div className="rounded-[22px] border border-blue-200/60 bg-blue-50/80 p-4 flex items-center justify-between dark:border-blue-500/20 dark:bg-blue-900/10">
                             <div>
                                 <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Farmaci Indicizzati</p>
                                 <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
@@ -991,7 +1214,7 @@ export default function SettingsPage() {
                             {!importing ? (
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-600 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all cursor-pointer"
+                                    className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-all hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
                                 >
                                     <Upload className="w-5 h-5" />
                                     <span className="font-medium">Carica File AIFA (.csv)</span>
@@ -1026,16 +1249,24 @@ export default function SettingsPage() {
 
                 {/* @Codex */}
                 <ExemptionDbManager />
+                        </div>
+                    </section>
+
+                    <section id="operations" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Operatività"
+                            title="Sistema e manutenzione"
+                            description="Diagnostica, architettura servizi e strumenti secondari stanno insieme, cosi non invadono le aree di configurazione clinica e account."
+                        />
 
                 {/* --- System & Maintenance Section --- */}
-                <div className="md:col-span-2 space-y-6">
+                <div className="space-y-6">
+                    <ServiceArchitecturePanel />
                     <DiagnosticHub />
 
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2">Sistema & Manutenzione</h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                         {/* Ambulatory Management */}
-                        <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl p-6 border border-blue-100 dark:border-blue-800/30 flex flex-col justify-between">
+                        <div className="apple-subsection flex flex-col justify-between">
                             <div className="flex items-start gap-4 mb-4">
                                 <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
                                     <Building2 className="w-6 h-6" />
@@ -1046,14 +1277,14 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                             <div className="flex items-center justify-end">
-                                <a href="/settings/ambulatories" className="text-sm font-medium text-blue-600 hover:underline">
+                                <a href="/settings/ambulatories" className="inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20">
                                     Apri Gestione &rarr;
                                 </a>
                             </div>
                         </div>
 
                         {/* Developer Tools */}
-                        <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-2xl p-6 border border-amber-100 dark:border-amber-800/30 flex flex-col justify-between">
+                        <div className="apple-subsection flex flex-col justify-between">
                             <div className="flex items-start gap-4 mb-4">
                                 <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
                                     <Server className="w-6 h-6" />
@@ -1069,7 +1300,7 @@ export default function SettingsPage() {
                         </div>
 
                         {/* @Codex: Native app launcher */}
-                        <div className="bg-slate-50/50 dark:bg-slate-900/10 rounded-2xl p-6 border border-slate-100 dark:border-slate-800/30 flex flex-col justify-between">
+                        <div className="apple-subsection flex flex-col justify-between">
                             <div className="flex items-start gap-4 mb-4">
                                 <div className="p-2.5 bg-slate-100 text-slate-600 rounded-xl shrink-0">
                                     <Cpu className="w-6 h-6" />
@@ -1083,7 +1314,7 @@ export default function SettingsPage() {
                                 <button
                                     onClick={openNativeApp}
                                     disabled={nativeLaunchState === 'loading'}
-                                    className="text-sm font-medium text-slate-700 hover:text-slate-900 disabled:text-slate-400"
+                                    className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/76 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:text-slate-400"
                                 >
                                     {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
                                 </button>
@@ -1095,70 +1326,80 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Danger Zone */}
-                        <div className="bg-red-50/50 dark:bg-red-900/10 rounded-2xl p-6 border border-red-100 dark:border-red-800/30">
-                            <div className="flex items-start gap-4 mb-6">
-                                <div className="p-2.5 bg-red-100 text-red-600 rounded-xl shrink-0">
-                                    <AlertTriangle className="w-6 h-6" />
+                    {/* Danger Zone */}
+                    <div className="rounded-[28px] border border-red-200/60 bg-[linear-gradient(135deg,rgba(254,242,242,0.94),rgba(255,255,255,0.82))] p-6 shadow-[0_16px_32px_rgba(185,28,28,0.08)] dark:border-red-500/20 dark:bg-red-900/10">
+                        <div className="mb-6 flex items-start gap-4">
+                            <div className="rounded-2xl bg-red-100 p-2.5 text-red-600 dark:bg-red-500/15 dark:text-red-200">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="section-kicker">Zona Pericolo</p>
+                                <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Separata dal resto delle isole operative per non competere visivamente con diagnostica e strumenti quotidiani.</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-6 rounded-[22px] border border-yellow-200/70 bg-yellow-50/80 p-4 dark:border-yellow-500/20 dark:bg-yellow-900/10">
+                            <div className="flex gap-3">
+                                <div className="flex-shrink-0">
+                                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">Zona Pericolo</h3>
-                                    <p className="text-xs text-gray-500 mt-1">Azioni irreversibili che influenzano l&apos;account.</p>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        Provider locale consigliato: Ollama.
+                                    </p>
+                                    <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-200">
+                                        Modificando queste impostazioni potresti interrompere il collegamento con l&apos;AI.
+                                        Assicurati che il server Ollama sia attivo su <code>{aiConfig.url || "localhost:11434"}</code>.
+                                    </p>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="bg-yellow-50 dark:bg-yellow-900/10 border-l-4 border-yellow-400 p-4 mb-6">
-                                <div className="flex">
-                                    <div className="flex-shrink-0">
-                                        <AlertTriangle className="h-5 w-5 text-yellow-400" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Provider locale consigliato: Ollama.
-                                        </p>
-                                        <p className="text-sm text-yellow-700 dark:text-yellow-200">
-                                            Modificando queste impostazioni potresti interrompere il collegamento con l&apos;AI.
-                                            Assicurati che il server Ollama sia attivo su <code>{aiConfig.url || "localhost:11434"}</code>.
-                                        </p>
-                                    </div>
-                                </div>
+                        <div className="flex flex-col gap-4 rounded-[22px] border border-red-100 bg-white/78 p-4 shadow-[0_10px_22px_rgba(185,28,28,0.06)] dark:border-red-900/50 dark:bg-red-950/20 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-red-100">Reset Onboarding</p>
+                                <p className="text-xs text-slate-500 dark:text-red-200/70">Cancella profilo utente e chiavi. I pazienti restano invariati.</p>
                             </div>
-
-                            <div className="flex items-center justify-between p-4 bg-white dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/50 shadow-sm">
-                                <div>
-                                    <p className="text-sm font-bold text-gray-700 dark:text-red-200">Reset Onboarding</p>
-                                    <p className="text-[10px] text-gray-400">Cancella profilo utente e chiavi. (I pazienti restano)</p>
-                                </div>
-                                <button
-                                    onClick={async () => {
-                                        if (confirm("Sei sicuro? Questo cancellerà il tuo profilo utente e ti riporterà alla configurazione iniziale.\n\nI dati dei pazienti NON verranno persi, ma dovrai riconfigurare l'accesso.")) {
-                                            try {
-                                                const res = await fetch('/api/auth/reset', { method: 'POST' });
-                                                if (res.ok) {
-                                                    window.location.href = '/';
-                                                } else {
-                                                    alert("Errore durante il reset.");
-                                                }
-                                            } catch (e) {
-                                                console.error(e);
-                                                alert("Errore di connessione.");
+                            <button
+                                onClick={async () => {
+                                    if (confirm("Sei sicuro? Questo cancellerà il tuo profilo utente e ti riporterà alla configurazione iniziale.\n\nI dati dei pazienti NON verranno persi, ma dovrai riconfigurare l'accesso.")) {
+                                        try {
+                                            const res = await fetch('/api/auth/reset', { method: 'POST' });
+                                            if (res.ok) {
+                                                window.location.href = '/';
+                                            } else {
+                                                alert("Errore durante il reset.");
                                             }
+                                        } catch (e) {
+                                            console.error(e);
+                                            alert("Errore di connessione.");
                                         }
-                                    }}
-                                    className="text-xs bg-white border border-red-200 text-red-600 hover:bg-red-600 hover:text-white px-3 py-2 rounded-lg font-bold transition-all shadow-sm"
-                                >
-                                    Reset Completo
-                                </button>
-                            </div>
+                                    }
+                                }}
+                                className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-all hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
+                            >
+                                Reset Completo
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
+                    </section>
 
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-8">
-                <BackupSchedulerUI />
-                <BackupRestoreUI />
+                    <section id="backups" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Backup"
+                            title="Continuità e ripristino"
+                            description="Schedulazione e restore diventano una famiglia dedicata: importante, ma non concorrente con account, AI o manutenzione quotidiana."
+                        />
+                        <div className="space-y-6">
+                            <BackupSchedulerUI />
+                            <BackupRestoreUI />
+                        </div>
+                    </section>
+                </div>
             </div>
         </div >
     );

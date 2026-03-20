@@ -19,6 +19,15 @@ interface PatientFormProps {
     isEditMode?: boolean;
 }
 
+/* @Codex */
+const FORM_SECTION_CLASS = 'glass-panel p-6 md:p-7 space-y-6';
+/* @Codex */
+const FORM_TITLE_CLASS = 'text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2';
+/* @Codex */
+const FORM_LABEL_CLASS = 'text-sm font-medium text-slate-700 dark:text-slate-300';
+/* @Codex */
+const FORM_INPUT_CLASS = 'w-full rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-slate-900 outline-none transition-all focus:border-sky-300 focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-sky-500/30';
+
 function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues>, setValue: UseFormSetValue<PatientFormValues>, watch: UseFormWatch<PatientFormValues> }) {
     const { fields, append, remove } = useFieldArray({
         control,
@@ -32,12 +41,12 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
             )}
 
             {fields.map((field, index) => (
-                <div key={field.id} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-red-50/50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-white/5 relative group animate-in fade-in focus-within:z-50">
+                <div key={field.id} className="relative flex flex-col items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5">
                     {/* Delete Button */}
                     <button
                         type="button"
                         onClick={() => remove(index)}
-                        className="absolute -right-2 -top-2 p-1.5 bg-white shadow-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 z-10"
+                        className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-white/10 dark:bg-[#161b22] dark:text-slate-400 dark:hover:border-red-500/20 dark:hover:bg-red-900/10"
                         aria-label="Rimuovi diagnosi"
                     >
                         <Trash2 className="w-3 h-3" />
@@ -45,7 +54,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
 
                     <div className="flex gap-3 w-full">
                         <div className="w-20 shrink-0">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Sistema</label>
+                            <label className="section-kicker mb-1 block">Sistema</label>
                             {(() => {
                                 const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                 const isV11 = sys === 'ICD-11';
@@ -61,18 +70,18 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
 
                         {/* Code Input (Read-onlyish but editable) */}
                         <div className="w-24 shrink-0">
-                            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1 block">Codice</label>
+                            <label className="section-kicker mb-1 block">Codice</label>
                             <input
                                 {...register(`diagnoses.${index}.code`)}
                                 placeholder="Codice"
-                                className={`w-full p-2.5 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none font-mono dark:text-white ${errors.diagnoses?.[index]?.code ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20'
+                                className={`w-full rounded-2xl border p-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white ${errors.diagnoses?.[index]?.code ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'
                                     }`}
                             />
                         </div>
 
                         {/* Description / Autocomplete */}
                         <div className="flex-1 min-w-0 relative">
-                            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1 block">Patologia / Ricerca</label>
+                            <label className="section-kicker mb-1 block">Patologia / Ricerca</label>
                             <div className="relative">
                                 <ICDAutocomplete
                                     value={{
@@ -114,7 +123,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
             <button
                 type="button"
                 onClick={() => append({ code: '', description: '', system: 'ICD-11', date: new Date() })}
-                className="text-sm text-blue-600 font-medium flex items-center gap-1 hover:underline mt-2"
+                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:bg-sky-900/10 dark:text-sky-300 dark:hover:bg-sky-900/20"
             >
                 <Plus className="w-4 h-4" />
                 Aggiungi Diagnosi
@@ -123,9 +132,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
     );
 }
 
-function CheckupsFieldArray({ control, register, errors, watch, remove }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues>, watch: UseFormWatch<PatientFormValues>, remove: (index: number) => void, append: (val: any) => void }) {
-    // We pass append/remove from parent or utilize useFieldArray here if we want isolation
-    // But since DiagnosesFieldArray used internal useFieldArray, let's do the same for consistency
+function CheckupsFieldArray({ control, register, errors }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues> }) {
     const { fields, append, remove: removeField } = useFieldArray({
         control,
         name: "checkups"
@@ -138,12 +145,12 @@ function CheckupsFieldArray({ control, register, errors, watch, remove }: { cont
             )}
 
             {fields.map((field, index) => (
-                <div key={field.id} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg border border-indigo-100 dark:border-white/5 relative group animate-in fade-in">
+                <div key={field.id} className="relative flex flex-col items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5">
                     {/* Delete Button */}
                     <button
                         type="button"
                         onClick={() => removeField(index)}
-                        className="absolute -right-2 -top-2 p-1.5 bg-white shadow-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 z-10"
+                        className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-white/10 dark:bg-[#161b22] dark:text-slate-400 dark:hover:border-red-500/20 dark:hover:bg-red-900/10"
                         aria-label="Rimuovi controllo"
                     >
                         <Trash2 className="w-3 h-3" />
@@ -152,21 +159,21 @@ function CheckupsFieldArray({ control, register, errors, watch, remove }: { cont
                     <div className="flex gap-3 w-full">
                         {/* Date */}
                         <div className="w-32 shrink-0">
-                            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1 block">Data</label>
+                            <label className="section-kicker mb-1 block">Data</label>
                             <input
                                 type="date"
                                 {...register(`checkups.${index}.date`)}
-                                className={`w-full p-2 text-sm rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white dark:[color-scheme:dark] ${errors.checkups?.[index]?.date ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20'}`}
+                                className={`w-full rounded-2xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white dark:[color-scheme:dark] ${errors.checkups?.[index]?.date ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'}`}
                             />
                         </div>
 
                         {/* Title */}
                         <div className="flex-1">
-                            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1 block">Motivo / Titolo</label>
+                            <label className="section-kicker mb-1 block">Motivo / Titolo</label>
                             <input
                                 {...register(`checkups.${index}.title`)}
                                 placeholder="Esempio: Controllo Cardiologico"
-                                className={`w-full p-2 text-sm rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white ${errors.checkups?.[index]?.title ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20'}`}
+                                className={`w-full rounded-2xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white ${errors.checkups?.[index]?.title ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'}`}
                             />
                         </div>
 
@@ -180,7 +187,7 @@ function CheckupsFieldArray({ control, register, errors, watch, remove }: { cont
             <button
                 type="button"
                 onClick={() => append({ date: new Date(), title: '', status: 'pending', source: 'manual' })}
-                className="text-sm text-indigo-600 font-medium flex items-center gap-1 hover:underline mt-2"
+                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:bg-sky-900/10 dark:text-sky-300 dark:hover:bg-sky-900/20"
             >
                 <Plus className="w-4 h-4" />
                 Aggiungi Controllo
@@ -232,38 +239,41 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
 
             {/* Personal Info Section */}
-            <div className="glass-panel p-6 space-y-6 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Dati base</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <User className="w-5 h-5 text-blue-500" />
                     Dati Anagrafici
-                </h3>
+                    </h3>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Nome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS}>Nome <span className="text-red-500">*</span></label>
                         <input
                             {...register('firstName')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-[#c9d1d9]"
+                            className={FORM_INPUT_CLASS}
                             placeholder="Mario"
                         />
                         {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message}</p>}
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Cognome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS}>Cognome <span className="text-red-500">*</span></label>
                         <input
                             {...register('lastName')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-[#c9d1d9]"
+                            className={FORM_INPUT_CLASS}
                             placeholder="Rossi"
                         />
                         {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message}</p>}
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Codice Fiscale <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS}>Codice Fiscale <span className="text-red-500">*</span></label>
                         <input
                             {...register('taxCode')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none uppercase font-mono dark:text-[#c9d1d9]"
+                            className={`${FORM_INPUT_CLASS} uppercase font-mono`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />
@@ -272,9 +282,9 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Data di Nascita</label>
+                            <label className={FORM_LABEL_CLASS}>Data di Nascita</label>
                             {estimatedAge !== null && (
-                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md animate-pulse">
+                                <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
                                     Stima: ~{estimatedAge} anni ({estimatedYear})
                                 </span>
                             )}
@@ -282,7 +292,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         <input
                             type="date"
                             {...register('birthDate')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-[#c9d1d9] dark:[color-scheme:dark]"
+                            className={`${FORM_INPUT_CLASS} dark:[color-scheme:dark]`}
                         />
                         {errors.birthDate && <p className="text-sm text-red-500">{errors.birthDate.message}</p>}
                     </div>
@@ -290,42 +300,45 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Contact Info Section */}
-            <div className="glass-panel p-6 space-y-6 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Recapiti</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <MapPin className="w-5 h-5 text-green-500" />
                     Contatti & Recapiti
-                </h3>
+                    </h3>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Indirizzo</label>
+                        <label className={FORM_LABEL_CLASS}>Indirizzo</label>
                         <input
                             {...register('address')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-transparent focus:bg-white dark:focus:bg-black/20 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-white"
+                            className={FORM_INPUT_CLASS}
                             placeholder="Via Roma 1, Milano"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <label className={`${FORM_LABEL_CLASS} flex items-center gap-2`}>
                             <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                             Cellulare / Telefono
                         </label>
                         <input
                             {...register('phone')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-transparent focus:bg-white dark:focus:bg-black/20 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-white"
+                            className={FORM_INPUT_CLASS}
                             placeholder="+39 333 1234567"
                         />
                     </div>
 
                     <div className="col-span-full space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <label className={`${FORM_LABEL_CLASS} flex items-center gap-2`}>
                             <HeartHandshake className="w-4 h-4 text-pink-500" />
                             Caregiver / Riferimento Familiare
                         </label>
                         <input
                             {...register('caregiver')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none dark:text-[#c9d1d9]"
+                            className={FORM_INPUT_CLASS}
                             placeholder="Nome Cognome (figlio/a) - Tel..."
                         />
                     </div>
@@ -335,30 +348,39 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             {/* Diagnosi & Patologie (ICD-9/10) */}
 
 
-            <div className="glass-panel p-6 space-y-6 relative z-50 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Codifica clinica</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <Activity className="w-5 h-5 text-red-500" />
                     Patologie e Diagnosi (ICD-11)
-                </h3>
+                    </h3>
+                </div>
 
                 <DiagnosesFieldArray register={register} control={control} errors={errors} setValue={setValue} watch={watch} />
             </div>
 
             {/* Prossimi Controlli */}
-            <div className="glass-panel p-6 space-y-6 relative z-40 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Agenda clinica</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <Calendar className="w-5 h-5 text-indigo-500" />
                     Prossimi Controlli
-                </h3>
-                <CheckupsFieldArray register={register} control={control} errors={errors} watch={watch} remove={() => { }} append={() => { }} />
+                    </h3>
+                </div>
+                <CheckupsFieldArray register={register} control={control} errors={errors} />
             </div>
 
             {/* @Codex */}
-            <div className="glass-panel p-6 space-y-4 relative z-30 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Assetto amministrativo</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <Ticket className="w-5 h-5 text-indigo-500" />
                     Codici Esenzione
-                </h3>
+                    </h3>
+                </div>
                 <Controller
                     name="exemptions"
                     control={control}
@@ -375,32 +397,34 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Clinical Profile Section */}
-            <div className="glass-panel p-6 space-y-6 dark:bg-[#161b22] dark:border-[#30363d]">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#c9d1d9] flex items-center gap-2 border-b border-gray-100 dark:border-[#30363d] pb-2">
+            <div className={FORM_SECTION_CLASS}>
+                <div>
+                    <p className="section-kicker">Profilo assistenziale</p>
+                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
                     <FileText className="w-5 h-5 text-purple-500" />
                     Profilo Assistenziale
-                </h3>
+                    </h3>
+                </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                    <div className="p-4 bg-blue-50/50 dark:bg-[#0d1117] rounded-xl border border-blue-100 dark:border-[#30363d] flex flex-col md:flex-row gap-6">
+                    <div className="rounded-[24px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5 flex flex-col md:flex-row gap-6">
                         <div className="flex items-center gap-3">
                             <input
                                 type="checkbox"
                                 id="adi"
                                 {...register('isAdi')}
-                                {...register('isAdi')}
-                                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-[#161b22] dark:border-[#30363d]"
+                                className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-white/10 dark:bg-white/5"
                             />
-                            <label htmlFor="adi" className="font-medium text-gray-800 dark:text-[#c9d1d9]">Paziente in ADI (Assistenza Domiciliare Integrata)</label>
+                            <label htmlFor="adi" className="font-medium text-slate-800 dark:text-white">Paziente in ADI (Assistenza Domiciliare Integrata)</label>
                         </div>
 
                         <div className="flex-1 space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Profilo Monitoraggio</label>
+                            <label className={FORM_LABEL_CLASS}>Profilo Monitoraggio</label>
                             <select
                                 {...register('monitoringProfile')}
-                                className={`w-full px-4 py-2 rounded-lg bg-white dark:bg-[#161b22] dark:text-[#c9d1d9] border-0 ring-1 focus:ring-2 appearance-none ${currentStatus === 'taken_in_charge'
-                                    ? 'ring-green-200 focus:ring-green-500 text-green-800 dark:text-green-400 font-medium'
-                                    : 'ring-orange-200 focus:ring-orange-500 text-orange-800 dark:text-orange-400 font-medium'
+                                className={`w-full appearance-none rounded-2xl border px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-500/20 ${currentStatus === 'taken_in_charge'
+                                    ? 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-300'
+                                    : 'border-orange-200 bg-orange-50/70 text-orange-800 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-300'
                                     }`}
                             >
                                 <option value="taken_in_charge">Presa in Carico (Continua)</option>
@@ -410,14 +434,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             {/* Conditional Reason Field */}
                             {hasStatusChanged && isEditMode && (
                                 <div className="animate-in slide-in-from-top-2 pt-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mb-1">
+                                    <label className="section-kicker mb-1 flex items-center gap-1">
                                         <AlertTriangle className="w-3 h-3 text-orange-500" />
                                         Motivo Cambio Stato (Richiesto)
                                     </label>
                                     <textarea
                                         {...register('statusReason')}
                                         required
-                                        className="w-full p-2 text-sm border border-orange-200 dark:border-white/10 bg-orange-50 dark:bg-orange-900/10 dark:text-orange-100 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                        className="w-full rounded-2xl border border-orange-200 bg-orange-50 p-3 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-100"
                                         placeholder="Perché stai cambiando lo stato? (es. Trasferito ad altro ente...)"
                                         rows={2}
                                     />
@@ -427,10 +451,10 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-[#8b949e]">Note Globali (Anamnesi Sociale / Memo)</label>
+                        <label className={FORM_LABEL_CLASS}>Note Globali (Anamnesi Sociale / Memo)</label>
                         <textarea
                             {...register('notes')}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none min-h-[100px] dark:text-[#c9d1d9]"
+                            className={`${FORM_INPUT_CLASS} min-h-[100px]`}
                             placeholder="Informazioni aggiuntive, contesto sociale, codici accesso..."
                         />
                     </div>
@@ -441,7 +465,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Save className="w-5 h-5" />
                     {isSubmitting ? 'Salvataggio...' : (isEditMode ? 'Aggiorna Paziente' : 'Crea Paziente')}

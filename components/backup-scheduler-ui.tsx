@@ -55,6 +55,10 @@ function formatBytes(value: number): string {
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const INPUT_CLASS = 'mt-1 w-full rounded-2xl border border-white/70 bg-white/76 p-3 text-sm text-slate-800 shadow-[0_10px_22px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-all focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100';
+const PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#4F46E5,#818CF8)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_36px_rgba(79,70,229,0.3)] disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
+
 export default function BackupSchedulerUI() {
     const [status, setStatus] = useState<BackupSchedulerResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -225,9 +229,10 @@ export default function BackupSchedulerUI() {
     const lastRun = status?.state.run;
 
     return (
-        <div className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-6 shadow-sm space-y-4">
+        <div className="glass-panel p-6 md:p-7 space-y-5">
             <div className="flex items-start justify-between gap-4">
                 <div>
+                    <p className="section-kicker">Continuità operativa</p>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <Clock3 className="w-5 h-5 text-indigo-500" />
                         Backup automatico notturno
@@ -237,14 +242,14 @@ export default function BackupSchedulerUI() {
                     </p>
                 </div>
                 {status && (
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${status.installed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
                         {status.installed ? 'Installato' : 'Non installato'}
                     </span>
                 )}
             </div>
 
             {!isLoading && status && !status.supported && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
                     Il backup automatico di questa slice e supportato solo su macOS.
                 </div>
             )}
@@ -266,7 +271,7 @@ export default function BackupSchedulerUI() {
                         type="time"
                         value={time}
                         onChange={(event) => setTime(event.target.value)}
-                        className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 bg-gray-50 p-2.5 text-sm"
+                        className={INPUT_CLASS}
                     />
                 </label>
 
@@ -277,7 +282,7 @@ export default function BackupSchedulerUI() {
                         value={destinationDir}
                         onChange={(event) => setDestinationDir(event.target.value)}
                         placeholder="/Users/.../Backups/MediFlow"
-                        className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 bg-gray-50 p-2.5 text-sm"
+                        className={INPUT_CLASS}
                     />
                 </label>
 
@@ -289,12 +294,12 @@ export default function BackupSchedulerUI() {
                         max={365}
                         value={retentionKeepArtifacts}
                         onChange={(event) => setRetentionKeepArtifacts(Math.max(1, Number.parseInt(event.target.value || '1', 10) || 1))}
-                        className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 bg-gray-50 p-2.5 text-sm"
+                        className={INPUT_CLASS}
                     />
                 </label>
             </div>
 
-            <div className="rounded-lg border border-slate-200 dark:border-[#30363d] bg-slate-50 dark:bg-[#0d1117] px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+            <div className="rounded-[22px] border border-slate-200/70 bg-white/72 px-4 py-3 text-sm text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                 La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.
             </div>
 
@@ -302,7 +307,7 @@ export default function BackupSchedulerUI() {
                 <button
                     onClick={save}
                     disabled={isSaving}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className={PRIMARY_BUTTON_CLASS}
                 >
                     {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Salva schedulazione
@@ -310,7 +315,7 @@ export default function BackupSchedulerUI() {
                 <button
                     onClick={runNow}
                     disabled={isRunning}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className={SECONDARY_BUTTON_CLASS}
                 >
                     {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
                     Esegui adesso
@@ -318,7 +323,7 @@ export default function BackupSchedulerUI() {
                 <button
                     onClick={previewRetention}
                     disabled={isPreviewingRetention}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className={SECONDARY_BUTTON_CLASS}
                 >
                     {isPreviewingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     Anteprima retention
@@ -326,7 +331,7 @@ export default function BackupSchedulerUI() {
                 <button
                     onClick={applyRetention}
                     disabled={isApplyingRetention}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className={SECONDARY_BUTTON_CLASS}
                 >
                     {isApplyingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
                     Applica pulizia
@@ -334,7 +339,7 @@ export default function BackupSchedulerUI() {
             </div>
 
             {lastRun && (
-                <div className="rounded-lg border border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117] px-4 py-3 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                <div className="apple-subsection space-y-1 text-sm text-gray-700 dark:text-gray-300">
                     <p><strong>Ultimo run:</strong> {lastRun.lastRunAt ?? 'mai eseguito'}</p>
                     <p><strong>Esito:</strong> {lastRun.lastRunStatus ?? 'n/d'}</p>
                     {lastRun.lastRunMessage && <p><strong>Messaggio:</strong> {lastRun.lastRunMessage}</p>}
@@ -350,7 +355,7 @@ export default function BackupSchedulerUI() {
             )}
 
             {retentionPreview && (
-                <div className="rounded-lg border border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117] px-4 py-3 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                <div className="apple-subsection space-y-2 text-sm text-gray-700 dark:text-gray-300">
                     <p><strong>Anteprima retention:</strong> {retentionPreview.deleteCount} file candidati, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
                     <p><strong>Policy:</strong> mantieni ultimi {retentionPreview.keepArtifacts} artifact nella cartella {retentionPreview.destinationDir}</p>
                     <p><strong>Inventario:</strong> {retentionPreview.artifactCount} artifact gestiti, {retentionPreview.orphanTempCount} `.tmp` orfani</p>
@@ -370,12 +375,12 @@ export default function BackupSchedulerUI() {
             )}
 
             {message && (
-                <div className={`rounded-lg border px-4 py-3 flex items-center gap-2 text-sm ${
+                <div className={`rounded-[18px] border px-4 py-3 flex items-center gap-2 text-sm ${
                     message.type === 'success'
-                        ? 'border-green-200 bg-green-50 text-green-700'
+                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300'
                         : message.type === 'error'
-                            ? 'border-red-200 bg-red-50 text-red-700'
-                            : 'border-blue-200 bg-blue-50 text-blue-700'
+                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-300'
+                            : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-300'
                 }`}>
                     {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     <span>{message.text}</span>

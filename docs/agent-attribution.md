@@ -4,7 +4,14 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-20 Codex
+- Reworked the settings experience into a more coherent Apple-inspired shell with a liquid hero header, sticky family rail, grouped section hierarchy for account/AI/data/operations/backup, and more harmonious “floating island” spacing: `app/settings/page.tsx`
+- Aligned the embedded settings panels to the same grouped/liquid visual language so diagnostics, catalog maintenance, service topology, scheduler and restore no longer feel like legacy islands inside the new shell: `components/settings/exemption-db-manager.tsx`, `components/diagnostic-hub.tsx`, `components/service-architecture-panel.tsx`, `components/backup-scheduler-ui.tsx`, `components/backup-restore-ui.tsx`
+- Fixed the preview/auth refresh gap that left patient queries stale after unlocking on a fresh origin by invalidating live queries whenever the active client-side master key changes, and hardened the dev server session store so route modules share the same session map across HMR/module reloads: `components/security-provider.tsx`, `lib/server-session.ts`
+
 ## 2026-03-19 Codex
+- Reworked the patient-detail readability layer toward an Apple-inspired, content-first hierarchy with lighter chrome, a more expressive Liquid-Glass-like surface language, centralized quick actions, progressive disclosure for secondary metadata, and simplified AI/archive/observation panels: `app/globals.css`, `app/patients/[id]/page.tsx`, `components/ai-patient-insight.tsx`, `components/document-insights-panel.tsx`, `components/observation-manager.tsx`
+- Extended the same patient-UI slice to browse/create flows by replacing dense card-heavy listings with scan-friendly grouped rows, adding more tactile pill-and-glass interactions, and reshaping the patient form into grouped sections with lower visual noise: `components/patient-list.tsx`, `components/patient-form.tsx`
 - Realigned release-hygiene documentation to the actual `main` state before the `0.4.0` push by tightening the active gate wording, switching the canonical verify loop to `npm run typecheck`, and marking ADR 0024 as accepted: `PLANS.md`, `CONTRIBUTING.md`, `docs/adr/0024-web-core-stabilization-before-next-version-bump.md`
 - Extended the release-facing documentation so `v0.4.0` explicitly records the macOS freeze/rebuild decision and keeps README/roadmap/native guides aligned with the actual post-release plan: `README.md`, `CHANGELOG.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/ROADMAP.md`, `docs/NATIVE.md`, `docs/walkthrough.md`
 

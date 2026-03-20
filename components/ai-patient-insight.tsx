@@ -113,13 +113,14 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
     if (!patient.aiSummary && !isGenerating) {
         return (
-            <div className="glass-panel p-6 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-transparent border-indigo-100 dark:border-indigo-500/20 flex flex-col items-center text-center space-y-4">
-                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
+            <div className="glass-panel p-6 flex flex-col items-start space-y-4">
+                <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-300">
                     <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                    <h3 className="font-bold text-gray-800 dark:text-white">Genera Patient Insight</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                    <p className="section-kicker">Supporto decisionale</p>
+                    <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Genera Patient Insight</h3>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
                         Usa l&apos;intelligenza artificiale per ottenere un quadro clinico breve, citabile e orientato all&apos;azione.
                     </p>
                 </div>
@@ -132,7 +133,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
                 <button
                     onClick={generateInsight}
-                    className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED]"
                 >
                     <Sparkles className="w-4 h-4" />
                     Genera Insight
@@ -142,21 +143,17 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     }
 
     return (
-        <div className="glass-panel p-6 relative overflow-hidden border-indigo-100 dark:border-indigo-500/20 shadow-lg shadow-indigo-100/50 dark:shadow-none">
-            {/* Background Decoration */}
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <Sparkles className="w-32 h-32 text-indigo-900 dark:text-indigo-400" />
-            </div>
-
-            <div className="flex justify-between items-start mb-4 relative z-10">
+        <div className="glass-panel p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
                 <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-md shadow-indigo-200 dark:shadow-none">
+                    <div className="rounded-2xl bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-300">
                         <Sparkles className="w-5 h-5" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-xl text-gray-800 dark:text-white">AI Patient Insight</h3>
+                        <p className="section-kicker">Supporto decisionale</p>
+                        <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">AI Patient Insight</h3>
                         {modelLabel && (
-                            <p className="text-[10px] text-gray-500">Modello: {modelLabel}</p>
+                            <p className="text-[10px] text-slate-500">Modello: {modelLabel}</p>
                         )}
                     </div>
                 </div>
@@ -164,7 +161,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 <button
                     onClick={generateInsight}
                     disabled={isGenerating}
-                    className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20"
                     title="Rigenera analisi"
                 >
                     {isGenerating ? (
@@ -177,7 +174,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
             </div>
 
             {error && (
-                <div className="mb-4 text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">
+                <div className="mb-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     {error}
                 </div>
@@ -212,15 +209,15 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
             ) : hasStructuredInsight ? (
                 <div className="space-y-4">
                     {parsedInsight.nextSteps.length > 0 && (
-                        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-500/20 dark:bg-indigo-900/10">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                        <div className="apple-subsection">
+                            <p className="section-kicker text-indigo-700 dark:text-indigo-300">
                                 Prossimi passi suggeriti
                             </p>
                             <div className="mt-3 space-y-2">
                                 {parsedInsight.nextSteps.map((step, index) => (
                                     <div
                                         key={`${index}-${step}`}
-                                        className="rounded-xl bg-white/80 px-3 py-2 text-sm font-medium text-indigo-950 shadow-sm dark:bg-black/20 dark:text-indigo-100"
+                                        className="rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2.5 text-sm font-medium text-slate-800 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                                     >
                                         {index + 1}. <PrivacyBlur intensity="sm">{step}</PrivacyBlur>
                                     </div>
@@ -230,19 +227,19 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     )}
 
                     {parsedInsight.summary && (
-                        <div className="rounded-2xl border border-white/60 bg-white/60 p-4 dark:border-white/10 dark:bg-black/20">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <div className="apple-subsection">
+                            <p className="section-kicker">
                                 Quadro clinico
                             </p>
-                            <p className="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-200">
+                            <p className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-200">
                                 <PrivacyBlur intensity="sm">{parsedInsight.summary}</PrivacyBlur>
                             </p>
                         </div>
                     )}
 
                     {parsedInsight.alerts.length > 0 && (
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                        <div className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
+                            <p className="section-kicker text-amber-700 dark:text-amber-300">
                                 Attenzioni
                             </p>
                             <ul className="mt-2 space-y-1 text-sm text-amber-900 dark:text-amber-100">
@@ -257,8 +254,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     )}
 
                     {parsedInsight.gaps.length > 0 && (
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-white/10 dark:bg-white/5">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <div className="apple-subsection">
+                            <p className="section-kicker">
                                 Gap da chiarire
                             </p>
                             <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-200">
@@ -273,7 +270,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     )}
                 </div>
             ) : (
-                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 prose-headings:text-indigo-900 dark:prose-headings:text-indigo-300 prose-strong:text-indigo-700 dark:prose-strong:text-indigo-400 leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-indigo-50/50 dark:border-indigo-500/10">
+                <div className="prose prose-sm max-w-none rounded-[24px] border border-slate-200/80 bg-white/80 p-4 text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:prose-headings:text-white dark:prose-strong:text-white">
                     <PrivacyBlur>
                         <ReactMarkdown>{diagnostics.mainMarkdown || parsedInsight.fallbackMarkdown}</ReactMarkdown>
                     </PrivacyBlur>
@@ -281,7 +278,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
             )}
 
             {hasDiagnostics && (
-                <details className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
+                <details className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-900/10">
                     <summary className="cursor-pointer text-sm font-semibold text-amber-800 dark:text-amber-200">
                         Fonti e avvisi AI
                     </summary>
@@ -304,7 +301,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 </details>
             )}
 
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center gap-2 text-[10px] text-gray-400">
+            <div className="mt-4 flex items-center gap-2 border-t border-slate-200/80 pt-3 text-[10px] text-slate-400 dark:border-white/10">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
                 <span>Generato da IA locale. Apri “Fonti e avvisi AI” per citazioni e limiti di supporto.</span>
             </div>
