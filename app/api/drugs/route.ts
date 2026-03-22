@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
-import { sql } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
@@ -17,7 +17,13 @@ export async function GET(request: Request) {
     try {
         if (query) {
             const results = await dbServer.select().from(drugs)
-                .where(sql`${drugs.name} LIKE ${`%${query}%`} OR ${drugs.activePrinciple} LIKE ${`%${query}%`} OR ${drugs.aic} LIKE ${`%${query}%`}`)
+                .where(sql`
+                    ${drugs.name} LIKE ${`%${query}%`}
+                    OR ${drugs.activePrinciple} LIKE ${`%${query}%`}
+                    OR ${drugs.packaging} LIKE ${`%${query}%`}
+                    OR ${drugs.aic} LIKE ${`%${query}%`}
+                `)
+                .orderBy(asc(drugs.name), asc(drugs.packaging))
                 .limit(50);
             return NextResponse.json(results);
         }

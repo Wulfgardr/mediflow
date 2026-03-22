@@ -18,6 +18,8 @@ import DiagnosticHub from '@/components/diagnostic-hub';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';
 /* @Codex */
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
+/* @Codex */
+import AiModelParliamentPanel from '@/components/settings/ai-model-parliament-panel';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -29,9 +31,10 @@ interface ModelSelectorProps {
     onChange: (val: string) => void;
     recommended: { name: string; desc: string }[];
     provider: string;
+    targetUrl: string;
 }
 
-function ModelSelector({ label, description, icon, color, value, onChange, recommended, provider }: ModelSelectorProps) {
+function ModelSelector({ label, description, icon, color, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
     const [installedModels, setInstalledModels] = useState<string[]>([]);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(false);
@@ -46,12 +49,14 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
         if (provider === 'ollama') {
             checkInstalled();
         }
-    }, [provider]);
+    }, [provider, targetUrl]);
 
     const checkInstalled = async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/ai/models');
+            const res = await fetch('/api/ai/models', {
+                headers: { 'x-target-url': targetUrl }
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (data.models) {
@@ -77,7 +82,10 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
         try {
             const response = await fetch('/api/ai/pull', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-target-url': targetUrl,
+                },
                 body: JSON.stringify({ model: modelName })
             });
 
@@ -890,6 +898,7 @@ export default function SettingsPage() {
                                     { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Specialistico medico, non default)" }
                                 ]}
                                 provider={aiConfig.provider}
+                                targetUrl={aiConfig.url}
                             />
 
                             <ModelSelector
@@ -907,6 +916,7 @@ export default function SettingsPage() {
                                     { name: "deepseek-r1:14b", desc: "DeepSeek R1 14B (Reasoning)" }
                                 ]}
                                 provider={aiConfig.provider}
+                                targetUrl={aiConfig.url}
                             />
 
                             <ModelSelector
@@ -922,6 +932,7 @@ export default function SettingsPage() {
                                     { name: "llava:13b", desc: "LLaVA 13B (Vision Generalista)" }
                                 ]}
                                 provider={aiConfig.provider}
+                                targetUrl={aiConfig.url}
                             />
                         </div>
 
@@ -1155,6 +1166,8 @@ export default function SettingsPage() {
                                 Impossibile connettersi. Controlla che Ollama sia attivo.
                             </div>
                         )}
+
+                        <AiModelParliamentPanel />
                     </div>
                 </div>
                     </section>

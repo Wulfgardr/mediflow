@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-03-19
+Ultimo aggiornamento: 2026-03-22
 
 ## Come usare questo indice
 
@@ -63,6 +63,9 @@ Ultimo aggiornamento: 2026-03-19
 | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | Benchmark v1 per facts osservazionali `LOINC/UCUM`, corpus sintetico e decisione `hybrid` default / `rules` fallback. | Quando si toccano osservazioni, import documentale codificato o decisioni di interoperabilità sui clinical facts. |
 | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | Matrice di allineamento tra baseline ufficiale GTW/FSE e stato MediFlow. | Per gap analysis ministeriale, priorità FSE e anti-drift tecnico. |
 | [docs/siss-baseline.md](./siss-baseline.md) | Baseline canonica SISS: stato attuale, target certificato, gap e sequenza di consegna. | Quando si lavora su `WUL-43`, `WUL-44` e `WUL-45`. |
+| [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | Valutazione comparativa tra OpenMed e lo stack AI locale MediFlow, con raccomandazione di fit per lane (`PII`, `NER`, runtime generativo). | Quando si esplorano toolkit AI esterni o si decide se introdurre sidecar locali specialistici. |
+| [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | Dossier tecnico trasversale sullo stato reale dello stack AI, sugli incidenti incontrati, sui benchmark gia eseguiti e sulle priorita di hardening. | Quando serve una vista unica su current state AI, colli di bottiglia, benchmark e prossime mosse affidabili. |
+| [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | Piano operativo work-package per portare a terra benchmark resolver, hardening Smart Import/Insight, lane PII e rollout prudente dello stack AI. | Quando serve passare dal dossier AI alla sequenza concreta di implementazione con dipendenze ed exit criteria. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 | [oss-assets/README.md](../oss-assets/README.md) | Presentazione OSS e posizionamento progetto. | Per contesto pubblico/comunicazione. |
 
@@ -106,6 +109,9 @@ Ultimo aggiornamento: 2026-03-19
 | [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./adr/0024-web-core-stabilization-before-next-version-bump.md) | Fissa la sequenza di stabilizzazione web/core prima del prossimo version bump, con helper condivisi, `typecheck` canonico e split incrementale dei god files. |
 | [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md) | Introduce il foundation layer locale SISS con azioni tipizzate, error taxonomy stabile, retry sui transienti e metadata audit PHI-safe. |
 | [docs/adr/0026-pin-rotation-via-client-side-rewrap.md](./adr/0026-pin-rotation-via-client-side-rewrap.md) | Definisce la rotazione zero-knowledge del PIN tramite re-wrap client-side della master key, senza ricifrare i dati clinici. |
+| [docs/adr/0027-ai-task-extraction-envelope-and-local-render.md](./adr/0027-ai-task-extraction-envelope-and-local-render.md) | Introduce l'envelope condiviso `mediflow.ai.extract.v1` per insight/smart import/document synthesis, separando il render locale compatto e il benchmark contrattuale sui modelli Qwen target. |
+| [docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md](./adr/0028-stack-aware-ai-model-evaluation-matrix.md) | Definisce una matrice stack-aware per i candidati AI: benchmark reale solo sui generativi `ollama` eseguibili, con stati espliciti per modelli PII/NER/encoder bloccati da integrazione, licenza o gating. |
+| [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | Introduce il parlamento dei modelli AI locali per unire benchmark, retention e pruning esplicito dei modelli ridondanti senza toccare automaticamente i ruoli attivi nei settings. |
 
 ## Checklist manutenzione indice
 

@@ -21,16 +21,54 @@ export interface ChatMessageContent {
     image_url?: { url: string }; // base64 data URL or http URL
 }
 
+function normalizeOllamaImage(url: string): string {
+    if (url.startsWith('data:')) {
+        const [, data] = url.split(',', 2);
+        return data || url;
+    }
+    return url;
+}
+
+function toOllamaMessages(messages: ChatMessage[]) {
+    return messages.map((message) => {
+        if (typeof message.content === 'string') {
+            return {
+                role: message.role,
+                content: message.content,
+            };
+        }
+
+        const textParts: string[] = [];
+        const images: string[] = [];
+
+        for (const item of message.content) {
+            if (item.type === 'text' && item.text) {
+                textParts.push(item.text);
+            } else if (item.type === 'image_url' && item.image_url?.url) {
+                images.push(normalizeOllamaImage(item.image_url.url));
+            }
+        }
+
+        return {
+            role: message.role,
+            content: textParts.join('\n\n').trim(),
+            ...(images.length > 0 ? { images } : {})
+        };
+    });
+}
+
 export class AIService {
     public provider: AIProvider;
     private baseUrl: string;
     private model: string;
+    private disableThinking: boolean;
 
-    constructor(provider: AIProvider, baseUrl: string, model: string) {
+    constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false) {
         // Clean URL: Handle /v1, /v (typo), and trailing slash
         this.baseUrl = baseUrl.replace(/\/v1?\/?$/, '').replace(/\/$/, '');
         this.provider = provider;
         this.model = model;
+        this.disableThinking = disableThinking;
     }
 
     /* @Codex */
@@ -84,36 +122,31 @@ export class AIService {
 
         console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
 
-        return new AIService(provider, url, model);
+        return new AIService(provider, url, model, task === 'clinical');
     }
 
     /**
-     * Unified Chat Completion (OpenAI Compatible)
-     * Used for both chat and single-prompt generation (wrapped)
+     * Unified chat entrypoint backed by the native Ollama chat API.
      */
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number): Promise<{ content: string; stats: AIStats }> {
         const start = Date.now();
-
-        // OpenAI Format
         const body = {
             model: this.model,
-            messages: messages,
+            messages: toOllamaMessages(messages),
             stream: false,
-            // formatted options for OpenAI-compatible providers
-            temperature: 0.4,
-            max_tokens: maxTokens || 4096
+            options: {
+                temperature: 0.4,
+                num_predict: maxTokens || 4096,
+            },
+            ...(this.disableThinking ? { think: false } : {}),
         };
 
-        // Target Endpoint: /v1/chat/completions (OpenAI-compatible)
-        // We use our Proxy to forward the request to the correct local URL
-        const targetUrl = `${this.baseUrl}/v1/chat/completions`;
-
         try {
-            const response = await fetch('/api/proxy/ai/chat', {
+            const response = await fetch('/api/proxy/ollama/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-target-url': targetUrl
+                    'x-target-url': this.baseUrl,
                 },
                 body: JSON.stringify(body),
                 signal // Allow cancellation
@@ -125,17 +158,17 @@ export class AIService {
             }
 
             const data = await response.json();
-
-            // OpenAI format response parsing
-            const content = data.choices?.[0]?.message?.content || "";
+            const content = data.message?.content || data.choices?.[0]?.message?.content || "";
             const usage = data.usage || {};
+            const tokensIn = data.prompt_eval_count || usage.prompt_tokens || 0;
+            const tokensOut = data.eval_count || usage.completion_tokens || 0;
 
             return {
                 content,
                 stats: {
                     latency: Date.now() - start,
-                    tokensIn: usage.prompt_tokens || 0,
-                    tokensOut: usage.completion_tokens || 0
+                    tokensIn,
+                    tokensOut,
                 }
             };
 

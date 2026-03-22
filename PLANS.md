@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-19
+Ultimo aggiornamento: 2026-03-22
 
 ---
 
@@ -31,6 +31,21 @@ Nota operativa:
 - [x] Introdurre validazione documentale pilota FSE (`error` + `warning`) prima dell'export.
 - [x] Avviare thin slice osservazioni con `LOINC + UCUM` su un percorso clinico verticale.
 - [x] Introdurre smart import reviewable nel profilo paziente da note/diario/documenti per diagnosi ICD-11 e terapie, mantenendo l'autofill automatico limitato ai soli ICD espliciti (ADR 0012).
+
+### 0c) Affidabilita stack AI locale
+- [ ] Eseguire `AI-01`: benchmark headless dei resolver reali WHO ICD-11 e AIFA, con corpora sintetici e metriche top-k/latency/ambiguity.
+- [ ] Eseguire `AI-02`: hardening Smart Import sui casi di switch terapeutico, applicabilita suggerimenti e policy `manual|blocked|uncertain`.
+- [ ] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
+- [ ] Eseguire `AI-04`: preparare ADR e thin slice lane `PII/redaction` locale in shadow mode, coerente con la valutazione OpenMed.
+- [ ] Eseguire `AI-05`: aggiungere input normalization tollerante per PDF e CDA/CCD prima delle lane semantiche.
+- [ ] Eseguire `AI-06`: benchmarkare una lane NER clinica italiana deterministica (`HUMADEX`) solo se migliora auditabilita o coding.
+- [ ] Eseguire `AI-07`: valutare challenger generativi solo dopo baseline e resolver stabili, senza cambiare il default per intuizione.
+- [ ] Eseguire `AI-08`: formalizzare rollout/shadow mode/stop-rules delle lane AI prima di qualunque attivazione operativa.
+
+Nota operativa:
+- la sequenza esecutiva dettagliata e in [docs/ai-stack-execution-plan.md](./docs/ai-stack-execution-plan.md)
+- il contesto tecnico e i benchmark gia eseguiti restano documentati in [docs/ai-stack-reliability-review.md](./docs/ai-stack-reliability-review.md)
+- nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
 - [x] Formalizzare i controlli "never regress" (no default creds, no egress di default, no regressioni zero-knowledge).

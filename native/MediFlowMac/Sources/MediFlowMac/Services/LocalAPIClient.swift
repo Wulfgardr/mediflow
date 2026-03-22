@@ -304,7 +304,7 @@ actor LocalAPIClient {
     }
 
     func login(pin: String) async throws -> AuthLoginResponse {
-        let payload = AuthLoginRequest(username: "admin", password: pin)
+        let payload = AuthLoginRequest(username: nil, password: pin)
         let request = try makeRootRequest(path: "auth/login", method: "POST", body: payload, requiresAuth: false)
         let (data, response) = try await data(for: request)
         try validate(data: data, response: response)
@@ -1101,7 +1101,7 @@ struct AuthDbHealth: Decodable {
 }
 
 struct AuthLoginRequest: Encodable {
-    let username: String
+    let username: String?
     let password: String
 }
 

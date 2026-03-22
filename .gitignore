@@ -20,6 +20,7 @@
 /tmp-parity-smoke
 /tmp-audit-test
 /tmp-auth-lockout-test
+/tmp/
 
 # next.js
 /.next/

@@ -58,13 +58,28 @@ function authFailureResponse(payload: Record<string, unknown>, status: number) {
     return response;
 }
 
+/* @Codex */
+async function resolveLoginUsername(requestedUsername: string): Promise<string> {
+    if (requestedUsername) return requestedUsername;
+
+    // The web/native clients are currently single-user by default. If the DB has
+    // exactly one local account, allow PIN login without sending a username.
+    const candidates = await dbServer
+        .select({ username: users.username })
+        .from(users)
+        .limit(2);
+
+    return candidates.length === 1 ? candidates[0].username : '';
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const username = typeof body?.username === 'string' ? body.username.trim() : '';
+        const requestedUsername = typeof body?.username === 'string' ? body.username.trim() : '';
         const password = typeof body?.password === 'string' ? body.password : '';
+        const username = await resolveLoginUsername(requestedUsername);
 
-        if (!username || !password) {
+        if (!password || !username) {
             return authFailureResponse({ error: 'Missing credentials', code: 'AUTH_MISSING_CREDENTIALS' }, 400);
         }
 

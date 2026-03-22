@@ -11,50 +11,12 @@ import type {
 } from './db';
 import { db } from './db';
 import { v4 as uuid } from 'uuid';
+import { buildDocumentSynthesisExtractionPrompt } from './ai-task-contracts';
 import {
     normalizeDiagnosisSystem,
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
 } from './document-synthesis-parser';
-
-const ANALYSIS_PROMPT = `Sei un assistente clinico locale. Ricevi testo OCR grezzo di un documento medico italiano.
-
-Restituisci SOLO JSON valido, senza testo extra, con questa forma:
-{
-  "summary_markdown": "riassunto clinico conciso in markdown",
-  "quality": {
-    "level": "green|yellow|red",
-    "reason": "motivo sintetico della valutazione"
-  },
-  "medications": [
-    "farmaco o principio attivo esplicitamente presente nel documento, con posologia se esplicita"
-  ],
-  "diagnoses": [
-    {
-      "code": "codice ICD esplicito nel documento",
-      "description": "descrizione clinica associata",
-      "system": "ICD-9|ICD-10|ICD-11",
-      "evidence": "breve citazione/parafrasi locale del passaggio rilevante",
-      "confidence": "high|medium|low"
-    }
-  ]
-}
-
-Regole:
-- Usa "green" se il contenuto OCR e chiaro e coerente, "yellow" se ambiguo o parziale, "red" se insufficiente o molto rumoroso.
-- In "medications" includi SOLO terapie o principi attivi esplicitamente presenti nel testo OCR.
-- Non inventare posologie o farmaci mancanti.
-- Ogni elemento in "medications" deve rappresentare una terapia distinta.
-- In "diagnoses" includi SOLO patologie con codice ICD esplicitamente presente nel testo OCR.
-- Non inventare o inferire codici ICD mancanti.
-- Se il documento non contiene terapie esplicite, usa "medications": [].
-- Se il documento non contiene codici ICD, usa "diagnoses": [].
-- "summary_markdown" deve essere breve, clinico, senza dati identificativi superflui.
-- Massimo 5 diagnosi.
-- Massimo 8 terapie.
-
-DOCUMENTO OCR:
-`;
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
@@ -192,7 +154,7 @@ function mergeDiagnoses(
 export async function analyzeDocumentContent(rawMarkdown: string): Promise<DocumentStructuredAnalysis> {
     const ai = await AIService.create('clinical');
     const sliced = smartSliceText(rawMarkdown, MAX_SYNTHESIS_CHARS);
-    const content = await ai.generate(ANALYSIS_PROMPT + sliced, undefined, 1024);
+    const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1024);
     return parseStructuredAnalysisResponse(content, rawMarkdown);
 }
 
