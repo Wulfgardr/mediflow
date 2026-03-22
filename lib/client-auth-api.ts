@@ -112,7 +112,7 @@ export function loginWithPinRequest(pin: string) {
     return requestJson<LoginSuccessPayload | LoginFailurePayload>('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: pin }),
+        body: JSON.stringify({ password: pin }),
     });
 }
 
