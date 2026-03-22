@@ -1,0 +1,720 @@
+{
+  "generatedAt": "2026-03-22T09:22:01.758Z",
+  "baseUrl": "http://127.0.0.1:9",
+  "registryPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-model-stack-candidates.json",
+  "taskCorpusPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-task-contract-corpus.json",
+  "smartImportCorpusPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/smart-import-benchmark-corpus.json",
+  "iterations": 1,
+  "schemaVersion": "mediflow.ai.model-stack-candidates.v1",
+  "configuredRuntime": {
+    "dbPath": "/Users/leonardopegollo/Library/Application Support/MediFlow/medical.db",
+    "configuredBaseUrl": "http://127.0.0.1:11434/v1",
+    "activeRoleModels": {
+      "clinical": "qwen2.5:32b",
+      "reasoning": "qwen3.5:35b-a3b",
+      "ocr": "deepseek-ocr",
+      "legacy": "qwen3.5:35b-a3b"
+    },
+    "protectedModels": [
+      "qwen2.5:32b",
+      "qwen3.5:35b-a3b",
+      "deepseek-ocr"
+    ]
+  },
+  "chambers": {
+    "generative": {
+      "generatedAt": "2026-03-22T09:22:01.757Z",
+      "registryPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-model-stack-candidates.json",
+      "corpusPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-task-contract-corpus.json",
+      "baseUrl": "http://127.0.0.1:9",
+      "iterations": 1,
+      "schemaVersion": "mediflow.ai.model-stack-candidates.v1",
+      "benchmarkedRuntimeModels": [
+        "qwen2.5:32b",
+        "qwen3:32b",
+        "qwen3.5:35b-a3b",
+        "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest"
+      ],
+      "summary": {
+        "totalCandidates": 12,
+        "benchmarked": 0,
+        "blocked": 8,
+        "missingRuntime": 4,
+        "errors": 0
+      },
+      "decisions": {
+        "generative": {
+          "recommendedCandidateId": null,
+          "recommendedModel": null,
+          "rationale": "No target model completed the benchmark run."
+        }
+      },
+      "candidates": [
+        {
+          "id": "qwen2_5_32b",
+          "label": "Qwen2.5 32B",
+          "lane": "generative",
+          "origin": "current_stack",
+          "runtime": "ollama_chat",
+          "runtimeModel": "qwen2.5:32b",
+          "executionStatus": "runnable",
+          "notes": "Contract benchmark baseline from ADR 0027.",
+          "status": "missing_runtime",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+          "benchmark": {
+            "model": "qwen2.5:32b",
+            "status": "missing",
+            "error": "Model not installed in local Ollama runtime."
+          }
+        },
+        {
+          "id": "qwen3_32b",
+          "label": "Qwen3 32B",
+          "lane": "generative",
+          "origin": "current_stack",
+          "runtime": "ollama_chat",
+          "runtimeModel": "qwen3:32b",
+          "executionStatus": "runnable",
+          "notes": "Local contract benchmark baseline after the native Ollama chat transport fix.",
+          "status": "missing_runtime",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+          "benchmark": {
+            "model": "qwen3:32b",
+            "status": "missing",
+            "error": "Model not installed in local Ollama runtime."
+          }
+        },
+        {
+          "id": "qwen3_5_35b_a3b",
+          "label": "Qwen3.5 35B A3B",
+          "lane": "generative",
+          "origin": "current_stack",
+          "runtime": "ollama_chat",
+          "runtimeModel": "qwen3.5:35b-a3b",
+          "executionStatus": "runnable",
+          "notes": "Current default text-only model from ADR 0013.",
+          "status": "missing_runtime",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+          "benchmark": {
+            "model": "qwen3.5:35b-a3b",
+            "status": "missing",
+            "error": "Model not installed in local Ollama runtime."
+          }
+        },
+        {
+          "id": "medgemma_1_5_4b_it",
+          "label": "MedGemma 1.5 4B IT",
+          "lane": "generative",
+          "origin": "current_stack",
+          "runtime": "ollama_chat",
+          "runtimeModel": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+          "executionStatus": "runnable",
+          "notes": "Specialist medical challenger already present in the local runtime.",
+          "status": "missing_runtime",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+          "benchmark": {
+            "model": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+            "status": "missing",
+            "error": "Model not installed in local Ollama runtime."
+          }
+        },
+        {
+          "id": "biomistral_7b",
+          "label": "BioMistral 7B",
+          "lane": "generative",
+          "origin": "report",
+          "runtime": "external_chat_runtime",
+          "executionStatus": "integration_required",
+          "blockers": [
+            "not_installed",
+            "local_runtime_packaging_pending"
+          ],
+          "notes": "Most plausible biomedical generative challenger from the report once a local packaging decision exists.",
+          "status": "blocked",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus."
+        },
+        {
+          "id": "meditron_7b",
+          "label": "Meditron 7B",
+          "lane": "generative",
+          "origin": "report",
+          "runtime": "external_chat_runtime",
+          "executionStatus": "gated_access",
+          "blockers": [
+            "gated_hf_access",
+            "english_first_fit"
+          ],
+          "notes": "Kept out of the first runnable sweep because gating and language fit are unresolved.",
+          "status": "blocked",
+          "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus."
+        },
+        {
+          "id": "openmed_pii_it_clinicallongformer",
+          "label": "OpenMed PII Italian ClinicalLongformer",
+          "lane": "pii",
+          "origin": "report",
+          "runtime": "transformers_token_classification",
+          "executionStatus": "integration_required",
+          "blockers": [
+            "adapter_missing",
+            "sidecar_or_onnx_decision_missing"
+          ],
+          "notes": "Priority de-identification candidate for a future redaction lane.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before a dedicated local adapter and a lane-specific benchmark exist."
+        },
+        {
+          "id": "humadex_italian_medical_ner",
+          "label": "HUMADEX Italian Medical NER",
+          "lane": "clinical_entities",
+          "origin": "report",
+          "runtime": "transformers_token_classification",
+          "executionStatus": "integration_required",
+          "blockers": [
+            "adapter_missing",
+            "entity_contract_missing"
+          ],
+          "notes": "Best deterministic entity extractor candidate for smart import and synthesis enrichment.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before a dedicated local adapter and a lane-specific benchmark exist."
+        },
+        {
+          "id": "biobit",
+          "label": "bioBIT",
+          "lane": "embedding",
+          "origin": "report",
+          "runtime": "transformers_encoder",
+          "executionStatus": "license_blocked",
+          "blockers": [
+            "license_unclear",
+            "adapter_missing"
+          ],
+          "notes": "Potential Italian biomedical embedding backbone, but license clarity is required first.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+        },
+        {
+          "id": "medbit",
+          "label": "medBIT",
+          "lane": "embedding",
+          "origin": "report",
+          "runtime": "transformers_encoder",
+          "executionStatus": "license_blocked",
+          "blockers": [
+            "license_unclear",
+            "adapter_missing"
+          ],
+          "notes": "Same integration path as bioBIT, with licensing still unresolved.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+        },
+        {
+          "id": "biomedbert_pubmedbert",
+          "label": "BiomedBERT PubMedBERT",
+          "lane": "embedding",
+          "origin": "report",
+          "runtime": "transformers_encoder",
+          "executionStatus": "integration_required",
+          "blockers": [
+            "adapter_missing",
+            "english_biomedical_fit"
+          ],
+          "notes": "Possible English-heavy retrieval/reranking baseline with clear licensing.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+        },
+        {
+          "id": "bio_clinicalbert",
+          "label": "Bio ClinicalBERT",
+          "lane": "embedding",
+          "origin": "report",
+          "runtime": "transformers_encoder",
+          "executionStatus": "integration_required",
+          "blockers": [
+            "adapter_missing",
+            "english_clinical_fit"
+          ],
+          "notes": "English clinical encoder, useful only if a dual-language retrieval lane becomes necessary.",
+          "status": "blocked",
+          "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+        }
+      ]
+    },
+    "smartImport": {
+      "generatedAt": "2026-03-22T09:22:01.758Z",
+      "baseUrl": "http://127.0.0.1:9",
+      "corpusPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/smart-import-benchmark-corpus.json",
+      "corpusSize": 3,
+      "iterations": 1,
+      "installedModels": [],
+      "targetModels": [
+        "qwen2.5:32b",
+        "qwen3:32b",
+        "qwen3.5:35b-a3b",
+        "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest"
+      ],
+      "models": [
+        {
+          "model": "qwen2.5:32b",
+          "status": "missing",
+          "error": "Model not installed in local Ollama runtime."
+        },
+        {
+          "model": "qwen3:32b",
+          "status": "missing",
+          "error": "Model not installed in local Ollama runtime."
+        },
+        {
+          "model": "qwen3.5:35b-a3b",
+          "status": "missing",
+          "error": "Model not installed in local Ollama runtime."
+        },
+        {
+          "model": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+          "status": "missing",
+          "error": "Model not installed in local Ollama runtime."
+        }
+      ],
+      "decision": {
+        "recommendedModel": null,
+        "rationale": "No completed smart import benchmark runs were available."
+      }
+    }
+  },
+  "parliament": {
+    "readiness": "hold",
+    "baselineModel": "qwen3.5:35b-a3b",
+    "challengerModels": [],
+    "rationale": "No model passed both the shared-contract chamber and the Smart Import chamber, so pruning is held and the output stays advisory only. Keep `qwen3.5:35b-a3b` as the protected provisional baseline until Smart Import thresholds are met.",
+    "protectedModels": [
+      "deepseek-ocr",
+      "qwen2.5:32b",
+      "qwen3.5:35b-a3b"
+    ],
+    "recommendedPruneModels": [],
+    "untrackedInstalledModels": [],
+    "pruneCommands": [],
+    "pruneApplied": false,
+    "pruneResults": []
+  },
+  "candidates": [
+    {
+      "id": "qwen2_5_32b",
+      "label": "Qwen2.5 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen2.5:32b",
+      "executionStatus": "runnable",
+      "registryStatus": "missing_runtime",
+      "verdict": "protected_active",
+      "reasons": [
+        "Configured active role model is protected from pruning.",
+        "No completed shared-contract benchmark available.",
+        "No completed smart import benchmark available."
+      ],
+      "blockers": [],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed smart import benchmark available."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "qwen3_32b",
+      "label": "Qwen3 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3:32b",
+      "executionStatus": "runnable",
+      "registryStatus": "missing_runtime",
+      "verdict": "prune_failed",
+      "reasons": [
+        "Failed at least one chamber threshold.",
+        "No completed shared-contract benchmark available.",
+        "No completed smart import benchmark available."
+      ],
+      "blockers": [],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed smart import benchmark available."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "qwen3_5_35b_a3b",
+      "label": "Qwen3.5 35B A3B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3.5:35b-a3b",
+      "executionStatus": "runnable",
+      "registryStatus": "missing_runtime",
+      "verdict": "protected_active",
+      "reasons": [
+        "Configured active role model is protected from pruning.",
+        "No completed shared-contract benchmark available.",
+        "No completed smart import benchmark available."
+      ],
+      "blockers": [],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed smart import benchmark available."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "medgemma_1_5_4b_it",
+      "label": "MedGemma 1.5 4B IT",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+      "executionStatus": "runnable",
+      "registryStatus": "missing_runtime",
+      "verdict": "prune_failed",
+      "reasons": [
+        "Failed at least one chamber threshold.",
+        "No completed shared-contract benchmark available.",
+        "No completed smart import benchmark available."
+      ],
+      "blockers": [],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed smart import benchmark available."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "biomistral_7b",
+      "label": "BioMistral 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "runtimeModel": null,
+      "executionStatus": "integration_required",
+      "registryStatus": "blocked",
+      "verdict": "blocked",
+      "reasons": [
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "not_installed",
+        "local_runtime_packaging_pending"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "meditron_7b",
+      "label": "Meditron 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "runtimeModel": null,
+      "executionStatus": "gated_access",
+      "registryStatus": "blocked",
+      "verdict": "blocked",
+      "reasons": [
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "gated_hf_access",
+        "english_first_fit"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "openmed_pii_it_clinicallongformer",
+      "label": "OpenMed PII Italian ClinicalLongformer",
+      "lane": "pii",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "runtimeModel": null,
+      "executionStatus": "integration_required",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "adapter_missing",
+        "sidecar_or_onnx_decision_missing"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "humadex_italian_medical_ner",
+      "label": "HUMADEX Italian Medical NER",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "runtimeModel": null,
+      "executionStatus": "integration_required",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "adapter_missing",
+        "entity_contract_missing"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "biobit",
+      "label": "bioBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "runtimeModel": null,
+      "executionStatus": "license_blocked",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "medbit",
+      "label": "medBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "runtimeModel": null,
+      "executionStatus": "license_blocked",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "biomedbert_pubmedbert",
+      "label": "BiomedBERT PubMedBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "runtimeModel": null,
+      "executionStatus": "integration_required",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "adapter_missing",
+        "english_biomedical_fit"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    },
+    {
+      "id": "bio_clinicalbert",
+      "label": "Bio ClinicalBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "runtimeModel": null,
+      "executionStatus": "integration_required",
+      "registryStatus": "blocked",
+      "verdict": "lane_pending",
+      "reasons": [
+        "Lane-specific adapter or benchmark still pending.",
+        "No completed shared-contract benchmark available.",
+        "No runnable model id available for smart import benchmark."
+      ],
+      "blockers": [
+        "adapter_missing",
+        "english_clinical_fit"
+      ],
+      "contractChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No completed shared-contract benchmark available."
+        ],
+        "score": 0
+      },
+      "smartImportChamber": {
+        "available": false,
+        "passed": false,
+        "reasons": [
+          "No runnable model id available for smart import benchmark."
+        ],
+        "score": 0
+      }
+    }
+  ]
+}

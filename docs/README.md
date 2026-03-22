@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-03-19
+Ultimo aggiornamento: 2026-03-22
 
 ## Policy di consultazione (agent)
 
@@ -28,6 +28,9 @@ Documenti da consultare **al bisogno**:
 - Test concorrenza cross-client sui pazienti: [docs/patient-concurrency-tests.md](./patient-concurrency-tests.md)
 - Tooling documentale Apple (MCP): [docs/apple-docs-mcp.md](./apple-docs-mcp.md)
 - Compliance e roadmap: [docs/COMPLIANCE.md](./COMPLIANCE.md), [docs/ROADMAP.md](./ROADMAP.md), [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md), [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md), [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md), [docs/siss-baseline.md](./siss-baseline.md)
+- Valutazioni comparative toolkit AI: [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md)
+- Stato affidabilita stack AI e piano di hardening: [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md)
+- Piano esecutivo work-package per affidabilita AI: [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md)
 
 ## Ordine di lettura consigliato
 
@@ -67,6 +70,9 @@ Documenti da consultare **al bisogno**:
 | Benchmark clinical facts osservazioni | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | `CANONICAL` | Decisione benchmark v1 per facts osservazionali `LOINC/UCUM`: `hybrid` default, `rules` fallback, `ai` non eseguito nella thin slice headless. |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
 | Baseline SISS | [docs/siss-baseline.md](./siss-baseline.md) | `CANONICAL` | Stato attuale, target certificato, gap e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` per l'integrazione SISS. |
+| Valutazione toolkit AI esterni | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | `SECONDARY` | Nota comparativa per valutare toolkit AI esterni rispetto ai vincoli MediFlow; oggi documenta il fit di OpenMed come possibile sidecar locale `PII/redaction`, non come sostituto del runtime generativo. |
+| Stato affidabilita stack AI | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | `SECONDARY` | Dossier tecnico trasversale sullo stato reale delle lane AI, sui problemi incontrati, sui benchmark eseguiti e sul piano di hardening coerente con le ADR correnti. |
+| Piano esecutivo affidabilita AI | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | `SECONDARY` | Traduzione operativa del dossier AI in work package, dipendenze, exit criteria e stop-rules per portare a terra benchmarking, hardening e rollout delle lane AI. |
 | Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Mappa operativa web + native + servizi locali. |
 | Topologia dati e flussi | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries). |
 | Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Elenco navigabile e descrittivo di tutti i `.md` tracciati nel repository. |
@@ -93,6 +99,9 @@ Documenti da consultare **al bisogno**:
 | ADR web/core stabilization before next version bump | [docs/adr/0024-web-core-stabilization-before-next-version-bump.md](./adr/0024-web-core-stabilization-before-next-version-bump.md) | `CANONICAL` | Sequenza di consolidamento web/core prima del prossimo version bump: helper condivisi per patient payload/structured fields, `typecheck` canonico e split incrementale dei god files. |
 | ADR SISS local adapter contract and error taxonomy | [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md) | `CANONICAL` | Foundation locale del filone SISS: azioni tipizzate, error taxonomy stabile, retry transiente e metadata audit redatti prima dell'integrazione UI. |
 | ADR PIN rotation via client-side rewrap | [docs/adr/0026-pin-rotation-via-client-side-rewrap.md](./adr/0026-pin-rotation-via-client-side-rewrap.md) | `CANONICAL` | Cambio PIN zero-knowledge: il client riavvolge la stessa master key con un nuovo KEK derivato dal nuovo PIN, senza ricifrare i dati clinici. |
+| ADR shared AI extraction envelope and local render separation | [docs/adr/0027-ai-task-extraction-envelope-and-local-render.md](./adr/0027-ai-task-extraction-envelope-and-local-render.md) | `CANONICAL` | Thin slice WUL-95: envelope condiviso `mediflow.ai.extract.v1` per insight/smart import/document synthesis e render locale compatto separato per stabilizzare benchmark/validator JSON. |
+| ADR stack-aware AI model evaluation matrix | [docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md](./adr/0028-stack-aware-ai-model-evaluation-matrix.md) | `CANONICAL` | Estende WUL-95 con una matrice di valutazione stack-aware: benchmark immediato solo per candidati generativi `ollama`, mentre modelli PII/NER/encoder restano tracciati come lane dedicate con blocker espliciti. |
+| ADR AI model parliament and local retention policy | [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | `CANONICAL` | Governa la gara tra modelli generativi locali, il report unificato benchmark+retention e il pruning solo esplicito dei modelli ridondanti, tenendo protetti i ruoli AI attivi. |
 
 ## File sovrapposti o secondari
 

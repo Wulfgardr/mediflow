@@ -183,6 +183,8 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.ok(prompt.indexOf('[OSSERVAZIONI RECENTI]') < prompt.indexOf('[CONTROLLI PENDENTI]'));
         assert.ok(prompt.indexOf('[CONTROLLI PENDENTI]') < prompt.indexOf('[DIARIO CLINICO RECENTE]'));
         assert.ok(prompt.indexOf('[DIARIO CLINICO RECENTE]') < prompt.indexOf('[DOCUMENTI RECENTI]'));
+        assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
+        assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
         assert.match(prompt, /referto-lab\.pdf: Azotemia in lieve aumento/);
         assert.match(prompt, /dimissione\.pdf: Follow-up cardiologico stabile/);
         assert.match(prompt, /eco-cuore\.pdf: Funzione sistolica conservata/);

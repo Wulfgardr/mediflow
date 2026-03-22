@@ -1,0 +1,506 @@
+{
+  "generatedAt": "2026-03-21T11:47:56.709Z",
+  "registryPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-model-stack-candidates.json",
+  "corpusPath": "/Users/leonardopegollo/Antigravity/medical-record-app/scripts/fixtures/ai-task-contract-corpus.json",
+  "baseUrl": "http://127.0.0.1:11434",
+  "iterations": 1,
+  "schemaVersion": "mediflow.ai.model-stack-candidates.v1",
+  "benchmarkedRuntimeModels": [
+    "qwen2.5:32b",
+    "qwen3:32b",
+    "qwen3.5:35b-a3b",
+    "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest"
+  ],
+  "summary": {
+    "totalCandidates": 12,
+    "benchmarked": 4,
+    "blocked": 8,
+    "missingRuntime": 0,
+    "errors": 0
+  },
+  "decisions": {
+    "generative": {
+      "recommendedCandidateId": "qwen3_5_35b_a3b",
+      "recommendedModel": "qwen3.5:35b-a3b",
+      "rationale": "Highest contract-valid rate, then JSON-valid rate, then lowest average latency among the target models."
+    }
+  },
+  "candidates": [
+    {
+      "id": "qwen2_5_32b",
+      "label": "Qwen2.5 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen2.5:32b",
+      "executionStatus": "runnable",
+      "notes": "Contract benchmark baseline from ADR 0027.",
+      "status": "benchmarked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+      "benchmark": {
+        "model": "qwen2.5:32b",
+        "status": "completed",
+        "metrics": {
+          "jsonValidRate": 1,
+          "contractValidRate": 1,
+          "avgLatencyMs": 57973.4,
+          "p95LatencyMs": 70966.6
+        },
+        "tasks": {
+          "patient_insight": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 52251.1
+          },
+          "smart_import": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 66842.6
+          },
+          "document_synthesis": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 54826.7
+          }
+        },
+        "cases": [
+          {
+            "id": "insight-copd-followup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 50908.7,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "insight-diabetes-checkup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 53593.5,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-notes-and-docs",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 70966.6,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-therapy-transition",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 62718.5,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-discharge",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 65983.5,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-outpatient",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 43669.8,
+            "validJson": true,
+            "validTask": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen3_32b",
+      "label": "Qwen3 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3:32b",
+      "executionStatus": "runnable",
+      "notes": "Local contract benchmark baseline after the native Ollama chat transport fix.",
+      "status": "benchmarked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+      "benchmark": {
+        "model": "qwen3:32b",
+        "status": "completed",
+        "metrics": {
+          "jsonValidRate": 1,
+          "contractValidRate": 1,
+          "avgLatencyMs": 65343.1,
+          "p95LatencyMs": 99397.9
+        },
+        "tasks": {
+          "patient_insight": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 77428.8
+          },
+          "smart_import": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 66900.1
+          },
+          "document_synthesis": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 51700.4
+          }
+        },
+        "cases": [
+          {
+            "id": "insight-copd-followup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 99397.9,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "insight-diabetes-checkup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 55459.6,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-notes-and-docs",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 80797.7,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-therapy-transition",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 53002.5,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-discharge",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 56826,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-outpatient",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 46574.8,
+            "validJson": true,
+            "validTask": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen3_5_35b_a3b",
+      "label": "Qwen3.5 35B A3B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3.5:35b-a3b",
+      "executionStatus": "runnable",
+      "notes": "Current default text-only model from ADR 0013.",
+      "status": "benchmarked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+      "benchmark": {
+        "model": "qwen3.5:35b-a3b",
+        "status": "completed",
+        "metrics": {
+          "jsonValidRate": 1,
+          "contractValidRate": 1,
+          "avgLatencyMs": 13589.7,
+          "p95LatencyMs": 20583.5
+        },
+        "tasks": {
+          "patient_insight": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 16045.6
+          },
+          "smart_import": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 15350.3
+          },
+          "document_synthesis": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 9373.3
+          }
+        },
+        "cases": [
+          {
+            "id": "insight-copd-followup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 20583.5,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "insight-diabetes-checkup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 11507.7,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-notes-and-docs",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 16524.3,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-therapy-transition",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 14176.2,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-discharge",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 9292.1,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-outpatient",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 9454.5,
+            "validJson": true,
+            "validTask": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "medgemma_1_5_4b_it",
+      "label": "MedGemma 1.5 4B IT",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+      "executionStatus": "runnable",
+      "notes": "Specialist medical challenger already present in the local runtime.",
+      "status": "benchmarked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus.",
+      "benchmark": {
+        "model": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+        "status": "completed",
+        "metrics": {
+          "jsonValidRate": 0.667,
+          "contractValidRate": 0.667,
+          "avgLatencyMs": 13002,
+          "p95LatencyMs": 17336.1
+        },
+        "tasks": {
+          "patient_insight": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 14625.8
+          },
+          "smart_import": {
+            "jsonValidRate": 0,
+            "contractValidRate": 0,
+            "avgLatencyMs": 12905.6
+          },
+          "document_synthesis": {
+            "jsonValidRate": 1,
+            "contractValidRate": 1,
+            "avgLatencyMs": 11474.5
+          }
+        },
+        "cases": [
+          {
+            "id": "insight-copd-followup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 17336.1,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "insight-diabetes-checkup",
+            "task": "patient_insight",
+            "iteration": 1,
+            "latencyMs": 11915.4,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "smart-import-notes-and-docs",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 13214.3,
+            "validJson": false,
+            "validTask": false
+          },
+          {
+            "id": "smart-import-therapy-transition",
+            "task": "smart_import",
+            "iteration": 1,
+            "latencyMs": 12596.9,
+            "validJson": false,
+            "validTask": false
+          },
+          {
+            "id": "document-synthesis-discharge",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 9882.2,
+            "validJson": true,
+            "validTask": true
+          },
+          {
+            "id": "document-synthesis-outpatient",
+            "task": "document_synthesis",
+            "iteration": 1,
+            "latencyMs": 13066.8,
+            "validJson": true,
+            "validTask": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "biomistral_7b",
+      "label": "BioMistral 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "not_installed",
+        "local_runtime_packaging_pending"
+      ],
+      "notes": "Most plausible biomedical generative challenger from the report once a local packaging decision exists.",
+      "status": "blocked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus."
+    },
+    {
+      "id": "meditron_7b",
+      "label": "Meditron 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "gated_access",
+      "blockers": [
+        "gated_hf_access",
+        "english_first_fit"
+      ],
+      "notes": "Kept out of the first runnable sweep because gating and language fit are unresolved.",
+      "status": "blocked",
+      "stopRule": "Promote only if contractValidRate >= 0.95, jsonValidRate >= 0.95, and no task falls below 0.90 on the shared synthetic corpus."
+    },
+    {
+      "id": "openmed_pii_it_clinicallongformer",
+      "label": "OpenMed PII Italian ClinicalLongformer",
+      "lane": "pii",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "sidecar_or_onnx_decision_missing"
+      ],
+      "notes": "Priority de-identification candidate for a future redaction lane.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before a dedicated local adapter and a lane-specific benchmark exist."
+    },
+    {
+      "id": "humadex_italian_medical_ner",
+      "label": "HUMADEX Italian Medical NER",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "entity_contract_missing"
+      ],
+      "notes": "Best deterministic entity extractor candidate for smart import and synthesis enrichment.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before a dedicated local adapter and a lane-specific benchmark exist."
+    },
+    {
+      "id": "biobit",
+      "label": "bioBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Potential Italian biomedical embedding backbone, but license clarity is required first.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+    },
+    {
+      "id": "medbit",
+      "label": "medBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Same integration path as bioBIT, with licensing still unresolved.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+    },
+    {
+      "id": "biomedbert_pubmedbert",
+      "label": "BiomedBERT PubMedBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_biomedical_fit"
+      ],
+      "notes": "Possible English-heavy retrieval/reranking baseline with clear licensing.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+    },
+    {
+      "id": "bio_clinicalbert",
+      "label": "Bio ClinicalBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_clinical_fit"
+      ],
+      "notes": "English clinical encoder, useful only if a dual-language retrieval lane becomes necessary.",
+      "status": "blocked",
+      "stopRule": "Do not integrate before license/runtime fit is clear and the usage is narrowed to a local encoder lane."
+    }
+  ]
+}

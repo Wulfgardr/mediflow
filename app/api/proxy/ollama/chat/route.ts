@@ -15,25 +15,24 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-
-        // Hardcoded or Env-based internal URL
-        // If running in Docker, 'host.docker.internal' might be needed, or just 'localhost' if host networking
-        // The user configured URL in settings is usually for the CLIENT.
-        // For the SERVER, we might need a different one if they differ.
-        // For now, let's respect the body's intent but force the destination.
-        // wait, we can't easily get the settings from DB here without decrypting if it's encrypted.
-        // Let's assume standard localhost for now as fallback.
-
-        const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+        const targetUrl = req.headers.get('x-target-url') || process.env.OLLAMA_URL || 'http://localhost:11434';
         /* @Codex */
-        const validation = validateLocalTarget(OLLAMA_URL);
+        const validation = validateLocalTarget(targetUrl);
         if (!validation.ok) {
             return NextResponse.json({ error: `Ollama URL not allowed: ${validation.reason}` }, { status: 400 });
         }
 
-        console.log(`[Proxy] Forwarding chat request to ${validation.url.toString()}/api/chat`);
+        const baseUrl = validation.url.toString()
+            .replace(/\/v1\/chat\/completions\/?$/, '')
+            .replace(/\/v1\/completions\/?$/, '')
+            .replace(/\/v1\/?$/, '')
+            .replace(/\/api\/chat\/?$/, '')
+            .replace(/\/api\/generate\/?$/, '')
+            .replace(/\/$/, '');
 
-        const res = await fetch(`${validation.url.toString()}/api/chat`, {
+        console.log(`[Proxy] Forwarding chat request to ${baseUrl}/api/chat`);
+
+        const res = await fetch(`${baseUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

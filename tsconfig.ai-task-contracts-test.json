@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-ai-task-contracts-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/ai-task-contracts.ts",
+    "lib/ai-task-contracts.test.ts"
+  ]
+}

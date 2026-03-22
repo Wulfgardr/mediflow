@@ -15,18 +15,25 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-
-        const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+        const targetUrl = req.headers.get('x-target-url') || process.env.OLLAMA_URL || 'http://localhost:11434';
         /* @Codex */
-        const validation = validateLocalTarget(OLLAMA_URL);
+        const validation = validateLocalTarget(targetUrl);
         if (!validation.ok) {
             return NextResponse.json({ error: `Ollama URL not allowed: ${validation.reason}` }, { status: 400 });
         }
 
-        console.log(`[Proxy] Forwarding generate request to ${validation.url.toString()}/api/generate`);
+        const baseUrl = validation.url.toString()
+            .replace(/\/v1\/chat\/completions\/?$/, '')
+            .replace(/\/v1\/completions\/?$/, '')
+            .replace(/\/v1\/?$/, '')
+            .replace(/\/api\/chat\/?$/, '')
+            .replace(/\/api\/generate\/?$/, '')
+            .replace(/\/$/, '');
+
+        console.log(`[Proxy] Forwarding generate request to ${baseUrl}/api/generate`);
 
         // Forward request to internal Ollama instance
-        const res = await fetch(`${validation.url.toString()}/api/generate`, {
+        const res = await fetch(`${baseUrl}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "mediflow.ai.model-stack-candidates.v1",
+  "candidates": [
+    {
+      "id": "qwen2_5_32b",
+      "label": "Qwen2.5 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen2.5:32b",
+      "executionStatus": "runnable",
+      "notes": "Contract benchmark baseline from ADR 0027."
+    },
+    {
+      "id": "qwen3_32b",
+      "label": "Qwen3 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3:32b",
+      "executionStatus": "runnable",
+      "notes": "Local contract benchmark baseline after the native Ollama chat transport fix."
+    },
+    {
+      "id": "qwen3_5_35b_a3b",
+      "label": "Qwen3.5 35B A3B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3.5:35b-a3b",
+      "executionStatus": "runnable",
+      "notes": "Current default text-only model from ADR 0013."
+    },
+    {
+      "id": "medgemma_1_5_4b_it",
+      "label": "MedGemma 1.5 4B IT",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+      "executionStatus": "runnable",
+      "notes": "Specialist medical challenger already present in the local runtime."
+    },
+    {
+      "id": "biomistral_7b",
+      "label": "BioMistral 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "not_installed",
+        "local_runtime_packaging_pending"
+      ],
+      "notes": "Most plausible biomedical generative challenger from the report once a local packaging decision exists."
+    },
+    {
+      "id": "meditron_7b",
+      "label": "Meditron 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "gated_access",
+      "blockers": [
+        "gated_hf_access",
+        "english_first_fit"
+      ],
+      "notes": "Kept out of the first runnable sweep because gating and language fit are unresolved."
+    },
+    {
+      "id": "openmed_pii_it_clinicallongformer",
+      "label": "OpenMed PII Italian ClinicalLongformer",
+      "lane": "pii",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "sidecar_or_onnx_decision_missing"
+      ],
+      "notes": "Priority de-identification candidate for a future redaction lane."
+    },
+    {
+      "id": "humadex_italian_medical_ner",
+      "label": "HUMADEX Italian Medical NER",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "entity_contract_missing"
+      ],
+      "notes": "Best deterministic entity extractor candidate for smart import and synthesis enrichment."
+    },
+    {
+      "id": "biobit",
+      "label": "bioBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Potential Italian biomedical embedding backbone, but license clarity is required first."
+    },
+    {
+      "id": "medbit",
+      "label": "medBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Same integration path as bioBIT, with licensing still unresolved."
+    },
+    {
+      "id": "biomedbert_pubmedbert",
+      "label": "BiomedBERT PubMedBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_biomedical_fit"
+      ],
+      "notes": "Possible English-heavy retrieval/reranking baseline with clear licensing."
+    },
+    {
+      "id": "bio_clinicalbert",
+      "label": "Bio ClinicalBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_clinical_fit"
+      ],
+      "notes": "English clinical encoder, useful only if a dual-language retrieval lane becomes necessary."
+    }
+  ]
+}

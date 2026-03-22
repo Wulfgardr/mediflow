@@ -46,6 +46,18 @@ function therapyStateBadgeClasses(state: TherapySuggestionState): string {
     return 'border-gray-200 bg-gray-50 text-gray-600';
 }
 
+function shouldPreselectDiagnosisSuggestion(diagnosis: PatientSmartImportAnalysis['diagnoses'][number]): boolean {
+    return diagnosis.canApply && diagnosis.confidence === 'high';
+}
+
+function shouldPreselectTherapySuggestion(therapy: PatientSmartImportAnalysis['therapies'][number]): boolean {
+    return therapy.canApply
+        && therapy.confidence === 'high'
+        && therapy.matchType === 'catalog'
+        && therapy.therapyState === 'active'
+        && Boolean(therapy.dosage?.trim());
+}
+
 export default function PatientSmartImportPanel({ patient, entries = [] }: PatientSmartImportPanelProps) {
     const [analysis, setAnalysis] = useState<PatientSmartImportAnalysis | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -68,6 +80,15 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
         return null;
     }
 
+    const autoSelectedCount = analysis
+        ? analysis.diagnoses.filter(shouldPreselectDiagnosisSuggestion).length
+        + analysis.therapies.filter(shouldPreselectTherapySuggestion).length
+        : 0;
+    const consultiveCount = analysis
+        ? analysis.diagnoses.filter((diagnosis) => !shouldPreselectDiagnosisSuggestion(diagnosis)).length
+        + analysis.therapies.filter((therapy) => !shouldPreselectTherapySuggestion(therapy)).length
+        : 0;
+
     const generateSuggestions = async () => {
         setIsGenerating(true);
         setError(null);
@@ -77,10 +98,10 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
             const nextAnalysis = await generatePatientSmartImportAnalysis(patient.id);
             setAnalysis(nextAnalysis);
             setSelectedDiagnosisIds(nextAnalysis.diagnoses
-                .filter((diagnosis) => diagnosis.canApply && diagnosis.confidence !== 'low')
+                .filter(shouldPreselectDiagnosisSuggestion)
                 .map((diagnosis) => diagnosis.id));
             setSelectedTherapyIds(nextAnalysis.therapies
-                .filter((therapy) => therapy.canApply && therapy.confidence !== 'low')
+                .filter(shouldPreselectTherapySuggestion)
                 .map((therapy) => therapy.id));
         } catch (generationError) {
             setError(generationError instanceof Error ? generationError.message : 'Analisi non disponibile');
@@ -165,6 +186,16 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                 {analysis && (
                     <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
                         Modello: {analysis.model.model}
+                    </span>
+                )}
+                {analysis && (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                        Preselezionati forti: {autoSelectedCount}
+                    </span>
+                )}
+                {analysis && consultiveCount > 0 && (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
+                        Da rivedere: {consultiveCount}
                     </span>
                 )}
             </div>
@@ -324,7 +355,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
                     <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 md:flex-row md:items-center md:justify-between">
                         <p className="text-xs text-gray-500">
-                            Seleziona solo i suggerimenti confermati. Le terapie in transizione o incerte restano visibili ma bloccate finche non vengono chiarite.
+                            Seleziona solo i suggerimenti confermati. Per default vengono preselezionate solo diagnosi con match ICD forte e terapie attive catalogate con posologia esplicita; transizioni, match manuali e voci incerte restano consultive.
                         </p>
                         <button
                             onClick={applySelection}

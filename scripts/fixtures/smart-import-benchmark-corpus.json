@@ -1,0 +1,175 @@
+[
+  {
+    "id": "smart-import-current-diagnoses-and-active-therapy",
+    "maxTokens": 1100,
+    "payload": {
+      "patientId": "bench-smart-quality-1",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:visit-1",
+          "label": "VISIT 20/03/2026",
+          "excerpt": "Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die"
+        }
+      ],
+      "sources": [
+        {
+          "id": "patient-notes:1",
+          "kind": "patient-notes",
+          "label": "Note paziente",
+          "content": "Diabete mellito tipo 2 in scarso compenso e ipertensione arteriosa in follow-up territoriale."
+        },
+        {
+          "id": "entry:visit-1",
+          "kind": "clinical-entry",
+          "label": "VISIT 20/03/2026",
+          "date": "2026-03-20T09:00:00.000Z",
+          "content": "Terapia domiciliare attiva: Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die."
+        },
+        {
+          "id": "insight:diab-1",
+          "kind": "document-insight",
+          "label": "Documento controllo diabetologico",
+          "date": "2026-03-10T09:00:00.000Z",
+          "content": "Controllo diabetologico recente: diabete mellito tipo 2 non compensato."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["diabete", "tipo", "2"],
+          "icdQueryTokens": ["type", "2", "diabetes"]
+        },
+        {
+          "labelTokens": ["ipertensione"],
+          "icdQueryTokens": ["essential", "hypertension"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["metformina"],
+          "dosageTokens": ["850", "2"],
+          "therapyState": "active"
+        },
+        {
+          "drugTokens": ["ramipril"],
+          "dosageTokens": ["5"],
+          "therapyState": "active"
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-negation-family-history-guardrail",
+    "maxTokens": 1100,
+    "payload": {
+      "patientId": "bench-smart-quality-2",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:visit-2",
+          "label": "VISIT 19/03/2026",
+          "excerpt": "Apixaban 5 mg 1 cp x 2/die in terapia domiciliare"
+        }
+      ],
+      "sources": [
+        {
+          "id": "patient-notes:1",
+          "kind": "patient-notes",
+          "label": "Note paziente",
+          "content": "Familiarita materna per carcinoma mammario. Nega BPCO. Pregressa frattura di polso sinistro guarita."
+        },
+        {
+          "id": "entry:visit-2",
+          "kind": "clinical-entry",
+          "label": "VISIT 19/03/2026",
+          "date": "2026-03-19T10:30:00.000Z",
+          "content": "Attualmente fibrillazione atriale parossistica in follow-up cardiologico; terapia domiciliare con Apixaban 5 mg 1 cp x 2/die."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["fibrillazione", "atriale"],
+          "icdQueryTokens": ["atrial", "fibrillation"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["apixaban"],
+          "dosageTokens": ["5", "2"],
+          "therapyState": "active"
+        }
+      ],
+      "forbiddenDiagnosisTokens": [
+        ["carcinoma", "mammario"],
+        ["bpco"],
+        ["frattura", "polso"]
+      ]
+    }
+  },
+  {
+    "id": "smart-import-therapy-transition-and-uncertain",
+    "maxTokens": 1100,
+    "payload": {
+      "patientId": "bench-smart-quality-3",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:visit-3",
+          "label": "NOTE 18/03/2026",
+          "excerpt": "sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp"
+        },
+        {
+          "sourceId": "entry:visit-3",
+          "label": "NOTE 18/03/2026",
+          "excerpt": "Furosemide: dose da verificare"
+        }
+      ],
+      "sources": [
+        {
+          "id": "patient-notes:1",
+          "kind": "patient-notes",
+          "label": "Note paziente",
+          "content": "Insufficienza cardiaca cronica nota in compenso clinico."
+        },
+        {
+          "id": "entry:visit-3",
+          "kind": "clinical-entry",
+          "label": "NOTE 18/03/2026",
+          "date": "2026-03-18T08:45:00.000Z",
+          "content": "Per ipotensione sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp; Furosemide dose da verificare."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["insufficienza", "cardiaca"],
+          "icdQueryTokens": ["heart", "failure"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["bisoprololo"],
+          "dosageTokens": ["1", "25"],
+          "therapyState": "transition"
+        },
+        {
+          "drugTokens": ["nebivololo"],
+          "dosageTokens": ["5"],
+          "therapyState": "transition"
+        },
+        {
+          "drugTokens": ["furosemide"],
+          "therapyState": "uncertain"
+        }
+      ]
+    }
+  }
+]

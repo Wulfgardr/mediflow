@@ -1,6 +1,12 @@
 /* @Codex */
 'use client';
 
+import {
+    buildPatientInsightExtractionPrompt,
+    parsePatientInsightExtractionResponse,
+    renderPatientInsightMarkdown,
+    toPatientInsightRenderContract,
+} from '@/lib/ai-task-contracts';
 import { db } from '@/lib/db';
 import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 /* @Codex */
@@ -22,37 +28,6 @@ interface SummaryOptions {
     signal?: AbortSignal;
     onStage?: (stage: SummaryStage, info?: SummaryModelInfo) => void;
 }
-
-const SUMMARY_PROMPT = `Sei un assistente medico locale.
-
-OBIETTIVO:
-- produrre un insight clinico breve, asciutto e orientato all'azione
-- evidenziare solo cio che aiuta la gestione pratica del paziente oggi
-- proporre prossimi passi prudenti, verificabili e non inventati
-
-FORMATO OBBLIGATORIO IN MARKDOWN:
-**Quadro attuale:** max 2 frasi brevi, ognuna chiusa con [Sx] o [DATI-INCOMPLETI].
-
-**Attenzioni:**
-- massimo 2 bullet, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
-
-**Prossimi passi:**
-- massimo 3 bullet operativi, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
-
-**Gap da chiarire:**
-- massimo 2 bullet solo se davvero utili, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI]
-
-REGOLE IMPORTANTI:
-- massimo 140 parole totali
-- niente introduzioni o conclusioni
-- niente ripetizioni o narrativa superflua
-- non inventare diagnosi, esami, terapie o fonti
-- usa solo i riferimenti [Sx] presenti nel contesto
-- se non emerge un'azione chiara, scrivi "monitoraggio clinico" nei prossimi passi
-- privilegia problemi attivi, diagnosi codificate, terapie in corso, controlli pendenti, osservazioni recenti e documenti recenti
-
-DATI PAZIENTE:
-`;
 
 const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
 
@@ -113,6 +88,13 @@ export function parsePatientInsight(content: string): ParsedPatientInsight {
     };
 }
 
+function hasInsightContractContent(content: ReturnType<typeof parsePatientInsightExtractionResponse>): boolean {
+    return content.value.data.currentState.length > 0
+        || content.value.data.alerts.length > 0
+        || content.value.data.nextSteps.length > 0
+        || content.value.data.gaps.length > 0;
+}
+
 /* @Codex */
 export { sanitizeInsightMarkdown } from '@/lib/patient-insight';
 
@@ -156,13 +138,17 @@ export async function regeneratePatientSummary(
         const contextData = await buildPatientInsightContext(patientId);
         options.onStage?.('context', info);
 
-        const prompt = SUMMARY_PROMPT + contextData.prompt;
+        const prompt = buildPatientInsightExtractionPrompt(contextData.prompt);
 
         options.onStage?.('generate', info);
         const content = await ai.generate(prompt, options.signal, contextData.outputMaxTokens);
+        const extracted = parsePatientInsightExtractionResponse(content);
+        const draftMarkdown = hasInsightContractContent(extracted)
+            ? renderPatientInsightMarkdown(toPatientInsightRenderContract(extracted.value))
+            : sanitizeInsightMarkdown(content);
 
         const cleaned = finalizePatientInsight({
-            content,
+            content: draftMarkdown,
             sourceRefs: contextData.sourceRefs,
             limitations: contextData.limitations,
             patientName: contextData.patientName,
