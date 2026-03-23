@@ -7,10 +7,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { getAiModelParliamentArtifactPaths, ensureAiModelParliamentArtifactDirectory } from '../lib/ai-model-parliament-storage.ts';
-import { runModelStackBenchmark } from './benchmark-model-stack.ts';
-import { runSmartImportBenchmark } from './benchmark-smart-import.ts';
-import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
+import { getAiModelParliamentArtifactPaths, ensureAiModelParliamentArtifactDirectory } from '../lib/ai-model-parliament-storage';
+import { runModelStackBenchmark } from './benchmark-model-stack';
+import { runSmartImportBenchmark } from './benchmark-smart-import';
+import { normalizeOllamaBaseUrl } from './ollama-base-url';
 
 type ParliamentVerdict =
     | 'baseline'

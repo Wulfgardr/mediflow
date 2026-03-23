@@ -9,7 +9,7 @@ import {
 export type { DocumentQualityLevel };
 
 /* @Codex */
-export interface DocumentDiagnosisSuggestion extends DocumentDiagnosisSuggestionContract {}
+export type DocumentDiagnosisSuggestion = DocumentDiagnosisSuggestionContract;
 
 /* @Codex */
 export type DocumentStructuredAnalysis = {

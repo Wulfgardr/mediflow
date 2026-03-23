@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-22
+Ultimo aggiornamento: 2026-03-23
 
 ---
 
@@ -117,6 +117,20 @@ Ordine di consegna consigliato (incrementale):
 - [ ] Pianificare il ciclo `post-0.4`: consolidamento UI/leggibilita web, CI minima e rebuild controllato della shell macOS.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
+
+Nota operativa per il filone UI web `post-0.4` (`WUL-98`):
+- la leadership autoriale di UI/UX puo essere delegata a Gemini quando il focus e strettamente di interfaccia
+- Codex mantiene i guardrail su scope, regressioni comportamentali, accessibilita, compliance repo e gestione Linear
+- direzione d'uso: intuitivita clinica, sleekness adatta al contesto medico, linguaggio `liquid glass` leggibile e credibile anche per medici digitalmente fluenti
+- tesi visiva esplicita: unire ricercatezza e immediatezza secondo principi Apple `Liquid Glass`, mantenendo un'interfaccia quotidianamente usabile e senza barriere
+- principi da rispettare nella lane UI:
+  - `Liquid Glass` come layer funzionale superiore per navigazione, controlli chiave, sheet e CTA
+  - uso parco del glass nei controlli custom: evitare layering e overcrowding di superfici traslucide
+  - separazione chiara tra contenuto clinico e chrome di navigazione
+  - corner radius morbidi e concentrici, senza durezza geometrica gratuita
+  - profondita multilayer `frosted` + `liquid` usata per gerarchia e focus, non come decorazione diffusa
+  - colore giudizioso nei controlli per preservare leggibilita, contrasto e accessibilita
+  - tono generale: sofisticato, leggibile, un po' giocoso, ma sempre operativo
 
 ---
 
