@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-03-22
+Ultimo aggiornamento: 2026-03-23
 
 ## Come usare questo indice
 
@@ -64,6 +64,8 @@ Ultimo aggiornamento: 2026-03-22
 | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | Matrice di allineamento tra baseline ufficiale GTW/FSE e stato MediFlow. | Per gap analysis ministeriale, priorità FSE e anti-drift tecnico. |
 | [docs/siss-baseline.md](./siss-baseline.md) | Baseline canonica SISS: stato attuale, target certificato, gap e sequenza di consegna. | Quando si lavora su `WUL-43`, `WUL-44` e `WUL-45`. |
 | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | Valutazione comparativa tra OpenMed e lo stack AI locale MediFlow, con raccomandazione di fit per lane (`PII`, `NER`, runtime generativo). | Quando si esplorano toolkit AI esterni o si decide se introdurre sidecar locali specialistici. |
+| [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
+| [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |
 | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | Dossier tecnico trasversale sullo stato reale dello stack AI, sugli incidenti incontrati, sui benchmark gia eseguiti e sulle priorita di hardening. | Quando serve una vista unica su current state AI, colli di bottiglia, benchmark e prossime mosse affidabili. |
 | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | Piano operativo work-package per portare a terra benchmark resolver, hardening Smart Import/Insight, lane PII e rollout prudente dello stack AI. | Quando serve passare dal dossier AI alla sequenza concreta di implementazione con dipendenze ed exit criteria. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
@@ -112,6 +114,8 @@ Ultimo aggiornamento: 2026-03-22
 | [docs/adr/0027-ai-task-extraction-envelope-and-local-render.md](./adr/0027-ai-task-extraction-envelope-and-local-render.md) | Introduce l'envelope condiviso `mediflow.ai.extract.v1` per insight/smart import/document synthesis, separando il render locale compatto e il benchmark contrattuale sui modelli Qwen target. |
 | [docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md](./adr/0028-stack-aware-ai-model-evaluation-matrix.md) | Definisce una matrice stack-aware per i candidati AI: benchmark reale solo sui generativi `ollama` eseguibili, con stati espliciti per modelli PII/NER/encoder bloccati da integrazione, licenza o gating. |
 | [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | Introduce il parlamento dei modelli AI locali per unire benchmark, retention e pruning esplicito dei modelli ridondanti senza toccare automaticamente i ruoli attivi nei settings. |
+| [docs/adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md](./adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md) | Separa `WUL-96` in lane benchmark dedicate: `OpenMed` prima su `redaction.v1`, `HUMADEX` primo confronto NER italiano e `OpenMed NER` solo baseline secondaria, senza gara diretta contro i generativi. |
+| [docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md](./adr/0031-clinical-entities-evidence-first-medication-problem-lane.md) | Apre la thin slice `clinical_entities.v1` limitata a `medication` e `problem`, con contratto evidence-first, corpus sintetico italiano e harness benchmark separato prima degli adapter reali `HUMADEX/OpenMed NER`. |
 
 ## Checklist manutenzione indice
 

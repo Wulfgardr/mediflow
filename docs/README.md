@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-03-22
+Ultimo aggiornamento: 2026-03-23
 
 ## Policy di consultazione (agent)
 
@@ -29,6 +29,8 @@ Documenti da consultare **al bisogno**:
 - Tooling documentale Apple (MCP): [docs/apple-docs-mcp.md](./apple-docs-mcp.md)
 - Compliance e roadmap: [docs/COMPLIANCE.md](./COMPLIANCE.md), [docs/ROADMAP.md](./ROADMAP.md), [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md), [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md), [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md), [docs/siss-baseline.md](./siss-baseline.md)
 - Valutazioni comparative toolkit AI: [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md)
+- Runbook benchmark OpenMed `redaction.v1`: [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md)
+- Runbook benchmark `clinical_entities.v1`: [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md)
 - Stato affidabilita stack AI e piano di hardening: [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md)
 - Piano esecutivo work-package per affidabilita AI: [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md)
 
@@ -71,6 +73,8 @@ Documenti da consultare **al bisogno**:
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
 | Baseline SISS | [docs/siss-baseline.md](./siss-baseline.md) | `CANONICAL` | Stato attuale, target certificato, gap e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` per l'integrazione SISS. |
 | Valutazione toolkit AI esterni | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | `SECONDARY` | Nota comparativa per valutare toolkit AI esterni rispetto ai vincoli MediFlow; oggi documenta il fit di OpenMed come possibile sidecar locale `PII/redaction`, non come sostituto del runtime generativo. |
+| Runbook benchmark OpenMed redaction | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | `SECONDARY` | Guida operativa per lanciare il benchmark `WUL-96` contro un sidecar locale OpenMed, con env vars, healthcheck e metrica attesa della lane `redaction.v1`. |
+| Runbook benchmark clinical entities | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | `SECONDARY` | Guida operativa per eseguire la thin slice `clinical_entities.v1` con adapter locali benchmark-only, a partire da `HUMADEX`, senza toccare il runtime applicativo. |
 | Stato affidabilita stack AI | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | `SECONDARY` | Dossier tecnico trasversale sullo stato reale delle lane AI, sui problemi incontrati, sui benchmark eseguiti e sul piano di hardening coerente con le ADR correnti. |
 | Piano esecutivo affidabilita AI | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | `SECONDARY` | Traduzione operativa del dossier AI in work package, dipendenze, exit criteria e stop-rules per portare a terra benchmarking, hardening e rollout delle lane AI. |
 | Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Mappa operativa web + native + servizi locali. |
@@ -102,6 +106,8 @@ Documenti da consultare **al bisogno**:
 | ADR shared AI extraction envelope and local render separation | [docs/adr/0027-ai-task-extraction-envelope-and-local-render.md](./adr/0027-ai-task-extraction-envelope-and-local-render.md) | `CANONICAL` | Thin slice WUL-95: envelope condiviso `mediflow.ai.extract.v1` per insight/smart import/document synthesis e render locale compatto separato per stabilizzare benchmark/validator JSON. |
 | ADR stack-aware AI model evaluation matrix | [docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md](./adr/0028-stack-aware-ai-model-evaluation-matrix.md) | `CANONICAL` | Estende WUL-95 con una matrice di valutazione stack-aware: benchmark immediato solo per candidati generativi `ollama`, mentre modelli PII/NER/encoder restano tracciati come lane dedicate con blocker espliciti. |
 | ADR AI model parliament and local retention policy | [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | `CANONICAL` | Governa la gara tra modelli generativi locali, il report unificato benchmark+retention e il pruning solo esplicito dei modelli ridondanti, tenendo protetti i ruoli AI attivi. |
+| ADR OpenMed redaction first and separate Italian NER lane | [docs/adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md](./adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md) | `CANONICAL` | Fissa `WUL-96` come workstream lane-specific: `OpenMed` prima su `redaction.v1`, `HUMADEX` primo confronto NER italiano, `OpenMed NER` solo baseline secondaria e nessun confronto diretto con i generativi. |
+| ADR clinical entities evidence-first medication/problem lane | [docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md](./adr/0031-clinical-entities-evidence-first-medication-problem-lane.md) | `CANONICAL` | Apre la thin slice `clinical_entities.v1` limitata a `medication` e `problem`, con output evidence-first, corpus sintetico dedicato e harness benchmark separato prima degli adapter reali `HUMADEX/OpenMed NER`. |
 
 ## File sovrapposti o secondari
 

@@ -55,6 +55,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .venv_mlx/
+.venv_humadex/
+.venv_openmed/
+__pycache__/
 
 # local database
 *.db

@@ -75,10 +75,10 @@
       "runtime": "transformers_token_classification",
       "executionStatus": "integration_required",
       "blockers": [
-        "adapter_missing",
-        "sidecar_or_onnx_decision_missing"
+        "shadow_validation_failed",
+        "email_mailbox_recall_too_low"
       ],
-      "notes": "Priority de-identification candidate for a future redaction lane."
+      "notes": "WUL-96 benchmark stack is complete, but the model remains benchmark-only / not shadow-ready: full-corpus email recall is 0.333 and email-focused recall is 0.143, with critical mailbox leaks still present."
     },
     {
       "id": "humadex_italian_medical_ner",
@@ -86,12 +86,35 @@
       "lane": "clinical_entities",
       "origin": "report",
       "runtime": "transformers_token_classification",
+      "runtimeModel": "HUMADEX/italian_medical_ner",
       "executionStatus": "integration_required",
       "blockers": [
-        "adapter_missing",
-        "entity_contract_missing"
+        "benchmark_only",
+        "promotion_gate_failed",
+        "negative_case_leaks",
+        "false_positive_context_tokens",
+        "under_span_problem_phrases",
+        "corpus_scope_still_expanding"
       ],
-      "notes": "Best deterministic entity extractor candidate for smart import and synthesis enrichment."
+      "notes": "Current corpus v2 benchmark makes HUMADEX the leading deterministic candidate and the result is stable over 5 repeat runs: contractValidRate=1, spanPrecision=0.6, spanRecall=0.7, criticalRecall=0.7, evidenceCoverage=1, negativeCaseLeakRate=1. Promotion gate still fails on negative-case leaks and under-span problem phrases, so the lane remains benchmark-only."
+    },
+    {
+      "id": "openmed_ner_secondary_baseline",
+      "label": "OpenMed NER Secondary Baseline",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "runtimeModel": "disease_detection_superclinical + pharma_detection_superclinical",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "benchmark_only",
+        "promotion_gate_failed",
+        "negative_case_leaks",
+        "secondary_baseline_only",
+        "problem_span_underextension",
+        "lab_values_misclassified_as_medication"
+      ],
+      "notes": "Measured on the same clinical_entities.v2 harness with openmed==0.6.3 and now repeated across 5 runs: contractValidRate=1, spanPrecision=0.5, spanRecall=0.6, criticalRecall=0.6, evidenceCoverage=1, negativeCaseLeakRate=1. Useful only as a secondary baseline; currently weaker than HUMADEX and also fails the promotion gate."
     },
     {
       "id": "biobit",
