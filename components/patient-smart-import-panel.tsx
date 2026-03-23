@@ -155,219 +155,199 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
     };
 
     return (
-        <div className="glass-panel p-6 border-sky-100 dark:border-sky-500/20 shadow-lg shadow-sky-100/50 dark:shadow-none">
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-sky-600 p-2 text-white shadow-md shadow-sky-200 dark:shadow-none">
-                        <Brain className="h-5 w-5" />
+        <div className="glass-panel overflow-hidden rounded-[28px] border-sky-100/50 bg-sky-50/10 p-0 backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
+            <div className="border-b border-sky-200/30 p-5 dark:border-white/5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-sky-600 text-white shadow-lg shadow-sky-500/20">
+                            <Brain className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Smart Import</h3>
+                            <div className="mt-0.5 flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                                    {sourceCount} fonti
+                                </span>
+                                {analysis && (
+                                    <span className="text-[9px] font-medium text-slate-400 uppercase tracking-tight">
+                                        {analysis.model.model}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white">Smart Import</h3>
-                        <p className="text-xs text-gray-500">
-                            Note, diario e documenti gia analizzati possono diventare diagnosi ICD-11 e terapie reviewable.
-                        </p>
-                    </div>
-                </div>
 
-                <button
-                    onClick={generateSuggestions}
-                    disabled={isGenerating || isApplying}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition-all hover:bg-sky-700 disabled:opacity-60"
-                >
-                    {isGenerating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {analysis ? 'Aggiorna suggerimenti' : 'Genera suggerimenti smart'}
-                </button>
+                    <button
+                        onClick={generateSuggestions}
+                        disabled={isGenerating || isApplying}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-95 disabled:opacity-50"
+                    >
+                        {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        {analysis ? 'Aggiorna' : 'Analizza fonti'}
+                    </button>
+                </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-gray-500">
-                <span className="rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1">
-                    Fonti disponibili: {sourceCount}
-                </span>
-                {analysis && (
-                    <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                        Modello: {analysis.model.model}
-                    </span>
+            <div className="p-5">
+                {error && (
+                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{error}</span>
+                    </div>
                 )}
-                {analysis && (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
-                        Preselezionati forti: {autoSelectedCount}
-                    </span>
+
+                {statusMessage && (
+                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{statusMessage}</span>
+                    </div>
                 )}
-                {analysis && consultiveCount > 0 && (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
-                        Da rivedere: {consultiveCount}
-                    </span>
+
+                {!analysis && !isGenerating && (
+                    <div className="rounded-[24px] border border-sky-100 bg-sky-50/30 p-4 text-sm leading-relaxed text-sky-900 dark:border-sky-500/10 dark:text-sky-200">
+                        Analisi automatica di note, diario e documenti per suggerire diagnosi ICD-11 e terapie farmacologiche da importare in scheda.
+                    </div>
+                )}
+
+                {isGenerating && (
+                    <div className="py-10 text-center space-y-4">
+                        <div className="relative mx-auto h-12 w-12">
+                            <Brain className="h-12 w-12 text-sky-500/20 animate-pulse" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <RefreshCw className="h-5 w-5 text-sky-600 animate-spin" />
+                            </div>
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-sky-600">Elaborazione fonti cliniche...</p>
+                    </div>
+                )}
+
+                {analysis && !isGenerating && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                            {/* Diagnoses Section */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 px-1">
+                                    <Stethoscope className="h-3.5 w-3.5 text-rose-500" />
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Diagnosi Candidate</h4>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {analysis.diagnoses.length === 0 && (
+                                        <p className="py-4 text-center text-xs italic text-slate-400">Nessun match trovato</p>
+                                    )}
+
+                                    {analysis.diagnoses.map((diagnosis) => (
+                                        <div
+                                            key={diagnosis.id}
+                                            className={`group relative overflow-hidden rounded-[24px] border transition-all ${diagnosis.canApply
+                                                ? 'border-slate-100 bg-white hover:border-sky-200 dark:border-white/5 dark:bg-white/5'
+                                                : 'border-slate-100 bg-slate-50 opacity-60 dark:border-white/5 dark:bg-white/5'
+                                            }`}
+                                        >
+                                            <label className="flex cursor-pointer items-start gap-3 p-3.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDiagnosisIds.includes(diagnosis.id)}
+                                                    disabled={!diagnosis.canApply || isApplying}
+                                                    onChange={() => toggleDiagnosis(diagnosis.id)}
+                                                    className="mt-1 h-4 w-4 rounded-full border-slate-300 text-sky-600 focus:ring-sky-500"
+                                                />
+                                                <div className="min-w-0 flex-1 space-y-1.5">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{diagnosis.label}</p>
+                                                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-slate-500 dark:bg-white/10">
+                                                            {diagnosis.confidence}
+                                                        </span>
+                                                    </div>
+                                                    {diagnosis.match && (
+                                                        <p className="font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                                            ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
+                                                        </p>
+                                                    )}
+                                                    <div className="rounded-[18px] bg-slate-50 p-2 text-[10px] italic text-slate-500 dark:bg-white/5">
+                                                        &ldquo;<PrivacyBlur intensity="sm">{diagnosis.evidence.excerpt}</PrivacyBlur>&rdquo;
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Therapies Section */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 px-1">
+                                    <Pill className="h-3.5 w-3.5 text-sky-500" />
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Terapie Candidate</h4>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {analysis.therapies.length === 0 && (
+                                        <p className="py-4 text-center text-xs italic text-slate-400">Nessun match trovato</p>
+                                    )}
+
+                                    {analysis.therapies.map((therapy) => (
+                                        <div
+                                            key={therapy.id}
+                                            className={`group relative overflow-hidden rounded-[24px] border transition-all ${therapy.canApply
+                                                ? 'border-slate-100 bg-white hover:border-sky-200 dark:border-white/5 dark:bg-white/5'
+                                                : 'border-slate-100 bg-slate-50 opacity-60 dark:border-white/5 dark:bg-white/5'
+                                            }`}
+                                        >
+                                            <label className="flex cursor-pointer items-start gap-3 p-3.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTherapyIds.includes(therapy.id)}
+                                                    disabled={!therapy.canApply || isApplying}
+                                                    onChange={() => toggleTherapy(therapy.id)}
+                                                    className="mt-1 h-4 w-4 rounded-full border-slate-300 text-sky-600 focus:ring-sky-500"
+                                                />
+                                                <div className="min-w-0 flex-1 space-y-1.5">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{therapy.match?.name || therapy.drugMention}</p>
+                                                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${therapyStateBadgeClasses(therapy.therapyState)}`}>
+                                                            {therapyStateLabel(therapy.therapyState)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] font-bold text-sky-700 dark:text-sky-400">
+                                                        {therapy.activePrinciple} {therapy.dosage && `· ${therapy.dosage}`}
+                                                    </p>
+                                                    <div className="rounded-[18px] bg-slate-50 p-2 text-[10px] italic text-slate-500 dark:bg-white/5">
+                                                        &ldquo;<PrivacyBlur intensity="sm">{therapy.evidence.excerpt}</PrivacyBlur>&rdquo;
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex gap-4">
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Preselezionati</span>
+                                    <span className="text-xs font-bold text-emerald-600">{autoSelectedCount} solidi</span>
+                                </div>
+                                <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Da rivedere</span>
+                                    <span className="text-xs font-bold text-amber-600">{consultiveCount} incerti</span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={applySelection}
+                                disabled={isApplying || (!selectedDiagnosisIds.length && !selectedTherapyIds.length)}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-emerald-600 px-8 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                            >
+                                {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                Applica Selezionati
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
-
-            {error && (
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{error}</span>
-                </div>
-            )}
-
-            {statusMessage && (
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{statusMessage}</span>
-                </div>
-            )}
-
-            {!analysis && !isGenerating && (
-                <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-sky-900">
-                    <p className="font-medium">Il prompt resta disponibile finche il paziente ha fonti utili.</p>
-                    <p className="mt-1 text-sky-800">
-                        Le diagnosi da free text e le terapie vengono proposte per revisione manuale. L&apos;autofill automatico dei documenti resta limitato ai soli ICD espliciti gia gestiti dal flusso OCR-first.
-                    </p>
-                </div>
-            )}
-
-            {analysis && (
-                <div className="mt-5 space-y-5">
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                        <section className="rounded-2xl border border-red-100 bg-red-50/50 p-4">
-                            <div className="mb-3 flex items-center gap-2">
-                                <Stethoscope className="h-4 w-4 text-red-500" />
-                                <h4 className="font-semibold text-gray-800">Diagnosi candidate</h4>
-                            </div>
-
-                            <div className="space-y-3">
-                                {analysis.diagnoses.length === 0 && (
-                                    <p className="text-sm text-gray-500">Nessuna diagnosi candidabile trovata nelle fonti correnti.</p>
-                                )}
-
-                                {analysis.diagnoses.map((diagnosis) => (
-                                    <label
-                                        key={diagnosis.id}
-                                        className={`block rounded-xl border p-3 transition-colors ${diagnosis.canApply
-                                            ? 'cursor-pointer border-red-100 bg-white'
-                                            : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-75'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDiagnosisIds.includes(diagnosis.id)}
-                                                disabled={!diagnosis.canApply || isApplying}
-                                                onChange={() => toggleDiagnosis(diagnosis.id)}
-                                                className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="font-medium text-gray-800">{diagnosis.label}</p>
-                                                    <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase text-gray-500">
-                                                        {diagnosis.confidence}
-                                                    </span>
-                                                </div>
-                                                {diagnosis.match ? (
-                                                    <p className="mt-1 text-sm text-red-700">
-                                                        ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
-                                                    </p>
-                                                ) : (
-                                                    <p className="mt-1 text-sm text-amber-700">
-                                                        Nessun match ICD-11 affidabile: la proposta resta solo consultiva.
-                                                    </p>
-                                                )}
-                                                <p className="mt-2 text-xs text-gray-500">
-                                                    <strong>{diagnosis.evidence.label}:</strong> <PrivacyBlur intensity="sm">{diagnosis.evidence.excerpt}</PrivacyBlur>
-                                                </p>
-                                                {diagnosis.blockedReason && (
-                                                    <p className="mt-2 text-xs text-amber-700">{diagnosis.blockedReason}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
-                            <div className="mb-3 flex items-center gap-2">
-                                <Pill className="h-4 w-4 text-indigo-500" />
-                                <h4 className="font-semibold text-gray-800">Terapie candidate</h4>
-                            </div>
-
-                            <div className="space-y-3">
-                                {analysis.therapies.length === 0 && (
-                                    <p className="text-sm text-gray-500">Nessuna terapia candidabile trovata nelle fonti correnti.</p>
-                                )}
-
-                                {analysis.therapies.map((therapy) => (
-                                    <label
-                                        key={therapy.id}
-                                        className={`block rounded-xl border p-3 transition-colors ${therapy.canApply
-                                            ? 'cursor-pointer border-indigo-100 bg-white'
-                                            : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-75'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedTherapyIds.includes(therapy.id)}
-                                                disabled={!therapy.canApply || isApplying}
-                                                onChange={() => toggleTherapy(therapy.id)}
-                                                className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="font-medium text-gray-800">{therapy.match?.name || therapy.drugMention}</p>
-                                                    <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase text-gray-500">
-                                                        {therapy.confidence}
-                                                    </span>
-                                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${therapy.matchType === 'catalog'
-                                                        ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
-                                                        : therapy.matchType === 'manual'
-                                                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                                            : 'border-gray-200 bg-gray-50 text-gray-500'
-                                                        }`}>
-                                                        {therapy.matchType === 'catalog' ? 'catalogo' : therapy.matchType === 'manual' ? 'manuale' : 'nessun match'}
-                                                    </span>
-                                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${therapyStateBadgeClasses(therapy.therapyState)}`}>
-                                                        {therapyStateLabel(therapy.therapyState)}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-1 text-sm text-indigo-700">
-                                                    {therapy.activePrinciple ? `${therapy.activePrinciple}` : 'Principio attivo da verificare'}
-                                                    {therapy.dosage ? ` · ${therapy.dosage}` : ''}
-                                                </p>
-                                                {therapy.match?.aic && (
-                                                    <p className="mt-1 text-xs text-gray-500">
-                                                        AIC {therapy.match.aic}{therapy.match.atc ? ` · ATC ${therapy.match.atc}` : ''}
-                                                    </p>
-                                                )}
-                                                <p className="mt-2 text-xs text-gray-500">
-                                                    <strong>{therapy.evidence.label}:</strong> <PrivacyBlur intensity="sm">{therapy.evidence.excerpt}</PrivacyBlur>
-                                                </p>
-                                                {therapy.reviewNote && therapy.reviewNote !== therapy.blockedReason && (
-                                                    <p className="mt-2 text-xs text-gray-600">{therapy.reviewNote}</p>
-                                                )}
-                                                {therapy.blockedReason && (
-                                                    <p className="mt-2 text-xs text-amber-700">{therapy.blockedReason}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </section>
-                    </div>
-
-                    <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 md:flex-row md:items-center md:justify-between">
-                        <p className="text-xs text-gray-500">
-                            Seleziona solo i suggerimenti confermati. Per default vengono preselezionate solo diagnosi con match ICD forte e terapie attive catalogate con posologia esplicita; transizioni, match manuali e voci incerte restano consultive.
-                        </p>
-                        <button
-                            onClick={applySelection}
-                            disabled={isApplying || (!selectedDiagnosisIds.length && !selectedTherapyIds.length)}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                            {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                            Applica selezionati
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
