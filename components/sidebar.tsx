@@ -19,15 +19,13 @@ import SystemStatus from '@/components/system-status';
 import { usePrivacy } from '@/components/privacy-provider';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useSecurity } from '@/components/security-provider';
+import { useUIStyle } from '@/components/ui-style-provider';
 
 // Helper to read cookie
 function useCookie(name: string) {
-    const [value, setValue] = useState<string | null>(null);
-    useEffect(() => {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        if (match && match[2] !== value) setValue(match[2]);
-    }, [name, value]);
-    return value;
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match?.[2] ?? null;
 }
 
 // Recursive Tree Component
@@ -226,6 +224,8 @@ export function Sidebar() {
     const [showNewVisitModal, setShowNewVisitModal] = useState(false);
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
     const { user } = useSecurity();
+    const { uiStyleMode } = useUIStyle();
+    const isLiquid = uiStyleMode === 'liquid';
 
     const profile = {
         doctor: user?.displayName || 'Medico',
@@ -241,10 +241,25 @@ export function Sidebar() {
     return (
         <>
             <aside className="w-80 h-screen fixed left-0 top-0 p-4 z-50">
-                <div className="h-full glass-panel flex flex-col p-4 rounded-3xl">
+                <div className={cn(
+                    "relative h-full glass-panel flex flex-col overflow-hidden p-4",
+                    isLiquid ? "rounded-[34px]" : "rounded-[28px]"
+                )}>
+                    {isLiquid && (
+                        <>
+                            <div className="liquid-orb -left-10 top-0 h-28 w-28 bg-sky-300/30" />
+                            <div className="liquid-orb right-2 top-8 h-24 w-24 bg-violet-300/22" />
+                            <div className="liquid-orb bottom-20 left-12 h-24 w-24 bg-emerald-200/18" />
+                        </>
+                    )}
                     <div className="mb-6 px-2 pt-2">
                         <div className="flex justify-between items-center mb-1">
-                            <h1 className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
+                            <h1 className={cn(
+                                "text-lg font-black tracking-tight",
+                                isLiquid
+                                    ? "bg-[linear-gradient(135deg,#0A84FF,#5AC8FA_55%,#5E5CE6)] bg-clip-text text-transparent"
+                                    : "text-gray-900 dark:text-white"
+                            )}>
                                 MediFlow
                             </h1>
                             <button
@@ -287,11 +302,20 @@ export function Sidebar() {
                                     className={cn(
                                         "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-[14px] font-medium",
                                         isActive
-                                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold"
+                                            ? isLiquid
+                                                ? "border border-white/60 bg-white/70 text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-white/10 dark:text-white font-semibold"
+                                                : "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold"
                                             : "text-gray-500 hover:bg-black/5 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
                                     )}
                                 >
-                                    <Icon className={cn("w-4.5 h-4.5", isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300")} />
+                                    <Icon className={cn(
+                                        "w-4.5 h-4.5",
+                                        isActive
+                                            ? isLiquid
+                                                ? "text-sky-500 dark:text-sky-300"
+                                                : "text-blue-600 dark:text-blue-400"
+                                            : "text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"
+                                    )} />
                                     <span>{link.name}</span>
                                 </Link>
                             );
@@ -308,7 +332,12 @@ export function Sidebar() {
                         <SystemStatus />
                         <button
                             onClick={() => setShowNewVisitModal(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 p-2.5 rounded-xl hover:opacity-90 transition-all active:scale-[0.98] text-[13px] font-bold shadow-sm"
+                            className={cn(
+                                "w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold",
+                                isLiquid
+                                    ? "ui-btn-primary"
+                                    : "rounded-xl bg-gray-900 text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
+                            )}
                         >
                             <PlusCircle className="w-4 h-4" />
                             <span>Nuova Visita</span>

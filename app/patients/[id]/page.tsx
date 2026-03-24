@@ -1,7 +1,7 @@
 'use client';
 
 import { useLiveQuery } from '@/lib/live-query';
-import { db } from '@/lib/db';
+import { db, type Checkup, type ClinicalEntry } from '@/lib/db';
 import { useParams } from 'next/navigation';
 import { Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, Download } from 'lucide-react';
 import Timeline from '@/components/timeline';
@@ -19,6 +19,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
+import { useUIStyle } from '@/components/ui-style-provider';
 
 /* @Codex */
 type ValidationSummary = {
@@ -50,21 +51,21 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const { uiStyleMode } = useUIStyle();
+    const isLiquid = uiStyleMode === 'liquid';
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
         async () => {
-            const items = await db.entries.filter((e: any) => e.patientId === id).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const items = await db.entries.filter((entry: ClinicalEntry) => entry.patientId === id).toArray();
+            return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         },
         [id]
     );
     const checkups = useLiveQuery(
         async () => {
-            const items = await db.checkups.filter((c: any) => c.patientId === id).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.filter((c: any) => c.status !== 'completed').sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const items = await db.checkups.filter((checkup: Checkup) => checkup.patientId === id).toArray();
+            return items.filter((checkup) => checkup.status !== 'completed').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         },
         [id]
     );
@@ -151,7 +152,11 @@ export default function PatientDetailPage() {
         <div className="space-y-6">
             {/* Top Functional Layer: Liquid Glass Header */}
             <div className="relative z-20 -mx-4 -mt-2 px-4 pb-4 md:mx-0 md:mt-0 md:px-0">
-                <div className="glass-panel overflow-hidden rounded-[32px] border-white/40 bg-white/70 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
+                <div className={`glass-panel overflow-hidden rounded-[32px] backdrop-blur-2xl ${
+                    isLiquid
+                        ? 'border-white/40 bg-white/70 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-white/10'
+                        : 'border-black/5 bg-white/84 shadow-[0_22px_48px_-20px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/8'
+                }`}>
                     <div className="liquid-orb -left-10 -top-10 h-40 w-40 bg-sky-400/20 blur-3xl" />
                     <div className="liquid-orb -bottom-10 right-0 h-40 w-40 bg-rose-400/15 blur-3xl" />
                     
@@ -159,7 +164,11 @@ export default function PatientDetailPage() {
                         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                             {/* Identity & Status Layer */}
                             <div className="flex items-center gap-5">
-                                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[30px] bg-[linear-gradient(145deg,#0A84FF,#5AC8FA_58%,#34C759)] text-2xl font-semibold text-white shadow-[0_20px_40px_rgba(10,132,255,0.25)]">
+                                <div className={`flex h-20 w-20 shrink-0 items-center justify-center text-2xl font-semibold text-white ${
+                                    isLiquid
+                                        ? 'rounded-[30px] bg-[linear-gradient(145deg,#0A84FF,#5AC8FA_58%,#34C759)] shadow-[0_20px_40px_rgba(10,132,255,0.25)]'
+                                        : 'rounded-[24px] bg-sky-600 shadow-[0_14px_28px_rgba(10,132,255,0.18)]'
+                                }`}>
                                     {patient.firstName[0]}{patient.lastName[0]}
                                 </div>
                                 <div className="space-y-1.5">
@@ -190,13 +199,17 @@ export default function PatientDetailPage() {
                             <div className="flex flex-wrap items-center gap-3">
                                 <Link
                                     href={`/patients/${id}/entries/new`}
-                                    className="inline-flex h-11 items-center gap-2 rounded-[28px] bg-[#0A84FF] px-6 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(10,132,255,0.3)] transition-all hover:-translate-y-0.5 hover:bg-[#007AFF] active:scale-95"
+                                    className={`ui-btn-primary h-11 px-6 ${isLiquid ? 'rounded-[28px]' : 'rounded-2xl'}`}
                                 >
                                     <Plus className="h-4 w-4" />
                                     Nuova visita
                                 </Link>
 
-                                <div className="flex h-11 items-center overflow-hidden rounded-[28px] border border-white/60 bg-white/35 p-1 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                                <div className={`flex h-11 items-center overflow-hidden p-1 ${
+                                    isLiquid
+                                        ? 'rounded-[28px] border border-white/60 bg-white/35 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5'
+                                        : 'rounded-2xl border border-slate-200/80 bg-white/92 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-white/8'
+                                }`}>
                                     <button
                                         onClick={() => setIsExportModalOpen(true)}
                                         className="flex h-full items-center gap-2 rounded-[22px] px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/10"

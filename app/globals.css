@@ -23,21 +23,56 @@
 :root {
   --background: #f4f6fb;
   --foreground: #1d1d1f;
+  --ui-canvas-background: linear-gradient(180deg, #fbfcff 0%, #f4f6fb 54%, #eef2fa 100%);
 
   /* Glass Chrome (Shell) */
   --glass-border: rgba(255, 255, 255, 0.45);
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  --glass-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --glass-card-shadow: 0 10px 28px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   
   /* Clinical Paper (Content) */
   --paper-bg: #ffffff;
   --paper-border: rgba(0, 0, 0, 0.06);
   --paper-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --ui-chip-bg: rgba(15, 23, 42, 0.04);
+  --ui-chip-border: rgba(15, 23, 42, 0.06);
+  --ui-panel-radius: 28px;
+  --ui-card-radius: 24px;
+  --ui-subsection-radius: 22px;
+  --ui-orb-opacity: 0;
+  --ui-btn-primary-bg: linear-gradient(135deg, #0A84FF, #0A84FF);
+  --ui-btn-primary-shadow: 0 14px 30px rgba(10, 132, 255, 0.22);
+  --ui-btn-primary-radius: 18px;
 
   /* Apple System Colors (Light) */
   --apple-blue: #007AFF;
   --apple-gray: #8E8E93;
   --system-gray-6: #F2F2F7;
+}
+
+:root[data-ui-style='liquid'] {
+  --background: #edf4ff;
+  --ui-canvas-background:
+    radial-gradient(circle at 10% 10%, rgba(96, 165, 250, 0.24) 0, transparent 24%),
+    radial-gradient(circle at 84% 4%, rgba(244, 114, 182, 0.18) 0, transparent 22%),
+    radial-gradient(circle at 56% 18%, rgba(45, 212, 191, 0.12) 0, transparent 18%),
+    linear-gradient(180deg, #fbfdff 0%, #eef4ff 52%, #e7efff 100%);
+  --glass-border: rgba(255, 255, 255, 0.62);
+  --glass-bg: rgba(255, 255, 255, 0.74);
+  --glass-panel-shadow: 0 28px 64px rgba(87, 98, 182, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  --glass-card-shadow: 0 18px 40px rgba(115, 128, 202, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.54);
+  --paper-shadow: 0 12px 30px rgba(148, 163, 184, 0.12);
+  --ui-chip-bg: rgba(255, 255, 255, 0.72);
+  --ui-chip-border: rgba(255, 255, 255, 0.55);
+  --ui-panel-radius: 32px;
+  --ui-card-radius: 28px;
+  --ui-subsection-radius: 24px;
+  --ui-orb-opacity: 1;
+  --ui-btn-primary-bg: linear-gradient(145deg, #0A84FF, #5AC8FA 58%, #5E5CE6);
+  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.28);
+  --ui-btn-primary-radius: 28px;
 }
 
 body {
@@ -47,10 +82,7 @@ body {
   font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
   letter-spacing: -0.01em;
-  background-image:
-    radial-gradient(circle at 12% 8%, rgba(123, 191, 255, 0.18) 0, transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(255, 171, 198, 0.14) 0, transparent 24%),
-    linear-gradient(180deg, #fbfcff 0%, #f4f6fb 54%, #eef2fa 100%);
+  background-image: var(--ui-canvas-background);
   background-size: 100% 100%;
   background-attachment: fixed;
 }
@@ -90,14 +122,20 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   /* High contrast dark palette */
   --background: #000000;
   --foreground: #f5f5f7;
+  --ui-canvas-background: linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
 
   /* Glass Chrome (Dark Shell) */
   --glass-bg: rgba(28, 28, 30, 0.85);
   --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   
   /* Clinical Paper (Dark Content) */
   --paper-bg: #1c1c1e;
   --paper-border: rgba(255, 255, 255, 0.08);
+  --paper-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+  --ui-chip-bg: rgba(255, 255, 255, 0.05);
+  --ui-chip-border: rgba(255, 255, 255, 0.1);
 
   /* Semantic Layers */
   --card: #1c1c1e;
@@ -120,11 +158,20 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   --system-gray-6: #1c1c1e;
 }
 
-:root.dark body {
-  background-image: 
-    radial-gradient(circle at 10% 10%, rgba(10, 132, 255, 0.08) 0, transparent 25%),
-    linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
-  background-color: var(--background);
+:root.dark[data-ui-style='liquid'] {
+  --ui-canvas-background:
+    radial-gradient(circle at 12% 10%, rgba(10, 132, 255, 0.14) 0, transparent 26%),
+    radial-gradient(circle at 82% 0%, rgba(147, 51, 234, 0.11) 0, transparent 22%),
+    radial-gradient(circle at 54% 16%, rgba(45, 212, 191, 0.08) 0, transparent 18%),
+    linear-gradient(180deg, #020308 0%, #0b0f18 100%);
+  --glass-bg: rgba(23, 24, 32, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-panel-shadow: 0 28px 60px rgba(2, 6, 23, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-card-shadow: 0 18px 38px rgba(2, 6, 23, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ui-chip-bg: rgba(255, 255, 255, 0.08);
+  --ui-chip-border: rgba(255, 255, 255, 0.14);
+  --ui-orb-opacity: 1;
+  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.34);
 }
 
 :root.dark body[data-preview-profile-id='liquid-glass-ui'] {
@@ -153,51 +200,58 @@ body[data-preview-profile-id='smart-import-review-v2'] {
 
 @layer utilities {
   .liquid-hero {
-    @apply relative overflow-hidden rounded-[32px];
+    @apply relative overflow-hidden;
+    border-radius: var(--ui-panel-radius);
   }
 
   .liquid-orb {
-    @apply pointer-events-none absolute rounded-full blur-3xl;
+    @apply pointer-events-none absolute rounded-full blur-3xl transition-opacity duration-300;
+    opacity: var(--ui-orb-opacity);
   }
 
   /* Disciplined Glass: The Chrome */
   .glass {
-    @apply rounded-[24px] border backdrop-blur-xl;
+    @apply border backdrop-blur-xl;
+    border-radius: var(--ui-card-radius);
     background-color: var(--glass-bg);
     border-color: var(--glass-border);
-    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: var(--glass-card-shadow);
   }
 
   /* Clinical Paper: The Content */
   .clinical-paper {
-    @apply rounded-[24px] border;
+    @apply border;
+    border-radius: var(--ui-card-radius);
     background-color: var(--paper-bg);
     border-color: var(--paper-border);
     box-shadow: var(--paper-shadow);
   }
 
   .glass-panel {
-    @apply rounded-[28px] border backdrop-blur-3xl;
+    @apply border backdrop-blur-3xl;
+    border-radius: var(--ui-panel-radius);
     background-color: var(--glass-bg);
     border-color: var(--glass-border);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: var(--glass-panel-shadow);
   }
 
   /* Disciplined Glass Card: premium but calmer than the shell chrome */
   .glass-card {
-    @apply rounded-[24px] border backdrop-blur-xl;
+    @apply border backdrop-blur-xl;
+    border-radius: var(--ui-card-radius);
     background-color: var(--glass-bg);
     border-color: var(--glass-border);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: var(--glass-card-shadow);
   }
 
   .glass-card:hover {
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: var(--glass-panel-shadow);
     transform: translateY(-1px);
   }
 
   .apple-subsection {
-    @apply rounded-[24px] border p-4 md:p-5;
+    @apply border p-4 md:p-5;
+    border-radius: var(--ui-subsection-radius);
     background-color: var(--paper-bg);
     border-color: var(--paper-border);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -205,14 +259,9 @@ body[data-preview-profile-id='smart-import-review-v2'] {
 
   .apple-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
-    background-color: rgba(0, 0, 0, 0.03);
-    border-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--ui-chip-bg);
+    border-color: var(--ui-chip-border);
     color: var(--apple-gray);
-  }
-  
-  :root.dark .apple-chip {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .apple-list-row {
@@ -230,6 +279,17 @@ body[data-preview-profile-id='smart-import-review-v2'] {
     @apply text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
   }
 
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    border-radius: var(--ui-btn-primary-radius);
+    background: var(--ui-btn-primary-bg);
+    box-shadow: var(--ui-btn-primary-shadow);
+  }
+
+  .ui-btn-primary:hover {
+    transform: translateY(-1px);
+  }
+
   /* @Codex */
   .clamp-2 {
     display: -webkit-box;
@@ -237,12 +297,6 @@ body[data-preview-profile-id='smart-import-review-v2'] {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-}
-
-/* @Codex */
-:root.dark .glass,
-:root.dark .glass-panel {
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 

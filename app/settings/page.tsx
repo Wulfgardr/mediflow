@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import {
     AI_INSIGHT_MODE_OPTIONS,
-    type AIInsightManualConfig,
 } from '@/lib/ai-insight-settings';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check, Shield } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check, Shield, Sparkles } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -28,6 +27,7 @@ import {
     PREVIEW_PROFILE_FLAG_LABELS,
     type PreviewProfileId,
 } from '@/lib/preview-profiles';
+import { useUIStyle } from '@/components/ui-style-provider';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -52,14 +52,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
     const [showCustom, setShowCustom] = useState(false);
     const [pullingModel, setPullingModel] = useState<string | null>(null);
 
-    // Initial check
-    useEffect(() => {
-        if (provider === 'ollama') {
-            checkInstalled();
-        }
-    }, [provider, targetUrl]);
-
-    const checkInstalled = async () => {
+    const checkInstalled = useCallback(async () => {
         try {
             setLoading(true);
             const res = await fetch('/api/ai/models', {
@@ -77,7 +70,14 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
         } finally {
             setLoading(false);
         }
-    };
+    }, [targetUrl]);
+
+    // Initial check
+    useEffect(() => {
+        if (provider === 'ollama') {
+            void checkInstalled();
+        }
+    }, [provider, checkInstalled]);
 
     const handlePull = async (modelName: string) => {
         if (!confirm(`Vuoi scaricare il modello '${modelName}'? \nPotrebbe richiedere diversi GB e tempo a seconda della connessione.`)) return;
@@ -312,8 +312,6 @@ const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white
 /* @Codex */
 const SETTINGS_LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
 /* @Codex */
-const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
-/* @Codex */
 const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
     emerald: 'inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(5,150,105,0.22)] transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50',
     amber: 'inline-flex items-center gap-2 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(217,119,6,0.22)] transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50',
@@ -437,6 +435,7 @@ export default function SettingsPage() {
     useEffect(() => {
         setSelectedPreviewProfileId(activeProfile.id);
     }, [activeProfile.id]);
+    const { uiStyleMode, setUIStyleMode } = useUIStyle();
 
     // Load initial data
     useEffect(() => {
@@ -573,6 +572,7 @@ export default function SettingsPage() {
 
     /* @Codex */
     const railItems = [
+        { href: '#appearance', label: 'Interfaccia', description: 'Stile clinico o liquid', icon: <Sparkles className="h-4 w-4" /> },
         { href: '#account', label: 'Account', description: 'Profilo e accesso', icon: <User className="h-4 w-4" /> },
         { href: '#ai', label: 'AI', description: 'Modelli, budget e runtime', icon: <Bot className="h-4 w-4" /> },
         { href: '#data', label: 'Dati locali', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
@@ -666,6 +666,90 @@ export default function SettingsPage() {
                 </aside>
 
                 <div className="space-y-10">
+                    <section id="appearance" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Interfaccia"
+                            title="Stile visivo"
+                            description="Scegli se usare una UI piu clinica e istituzionale oppure una variante piu massimalista, piu liquid e piu playful. La preferenza resta locale e persistente."
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-6 flex items-center gap-3">
+                                    <div className="rounded-lg bg-sky-100 p-2 text-sky-600">
+                                        <Sparkles className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Modalita interfaccia</h2>
+                                        <p className="text-xs text-gray-500">Due grammatiche diverse, stesso prodotto.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setUIStyleMode('clinical')}
+                                        className={cn(
+                                            "rounded-[24px] border px-4 py-4 text-left transition-all",
+                                            uiStyleMode === 'clinical'
+                                                ? "border-sky-300/80 bg-white shadow-[0_14px_28px_rgba(10,132,255,0.12)] dark:border-sky-500/20 dark:bg-white/10"
+                                                : "border-white/70 bg-white/76 hover:border-slate-200 hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                        )}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Clinico</p>
+                                                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Piu paper-first, piu denso, piu istituzionale. Ottimizzato per scansione rapida e calma operativa.</p>
+                                            </div>
+                                            {uiStyleMode === 'clinical' ? <CheckCircle className="mt-0.5 h-4 w-4 text-sky-600 dark:text-sky-300" /> : null}
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setUIStyleMode('liquid')}
+                                        className={cn(
+                                            "rounded-[28px] border px-4 py-4 text-left transition-all",
+                                            uiStyleMode === 'liquid'
+                                                ? "border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.86),rgba(255,255,255,0.62))] shadow-[0_24px_48px_rgba(10,132,255,0.14)] backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+                                                : "border-white/70 bg-white/76 hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                        )}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="bg-[linear-gradient(135deg,#0A84FF,#5AC8FA_55%,#5E5CE6)] bg-clip-text text-sm font-semibold text-transparent">Liquid</p>
+                                                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Piu massimalista, piu materica, piu vicina a Play, Sleeve e Craft. Tiene il delight nel chrome, non nel dato clinico.</p>
+                                            </div>
+                                            {uiStyleMode === 'liquid' ? <CheckCircle className="mt-0.5 h-4 w-4 text-sky-500 dark:text-sky-300" /> : null}
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="apple-subsection">
+                                <p className="section-kicker">Stato corrente</p>
+                                <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                                    {uiStyleMode === 'liquid' ? 'Liquid attivo' : 'Clinico attivo'}
+                                </h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                                    {uiStyleMode === 'liquid'
+                                        ? 'Shell, hero e superfici principali spingono di piu su glass, profondita, curvature morbide e presence.'
+                                        : "L'interfaccia resta piu sobria, piu densa e piu focalizzata sul dato operativo."}
+                                </p>
+                                <div className="mt-5 flex flex-wrap gap-2.5">
+                                    <span className="apple-chip">
+                                        <Sparkles className="h-3.5 w-3.5 text-sky-500" />
+                                        {uiStyleMode === 'liquid' ? 'Massimalismo controllato' : 'Sobrieta operativa'}
+                                    </span>
+                                    <span className="apple-chip">
+                                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                                        Preferenza locale persistente
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     <section id="account" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
                             kicker="Account"

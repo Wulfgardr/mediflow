@@ -12,6 +12,7 @@ import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
 import { usePatientClipboard } from '@/hooks/use-patient-clipboard';
 import { notifyDbChange } from '@/lib/live-query';
+import { useUIStyle } from '@/components/ui-style-provider';
 
 function useCookie(name: string) {
     const [value, setValue] = useState<string | null>(null);
@@ -89,6 +90,8 @@ export default function PatientList() {
     const [targetAmbulatory, setTargetAmbulatory] = useState<string>('');
     const [showMoveModal, setShowMoveModal] = useState(false);
     const { copy, cut, paste, clipboard } = usePatientClipboard();
+    const { uiStyleMode } = useUIStyle();
+    const isLiquid = uiStyleMode === 'liquid';
     const currentAmbulatoryId = useCookie('ambulatory_id');
     const isGlobalView = !currentAmbulatoryId;
 
@@ -278,14 +281,21 @@ export default function PatientList() {
         return (
             <div
                 key={patient.id}
-                className={`group flex items-center gap-3 rounded-xl border transition-all duration-300 ${
+                className={`group relative flex items-center gap-3 transition-all duration-200 ${
                     isWide ? 'px-5 py-4' : 'px-3 py-1.5'
                 } ${
-                    isSelected
-                        ? 'border-sky-400/50 bg-sky-50/50 ring-1 ring-sky-500/10 dark:border-sky-500/40 dark:bg-sky-500/10'
-                        : 'border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-sm dark:border-white/5 dark:bg-white/2'
+                    isLiquid
+                        ? isSelected
+                            ? 'rounded-[18px] border border-sky-300/60 bg-white/82 shadow-[0_14px_28px_rgba(15,23,42,0.08)] ring-1 ring-sky-400/20 dark:border-sky-400/30 dark:bg-white/10'
+                            : 'rounded-[18px] border border-transparent bg-transparent hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/55 hover:shadow-[0_12px_26px_rgba(15,23,42,0.07)] dark:hover:border-white/10 dark:hover:bg-white/8'
+                        : isSelected
+                            ? 'bg-sky-50/90 dark:bg-sky-500/15'
+                            : 'hover:bg-slate-50/80 dark:hover:bg-white/5'
                 }`}
             >
+                {isSelected && !isLiquid && (
+                    <div className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-sky-500 dark:bg-sky-400" />
+                )}
                 <div className={`shrink-0 transition-opacity ${selectionVisible ? 'opacity-100' : 'opacity-40 md:opacity-0 md:group-hover:opacity-100'}`}>
                     <input
                         type="checkbox"
@@ -347,7 +357,7 @@ export default function PatientList() {
 
     return (
         <div className="space-y-6">
-            <div className="glass-panel liquid-hero px-6 py-5 md:px-7 md:py-6">
+            <div className={`glass-panel liquid-hero px-6 py-5 md:px-7 md:py-6 ${isLiquid ? '' : 'border-black/5 bg-white/80 shadow-[0_20px_44px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/8'}`}>
                 <div className="liquid-orb -left-8 top-0 h-28 w-28 bg-sky-300/20" />
                 <div className="liquid-orb right-0 top-4 h-24 w-24 bg-rose-300/15" />
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -377,14 +387,18 @@ export default function PatientList() {
                     <div className="relative z-10 flex flex-wrap items-center gap-2">
                         <Link
                             href="/analytics"
-                            className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/40 px-3.5 py-1.5 text-[13px] font-medium text-slate-700 backdrop-blur-md hover:bg-white/80 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium text-slate-700 transition-all dark:text-slate-200 ${
+                                isLiquid
+                                    ? 'rounded-full border border-white/60 bg-white/40 backdrop-blur-md hover:bg-white/80 dark:border-white/10 dark:bg-white/5'
+                                    : 'rounded-2xl border border-slate-200/80 bg-white/92 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/8'
+                            }`}
                         >
                             <Activity className="h-3.5 w-3.5" />
                             Statistiche
                         </Link>
                         <Link
                             href="/patients/new"
-                            className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-1.5 text-[13px] font-bold text-white shadow-sm hover:bg-sky-500 dark:bg-sky-500"
+                            className={`ui-btn-primary px-4 py-1.5 text-[13px] font-bold ${isLiquid ? '' : 'rounded-2xl'}`}
                         >
                             <UserPlus className="h-3.5 w-3.5" />
                             Nuovo
@@ -560,7 +574,7 @@ export default function PatientList() {
                             {patientGroups.map((group) => (
                                 <div key={group.ambulatory?.id || 'unassigned'} className="space-y-2.5">
                                     <div className="flex items-center justify-between px-1">
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2">
                                             <div className={`h-2 w-2 rounded-full ${group.color.dot}`} />
                                             <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
                                                 {group.ambulatory?.name || 'Non assegnati'}
@@ -570,7 +584,11 @@ export default function PatientList() {
                                             {group.patients.length} pazienti
                                         </span>
                                     </div>
-                                    <div className="space-y-1.5">
+                                    <div className={`overflow-hidden border dark:border-white/10 dark:bg-[#11151f]/80 dark:shadow-none ${
+                                        isLiquid
+                                            ? 'flex flex-col gap-2 rounded-[30px] border-white/60 bg-white/62 p-2 shadow-[0_22px_48px_-24px_rgba(87,98,182,0.22)] backdrop-blur-2xl'
+                                            : 'rounded-2xl border-slate-200/70 bg-white/90 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.18)] divide-y divide-slate-100 dark:divide-white/5'
+                                    }`}>
                                         {group.patients.map((patient) => renderPatientItem(patient, group.color))}
                                     </div>
                                 </div>
@@ -591,7 +609,11 @@ export default function PatientList() {
                             </h2>
                         </div>
                         {patients && patients.length > 0 ? (
-                            <div className="space-y-1.5">
+                            <div className={`overflow-hidden border dark:border-white/10 dark:bg-[#11151f]/80 dark:shadow-none ${
+                                isLiquid
+                                    ? 'flex flex-col gap-2 rounded-[30px] border-white/60 bg-white/62 p-2 shadow-[0_22px_48px_-24px_rgba(87,98,182,0.22)] backdrop-blur-2xl'
+                                    : 'rounded-2xl border-slate-200/70 bg-white/90 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.18)] divide-y divide-slate-100 dark:divide-white/5'
+                            }`}>
                                 {patients.map((patient) => renderPatientItem(patient))}
                             </div>
                         ) : (
