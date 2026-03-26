@@ -4,7 +4,7 @@ import { bootstrapUnlockedSession } from './utils';
 
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
-  const patientsSearch = page.getByPlaceholder('Cerca per nome, cognome o codice fiscale...');
+  const patientsSearch = page.getByPlaceholder('Cerca paziente...');
 
   await bootstrapUnlockedSession(page, pin);
 

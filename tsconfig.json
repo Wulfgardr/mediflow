@@ -41,6 +41,8 @@
     ".next-e2e-smart-import/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "scripts/**/*.ts",
+    "scripts/**/*.mts"
   ]
 }

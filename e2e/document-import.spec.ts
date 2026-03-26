@@ -70,7 +70,7 @@ test('document import precompiles ICD diagnoses for operator review before patie
   await bootstrapUnlockedSession(page, pin);
   await page.goto('/patients/new');
 
-  await expect(page.getByRole('heading', { name: 'Nuovo Paziente' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Nuova (Anagrafica|Paziente)/ })).toBeVisible();
 
   const uploadInput = page.getByLabel('Carica documento');
   await uploadInput.setInputFiles({
@@ -79,18 +79,18 @@ test('document import precompiles ICD diagnoses for operator review before patie
     buffer: Buffer.from(TEST_PNG_BASE64, 'base64')
   });
 
-  await expect(page.getByText('Import documentale completato')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Ho precompilato 1 diagnosi ICD nel form. Verificale e rimuovi quelle non corrette prima di salvare.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Importazione assistita completata' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Sono stati estratti 1 quesiti diagnostici. Verificare la correttezza della codifica ICD prima della conferma finale.')).toBeVisible();
   await expect(page.getByPlaceholder('RSSMRA80A01H501U')).toHaveValue(taxCode);
-  await expect(page.getByPlaceholder('Codice').first()).toHaveValue('EF00');
+  await expect(page.getByPlaceholder('Es. 8A80.0').first()).toHaveValue('EF00');
   await expect(page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)').first()).toHaveValue(
     'EF00 - Disturbo depressivo maggiore, episodio singolo lieve'
   );
 
-  await page.getByRole('button', { name: 'Crea Paziente' }).click();
+  await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  const search = page.getByPlaceholder('Cerca per nome, cognome o codice fiscale...');
+  const search = page.getByPlaceholder('Cerca paziente...');
   await search.fill(lastName);
   await expect(page.getByText(new RegExp(`${lastName} ${firstName}`))).toBeVisible();
 });
