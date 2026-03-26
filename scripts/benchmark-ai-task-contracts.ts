@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
+import { normalizeOllamaBaseUrl } from './ollama-base-url';
 import {
     buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
@@ -13,7 +13,7 @@ import {
     parseDocumentSynthesisExtractionResponse,
     parsePatientInsightExtractionResponse,
     parseSmartImportExtractionResponse,
-} from '../lib/ai-task-contracts.ts';
+} from '../lib/ai-task-contracts';
 
 type BenchmarkTask = 'patient_insight' | 'smart_import' | 'document_synthesis';
 

@@ -2,8 +2,7 @@
 
 import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket } from 'lucide-react';
+import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket, ChevronDown } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
 /* @Codex */
 import ExemptionSelector from '@/components/exemption-selector';
@@ -20,13 +19,13 @@ interface PatientFormProps {
 }
 
 /* @Codex */
-const FORM_SECTION_CLASS = 'glass-panel p-6 md:p-7 space-y-6';
+const FORM_SECTION_CLASS = 'glass-panel p-8 md:p-10 rounded-[32px] space-y-8 relative overflow-hidden transition-all hover:shadow-2xl hover:shadow-blue-500/5';
 /* @Codex */
-const FORM_TITLE_CLASS = 'text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2';
+const FORM_TITLE_CLASS = 'text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3';
 /* @Codex */
-const FORM_LABEL_CLASS = 'text-sm font-medium text-slate-700 dark:text-slate-300';
+const FORM_LABEL_CLASS = 'text-[13px] font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-1.5 block';
 /* @Codex */
-const FORM_INPUT_CLASS = 'w-full rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-slate-900 outline-none transition-all focus:border-sky-300 focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-sky-500/30';
+const FORM_INPUT_CLASS = 'w-full rounded-2xl border border-slate-200/60 bg-white px-4 py-3.5 text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-blue-500/40';
 
 function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues>, setValue: UseFormSetValue<PatientFormValues>, watch: UseFormWatch<PatientFormValues> }) {
     const { fields, append, remove } = useFieldArray({
@@ -35,95 +34,93 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
     });
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             {fields.length === 0 && (
-                <p className="text-sm text-gray-400 italic">Nessuna diagnosi registrata.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-6 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/2">
+                    <Activity className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                    <p className="text-sm text-slate-400 font-medium">Nessuna diagnosi registrata.</p>
+                </div>
             )}
 
-            {fields.map((field, index) => (
-                <div key={field.id} className="relative flex flex-col items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5">
-                    {/* Delete Button */}
-                    <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-white/10 dark:bg-[#161b22] dark:text-slate-400 dark:hover:border-red-500/20 dark:hover:bg-red-900/10"
-                        aria-label="Rimuovi diagnosi"
-                    >
-                        <Trash2 className="w-3 h-3" />
-                    </button>
+            <div className="grid grid-cols-1 gap-4">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="apple-subsection relative group transition-all hover:border-blue-200 dark:hover:border-blue-500/30">
+                        {/* Delete Button */}
+                        <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all rounded-full bg-white dark:bg-slate-800 p-2 shadow-lg border border-slate-100 dark:border-white/10 text-slate-400 hover:text-red-500 hover:scale-110 z-10"
+                            aria-label="Rimuovi diagnosi"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
 
-                    <div className="flex gap-3 w-full">
-                        <div className="w-20 shrink-0">
-                            <label className="section-kicker mb-1 block">Sistema</label>
-                            {(() => {
-                                const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
-                                const isV11 = sys === 'ICD-11';
-                                return (
-                                    <div className={`w-full py-2.5 px-3 text-xs font-bold text-center rounded-lg border font-mono ${isV11 ? 'border-blue-200 bg-blue-100 text-blue-700' : 'border-purple-200 bg-purple-100 text-purple-700'
+                        <div className="flex flex-col md:flex-row gap-5 items-end">
+                            <div className="w-full md:w-24 shrink-0">
+                                <label className="section-kicker mb-1.5 block">Sistema</label>
+                                {(() => {
+                                    const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
+                                    const isV11 = sys === 'ICD-11';
+                                    return (
+                                        <div className={`w-full py-2.5 px-3 text-xs font-bold text-center rounded-xl border transition-colors ${
+                                            isV11 
+                                                ? 'border-blue-100 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:border-blue-500/30 dark:text-blue-400' 
+                                                : 'border-purple-100 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:border-purple-500/30 dark:text-purple-400'
                                         }`}>
-                                        {sys}
-                                    </div>
-                                );
-                            })()}
-                            <input type="hidden" {...register(`diagnoses.${index}.system`)} />
-                        </div>
+                                            {sys}
+                                        </div>
+                                    );
+                                })()}
+                                <input type="hidden" {...register(`diagnoses.${index}.system`)} />
+                            </div>
 
-                        {/* Code Input (Read-onlyish but editable) */}
-                        <div className="w-24 shrink-0">
-                            <label className="section-kicker mb-1 block">Codice</label>
-                            <input
-                                {...register(`diagnoses.${index}.code`)}
-                                placeholder="Codice"
-                                className={`w-full rounded-2xl border p-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white ${errors.diagnoses?.[index]?.code ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'
-                                    }`}
-                            />
-                        </div>
-
-                        {/* Description / Autocomplete */}
-                        <div className="flex-1 min-w-0 relative">
-                            <label className="section-kicker mb-1 block">Patologia / Ricerca</label>
-                            <div className="relative">
-                                <ICDAutocomplete
-                                    value={{
-                                        code: watch(`diagnoses.${index}.code`) || "",
-                                        description: watch(`diagnoses.${index}.description`) || "",
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11"
-                                    }}
-                                    onChange={(val) => {
-                                        setValue(`diagnoses.${index}.code`, val.code);
-                                        setValue(`diagnoses.${index}.description`, val.description);
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        setValue(`diagnoses.${index}.system`, val.system as any);
-                                    }}
-                                />
-                                {/* Hidden input to ensure 'description' is registered for validation if needed, 
-                                    though setValue should handle it. 
-                                    Actually, we need to register it so handleSubmit includes it.
-                                    But ICDAutocomplete doesn't accept 'register'.
-                                    Solution: Keep a hidden input for description sync?
-                                    No, we just need to ensure the register ref is connected? 
-                                    Or just populate the invisible input?
-                                */}
+                            <div className="w-full md:w-28 shrink-0">
+                                <label className="section-kicker mb-1.5 block">Codice</label>
                                 <input
-                                    type="hidden"
-                                    {...register(`diagnoses.${index}.description`)}
+                                    {...register(`diagnoses.${index}.code`)}
+                                    placeholder="Es. 8A80.0"
+                                    className={`w-full rounded-xl border p-2.5 text-sm font-mono font-bold outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white ${
+                                        errors.diagnoses?.[index]?.code 
+                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
+                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
+                                    }`}
                                 />
                             </div>
-                            {errors.diagnoses?.[index]?.description && (
-                                <span className="text-[10px] text-red-500 absolute -bottom-4 left-0">Campo obbligatorio</span>
-                            )}
-                        </div>
-                    </div>
 
-                    <input type="hidden" {...register(`diagnoses.${index}.date`)} value={new Date().toISOString()} />
-                </div>
-            ))}
+                            <div className="flex-1 w-full min-w-0">
+                                <label className="section-kicker mb-1.5 block">Patologia / Ricerca Clinica</label>
+                                <div className="relative">
+                                    <ICDAutocomplete
+                                        value={{
+                                            code: watch(`diagnoses.${index}.code`) || "",
+                                            description: watch(`diagnoses.${index}.description`) || "",
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11"
+                                        }}
+                                        onChange={(val) => {
+                                            setValue(`diagnoses.${index}.code`, val.code);
+                                            setValue(`diagnoses.${index}.description`, val.description);
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            setValue(`diagnoses.${index}.system`, val.system as any);
+                                        }}
+                                    />
+                                    <input type="hidden" {...register(`diagnoses.${index}.description`)} />
+                                </div>
+                                {errors.diagnoses?.[index]?.description && (
+                                    <span className="text-[10px] font-semibold text-red-500 mt-1 block">Campo obbligatorio</span>
+                                )}
+                            </div>
+                        </div>
+
+                        <input type="hidden" {...register(`diagnoses.${index}.date`)} value={new Date().toISOString()} />
+                    </div>
+                ))}
+            </div>
 
             <button
                 type="button"
                 onClick={() => append({ code: '', description: '', system: 'ICD-11', date: new Date() })}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:bg-sky-900/10 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all hover:bg-slate-50 dark:hover:bg-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95 shadow-sm"
             >
                 <Plus className="w-4 h-4" />
                 Aggiungi Diagnosi
@@ -139,58 +136,67 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
     });
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             {fields.length === 0 && (
-                <p className="text-sm text-gray-400 italic">Nessun controllo programmato.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-6 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/2">
+                    <Calendar className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                    <p className="text-sm text-slate-400 font-medium">Nessun controllo programmato.</p>
+                </div>
             )}
 
-            {fields.map((field, index) => (
-                <div key={field.id} className="relative flex flex-col items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5">
-                    {/* Delete Button */}
-                    <button
-                        type="button"
-                        onClick={() => removeField(index)}
-                        className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-white/10 dark:bg-[#161b22] dark:text-slate-400 dark:hover:border-red-500/20 dark:hover:bg-red-900/10"
-                        aria-label="Rimuovi controllo"
-                    >
-                        <Trash2 className="w-3 h-3" />
-                    </button>
+            <div className="grid grid-cols-1 gap-4">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="apple-subsection relative group transition-all hover:border-blue-200 dark:hover:border-blue-500/30">
+                        {/* Delete Button */}
+                        <button
+                            type="button"
+                            onClick={() => removeField(index)}
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all rounded-full bg-white dark:bg-slate-800 p-2 shadow-lg border border-slate-100 dark:border-white/10 text-slate-400 hover:text-red-500 hover:scale-110 z-10"
+                            aria-label="Rimuovi controllo"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
 
-                    <div className="flex gap-3 w-full">
-                        {/* Date */}
-                        <div className="w-32 shrink-0">
-                            <label className="section-kicker mb-1 block">Data</label>
-                            <input
-                                type="date"
-                                {...register(`checkups.${index}.date`)}
-                                className={`w-full rounded-2xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white dark:[color-scheme:dark] ${errors.checkups?.[index]?.date ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'}`}
-                            />
+                        <div className="flex flex-col md:flex-row gap-5 items-end">
+                            <div className="w-full md:w-40 shrink-0">
+                                <label className="section-kicker mb-1.5 block">Data Controllo</label>
+                                <input
+                                    type="date"
+                                    {...register(`checkups.${index}.date`)}
+                                    className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white dark:[color-scheme:dark] ${
+                                        errors.checkups?.[index]?.date 
+                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
+                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
+                                    }`}
+                                />
+                            </div>
+
+                            <div className="flex-1 w-full">
+                                <label className="section-kicker mb-1.5 block">Motivazione / Esame</label>
+                                <input
+                                    {...register(`checkups.${index}.title`)}
+                                    placeholder="Es. Controllo pressione, ECG, Emocromo..."
+                                    className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white ${
+                                        errors.checkups?.[index]?.title 
+                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
+                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
+                                    }`}
+                                />
+                            </div>
                         </div>
-
-                        {/* Title */}
-                        <div className="flex-1">
-                            <label className="section-kicker mb-1 block">Motivo / Titolo</label>
-                            <input
-                                {...register(`checkups.${index}.title`)}
-                                placeholder="Esempio: Controllo Cardiologico"
-                                className={`w-full rounded-2xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white ${errors.checkups?.[index]?.title ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200/80 bg-white/90 dark:border-white/10 dark:bg-white/5'}`}
-                            />
-                        </div>
-
-                        {/* Status (Optional visual, usually pending for new ones) */}
                         <input type="hidden" {...register(`checkups.${index}.status`)} />
                         <input type="hidden" {...register(`checkups.${index}.source`)} />
                     </div>
-                </div>
-            ))}
+                ))}
+            </div>
 
             <button
                 type="button"
                 onClick={() => append({ date: new Date(), title: '', status: 'pending', source: 'manual' })}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:bg-sky-900/10 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all hover:bg-slate-50 dark:hover:bg-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95 shadow-sm"
             >
                 <Plus className="w-4 h-4" />
-                Aggiungi Controllo
+                Pianifica Controllo
             </button>
         </div>
     );
@@ -236,56 +242,60 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
     const estimatedAge = estimatedYear ? calculateAge(estimatedYear) : null;
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
 
             {/* Personal Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Dati base</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <User className="w-5 h-5 text-blue-500" />
-                    Dati Anagrafici
-                    </h3>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+                            <User className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <div>
+                            <p className="section-kicker">Dati anagrafici</p>
+                            <h3 className={FORM_TITLE_CLASS}>Profilo Paziente</h3>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS}>Nome <span className="text-red-500">*</span></label>
                         <input
                             {...register('firstName')}
                             className={FORM_INPUT_CLASS}
-                            placeholder="Mario"
+                            placeholder="Es. Mario"
                         />
-                        {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message}</p>}
+                        {errors.firstName && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.firstName.message}</p>}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS}>Cognome <span className="text-red-500">*</span></label>
                         <input
                             {...register('lastName')}
                             className={FORM_INPUT_CLASS}
-                            placeholder="Rossi"
+                            placeholder="Es. Rossi"
                         />
-                        {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message}</p>}
+                        {errors.lastName && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.lastName.message}</p>}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS}>Codice Fiscale <span className="text-red-500">*</span></label>
                         <input
                             {...register('taxCode')}
-                            className={`${FORM_INPUT_CLASS} uppercase font-mono`}
+                            className={`${FORM_INPUT_CLASS} uppercase font-mono font-bold tracking-wider`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />
-                        {errors.taxCode && <p className="text-sm text-red-500">{errors.taxCode.message}</p>}
+                        {errors.taxCode && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.taxCode.message}</p>}
                     </div>
 
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                            <label className={FORM_LABEL_CLASS}>Data di Nascita</label>
+                    <div className="space-y-1">
+                        <div className="flex justify-between items-center mb-1.5">
+                            <label className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 ml-1">Data di Nascita</label>
                             {estimatedAge !== null && (
-                                <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
-                                    Stima: ~{estimatedAge} anni ({estimatedYear})
+                                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-600 dark:border-blue-500/20 dark:bg-blue-900/30 dark:text-blue-300">
+                                    Stima eta ~{estimatedAge} anni ({estimatedYear})
                                 </span>
                             )}
                         </div>
@@ -294,67 +304,69 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             {...register('birthDate')}
                             className={`${FORM_INPUT_CLASS} dark:[color-scheme:dark]`}
                         />
-                        {errors.birthDate && <p className="text-sm text-red-500">{errors.birthDate.message}</p>}
+                        {errors.birthDate && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.birthDate.message}</p>}
                     </div>
                 </div>
             </div>
 
             {/* Contact Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Recapiti</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <MapPin className="w-5 h-5 text-green-500" />
-                    Contatti & Recapiti
-                    </h3>
+                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                        <MapPin className="w-6 h-6 text-emerald-500" />
+                    </div>
+                    <div>
+                        <p className="section-kicker">Reperibilità</p>
+                        <h3 className={FORM_TITLE_CLASS}>Contatti & Recapiti</h3>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <div className="space-y-2">
-                        <label className={FORM_LABEL_CLASS}>Indirizzo</label>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-1">
+                        <label className={FORM_LABEL_CLASS}>Indirizzo di Residenza</label>
                         <input
                             {...register('address')}
                             className={FORM_INPUT_CLASS}
-                            placeholder="Via Roma 1, Milano"
+                            placeholder="Es. Via Roma 1, Milano"
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <label className={`${FORM_LABEL_CLASS} flex items-center gap-2`}>
-                            <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                            Cellulare / Telefono
-                        </label>
-                        <input
-                            {...register('phone')}
-                            className={FORM_INPUT_CLASS}
-                            placeholder="+39 333 1234567"
-                        />
+                    <div className="space-y-1">
+                        <label className={FORM_LABEL_CLASS}>Cellulare / Telefono</label>
+                        <div className="relative">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                {...register('phone')}
+                                className={`${FORM_INPUT_CLASS} pl-11`}
+                                placeholder="Es. +39 333 1234567"
+                            />
+                        </div>
                     </div>
 
-                    <div className="col-span-full space-y-2">
-                        <label className={`${FORM_LABEL_CLASS} flex items-center gap-2`}>
-                            <HeartHandshake className="w-4 h-4 text-pink-500" />
-                            Caregiver / Riferimento Familiare
-                        </label>
-                        <input
-                            {...register('caregiver')}
-                            className={FORM_INPUT_CLASS}
-                            placeholder="Nome Cognome (figlio/a) - Tel..."
-                        />
+                    <div className="col-span-full space-y-1">
+                        <label className={FORM_LABEL_CLASS}>Caregiver / Riferimento Familiare</label>
+                        <div className="relative">
+                            <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pink-400" />
+                            <input
+                                {...register('caregiver')}
+                                className={`${FORM_INPUT_CLASS} pl-11`}
+                                placeholder="Es. Nome Cognome (figlio/a) - Tel..."
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Diagnosi & Patologie (ICD-9/10) */}
-
-
+            {/* Diagnosi & Patologie */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Codifica clinica</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <Activity className="w-5 h-5 text-red-500" />
-                    Patologie e Diagnosi (ICD-11)
-                    </h3>
+                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                        <Activity className="w-6 h-6 text-red-500" />
+                    </div>
+                    <div>
+                        <p className="section-kicker">Codifica clinica</p>
+                        <h3 className={FORM_TITLE_CLASS}>Patologie e Diagnosi (ICD-11)</h3>
+                    </div>
                 </div>
 
                 <DiagnosesFieldArray register={register} control={control} errors={errors} setValue={setValue} watch={watch} />
@@ -362,87 +374,108 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Prossimi Controlli */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Agenda clinica</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <Calendar className="w-5 h-5 text-indigo-500" />
-                    Prossimi Controlli
-                    </h3>
+                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <div>
+                        <p className="section-kicker">Agenda clinica</p>
+                        <h3 className={FORM_TITLE_CLASS}>Prossimi Controlli</h3>
+                    </div>
                 </div>
                 <CheckupsFieldArray register={register} control={control} errors={errors} />
             </div>
 
             {/* @Codex */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Assetto amministrativo</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <Ticket className="w-5 h-5 text-indigo-500" />
-                    Codici Esenzione
-                    </h3>
+                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                        <Ticket className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div>
+                        <p className="section-kicker">Assetto amministrativo</p>
+                        <h3 className={FORM_TITLE_CLASS}>Codici Esenzione</h3>
+                    </div>
                 </div>
-                <Controller
-                    name="exemptions"
-                    control={control}
-                    render={({ field }) => (
-                        <ExemptionSelector
-                            value={Array.isArray(field.value) ? field.value : []}
-                            onChange={field.onChange}
-                        />
-                    )}
-                />
-                <p className="text-xs text-gray-500 dark:text-[#8b949e]">
-                    Seleziona i codici da associare al paziente: verranno salvati in modo cifrato nella scheda.
-                </p>
+                
+                <div className="apple-subsection bg-slate-50/50 dark:bg-white/2 border-dashed">
+                    <Controller
+                        name="exemptions"
+                        control={control}
+                        render={({ field }) => (
+                            <ExemptionSelector
+                                value={Array.isArray(field.value) ? field.value : []}
+                                onChange={field.onChange}
+                            />
+                        )}
+                    />
+                    <div className="mt-4 flex items-start gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        I codici selezionati verranno salvati in modo cifrato nella scheda del paziente.
+                    </div>
+                </div>
             </div>
 
             {/* Clinical Profile Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div>
-                    <p className="section-kicker">Profilo assistenziale</p>
-                    <h3 className={`${FORM_TITLE_CLASS} mt-1`}>
-                    <FileText className="w-5 h-5 text-purple-500" />
-                    Profilo Assistenziale
-                    </h3>
+                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-purple-500" />
+                    </div>
+                    <div>
+                        <p className="section-kicker">Profilo assistenziale</p>
+                        <h3 className={FORM_TITLE_CLASS}>Inquadramento Clinico</h3>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6">
-                    <div className="rounded-[24px] border border-slate-200/80 bg-white/78 p-4 dark:border-white/10 dark:bg-white/5 flex flex-col md:flex-row gap-6">
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                id="adi"
-                                {...register('isAdi')}
-                                className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-white/10 dark:bg-white/5"
-                            />
-                            <label htmlFor="adi" className="font-medium text-slate-800 dark:text-white">Paziente in ADI (Assistenza Domiciliare Integrata)</label>
+                <div className="grid grid-cols-1 gap-8">
+                    <div className="apple-subsection flex flex-col md:flex-row gap-8">
+                        <div className="flex items-center gap-4 px-2">
+                            <div className="relative flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="adi"
+                                    {...register('isAdi')}
+                                    className="peer h-6 w-6 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-white/10 dark:bg-white/5 transition-all cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="adi" className="font-bold text-slate-800 dark:text-white cursor-pointer select-none">
+                                Paziente in ADI
+                                <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">Assistenza Domiciliare Integrata</span>
+                            </label>
                         </div>
 
                         <div className="flex-1 space-y-2">
                             <label className={FORM_LABEL_CLASS}>Profilo Monitoraggio</label>
-                            <select
-                                {...register('monitoringProfile')}
-                                className={`w-full appearance-none rounded-2xl border px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-500/20 ${currentStatus === 'taken_in_charge'
-                                    ? 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-300'
-                                    : 'border-orange-200 bg-orange-50/70 text-orange-800 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-300'
+                            <div className="relative">
+                                <select
+                                    {...register('monitoringProfile')}
+                                    className={`w-full appearance-none rounded-2xl border px-4 py-3.5 text-sm font-bold outline-none transition-all focus:ring-4 focus:ring-blue-500/10 cursor-pointer ${
+                                        currentStatus === 'taken_in_charge'
+                                            ? 'border-emerald-200 bg-emerald-50/50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-400'
+                                            : 'border-orange-200 bg-orange-50/50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-400'
                                     }`}
-                            >
-                                <option value="taken_in_charge">Presa in Carico (Continua)</option>
-                                <option value="extemporaneous">Estemporanea (One Shot)</option>
-                            </select>
+                                >
+                                    <option value="taken_in_charge">Presa in Carico (Continua)</option>
+                                    <option value="extemporaneous">Estemporanea (One Shot)</option>
+                                </select>
+                                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
+                                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                                </div>
+                            </div>
 
                             {/* Conditional Reason Field */}
                             {hasStatusChanged && isEditMode && (
-                                <div className="animate-in slide-in-from-top-2 pt-2">
-                                    <label className="section-kicker mb-1 flex items-center gap-1">
-                                        <AlertTriangle className="w-3 h-3 text-orange-500" />
-                                        Motivo Cambio Stato (Richiesto)
+                                <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                                    <label className="text-[11px] font-bold text-orange-600 dark:text-orange-400 mb-1.5 flex items-center gap-1.5 ml-1">
+                                        <AlertTriangle className="w-3.5 h-3.5" />
+                                        MOTIVO CAMBIO STATO (OBBLIGATORIO)
                                     </label>
                                     <textarea
                                         {...register('statusReason')}
                                         required
-                                        className="w-full rounded-2xl border border-orange-200 bg-orange-50 p-3 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-100"
-                                        placeholder="Perché stai cambiando lo stato? (es. Trasferito ad altro ente...)"
+                                        className="w-full rounded-2xl border border-orange-200 bg-orange-50/50 p-4 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-orange-500/10 dark:border-orange-500/30 dark:bg-orange-900/10 dark:text-orange-100 placeholder:text-orange-300 dark:placeholder:text-orange-900/40"
+                                        placeholder="Specificare il motivo del cambio di profilo (es. Trasferimento, fine cure...)"
                                         rows={2}
                                     />
                                 </div>
@@ -450,25 +483,28 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className={FORM_LABEL_CLASS}>Note Globali (Anamnesi Sociale / Memo)</label>
+                    <div className="space-y-1">
+                        <label className={FORM_LABEL_CLASS}>Note Globali & Anamnesi Sociale</label>
                         <textarea
                             {...register('notes')}
-                            className={`${FORM_INPUT_CLASS} min-h-[100px]`}
-                            placeholder="Informazioni aggiuntive, contesto sociale, codici accesso..."
+                            className={`${FORM_INPUT_CLASS} min-h-[140px] leading-relaxed`}
+                            placeholder="Informazioni aggiuntive, contesto familiare, codici accesso, preferenze del paziente..."
                         />
                     </div>
                 </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-200 dark:border-white/10">
+                <p className="text-xs text-slate-400 font-medium">
+                    I campi contrassegnati con <span className="text-red-500">*</span> sono obbligatori per la corretta gestione clinica.
+                </p>
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full md:w-auto inline-flex items-center justify-center gap-3 rounded-[24px] bg-blue-600 px-10 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 shadow-xl shadow-blue-500/20"
                 >
                     <Save className="w-5 h-5" />
-                    {isSubmitting ? 'Salvataggio...' : (isEditMode ? 'Aggiorna Paziente' : 'Crea Paziente')}
+                    {isSubmitting ? 'Salvataggio in corso...' : (isEditMode ? 'Aggiorna Scheda Paziente' : 'Crea Nuova Scheda')}
                 </button>
             </div>
         </form>

@@ -89,62 +89,79 @@ export default function NewPatientPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto pb-10">
-            <div className="mb-6 flex items-center gap-4">
-                <Link href="/" className="p-2 hover:bg-white/50 dark:hover:bg-white/10 rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-200" />
-                </Link>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Nuovo Paziente</h1>
+        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
+            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
+                <div className="flex items-center gap-5">
+                    <Link href="/" className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
+                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
+                    </Link>
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pazienti</p>
+                        </div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Nuova Anagrafica</h1>
+                    </div>
+                </div>
             </div>
 
-            <PdfImporter onDataExtracted={(data) => {
-                const imported = data as ExtractedPatientData;
-                /* @Codex */
-                setImportedData({
-                    firstName: imported.firstName,
-                    lastName: imported.lastName,
-                    taxCode: imported.taxCode,
-                    birthDate: imported.birthDate,
-                    address: imported.address,
-                    notes: imported.documentSummary || imported.notes,
-                    diagnoses: (imported.diagnoses || []).map((diagnosis) => ({
-                        code: diagnosis.code,
-                        description: diagnosis.description,
-                        system: diagnosis.system,
-                        date: new Date()
-                    }))
-                });
-                setImportMeta({
-                    quality: imported.documentQuality,
-                    diagnosisCount: imported.diagnoses?.length || 0
-                });
-            }} />
+            <div className="mb-10">
+                <PdfImporter onDataExtracted={(data) => {
+                    const imported = data as ExtractedPatientData;
+                    /* @Codex */
+                    setImportedData({
+                        firstName: imported.firstName,
+                        lastName: imported.lastName,
+                        taxCode: imported.taxCode,
+                        birthDate: imported.birthDate,
+                        address: imported.address,
+                        notes: imported.documentSummary || imported.notes,
+                        diagnoses: (imported.diagnoses || []).map((diagnosis) => ({
+                            code: diagnosis.code,
+                            description: diagnosis.description,
+                            system: diagnosis.system,
+                            date: new Date()
+                        }))
+                    });
+                    setImportMeta({
+                        quality: imported.documentQuality,
+                        diagnosisCount: imported.diagnoses?.length || 0
+                    });
+                }} />
+            </div>
 
             {/* @Codex */}
             {importMeta && (
-                <div className={`mb-6 rounded-2xl border p-4 ${importMeta.quality?.level === 'red'
-                    ? 'border-red-200 bg-red-50'
-                    : importMeta.quality?.level === 'green'
-                        ? 'border-emerald-200 bg-emerald-50'
-                        : 'border-amber-200 bg-amber-50'
+                <div className={`mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 p-6 shadow-xl ${
+                    importMeta.quality?.level === 'red'
+                        ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20 shadow-red-500/5'
+                        : importMeta.quality?.level === 'green'
+                            ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20 shadow-emerald-500/5'
+                            : 'border-blue-200 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 shadow-blue-500/5'
                     }`}>
-                    <div className="flex items-start gap-3">
-                        {importMeta.quality?.level === 'red' ? (
-                            <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600 shrink-0" />
-                        ) : (
-                            <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600 shrink-0" />
-                        )}
+                    <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-2xl ${
+                            importMeta.quality?.level === 'red' ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 
+                            importMeta.quality?.level === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600' : 
+                            'bg-blue-100 dark:bg-blue-900/40 text-blue-600'
+                        }`}>
+                            {importMeta.quality?.level === 'red' ? (
+                                <AlertTriangle className="h-6 w-6 shrink-0" />
+                            ) : (
+                                <CheckCircle2 className="h-6 w-6 shrink-0" />
+                            )}
+                        </div>
                         <div className="space-y-1">
-                            <p className="text-sm font-semibold text-gray-800">
-                                Import documentale completato
-                            </p>
-                            <p className="text-sm text-gray-700">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                                Importazione assistita completata
+                            </h3>
+                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
                                 {importMeta.diagnosisCount > 0
-                                    ? `Ho precompilato ${importMeta.diagnosisCount} diagnosi ICD nel form. Verificale e rimuovi quelle non corrette prima di salvare.`
-                                    : 'Non sono state precompilate diagnosi ICD esplicite dal documento.'}
+                                    ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici. Verificare la correttezza della codifica ICD prima della conferma finale.`
+                                    : 'Il documento è stato analizzato correttamente, ma non sono state individuate diagnosi codificabili automaticamente.'}
                             </p>
                             {importMeta.quality?.reason && (
-                                <p className="text-xs text-gray-600">
+                                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">
                                     Qualita documento: {importMeta.quality.reason}
                                 </p>
                             )}

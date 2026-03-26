@@ -2,7 +2,10 @@
 
 import { useLiveQuery } from '@/lib/live-query';
 import { db, Ambulatory, Patient } from '@/lib/db';
-import { Search, UserPlus, Archive, Copy, Scissors, Activity, RefreshCw, Users, Building2 } from 'lucide-react';
+import { 
+    Search, UserPlus, Activity, Building2,
+    Copy, Scissors, RotateCcw, Layout, Maximize2
+} from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
@@ -79,6 +82,7 @@ export default function PatientList() {
     const [search, setSearch] = useState('');
     /* @Codex */
     const [sortMode, setSortMode] = useState<'alpha' | 'recent'>('recent');
+    const [density, setDensity] = useState<'compact' | 'wide'>('compact');
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMoving, setIsMoving] = useState(false);
@@ -86,6 +90,7 @@ export default function PatientList() {
     const [showMoveModal, setShowMoveModal] = useState(false);
     const { copy, cut, paste, clipboard } = usePatientClipboard();
     const currentAmbulatoryId = useCookie('ambulatory_id');
+    const isGlobalView = !currentAmbulatoryId;
 
     const ambulatories = useLiveQuery(() => db.ambulatories.toArray());
 
@@ -94,9 +99,9 @@ export default function PatientList() {
         const sorted = [...items];
         if (sortMode === 'alpha') {
             sorted.sort((a, b) => {
-                const last = a.lastName.localeCompare(b.lastName);
+                const last = (a.lastName || '').localeCompare(b.lastName || '');
                 if (last !== 0) return last;
-                return a.firstName.localeCompare(b.firstName);
+                return (a.firstName || '').localeCompare(b.firstName || '');
             });
             return sorted;
         }
@@ -201,28 +206,23 @@ export default function PatientList() {
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
             if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
-
             const isCtrl = e.metaKey || e.ctrlKey;
-
             if (isCtrl && e.key === 'a') {
                 e.preventDefault();
                 handleSelectAll();
             }
-
             if (isCtrl && e.key === 'c') {
                 e.preventDefault();
                 if (selectedIds.size > 0 && currentAmbulatoryId) {
                     copy(Array.from(selectedIds), currentAmbulatoryId);
                 }
             }
-
             if (isCtrl && e.key === 'x') {
                 e.preventDefault();
                 if (selectedIds.size > 0 && currentAmbulatoryId) {
                     cut(Array.from(selectedIds), currentAmbulatoryId);
                 }
             }
-
             if (isCtrl && e.key === 'v') {
                 e.preventDefault();
                 if (clipboard.patientIds.length > 0 && currentAmbulatoryId) {
@@ -238,7 +238,6 @@ export default function PatientList() {
                 }
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedIds, currentAmbulatoryId, clipboard, copy, cut, paste, ambulatories, handleSelectAll]);
@@ -257,9 +256,7 @@ export default function PatientList() {
                     sourceAmbulatoryId: currentAmbulatoryId,
                 }),
             });
-
             if (!res.ok) throw new Error("Move failed");
-
             setSelectedIds(new Set());
             setShowMoveModal(false);
             setTargetAmbulatory('');
@@ -272,114 +269,106 @@ export default function PatientList() {
         }
     };
 
-    const renderPatientRow = (patient: Patient, color?: typeof AMBULATORY_COLORS[0]) => {
+    const renderPatientItem = (patient: Patient, color?: typeof AMBULATORY_COLORS[0]) => {
         const status = getPatientStatusPresentation(patient);
-        const selectionVisible = selectedIds.size > 0 || selectedIds.has(patient.id);
+        const isSelected = selectedIds.has(patient.id);
+        const selectionVisible = selectedIds.size > 0 || isSelected;
+        const isWide = isGlobalView && density === 'wide';
 
         return (
             <div
                 key={patient.id}
-                className={`group rounded-[26px] border px-3.5 py-3.5 backdrop-blur-xl transition-all ${
-                    selectedIds.has(patient.id)
-                        ? 'border-sky-300 bg-[linear-gradient(135deg,rgba(224,242,255,0.92),rgba(245,250,255,0.82))] ring-2 ring-sky-500/15 shadow-[0_18px_36px_rgba(14,116,217,0.10)] dark:border-sky-500/30 dark:bg-sky-900/10'
-                        : 'border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(248,250,255,0.7))] shadow-[0_14px_30px_rgba(15,23,42,0.05)] hover:border-white hover:shadow-[0_18px_38px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20'
+                className={`group flex items-center gap-3 rounded-xl border transition-all duration-300 ${
+                    isWide ? 'px-5 py-4' : 'px-3 py-1.5'
+                } ${
+                    isSelected
+                        ? 'border-sky-400/50 bg-sky-50/50 ring-1 ring-sky-500/10 dark:border-sky-500/40 dark:bg-sky-500/10'
+                        : 'border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-sm dark:border-white/5 dark:bg-white/2'
                 }`}
             >
-                <div className="flex items-center gap-3">
-                    <div className={`shrink-0 transition-opacity ${selectionVisible ? 'opacity-100' : 'opacity-60 md:opacity-0 md:group-hover:opacity-100'}`}>
-                        <input
-                            type="checkbox"
-                            checked={selectedIds.has(patient.id)}
-                            onChange={() => toggleSelection(patient.id)}
-                            aria-label={`Seleziona paziente ${patient.firstName || ''} ${patient.lastName || patient.id}`}
-                            className="h-4.5 w-4.5 cursor-pointer rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                        />
-                    </div>
-
-                    <Link href={`/patients/${patient.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                            <div
-                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-sm font-semibold shadow-[0_12px_24px_rgba(15,23,42,0.12)] ${
-                                    patient.isArchived
-                                        ? 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'
-                                        : color
-                                            ? `${color.bg} ${color.text} ${color.dark}`
-                                            : 'bg-sky-100 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300'
-                                }`}
-                            >
-                                {patient.firstName[0]}{patient.lastName[0]}
-                            </div>
-
-                            <div className="min-w-0">
-                                <div className="flex min-w-0 items-center gap-2">
-                                    <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
-                                        <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
-                                    </p>
-                                </div>
-                                <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
-                                    <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
-                                </p>
-                                <div className="mt-1 flex flex-wrap items-center gap-1.5 md:hidden">
-                                    <span className="apple-chip py-1">{getPatientAgeLabel(patient)}</span>
-                                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${status.classes}`}>
-                                        {status.label}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="hidden items-center gap-3 md:flex">
-                            <div className="text-right">
-                                <p className="section-kicker">Età</p>
-                                <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {getPatientAgeLabel(patient)}
-                                </p>
-                            </div>
-                            <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${status.classes}`}>
-                                {status.label}
-                            </span>
-                        </div>
-                    </Link>
+                <div className={`shrink-0 transition-opacity ${selectionVisible ? 'opacity-100' : 'opacity-40 md:opacity-0 md:group-hover:opacity-100'}`}>
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelection(patient.id)}
+                        aria-label={`Seleziona paziente ${patient.firstName || ''} ${patient.lastName || patient.id}`}
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 text-sky-600"
+                    />
                 </div>
+
+                <Link href={`/patients/${patient.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                        <div
+                            className={`flex shrink-0 items-center justify-center rounded-xl font-bold shadow-sm transition-all duration-300 ${
+                                isWide ? 'h-11 w-11 text-xs' : 'h-8 w-8 text-[10px]'
+                            } ${
+                                patient.isArchived
+                                    ? 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'
+                                    : color
+                                        ? `${color.bg} ${color.text} ${color.dark}`
+                                        : 'bg-sky-100 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300'
+                            }`}
+                        >
+                            {patient.firstName?.[0]}{patient.lastName?.[0]}
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                            <p className={`truncate font-bold text-slate-900 dark:text-white transition-all duration-300 ${
+                                isWide ? 'text-base' : 'text-sm'
+                            }`}>
+                                <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
+                            </p>
+                            <p className={`truncate font-mono tracking-tight text-slate-500 transition-all duration-300 ${
+                                isWide ? 'text-[12px]' : 'text-[10px]'
+                            }`}>
+                                <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <div className="hidden md:block text-right">
+                            <p className={`font-medium text-slate-700 dark:text-slate-300 transition-all duration-300 ${
+                                isWide ? 'text-sm' : 'text-[12px]'
+                            }`}>
+                                {getPatientAgeLabel(patient)}
+                            </p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full border font-semibold transition-all duration-300 ${
+                            isWide ? 'px-3 py-1 text-[11px]' : 'px-2 py-0.5 text-[10px]'
+                        } ${status.classes}`}>
+                            {status.label}
+                        </span>
+                    </div>
+                </Link>
             </div>
         );
     };
 
-    const isGlobalView = !currentAmbulatoryId;
     const currentAmbulatory = currentAmbulatoryId ? ambulatories?.find((a) => a.id === currentAmbulatoryId) : null;
 
     return (
         <div className="space-y-6">
-            <div className="glass-panel liquid-hero p-6 md:p-7">
-                <div className="liquid-orb -left-8 top-0 h-28 w-28 bg-sky-300/35" />
-                <div className="liquid-orb right-0 top-4 h-24 w-24 bg-rose-300/30" />
-                <div className="liquid-orb bottom-0 left-1/3 h-20 w-20 bg-emerald-200/20" />
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="relative z-10 space-y-3">
+            <div className="glass-panel liquid-hero px-6 py-5 md:px-7 md:py-6">
+                <div className="liquid-orb -left-8 top-0 h-28 w-28 bg-sky-300/20" />
+                <div className="liquid-orb right-0 top-4 h-24 w-24 bg-rose-300/15" />
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="relative z-10 space-y-1">
                         <div className="flex items-center gap-2">
                             {currentAmbulatoryId && (
-                                <div className={`h-3 w-3 rounded-full ${getAmbulatoryColor(currentAmbulatoryId).dot}`} />
+                                <div className={`h-2.5 w-2.5 rounded-full ${getAmbulatoryColor(currentAmbulatoryId).dot}`} />
                             )}
                             <p className="section-kicker">
-                                {isGlobalView ? 'Vista cumulativa' : 'Ambulatorio attivo'}
+                                {isGlobalView ? 'Vista cumulativa' : 'Ambulatorio'}
                             </p>
                         </div>
-
                         <div>
-                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white md:text-3xl">
                                 {currentAmbulatory?.name || (isGlobalView ? 'Pazienti' : 'Caricamento...')}
                             </h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                            <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
                                 {isGlobalView ? (
-                                    <>
-                                        {patientGroups.length} gruppi attivi, {patients?.length || 0} pazienti visibili. Una lettura piu densa, piu morbida e meno “a scatole”.
-                                    </>
-                                ) : currentAmbulatory?.parentId ? (
-                                    <>
-                                        {ambulatories?.find((a) => a.id === currentAmbulatory.parentId)?.name} / {currentAmbulatory.name}
-                                    </>
+                                    <>{patients?.length || 0} pazienti totali in {patientGroups.length} gruppi.</>
                                 ) : (
-                                    'Schede paziente organizzate per lavoro quotidiano, con ricerca e operazioni rapide.'
+                                    'Gestione rapida delle schede cliniche e del diario.'
                                 )}
                             </p>
                         </div>
@@ -388,131 +377,131 @@ export default function PatientList() {
                     <div className="relative z-10 flex flex-wrap items-center gap-2">
                         <Link
                             href="/analytics"
-                            className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_28px_rgba(15,23,42,0.06)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20"
+                            className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/40 px-3.5 py-1.5 text-[13px] font-medium text-slate-700 backdrop-blur-md hover:bg-white/80 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                         >
-                            <Activity className="h-4 w-4 text-slate-400" />
+                            <Activity className="h-3.5 w-3.5" />
                             Statistiche
                         </Link>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/76 text-slate-500 shadow-[0_12px_28px_rgba(15,23,42,0.06)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 hover:text-sky-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-sky-300"
-                            title="Aggiorna lista"
-                        >
-                            <RefreshCw className="h-4 w-4" />
-                        </button>
                         <Link
                             href="/patients/new"
-                            className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)]"
+                            className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-1.5 text-[13px] font-bold text-white shadow-sm hover:bg-sky-500 dark:bg-sky-500"
                         >
-                            <UserPlus className="h-4 w-4" />
-                            Nuovo paziente
+                            <UserPlus className="h-3.5 w-3.5" />
+                            Nuovo
                         </Link>
                     </div>
                 </div>
 
-                <div className="relative z-10 mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="relative z-10 mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
                     <div className="relative group">
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <Search className="h-5 w-5 text-slate-400 transition-colors group-focus-within:text-sky-500" />
+                            <Search className="h-4 w-4 text-slate-400" />
                         </div>
                         <input
                             type="text"
-                            className="block w-full rounded-full border border-white/70 bg-white/76 py-3.5 pl-10 pr-4 text-slate-800 shadow-[0_12px_28px_rgba(15,23,42,0.06)] outline-none backdrop-blur-md transition-all placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500/30"
-                            placeholder="Cerca per nome, cognome o codice fiscale..."
+                            className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 dark:border-white/10 dark:bg-white/5"
+                            placeholder="Cerca paziente..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="section-kicker">Ordina</span>
+                    <div className="flex items-center gap-1.5 bg-slate-100/50 p-1 rounded-xl dark:bg-white/5">
+                        <div className="flex border-r border-slate-200 pr-1.5 mr-1.5 dark:border-white/10">
+                            <button
+                                onClick={() => setViewMode('active')}
+                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${viewMode === 'active' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                            >
+                                Attivi
+                            </button>
+                            <button
+                                onClick={() => setViewMode('archived')}
+                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${viewMode === 'archived' ? 'bg-white shadow-sm text-amber-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                            >
+                                Archiviati
+                            </button>
+                        </div>
+                        {isGlobalView && (
+                            <div className="flex border-r border-slate-200 pr-1.5 mr-1.5 dark:border-white/10">
+                                <button
+                                    onClick={() => setDensity('compact')}
+                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${density === 'compact' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                    title="Vista Compatta"
+                                >
+                                    <Layout className="h-3.5 w-3.5" />
+                                    Compatta
+                                </button>
+                                <button
+                                    onClick={() => setDensity('wide')}
+                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${density === 'wide' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                    title="Vista Ampia"
+                                >
+                                    <Maximize2 className="h-3.5 w-3.5" />
+                                    Ampia
+                                </button>
+                            </div>
+                        )}
                         <button
                             onClick={() => setSortMode('recent')}
-                            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-                                sortMode === 'recent'
-                                    ? 'bg-sky-100/90 text-sky-700 shadow-[0_10px_22px_rgba(14,116,217,0.10)] dark:bg-sky-900/20 dark:text-sky-300'
-                                    : 'bg-white/72 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:bg-white/90 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                            }`}
+                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${sortMode === 'recent' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
                         >
                             Recenti
                         </button>
                         <button
                             onClick={() => setSortMode('alpha')}
-                            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-                                sortMode === 'alpha'
-                                    ? 'bg-sky-100/90 text-sky-700 shadow-[0_10px_22px_rgba(14,116,217,0.10)] dark:bg-sky-900/20 dark:text-sky-300'
-                                    : 'bg-white/72 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:bg-white/90 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                            }`}
+                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${sortMode === 'alpha' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
                         >
                             A-Z
                         </button>
-                    </div>
-                </div>
-
-                <div className="relative z-10 mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {selectedIds.size > 0 ? (
-                            <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-sky-200/80 bg-[linear-gradient(135deg,rgba(224,242,255,0.92),rgba(244,249,255,0.82))] px-4 py-3 text-sm text-sky-700 shadow-[0_14px_30px_rgba(14,116,217,0.10)] dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-300">
-                                <span className="font-semibold">{selectedIds.size} selezionati</span>
-                                <button onClick={() => setShowMoveModal(true)} className="rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-white dark:bg-white/10 dark:text-sky-200 dark:hover:bg-white/15">
-                                    Sposta
-                                </button>
-                                <button
-                                    onClick={() => currentAmbulatoryId && copy(Array.from(selectedIds), currentAmbulatoryId)}
-                                    className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-white dark:bg-white/10 dark:text-sky-200 dark:hover:bg-white/15"
-                                    title="Copia (Ctrl+C)"
-                                >
-                                    <Copy className="h-3 w-3" />
-                                    Copia
-                                </button>
-                                <button
-                                    onClick={() => currentAmbulatoryId && cut(Array.from(selectedIds), currentAmbulatoryId)}
-                                    className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-white dark:bg-white/10 dark:text-sky-200 dark:hover:bg-white/15"
-                                    title="Taglia (Ctrl+X)"
-                                >
-                                    <Scissors className="h-3 w-3" />
-                                    Taglia
-                                </button>
-                                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-sky-500 hover:text-sky-700 dark:text-sky-300 dark:hover:text-white">
-                                    Annulla
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={() => setViewMode('active')}
-                                    className={`rounded-full px-4 py-2.5 text-sm font-medium transition-all ${
-                                        viewMode === 'active'
-                                            ? 'bg-sky-100/90 text-sky-700 shadow-[0_12px_24px_rgba(14,116,217,0.10)] dark:bg-sky-900/20 dark:text-sky-300'
-                                            : 'bg-white/72 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:bg-white/90 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                                    }`}
-                                >
-                                    Attivi
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('archived')}
-                                    className={`rounded-full px-4 py-2.5 text-sm font-medium transition-all ${
-                                        viewMode === 'archived'
-                                            ? 'bg-amber-100/90 text-amber-700 shadow-[0_12px_24px_rgba(217,119,6,0.10)] dark:bg-amber-900/20 dark:text-amber-300'
-                                            : 'bg-white/72 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:bg-white/90 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                                    }`}
-                                >
-                                    Archiviati
-                                </button>
-                            </>
-                        )}
-                    </div>
-
-                    {patients && patients.length > 0 && (
                         <button
-                            onClick={handleSelectAll}
-                            className="self-start rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20"
+                            onClick={() => notifyDbChange()}
+                            className="ml-1 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-sky-600 dark:hover:bg-white/10"
+                            title="Aggiorna lista"
                         >
-                            {selectedIds.size === patients.length ? 'Deseleziona tutto' : 'Seleziona tutto'}
+                            <RotateCcw className="h-3.5 w-3.5" />
                         </button>
-                    )}
+                    </div>
                 </div>
             </div>
+
+            {patients && patients.length > 0 && (
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={handleSelectAll}
+                            className="text-[12px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                        >
+                            {selectedIds.size === (patients?.length || 0) ? 'Deseleziona tutto' : 'Seleziona tutto'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {selectedIds.size > 0 && (
+                <div className="sticky top-4 z-30 flex animate-in fade-in slide-in-from-top-2 items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-white/80 p-2 shadow-lg backdrop-blur-md dark:border-sky-500/20 dark:bg-slate-900/90">
+                    <div className="flex items-center gap-3">
+                        <span className="pl-3 text-sm font-bold text-sky-700 dark:text-sky-300">{selectedIds.size} selezionati</span>
+                        <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => setShowMoveModal(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
+                                <Building2 className="h-3.5 w-3.5" />
+                                Sposta
+                            </button>
+                            <button onClick={() => { if (currentAmbulatoryId) { copy(Array.from(selectedIds), currentAmbulatoryId); setSelectedIds(new Set()); } }} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
+                                <Copy className="h-3.5 w-3.5" />
+                                Copia
+                            </button>
+                            <button onClick={() => { if (currentAmbulatoryId) { cut(Array.from(selectedIds), currentAmbulatoryId); setSelectedIds(new Set()); } }} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
+                                <Scissors className="h-3.5 w-3.5" />
+                                Taglia
+                            </button>
+                        </div>
+                    </div>
+                    <button onClick={() => setSelectedIds(new Set())} className="pr-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400">
+                        Annulla
+                    </button>
+                </div>
+            )}
 
             {showMoveModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -521,11 +510,11 @@ export default function PatientList() {
                         <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                             Seleziona l&apos;ambulatorio di destinazione per <strong>{selectedIds.size}</strong> pazienti.
                         </p>
-                        <div className="mt-5 max-h-60 space-y-3 overflow-y-auto">
+                        <div className="mt-5 max-h-60 space-y-3 overflow-y-auto pr-1">
                             {ambulatories?.map((amb) => (
                                 <label
                                     key={amb.id}
-                                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 px-3 py-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
+                                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${targetAmbulatory === amb.id ? 'border-sky-500 bg-sky-50 dark:bg-sky-500/10' : 'border-slate-200 hover:bg-slate-50 dark:border-white/10'}`}
                                 >
                                     <input
                                         type="radio"
@@ -536,32 +525,26 @@ export default function PatientList() {
                                         className="h-4 w-4 text-sky-600"
                                     />
                                     <div className={`h-3 w-3 rounded-full ${getAmbulatoryColor(amb.id).dot}`} />
-                                    <div>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{amb.name}</p>
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                        <div className="flex items-center">
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">{amb.name}</p>
                                             {amb.type === 'test' && (
-                                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                                     Test
                                                 </span>
                                             )}
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{amb.address || 'Nessun indirizzo'}</p>
                                         </div>
+                                        <p className="text-xs text-slate-500">{amb.address || 'Nessun indirizzo'}</p>
                                     </div>
                                 </label>
                             ))}
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowMoveModal(false)}
-                                disabled={isMoving}
-                                className="rounded-full px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
-                            >
-                                Annulla
-                            </button>
+                            <button onClick={() => setShowMoveModal(false)} className="rounded-full px-4 py-2 text-sm font-medium text-slate-600">Annulla</button>
                             <button
                                 onClick={handleMove}
                                 disabled={!targetAmbulatory || isMoving}
-                                className="rounded-2xl bg-[#0A84FF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED] disabled:opacity-50"
+                                className="rounded-2xl bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
                             >
                                 {isMoving ? 'Spostamento...' : 'Conferma'}
                             </button>
@@ -570,93 +553,57 @@ export default function PatientList() {
                 </div>
             )}
 
-            {isGlobalView ? (
-                patientGroups.length > 0 ? (
-                    <div className="space-y-4">
-                        {patientGroups.map((group) => (
-                            <div key={group.ambulatory?.id || 'unassigned'} className="glass-panel p-5 md:p-6">
-                                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`h-3 w-3 rounded-full shadow-[0_0_0_6px_rgba(255,255,255,0.45)] ${group.color.dot}`} />
-                                        <div>
-                                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <div className="space-y-4">
+                {isGlobalView ? (
+                    patientGroups.length > 0 ? (
+                        <div className="space-y-6">
+                            {patientGroups.map((group) => (
+                                <div key={group.ambulatory?.id || 'unassigned'} className="space-y-2.5">
+                                    <div className="flex items-center justify-between px-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`h-2 w-2 rounded-full ${group.color.dot}`} />
+                                            <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
                                                 {group.ambulatory?.name || 'Non assegnati'}
                                             </h2>
-                                            {group.ambulatory?.parentId && (
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">Sotto-ambulatorio</p>
-                                            )}
                                         </div>
+                                        <span className="text-[10px] font-bold text-slate-300">
+                                            {group.patients.length} pazienti
+                                        </span>
                                     </div>
-                                    <span className="apple-chip">
-                                        <Users className="h-3.5 w-3.5" />
-                                        {group.patients.length} pazienti
-                                    </span>
+                                    <div className="space-y-1.5">
+                                        {group.patients.map((patient) => renderPatientItem(patient, group.color))}
+                                    </div>
                                 </div>
-
-                                <div className="space-y-3">
-                                    {group.patients.map((patient) => renderPatientRow(patient, group.color))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="glass-panel p-8 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500">
-                            <Building2 className="h-8 w-8" />
-                        </div>
-                        <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Nessun paziente visibile</h3>
-                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                            Aggiungi pazienti o seleziona un ambulatorio specifico dalla sidebar.
-                        </p>
-                    </div>
-                )
-            ) : (
-                <div className="glass-panel p-5 md:p-6">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="section-kicker">Vista elenco</p>
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
-                                {patients?.length || 0} pazienti
-                            </h2>
-                        </div>
-                        {currentAmbulatory && (
-                            <span className="apple-chip">
-                                <Building2 className="h-3.5 w-3.5" />
-                                {currentAmbulatory.name}
-                            </span>
-                        )}
-                    </div>
-
-                    {patients && patients.length > 0 ? (
-                        <div className="space-y-3">
-                            {patients.map((patient) => renderPatientRow(patient))}
+                            ))}
                         </div>
                     ) : (
-                        <div className="py-12 text-center">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500">
-                                {viewMode === 'active' ? <UserPlus className="h-8 w-8" /> : <Archive className="h-8 w-8" />}
-                            </div>
-                            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
-                                {viewMode === 'active' ? 'Nessun paziente attivo' : 'Nessun paziente in archivio'}
-                            </h3>
-                            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                                {viewMode === 'active'
-                                    ? 'Aggiungi un nuovo paziente o sposta qui schede gia esistenti.'
-                                    : 'Le schede archiviate compariranno qui quando necessario.'}
-                            </p>
-                            {viewMode === 'active' && (
-                                <Link
-                                    href="/patients/new"
-                                    className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED]"
-                                >
-                                    <UserPlus className="h-4 w-4" />
-                                    Aggiungi primo paziente
-                                </Link>
-                            )}
+                        <div className="glass-panel p-12 text-center">
+                            <Building2 className="mx-auto h-12 w-12 text-slate-300" />
+                            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Nessun paziente trovato</h3>
+                            <p className="mt-2 text-sm text-slate-500">Prova a cambiare i filtri di ricerca.</p>
                         </div>
-                    )}
-                </div>
-            )}
+                    )
+                ) : (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                            <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                                {patients?.length || 0} pazienti filtrati
+                            </h2>
+                        </div>
+                        {patients && patients.length > 0 ? (
+                            <div className="space-y-1.5">
+                                {patients.map((patient) => renderPatientItem(patient))}
+                            </div>
+                        ) : (
+                            <div className="glass-panel py-16 text-center">
+                                <UserPlus className="mx-auto h-12 w-12 text-slate-300" />
+                                <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Nessun paziente</h3>
+                                <p className="mt-2 text-sm text-slate-500">Inizia aggiungendo il primo paziente in questo ambulatorio.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

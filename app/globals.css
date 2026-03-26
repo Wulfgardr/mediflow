@@ -24,9 +24,15 @@
   --background: #f4f6fb;
   --foreground: #1d1d1f;
 
-  --glass-border: rgba(255, 255, 255, 0.4);
+  /* Glass Chrome (Shell) */
+  --glass-border: rgba(255, 255, 255, 0.45);
   --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  
+  /* Clinical Paper (Content) */
+  --paper-bg: #ffffff;
+  --paper-border: rgba(0, 0, 0, 0.06);
+  --paper-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   /* Apple System Colors (Light) */
   --apple-blue: #007AFF;
@@ -42,9 +48,8 @@ body {
   min-height: 100vh;
   letter-spacing: -0.01em;
   background-image:
-    radial-gradient(circle at 12% 8%, rgba(123, 191, 255, 0.28) 0, transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(255, 171, 198, 0.24) 0, transparent 24%),
-    radial-gradient(circle at 88% 42%, rgba(138, 224, 185, 0.18) 0, transparent 22%),
+    radial-gradient(circle at 12% 8%, rgba(123, 191, 255, 0.18) 0, transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(255, 171, 198, 0.14) 0, transparent 24%),
     linear-gradient(180deg, #fbfcff 0%, #f4f6fb 54%, #eef2fa 100%);
   background-size: 100% 100%;
   background-attachment: fixed;
@@ -52,49 +57,49 @@ body {
 
 /* Ensure selected text is readable in dark mode */
 ::selection {
-  background: rgba(99, 102, 241, 0.5);
-  /* indigo-500/50 */
-  color: #fff;
+  background: rgba(0, 122, 255, 0.2);
+  color: inherit;
 }
 
 /* Manually handle dark mode via class */
-/* Manually handle dark mode via class */
-/* Manually handle dark mode via class */
 :root.dark {
-  /* GitHub Dark Mode Palette */
-  --background: #0d1117;
-  /* GitHub Base */
-  --foreground: #c9d1d9;
-  /* GitHub Text */
+  /* High contrast dark palette */
+  --background: #000000;
+  --foreground: #f5f5f7;
+
+  /* Glass Chrome (Dark Shell) */
+  --glass-bg: rgba(28, 28, 30, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  
+  /* Clinical Paper (Dark Content) */
+  --paper-bg: #1c1c1e;
+  --paper-border: rgba(255, 255, 255, 0.08);
 
   /* Semantic Layers */
-  --card: #161b22;
-  /* GitHub Card/Header */
-  --card-foreground: #c9d1d9;
-  --popover: #161b22;
-  --popover-foreground: #c9d1d9;
+  --card: #1c1c1e;
+  --card-foreground: #f5f5f7;
+  --popover: #1c1c1e;
+  --popover-foreground: #f5f5f7;
 
   /* Controls & Inputs */
-  --input: #010409;
-  /* GitHub Input Bg */
-  --border: #30363d;
-  /* GitHub Border */
+  --input: #2c2c2e;
+  --border: #3a3a3c;
 
   /* Semantic Text */
-  --muted: #8b949e;
-  /* GitHub Muted */
-  --muted-foreground: #8b949e;
+  --muted: #8e8e93;
+  --muted-foreground: #8e8e93;
 
   /* Semantic Colors */
-  --primary: #58a6ff;
-  /* GitHub Blue */
-  --apple-blue: #58a6ff;
-  --apple-gray: #8b949e;
-  --system-gray-6: #161b22;
+  --primary: #0a84ff;
+  --apple-blue: #0a84ff;
+  --apple-gray: #8e8e93;
+  --system-gray-6: #1c1c1e;
 }
 
 :root.dark body {
-  background-image: none;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(10, 132, 255, 0.08) 0, transparent 25%),
+    linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
   background-color: var(--background);
 }
 
@@ -109,18 +114,8 @@ body {
 
 /* Fix native select options in dark mode */
 :root.dark select option {
-  background-color: #161b22;
-  color: #c9d1d9;
-}
-
-/* Light mode overrides (default) - applied when NOT .dark */
-:root:not(.dark) body {
-  background-color: #f4f6fb;
-  background-image:
-    radial-gradient(circle at 18% 12%, rgba(120, 190, 255, 0.32) 0px, transparent 28%),
-    radial-gradient(circle at 82% 4%, rgba(255, 170, 196, 0.24) 0px, transparent 24%),
-    radial-gradient(circle at 72% 82%, rgba(153, 225, 195, 0.2) 0px, transparent 24%),
-    linear-gradient(180deg, rgba(251, 252, 255, 0.98) 0%, rgba(244, 246, 251, 1) 64%, rgba(238, 242, 250, 1) 100%);
+  background-color: #1c1c1e;
+  color: #f5f5f7;
 }
 
 @layer utilities {
@@ -132,58 +127,74 @@ body {
     @apply pointer-events-none absolute rounded-full blur-3xl;
   }
 
+  /* Disciplined Glass: The Chrome */
   .glass {
-    @apply backdrop-blur-md bg-white/70 dark:bg-[#161b22]/90 border border-white/50 dark:border-[#30363d] shadow-xl;
-    background-image:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.1)),
-      radial-gradient(circle at top left, rgba(116, 192, 252, 0.18), transparent 42%);
-    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    @apply rounded-[24px] border backdrop-blur-xl;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
-  .glass-card {
-    @apply backdrop-blur-xl bg-white/60 dark:bg-[#161b22] border border-white/40 dark:border-[#30363d] shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
-    background-image:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.72)),
-      radial-gradient(circle at top right, rgba(255, 186, 214, 0.12), transparent 38%);
-    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  }
-
-  .glass-card:hover {
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
-    transform: translateY(-1px);
+  /* Clinical Paper: The Content */
+  .clinical-paper {
+    @apply rounded-[24px] border;
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
+    box-shadow: var(--paper-shadow);
   }
 
   .glass-panel {
-    @apply backdrop-blur-2xl bg-white/80 dark:bg-[#0d1117] border border-white/30 dark:border-[#30363d] shadow-lg rounded-3xl;
-    background-image:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.76)),
-      radial-gradient(circle at top left, rgba(120, 190, 255, 0.18), transparent 34%),
-      radial-gradient(circle at top right, rgba(255, 176, 199, 0.16), transparent 30%);
-    box-shadow: 0 24px 52px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    @apply rounded-[28px] border backdrop-blur-3xl;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Disciplined Glass Card: premium but calmer than the shell chrome */
+  .glass-card {
+    @apply rounded-[24px] border backdrop-blur-xl;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-card:hover {
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
   }
 
   .apple-subsection {
-    @apply rounded-[26px] border border-white/65 bg-white/68 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 p-4 md:p-5;
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    @apply rounded-[24px] border p-4 md:p-5;
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   }
 
   .apple-chip {
-    @apply inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/72 px-3.5 py-1.5 text-xs font-medium text-slate-700 backdrop-blur-md dark:border-white/10 dark:bg-white/8 dark:text-slate-300;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.05);
+    color: var(--apple-gray);
+  }
+  
+  :root.dark .apple-chip {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .apple-list-row {
-    @apply flex items-center justify-between gap-3 rounded-[24px] border border-white/65 bg-white/70 px-4 py-3.5 text-sm text-slate-700 backdrop-blur-md transition-all hover:border-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    @apply flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-sm transition-all;
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
   }
 
   .apple-list-row:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    @apply border-gray-300 dark:border-gray-600;
+    transform: translateY(-0.5px);
   }
 
   .section-kicker {
-    @apply text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-slate-400;
+    @apply text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
   }
 
   /* @Codex */
@@ -197,18 +208,10 @@ body {
 
 /* @Codex */
 :root.dark .glass,
-:root.dark .glass-card,
 :root.dark .glass-panel {
-  background-image:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02)),
-    radial-gradient(circle at top left, rgba(93, 169, 255, 0.12), transparent 36%);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* @Codex */
-:root.dark .glass-card:hover {
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
 
 /* Progress bar widths (used by analytics/settings pages) */
 /* These allow dynamic widths via CSS custom properties */
