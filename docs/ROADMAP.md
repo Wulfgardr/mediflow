@@ -1,7 +1,7 @@
 # Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.4.0 (Corrente) — Marzo 2026
+> v0.4.0 (release corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
 ---
@@ -36,32 +36,45 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ## In corso (v0.5.0)
 
-Priorita per consolidare UX web, finishing release e preparare il nuovo ciclo native.
+`v0.5.0` non e pensata come semplice patch o raccolta feature.
+E la release in cui MediFlow deve rendere credibili e coerenti due cose insieme:
 
-### Web e UX
+* **interfaccia clinica web** piu leggibile, piu gerarchica e piu orientata all'azione
+* **stack AI locale** piu disciplinato, benchmarkabile e governato nel rollout
 
-* [ ] **Leggibilita e accessibilita**: refresh mirato di tipografia, spaziatura, contrasto e percorsi clinici piu usati.
+### Consolidamento AI/UI
+
+* [ ] **First fold clinico e superfici chiave**: scheda paziente, shell/sidebar, lista pazienti e form devono convergere verso un linguaggio `liquid glass` disciplinato e operativo.
+* [ ] **Affidabilita AI locale**: completare benchmark resolver WHO/AIFA, normalizzazione input documentali e regole di rollout/fallback/stop-rules prima di raccontare lo stack come consolidato.
+* [ ] **Release hygiene minima**: `lint`, `build` e benchmark CLI rilevanti devono tornare a essere segnali affidabili del prodotto, non del rumore del workspace.
 * [ ] **Miglioramenti export**: export FHIR/human-readable e validazione documentale piu completi.
 * [ ] **CI minima**: lint, build e controlli essenziali stabili su PR.
 
-### Native reboot
+### Esplicitamente fuori da v0.5.0
 
-* [ ] **Demolizione controllata macOS**: ricostruire la shell nativa "from the ground up" senza perdere il contratto `/api/v1`, il trasporto TLS locale e la semantica security/sessione.
-* [ ] **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
+* [ ] **No retro-rewrite di v0.4.0**: la `0.4.0` resta la baseline storica gia rilasciata.
+* [ ] **No promozione prematura delle lane benchmark-only**: redaction/NER/challenger generativi restano fuori dal claim principale finche non superano benchmark e governance.
 
 ---
 
-## Futuro (v0.5.0+)
+## Dopo v0.5.0
+
+### Modalita network home-base
+
+* **Nodo centrale locale**: pairing esplicito, capability discovery e lavoro su piu macchine senza rompere il local-first.
+* **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita.
+* **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud.
+
+### Esperienza nativa
+
+* **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
+* **App iPad/iPhone**: consultazione rapida in mobilita coerente con il modello home-base.
 
 ### Interazione vocale
 
 * **Dettatura**: Usare Whisper (locale) per dettare la visita invece di scrivere.
 * **Chat**: Chiedere al sistema: *"Fammi un grafico della glicemia di Mario dell'ultimo anno"*.
-
-### Esperienza nativa
-
-* **App Mac Completa**: Nuova app 100% nativa (SwiftUI) costruita sul contratto locale gia stabilizzato.
-* **App iPad/iPhone**: Consultazione rapida in mobilità (sulla stessa rete WiFi).
 
 ---
 

@@ -5,13 +5,26 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-23
+Ultimo aggiornamento: 2026-03-29
 
 ---
 
 ## Focus corrente (prossime 2-6 settimane)
 
-### Release gate v0.4 (web/core only)
+### Release gate v0.5.0 (consolidamento AI/UI)
+- [ ] Chiudere il pacchetto UI web orientato alla leggibilita clinica e al first fold operativo: `WUL-94`, `WUL-98`, `WUL-106`, `WUL-107`, `WUL-108`.
+- [ ] Portare le lane AI core da "disciplinate ma non ancora omogeneamente affidabili" a stato release-ready, con focus su `AI-01/WUL-109`, `AI-05/WUL-110` e `AI-08/WUL-111`.
+- [ ] Ripristinare il verify loop minimo della release: `lint` confinato ai file sorgente, `typecheck`/`build` verdi e harness CLI dei benchmark generativi di nuovo eseguibili su `main`.
+- [ ] Tenere fuori dal gate `v0.5.0` le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
+- [ ] Chiudere la narrativa release in modo coerente e documentato: `v0.4.0` come baseline storica taggata, `v0.5.0` come release di consolidamento AI/UI, `post-v0.5` per nodo centrale locale, replica tra macchine e reboot native.
+- [ ] Eseguire verifica manuale esplicita desktop/mobile sulle superfici UI toccate e dichiarare cosa resta non verificato.
+
+Nota operativa:
+- `v0.4.0` resta una release storica gia taggata su `main` il `2026-03-19`; non va riscritta retroattivamente
+- `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo corrente completa benchmark, input normalization e rollout governance
+- il label Linear `bucket/post-0.4` va trattato come etichetta legacy: durante questo ciclo contiene sia lavoro `v0.5.0` sia backlog effettivamente `post-v0.5`, da separare progressivamente
+
+### Contesto storico chiuso: Release gate v0.4 (web/core only)
 - [x] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
 - [x] Riallineare Linear sugli issue non bloccanti `0.4`, mantenendoli in `Backlog` senza mischiarli con il push release.
 - [x] Chiudere la queue attiva non-macOS in Linear (`Todo`, `In Progress`, `In Review` a zero) lasciando solo backlog intenzionale, tracker e filone native congelato.
@@ -114,11 +127,11 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
-- [ ] Pianificare il ciclo `post-0.4`: consolidamento UI/leggibilita web, CI minima e rebuild controllato della shell macOS.
+- [ ] Pianificare il ciclo `post-v0.5`: nodo centrale locale/home-base, contratto `/api/v1/network`, pairing esplicito, replica/fallback offline, runtime AI centralizzabile e rebuild controllato della shell macOS.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 
-Nota operativa per il filone UI web `post-0.4` (`WUL-98`):
+Nota operativa per il filone UI web `v0.5.0` (`WUL-98`, label Linear legacy `bucket/post-0.4`):
 - la leadership autoriale di UI/UX puo essere delegata a Gemini quando il focus e strettamente di interfaccia
 - Codex mantiene i guardrail su scope, regressioni comportamentali, accessibilita, compliance repo e gestione Linear
 - direzione d'uso: intuitivita clinica, sleekness adatta al contesto medico, linguaggio `liquid glass` leggibile e credibile anche per medici digitalmente fluenti
