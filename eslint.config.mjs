@@ -20,11 +20,13 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // @Codex: generated local test artifacts
+    "tmp/**",
     "playwright-report/**",
     "test-results/**",
     "tmp-e2e-data*/**",
     "tmp-native-derived-data/**",
     "tmp-parity-smoke/**",
+    ".venv_openmed/**",
   ]),
 ]);
 

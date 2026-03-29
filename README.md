@@ -1,4 +1,4 @@
-# MediFlow v0.4.0
+# MediFlow v0.5.0
 
 > Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
 > Offline, privata, veloce.
@@ -70,7 +70,7 @@ GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
 ### 🍏 Client nativo macOS
 
 > [!IMPORTANT]
-> Dopo `v0.4.0` il filone macOS/parity e sospeso: la shell nativa entra in **riscrittura controllata** ("demolizione controllata").
+> Nel ciclo `v0.5.0` il filone macOS/parity resta sospeso: la shell nativa continua la **riscrittura controllata** ("demolizione controllata").
 > Il contratto locale `/api/v1`, il trasporto TLS e i vincoli di sicurezza restano validi; la delivery di nuove feature native sul vecchio shell e congelata fino al rebuild.
 
 - [docs/NATIVE.md](./docs/NATIVE.md)

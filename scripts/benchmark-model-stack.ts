@@ -4,11 +4,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { normalizeOllamaBaseUrl } from './ollama-base-url';
+import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
 import {
     runAiTaskContractBenchmark,
     type AiTaskContractBenchmarkReport,
-} from './benchmark-ai-task-contracts';
+} from './benchmark-ai-task-contracts.ts';
 
 type CandidateLane = 'generative' | 'pii' | 'clinical_entities' | 'embedding';
 type CandidateOrigin = 'current_stack' | 'report';

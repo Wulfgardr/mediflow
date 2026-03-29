@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { normalizeOllamaBaseUrl } from './ollama-base-url';
+import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
 import {
     buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
@@ -13,7 +13,7 @@ import {
     parseDocumentSynthesisExtractionResponse,
     parsePatientInsightExtractionResponse,
     parseSmartImportExtractionResponse,
-} from '../lib/ai-task-contracts';
+} from '../lib/ai-task-contracts.ts';
 
 type BenchmarkTask = 'patient_insight' | 'smart_import' | 'document_synthesis';
 
@@ -83,7 +83,7 @@ export type AiTaskContractBenchmarkReport = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_CORPUS_PATH = path.join(__dirname, 'fixtures', 'ai-task-contract-corpus.json');
-const DEFAULT_TARGET_MODELS = ['qwen2.5:32b', 'qwen3:32b'] as const;
+const DEFAULT_TARGET_MODELS = ['qwen3.5:35b-a3b', 'qwen3:32b'] as const;
 
 function parseArgs(argv: string[]) {
     const args = {

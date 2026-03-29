@@ -5,6 +5,29 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-29
+
+> Nota release: `v0.5.0` consolida il lavoro UI/AI entrato su `main` dopo `v0.4.0`. La shell macOS storica resta fuori scope e continua la **riscrittura controllata**; restano invarianti il contratto locale `/api/v1`, il trasporto TLS e i vincoli security/local-first.
+
+### ✨ Aggiunto
+
+- **Governance AI locale più esplicita**: envelope condiviso `mediflow.ai.extract.v1`, benchmark headless sui task contract, benchmark `smart import`, registro candidati `model stack` e `model parliament` con artifact locali versionabili.
+- **Lane benchmark-only separate per toolkit clinici esterni**: benchmark `redaction.v1` e `clinical_entities.v1` con adapter locali `OpenMed`/`HUMADEX`, runbook dedicati e stop-rules esplicite senza toccare il runtime applicativo.
+
+### 🧪 Migliorato
+
+- **Interfaccia clinica web**: scheda paziente, lista, form e shell impostazioni convergono verso una gerarchia visiva più leggibile, con linguaggio `liquid glass` più disciplinato e first fold più operativo.
+- **Coerenza operativa web/native**: attribuzione audit per i client native preservata sul mainline e refresh auth/preview più affidabile dopo sblocco o bootstrap locale.
+
+### 🐛 Risolto
+
+- **Verify loop locale**: `eslint` torna confinato ai sorgenti e non attraversa più gli artifact generati locali in `tmp/**` e `.venv_openmed/**`.
+- **Benchmark CLI generativi**: i runner TypeScript usati con `node --experimental-strip-types` risolvono di nuovo correttamente i moduli relativi, evitando il fail immediato in module resolution.
+
+### 📚 Documentazione
+
+- **Narrativa release riallineata**: README, roadmap, piano engineering e mappa documentale canonica raccontano ora `v0.5.0` come release corrente, lasciando `v0.4.0` come baseline storica e spostando home-base/native rebuild nel `post-v0.5`.
+
 ## [0.4.0] - 2026-03-19
 
 > Nota release: dopo `v0.4.0` il filone `macOS/parity` viene sospeso e spostato in **riscrittura controllata** della shell nativa. Restano fonte di verita il contratto locale `/api/v1`, il trasporto TLS e i vincoli security/local-first; la delivery native sul vecchio client non continua oltre questo snapshot.

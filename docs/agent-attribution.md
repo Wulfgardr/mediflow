@@ -4,6 +4,10 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-29 Codex
+- Finalized the `v0.5.0` release hygiene pass by restoring source-only ESLint ignores, fixing `node --experimental-strip-types` module resolution in the benchmark runners, and bumping the repository version metadata to `0.5.0`: `eslint.config.mjs`, `scripts/benchmark-ai-task-contracts.ts`, `scripts/benchmark-smart-import.ts`, `scripts/benchmark-model-stack.ts`, `scripts/benchmark-model-parliament.ts`, `package.json`, `package-lock.json`
+- Published the canonical `v0.5.0` release narrative across the repository entrypoints so README, changelog, plans, roadmap and docs map all reflect `v0.5.0` as the released baseline and move the next cycle to `post-v0.5`: `README.md`, `CHANGELOG.md`, `PLANS.md`, `docs/ROADMAP.md`, `docs/README.md`
+
 ## 2026-03-22 Codex
 - Added a cross-stack AI reliability dossier that consolidates current runtime architecture, contract decisions, incidents, benchmarks, bottlenecks, and the recommended hardening path, and refreshed the canonical doc maps to reference it: `docs/ai-stack-reliability-review.md`, `docs/README.md`, `docs/markdown-index.md`
 - Added an execution-layer AI work package plan and promoted it into the active engineering plan so the reliability dossier now maps to concrete sequencing, dependencies, exit criteria and stop-rules: `docs/ai-stack-execution-plan.md`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`

@@ -1,7 +1,7 @@
 # Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.4.0 (release corrente) — Marzo 2026
+> v0.5.0 (release corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
 ---
@@ -34,30 +34,20 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ---
 
-## In corso (v0.5.0)
+## Fatto (v0.5.0)
 
-`v0.5.0` non e pensata come semplice patch o raccolta feature.
-E la release in cui MediFlow deve rendere credibili e coerenti due cose insieme:
+`v0.5.0` e la release che consolida lo snapshot oggi usato dal vivo: UI web piu leggibile e stack AI locale piu governato, senza riscrivere retroattivamente `v0.4.0`.
 
-* **interfaccia clinica web** piu leggibile, piu gerarchica e piu orientata all'azione
-* **stack AI locale** piu disciplinato, benchmarkabile e governato nel rollout
+* **Interfaccia clinica web piu coerente**: scheda paziente, lista, form e shell impostazioni convergono verso una gerarchia visiva piu leggibile e piu orientata all'azione.
+* **Governance AI locale piu esplicita**: task contract condiviso, benchmark headless, model stack/model parliament e separazione netta tra runtime operativo e lane `benchmark-only`.
+* **Release hygiene ripristinata**: `lint` torna confinato ai sorgenti e i benchmark CLI generativi tornano eseguibili su `main`.
+* **Narrativa prodotto riallineata**: `v0.4.0` resta la baseline storica, `v0.5.0` chiude il consolidamento AI/UI e il ciclo successivo si sposta su home-base e client native.
 
-### Consolidamento AI/UI
-
-* [ ] **First fold clinico e superfici chiave**: scheda paziente, shell/sidebar, lista pazienti e form devono convergere verso un linguaggio `liquid glass` disciplinato e operativo.
-* [ ] **Affidabilita AI locale**: completare benchmark resolver WHO/AIFA, normalizzazione input documentali e regole di rollout/fallback/stop-rules prima di raccontare lo stack come consolidato.
-* [ ] **Release hygiene minima**: `lint`, `build` e benchmark CLI rilevanti devono tornare a essere segnali affidabili del prodotto, non del rumore del workspace.
-* [ ] **Miglioramenti export**: export FHIR/human-readable e validazione documentale piu completi.
-* [ ] **CI minima**: lint, build e controlli essenziali stabili su PR.
-
-### Esplicitamente fuori da v0.5.0
-
-* [ ] **No retro-rewrite di v0.4.0**: la `0.4.0` resta la baseline storica gia rilasciata.
-* [ ] **No promozione prematura delle lane benchmark-only**: redaction/NER/challenger generativi restano fuori dal claim principale finche non superano benchmark e governance.
+> Nota: le lane `benchmark-only` (`OpenMed redaction`, `clinical_entities`, challenger generativi non promossi) restano fuori dal runtime operativo e dal claim principale della release.
 
 ---
 
-## Dopo v0.5.0
+## In corso (post-v0.5)
 
 ### Modalita network home-base
 

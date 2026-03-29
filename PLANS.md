@@ -11,18 +11,29 @@ Ultimo aggiornamento: 2026-03-29
 
 ## Focus corrente (prossime 2-6 settimane)
 
-### Release gate v0.5.0 (consolidamento AI/UI)
-- [ ] Chiudere il pacchetto UI web orientato alla leggibilita clinica e al first fold operativo: `WUL-94`, `WUL-98`, `WUL-106`, `WUL-107`, `WUL-108`.
-- [ ] Portare le lane AI core da "disciplinate ma non ancora omogeneamente affidabili" a stato release-ready, con focus su `AI-01/WUL-109`, `AI-05/WUL-110` e `AI-08/WUL-111`.
-- [ ] Ripristinare il verify loop minimo della release: `lint` confinato ai file sorgente, `typecheck`/`build` verdi e harness CLI dei benchmark generativi di nuovo eseguibili su `main`.
-- [ ] Tenere fuori dal gate `v0.5.0` le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
-- [ ] Chiudere la narrativa release in modo coerente e documentato: `v0.4.0` come baseline storica taggata, `v0.5.0` come release di consolidamento AI/UI, `post-v0.5` per nodo centrale locale, replica tra macchine e reboot native.
-- [ ] Eseguire verifica manuale esplicita desktop/mobile sulle superfici UI toccate e dichiarare cosa resta non verificato.
+### Post-v0.5.0 (stabilizzazione sul campo + home-base discovery)
+- [ ] Eseguire validazione sul campo delle superfici UI/AI rilasciate in `v0.5.0` e riversare bug/regressioni in Linear con priorita esplicite.
+- [ ] Mantenere affidabile il verify loop per le patch `0.5.x`: `lint`, `typecheck`, `build` verdi e benchmark CLI generativi eseguibili su `main`.
+- [ ] Preparare ADR + thin slice del nodo locale `home-base`: discovery, pairing esplicito e capability contract `/api/v1/network`.
+- [ ] Definire la prima slice read-only multi-device (Mac host -> iPhone/iPad client) senza rompere il modello local-first.
+- [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
 Nota operativa:
-- `v0.4.0` resta una release storica gia taggata su `main` il `2026-03-19`; non va riscritta retroattivamente
-- `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo corrente completa benchmark, input normalization e rollout governance
-- il label Linear `bucket/post-0.4` va trattato come etichetta legacy: durante questo ciclo contiene sia lavoro `v0.5.0` sia backlog effettivamente `post-v0.5`, da separare progressivamente
+- `v0.5.0` e la release corrente formalizzata su `main` il `2026-03-29`
+- `v0.4.0` resta la baseline storica taggata su `main` il `2026-03-19`
+- `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo successivo sposta il focus su uso reale, rollout governance e architettura home-base
+- il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
+
+### Contesto storico chiuso: Release gate v0.5.0 (consolidamento AI/UI)
+- [x] Chiudere il pacchetto UI web orientato alla leggibilita clinica e al first fold operativo: `WUL-94`, `WUL-98`, `WUL-106`, `WUL-107`, `WUL-108`.
+- [x] Portare le lane AI core a una baseline release-ready di consolidamento, con focus su task contract condiviso, benchmark generativi eseguibili e governance esplicita del runtime locale.
+- [x] Ripristinare il verify loop minimo della release: `lint` confinato ai file sorgente, `typecheck`/`build` verdi e harness CLI dei benchmark generativi di nuovo eseguibili su `main`.
+- [x] Tenere fuori dal gate `v0.5.0` le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`.
+- [x] Chiudere la narrativa release in modo coerente e documentato: `v0.4.0` come baseline storica, `v0.5.0` come release di consolidamento AI/UI, `post-v0.5` per nodo centrale locale, replica tra macchine e reboot native.
+
+Nota operativa:
+- la validazione manuale desktop/mobile continua nel focus post-release e non va retro-proiettata come gate bloccante ormai chiuso
+- `WUL-109`, `WUL-110` e `WUL-111` restano la coda esplicita di hardening AI sul campo, non il motivo per tenere `v0.5.0` in uno stato narrativo indefinito
 
 ### Contesto storico chiuso: Release gate v0.4 (web/core only)
 - [x] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
