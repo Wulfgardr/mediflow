@@ -39,6 +39,22 @@ const MAX_OBSERVATIONS = 5;
 const MAX_CHECKUPS = 5;
 const MAX_DIAGNOSES = 5;
 const DOCUMENT_SOURCE_SUMMARY_CHARS = 600;
+const DOCUMENT_HIGHLIGHT_KEYWORDS = [
+    'diagnosi',
+    'dimission',
+    'terapia',
+    'farmac',
+    'indicazioni',
+    'riabilit',
+    'deambul',
+    'cadut',
+    'barthel',
+    'tinetti',
+    'nrs',
+    'follow-up',
+    'controllo',
+    'frattur',
+];
 
 const CONTAMINATED_NOTE_MARKERS = [
     '**quadro attuale:**',
@@ -94,6 +110,98 @@ function isNarrativeNoteContaminated(value: string | null | undefined): boolean 
 
 function normalizeEvidenceLine(line: string): string {
     return line.replace(/^-\s+/, '').trim();
+}
+
+function isGenericDocumentHeading(line: string): boolean {
+    const normalized = line.toLowerCase().trim();
+    if (!normalized) return false;
+    if (/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ui|gtt|cp|cps|fl)\b/i.test(line)) return false;
+    if (/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/.test(line)) return false;
+
+    const tokenCount = normalized.split(/\s+/).length;
+    return tokenCount <= 5 && DOCUMENT_HIGHLIGHT_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+function buildDocumentHighlightExcerpt(value: string, maxChars: number): string {
+    const lines = value
+        .replace(/\r/g, '\n')
+        .split(/\n+/)
+        .map((line) => compactText(line, 160))
+        .filter((line) => line.length >= 12 && !isGenericDocumentHeading(line));
+
+    if (lines.length === 0) return '';
+
+    const seen = new Set<string>();
+    const scored = lines.map((line, index) => {
+        const normalized = line.toLowerCase();
+        let score = Math.min(line.length, 90);
+
+        for (const keyword of DOCUMENT_HIGHLIGHT_KEYWORDS) {
+            if (normalized.includes(keyword)) score += 18;
+        }
+        if (/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ui|gtt|cp|cps|fl)\b/i.test(line)) score += 10;
+        if (/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/.test(line)) score += 4;
+
+        return { line, index, score };
+    }).sort((left, right) => right.score - left.score || left.index - right.index);
+
+    const picked: string[] = [];
+    let total = 0;
+    for (const item of scored) {
+        const key = item.line.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const nextTotal = total + item.line.length + (picked.length > 0 ? 3 : 0);
+        if (picked.length > 0 && nextTotal > maxChars) continue;
+
+        picked.push(item.line);
+        total = nextTotal;
+        if (picked.length >= 4 || total >= maxChars) break;
+    }
+
+    return picked.join(' | ');
+}
+
+function renderStructuredDocumentData(insight: DocumentInsight): string[] {
+    const diagnoses = insight.extractedData?.diagnoses
+        ?.slice(0, 3)
+        .map((diagnosis) => `${diagnosis.system} ${diagnosis.code}: ${compactText(diagnosis.description, 70)}`)
+        .filter(Boolean) || [];
+    const medications = insight.extractedData?.medications
+        ?.slice(0, 4)
+        .map((medication) => compactText(medication, 80))
+        .filter(Boolean) || [];
+
+    const parts: string[] = [];
+    if (diagnoses.length > 0) {
+        parts.push(`Diagnosi: ${diagnoses.join('; ')}`);
+    }
+    if (medications.length > 0) {
+        parts.push(`Terapie: ${medications.join('; ')}`);
+    }
+    return parts;
+}
+
+function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number): string {
+    const fileName = compactText(insight.fileName, 80);
+    const parts = [
+        ...renderStructuredDocumentData(insight),
+    ];
+
+    const rawHighlights = buildDocumentHighlightExcerpt(insight.rawMarkdown || '', Math.min(260, maxChars));
+    if (rawHighlights) {
+        parts.push(`Estratto: ${rawHighlights}`);
+    }
+
+    const summary = compactText(insight.summary, 150);
+    if (summary) {
+        parts.push(`Sintesi: ${summary}`);
+    }
+
+    const rendered = compactText(parts.join(' | '), maxChars || DOCUMENT_SOURCE_SUMMARY_CHARS);
+    if (!rendered) return '';
+    return fileName ? `${fileName}: ${rendered}` : rendered;
 }
 
 function createSourceRefs(
@@ -173,12 +281,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
 
     const archiveSummaries = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
         .sort((left, right) => compareDatesDesc(left.date, right.date))
-        .map((insight) => {
-            const fileName = compactText(insight.fileName, 80);
-            const summary = compactText(insight.summary, DOCUMENT_SOURCE_SUMMARY_CHARS);
-            if (!summary) return '';
-            return fileName ? `${fileName}: ${summary}` : summary;
-        })
+        .map((insight) => renderDocumentInsightContext(insight, DOCUMENT_SOURCE_SUMMARY_CHARS))
         .filter(Boolean);
 
     const attachmentSummaries = attachments

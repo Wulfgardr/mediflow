@@ -69,8 +69,40 @@ async function withHarness() {
                     },
                 ],
                 documentInsights: JSON.stringify([
-                    { id: 'doc-1', date: '2025-03-10T00:00:00Z', fileName: 'referto-lab.pdf', summary: 'Azotemia in lieve aumento' },
-                    { id: 'doc-2', date: '2025-03-05T00:00:00Z', fileName: 'dimissione.pdf', summary: 'Follow-up cardiologico stabile' },
+                    {
+                        id: 'doc-1',
+                        date: '2025-03-10T00:00:00Z',
+                        fileName: 'referto-lab.pdf',
+                        summary: 'Azotemia in lieve aumento',
+                    },
+                    {
+                        id: 'doc-2',
+                        date: '2025-03-05T00:00:00Z',
+                        fileName: 'dimissione.pdf',
+                        summary: 'Follow-up cardiologico stabile',
+                        rawMarkdown: [
+                            'Diagnosi di dimissione',
+                            'Deficit della deambulazione in postumi di frattura pertrocanterica sx',
+                            'Terapia farmacologica alla dimissione',
+                            'Duloxetina 60 mg 1 cp ore 20',
+                            'Pregabalin 75 mg 1 cp ore 8',
+                            'Indicazioni alla dimissione',
+                            'FKT domiciliare 2-3 volte alla settimana',
+                        ].join('\n'),
+                        extractedData: {
+                            diagnoses: [
+                                {
+                                    code: 'S72.1',
+                                    description: 'Frattura pertrocanterica del femore sinistro',
+                                    system: 'ICD-10',
+                                },
+                            ],
+                            medications: [
+                                'Duloxetina 60 mg 1 cp ore 20',
+                                'Pregabalin 75 mg 1 cp ore 8',
+                            ],
+                        },
+                    },
                 ]),
             }
             : undefined
@@ -185,8 +217,10 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.ok(prompt.indexOf('[DIARIO CLINICO RECENTE]') < prompt.indexOf('[DOCUMENTI RECENTI]'));
         assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
         assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
-        assert.match(prompt, /referto-lab\.pdf: Azotemia in lieve aumento/);
-        assert.match(prompt, /dimissione\.pdf: Follow-up cardiologico stabile/);
+        assert.match(prompt, /referto-lab\.pdf: Sintesi: Azotemia in lieve aumento/);
+        assert.match(prompt, /dimissione\.pdf: Diagnosi: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /Terapie: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
+        assert.match(prompt, /FKT domiciliare 2-3/i);
         assert.match(prompt, /eco-cuore\.pdf: Funzione sistolica conservata/);
         assert.ok(!prompt.includes('rx-polmoni.pdf'));
         assert.match(snapshot.limitations.join('\n'), /note narrative della scheda sono state escluse/i);
