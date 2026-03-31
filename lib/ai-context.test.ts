@@ -103,6 +103,26 @@ async function withHarness() {
                             ],
                         },
                     },
+                    {
+                        id: 'doc-3',
+                        date: '2025-03-05T00:00:00Z',
+                        fileName: 'ps.pdf',
+                        summary: 'Accesso in PS per frattura pertrocanterica femore sinistro',
+                        rawMarkdown: [
+                            'Verbale di pronto soccorso',
+                            'Frattura pertrocanterica femore sinistro',
+                            'Dimissione con controllo ortopedico',
+                        ].join('\n'),
+                        extractedData: {
+                            diagnoses: [
+                                {
+                                    code: 'S72.1',
+                                    description: 'Frattura pertrocanterica del femore sinistro',
+                                    system: 'ICD-10',
+                                },
+                            ],
+                        },
+                    },
                 ]),
             }
             : undefined
@@ -218,13 +238,17 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
         assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
         assert.match(prompt, /referto-lab\.pdf: Sintesi: Azotemia in lieve aumento/);
-        assert.match(prompt, /dimissione\.pdf: Diagnosi: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
-        assert.match(prompt, /Terapie: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
+        assert.match(prompt, /dimissione\.pdf: Diagnosi documentate: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /Terapie documentate: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
         assert.match(prompt, /FKT domiciliare 2-3/i);
+        assert.ok(!prompt.includes('ps.pdf'));
         assert.match(prompt, /eco-cuore\.pdf: Funzione sistolica conservata/);
         assert.ok(!prompt.includes('rx-polmoni.pdf'));
         assert.match(snapshot.limitations.join('\n'), /note narrative della scheda sono state escluse/i);
         assert.match(snapshot.limitations.join('\n'), /contesto documentale AI e stato ridotto a 3 documenti/i);
+        assert.match(snapshot.limitations.join('\n'), /documenti ai sovrapposti sullo stesso episodio sono stati consolidati/i);
+        assert.match(prompt, /\[TERAPIE ATTIVE\][\s\S]*Ramipril 5 mg\/die/i);
+        assert.match(prompt, /sezione TERAPIE ATTIVE come fonte primaria della terapia corrente/i);
     } finally {
         restore();
     }

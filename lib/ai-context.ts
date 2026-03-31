@@ -5,6 +5,8 @@ import {
 } from '@/lib/ai-insight-settings';
 /* @Codex */
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
+/* @Codex */
+import { dedupeDocumentInsightsForContext } from '@/lib/document-insight-context';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -223,10 +225,10 @@ function renderStructuredDocumentData(insight: DocumentInsight): string[] {
 
     const parts: string[] = [];
     if (diagnoses.length > 0) {
-        parts.push(`Diagnosi: ${diagnoses.join('; ')}`);
+        parts.push(`Diagnosi documentate: ${diagnoses.join('; ')}`);
     }
     if (medications.length > 0) {
-        parts.push(`Terapie: ${medications.join('; ')}`);
+        parts.push(`Terapie documentate: ${medications.join('; ')}`);
     }
     return parts;
 }
@@ -362,8 +364,9 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .toArray();
     attachments.sort((left, right) => compareDatesDesc(left.createdAt, right.createdAt));
 
-    const archiveInsights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
+    const parsedArchiveInsights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
         .sort((left, right) => compareDatesDesc(left.date, right.date));
+    const dedupedArchiveInsights = dedupeDocumentInsightsForContext(parsedArchiveInsights);
     const attachmentSummariesSource = attachments
         .filter((attachment) => attachment.summarySnapshot?.trim())
         .map((attachment) => ({
@@ -375,11 +378,11 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         patientComplexityScore: estimateAIInsightComplexityScore({
             diagnoses: allDiagnoses.length,
             entries: activeEntries.length,
-            documents: archiveInsights.length + attachmentSummariesSource.length,
+            documents: dedupedArchiveInsights.insights.length + attachmentSummariesSource.length,
         }),
     });
 
-    const archiveSummaries = archiveInsights
+    const archiveSummaries = dedupedArchiveInsights.insights
         .map((insight) => renderDocumentInsightContext(insight, runtimeSettings.maxDocumentSummaryChars))
         .filter(Boolean);
 
@@ -425,6 +428,9 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
 
     if (omittedDocumentCount > 0) {
         limitations.push(`Il contesto documentale AI e stato ridotto a ${documentLines.length} documenti per rispettare il budget configurato.`);
+    }
+    if (dedupedArchiveInsights.omittedCount > 0) {
+        limitations.push('Documenti AI sovrapposti sullo stesso episodio sono stati consolidati per ridurre duplicazioni nel contesto.');
     }
 
     const patientNotes = typeof patient.notes === 'string' ? patient.notes.trim() : '';
@@ -506,6 +512,7 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         '- Non inventare fonti, nomi di persona o dettagli non presenti.',
         '- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.',
         '- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.',
+        '- Considera la sezione TERAPIE ATTIVE come fonte primaria della terapia corrente; le terapie riportate nei documenti recenti sono documentate/storiche finche non trovano conferma nello stato attivo o nel diario clinico recente.',
         '- Se una fonte storica o sociale non e chiaramente attiva o rilevante oggi, omettila oppure marcala come [DATI-INCOMPLETI].',
         '',
         '[PROFILO STRUTTURATO]',

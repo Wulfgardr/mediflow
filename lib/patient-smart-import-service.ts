@@ -10,6 +10,8 @@ import {
     type TherapySuggestionState,
 } from './ai-task-contracts';
 import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from './db';
+/* @Codex */
+import { dedupeDocumentInsightsForContext } from './document-insight-context';
 import { searchICDHybrid, type ICDSearchResult } from './icd-service';
 import { notifyDbChange } from './live-query';
 import {
@@ -304,7 +306,11 @@ function buildSourceRecords(
         });
 
     const insightFileNames = new Set<string>();
-    parseDocumentInsights(patient.documentInsights)
+    dedupeDocumentInsightsForContext(
+        parseDocumentInsights(patient.documentInsights)
+            .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    )
+        .insights
         .slice(0, 4)
         .forEach((insight) => {
             const fileName = typeof insight.fileName === 'string' ? insight.fileName.trim() : '';
