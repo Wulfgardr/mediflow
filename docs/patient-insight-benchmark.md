@@ -80,6 +80,8 @@ Il corpus iniziale copre cinque famiglie di caso:
 Regole gold correnti:
 
 - le aspettative sono a token-set, non a frase esatta
+- per i casi documentali piu ricchi, una singola anchor puo accettare
+  alternative semanticamente equivalenti
 - le fonti recenti preferite sono esplicite per-case
 - le fonti stale o i topic fuori focus possono essere proibiti per-case
 - il benchmark privilegia priorita clinica e tracciabilita, non esaustivita
@@ -98,6 +100,8 @@ Ogni case include:
 
 - `context`: prompt completo sintetico
 - `expected.currentStateAny|alertsAny|nextStepsAny|gapsAny`
+- ogni anchor puo essere un token-set singolo oppure una lista di alternative
+  semanticamente equivalenti, per esempio `SpO2 91%` oppure `saturazione 91%`
 - `preferredSourceIds`
 - `forbiddenSourceIds`
 - `forbiddenTokens`

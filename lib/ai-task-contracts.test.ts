@@ -44,6 +44,9 @@ test('patient insight extraction prompt enforces recency, neutral tone, and evid
     assert.match(prompt, /se non esistono alert reali o di sicurezza, lascia alerts vuoto/i);
     assert.match(prompt, /currentState descrive il quadro clinico attuale e il follow-up immediato, non deve assorbire alert di sicurezza o monitoraggio attivo/i);
     assert.match(prompt, /usa alerts per peggioramento recente, valori chiaramente anomali, sospensione o stop temporaneo di terapia/i);
+    assert.match(prompt, /nei documenti recenti di dimissione, PS o riabilitazione, tratta mobilita ridotta, ausili, ADI\/FKT e recupero funzionale/i);
+    assert.match(prompt, /se valori recenti o controlli pendenti riguardano una cronica attiva, mantieni esplicita la patologia nel currentState/i);
+    assert.match(prompt, /nei casi post-dimissione o riabilitativi, usa alerts per limiti funzionali, deambulatore, mobilita ridotta o recupero da rivalutare/i);
     assert.match(prompt, /se un contenuto segnala rischio o richiede sorveglianza ravvicinata, mettilo in alerts/i);
     assert.match(prompt, /se alerts e vuoto, ricontrolla che currentState e nextSteps non stiano nascondendo/i);
     assert.match(prompt, /nextSteps deve contenere azioni, controlli o verifiche/i);

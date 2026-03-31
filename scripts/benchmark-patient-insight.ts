@@ -16,10 +16,10 @@ type PatientInsightBenchmarkEntry = {
     id: string;
     context: string;
     expected: {
-        currentStateAny?: string[][];
-        alertsAny?: string[][];
-        nextStepsAny?: string[][];
-        gapsAny?: string[][];
+        currentStateAny?: Array<string[] | string[][]>;
+        alertsAny?: Array<string[] | string[][]>;
+        nextStepsAny?: Array<string[] | string[][]>;
+        gapsAny?: Array<string[] | string[][]>;
         preferredSourceIds?: string[];
         forbiddenSourceIds?: string[];
         forbiddenTokens?: string[][];
@@ -27,6 +27,8 @@ type PatientInsightBenchmarkEntry = {
     };
     maxTokens?: number;
 };
+
+type ExpectedTokenMatcher = string[] | string[][];
 
 type CaseResult = {
     id: string;
@@ -220,6 +222,33 @@ function includesAllTokens(text: string, tokens: string[] | undefined): boolean 
     return tokens.every((token) => haystack.includes(normalizeText(token)));
 }
 
+function normalizeExpectedMatchers(matchers: ExpectedTokenMatcher[] | undefined): string[][][] {
+    if (!matchers || matchers.length === 0) return [];
+    const normalized: string[][][] = [];
+
+    for (const matcher of matchers) {
+        if (!Array.isArray(matcher) || matcher.length === 0) continue;
+        if (Array.isArray(matcher[0])) {
+            const alternatives = (matcher as string[][]).filter((tokens) => Array.isArray(tokens) && tokens.length > 0);
+            if (alternatives.length > 0) normalized.push(alternatives);
+            continue;
+        }
+        normalized.push([matcher as string[]]);
+    }
+
+    return normalized;
+}
+
+function matcherSatisfied(text: string, matcher: string[][]): boolean {
+    return matcher.some((tokens) => includesAllTokens(text, tokens));
+}
+
+function formatMatcher(matcher: string[][]): string {
+    return matcher
+        .map((tokens) => tokens.join(' + '))
+        .join(' | ');
+}
+
 function toRate(numerator: number, denominator: number): number {
     if (denominator === 0) return 1;
     return Number((numerator / denominator).toFixed(3));
@@ -251,25 +280,28 @@ function hasCitationOrGapMarker(text: string): boolean {
     return hasSourceCitation(text) || text.includes('[DATI-INCOMPLETI]');
 }
 
-function scoreExpectedGroups(claims: string[], expectedGroups: string[][] | undefined): number {
-    if (!expectedGroups || expectedGroups.length === 0) return 1;
+function scoreExpectedGroups(claims: string[], expectedGroups: ExpectedTokenMatcher[] | undefined): number {
+    const matchers = normalizeExpectedMatchers(expectedGroups);
+    if (matchers.length === 0) return 1;
     const strippedClaims = claims.map((claim) => stripMarkers(claim));
-    const hits = expectedGroups.filter((tokens) => strippedClaims.some((claim) => includesAllTokens(claim, tokens))).length;
-    return toRate(hits, expectedGroups.length);
+    const hits = matchers.filter((matcher) => strippedClaims.some((claim) => matcherSatisfied(claim, matcher))).length;
+    return toRate(hits, matchers.length);
 }
 
-function countExpectedGroupHits(claims: string[], expectedGroups: string[][] | undefined): number {
-    if (!expectedGroups || expectedGroups.length === 0) return 0;
+function countExpectedGroupHits(claims: string[], expectedGroups: ExpectedTokenMatcher[] | undefined): number {
+    const matchers = normalizeExpectedMatchers(expectedGroups);
+    if (matchers.length === 0) return 0;
     const strippedClaims = claims.map((claim) => stripMarkers(claim));
-    return expectedGroups.filter((tokens) => strippedClaims.some((claim) => includesAllTokens(claim, tokens))).length;
+    return matchers.filter((matcher) => strippedClaims.some((claim) => matcherSatisfied(claim, matcher))).length;
 }
 
-function findMissingExpectedGroups(claims: string[], expectedGroups: string[][] | undefined): string[] {
-    if (!expectedGroups || expectedGroups.length === 0) return [];
+function findMissingExpectedGroups(claims: string[], expectedGroups: ExpectedTokenMatcher[] | undefined): string[] {
+    const matchers = normalizeExpectedMatchers(expectedGroups);
+    if (matchers.length === 0) return [];
     const strippedClaims = claims.map((claim) => stripMarkers(claim));
-    return expectedGroups
-        .filter((tokens) => !strippedClaims.some((claim) => includesAllTokens(claim, tokens)))
-        .map((tokens) => tokens.join(' + '));
+    return matchers
+        .filter((matcher) => !strippedClaims.some((claim) => matcherSatisfied(claim, matcher)))
+        .map((matcher) => formatMatcher(matcher));
 }
 
 function describeSectionGap(label: string, groups: string[]) {
