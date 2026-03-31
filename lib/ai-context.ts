@@ -40,19 +40,39 @@ const MAX_CHECKUPS = 5;
 const MAX_DIAGNOSES = 5;
 const DOCUMENT_SOURCE_SUMMARY_CHARS = 600;
 const DOCUMENT_HIGHLIGHT_KEYWORDS = [
+    'anamnesi',
+    'esito',
+    'ricovero',
+    'ingresso',
     'diagnosi',
     'dimission',
     'terapia',
     'farmac',
+    'domiciliar',
     'indicazioni',
+    'condizion',
+    'programma',
+    'progetto',
     'riabilit',
     'deambul',
+    'cammino',
     'cadut',
     'barthel',
     'tinetti',
     'nrs',
     'follow-up',
     'controllo',
+    'adi',
+    'assist',
+    'caregiver',
+    'esami',
+    'laborator',
+    'ecg',
+    'referto',
+    'quesito',
+    'istolog',
+    'biops',
+    'vaccin',
     'frattur',
 ];
 
@@ -112,6 +132,31 @@ function normalizeEvidenceLine(line: string): string {
     return line.replace(/^-\s+/, '').trim();
 }
 
+function normalizeComparableDocumentText(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function scoreNovelDocumentHighlight(line: string): number {
+    const normalized = line.toLowerCase();
+    let score = Math.max(0, 80 - normalized.length);
+
+    if (/\b(fkt|indicazioni|follow|controll|adi|programma|progetto|riabilit)\b/i.test(normalized)) {
+        score += 60;
+    }
+    if (/\b(deambul|cammino|cadut|barthel|tinetti|nrs)\w*/i.test(normalized)) {
+        score += 25;
+    }
+    if (/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ui|gtt|cp|cps|fl)\b/i.test(normalized)) {
+        score -= 20;
+    }
+
+    return score;
+}
+
 function isGenericDocumentHeading(line: string): boolean {
     const normalized = line.toLowerCase().trim();
     if (!normalized) return false;
@@ -145,7 +190,7 @@ function buildDocumentHighlightExcerpt(value: string, maxChars: number): string 
         return { line, index, score };
     }).sort((left, right) => right.score - left.score || left.index - right.index);
 
-    const picked: string[] = [];
+    const picked: Array<{ line: string; index: number }> = [];
     let total = 0;
     for (const item of scored) {
         const key = item.line.toLowerCase();
@@ -155,12 +200,15 @@ function buildDocumentHighlightExcerpt(value: string, maxChars: number): string 
         const nextTotal = total + item.line.length + (picked.length > 0 ? 3 : 0);
         if (picked.length > 0 && nextTotal > maxChars) continue;
 
-        picked.push(item.line);
+        picked.push({ line: item.line, index: item.index });
         total = nextTotal;
         if (picked.length >= 4 || total >= maxChars) break;
     }
 
-    return picked.join(' | ');
+    return picked
+        .sort((left, right) => left.index - right.index)
+        .map((item) => item.line)
+        .join(' | ');
 }
 
 function renderStructuredDocumentData(insight: DocumentInsight): string[] {
@@ -185,21 +233,56 @@ function renderStructuredDocumentData(insight: DocumentInsight): string[] {
 
 function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number): string {
     const fileName = compactText(insight.fileName, 80);
-    const parts = [
+    const prioritizedParts = [
         ...renderStructuredDocumentData(insight),
     ];
 
-    const rawHighlights = buildDocumentHighlightExcerpt(insight.rawMarkdown || '', Math.min(260, maxChars));
-    if (rawHighlights) {
-        parts.push(`Estratto: ${rawHighlights}`);
+    const structuredEvidence = [
+        ...(insight.extractedData?.diagnoses?.map((diagnosis) => diagnosis.description) || []),
+        ...(insight.extractedData?.medications || []),
+    ]
+        .map((value) => normalizeComparableDocumentText(value))
+        .filter(Boolean);
+
+    const rawHighlightLines = buildDocumentHighlightExcerpt(insight.rawMarkdown || '', Math.min(260, maxChars))
+        .split(' | ')
+        .map((line) => line.trim())
+        .filter((line) => {
+            const normalized = normalizeComparableDocumentText(line);
+            if (!normalized) return false;
+
+            return !structuredEvidence.some((value) => (
+                normalized.includes(value)
+                || value.includes(normalized)
+            ));
+        })
+        .sort((left, right) => scoreNovelDocumentHighlight(right) - scoreNovelDocumentHighlight(left));
+    if (rawHighlightLines.length > 0) {
+        rawHighlightLines.forEach((line, index) => {
+            prioritizedParts.push(index === 0 ? `Estratto: ${line}` : line);
+        });
     }
 
     const summary = compactText(insight.summary, 150);
     if (summary) {
-        parts.push(`Sintesi: ${summary}`);
+        prioritizedParts.push(`Sintesi: ${summary}`);
     }
 
-    const rendered = compactText(parts.join(' | '), maxChars || DOCUMENT_SOURCE_SUMMARY_CHARS);
+    const selectedParts: string[] = [];
+    const limit = maxChars || DOCUMENT_SOURCE_SUMMARY_CHARS;
+    for (const part of prioritizedParts) {
+        if (!part) continue;
+        const candidate = selectedParts.length > 0
+            ? `${selectedParts.join(' | ')} | ${part}`
+            : part;
+        if (candidate.length <= limit) {
+            selectedParts.push(part);
+        }
+    }
+
+    const rendered = selectedParts.length > 0
+        ? selectedParts.join(' | ')
+        : compactText(prioritizedParts[0] || '', limit);
     if (!rendered) return '';
     return fileName ? `${fileName}: ${rendered}` : rendered;
 }
@@ -279,18 +362,32 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .toArray();
     attachments.sort((left, right) => compareDatesDesc(left.createdAt, right.createdAt));
 
-    const archiveSummaries = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
-        .sort((left, right) => compareDatesDesc(left.date, right.date))
-        .map((insight) => renderDocumentInsightContext(insight, DOCUMENT_SOURCE_SUMMARY_CHARS))
+    const archiveInsights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
+        .sort((left, right) => compareDatesDesc(left.date, right.date));
+    const attachmentSummariesSource = attachments
+        .filter((attachment) => attachment.summarySnapshot?.trim())
+        .map((attachment) => ({
+            fileName: compactText(attachment.name, 80),
+            summarySnapshot: attachment.summarySnapshot,
+        }));
+
+    const runtimeSettings = await getAIInsightRuntimeSettings({
+        patientComplexityScore: estimateAIInsightComplexityScore({
+            diagnoses: allDiagnoses.length,
+            entries: activeEntries.length,
+            documents: archiveInsights.length + attachmentSummariesSource.length,
+        }),
+    });
+
+    const archiveSummaries = archiveInsights
+        .map((insight) => renderDocumentInsightContext(insight, runtimeSettings.maxDocumentSummaryChars))
         .filter(Boolean);
 
-    const attachmentSummaries = attachments
-        .filter((attachment) => attachment.summarySnapshot?.trim())
+    const attachmentSummaries = attachmentSummariesSource
         .map((attachment) => {
-            const fileName = compactText(attachment.name, 80);
-            const summary = compactText(attachment.summarySnapshot, DOCUMENT_SOURCE_SUMMARY_CHARS);
+            const summary = compactText(attachment.summarySnapshot, runtimeSettings.maxDocumentSummaryChars);
             if (!summary) return '';
-            return fileName ? `${fileName}: ${summary}` : summary;
+            return attachment.fileName ? `${attachment.fileName}: ${summary}` : summary;
         })
         .filter(Boolean);
 
@@ -304,20 +401,12 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
             return true;
         });
 
-    const runtimeSettings = await getAIInsightRuntimeSettings({
-        patientComplexityScore: estimateAIInsightComplexityScore({
-            diagnoses: allDiagnoses.length,
-            entries: activeEntries.length,
-            documents: uniqueDocumentSummaries.length,
-        }),
-    });
-
     const documentLines: string[] = [];
     let documentContextChars = 0;
     let omittedDocumentCount = 0;
 
     for (const rawLine of uniqueDocumentSummaries) {
-        const line = compactText(rawLine, runtimeSettings.maxDocumentSummaryChars);
+        const line = rawLine;
         if (!line) continue;
         if (documentLines.length >= runtimeSettings.maxDocuments) {
             omittedDocumentCount += 1;

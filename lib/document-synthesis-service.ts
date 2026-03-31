@@ -17,51 +17,13 @@ import {
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
 } from './document-synthesis-parser';
+import {
+    buildDocumentExcerpt,
+    buildStoredDocumentExcerpt,
+} from './document-excerpt';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
-
-/* @Codex */
-function smartSliceText(text: string, maxChars: number): string {
-    if (!text) return "";
-    if (text.length <= maxChars) return text;
-
-    const keywords = [
-        'diagnosi', 'terapia', 'farmac', 'prescr', 'anamnesi', 'esami', 'referto',
-        'dimission', 'valutazione', 'conclusioni', 'patologia', 'icd', 'codice'
-    ];
-
-    const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
-    const scored = lines.map((line, index) => {
-        const lower = line.toLowerCase();
-        let score = lower.length;
-        for (const keyword of keywords) {
-            if (lower.includes(keyword)) score += 500;
-        }
-        if (/\b(icd[\s:-]*\d{0,2}|\d[A-Z0-9\.]{2,})\b/i.test(lower)) score += 400;
-        if (/\d{1,3}[,\.]\d+/.test(lower)) score += 200;
-        return { line, score, index };
-    });
-
-    scored.sort((a, b) => b.score - a.score || a.index - b.index);
-
-    const picked: string[] = [];
-    let total = 0;
-    for (const item of scored) {
-        if (total + item.line.length + 1 > maxChars) continue;
-        picked.push(item.line);
-        total += item.line.length + 1;
-        if (total >= maxChars) break;
-    }
-
-    if (total < maxChars * 0.35) {
-        const head = text.slice(0, Math.floor(maxChars * 0.55));
-        const tail = text.slice(-Math.floor(maxChars * 0.2));
-        return `${head}\n...\n${tail}`;
-    }
-
-    return picked.join('\n');
-}
 
 /* @Codex */
 function parseExistingInsights(raw: unknown): DocumentInsight[] {
@@ -153,7 +115,7 @@ function mergeDiagnoses(
  */
 export async function analyzeDocumentContent(rawMarkdown: string): Promise<DocumentStructuredAnalysis> {
     const ai = await AIService.create('clinical');
-    const sliced = smartSliceText(rawMarkdown, MAX_SYNTHESIS_CHARS);
+    const sliced = buildDocumentExcerpt(rawMarkdown, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1024);
     return parseStructuredAnalysisResponse(content, rawMarkdown);
 }
@@ -187,7 +149,7 @@ export async function synthesizeDocument(
         id: uuid(),
         date: new Date(),
         fileName,
-        rawMarkdown: rawMarkdown.substring(0, 3000),
+        rawMarkdown: buildStoredDocumentExcerpt(rawMarkdown),
         summary: analysis.summary,
         quality: analysis.quality,
         extractedData: analysis.diagnoses.length > 0 || analysis.medications.length > 0

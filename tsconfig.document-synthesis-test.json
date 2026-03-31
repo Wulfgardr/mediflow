@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-document-synthesis-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/document-excerpt.ts",
+    "lib/document-synthesis-service.test.ts",
+    "lib/document-synthesis-parser.ts",
+    "lib/ai-task-contracts.ts"
+  ]
+}
