@@ -1,0 +1,68 @@
+[
+  {
+    "id": "insight-copd-followup",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-1) ---\nDATI BASE: Bianchi Giulia | Eta: 74 | CF: BNCGLI50A41F205X\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n\n[PROFILO STRUTTURATO]\n[S1] ADI attiva, monitoraggio domiciliare infermieristico.\n[S2] Note scheda: dispnea da sforzo moderato e limitazione funzionale recente.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 J44.9: BPCO (14/03/2026)\n[S4] ICD-10 I10: Ipertensione essenziale (11/01/2026)\n\n[TERAPIE ATTIVE]\n[S5] Tiotropio 18 mcg 1 cps/die\n[S6] Ramipril 5 mg 1 cp/die\n\n[OSSERVAZIONI RECENTI]\n[S7] SpO2 (59408-5) = 91 % [18/03/2026]\n[S8] Frequenza cardiaca (8867-4) = 96 /min [18/03/2026]\n\n[CONTROLLI PENDENTI]\n[S9] 28/03/2026: controllo MMG per rivalutazione dispnea\n\n[DIARIO CLINICO RECENTE]\n[S10] [18/03/2026] VISIT: peggioramento della dispnea nelle ultime due settimane, senza febbre.\n\n[DOCUMENTI RECENTI]\n[S11] lettera_dimissione_bpco.pdf: riacutizzazione BPCO trattata con broncodilatatori; consigliato follow-up pneumologico precoce.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [["bpco"], ["dispnea"]],
+      "alertsAny": [["spo2", "91"]],
+      "nextStepsAny": [["controllo", "mmg"], ["pneumologico"]],
+      "preferredSourceIds": ["S7", "S9", "S10", "S11"],
+      "forbiddenTokens": [["ipertensione"]],
+      "maxIncompleteClaims": 1
+    }
+  },
+  {
+    "id": "insight-diabetes-kidney-followup",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-2) ---\nDATI BASE: Verdi Paolo | Eta: 68 | CF: VRDPLA57M10F205Z\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n\n[PROFILO STRUTTURATO]\n[S1] ADI no.\n[S2] Profilo monitoraggio: diabete con follow-up trimestrale.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 E11.9: Diabete mellito tipo 2 (02/02/2026)\n[S4] ICD-10 N18.3: Malattia renale cronica stadio 3 (15/02/2026)\n\n[TERAPIE ATTIVE]\n[S5] Metformina 500 mg 1 cp x 2/die\n[S6] Insulina glargine 16 UI serale\n\n[OSSERVAZIONI RECENTI]\n[S7] Glicemia (2339-0) = 182 mg/dL [19/03/2026]\n[S8] Peso (29463-7) = 84 kg [19/03/2026]\n\n[CONTROLLI PENDENTI]\n[S9] 04/04/2026: prelievo HbA1c e creatinina\n\n[DIARIO CLINICO RECENTE]\n[S10] [19/03/2026] NOTE: riferisce aderenza incerta alla dieta nelle ultime settimane.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [["diabete"], ["compenso"]],
+      "alertsAny": [["malattia", "renale"]],
+      "nextStepsAny": [["hba1c"], ["creatinina"]],
+      "gapsAny": [["aderenza"]],
+      "preferredSourceIds": ["S7", "S9", "S10"],
+      "maxIncompleteClaims": 1
+    }
+  },
+  {
+    "id": "insight-fracture-rehab-priority",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-3) ---\nDATI BASE: Gialli Rosella | Eta: 67 | CF: GRLSLL59S66H501O\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n- Se una fonte storica o sociale non e chiaramente attiva o rilevante oggi, omettila oppure marcala come [DATI-INCOMPLETI].\n\n[PROFILO STRUTTURATO]\n[S1] Anagrafica clinica: Gialli Rosella, eta 67, CF GRLSLL59S66H501O.\n[S2] ADI: si.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 C50.9: Storia personale di neoplasia maligna del seno (12/05/2018)\n[S4] ICD-10 E66.9: Obesita (18/09/2024)\n[S5] ICD-10 R73.0: Tolleranza alterata al glucosio (18/09/2024)\n[S6] ICD-10 Z72.0: Uso di tabacco (18/09/2024)\n[S7] ICD-10 Z72.1: Consumo di alcol (18/09/2024)\n\n[TERAPIE ATTIVE]\nNessuna terapia attiva registrata.\n\n[OSSERVAZIONI RECENTI]\nNessuna osservazione recente.\n\n[CONTROLLI PENDENTI]\n[S8] 26/03/2026: controllo ortopedico post-intervento femore sinistro\n\n[DIARIO CLINICO RECENTE]\n[S9] [20/03/2026] NOTE: dimessa dopo intervento per frattura pertrocanterica del femore sinistro; recupero funzionale da rivalutare.\n\n[DOCUMENTI RECENTI]\n[S10] lettera_dimissione_ortopedia.pdf: frattura pertrocanterica femore sinistro trattata chirurgicamente; consigliato follow-up ortopedico e riabilitazione motoria.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [["frattura", "femore"], ["riabilitazione"]],
+      "alertsAny": [["recupero", "funzionale"]],
+      "nextStepsAny": [["controllo", "ortopedico"], ["riabilitazione", "motoria"]],
+      "preferredSourceIds": ["S8", "S9", "S10"],
+      "forbiddenSourceIds": ["S3", "S4", "S5", "S6", "S7"],
+      "forbiddenTokens": [["neoplasia"], ["tabacco"], ["alcol"]],
+      "maxIncompleteClaims": 1
+    }
+  },
+  {
+    "id": "insight-ps-anticoagulant-review",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-4) ---\nDATI BASE: Neri Giuseppe | Eta: 79 | CF: NRGGPP47A12F205K\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n\n[PROFILO STRUTTURATO]\n[S1] ADI attiva con supporto infermieristico domiciliare.\n[S2] Paziente con follow-up condiviso MMG + diabetologo.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 I48.9: Fibrillazione atriale (15/11/2025)\n[S4] ICD-10 E11.9: Diabete mellito tipo 2 (03/01/2026)\n\n[TERAPIE ATTIVE]\n[S5] Xarelto 20 mg 1 cp/die\n[S6] Metformina 850 mg 1 cp x 2/die\n\n[OSSERVAZIONI RECENTI]\n[S7] Pressione arteriosa (85354-9) = 132/74 mmHg [21/03/2026]\n\n[CONTROLLI PENDENTI]\n[S8] 02/04/2026: rivalutazione ematologica per gestione anticoagulante\n[S9] 07/04/2026: follow-up diabetologico territoriale\n\n[DIARIO CLINICO RECENTE]\n[S10] [21/03/2026] PS: accesso per epistassi; indicato stop temporaneo di Xarelto fino a rivalutazione specialistica.\n\n[DOCUMENTI RECENTI]\n[S11] RefertoCittadino.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [["epistassi"], ["xarelto"]],
+      "alertsAny": [["rivalutare", "anticoagulante"]],
+      "nextStepsAny": [["ematologica"], ["diabetologico"]],
+      "preferredSourceIds": ["S8", "S9", "S10", "S11"],
+      "maxIncompleteClaims": 1
+    }
+  },
+  {
+    "id": "insight-document-rich-rehab-no-icd",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-5) ---\nDATI BASE: Rossi Isabella Maria | Eta: 82 | CF: RSSSBL44C41F205T\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n\n[PROFILO STRUTTURATO]\n[S1] ADI attiva.\n[S2] Mobilita ridotta dopo ricovero recente, supporto familiare presente.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 M79.7: Fibromialgia (14/10/2024)\n[S4] ICD-10 E03.9: Ipotiroidismo (14/10/2024)\n\n[TERAPIE ATTIVE]\n[S5] Duloxetina 60 mg 1 cp/die\n[S6] Pregabalin 75 mg 1 cp x 2/die\n\n[OSSERVAZIONI RECENTI]\nNessuna osservazione recente.\n\n[CONTROLLI PENDENTI]\n[S7] 15/04/2026: controllo ortopedico post-dimissione\n\n[DIARIO CLINICO RECENTE]\n[S8] [24/03/2026] NOTE: dimessa dopo ricovero ortopedico, necessita supporto per recupero della deambulazione.\n\n[DOCUMENTI RECENTI]\n[S9] lettera_dimissione_ortopedia.pdf: frattura pertrocanterica del femore sinistro trattata chirurgicamente; carico con deambulatore, FKT domiciliare 2-3 volte/settimana, emocromo di controllo e visita ortopedica.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [["frattura", "femore"], ["deambulazione"]],
+      "alertsAny": [["deambulatore"]],
+      "nextStepsAny": [["controllo", "ortopedico"], ["fkt", "domiciliare"]],
+      "preferredSourceIds": ["S7", "S8", "S9"],
+      "forbiddenSourceIds": ["S3", "S4"],
+      "forbiddenTokens": [["fibromialgia"], ["ipotiroidismo"]],
+      "maxIncompleteClaims": 1
+    }
+  }
+]

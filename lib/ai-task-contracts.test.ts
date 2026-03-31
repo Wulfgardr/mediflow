@@ -36,7 +36,13 @@ test('patient insight extraction prompt enforces recency, neutral tone, and evid
     const prompt = buildPatientInsightExtractionPrompt('contesto sintetico');
 
     assert.match(prompt, /problema clinico o follow-up piu attuale/i);
+    assert.match(prompt, /seconda frase di currentState solo se aggiunge un secondo fatto clinico attuale/i);
+    assert.match(prompt, /se diario o documenti recenti descrivono un episodio acuto, una dimissione o un percorso riabilitativo/i);
     assert.match(prompt, /storia remota solo se cambia la gestione attuale/i);
+    assert.match(prompt, /non combinare nel currentState il problema attuale con comorbidita croniche/i);
+    assert.match(prompt, /non citare diagnosi codificate o terapie attive di sfondo solo perche presenti nel contesto/i);
+    assert.match(prompt, /se non esistono alert reali o di sicurezza, lascia alerts vuoto/i);
+    assert.match(prompt, /non usare placeholder come \[Sx\], \[S\?\] o riferimenti generici/i);
     assert.match(prompt, /evita etichette inferite o enfatiche/i);
     assert.match(prompt, /non trasformare da soli codici storici, fattori sociali o stili di vita/i);
     assert.match(prompt, /italiano clinico neutro e non moralizzante/i);

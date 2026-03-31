@@ -4,6 +4,10 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-03-31 Codex
+- Added the `WUL-123` AI Patient Insight benchmark lane with a dedicated synthetic corpus, local scorer/validator, runbook, npm wiring, and plan/doc index updates so insight quality is now measured on focus, citations, preferred sources, stale leakage and incomplete-claim burden instead of JSON validity alone: `scripts/benchmark-patient-insight.ts`, `scripts/fixtures/patient-insight-benchmark-corpus.json`, `docs/patient-insight-benchmark.md`, `package.json`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
+- Hardened the shared `Patient Insight` prompt contract against stale chronic-background leakage and fake citation placeholders, with regression coverage for the new prompt rules: `lib/ai-task-contracts.ts`, `lib/ai-task-contracts.test.ts`
+
 ## 2026-03-29 Codex
 - Finalized the `v0.5.0` release hygiene pass by restoring source-only ESLint ignores, fixing `node --experimental-strip-types` module resolution in the benchmark runners, and bumping the repository version metadata to `0.5.0`: `eslint.config.mjs`, `scripts/benchmark-ai-task-contracts.ts`, `scripts/benchmark-smart-import.ts`, `scripts/benchmark-model-stack.ts`, `scripts/benchmark-model-parliament.ts`, `package.json`, `package-lock.json`
 - Published the canonical `v0.5.0` release narrative across the repository entrypoints so README, changelog, plans, roadmap and docs map all reflect `v0.5.0` as the released baseline and move the next cycle to `post-v0.5`: `README.md`, `CHANGELOG.md`, `PLANS.md`, `docs/ROADMAP.md`, `docs/README.md`
