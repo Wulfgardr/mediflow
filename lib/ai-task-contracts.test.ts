@@ -42,6 +42,14 @@ test('patient insight extraction prompt enforces recency, neutral tone, and evid
     assert.match(prompt, /non combinare nel currentState il problema attuale con comorbidita croniche/i);
     assert.match(prompt, /non citare diagnosi codificate o terapie attive di sfondo solo perche presenti nel contesto/i);
     assert.match(prompt, /se non esistono alert reali o di sicurezza, lascia alerts vuoto/i);
+    assert.match(prompt, /currentState descrive il quadro clinico attuale e il follow-up immediato, non deve assorbire alert di sicurezza o monitoraggio attivo/i);
+    assert.match(prompt, /usa alerts per peggioramento recente, valori chiaramente anomali, sospensione o stop temporaneo di terapia/i);
+    assert.match(prompt, /se un contenuto segnala rischio o richiede sorveglianza ravvicinata, mettilo in alerts/i);
+    assert.match(prompt, /se alerts e vuoto, ricontrolla che currentState e nextSteps non stiano nascondendo/i);
+    assert.match(prompt, /nextSteps deve contenere azioni, controlli o verifiche/i);
+    assert.match(prompt, /non scrivere frasi rassicuranti o boilerplate come nessuna criticita/i);
+    assert.match(prompt, /hard fail interno: se anche una sola stringa non contiene \[Sx\] o \[DATI-INCOMPLETI\]/i);
+    assert.match(prompt, /mantieni sempre i marker \[Sx\] anche quando riassumi piu fatti clinici/i);
     assert.match(prompt, /non usare placeholder come \[Sx\], \[S\?\] o riferimenti generici/i);
     assert.match(prompt, /evita etichette inferite o enfatiche/i);
     assert.match(prompt, /non trasformare da soli codici storici, fattori sociali o stili di vita/i);
