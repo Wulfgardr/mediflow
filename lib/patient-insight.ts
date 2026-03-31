@@ -141,6 +141,7 @@ export function finalizePatientInsight(options: FinalizePatientInsightOptions): 
     const usedIds = new Set<string>();
     const diagnostics = new Set((options.limitations ?? []).filter(Boolean));
     const claimTexts: string[] = [];
+    let supportedClaims = 0;
     let unsupportedClaims = 0;
     let currentSection = '';
 
@@ -158,6 +159,7 @@ export function finalizePatientInsight(options: FinalizePatientInsightOptions): 
                 const tokens = [...validClaimIds];
 
                 for (const id of validClaimIds) usedIds.add(id);
+                if (validClaimIds.length > 0) supportedClaims += 1;
 
                 if (explicitFallback || validClaimIds.length === 0) {
                     tokens.push(CLAIM_SUPPORT_FALLBACK);
@@ -176,6 +178,7 @@ export function finalizePatientInsight(options: FinalizePatientInsightOptions): 
             const tokens = [...validClaimIds];
 
             for (const id of validClaimIds) usedIds.add(id);
+            if (validClaimIds.length > 0) supportedClaims += 1;
 
             if (explicitFallback || validClaimIds.length === 0) {
                 tokens.push(CLAIM_SUPPORT_FALLBACK);
@@ -199,7 +202,7 @@ export function finalizePatientInsight(options: FinalizePatientInsightOptions): 
     }
 
     const shouldFallback = suspiciousNames.length > 0
-        || (claimTexts.length >= 3 && unsupportedClaims / Math.max(claimTexts.length, 1) > 0.5);
+        || (claimTexts.length > 0 && supportedClaims === 0 && unsupportedClaims > 0);
 
     if (shouldFallback) {
         const fallbackMarkdown = buildFallbackInsight(Array.from(diagnostics));
