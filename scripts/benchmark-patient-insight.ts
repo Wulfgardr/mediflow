@@ -38,7 +38,14 @@ type CaseResult = {
     alertsRecall: number;
     nextStepsRecall: number;
     gapsRecall: number;
+    currentStateSemanticRecall: number;
+    alertsSemanticRecall: number;
+    nextStepsSemanticRecall: number;
+    gapsSemanticRecall: number;
     focusRecall: number;
+    focusSemanticRecall: number;
+    sectionPlacementRate: number;
+    alertsPlacementRate: number;
     citationCoverageRate: number;
     supportedClaimRate: number;
     preferredSourceCoverage: number;
@@ -49,6 +56,7 @@ type CaseResult = {
     incompleteClaimCount: number;
     incompleteBudgetExceeded: boolean;
     citedSourceIds: string[];
+    findings: string[];
     output: PatientInsightExtractionData;
     error?: string;
 };
@@ -63,7 +71,14 @@ type ModelReport = {
         alertsRecall: number;
         nextStepsRecall: number;
         gapsRecall: number;
+        currentStateSemanticRecall: number;
+        alertsSemanticRecall: number;
+        nextStepsSemanticRecall: number;
+        gapsSemanticRecall: number;
         focusRecall: number;
+        focusSemanticRecall: number;
+        sectionPlacementRate: number;
+        alertsPlacementRate: number;
         citationCoverageRate: number;
         supportedClaimRate: number;
         preferredSourceCoverage: number;
@@ -116,6 +131,7 @@ function parseArgs(argv: string[]) {
         iterations: 1,
         models: null as string[] | null,
         validate: false,
+        markdownOut: null as string | null,
         minContractRate: 0.95,
         minFocusRecall: 0.75,
         minCitationRate: 0.95,
@@ -133,6 +149,9 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--out' && argv[index + 1]) {
             args.out = path.resolve(argv[index + 1]);
+            index += 1;
+        } else if (value === '--markdown-out' && argv[index + 1]) {
+            args.markdownOut = path.resolve(argv[index + 1]);
             index += 1;
         } else if (value === '--base-url' && argv[index + 1]) {
             args.baseUrl = argv[index + 1];
@@ -239,6 +258,50 @@ function scoreExpectedGroups(claims: string[], expectedGroups: string[][] | unde
     return toRate(hits, expectedGroups.length);
 }
 
+function countExpectedGroupHits(claims: string[], expectedGroups: string[][] | undefined): number {
+    if (!expectedGroups || expectedGroups.length === 0) return 0;
+    const strippedClaims = claims.map((claim) => stripMarkers(claim));
+    return expectedGroups.filter((tokens) => strippedClaims.some((claim) => includesAllTokens(claim, tokens))).length;
+}
+
+function findMissingExpectedGroups(claims: string[], expectedGroups: string[][] | undefined): string[] {
+    if (!expectedGroups || expectedGroups.length === 0) return [];
+    const strippedClaims = claims.map((claim) => stripMarkers(claim));
+    return expectedGroups
+        .filter((tokens) => !strippedClaims.some((claim) => includesAllTokens(claim, tokens)))
+        .map((tokens) => tokens.join(' + '));
+}
+
+function describeSectionGap(label: string, groups: string[]) {
+    if (groups.length === 0) return null;
+    return `missing ${label}: ${groups.join(', ')}`;
+}
+
+function describeSectionDrift(label: string, strictMissing: string[], semanticMissing: string[]) {
+    const driftGroups = strictMissing.filter((group) => !semanticMissing.includes(group));
+    if (driftGroups.length === 0) return null;
+    return `section drift in ${label}: ${driftGroups.join(', ')}`;
+}
+
+function summarizeFindings(caseResult: CaseResult): string {
+    if (caseResult.error) {
+        return `error: ${caseResult.error}`;
+    }
+    if (caseResult.findings.length === 0) {
+        return 'no notable findings';
+    }
+    return caseResult.findings.join('; ');
+}
+
+function rankCases(cases: CaseResult[]): CaseResult[] {
+    return [...cases].sort((left, right) => {
+        const leftSeverity = left.findings.length + (left.error ? 5 : 0);
+        const rightSeverity = right.findings.length + (right.error ? 5 : 0);
+        if (rightSeverity !== leftSeverity) return rightSeverity - leftSeverity;
+        return left.latencyMs - right.latencyMs;
+    });
+}
+
 function scoreCase(
     entry: PatientInsightBenchmarkEntry,
     output: PatientInsightExtractionData,
@@ -266,13 +329,67 @@ function scoreCase(
     const alertsRecall = scoreExpectedGroups(output.alerts, entry.expected.alertsAny);
     const nextStepsRecall = scoreExpectedGroups(output.nextSteps, entry.expected.nextStepsAny);
     const gapsRecall = scoreExpectedGroups(output.gaps, entry.expected.gapsAny);
+    const currentStateSemanticRecall = scoreExpectedGroups(claims, entry.expected.currentStateAny);
+    const alertsSemanticRecall = scoreExpectedGroups(claims, entry.expected.alertsAny);
+    const nextStepsSemanticRecall = scoreExpectedGroups(claims, entry.expected.nextStepsAny);
+    const gapsSemanticRecall = scoreExpectedGroups(claims, entry.expected.gapsAny);
+    const currentStateMissing = findMissingExpectedGroups(output.currentState, entry.expected.currentStateAny);
+    const alertsMissing = findMissingExpectedGroups(output.alerts, entry.expected.alertsAny);
+    const nextStepsMissing = findMissingExpectedGroups(output.nextSteps, entry.expected.nextStepsAny);
+    const gapsMissing = findMissingExpectedGroups(output.gaps, entry.expected.gapsAny);
+    const currentStateSemanticMissing = findMissingExpectedGroups(claims, entry.expected.currentStateAny);
+    const alertsSemanticMissing = findMissingExpectedGroups(claims, entry.expected.alertsAny);
+    const nextStepsSemanticMissing = findMissingExpectedGroups(claims, entry.expected.nextStepsAny);
+    const gapsSemanticMissing = findMissingExpectedGroups(claims, entry.expected.gapsAny);
+    const preferredSourceMisses = Array.from(preferredSourceIds).filter((sourceId) => !citedSourceIds.includes(sourceId));
+    const uncitedClaimCount = claims.filter((claim) => !hasCitationOrGapMarker(claim)).length;
+    const currentStateStrictHits = countExpectedGroupHits(output.currentState, entry.expected.currentStateAny);
+    const alertsStrictHits = countExpectedGroupHits(output.alerts, entry.expected.alertsAny);
+    const nextStepsStrictHits = countExpectedGroupHits(output.nextSteps, entry.expected.nextStepsAny);
+    const gapsStrictHits = countExpectedGroupHits(output.gaps, entry.expected.gapsAny);
+    const currentStateSemanticHits = countExpectedGroupHits(claims, entry.expected.currentStateAny);
+    const alertsSemanticHits = countExpectedGroupHits(claims, entry.expected.alertsAny);
+    const nextStepsSemanticHits = countExpectedGroupHits(claims, entry.expected.nextStepsAny);
+    const gapsSemanticHits = countExpectedGroupHits(claims, entry.expected.gapsAny);
+    const placementRates = [
+        currentStateSemanticHits === 0 ? 1 : toRate(currentStateStrictHits, currentStateSemanticHits),
+        alertsSemanticHits === 0 ? 1 : toRate(alertsStrictHits, alertsSemanticHits),
+        nextStepsSemanticHits === 0 ? 1 : toRate(nextStepsStrictHits, nextStepsSemanticHits),
+        gapsSemanticHits === 0 ? 1 : toRate(gapsStrictHits, gapsSemanticHits),
+    ];
+    const findings = [
+        describeSectionDrift('currentState', currentStateMissing, currentStateSemanticMissing),
+        describeSectionGap('current state anchors', currentStateMissing),
+        describeSectionDrift('alerts', alertsMissing, alertsSemanticMissing),
+        describeSectionGap('alerts anchors', alertsMissing),
+        describeSectionDrift('nextSteps', nextStepsMissing, nextStepsSemanticMissing),
+        describeSectionGap('next-step anchors', nextStepsMissing),
+        describeSectionDrift('gaps', gapsMissing, gapsSemanticMissing),
+        describeSectionGap('gap anchors', gapsMissing),
+        preferredSourceMisses.length > 0 ? `missing preferred recent sources: ${preferredSourceMisses.join(', ')}` : null,
+        uncitedClaimCount > 0 ? `claims without citation or [DATI-INCOMPLETI]: ${uncitedClaimCount}` : null,
+        forbiddenLeakCount > 0 ? `forbidden topic leakage count: ${forbiddenLeakCount}` : null,
+        forbiddenSourceHits > 0 ? `forbidden sources cited: ${citedSourceIds.filter((sourceId) => forbiddenSourceIds.has(sourceId)).join(', ')}` : null,
+        moralizingLeakCount > 0 ? `moralizing phrasing count: ${moralizingLeakCount}` : null,
+        incompleteClaimCount > 0 ? `claims marked [DATI-INCOMPLETI]: ${incompleteClaimCount}` : null,
+        incompleteClaimCount > (entry.expected.maxIncompleteClaims ?? Number.MAX_SAFE_INTEGER)
+            ? `incomplete-claim budget exceeded: ${incompleteClaimCount}/${entry.expected.maxIncompleteClaims}`
+            : null,
+    ].filter((value): value is string => Boolean(value));
 
     return {
         currentStateRecall,
         alertsRecall,
         nextStepsRecall,
         gapsRecall,
+        currentStateSemanticRecall,
+        alertsSemanticRecall,
+        nextStepsSemanticRecall,
+        gapsSemanticRecall,
         focusRecall: average([currentStateRecall, nextStepsRecall]),
+        focusSemanticRecall: average([currentStateSemanticRecall, nextStepsSemanticRecall]),
+        sectionPlacementRate: average(placementRates),
+        alertsPlacementRate: alertsSemanticHits === 0 ? 1 : toRate(alertsStrictHits, alertsSemanticHits),
         citationCoverageRate: toRate(claims.filter((claim) => hasCitationOrGapMarker(claim)).length, claims.length),
         supportedClaimRate: toRate(claims.filter((claim) => hasSourceCitation(claim)).length, claims.length),
         preferredSourceCoverage: toRate(preferredSourceHits, preferredSourceIds.size),
@@ -283,6 +400,7 @@ function scoreCase(
         incompleteClaimCount,
         incompleteBudgetExceeded: incompleteClaimCount > (entry.expected.maxIncompleteClaims ?? Number.MAX_SAFE_INTEGER),
         citedSourceIds,
+        findings,
         output,
     };
 }
@@ -381,7 +499,14 @@ async function runModel(
                         alertsRecall: 0,
                         nextStepsRecall: 0,
                         gapsRecall: 0,
+                        currentStateSemanticRecall: 0,
+                        alertsSemanticRecall: 0,
+                        nextStepsSemanticRecall: 0,
+                        gapsSemanticRecall: 0,
                         focusRecall: 0,
+                        focusSemanticRecall: 0,
+                        sectionPlacementRate: 0,
+                        alertsPlacementRate: 0,
                         citationCoverageRate: 0,
                         supportedClaimRate: 0,
                         preferredSourceCoverage: 0,
@@ -392,6 +517,7 @@ async function runModel(
                         incompleteClaimCount: 0,
                         incompleteBudgetExceeded: false,
                         citedSourceIds: [],
+                        findings: [],
                         output: {
                             currentState: [],
                             alerts: [],
@@ -417,7 +543,14 @@ async function runModel(
                 alertsRecall: average(cases.map((entry) => entry.alertsRecall)),
                 nextStepsRecall: average(cases.map((entry) => entry.nextStepsRecall)),
                 gapsRecall: average(cases.map((entry) => entry.gapsRecall)),
+                currentStateSemanticRecall: average(cases.map((entry) => entry.currentStateSemanticRecall)),
+                alertsSemanticRecall: average(cases.map((entry) => entry.alertsSemanticRecall)),
+                nextStepsSemanticRecall: average(cases.map((entry) => entry.nextStepsSemanticRecall)),
+                gapsSemanticRecall: average(cases.map((entry) => entry.gapsSemanticRecall)),
                 focusRecall: average(cases.map((entry) => entry.focusRecall)),
+                focusSemanticRecall: average(cases.map((entry) => entry.focusSemanticRecall)),
+                sectionPlacementRate: average(cases.map((entry) => entry.sectionPlacementRate)),
+                alertsPlacementRate: average(cases.map((entry) => entry.alertsPlacementRate)),
                 citationCoverageRate: average(cases.map((entry) => entry.citationCoverageRate)),
                 supportedClaimRate: average(cases.map((entry) => entry.supportedClaimRate)),
                 preferredSourceCoverage: average(cases.map((entry) => entry.preferredSourceCoverage)),
@@ -492,6 +625,7 @@ function validateReport(
     },
 ) {
     const failures: string[] = [];
+    const caseFailures: string[] = [];
 
     for (const report of models) {
         if (report.status !== 'completed' || !report.metrics) {
@@ -523,9 +657,67 @@ function validateReport(
         if (report.metrics.incompleteClaimRate > thresholds.maxIncompleteClaimRate) {
             failures.push(`${report.model}: incomplete-claim rate ${report.metrics.incompleteClaimRate} > ${thresholds.maxIncompleteClaimRate}.`);
         }
+
+        const worstCases = rankCases(report.cases || [])
+            .filter((entry) => entry.error || entry.findings.length > 0)
+            .slice(0, 5);
+        for (const caseResult of worstCases) {
+            caseFailures.push(`${report.model} :: ${caseResult.id} [run ${caseResult.iteration}] ${summarizeFindings(caseResult)}`);
+        }
     }
 
-    return failures;
+    return { failures, caseFailures };
+}
+
+function renderMarkdownReport(report: PatientInsightBenchmarkReport): string {
+    const lines = [
+        '# Patient Insight Benchmark',
+        '',
+        `Generated at: ${report.generatedAt}`,
+        `Corpus: ${report.corpusPath}`,
+        `Corpus size: ${report.corpusSize}`,
+        `Iterations: ${report.iterations}`,
+        '',
+        `Recommended model: ${report.decision.recommendedModel || 'none'}`,
+        `Rationale: ${report.decision.rationale}`,
+        '',
+    ];
+
+    for (const model of report.models) {
+        lines.push(`## ${model.model}`);
+        lines.push(`Status: ${model.status}`);
+        if (model.metrics) {
+            lines.push(`- contractValidRate: ${model.metrics.contractValidRate}`);
+            lines.push(`- focusRecall: ${model.metrics.focusRecall}`);
+            lines.push(`- focusSemanticRecall: ${model.metrics.focusSemanticRecall}`);
+            lines.push(`- alertsRecall: ${model.metrics.alertsRecall}`);
+            lines.push(`- alertsSemanticRecall: ${model.metrics.alertsSemanticRecall}`);
+            lines.push(`- alertsPlacementRate: ${model.metrics.alertsPlacementRate}`);
+            lines.push(`- sectionPlacementRate: ${model.metrics.sectionPlacementRate}`);
+            lines.push(`- citationCoverageRate: ${model.metrics.citationCoverageRate}`);
+            lines.push(`- preferredSourceCoverage: ${model.metrics.preferredSourceCoverage}`);
+            lines.push(`- forbiddenLeakRate: ${model.metrics.forbiddenLeakRate}`);
+            lines.push(`- incompleteClaimRate: ${model.metrics.incompleteClaimRate}`);
+            lines.push(`- avgLatencyMs: ${model.metrics.avgLatencyMs}`);
+        }
+        if (model.error) {
+            lines.push(`Error: ${model.error}`);
+        }
+
+        const topCases = rankCases(model.cases || [])
+            .filter((entry) => entry.error || entry.findings.length > 0)
+            .slice(0, 5);
+        if (topCases.length > 0) {
+            lines.push('');
+            lines.push('Top cases needing attention:');
+            for (const caseResult of topCases) {
+                lines.push(`- ${caseResult.id} [run ${caseResult.iteration}]: ${summarizeFindings(caseResult)}`);
+            }
+        }
+        lines.push('');
+    }
+
+    return `${lines.join('\n').trim()}\n`;
 }
 
 export async function runPatientInsightBenchmark(options: {
@@ -576,11 +768,15 @@ async function main() {
         fs.mkdirSync(path.dirname(args.out), { recursive: true });
         fs.writeFileSync(args.out, output, 'utf8');
     }
+    if (args.markdownOut) {
+        fs.mkdirSync(path.dirname(args.markdownOut), { recursive: true });
+        fs.writeFileSync(args.markdownOut, renderMarkdownReport(report), 'utf8');
+    }
 
     console.log(output);
 
     if (args.validate) {
-        const failures = validateReport(report.models, {
+        const validation = validateReport(report.models, {
             minContractRate: args.minContractRate,
             minFocusRecall: args.minFocusRecall,
             minCitationRate: args.minCitationRate,
@@ -591,10 +787,16 @@ async function main() {
             maxIncompleteClaimRate: args.maxIncompleteClaimRate,
         });
 
-        if (failures.length > 0) {
+        if (validation.failures.length > 0) {
             console.error('\nValidation failed:');
-            for (const failure of failures) {
+            for (const failure of validation.failures) {
                 console.error(`- ${failure}`);
+            }
+            if (validation.caseFailures.length > 0) {
+                console.error('\nTop failing cases:');
+                for (const caseFailure of validation.caseFailures) {
+                    console.error(`- ${caseFailure}`);
+                }
             }
             process.exitCode = 1;
         }

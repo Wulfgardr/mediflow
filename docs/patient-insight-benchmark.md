@@ -103,6 +103,11 @@ Ogni case include:
 - `forbiddenTokens`
 - `maxIncompleteClaims`
 
+Ogni risultato di case nel report JSON include anche:
+
+- `findings`: elenco sintetico dei problemi osservati su quel case
+- `error`: eventuale errore runtime/parsing
+
 ## Metriche
 
 Metriche aggregate:
@@ -113,7 +118,14 @@ Metriche aggregate:
 - `alertsRecall`
 - `nextStepsRecall`
 - `gapsRecall`
+- `currentStateSemanticRecall`
+- `alertsSemanticRecall`
+- `nextStepsSemanticRecall`
+- `gapsSemanticRecall`
 - `focusRecall`
+- `focusSemanticRecall`
+- `sectionPlacementRate`
+- `alertsPlacementRate`
 - `citationCoverageRate`
 - `supportedClaimRate`
 - `preferredSourceCoverage`
@@ -129,6 +141,14 @@ Lettura pratica:
 
 - `focusRecall` dice se il modello apre e orienta il follow-up sul problema
   giusto, non solo se produce JSON corretto
+- `focusSemanticRecall` separa la priorita clinica dal rispetto rigido delle
+  sezioni: se il contenuto giusto compare ma nella sezione sbagliata, qui lo
+  vedi
+- `alertsSemanticRecall` misura se il contenuto-alert esiste da qualche parte
+  nell'output, anche se non e finito sotto `alerts`
+- `alertsPlacementRate` misura quanta parte degli alert semanticamente trovati
+  e stata anche collocata nella sezione corretta
+- `sectionPlacementRate` e il riassunto globale della disciplina di placement
 - `preferredSourceCoverage` misura se le fonti recenti davvero entrano
 - `forbiddenSourceLeakRate` e `forbiddenLeakRate` segnalano quando la sintesi
   torna a farsi trascinare da anamnesi o topic fuori focus
@@ -167,6 +187,12 @@ Output opzionale su file:
 npm run benchmark:patient-insight -- --out tmp/patient-insight-benchmark.json
 ```
 
+Output markdown leggibile per review o Linear:
+
+```bash
+npm run benchmark:patient-insight -- --markdown-out tmp/patient-insight-benchmark.md
+```
+
 ## Soglie iniziali del validator
 
 Il gate iniziale controlla:
@@ -187,6 +213,19 @@ Queste soglie sono conservative:
 
 Se una soglia cambia, il cambio va tracciato in repo e collegato alla issue
 Linear del workstream.
+
+Quando il validator fallisce, oltre alle metriche aggregate stampa anche i
+`Top failing cases` con i motivi principali, per esempio:
+
+- anchor mancanti in `currentState`, `alerts`, `nextSteps` o `gaps`
+- `section drift`, cioe anchor trovate semanticamente ma collocate nella
+  sezione sbagliata
+- fonti recenti preferite non citate
+- leak da topic o fonti proibite
+- eccesso di claim `[DATI-INCOMPLETI]`
+
+Questo serve a trasformare il benchmark da semplice gate numerico a strumento
+diagnostico per il fix successivo.
 
 ## Uso operativo
 
