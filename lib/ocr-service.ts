@@ -59,10 +59,11 @@ Extract ONLY what is clearly written. Do not invent data.`,
  */
 export async function extractDocumentWithAI(
     imageBase64: string,
-    mode: 'full' | 'patient' | 'labs' = 'patient'
+    mode: 'full' | 'patient' | 'labs' = 'patient',
+    aiService?: AIService
 ): Promise<ExtractedDocumentData> {
 
-    const ai = await AIService.create('ocr');
+    const ai = aiService ?? await AIService.create('ocr');
 
     // Build multimodal message
     const prompt = mode === 'full'

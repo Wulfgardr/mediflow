@@ -114,6 +114,31 @@ test('document synthesis extraction falls back when model JSON is invalid', () =
     assert.match(parsed.value.summary, /Referto clinico sintetico/);
 });
 
+test('document synthesis extraction accepts legacy payloads used by historical UI mocks', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** episodio depressivo lieve con codice esplicito nel referto.',
+        quality: {
+            level: 'green',
+            reason: 'Documento leggibile con codice ICD esplicito',
+        },
+        diagnoses: [
+            {
+                code: 'EF00',
+                description: 'Disturbo depressivo maggiore, episodio singolo lieve',
+                system: 'ICD-11',
+                evidence: 'ICD-11 EF00',
+                confidence: 'high',
+            },
+        ],
+        medications: [],
+    }), 'testo OCR legacy');
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.qualityLevel, 'green');
+    assert.equal(parsed.value.data.diagnoses.length, 1);
+    assert.match(parsed.value.summary, /episodio depressivo lieve/i);
+});
+
 test('document synthesis extraction normalizes structured diagnoses from shared contract', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,

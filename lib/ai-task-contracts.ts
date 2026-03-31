@@ -180,6 +180,58 @@ function normalizeTaskData(
     return value as Record<string, unknown>;
 }
 
+function parseLegacyDocumentSynthesisPayload(response: string): {
+    rawJson: string | null;
+    validJson: boolean;
+    summary: string;
+    qualityLevel: DocumentQualityLevel;
+    qualityReason: string;
+    medications: string[];
+    diagnoses: DocumentDiagnosisSuggestionContract[];
+} | null {
+    const rawJson = extractJsonObject(response);
+    if (!rawJson) return null;
+
+    try {
+        const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        const quality = normalizeTaskData(parsed.quality);
+        const medications = Array.isArray(parsed.medications)
+            ? Array.from(
+                new Set(
+                    parsed.medications
+                        .map(normalizeMedication)
+                        .filter((item): item is string => Boolean(item)),
+                ),
+            )
+            : [];
+        const diagnoses = Array.isArray(parsed.diagnoses)
+            ? parsed.diagnoses
+                .map(normalizeDocumentDiagnosis)
+                .filter((item): item is DocumentDiagnosisSuggestionContract => Boolean(item))
+            : [];
+
+        return {
+            rawJson,
+            validJson: true,
+            summary: normalizeCompactText(parsed.summary_markdown ?? parsed.summary, MAX_DOCUMENT_SUMMARY_CHARS),
+            qualityLevel: normalizeQualityLevel(quality.level),
+            qualityReason: normalizeCompactText(quality.reason, MAX_SHARED_SUMMARY_CHARS),
+            medications,
+            diagnoses,
+        };
+    } catch {
+        return {
+            rawJson,
+            validJson: false,
+            summary: '',
+            qualityLevel: 'yellow',
+            qualityReason: '',
+            medications: [],
+            diagnoses: [],
+        };
+    }
+}
+
 function parseEnvelope(
     response: string,
     expectedTask: AITaskKind
@@ -437,36 +489,44 @@ export function parseDocumentSynthesisExtractionResponse(
     rawText: string
 ): AITaskParseResult<DocumentSynthesisExtraction> {
     const envelope = parseEnvelope(response, 'document_synthesis');
+    const legacyPayload = !envelope.validTask
+        ? parseLegacyDocumentSynthesisPayload(response)
+        : null;
 
-    const medications = Array.isArray(envelope.data.medications)
-        ? Array.from(
-            new Set(
-                envelope.data.medications
-                    .map(normalizeMedication)
-                    .filter((item): item is string => Boolean(item)),
-            ),
-        )
-        : [];
+    const medications = legacyPayload
+        ? legacyPayload.medications
+        : Array.isArray(envelope.data.medications)
+            ? Array.from(
+                new Set(
+                    envelope.data.medications
+                        .map(normalizeMedication)
+                        .filter((item): item is string => Boolean(item)),
+                ),
+            )
+            : [];
 
-    const diagnoses = Array.isArray(envelope.data.diagnoses)
-        ? envelope.data.diagnoses
-            .map(normalizeDocumentDiagnosis)
-            .filter((item): item is DocumentDiagnosisSuggestionContract => Boolean(item))
-        : [];
+    const diagnoses = legacyPayload
+        ? legacyPayload.diagnoses
+        : Array.isArray(envelope.data.diagnoses)
+            ? envelope.data.diagnoses
+                .map(normalizeDocumentDiagnosis)
+                .filter((item): item is DocumentDiagnosisSuggestionContract => Boolean(item))
+            : [];
 
-    const summary = envelope.summary || buildDocumentFallbackSummary(rawText);
-    const qualityLevel = normalizeQualityLevel(envelope.data.qualityLevel);
-    const qualityReason = normalizeCompactText(envelope.data.qualityReason, MAX_SHARED_SUMMARY_CHARS)
-        || (envelope.validJson
+    const summary = (legacyPayload?.summary || envelope.summary) || buildDocumentFallbackSummary(rawText);
+    const qualityLevel = legacyPayload?.qualityLevel ?? normalizeQualityLevel(envelope.data.qualityLevel);
+    const qualityReason = legacyPayload?.qualityReason
+        || normalizeCompactText(envelope.data.qualityReason, MAX_SHARED_SUMMARY_CHARS)
+        || ((legacyPayload?.validJson || envelope.validJson)
             ? (diagnoses.length > 0 || medications.length > 0
                 ? 'Dati clinici strutturati estratti'
                 : 'Analisi completata con dati parziali')
             : 'JSON del modello non valido');
 
     return {
-        rawJson: envelope.rawJson,
-        validJson: envelope.validJson,
-        validTask: envelope.validTask,
+        rawJson: legacyPayload?.rawJson ?? envelope.rawJson,
+        validJson: legacyPayload?.validJson ?? envelope.validJson,
+        validTask: legacyPayload ? true : envelope.validTask,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
             task: 'document_synthesis',

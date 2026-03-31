@@ -32,7 +32,7 @@ test('document import precompiles ICD diagnoses for operator review before patie
     });
   });
 
-  await page.route('**/api/proxy/ai/chat', async (route) => {
+  await page.route('**/api/proxy/ollama/chat', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
