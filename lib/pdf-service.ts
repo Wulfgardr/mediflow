@@ -23,6 +23,30 @@ export interface ExtractedPatientData {
     confidence: number;  // 0-1 confidence score
 }
 
+function isOcrFailureNote(value: string): boolean {
+    return /^OCR extraction failed:/i.test(value.trim());
+}
+
+function looksLikeStructuredPayload(value: string): boolean {
+    const trimmed = value.trim();
+    return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
+}
+
+/* @Codex */
+export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
+    const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
+    if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown)) {
+        return rawMarkdown;
+    }
+
+    const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
+    if (notes && !isOcrFailureNote(notes)) {
+        return notes;
+    }
+
+    return '';
+}
+
 /* @Codex */
 const OCR_PAGE_LIMIT = 5;
 /* @Codex */
@@ -275,6 +299,11 @@ function mapOcrToPatientData(
     rawText: string,
     source: 'ai' | 'hybrid' | 'regex'
 ): ExtractedPatientData {
+    const fallbackText = rawText || extractUsableOcrText(data);
+    const notes = typeof data?.notes === 'string' && !isOcrFailureNote(data.notes)
+        ? data.notes.trim() || undefined
+        : undefined;
+
     return {
         firstName: data?.firstName,
         lastName: data?.lastName,
@@ -284,11 +313,36 @@ function mapOcrToPatientData(
         phone: data?.phone,
         diagnosis: data?.diagnosis,
         medications: data?.medications,
-        notes: data?.notes || data?.rawMarkdown?.slice(0, 500),
-        rawText,
+        notes: notes || (fallbackText ? fallbackText.slice(0, 500) : undefined),
+        rawText: fallbackText,
         source,
         confidence: data?.confidence || 0.6
     };
+}
+
+/* @Codex */
+export function buildOcrFallbackResult(
+    data: any,
+    source: 'ai' | 'hybrid' | 'regex',
+    rawText = ''
+): ExtractedPatientData | null {
+    if (!data || typeof data !== 'object') return null;
+
+    const result = mapOcrToPatientData(data, rawText, source);
+    const hasMeaningfulContent = Boolean(
+        result.firstName ||
+        result.lastName ||
+        result.taxCode ||
+        result.birthDate ||
+        result.address ||
+        result.phone ||
+        result.diagnosis ||
+        result.notes ||
+        result.rawText ||
+        result.medications?.length
+    );
+
+    return hasMeaningfulContent ? result : null;
 }
 
 /* @Codex */
@@ -332,8 +386,9 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
         if (isPdf) {
             const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
             if (images.length) {
+                let patientData: any = null;
                 try {
-                    const patientData = await callOcr(images[0], 'patient');
+                    patientData = await callOcr(images[0], 'patient');
                     if (patientData && patientData.confidence > 0.5) {
                         aiResult = mapOcrToPatientData(patientData, '', 'ai');
                     }
@@ -345,12 +400,27 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
                 if (aiResult && ocrText) {
                     aiResult.rawText = ocrText;
                 }
+                if (!aiResult && patientData) {
+                    aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
+                }
             }
         } else if (isImage) {
             const base64 = await fileToBase64(file);
             const patientData = await callOcr(base64, 'patient');
             if (patientData && patientData.confidence > 0.5) {
                 aiResult = mapOcrToPatientData(patientData, patientData.rawMarkdown || '', 'ai');
+            }
+            try {
+                const fullResult = await callOcr(base64, 'full');
+                ocrText = extractUsableOcrText(fullResult);
+                if (aiResult && ocrText) {
+                    aiResult.rawText = ocrText;
+                }
+            } catch (e) {
+                console.warn('[PDF Service] OCR full extraction failed for image', e);
+            }
+            if (!aiResult && patientData) {
+                aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
             }
         }
     } catch (e) {
@@ -410,7 +480,7 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     // Last resort: return AI result even with low confidence
     if (aiResult) return aiResult;
 
-    throw new Error('Could not extract data from document');
+    throw new Error('Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.');
 }
 
 /**

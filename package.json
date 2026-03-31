@@ -17,6 +17,7 @@
     "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",
     "test:backup-scheduler": "bash scripts/backup-scheduler-test.sh",
     "test:patient-insight": "bash scripts/patient-insight-test.sh",
+    "test:pdf-service": "bash scripts/pdf-service-test.sh",
     "test:patient-smart-import": "bash scripts/patient-smart-import-test.sh",
     "test:patient-structured-fields": "bash scripts/patient-structured-fields-test.sh",
     "test:ai-context": "bash scripts/ai-context-test.sh",
