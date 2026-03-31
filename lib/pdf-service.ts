@@ -200,7 +200,7 @@ async function callOcr(imageBase64: string, mode: 'full' | 'patient' | 'labs' = 
 /* @Codex */
 async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<string[]> {
     const buffer = await file.arrayBuffer();
-    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf');
+    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.js');
 
     try {
         if (pdfjsLib?.GlobalWorkerOptions) {

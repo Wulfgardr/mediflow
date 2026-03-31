@@ -93,3 +93,18 @@ test('finalizePatientInsight falls back when suspicious third-party names appear
     assert.match(output, /riferimenti nominali non coerenti/i);
     assert.match(output, /DATI-INCOMPLETI/);
 });
+
+test('finalizePatientInsight accepts two-token patient mentions when one side has compound names', () => {
+    const output = finalizePatientInsight({
+        content: '**Quadro attuale:** Isabella Garolla e stata dimessa dopo ricovero ortopedico [S1]',
+        sourceRefs,
+        patientName: {
+            firstName: 'Garolla',
+            lastName: 'Isabella Ester Maria',
+        },
+    });
+
+    assert.doesNotMatch(output, /Insight AI declassato/);
+    assert.doesNotMatch(output, /riferimenti nominali non coerenti/i);
+    assert.match(output, /\[S1\]/);
+});
