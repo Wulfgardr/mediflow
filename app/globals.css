@@ -55,6 +55,30 @@ body {
   background-attachment: fixed;
 }
 
+body[data-preview-profile-id='liquid-glass-ui'] {
+  --glass-bg: rgba(255, 255, 255, 0.52);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  background-image:
+    radial-gradient(circle at 8% 8%, rgba(90, 200, 250, 0.24) 0, transparent 26%),
+    radial-gradient(circle at 78% 2%, rgba(125, 211, 252, 0.22) 0, transparent 22%),
+    radial-gradient(circle at 92% 78%, rgba(236, 72, 153, 0.12) 0, transparent 20%),
+    linear-gradient(180deg, #fcfdff 0%, #eef4ff 52%, #e7eefb 100%);
+}
+
+body[data-preview-profile-id='ai-stack-preview'] {
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(99, 102, 241, 0.18) 0, transparent 28%),
+    radial-gradient(circle at 78% 0%, rgba(56, 189, 248, 0.14) 0, transparent 24%),
+    linear-gradient(180deg, #fbfcff 0%, #f2f4ff 54%, #eaf0ff 100%);
+}
+
+body[data-preview-profile-id='smart-import-review-v2'] {
+  background-image:
+    radial-gradient(circle at 10% 8%, rgba(16, 185, 129, 0.16) 0, transparent 24%),
+    radial-gradient(circle at 82% 4%, rgba(251, 191, 36, 0.12) 0, transparent 22%),
+    linear-gradient(180deg, #fcfdfb 0%, #f5f8f2 54%, #edf3ea 100%);
+}
+
 /* Ensure selected text is readable in dark mode */
 ::selection {
   background: rgba(0, 122, 255, 0.2);
@@ -101,6 +125,15 @@ body {
     radial-gradient(circle at 10% 10%, rgba(10, 132, 255, 0.08) 0, transparent 25%),
     linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
   background-color: var(--background);
+}
+
+:root.dark body[data-preview-profile-id='liquid-glass-ui'] {
+  --glass-bg: rgba(20, 28, 40, 0.72);
+  --glass-border: rgba(125, 211, 252, 0.14);
+  background-image:
+    radial-gradient(circle at 10% 8%, rgba(56, 189, 248, 0.16) 0, transparent 24%),
+    radial-gradient(circle at 82% 4%, rgba(14, 165, 233, 0.12) 0, transparent 22%),
+    linear-gradient(180deg, #02050a 0%, #07111c 100%);
 }
 
 /* Ensure input/card backgrounds are readable in dark mode */

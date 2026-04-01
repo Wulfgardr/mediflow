@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+/* @Codex */
+import PreviewProfileChrome from '@/components/preview-profile-chrome';
 import { Sidebar } from '@/components/sidebar';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
@@ -31,6 +33,7 @@ export default function RootLayout({
                 <main className="flex-1 ml-80 p-8 min-h-screen">
                   {/* Main Content Area - adding a max-width container for readability */}
                   <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <PreviewProfileChrome />
                     {children}
                   </div>
                 </main>
