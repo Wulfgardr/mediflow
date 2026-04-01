@@ -1,7 +1,7 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { conversations } from '@/lib/schema';
+import { conversations, messages } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
@@ -15,7 +15,7 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as unknown;
-        const updateData: { title?: string; isArchived?: boolean; updatedAt: Date } = {
+        const updateData: { title?: string; isArchived?: boolean; isDeleted?: boolean; updatedAt: Date } = {
             updatedAt: new Date()
         };
 
@@ -23,6 +23,8 @@ export async function PUT(
             const payload = body as Record<string, unknown>;
             if (typeof payload.title === 'string') updateData.title = payload.title;
             if (typeof payload.isArchived === 'boolean') updateData.isArchived = payload.isArchived;
+            /* @Codex */
+            if (typeof payload.isDeleted === 'boolean') updateData.isDeleted = payload.isDeleted;
         }
 
         await dbServer.update(conversations).set(updateData).where(eq(conversations.id, id));
@@ -42,7 +44,11 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        await dbServer.delete(conversations).where(eq(conversations.id, id));
+        /* @Codex */
+        dbServer.transaction((tx) => {
+            tx.delete(messages).where(eq(messages.conversationId, id)).run();
+            tx.delete(conversations).where(eq(conversations.id, id)).run();
+        });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /conversations/[id] error:', error);

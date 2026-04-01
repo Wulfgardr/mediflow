@@ -5,6 +5,15 @@ import { eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { buildAttachmentPath } from '@/lib/attachment-path';
+
+/* @Codex */
+function serializeAttachment(row: typeof attachments.$inferSelect) {
+    return {
+        ...row,
+        path: buildAttachmentPath(row.path, row.name, row.id),
+    };
+}
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -23,7 +32,7 @@ export async function GET(request: Request) {
         }
 
         const data = await query.orderBy(desc(attachments.createdAt));
-        return NextResponse.json(data);
+        return NextResponse.json(data.map(serializeAttachment));
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch attachments" }, { status: 500 });
     }
@@ -49,7 +58,8 @@ export async function POST(request: Request) {
             name: body.name,
             type: body.type,
             size: body.size,
-            path: body.path,
+            /* @Codex */
+            path: buildAttachmentPath(body.path, body.name, newId),
             /* @Codex */
             data: body.data ?? null,
             summarySnapshot: body.summarySnapshot ?? null,

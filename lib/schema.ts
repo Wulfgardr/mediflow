@@ -141,6 +141,8 @@ export const conversations = sqliteTable('conversations', {
     title: text('title').notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    /* @Codex */
+    isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

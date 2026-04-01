@@ -80,6 +80,12 @@ try {
 }
 /* @Codex */
 try {
+    ensureColumn('conversations', 'is_deleted', 'is_deleted INTEGER NOT NULL DEFAULT 0');
+} catch (error) {
+    console.warn('[MediFlow] Conversations schema check skipped:', error);
+}
+/* @Codex */
+try {
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS exemptions (
             code TEXT PRIMARY KEY NOT NULL,
