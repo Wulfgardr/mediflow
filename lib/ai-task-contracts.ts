@@ -397,7 +397,7 @@ export function parsePatientInsightExtractionResponse(response: string): AITaskP
     const currentState = normalizeStringArray(envelope.data.currentState, 2, MAX_INSIGHT_CLAIM_CHARS);
     const alerts = normalizeStringArray(envelope.data.alerts, 2, MAX_INSIGHT_CLAIM_CHARS);
     const nextSteps = normalizeStringArray(envelope.data.nextSteps, 3, MAX_INSIGHT_CLAIM_CHARS);
-    const gaps = normalizeStringArray(envelope.data.gaps, 2, MAX_INSIGHT_CLAIM_CHARS);
+    const gaps = normalizeStringArray(envelope.data.gaps, 1, MAX_INSIGHT_CLAIM_CHARS);
 
     return {
         rawJson: envelope.rawJson,
@@ -589,7 +589,8 @@ export function buildPatientInsightExtractionPrompt(contextPrompt: string): stri
             'currentState massimo 2 frasi brevi',
             'alerts massimo 2 elementi',
             'nextSteps massimo 3 elementi',
-            'gaps massimo 2 elementi e solo se utili',
+            'gaps massimo 1 elemento e solo se utile',
+            'gaps solo per informazioni mancanti che limitano interpretazione, priorita o decisione clinica attuale',
             'currentState descrive il quadro clinico attuale e il follow-up immediato, non deve assorbire alert di sicurezza o monitoraggio attivo',
             'apri currentState dal problema clinico o follow-up piu attuale, non dalla lista completa delle comorbidita',
             'usa la seconda frase di currentState solo se aggiunge un secondo fatto clinico attuale o un follow-up immediato; non usarla per inventariare comorbidita croniche, terapia di sfondo o codici storici non decisivi',
@@ -599,6 +600,7 @@ export function buildPatientInsightExtractionPrompt(contextPrompt: string): stri
             'non combinare nel currentState il problema attuale con comorbidita croniche non direttamente coinvolte nell evento o follow-up corrente',
             'se valori recenti o controlli pendenti riguardano una cronica attiva, mantieni esplicita la patologia nel currentState',
             'non citare diagnosi codificate o terapie attive di sfondo solo perche presenti nel contesto',
+            'nei casi post-dimissione, post-PS o riabilitativi non riportare in nextSteps diagnosi o terapie croniche di sfondo se non sono esplicitamente collegate all episodio attuale o a un controllo pendente',
             'alerts solo per criticita cliniche o di sicurezza chiaramente attive nel contesto locale',
             'usa alerts per peggioramento recente, valori chiaramente anomali, sospensione o stop temporaneo di terapia, episodio acuto non ancora risolto, limitazione funzionale o ausilio che cambia sicurezza o monitoraggio',
             'nei casi post-dimissione o riabilitativi, usa alerts per limiti funzionali, deambulatore, mobilita ridotta o recupero da rivalutare se sono ancora aperti',
@@ -607,6 +609,9 @@ export function buildPatientInsightExtractionPrompt(contextPrompt: string): stri
             'se alerts e vuoto, ricontrolla che currentState e nextSteps non stiano nascondendo peggioramento, stop terapeutici, rivalutazioni urgenti, valori anomali o limiti funzionali rilevanti',
             'nextSteps solo se derivano da controlli pendenti, diario recente, osservazioni recenti, documenti recenti o terapie attive',
             'nextSteps deve contenere azioni, controlli o verifiche; non usare nextSteps per spostare fuori da alerts una criticita clinica attiva',
+            'lascia gaps vuoto se il caso e gia interpretabile e i prossimi passi sono gia chiari con i dati presenti',
+            'in gaps privilegia aderenza, risposta a terapia, andamento funzionale, sintomi non rivalutati o dati che mancano per leggere il problema attuale; evita gap generici che ripetono semplicemente esami gia programmati',
+            'non usare gaps per duplicare nextSteps, per elencare dati mancanti ovvi o per riempire spazio',
             'ogni stringa deve gia includere [Sx] o [DATI-INCOMPLETI]',
             'hard fail interno: se anche una sola stringa non contiene [Sx] o [DATI-INCOMPLETI], correggi il JSON prima di rispondere',
             'mantieni sempre i marker [Sx] anche quando riassumi piu fatti clinici nella stessa stringa',

@@ -6,7 +6,7 @@
     "expected": {
       "currentStateAny": [["bpco"], ["dispnea"]],
       "alertsAny": [[["spo2", "91"], ["saturazione", "91"]]],
-      "nextStepsAny": [["controllo", "mmg"], [["pneumologico"], ["follow-up", "pneumologico"]]],
+      "nextStepsAny": [[["controllo", "mmg"], ["rivalutazione", "mmg"], ["mmg", "dispnea"]], [["pneumologico"], ["follow-up", "pneumologico"]]],
       "preferredSourceIds": ["S7", "S9", "S10", "S11"],
       "forbiddenTokens": [["ipertensione"]],
       "maxIncompleteClaims": 1
@@ -20,7 +20,7 @@
       "currentStateAny": [[["diabete"], ["diabete", "tipo", "2"]], [["compenso"], ["glicemia", "182"], ["aderenza", "incerta"]]],
       "alertsAny": [[["malattia", "renale"], ["creatinina"], ["glicemia", "182"], ["aderenza", "incerta"]]],
       "nextStepsAny": [["hba1c"], ["creatinina"]],
-      "gapsAny": [[["aderenza"], ["insulinica"], ["terapia", "insulinica"]]],
+      "gapsAny": [[["aderenza"], ["insulinica"], ["terapia", "insulinica"], ["andamento", "glicemico"], ["risposta", "terapia", "dietetica"]]],
       "preferredSourceIds": ["S7", "S9", "S10"],
       "maxIncompleteClaims": 1
     }
