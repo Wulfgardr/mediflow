@@ -90,6 +90,22 @@ function formatLoginFailure(payload: LoginFailurePayload | null, status: number)
     return payload?.message || payload?.error || 'Errore durante il login.';
 }
 
+/* @Codex */
+function canOfferLegacyRepair(health: AuthHealthPayload | null): boolean {
+    if (!health?.hasSession) return false;
+
+    switch (health.error?.code) {
+        case 'DB_SCHEMA_MISSING':
+        case 'DB_QUERY_FAILED':
+            return true;
+        case 'DATA_DIR_UNAVAILABLE':
+        case 'AUTH_CHECK_FAILED':
+            return false;
+        default:
+            return health.db?.state === 'missing' || health.db?.state === 'schema-missing';
+    }
+}
+
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
@@ -405,7 +421,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             <AuthHealthScreen
                 health={authHealth}
                 onRetry={() => checkAuthStatus()}
-                onRepair={authHealth.hasSession ? repairFromLegacy : undefined}
+                onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
                 isRepairing={isRepairing}
             />
         );

@@ -3,7 +3,7 @@ import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
 export async function PUT(request: Request) {
     /* @Codex */
@@ -12,18 +12,25 @@ export async function PUT(request: Request) {
 
     try {
         const body = await request.json();
-        const { id, displayName, ambulatoryName } = body;
+        const requestedId = typeof body?.id === 'string' && body.id.trim().length > 0 ? body.id : session.userId;
+        const displayName = typeof body?.displayName === 'string' ? body.displayName : null;
+        const ambulatoryName = typeof body?.ambulatoryName === 'string' ? body.ambulatoryName : null;
 
-        if (!id) {
-            return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+        if (requestedId !== session.userId) {
+            return forbiddenResponse();
         }
 
-        await dbServer.update(users)
+        const result = await dbServer.update(users)
             .set({
                 displayName,
                 ambulatoryName,
             })
-            .where(eq(users.id, id));
+            .where(eq(users.id, session.userId))
+            .run();
+
+        if (result.changes === 0) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -1050,6 +1050,20 @@ struct AuthCheckResponse: Decodable {
 }
 
 /* @Codex */
+enum AuthDbState: String, Decodable {
+    case ready
+    case missing
+    case schemaMissing = "schema-missing"
+    case unavailable
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = AuthDbState(rawValue: rawValue) ?? .unavailable
+    }
+}
+
+/* @Codex */
 struct AuthErrorResponse: Decodable {
     let error: String?
     let code: String?
@@ -1089,15 +1103,7 @@ struct PatientConflictSnapshot: Decodable, Equatable {
 
 /* @Codex */
 struct AuthDbHealth: Decodable {
-    let dataDir: String?
-    let dbPath: String?
-    let dbExists: Bool?
-    let dbReadable: Bool?
-    let dbWritable: Bool?
-    let dbSizeBytes: Int?
-    let legacyDbPath: String?
-    let legacyExists: Bool?
-    let schemaOk: Bool?
+    let state: AuthDbState?
 }
 
 struct AuthLoginRequest: Encodable {

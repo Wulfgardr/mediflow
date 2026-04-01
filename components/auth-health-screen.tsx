@@ -7,17 +7,22 @@ import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
 import type { AuthHealthPayload } from '@/lib/client-auth-api';
 
 /* @Codex */
-const formatBytes = (bytes?: number) => {
-    if (bytes === undefined) return 'n/a';
-    const mb = bytes / (1024 * 1024);
-    if (mb < 1) return `${bytes} B`;
-    return `${mb.toFixed(1)} MB`;
-};
+type AuthDbState = NonNullable<NonNullable<AuthHealthPayload['db']>['state']>;
 
 /* @Codex */
-const formatBool = (value?: boolean) => {
-    if (value === undefined) return 'n/a';
-    return value ? 'si' : 'no';
+const formatDbState = (state?: AuthDbState) => {
+    switch (state) {
+        case 'ready':
+            return 'pronto';
+        case 'missing':
+            return 'assente';
+        case 'schema-missing':
+            return 'schema mancante';
+        case 'unavailable':
+            return 'non disponibile';
+        default:
+            return 'n/d';
+    }
 };
 
 /* @Codex */
@@ -51,15 +56,7 @@ export function AuthHealthScreen({
     })();
 
     const details = [
-        health.db?.dataDir ? ['Cartella dati', health.db.dataDir] : null,
-        health.db?.dbPath ? ['Database', health.db.dbPath] : null,
-        health.db?.dbSizeBytes !== undefined ? ['Dimensione DB', formatBytes(health.db.dbSizeBytes)] : null,
-        health.db?.dbExists !== undefined ? ['DB presente', formatBool(health.db.dbExists)] : null,
-        health.db?.dbReadable !== undefined ? ['DB leggibile', formatBool(health.db.dbReadable)] : null,
-        health.db?.dbWritable !== undefined ? ['DB scrivibile', formatBool(health.db.dbWritable)] : null,
-        health.db?.legacyDbPath ? ['DB legacy', health.db.legacyDbPath] : null,
-        health.db?.legacyExists !== undefined ? ['Legacy presente', formatBool(health.db.legacyExists)] : null,
-        health.db?.schemaOk !== undefined ? ['Schema ok', formatBool(health.db.schemaOk)] : null
+        health.db?.state ? ['Stato archivio', formatDbState(health.db.state)] : null,
     ].filter(Boolean) as Array<[string, string]>;
 
     return (
@@ -104,7 +101,7 @@ export function AuthHealthScreen({
                         Riprova controllo
                     </button>
                     {/* @Codex */}
-                    {onRepair && health.db?.legacyExists && (
+                    {onRepair && (
                         <button
                             onClick={onRepair}
                             disabled={isRepairing}

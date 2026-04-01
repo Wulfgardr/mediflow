@@ -36,8 +36,8 @@ final class SecuritySession: ObservableObject {
                 healthIssue = AuthHealthIssue(
                     title: "Database non disponibile",
                     message: friendlyHealthMessage(code: status.error?.code, fallback: status.error?.message),
-                    detail: status.db?.dbPath ?? status.db?.dataDir,
-                    canRepair: status.db?.legacyExists == true
+                    detail: friendlyDbDetail(state: status.db?.state),
+                    canRepair: shouldOfferLegacyRepair(code: status.error?.code, state: status.db?.state)
                 )
                 return
             }
@@ -176,6 +176,32 @@ final class SecuritySession: ObservableObject {
             return "Impossibile verificare lo stato di sicurezza."
         default:
             return fallback ?? "Verifica il file medical.db e la cartella dati."
+        }
+    }
+
+    /* @Codex */
+    private func friendlyDbDetail(state: AuthDbState?) -> String? {
+        switch state {
+        case .missing:
+            return "Stato archivio: assente"
+        case .schemaMissing:
+            return "Stato archivio: schema mancante"
+        case .unavailable:
+            return "Stato archivio: non disponibile"
+        default:
+            return nil
+        }
+    }
+
+    /* @Codex */
+    private func shouldOfferLegacyRepair(code: String?, state: AuthDbState?) -> Bool {
+        switch code {
+        case "DB_SCHEMA_MISSING", "DB_QUERY_FAILED":
+            return true
+        case "DATA_DIR_UNAVAILABLE":
+            return false
+        default:
+            return state == .missing || state == .schemaMissing
         }
     }
 

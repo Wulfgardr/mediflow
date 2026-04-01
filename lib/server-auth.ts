@@ -3,14 +3,42 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/server-session';
+import { eq } from 'drizzle-orm';
+import { dbServer } from '@/lib/db-server';
+import { users } from '@/lib/schema';
+import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/server-session';
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 
 export async function requireSession(): Promise<ServerSession | null> {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    return getSession(sessionId);
+    const session = getSession(sessionId);
+    if (!session || !sessionId) return null;
+
+    try {
+        const user = await dbServer
+            .select({
+                id: users.id,
+                username: users.username,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, session.userId))
+            .get();
+
+        if (!user) {
+            deleteSession(sessionId);
+            return null;
+        }
+
+        session.username = user.username;
+        session.role = user.role ?? session.role;
+    } catch (error) {
+        console.error('[MediFlow] Session validation against users table failed:', error);
+    }
+
+    return session;
 }
 
 /* @Codex */

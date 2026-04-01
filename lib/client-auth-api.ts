@@ -8,15 +8,7 @@ export type AuthHealthPayload = {
         message?: string;
     };
     db?: {
-        dataDir?: string;
-        dbPath?: string;
-        dbExists?: boolean;
-        dbReadable?: boolean;
-        dbWritable?: boolean;
-        dbSizeBytes?: number;
-        legacyDbPath?: string;
-        legacyExists?: boolean;
-        schemaOk?: boolean;
+        state?: 'ready' | 'missing' | 'schema-missing' | 'unavailable';
     };
 };
 

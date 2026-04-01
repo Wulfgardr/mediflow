@@ -63,3 +63,8 @@ export function deleteSession(sessionId: string | null | undefined): void {
     if (!sessionId) return;
     sessions.delete(sessionId);
 }
+
+/* @Codex */
+export function clearAllSessions(): void {
+    sessions.clear();
+}
