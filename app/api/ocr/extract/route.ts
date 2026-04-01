@@ -17,13 +17,13 @@ async function loadOcrRuntimeSettings() {
 
     const getValue = (key: string) => rows.find(row => row.key === key)?.value || null;
     const configuredModel = getValue('aiModel_ocr') || 'deepseek-ocr';
-    const configuredUrl = (getValue('aiUrl') || getValue('ollamaUrl') || 'http://127.0.0.1:11434')
+    const baseUrl = (getValue('aiUrl') || getValue('ollamaUrl') || 'http://127.0.0.1:11434')
         .replace(/\/v1\/?$/, '')
         .replace(/\/$/, '');
 
     return {
         configuredModel,
-        validation: validateLocalTarget(configuredUrl),
+        baseUrl,
     };
 }
 
@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { configuredModel, validation } = await loadOcrRuntimeSettings();
+        const { configuredModel, baseUrl } = await loadOcrRuntimeSettings();
+        const validation = validateLocalTarget(baseUrl);
         if (!validation.ok) {
             return NextResponse.json(
                 { error: `Configured OCR endpoint not allowed: ${validation.reason}` },
@@ -94,7 +95,8 @@ export async function GET(request: NextRequest) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const { configuredModel, validation } = await loadOcrRuntimeSettings();
+        const { configuredModel, baseUrl } = await loadOcrRuntimeSettings();
+        const validation = validateLocalTarget(baseUrl);
         if (!validation.ok) {
             return NextResponse.json({
                 available: false,
