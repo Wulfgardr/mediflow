@@ -4,8 +4,11 @@ import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -70,8 +73,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
         const body = await request.json();
+        /* @Codex */
+        const auditBody = body as Record<string, unknown>;
         const newId = body.id || uuidv4();
 
         await dbServer.insert(entries).values({
@@ -82,6 +89,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             content: body.content,
             createdAt: new Date()
         });
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'entry.created',
+                subjectType: 'entry',
+                subjectRef: String(newId),
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody, ['id']),
+                },
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

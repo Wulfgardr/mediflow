@@ -4,7 +4,10 @@ import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -61,8 +64,10 @@ export async function PUT(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
 
         const existing = await dbServer.select({ id: entries.id }).from(entries)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
@@ -87,6 +92,21 @@ export async function PUT(
             })
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)));
 
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'entry.updated',
+                subjectType: 'entry',
+                subjectRef: entryId,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body),
+                },
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/entries/[entryId] error:', error);
@@ -103,6 +123,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
         const existing = await dbServer.select({ id: entries.id }).from(entries)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
@@ -112,6 +134,19 @@ export async function DELETE(
         }
 
         await dbServer.delete(entries).where(and(eq(entries.id, entryId), eq(entries.patientId, id)));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'entry.deleted',
+                subjectType: 'entry',
+                subjectRef: entryId,
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/entries/[entryId] error:', error);

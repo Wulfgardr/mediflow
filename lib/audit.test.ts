@@ -7,6 +7,7 @@ import {
     auditContextFromRequest,
     auditContextFromSession,
     auditSourceSurfaceFromRequest,
+    buildAuditWriteInputFromRequest,
     sanitizeAuditMetadata,
     summarizeAuditEvents,
     withAuditContextMetadata,
@@ -197,6 +198,61 @@ test('auditContextFromRequest marks shared routes as native only when a valid lo
     }
 });
 
+test('buildAuditWriteInputFromRequest derives actor, request id, and PHI-safe metadata from the request context', () => {
+    const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    process.env.MEDIFLOW_LOCAL_API_TOKEN = 'test-local-token';
+
+    const request = new Request('https://127.0.0.1/api/v1/patients/patient-1/therapies', {
+        headers: {
+            Authorization: 'Bearer test-local-token',
+            'x-request-id': 'req-native-1',
+        },
+    });
+
+    assert.deepEqual(
+        buildAuditWriteInputFromRequest(
+            request,
+            {
+                id: 'session-1',
+                userId: 'user-1',
+                username: 'admin',
+                role: 'admin',
+                authChannel: 'web',
+                createdAt: 0,
+                expiresAt: 1,
+            },
+            {
+                eventType: 'therapy.updated',
+                subjectType: 'therapy',
+                subjectRef: 'therapy-1',
+                redactedMetadata: {
+                    changedFields: ['dosage'],
+                },
+            },
+        ),
+        {
+            eventType: 'therapy.updated',
+            outcome: 'success',
+            actorType: 'user',
+            actorRef: 'user-1',
+            subjectType: 'therapy',
+            subjectRef: 'therapy-1',
+            sourceSurface: 'native',
+            requestId: 'req-native-1',
+            redactedMetadata: {
+                changedFields: ['dosage'],
+                flags: ['auth:local-token'],
+            },
+        },
+    );
+
+    if (previousToken === undefined) {
+        delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    } else {
+        process.env.MEDIFLOW_LOCAL_API_TOKEN = previousToken;
+    }
+});
+
 test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     const summary = summarizeAuditEvents([
         buildAuditRecord({}),
@@ -237,6 +293,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     assert.deepEqual(summary.subjectTypes, {
         session: 1,
         patient: 2,
+        checkup: 0,
         entry: 0,
         therapy: 0,
         observation: 0,

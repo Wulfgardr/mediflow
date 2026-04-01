@@ -17,6 +17,9 @@ export const AUDIT_EVENT_TYPES = [
     'patient.updated',
     'patient.deleted',
     'patient.restored',
+    'checkup.created',
+    'checkup.updated',
+    'checkup.deleted',
     'entry.created',
     'entry.updated',
     'entry.deleted',
@@ -32,7 +35,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'entry' | 'therapy' | 'observation' | 'settings';
+export type AuditSubjectType = 'session' | 'patient' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'settings';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -64,6 +67,15 @@ type AuditWriteInput = {
     sourceSurface: AuditSourceSurface;
     occurredAt?: Date;
     requestId?: string | null;
+    redactedMetadata?: AuditRedactedMetadata | null;
+};
+
+/* @Codex */
+export type AuditRequestWriteInput = {
+    eventType: AuditEventType;
+    outcome?: AuditOutcome;
+    subjectType: AuditSubjectType;
+    subjectRef?: string | null;
     redactedMetadata?: AuditRedactedMetadata | null;
 };
 
@@ -198,6 +210,40 @@ export function requestIdFromRequest(request: Request): string | null {
 }
 
 /* @Codex */
+export function buildAuditWriteInputFromRequest(
+    request: Request,
+    session: ServerSession | null | undefined,
+    input: AuditRequestWriteInput
+): AuditWriteInput {
+    const context = auditContextFromRequest(request, session);
+    return {
+        eventType: input.eventType,
+        outcome: input.outcome ?? 'success',
+        actorType: context.actorType,
+        actorRef: context.actorRef,
+        subjectType: input.subjectType,
+        subjectRef: input.subjectRef ?? null,
+        sourceSurface: context.sourceSurface,
+        requestId: requestIdFromRequest(request),
+        redactedMetadata: withAuditContextMetadata(context, input.redactedMetadata),
+    };
+}
+
+/* @Codex */
+export async function safeWriteAuditEventFromRequest(
+    request: Request,
+    session: ServerSession | null | undefined,
+    input: AuditRequestWriteInput,
+    errorLabel = '[MediFlow] Audit write failed:'
+): Promise<void> {
+    try {
+        await writeAuditEvent(buildAuditWriteInputFromRequest(request, session, input));
+    } catch (error) {
+        console.error(errorLabel, error);
+    }
+}
+
+/* @Codex */
 export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | undefined): AuditRedactedMetadata | null {
     if (!value) return null;
 
@@ -311,6 +357,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
     const subjectTypes: Record<AuditSubjectType, number> = {
         session: 0,
         patient: 0,
+        checkup: 0,
         entry: 0,
         therapy: 0,
         observation: 0,

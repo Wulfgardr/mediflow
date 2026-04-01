@@ -4,6 +4,7 @@ import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -12,6 +13,8 @@ import {
     parseTherapyStatus,
     therapyStatusFilterValues,
 } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -89,8 +92,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
         const body = await request.json();
+        /* @Codex */
+        const auditBody = body as Record<string, unknown>;
         /* @Codex */
         const normalizedStatus = body.status === undefined ? 'active' : parseTherapyStatus(body.status);
         if (body.status !== undefined && !normalizedStatus) {
@@ -120,6 +127,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             endDate: body.endDate ? new Date(body.endDate) : null,
             createdAt: new Date()
         });
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'therapy.created',
+                subjectType: 'therapy',
+                subjectRef: String(newId),
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody, ['id']),
+                },
+            },
+            '[MediFlow] Therapy audit write failed:',
+        );
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

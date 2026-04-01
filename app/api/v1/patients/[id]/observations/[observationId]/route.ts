@@ -4,7 +4,10 @@ import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -77,8 +80,10 @@ export async function PUT(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
 
         const existing = await dbServer
             .select({ id: observations.id })
@@ -153,6 +158,21 @@ export async function PUT(
             .set(updateData)
             .where(and(eq(observations.id, observationId), eq(observations.patientId, id)));
 
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'observation.updated',
+                subjectType: 'observation',
+                subjectRef: observationId,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body),
+                },
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/observations/[observationId] error:', error);
@@ -168,6 +188,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
         const existing = await dbServer
             .select({ id: observations.id })
@@ -181,6 +203,19 @@ export async function DELETE(
         await dbServer
             .delete(observations)
             .where(and(eq(observations.id, observationId), eq(observations.patientId, id)));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'observation.deleted',
+                subjectType: 'observation',
+                subjectRef: observationId,
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/observations/[observationId] error:', error);
