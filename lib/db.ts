@@ -121,7 +121,7 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     observations: ['notes'],
     conversations: ['title'],
-    messages: ['content', 'reasoning'],
+    messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
     /* @Codex */
     attachments: ['name', 'path', 'data', 'summarySnapshot']
 };
