@@ -222,11 +222,14 @@ dry-run e apply manuale dalla stessa UI.
 
 Flusso:
 
-1) il client web legge le collezioni supportate via API locale
-2) costruisce un artifact con manifest, counts e checksum `sha256`
-3) il restore invia il file a `app/api/system/backup-restore/route.ts`
-4) il server valida format, versione, scope, checksum e riferimenti interni
-5) il server svuota le tabelle supportate e reinserisce i record direttamente in SQLite
+1) il client web richiama `GET /api/system/backup-restore`
+2) il server legge direttamente SQLite, costruisce lo snapshot canonico e
+   arricchisce `patients` con `assignedAmbulatoryIds` quando esistono link
+   many-to-many aggiuntivi
+3) il server serializza l'artifact con manifest, counts e checksum `sha256`
+4) il restore invia il file alla stessa route server-side
+5) il server valida format, versione, scope, checksum e riferimenti interni
+6) il server svuota le tabelle supportate e reinserisce i record direttamente in SQLite
 
 Per il backup automatico:
 
@@ -236,8 +239,9 @@ Per il backup automatico:
 4) il runner legge `medical.db`, genera l'artifact v1, applica la retention sui
    soli file scheduler-owned e salva esito/path ultimo run
 
-Nota: `patients.ambulatoryId` viene re-materializzato anche nella relazione
-`patients_to_ambulatories`; le preferenze non esportabili restano follow-up.
+Nota: `patients.ambulatoryId` e gli eventuali `assignedAmbulatoryIds` vengono
+re-materializzati in `patients_to_ambulatories`; le preferenze non esportabili
+restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflight.md](./adr/0016-backup-artifact-v1-manifest-preflight.md).
 
 ---
 

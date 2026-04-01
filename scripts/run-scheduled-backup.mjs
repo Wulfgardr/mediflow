@@ -83,13 +83,51 @@ function formatTimestamp(now = new Date()) {
   return now.toISOString().replaceAll(':', '-');
 }
 
-function buildDataset(db) {
+/* @Codex */
+function hasTable(db, tableName) {
+  return Boolean(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName)
+  );
+}
+
+/* @Codex */
+function toCamelKey(key) {
+  return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+/* @Codex */
+function normalizeRowKeys(row) {
   return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [toCamelKey(key), value]),
+  );
+}
+
+/* @Codex */
+function filterRowsByReference(rows, foreignKey, validRefs) {
+  return rows.filter((row) => typeof row?.[foreignKey] === 'string' && validRefs.has(row[foreignKey]));
+}
+
+function buildDataset(db) {
+  const dataset = Object.fromEntries(
     BACKUP_COLLECTIONS.map((collection) => [
       collection,
-      db.prepare(`SELECT * FROM ${collection}`).all(),
+      hasTable(db, collection)
+        ? db.prepare(`SELECT * FROM ${collection}`).all().map(normalizeRowKeys)
+        : [],
     ]),
   );
+
+  const patientIds = new Set(dataset.patients.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
+  const conversationIds = new Set(dataset.conversations.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
+
+  dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
+  dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
+  dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
+  dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
+  dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
+  dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
+
+  return dataset;
 }
 
 async function main() {

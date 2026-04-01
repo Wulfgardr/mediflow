@@ -8,13 +8,6 @@ import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } f
 /* @Codex */
 import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
-import {
-    BACKUP_COLLECTIONS,
-    type BackupCollectionName,
-    type BackupDataset,
-    serializeBackupArtifact,
-} from './backup-artifact';
-/* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 
 // Document insight from OCR + AI synthesis
@@ -535,33 +528,11 @@ export class BackupRestorePreflightError extends Error {
 }
 
 export async function exportRawDatabase() {
-    const fetchRawCollection = async <T>(endpoint: string): Promise<T[]> => {
-        const response = await fetch(endpoint, { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`Failed to export ${endpoint}: ${response.status} ${response.statusText}`);
-        }
-        return await response.json() as T[];
-    };
-
-    const exportEndpoints: Record<BackupCollectionName, string> = {
-        ambulatories: '/api/ambulatories',
-        attachments: '/api/attachments',
-        conversations: '/api/conversations',
-        drugs: '/api/drugs',
-        entries: '/api/entries',
-        exemptions: '/api/exemptions?all=1',
-        messages: '/api/messages',
-        observations: '/api/observations',
-        patients: '/api/patients',
-        checkups: '/api/checkups',
-        therapies: '/api/therapies',
-    };
-
-    const snapshots = await Promise.all(
-        BACKUP_COLLECTIONS.map(async (collection) => [collection, await fetchRawCollection(exportEndpoints[collection])] as const)
-    );
-    const payload = Object.fromEntries(snapshots) as BackupDataset;
-    return await serializeBackupArtifact(payload);
+    const response = await fetch('/api/system/backup-restore', { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`Failed to export backup: ${response.status} ${response.statusText}`);
+    }
+    return await response.text();
 }
 
 export async function importRawDatabase(jsonString: string) {

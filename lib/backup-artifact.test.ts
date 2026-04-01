@@ -58,6 +58,7 @@ const basePayload = {
             address: 'ENC:iv:cipher',
             phone: 'ENC:iv:cipher',
             ambulatoryId: 'amb-1',
+            assignedAmbulatoryIds: ['amb-1'],
             createdAt: '2026-03-17T08:00:00.000Z',
             updatedAt: '2026-03-17T08:00:00.000Z',
             version: 1,
@@ -92,5 +93,37 @@ test('rejects tampered payloads before restore', async () => {
     await assert.rejects(
         () => parseBackupArtifact(tampered),
         (error: unknown) => error instanceof BackupArtifactError && error.code === 'checksum-mismatch',
+    );
+});
+
+test('preserves patient assigned ambulatory ids inside the backup payload', async () => {
+    const serialized = await serializeBackupArtifact({
+        ...basePayload,
+        patients: [{
+            ...basePayload.patients[0],
+            assignedAmbulatoryIds: ['amb-2', 'amb-1', 'amb-2'],
+        }],
+        ambulatories: [
+            ...basePayload.ambulatories,
+            {
+                id: 'amb-2',
+                name: 'Ambulatorio secondario',
+                createdAt: '2026-03-17T08:01:00.000Z',
+            },
+        ],
+    });
+
+    const parsed = await parseBackupArtifact(JSON.parse(serialized));
+    assert.deepEqual(parsed.payload.patients[0].assignedAmbulatoryIds, ['amb-2', 'amb-1', 'amb-2']);
+});
+
+test('rejects patient assigned ambulatory ids that reference missing ambulatories', async () => {
+    const serialized = await serializeBackupArtifact(basePayload);
+    const tampered = JSON.parse(serialized);
+    tampered.payload.patients[0].assignedAmbulatoryIds = ['amb-missing'];
+
+    await assert.rejects(
+        () => parseBackupArtifact(tampered),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
     );
 });

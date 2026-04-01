@@ -15,11 +15,17 @@ import {
     patientsToAmbulatories,
     therapies,
 } from '@/lib/schema';
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import {
+    forbiddenResponse,
+    requireSessionOrLocalToken,
+    unauthorizedResponse,
+} from '@/lib/server-auth';
 import {
     BACKUP_COLLECTIONS,
     type BackupArtifact,
     type BackupCollectionName,
+    type BackupDataset,
+    serializeBackupArtifact,
 } from '@/lib/backup-artifact';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 
@@ -98,12 +104,122 @@ type InsertableTable =
     | typeof patientsToAmbulatories
     | typeof therapies;
 
+type PatientAmbulatoryLinkRow = {
+    patientId: string;
+    ambulatoryId: string;
+    assignedAt: Date | null;
+};
+
 function chunk<T>(items: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let index = 0; index < items.length; index += size) {
         chunks.push(items.slice(index, index + size));
     }
     return chunks;
+}
+
+/* @Codex */
+function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+    return [...rows].sort((left, right) => {
+        const leftKey = String(left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
+        const rightKey = String(right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
+        return leftKey.localeCompare(rightKey);
+    });
+}
+
+/* @Codex */
+function buildAssignedAmbulatoryIds(
+    patient: Record<string, unknown>,
+    rows: PatientAmbulatoryLinkRow[]
+): string[] {
+    const ids = new Set<string>();
+
+    if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
+        ids.add(patient.ambulatoryId);
+    }
+
+    for (const row of rows) {
+        if (row.patientId === patient.id && row.ambulatoryId.trim().length > 0) {
+            ids.add(row.ambulatoryId);
+        }
+    }
+
+    return Array.from(ids).sort((left, right) => left.localeCompare(right));
+}
+
+/* @Codex */
+function filterRowsByReference<T extends Record<string, unknown>>(
+    rows: T[],
+    foreignKey: 'patientId' | 'conversationId',
+    validRefs: Set<string>
+): T[] {
+    return rows.filter((row) => {
+        const value = row[foreignKey];
+        return typeof value === 'string' && validRefs.has(value);
+    });
+}
+
+/* @Codex */
+async function buildBackupDataset(): Promise<BackupDataset> {
+    const [
+        ambulatoriesRows,
+        attachmentsRows,
+        conversationsRows,
+        drugsRows,
+        entriesRows,
+        exemptionsRows,
+        messagesRows,
+        observationsRows,
+        patientsRows,
+        checkupsRows,
+        therapiesRows,
+        patientAmbulatoryRows,
+    ] = await Promise.all([
+        dbServer.select().from(ambulatories),
+        dbServer.select().from(attachments),
+        dbServer.select().from(conversations),
+        dbServer.select().from(drugs),
+        dbServer.select().from(entries),
+        dbServer.select().from(exemptions),
+        dbServer.select().from(messages),
+        dbServer.select().from(observations),
+        dbServer.select().from(patients),
+        dbServer.select().from(checkups),
+        dbServer.select().from(therapies),
+        dbServer.select().from(patientsToAmbulatories),
+    ]);
+
+    const normalizedPatientAmbulatoryRows = sortBackupRows(patientAmbulatoryRows);
+    const enrichedPatients = patientsRows.map((patient) => {
+        const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, normalizedPatientAmbulatoryRows);
+        return assignedAmbulatoryIds.length > 0
+            ? { ...patient, assignedAmbulatoryIds }
+            : patient;
+    });
+    const patientIds = new Set(
+        enrichedPatients
+            .map((patient) => patient.id)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
+    const conversationIds = new Set(
+        conversationsRows
+            .map((conversation) => conversation.id)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
+
+    return {
+        ambulatories: sortBackupRows(ambulatoriesRows),
+        attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
+        conversations: sortBackupRows(conversationsRows),
+        drugs: sortBackupRows(drugsRows),
+        entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
+        exemptions: sortBackupRows(exemptionsRows),
+        messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
+        observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
+        patients: sortBackupRows(enrichedPatients),
+        checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
+        therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
+    };
 }
 
 /* @Codex */
@@ -145,11 +261,20 @@ function insertRows<T extends Record<string, unknown>>(runner: InsertRunner, tab
     }
 }
 
+/* @Codex */
+function parseAssignedAmbulatoryIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return Array.from(new Set(
+        value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    ));
+}
+
 function derivePatientLinks(patientsPayload: BackupArtifact['payload']['patients']): Array<{ patientId: string; ambulatoryId: string; assignedAt: Date }> {
     return patientsPayload.flatMap((patient) => {
-        if (typeof patient.id !== 'string' || typeof patient.ambulatoryId !== 'string' || patient.ambulatoryId.trim().length === 0) {
+        if (typeof patient.id !== 'string') {
             return [];
         }
+        const patientId = patient.id;
 
         const assignedAt = typeof patient.updatedAt === 'string'
             ? new Date(patient.updatedAt)
@@ -157,17 +282,46 @@ function derivePatientLinks(patientsPayload: BackupArtifact['payload']['patients
                 ? new Date(patient.createdAt)
                 : new Date();
 
-        return [{
-            patientId: patient.id,
-            ambulatoryId: patient.ambulatoryId,
-            assignedAt: Number.isNaN(assignedAt.getTime()) ? new Date() : assignedAt,
-        }];
+        const normalizedAssignedAt = Number.isNaN(assignedAt.getTime()) ? new Date() : assignedAt;
+        const ambulatoryIds = new Set(parseAssignedAmbulatoryIds(patient.assignedAmbulatoryIds));
+        if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
+            ambulatoryIds.add(patient.ambulatoryId);
+        }
+
+        return Array.from(ambulatoryIds).map((ambulatoryId) => ({
+            patientId,
+            ambulatoryId,
+            assignedAt: normalizedAssignedAt,
+        }));
     });
+}
+
+/* @Codex */
+export async function GET(request: Request) {
+    const session = await requireSessionOrLocalToken(request);
+    if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
+
+    try {
+        const payload = await buildBackupDataset();
+        const serialized = await serializeBackupArtifact(payload);
+        return new NextResponse(serialized, {
+            status: 200,
+            headers: {
+                'Cache-Control': 'no-store',
+                'Content-Type': 'application/json; charset=utf-8',
+            },
+        });
+    } catch (error) {
+        console.error('[MediFlow] Backup export failed:', error);
+        return NextResponse.json({ success: false, error: 'Backup export failed.' }, { status: 500 });
+    }
 }
 
 export async function POST(request: Request) {
     const session = await requireSessionOrLocalToken(request);
     if (!session) return unauthorizedResponse();
+    if (session.role !== 'admin') return forbiddenResponse();
 
     try {
         const body = await request.json();

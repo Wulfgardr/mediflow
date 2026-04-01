@@ -138,6 +138,14 @@ function assertCollectionArrays(payload: BackupDataset): void {
     }
 }
 
+/* @Codex */
+function parseAssignedAmbulatoryIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return Array.from(new Set(
+        value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    ));
+}
+
 function assertCollectionReferences(payload: BackupDataset): void {
     const ambulatoryIds = new Set(
         payload.ambulatories
@@ -161,6 +169,15 @@ function assertCollectionReferences(payload: BackupDataset): void {
                 'invalid-manifest',
                 `Patient ${patient.id ?? '<unknown>'} references an unknown ambulatory.`,
             );
+        }
+
+        for (const ambulatoryId of parseAssignedAmbulatoryIds(patient.assignedAmbulatoryIds)) {
+            if (!ambulatoryIds.has(ambulatoryId)) {
+                throw new BackupArtifactError(
+                    'invalid-manifest',
+                    `Patient ${patient.id ?? '<unknown>'} references an unknown assigned ambulatory.`,
+                );
+            }
         }
     }
 

@@ -45,17 +45,26 @@ Adottiamo l'opzione 3.
 - Formato canonico: `format = "mediflow-backup"`, `version = 1`.
 - Il manifest contiene `scope`, `createdAt`, lista collezioni, counts per
   collezione e checksum `sha256` del payload canonicalizzato.
-- Le collezioni v1 includono solo quelle esportabili via API locale:
+- Le collezioni v1 includono solo quelle esportabili via snapshot server-side
+  dedicato:
   `ambulatories`, `attachments`, `conversations`, `drugs`, `entries`,
   `exemptions`, `messages`, `observations`, `patients`, `checkups`,
   `therapies`.
+- L'export canonico passa da `app/api/system/backup-restore/route.ts`, che
+  legge direttamente SQLite e non dipende da route client-scoped come
+  `/api/patients`.
+- I record `patients` possono includere il campo opzionale
+  `assignedAmbulatoryIds` per preservare le assegnazioni secondarie
+  many-to-many senza introdurre una collezione top-level separata nel formato
+  v1.
 - Il restore esegue un preflight server-side: format, versione, scope,
   checksum, counts e riferimenti interni devono essere coerenti prima di
   cancellare o reinserire i record.
 - Il restore scrive direttamente su SQLite via route server-side dedicata, cosi
   timestamps e record persistiti restano fedeli al payload dell'artifact.
-- `patients.ambulatoryId` viene ripristinato anche nella relazione join
-  corrispondente, senza introdurre un payload separato per `patients_to_ambulatories`.
+- `patients.ambulatoryId` e gli eventuali `assignedAmbulatoryIds` vengono
+  ripristinati anche nella relazione join corrispondente, senza introdurre un
+  payload separato per `patients_to_ambulatories`.
 
 ## Conseguenze
 
