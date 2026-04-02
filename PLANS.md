@@ -83,6 +83,10 @@ Nota operativa:
 - `WUL-133` apre la prima thin slice vera di `AI-08`: runbook canonico
   lane-aware per `shadow mode`, fallback, rollback e kill-switch, senza ancora
   spostare nel prodotto la governance di rollout
+- `WUL-134` e il primo passo eseguibile di `AI-08`: validator CLI locale che
+  legge report benchmark gia esistenti e produce uno stato `hold` /
+  `shadow-ready` / `rollback-required` senza introdurre ancora automazioni UI o
+  runtime
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
