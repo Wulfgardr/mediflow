@@ -10,6 +10,14 @@ export type RolloutReadinessArtifactLane =
     | 'clinical_entities'
     | 'generative_challenger';
 
+export const AI_ROLLOUT_READINESS_LANES: RolloutReadinessArtifactLane[] = [
+    'patient_insight',
+    'smart_import',
+    'redaction',
+    'clinical_entities',
+    'generative_challenger',
+];
+
 function getDefaultDataDir() {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
@@ -49,4 +57,11 @@ export function readAiRolloutReadinessArtifact(lane: RolloutReadinessArtifactLan
             : null,
         report: JSON.parse(raw) as Record<string, unknown>,
     };
+}
+
+export function readAiRolloutReadinessArtifacts() {
+    return AI_ROLLOUT_READINESS_LANES.flatMap((lane) => {
+        const artifact = readAiRolloutReadinessArtifact(lane);
+        return artifact ? [{ lane, ...artifact }] : [];
+    });
 }
