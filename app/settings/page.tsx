@@ -415,6 +415,8 @@ export default function SettingsPage() {
         aiHealth,
         patientInsightEnabled,
         setPatientInsightEnabled,
+        smartImportEnabled,
+        setSmartImportEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         applyHardwareProfile,
@@ -1170,6 +1172,47 @@ export default function SettingsPage() {
                                             checked={!patientInsightEnabled}
                                             onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
                                             aria-label="Disabilita Patient Insight localmente"
+                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                className={cn(
+                                    "rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(79,70,229,0.06)]",
+                                    smartImportEnabled
+                                        ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                        : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
+                                )}
+                                data-testid="smart-import-kill-switch-card"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Kill switch Smart Import</p>
+                                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                            Se spento, il pannello paziente non avvia analisi Smart Import e il path runtime rifiuta sia generate sia apply in modo deterministico.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <label
+                                            htmlFor="smartImportKillSwitch"
+                                            className={cn(
+                                                "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                                                smartImportEnabled
+                                                    ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
+                                                    : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
+                                            )}
+                                        >
+                                            {smartImportEnabled ? 'Enabled' : 'Disabled'}
+                                        </label>
+                                        <input
+                                            id="smartImportKillSwitch"
+                                            type="checkbox"
+                                            checked={!smartImportEnabled}
+                                            onChange={(e) => setSmartImportEnabled(!e.target.checked)}
+                                            aria-label="Disabilita Smart Import localmente"
                                             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
                                         />
                                     </div>

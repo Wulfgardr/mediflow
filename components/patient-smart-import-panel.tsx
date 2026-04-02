@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
     AlertTriangle,
     Brain,
@@ -15,6 +16,11 @@ import {
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 import { db, type ClinicalEntry, type Patient } from '@/lib/db';
+import {
+    AI_SMART_IMPORT_KILL_SWITCH_KEY,
+    AiSmartImportDisabledError,
+    isAiSmartImportEnabledValue,
+} from '@/lib/ai-smart-import-kill-switch';
 import {
     applyPatientSmartImportSelection,
     generatePatientSmartImportAnalysis,
@@ -264,8 +270,10 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
         },
         [patient.id]
     );
+    const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
 
     const sourceCount = countUsableSources(patient, entries, attachments?.length || 0);
+    const smartImportEnabled = isAiSmartImportEnabledValue(smartImportKillSwitch?.value);
     if (sourceCount === 0) {
         return null;
     }
@@ -351,6 +359,11 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
     };
 
     const generateSuggestions = async () => {
+        if (!smartImportEnabled) {
+            setError('Smart Import è disabilitato localmente. Riattivalo in Impostazioni per analizzare nuove fonti.');
+            return;
+        }
+
         setIsGenerating(true);
         setError(null);
         setStatusMessage(null);
@@ -371,7 +384,11 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
             setEditingDiagnosisIds([]);
             setEditingTherapyIds([]);
         } catch (generationError) {
-            setError(generationError instanceof Error ? generationError.message : 'Analisi non disponibile');
+            if (generationError instanceof AiSmartImportDisabledError) {
+                setError('Smart Import è disabilitato localmente. Riattivalo in Impostazioni per analizzare nuove fonti.');
+            } else {
+                setError(generationError instanceof Error ? generationError.message : 'Analisi non disponibile');
+            }
         } finally {
             setIsGenerating(false);
         }
@@ -395,6 +412,10 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
     const applySelection = async () => {
         if (!analysis) return;
+        if (!smartImportEnabled) {
+            setError('Smart Import è disabilitato localmente. Riattivalo in Impostazioni per applicare suggerimenti.');
+            return;
+        }
 
         setIsApplying(true);
         setError(null);
@@ -417,11 +438,44 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
             setEditingTherapyIds((current) => current.filter((id) => !result.appliedTherapyIds.includes(id)));
             setStatusMessage(`Import completato: ${result.diagnosesApplied} diagnosi, ${result.therapiesApplied} terapie.`);
         } catch (applyError) {
-            setError(applyError instanceof Error ? applyError.message : 'Applicazione non riuscita');
+            if (applyError instanceof AiSmartImportDisabledError) {
+                setError('Smart Import è disabilitato localmente. Riattivalo in Impostazioni per applicare suggerimenti.');
+            } else {
+                setError(applyError instanceof Error ? applyError.message : 'Applicazione non riuscita');
+            }
         } finally {
             setIsApplying(false);
         }
     };
+
+    if (!analysis && !isGenerating && !smartImportEnabled) {
+        return (
+            <div
+                className="glass-panel overflow-hidden rounded-[28px] border-red-200/70 bg-red-50/20 p-6 backdrop-blur-xl dark:border-red-500/20 dark:bg-red-950/10"
+                data-testid="smart-import-disabled-card"
+            >
+                <div className="flex flex-col items-center text-center space-y-5">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-red-100 text-red-600 shadow-[0_12px_24px_rgba(239,68,68,0.12)] dark:bg-red-500/10 dark:text-red-300">
+                        <AlertTriangle className="w-8 h-8" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Smart Import disabilitato</h3>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né apply finché il toggle non viene riattivato in Impostazioni.
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/settings#ai"
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                        Apri Impostazioni AI
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="glass-panel overflow-hidden rounded-[28px] border-sky-100/50 bg-sky-50/10 p-0 backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
@@ -448,11 +502,11 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
                     <button
                         onClick={generateSuggestions}
-                        disabled={isGenerating || isApplying}
+                        disabled={isGenerating || isApplying || !smartImportEnabled}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 transition-[background-color,opacity,transform] hover:bg-sky-700 active:scale-95 disabled:opacity-50"
                     >
                         {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                        {analysis ? 'Aggiorna' : 'Analizza fonti'}
+                        {analysis ? (smartImportEnabled ? 'Aggiorna' : 'Disabilitata') : (smartImportEnabled ? 'Analizza fonti' : 'Disabilitata')}
                     </button>
                 </div>
             </div>
@@ -469,6 +523,19 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                     <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
                         <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>{statusMessage}</span>
+                    </div>
+                )}
+
+                {!smartImportEnabled && (
+                    <div
+                        className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
+                        data-testid="smart-import-disabled-banner"
+                    >
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Smart Import disabilitato localmente</p>
+                            <p className="mt-1">Puoi consultare gli ultimi suggerimenti già generati, ma analisi e apply restano bloccati finché non riattivi il toggle in Impostazioni.</p>
+                        </div>
                     </div>
                 )}
 
@@ -826,11 +893,11 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
                             <button
                                 onClick={applySelection}
-                                disabled={isApplying || selectedCount === 0}
+                                disabled={isApplying || selectedCount === 0 || !smartImportEnabled}
                                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-emerald-600 px-8 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-[background-color,opacity,transform] hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
                             >
                                 {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                                Applica selezionati
+                                {smartImportEnabled ? 'Applica selezionati' : 'Disabilitata'}
                             </button>
                         </div>
                     </div>

@@ -21,6 +21,11 @@ import {
     isAiPatientInsightEnabledValue,
     serializeAiPatientInsightKillSwitchState,
 } from '@/lib/ai-patient-insight-kill-switch';
+import {
+    AI_SMART_IMPORT_KILL_SWITCH_KEY,
+    isAiSmartImportEnabledValue,
+    serializeAiSmartImportKillSwitchState,
+} from '@/lib/ai-smart-import-kill-switch';
 
 type HardwareProfile = 'low' | 'medium' | 'high' | 'custom';
 
@@ -59,6 +64,7 @@ export function useAiSettingsController() {
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [aiHealth, setAiHealth] = useState<AIHealthState | null>(null);
     const [patientInsightEnabled, setPatientInsightEnabled] = useState(true);
+    const [smartImportEnabled, setSmartImportEnabled] = useState(true);
 
     useEffect(() => {
         void loadAiConfig();
@@ -92,6 +98,7 @@ export function useAiSettingsController() {
             const genericUrl = await safeGet('aiUrl');
             const legacyUrl = await safeGet('ollamaUrl');
             const patientInsightKillSwitch = await safeGet(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
+            const smartImportKillSwitch = await safeGet(AI_SMART_IMPORT_KILL_SWITCH_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
@@ -111,6 +118,7 @@ export function useAiSettingsController() {
                 manualConfig: insightSettings.manualConfig,
             });
             setPatientInsightEnabled(isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value));
+            setSmartImportEnabled(isAiSmartImportEnabledValue(smartImportKillSwitch?.value));
         } catch (e) {
             console.error('Failed to load AI config:', e);
         }
@@ -162,6 +170,10 @@ export function useAiSettingsController() {
             await db.settings.put({
                 key: AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
                 value: serializeAiPatientInsightKillSwitchState(patientInsightEnabled),
+            });
+            await db.settings.put({
+                key: AI_SMART_IMPORT_KILL_SWITCH_KEY,
+                value: serializeAiSmartImportKillSwitchState(smartImportEnabled),
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
@@ -251,6 +263,8 @@ export function useAiSettingsController() {
         aiHealth,
         patientInsightEnabled,
         setPatientInsightEnabled,
+        smartImportEnabled,
+        setSmartImportEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         applyHardwareProfile,
