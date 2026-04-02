@@ -2,7 +2,26 @@ import {
     type SmartImportDiagnosisExtraction as ParsedAiDiagnosis,
     type SmartImportTherapyExtraction as ParsedAiTherapy,
 } from './ai-task-contracts';
-import { type AifaDrug } from './db';
+import { type AifaDrug, type Therapy } from './db';
+
+export type SmartImportReviewState = 'new' | 'already-present' | 'update' | 'uncertain';
+
+export interface SmartImportReview {
+    state: SmartImportReviewState;
+    summary: string;
+    comparison?: string;
+}
+
+export interface TherapyReviewCandidate {
+    drugMention: string;
+    activePrinciple?: string;
+    dosage?: string;
+    therapyState: 'active' | 'transition' | 'uncertain' | 'inactive';
+    matchType: 'catalog' | 'manual' | 'none';
+    match?: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple'>;
+    canApply: boolean;
+    blockedReason?: string;
+}
 
 const DOSAGE_TOKEN_GLOBAL_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/gi;
 const DRUG_QUERY_STOPWORDS = new Set([
@@ -24,6 +43,95 @@ function tokenize(value: string): string[] {
     return normalizeText(value)
         .split(/\s+/)
         .filter((token) => token.length > 1);
+}
+
+function formatTherapyComparison(therapy: Pick<Therapy, 'drugName' | 'activePrinciple' | 'dosage' | 'status'>): string {
+    const details = [
+        therapy.activePrinciple?.trim(),
+        therapy.dosage?.trim(),
+        therapy.status ? `stato ${therapy.status}` : undefined,
+    ].filter(Boolean);
+
+    return [therapy.drugName.trim(), details.length > 0 ? `(${details.join(' · ')})` : undefined]
+        .filter(Boolean)
+        .join(' ');
+}
+
+function normalizeTherapyKey(
+    therapy: Pick<Therapy, 'drugName' | 'activePrinciple' | 'dosage' | 'aic'>
+): string {
+    return [
+        normalizeText(therapy.aic || ''),
+        normalizeText(therapy.activePrinciple || ''),
+        normalizeText(therapy.drugName || ''),
+        normalizeText(therapy.dosage || ''),
+    ].join('|');
+}
+
+function findRelatedExistingTherapy(
+    existing: Therapy[],
+    suggestion: TherapyReviewCandidate
+): Therapy | undefined {
+    const probeAic = normalizeText(suggestion.match?.aic || '');
+    const probePrinciple = normalizeText(suggestion.match?.activePrinciple || suggestion.activePrinciple || '');
+    const probeName = normalizeText(suggestion.match?.name || suggestion.drugMention);
+
+    return existing.find((therapy) => {
+        const existingAic = normalizeText(therapy.aic || '');
+        const existingPrinciple = normalizeText(therapy.activePrinciple || '');
+        const existingName = normalizeText(therapy.drugName || '');
+
+        if (probeAic && existingAic === probeAic) return true;
+        if (probePrinciple && existingPrinciple === probePrinciple) return true;
+        return Boolean(probeName && existingName === probeName);
+    });
+}
+
+export function buildTherapyReview(
+    existing: Therapy[],
+    suggestion: TherapyReviewCandidate
+): SmartImportReview {
+    const exactMatch = existing.find((therapy) => normalizeTherapyKey(therapy) === normalizeTherapyKey({
+        drugName: suggestion.match?.name || suggestion.drugMention,
+        activePrinciple: suggestion.match?.activePrinciple || suggestion.activePrinciple,
+        dosage: suggestion.dosage || '',
+        aic: suggestion.match?.aic,
+    }));
+
+    if (exactMatch) {
+        return {
+            state: 'already-present',
+            summary: 'Terapia gia presente nello storico paziente',
+            comparison: formatTherapyComparison(exactMatch),
+        };
+    }
+
+    const relatedExisting = findRelatedExistingTherapy(existing, suggestion);
+    if (
+        relatedExisting
+        && suggestion.therapyState === 'active'
+        && suggestion.matchType !== 'none'
+    ) {
+        return {
+            state: 'update',
+            summary: 'Possibile aggiornamento di terapia gia presente: richiede revisione manuale',
+            comparison: formatTherapyComparison(relatedExisting),
+        };
+    }
+
+    if (!suggestion.canApply) {
+        return {
+            state: 'uncertain',
+            summary: suggestion.blockedReason || 'Terapia da verificare prima dell\'import',
+        };
+    }
+
+    return {
+        state: 'new',
+        summary: suggestion.matchType === 'catalog'
+            ? 'Nuova terapia pronta per import con match catalogo AIFA'
+            : 'Nuova terapia reviewable con completamento manuale consigliato',
+    };
 }
 
 function uniqueTokens(values: string[]): string[] {

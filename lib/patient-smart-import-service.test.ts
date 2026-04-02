@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { type AifaDrug } from './db';
+import { type AifaDrug, type Therapy } from './db';
 import {
     buildDiagnosisSearchQueries,
+    buildTherapyReview,
     hasDrugDosageConflict,
     rankDrugMatch,
     selectTherapyCatalogMatch,
+    type TherapyReviewCandidate,
 } from './patient-smart-import-matching';
 
 test('smart import diagnosis search queries keep explicit code first and add textual fallbacks', () => {
@@ -79,4 +81,40 @@ test('smart import catalog match rejects dosage-specific therapy when only confl
 
     assert.equal(hasDrugDosageConflict(onlyWrongDose, suggestion), true);
     assert.equal(selected, undefined);
+});
+
+test('smart import review marks same therapy with different dosage as update instead of new', () => {
+    const existing: Therapy[] = [
+        {
+            id: 'therapy-1',
+            patientId: 'patient-1',
+            drugName: 'Bisoprololo EG',
+            activePrinciple: 'Bisoprololo',
+            dosage: '2,5 mg 1 cp',
+            status: 'active',
+            createdAt: new Date('2026-04-01T08:00:00Z'),
+            updatedAt: new Date('2026-04-01T08:00:00Z'),
+            startDate: new Date('2026-03-20T08:00:00Z'),
+        },
+    ];
+
+    const suggestion: TherapyReviewCandidate = {
+        drugMention: 'Bisoprololo',
+        activePrinciple: 'Bisoprololo',
+        dosage: '1,25 mg 1 cp',
+        therapyState: 'active',
+        matchType: 'catalog',
+        match: {
+            aic: 'AIC-125MG',
+            name: 'Bisoprololo EG',
+            activePrinciple: 'Bisoprololo',
+        },
+        canApply: true,
+    };
+
+    const review = buildTherapyReview(existing, suggestion);
+
+    assert.equal(review.state, 'update');
+    assert.match(review.summary, /aggiornamento/i);
+    assert.match(review.comparison || '', /2,5 mg 1 cp/i);
 });

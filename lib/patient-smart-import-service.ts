@@ -18,12 +18,15 @@ import { searchICDHybrid, type ICDSearchResult } from './icd-service';
 import { notifyDbChange } from './live-query';
 import {
     buildDiagnosisSearchQueries,
+    buildTherapyReview,
     buildDrugSearchTerms,
     rankIcdMatch,
     selectTherapyCatalogMatch,
+    type SmartImportReview,
+    type SmartImportReviewState,
 } from './patient-smart-import-matching';
 
-export type { SmartImportConfidence, TherapySuggestionState };
+export type { SmartImportConfidence, TherapySuggestionState, SmartImportReview, SmartImportReviewState };
 
 export interface SmartImportEvidence {
     sourceKind: 'patient-notes' | 'clinical-entry' | 'document-insight' | 'attachment-summary';
@@ -47,6 +50,8 @@ export interface DiagnosisSmartImportSuggestion {
     };
     canApply: boolean;
     blockedReason?: string;
+    review: SmartImportReview;
+    reviewedLabel?: string;
 }
 
 export interface TherapySmartImportSuggestion {
@@ -64,6 +69,11 @@ export interface TherapySmartImportSuggestion {
     match?: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple' | 'atc' | 'company'>;
     canApply: boolean;
     blockedReason?: string;
+    review: SmartImportReview;
+    reviewedDrugName?: string;
+    reviewedActivePrinciple?: string;
+    reviewedDosage?: string;
+    reviewedMotivation?: string;
 }
 
 export interface PatientSmartImportAnalysis {
@@ -127,6 +137,10 @@ function normalizeText(value: string): string {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
+}
+
+function formatDiagnosisComparison(diagnosis: Pick<Diagnosis, 'system' | 'code' | 'description'>): string {
+    return `${diagnosis.system} ${diagnosis.code} · ${diagnosis.description}`;
 }
 
 function tokenize(value: string): string[] {
@@ -455,6 +469,10 @@ async function resolveDiagnosisSuggestion(
         match,
         canApply: Boolean(match),
         blockedReason: match ? undefined : 'Nessun match ICD-11 affidabile',
+        review: {
+            state: 'uncertain',
+            summary: '',
+        },
     };
 }
 
@@ -466,6 +484,18 @@ async function searchDrugCatalog(query: string): Promise<AifaDrug[]> {
     if (!response.ok) return [];
     const payload = await response.json();
     return Array.isArray(payload) ? payload as AifaDrug[] : [];
+}
+
+function findExistingDiagnosisMatch(
+    existing: Diagnosis[],
+    suggestion: DiagnosisSmartImportSuggestion
+): Diagnosis | undefined {
+    if (!suggestion.match) return undefined;
+
+    return existing.find((diagnosis) => (
+        normalizeText(diagnosis.system) === normalizeText(suggestion.match?.system || '')
+        && normalizeText(diagnosis.code) === normalizeText(suggestion.match?.code || '')
+    ));
 }
 
 function sortDiagnosisSuggestions(
@@ -545,6 +575,34 @@ function buildTherapyBlockedReason(state: TherapySuggestionState, reviewNote: st
     return 'Terapia non attiva nelle fonti correnti';
 }
 
+function buildDiagnosisReview(
+    suggestion: DiagnosisSmartImportSuggestion,
+    existingDiagnosis: Diagnosis | undefined
+): SmartImportReview {
+    if (existingDiagnosis) {
+        return {
+            state: 'already-present',
+            summary: 'Diagnosi gia presente nel profilo paziente',
+            comparison: formatDiagnosisComparison(existingDiagnosis),
+        };
+    }
+
+    if (!suggestion.canApply || !suggestion.match) {
+        return {
+            state: 'uncertain',
+            summary: suggestion.blockedReason || 'Diagnosi da verificare prima dell\'import',
+        };
+    }
+
+    return {
+        state: 'new',
+        summary: suggestion.confidence === 'high'
+            ? 'Nuova diagnosi con match ICD-11 pronto per revisione'
+            : 'Nuova diagnosi proposta con confidenza da confermare',
+        comparison: formatDiagnosisComparison(suggestion.match),
+    };
+}
+
 async function resolveTherapySuggestion(
     suggestion: ParsedAiTherapy,
     sourceMap: Map<string, SmartImportSourceRecord>,
@@ -602,6 +660,10 @@ async function resolveTherapySuggestion(
         match,
         canApply: therapyState === 'active' && matchType !== 'none',
         blockedReason,
+        review: {
+            state: 'uncertain',
+            summary: '',
+        },
     };
 }
 
@@ -648,24 +710,43 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
         Promise.all(parsed.therapies.map((therapy) => resolveTherapySuggestion(therapy, sourceMap, drugCatalogSearch))),
     ]);
 
-    const diagnoses = resolvedDiagnoses.map((diagnosis) => (
-        diagnosisExists(currentDiagnoses, diagnosis)
-            ? {
-                ...diagnosis,
-                canApply: false,
-                blockedReason: 'Diagnosi gia presente in scheda',
-            }
-            : diagnosis
-    )).sort(sortDiagnosisSuggestions);
-    const therapySuggestions = resolvedTherapies.map((therapy) => (
-        therapyExists(currentTherapies, therapy)
-            ? {
-                ...therapy,
-                canApply: false,
-                blockedReason: 'Terapia gia presente in storico',
-            }
-            : therapy
-    )).sort(sortTherapySuggestions);
+    const diagnoses = resolvedDiagnoses.map((diagnosis) => {
+        const existingDiagnosis = findExistingDiagnosisMatch(currentDiagnoses, diagnosis);
+        const canApply = existingDiagnosis ? false : diagnosis.canApply;
+        const blockedReason = existingDiagnosis ? 'Diagnosi gia presente in scheda' : diagnosis.blockedReason;
+        const nextSuggestion: DiagnosisSmartImportSuggestion = {
+            ...diagnosis,
+            canApply,
+            blockedReason,
+            review: buildDiagnosisReview(
+                {
+                    ...diagnosis,
+                    canApply,
+                    blockedReason,
+                    review: diagnosis.review,
+                },
+                existingDiagnosis
+            ),
+        };
+
+        return nextSuggestion;
+    }).sort(sortDiagnosisSuggestions);
+    const therapySuggestions = resolvedTherapies.map((therapy) => {
+        const review = buildTherapyReview(currentTherapies, therapy);
+        const canApply = review.state === 'new' ? therapy.canApply : false;
+        const blockedReason = review.state === 'already-present'
+            ? 'Terapia gia presente in storico'
+            : review.state === 'update'
+                ? 'Possibile aggiornamento di terapia gia presente'
+                : therapy.blockedReason;
+
+        return {
+            ...therapy,
+            canApply,
+            blockedReason,
+            review,
+        };
+    }).sort(sortTherapySuggestions);
 
     return {
         generatedAt: new Date().toISOString(),
@@ -685,11 +766,7 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
 }
 
 function diagnosisExists(existing: Diagnosis[], suggestion: DiagnosisSmartImportSuggestion): boolean {
-    if (!suggestion.match) return true;
-    return existing.some((diagnosis) => (
-        normalizeText(diagnosis.system) === normalizeText(suggestion.match?.system || '')
-        && normalizeText(diagnosis.code) === normalizeText(suggestion.match?.code || '')
-    ));
+    return Boolean(findExistingDiagnosisMatch(existing, suggestion));
 }
 
 function normalizeTherapyKey(therapy: Pick<Therapy, 'drugName' | 'activePrinciple' | 'dosage' | 'aic'>): string {
@@ -742,7 +819,7 @@ export async function applyPatientSmartImportSelection(
         nextDiagnoses.push({
             system: suggestion.match.system,
             code: suggestion.match.code,
-            description: suggestion.match.description,
+            description: suggestion.reviewedLabel?.trim() || suggestion.label.trim() || suggestion.match.description,
             date: new Date(),
         });
         appliedDiagnosisIds.push(suggestion.id);
@@ -757,12 +834,12 @@ export async function applyPatientSmartImportSelection(
         therapyItems.push({
             id: crypto.randomUUID(),
             patientId,
-            drugName: suggestion.match?.name || suggestion.drugMention,
+            drugName: suggestion.reviewedDrugName?.trim() || suggestion.match?.name || suggestion.drugMention,
             aic: suggestion.match?.aic,
             atc: suggestion.match?.atc,
-            activePrinciple: suggestion.match?.activePrinciple || suggestion.activePrinciple,
-            dosage: suggestion.dosage || 'Posologia da verificare',
-            motivation: suggestion.motivation || suggestion.evidence.excerpt,
+            activePrinciple: suggestion.reviewedActivePrinciple?.trim() || suggestion.match?.activePrinciple || suggestion.activePrinciple,
+            dosage: suggestion.reviewedDosage?.trim() || suggestion.dosage || 'Posologia da verificare',
+            motivation: suggestion.reviewedMotivation?.trim() || suggestion.motivation || suggestion.evidence.excerpt,
             status: 'active',
             startDate: new Date(),
             createdAt: new Date(),
