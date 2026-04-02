@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-04-03 Codex
+- Opened `WUL-138` as the next `AI-08` regression-hardening slice by extracting a reusable rollout-readiness contract helper, adding explicit storage coverage for missing-vs-available lanes, and wiring a dedicated Settings Playwright smoke plus harness entrypoint so the read-only governance panel is protected against silent regressions: `lib/ai-rollout-readiness-storage.ts`, `lib/ai-rollout-readiness-storage.test.ts`, `app/api/system/ai-rollout-readiness/route.ts`, `components/settings/ai-rollout-readiness-panel.tsx`, `e2e/ai-rollout-readiness-panel.spec.ts`, `scripts/e2e-smoke.sh`, `package.json`
+
 ## 2026-04-02 Codex
 - Opened `WUL-137` as the next read-only `AI-08` refinement by making the rollout-readiness consumer lane-complete in Settings, so missing lanes stay visible instead of disappearing, and by surfacing the persisted markdown verdict preview directly in the UI without introducing any operational controls: `lib/ai-rollout-readiness-storage.ts`, `app/api/system/ai-rollout-readiness/route.ts`, `components/settings/ai-rollout-readiness-panel.tsx`
 - Opened `WUL-136` as the first read-only consumer of the rollout-governance artifacts by exposing lane-aware readiness verdicts through a protected local route and surfacing them in Settings with a parliament-style panel that stays strictly observational: `lib/ai-rollout-readiness-storage.ts`, `app/api/system/ai-rollout-readiness/route.ts`, `components/settings/ai-rollout-readiness-panel.tsx`, `app/settings/page.tsx`
