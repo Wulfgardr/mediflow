@@ -281,7 +281,7 @@ export default function PatientList() {
         return (
             <div
                 key={patient.id}
-                className={`group relative flex items-center gap-3 transition-all duration-200 ${
+                className={`group relative flex items-center gap-3 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
                     isWide ? 'px-5 py-4' : 'px-3 py-1.5'
                 } ${
                     isLiquid
@@ -309,7 +309,7 @@ export default function PatientList() {
                 <Link href={`/patients/${patient.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-4">
                     <div className="flex min-w-0 items-center gap-4">
                         <div
-                            className={`flex shrink-0 items-center justify-center rounded-xl font-bold shadow-sm transition-all duration-300 ${
+                            className={`flex shrink-0 items-center justify-center rounded-xl font-bold shadow-sm transition-[background-color,color,box-shadow,transform] duration-300 ${
                                 isWide ? 'h-11 w-11 text-xs' : 'h-8 w-8 text-[10px]'
                             } ${
                                 patient.isArchived
@@ -322,12 +322,12 @@ export default function PatientList() {
                             {patient.firstName?.[0]}{patient.lastName?.[0]}
                         </div>
                         <div className="min-w-0 space-y-0.5">
-                            <p className={`truncate font-bold text-slate-900 dark:text-white transition-all duration-300 ${
+                            <p className={`truncate font-bold text-slate-900 dark:text-white transition-[color,opacity,transform] duration-300 ${
                                 isWide ? 'text-base' : 'text-sm'
                             }`}>
                                 <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                             </p>
-                            <p className={`truncate font-mono tracking-tight text-slate-500 transition-all duration-300 ${
+                            <p className={`truncate font-mono tracking-tight text-slate-500 transition-[color,opacity,transform] duration-300 ${
                                 isWide ? 'text-[12px]' : 'text-[10px]'
                             }`}>
                                 <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
@@ -336,13 +336,13 @@ export default function PatientList() {
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="hidden md:block text-right">
-                            <p className={`font-medium text-slate-700 dark:text-slate-300 transition-all duration-300 ${
+                            <p className={`font-medium text-slate-700 dark:text-slate-300 transition-[color,opacity,transform] duration-300 ${
                                 isWide ? 'text-sm' : 'text-[12px]'
                             }`}>
                                 {getPatientAgeLabel(patient)}
                             </p>
                         </div>
-                        <span className={`inline-flex items-center rounded-full border font-semibold transition-all duration-300 ${
+                        <span className={`inline-flex items-center rounded-full border font-semibold transition-[border-color,background-color,color,transform] duration-300 ${
                             isWide ? 'px-3 py-1 text-[11px]' : 'px-2 py-0.5 text-[10px]'
                         } ${status.classes}`}>
                             {status.label}
@@ -387,7 +387,7 @@ export default function PatientList() {
                     <div className="relative z-10 flex flex-wrap items-center gap-2">
                         <Link
                             href="/analytics"
-                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium text-slate-700 transition-all dark:text-slate-200 ${
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium text-slate-700 transition-[border-color,background-color,color,box-shadow,transform] dark:text-slate-200 ${
                                 isLiquid
                                     ? 'rounded-full border border-white/60 bg-white/40 backdrop-blur-md hover:bg-white/80 dark:border-white/10 dark:bg-white/5'
                                     : 'rounded-2xl border border-slate-200/80 bg-white/92 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/8'
@@ -408,15 +408,22 @@ export default function PatientList() {
 
                 <div className="relative z-10 mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
                     <div className="relative group">
+                        <label htmlFor="patients-search" className="sr-only">
+                            Cerca paziente
+                        </label>
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <Search className="h-4 w-4 text-slate-400" />
+                            <Search aria-hidden="true" className="h-4 w-4 text-slate-400" />
                         </div>
                         <input
+                            id="patients-search"
+                            name="patientsSearch"
                             type="text"
-                            className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 dark:border-white/10 dark:bg-white/5"
+                            className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-[14px] shadow-sm outline-none transition-[border-color,background-color,box-shadow] placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 dark:border-white/10 dark:bg-white/5"
                             placeholder="Cerca paziente..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            autoComplete="off"
+                            spellCheck={false}
                         />
                     </div>
 
@@ -424,13 +431,13 @@ export default function PatientList() {
                         <div className="flex border-r border-slate-200 pr-1.5 mr-1.5 dark:border-white/10">
                             <button
                                 onClick={() => setViewMode('active')}
-                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${viewMode === 'active' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${viewMode === 'active' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
                             >
                                 Attivi
                             </button>
                             <button
                                 onClick={() => setViewMode('archived')}
-                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${viewMode === 'archived' ? 'bg-white shadow-sm text-amber-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${viewMode === 'archived' ? 'bg-white shadow-sm text-amber-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
                             >
                                 Archiviati
                             </button>
@@ -439,7 +446,7 @@ export default function PatientList() {
                             <div className="flex border-r border-slate-200 pr-1.5 mr-1.5 dark:border-white/10">
                                 <button
                                     onClick={() => setDensity('compact')}
-                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${density === 'compact' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${density === 'compact' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
                                     title="Vista Compatta"
                                 >
                                     <Layout className="h-3.5 w-3.5" />
@@ -447,7 +454,7 @@ export default function PatientList() {
                                 </button>
                                 <button
                                     onClick={() => setDensity('wide')}
-                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${density === 'wide' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
+                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${density === 'wide' ? 'bg-white shadow-sm text-sky-600 dark:bg-white/10' : 'text-slate-500 hover:text-slate-600'}`}
                                     title="Vista Ampia"
                                 >
                                     <Maximize2 className="h-3.5 w-3.5" />
@@ -457,13 +464,13 @@ export default function PatientList() {
                         )}
                         <button
                             onClick={() => setSortMode('recent')}
-                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${sortMode === 'recent' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
+                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${sortMode === 'recent' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
                         >
                             Recenti
                         </button>
                         <button
                             onClick={() => setSortMode('alpha')}
-                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-all ${sortMode === 'alpha' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
+                            className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-[background-color,color,box-shadow] ${sortMode === 'alpha' ? 'bg-white shadow-sm text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500'}`}
                         >
                             A-Z
                         </button>

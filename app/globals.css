@@ -265,9 +265,12 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   }
 
   .apple-list-row {
-    @apply flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-sm transition-all;
+    @apply flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-sm;
     background-color: var(--paper-bg);
     border-color: var(--paper-border);
+    transition-property: border-color, background-color, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
   }
 
   .apple-list-row:hover {
@@ -280,10 +283,13 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   }
 
   .ui-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold text-white active:scale-[0.98];
     border-radius: var(--ui-btn-primary-radius);
     background: var(--ui-btn-primary-bg);
     box-shadow: var(--ui-btn-primary-shadow);
+    transition-property: opacity, transform, box-shadow, background-color;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
   }
 
   .ui-btn-primary:hover {

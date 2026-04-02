@@ -128,7 +128,7 @@ function AmbulatoryTree() {
                 <div
                     onClick={() => activate(node.id)}
                     className={cn(
-                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-all select-none group relative border border-transparent min-w-0",
+                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0",
                         isActive
                             ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold border-blue-500/20"
                             : "hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400",
@@ -300,7 +300,7 @@ export function Sidebar() {
                                     key={link.href}
                                     href={link.href}
                                     className={cn(
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-[14px] font-medium",
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-[border-color,background-color,color,box-shadow] duration-200 group text-[14px] font-medium",
                                         isActive
                                             ? isLiquid
                                                 ? "border border-white/60 bg-white/70 text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-white/10 dark:text-white font-semibold"
@@ -336,7 +336,7 @@ export function Sidebar() {
                                 "w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold",
                                 isLiquid
                                     ? "ui-btn-primary"
-                                    : "rounded-xl bg-gray-900 text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
+                                    : "rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
                             )}
                         >
                             <PlusCircle className="w-4 h-4" />

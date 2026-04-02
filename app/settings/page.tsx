@@ -211,7 +211,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
                                     key={model.name}
                                     onClick={() => onChange(model.name)}
                                     className={`
-                                        relative flex items-center justify-between gap-3 rounded-[20px] border px-3.5 py-3 cursor-pointer transition-all
+                                        relative flex items-center justify-between gap-3 rounded-[20px] border px-3.5 py-3 cursor-pointer transition-[border-color,background-color,box-shadow,transform]
                                         ${selected
                                             ? `${c.selectedCard} z-10`
                                             : 'border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20'
@@ -292,7 +292,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
                         <div
-                            className={`h-full bg-gradient-to-r ${c.progress} transition-all duration-300`}
+                            className={`h-full bg-gradient-to-r ${c.progress} transition-[width] duration-300`}
                             style={{ width: `${pullProgress}%` }}
                         />
                     </div>
@@ -308,11 +308,11 @@ const SETTINGS_CARD_CLASS = 'glass-panel p-6 md:p-7';
 /* @Codex */
 const SETTINGS_SECTION_CARD_CLASS = 'apple-subsection p-5 md:p-6';
 /* @Codex */
-const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white/76 px-4 py-3 text-sm text-slate-800 shadow-[0_12px_26px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-all placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500/30';
+const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white/76 px-4 py-3 text-sm text-slate-800 shadow-[0_12px_26px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-[border-color,background-color,box-shadow] placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500/30';
 /* @Codex */
 const SETTINGS_LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
 /* @Codex */
-const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
+const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-[box-shadow,transform,opacity] hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
 /* @Codex */
 const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
     emerald: 'inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(5,150,105,0.22)] transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50',
@@ -320,7 +320,7 @@ const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string
     indigo: 'inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(79,70,229,0.22)] transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50',
 };
 /* @Codex */
-const SETTINGS_SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
+const SETTINGS_SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
 
 /* @Codex */
 function SettingsSectionIntro({
@@ -359,7 +359,7 @@ function SettingsRailLink({
         <a
             href={href}
             className={cn(
-                'border border-white/70 bg-white/68 text-left shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/86 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20',
+                'border border-white/70 bg-white/68 text-left shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-white hover:bg-white/86 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20',
                 compact
                     ? 'inline-flex min-w-max items-center gap-2.5 rounded-full px-4 py-2.5'
                     : 'flex items-start gap-3 rounded-[22px] px-3.5 py-3'
@@ -692,7 +692,7 @@ export default function SettingsPage() {
                                         type="button"
                                         onClick={() => setUIStyleMode('clinical')}
                                         className={cn(
-                                            "rounded-[24px] border px-4 py-4 text-left transition-all",
+                                            "rounded-[24px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
                                             uiStyleMode === 'clinical'
                                                 ? "border-sky-300/80 bg-white shadow-[0_14px_28px_rgba(10,132,255,0.12)] dark:border-sky-500/20 dark:bg-white/10"
                                                 : "border-white/70 bg-white/76 hover:border-slate-200 hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
@@ -711,7 +711,7 @@ export default function SettingsPage() {
                                         type="button"
                                         onClick={() => setUIStyleMode('liquid')}
                                         className={cn(
-                                            "rounded-[28px] border px-4 py-4 text-left transition-all",
+                                            "rounded-[28px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
                                             uiStyleMode === 'liquid'
                                                 ? "border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.86),rgba(255,255,255,0.62))] shadow-[0_24px_48px_rgba(10,132,255,0.14)] backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
                                                 : "border-white/70 bg-white/76 hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
@@ -774,27 +774,33 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                         <div>
-                            <label className={SETTINGS_LABEL_CLASS}>
+                            <label htmlFor="doctor-name" className={SETTINGS_LABEL_CLASS}>
                                 Nome Medico
                             </label>
                             <input
+                                id="doctor-name"
+                                name="doctorName"
                                 type="text"
                                 value={profile.doctorName}
                                 onChange={(e) => setProfile({ ...profile, doctorName: e.target.value })}
                                 placeholder="es. Dr. Mario Rossi"
+                                autoComplete="name"
                                 className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className={SETTINGS_LABEL_CLASS}>
+                            <label htmlFor="clinic-name" className={SETTINGS_LABEL_CLASS}>
                                 Nome Ambulatorio
                             </label>
                             <input
+                                id="clinic-name"
+                                name="clinicName"
                                 type="text"
                                 value={profile.clinicName}
                                 onChange={(e) => setProfile({ ...profile, clinicName: e.target.value })}
                                 placeholder="es. Studio Medico Centro"
+                                autoComplete="organization"
                                 className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
@@ -826,43 +832,55 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                         <div>
-                            <label className={SETTINGS_LABEL_CLASS}>
+                            <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>
                                 PIN attuale
                             </label>
                             <input
+                                id="current-pin"
+                                name="currentPin"
                                 type="password"
                                 inputMode="numeric"
                                 value={pinForm.currentPin}
                                 onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
                                 placeholder="Inserisci il PIN attuale"
+                                autoComplete="current-password"
+                                spellCheck={false}
                                 className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className={SETTINGS_LABEL_CLASS}>
+                            <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>
                                 Nuovo PIN
                             </label>
                             <input
+                                id="new-pin"
+                                name="newPin"
                                 type="password"
                                 inputMode="numeric"
                                 value={pinForm.newPin}
                                 onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
                                 placeholder="4-8 caratteri"
+                                autoComplete="new-password"
+                                spellCheck={false}
                                 className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className={SETTINGS_LABEL_CLASS}>
+                            <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>
                                 Conferma nuovo PIN
                             </label>
                             <input
+                                id="confirm-pin"
+                                name="confirmPin"
                                 type="password"
                                 inputMode="numeric"
                                 value={pinForm.confirmPin}
                                 onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
                                 placeholder="Ripeti il nuovo PIN"
+                                autoComplete="new-password"
+                                spellCheck={false}
                                 className={SETTINGS_INPUT_CLASS}
                             />
                         </div>
@@ -928,7 +946,7 @@ export default function SettingsPage() {
                                 <div
                                     onClick={() => applyHardwareProfile('low')}
                                     className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
                                         hardwareProfile === 'low'
                                             ? "border-emerald-300/80 bg-emerald-50/75 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10"
                                             : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
@@ -945,7 +963,7 @@ export default function SettingsPage() {
                                 <div
                                     onClick={() => applyHardwareProfile('medium')}
                                     className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
                                         hardwareProfile === 'medium'
                                             ? "border-indigo-300/80 bg-indigo-50/75 shadow-[0_14px_28px_rgba(79,70,229,0.12)] dark:border-indigo-500/20 dark:bg-indigo-900/10"
                                             : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
@@ -962,7 +980,7 @@ export default function SettingsPage() {
                                 <div
                                     onClick={() => applyHardwareProfile('high')}
                                     className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-all",
+                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
                                         hardwareProfile === 'high'
                                             ? "border-violet-300/80 bg-violet-50/75 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10"
                                             : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
@@ -1338,7 +1356,7 @@ export default function SettingsPage() {
                             {!importing ? (
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-all hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
+                                    className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,box-shadow] hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
                                 >
                                     <Upload className="w-5 h-5" />
                                     <span className="font-medium">Carica File AIFA (.csv)</span>
@@ -1350,7 +1368,7 @@ export default function SettingsPage() {
                                         <span>{progress}%</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 progress-bar-width" data-progress={progress}></div>
+                                        <div className="bg-blue-600 h-2.5 rounded-full transition-[width] duration-300 progress-bar-width" data-progress={progress}></div>
                                     </div>
                                     <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
                                 </div>
@@ -1590,7 +1608,7 @@ export default function SettingsPage() {
                                         }
                                     }
                                 }}
-                                className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-all hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
+                                className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color,box-shadow] hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
                             >
                                 Reset Completo
                             </button>
