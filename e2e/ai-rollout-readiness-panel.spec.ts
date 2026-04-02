@@ -67,6 +67,24 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
 
   await bootstrapUnlockedSession(page, pin);
 
+  await page.evaluate(async () => {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'disabled' }),
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'aiSmartImportKillSwitch', value: 'enabled' }),
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'aiDocumentSynthesisKillSwitch', value: 'disabled' }),
+    });
+  });
+
   await page.getByRole('link', { name: 'Impostazioni' }).click();
   await expect(page).toHaveURL(/\/settings$/);
 
@@ -76,6 +94,10 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page.getByTestId('ai-rollout-metric-ready')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-hold')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-missing')).toContainText('3');
+  await expect(page.getByTestId('ai-rollout-local-control-summary')).toContainText('2 disattivati su 3');
+  await expect(page.getByTestId('ai-rollout-local-control-patient_insight')).toContainText('disabled');
+  await expect(page.getByTestId('ai-rollout-local-control-smart_import')).toContainText('enabled');
+  await expect(page.getByTestId('ai-rollout-local-control-document_synthesis')).toContainText('disabled');
 
   const missingRedactionLane = page.getByTestId('ai-rollout-lane-redaction');
   await expect(missingRedactionLane).toContainText('Redaction');
@@ -83,6 +105,8 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
 
   const patientInsightLane = page.getByTestId('ai-rollout-lane-patient_insight');
   await expect(patientInsightLane).toContainText('qwen3.5:35b-a3b');
+  await expect(patientInsightLane).toContainText('Local control');
+  await expect(patientInsightLane).toContainText('disabled');
 
   const markdownPreview = page.getByTestId('ai-rollout-markdown-patient_insight');
   await markdownPreview.locator('summary').click();

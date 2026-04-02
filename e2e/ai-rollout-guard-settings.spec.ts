@@ -59,6 +59,10 @@ test('settings warns when selected AI model is still on hold in rollout readines
   await expect(page.getByTestId('ai-rollout-guard-notice')).toHaveCount(0);
 
   const clinicalSelector = page.getByTestId('ai-model-selector-clinical');
+  const resetToRecommended = clinicalSelector.getByRole('button', { name: 'Torna ai consigliati' });
+  if (await resetToRecommended.count()) {
+    await resetToRecommended.click();
+  }
   await clinicalSelector.getByRole('button', { name: 'Usa un modello personalizzato' }).click();
   await clinicalSelector.getByPlaceholder('es. llama3').fill('gemma4:e4b');
 

@@ -12,6 +12,10 @@ type RolloutLane =
     | 'redaction'
     | 'clinical_entities'
     | 'generative_challenger';
+type RolloutLocalControlLane =
+    | 'patient_insight'
+    | 'smart_import'
+    | 'document_synthesis';
 
 type RolloutArtifactPayload = {
     lanes: Array<{
@@ -33,6 +37,13 @@ type RolloutArtifactPayload = {
                 reportGeneratedAt?: string | null;
             };
         } | null;
+    }>;
+    localControls: Array<{
+        lane: RolloutLocalControlLane;
+        label: string;
+        key: string;
+        uiDriven: true;
+        state: 'enabled' | 'disabled';
     }>;
 };
 
@@ -102,6 +113,9 @@ export default function AiRolloutReadinessPanel() {
     const holdCount = lanes.filter((lane) => lane.report?.status === 'hold').length;
     const rollbackCount = lanes.filter((lane) => lane.report?.status === 'rollback-required').length;
     const missingCount = lanes.filter((lane) => !lane.available).length;
+    const localControls = state.payload?.localControls || [];
+    const localControlMap = new Map(localControls.map((control) => [control.lane, control]));
+    const disabledControlsCount = localControls.filter((control) => control.state === 'disabled').length;
 
     return (
         <div className="apple-subsection space-y-4" data-testid="ai-rollout-readiness-panel">
@@ -165,9 +179,47 @@ export default function AiRolloutReadinessPanel() {
                         <MetricCard label="Artifact mancanti" value={String(missingCount)} tone="missing" />
                     </div>
 
+                    <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                    Local controls
+                                </p>
+                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                                    Stato read-only dei kill switch locali per le lane gia productized. Il pannello readiness non modifica questi toggle.
+                                </p>
+                            </div>
+                            <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300" data-testid="ai-rollout-local-control-summary">
+                                {disabledControlsCount} disattivati su {localControls.length}
+                            </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {localControls.map((control) => (
+                                <div
+                                    key={control.lane}
+                                    className={cn(
+                                        'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em]',
+                                        control.state === 'enabled'
+                                            ? 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200'
+                                            : 'border-red-200/70 bg-red-50/80 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200'
+                                    )}
+                                    data-testid={`ai-rollout-local-control-${control.lane}`}
+                                >
+                                    <span>{control.label}</span>
+                                    <span>{control.state}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="grid gap-4 xl:grid-cols-2">
                         {lanes.map((entry) => (
-                            <LaneCard key={entry.lane} entry={entry} />
+                            <LaneCard
+                                key={entry.lane}
+                                entry={entry}
+                                localControl={localControlMap.get(entry.lane as RolloutLocalControlLane)}
+                            />
                         ))}
                     </div>
                 </div>
@@ -191,7 +243,13 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
     );
 }
 
-function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] }) {
+function LaneCard({
+    entry,
+    localControl,
+}: {
+    entry: RolloutArtifactPayload['lanes'][number];
+    localControl?: RolloutArtifactPayload['localControls'][number];
+}) {
     const meta = LANE_META[entry.lane];
     const status = entry.report?.status || (entry.available ? 'hold' : 'missing');
     const blockers = entry.report?.blockers || [];
@@ -223,6 +281,16 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
                     {status}
                 </div>
             </div>
+
+            {localControl ? (
+                <div className="mt-3">
+                    <MiniMetric
+                        label="Local control"
+                        value={localControl.state}
+                        tone={localControl.state === 'enabled' ? 'ready' : 'rollback'}
+                    />
+                </div>
+            ) : null}
 
             {entry.available && entry.report ? (
                 <>
@@ -304,9 +372,22 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
     );
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function MiniMetric({
+    label,
+    value,
+    tone,
+}: {
+    label: string;
+    value: string;
+    tone?: 'ready' | 'rollback';
+}) {
     return (
-        <div className="rounded-[16px] border border-slate-200/70 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/5">
+        <div className={cn(
+            'rounded-[16px] border px-3 py-3',
+            tone === 'ready' && 'border-emerald-200/70 bg-emerald-50/75 dark:border-emerald-500/20 dark:bg-emerald-900/10',
+            tone === 'rollback' && 'border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10',
+            !tone && 'border-slate-200/70 bg-slate-50/80 dark:border-white/10 dark:bg-white/5',
+        )}>
             <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">{label}</span>
             <span className="mt-1 block text-xs font-semibold text-slate-900 dark:text-white">{value}</span>
         </div>

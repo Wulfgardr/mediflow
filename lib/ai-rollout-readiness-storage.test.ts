@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
     AI_ROLLOUT_READINESS_LANES,
+    buildAiRolloutLocalControlsPayload,
     buildAiRolloutReadinessArtifactsPayload,
     ensureAiRolloutReadinessArtifactDirectory,
 } from './ai-rollout-readiness-storage.ts';
@@ -32,9 +33,16 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         }), 'utf8');
         fs.writeFileSync(patientInsightPaths.markdownPath, '# Patient Insight verdict', 'utf8');
 
-        const payload = buildAiRolloutReadinessArtifactsPayload();
+        const payload = buildAiRolloutReadinessArtifactsPayload({
+            localControls: buildAiRolloutLocalControlsPayload({
+                patient_insight: 'disabled',
+                smart_import: 'enabled',
+                document_synthesis: false,
+            }),
+        });
 
         assert.equal(payload.lanes.length, AI_ROLLOUT_READINESS_LANES.length);
+        assert.equal(payload.localControls.length, 3);
 
         const patientInsight = payload.lanes.find((lane) => lane.lane === 'patient_insight');
         assert.equal(patientInsight?.available, true);
@@ -42,6 +50,15 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         assert.equal(patientInsight?.markdown, '# Patient Insight verdict');
         assert.equal(patientInsight?.jsonPath, patientInsightPaths.jsonPath);
         assert.equal(patientInsight?.markdownPath, patientInsightPaths.markdownPath);
+
+        const patientInsightControl = payload.localControls.find((control) => control.lane === 'patient_insight');
+        assert.equal(patientInsightControl?.state, 'disabled');
+
+        const smartImportControl = payload.localControls.find((control) => control.lane === 'smart_import');
+        assert.equal(smartImportControl?.state, 'enabled');
+
+        const documentSynthesisControl = payload.localControls.find((control) => control.lane === 'document_synthesis');
+        assert.equal(documentSynthesisControl?.state, 'disabled');
 
         const redaction = payload.lanes.find((lane) => lane.lane === 'redaction');
         assert.equal(redaction?.available, false);

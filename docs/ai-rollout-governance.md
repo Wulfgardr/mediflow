@@ -112,8 +112,13 @@ Rollback significa sempre:
 
 ## Kill-switch operativi attuali
 
-Finche il prodotto non espone kill-switch dedicati, i kill-switch sono
-**operativi**, non UI-driven.
+Stato corrente:
+
+- `patient_insight`, `smart_import` e `document_synthesis` hanno ora
+  kill-switch locali **UI-driven** in `Settings`, ma restano controlli
+  strettamente locali e reversibili
+- `redaction.v1`, `clinical_entities.v1` e gli eventuali challenger
+  `benchmark-only` restano invece kill-switch **operativi**, non UI-driven
 
 Owner iniziale:
 
