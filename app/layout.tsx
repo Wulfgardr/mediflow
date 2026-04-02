@@ -3,6 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 /* @Codex */
 import PreviewProfileChrome from '@/components/preview-profile-chrome';
+import { MobileShellChrome } from '@/components/mobile-shell-chrome';
 import { Sidebar } from '@/components/sidebar';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
@@ -50,12 +51,15 @@ export default function RootLayout({
             <UIStyleProvider>
               {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}
               <PrivacyProvider>
-                <div className="flex">
-                  <Sidebar />
-                  {/* @Codex: align main offset with updated sidebar width */}
-                  <main className="flex-1 ml-80 p-8 min-h-screen">
+                <div className="xl:flex">
+                  <div className="hidden xl:block">
+                    <Sidebar />
+                  </div>
+                  {/* @Codex: use dedicated mobile chrome instead of shrinking the desktop sidebar */}
+                  <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-80 xl:p-8 xl:pb-8">
                     {/* Main Content Area - adding a max-width container for readability */}
                     <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      <MobileShellChrome />
                       <PreviewProfileChrome />
                       {children}
                     </div>
