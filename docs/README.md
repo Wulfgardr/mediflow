@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-03-29
+Ultimo aggiornamento: 2026-04-02
 
 ## Policy di consultazione (agent)
 
@@ -77,6 +77,7 @@ Documenti da consultare **al bisogno**:
 | Runbook benchmark OpenMed redaction | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | `SECONDARY` | Guida operativa per lanciare il benchmark `WUL-96` contro un sidecar locale OpenMed, con env vars, healthcheck e metrica attesa della lane `redaction.v1`. |
 | Runbook benchmark clinical entities | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | `SECONDARY` | Guida operativa per eseguire la thin slice `clinical_entities.v1` con adapter locali benchmark-only, a partire da `HUMADEX`, senza toccare il runtime applicativo. |
 | Runbook benchmark patient insight | [docs/patient-insight-benchmark.md](./patient-insight-benchmark.md) | `SECONDARY` | Guida operativa per misurare `AI Patient Insight` su corpus sintetico dedicato, con scoring su focus, citation discipline e leakage da fonti stale. |
+| Document intelligence lab | [docs/document-intelligence-lab.md](./document-intelligence-lab.md) | `SECONDARY` | Nota operativa per strutturare corpus documentali multi-archetipo e distinguere il corpus canonico `synthetic-only` dal vault locale privato di shadow evaluation. |
 | Stato affidabilita stack AI | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | `SECONDARY` | Dossier tecnico trasversale sullo stato reale delle lane AI, sui problemi incontrati, sui benchmark eseguiti e sul piano di hardening coerente con le ADR correnti. |
 | Piano esecutivo affidabilita AI | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | `SECONDARY` | Traduzione operativa del dossier AI in work package, dipendenze, exit criteria e stop-rules per portare a terra benchmarking, hardening e rollout delle lane AI. |
 | Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Mappa operativa web + native + servizi locali. |
@@ -110,6 +111,7 @@ Documenti da consultare **al bisogno**:
 | ADR AI model parliament and local retention policy | [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | `CANONICAL` | Governa la gara tra modelli generativi locali, il report unificato benchmark+retention e il pruning solo esplicito dei modelli ridondanti, tenendo protetti i ruoli AI attivi. |
 | ADR OpenMed redaction first and separate Italian NER lane | [docs/adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md](./adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md) | `CANONICAL` | Fissa `WUL-96` come workstream lane-specific: `OpenMed` prima su `redaction.v1`, `HUMADEX` primo confronto NER italiano, `OpenMed NER` solo baseline secondaria e nessun confronto diretto con i generativi. |
 | ADR clinical entities evidence-first medication/problem lane | [docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md](./adr/0031-clinical-entities-evidence-first-medication-problem-lane.md) | `CANONICAL` | Apre la thin slice `clinical_entities.v1` limitata a `medication` e `problem`, con output evidence-first, corpus sintetico dedicato e harness benchmark separato prima degli adapter reali `HUMADEX/OpenMed NER`. |
+| ADR document intelligence corpus and private shadow vault | [docs/adr/0032-document-intelligence-corpus-and-private-shadow-vault.md](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md) | `CANONICAL` | Formalizza la strategia a due livelli per la document intelligence: corpus canonico `synthetic-only` in repo e vault locale privato fuori Git per shadow evaluation e failure analysis. |
 
 ## File sovrapposti o secondari
 
