@@ -27,6 +27,10 @@ import {
     type SmartImportReview,
     type SmartImportReviewState,
 } from './patient-smart-import-matching';
+import {
+    AI_SMART_IMPORT_KILL_SWITCH_KEY,
+    assertAiSmartImportEnabledValue,
+} from './ai-smart-import-kill-switch';
 
 export type { SmartImportConfidence, TherapySuggestionState, SmartImportReview, SmartImportReviewState };
 
@@ -772,6 +776,9 @@ async function resolveTherapySuggestion(
 }
 
 export async function generatePatientSmartImportAnalysis(patientId: string): Promise<PatientSmartImportAnalysis> {
+    const smartImportKillSwitch = await db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY);
+    assertAiSmartImportEnabledValue(smartImportKillSwitch?.value);
+
     const patient = await db.patients.get(patientId);
     if (!patient) throw new Error('Paziente non trovato');
 
@@ -908,6 +915,9 @@ export async function applyPatientSmartImportSelection(
         therapyIds: string[];
     }
 ): Promise<ApplySmartImportResult> {
+    const smartImportKillSwitch = await db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY);
+    assertAiSmartImportEnabledValue(smartImportKillSwitch?.value);
+
     const patient = await db.patients.get(patientId);
     if (!patient) throw new Error('Paziente non trovato');
     if (typeof patient.version !== 'number') {
