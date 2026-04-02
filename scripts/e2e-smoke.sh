@@ -17,6 +17,7 @@ mkdir -p "$E2E_DATA_DIR" "$LOG_DIR"
 export MEDIFLOW_DATA_DIR="$E2E_DATA_DIR"
 export E2E_BASE_URL="$BASE_URL"
 export MEDIFLOW_NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next-e2e}"
+E2E_SPECS="${E2E_SPECS:-e2e/web-smoke.spec.ts e2e/document-import.spec.ts}"
 
 if ! node -e "require.resolve('@playwright/test/package.json')" >/dev/null 2>&1; then
   echo "Missing dependency: @playwright/test"
@@ -76,7 +77,8 @@ if ! curl -fsS "$BASE_URL/api/auth/check" >/dev/null 2>&1; then
 fi
 
 echo "Running web smoke test..."
-npx playwright test e2e/web-smoke.spec.ts e2e/document-import.spec.ts --workers=1
+read -r -a PLAYWRIGHT_SPECS <<< "$E2E_SPECS"
+npx playwright test "${PLAYWRIGHT_SPECS[@]}" --workers=1
 
 echo "Smoke run completed."
 echo "Data dir: $E2E_DATA_DIR"

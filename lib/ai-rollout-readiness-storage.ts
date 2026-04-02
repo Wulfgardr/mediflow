@@ -18,6 +18,18 @@ export const AI_ROLLOUT_READINESS_LANES: RolloutReadinessArtifactLane[] = [
     'generative_challenger',
 ];
 
+export type AiRolloutReadinessArtifactsPayload = {
+    lanes: Array<{
+        lane: RolloutReadinessArtifactLane;
+        available: boolean;
+        updatedAt: string | null;
+        jsonPath: string | null;
+        markdownPath: string | null;
+        markdown: string | null;
+        report: Record<string, unknown> | null;
+    }>;
+};
+
 function getDefaultDataDir() {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
@@ -68,4 +80,19 @@ export function readAiRolloutReadinessArtifacts() {
             artifact,
         };
     });
+}
+
+export function buildAiRolloutReadinessArtifactsPayload(): AiRolloutReadinessArtifactsPayload {
+    const artifacts = readAiRolloutReadinessArtifacts();
+    return {
+        lanes: artifacts.map((artifact) => ({
+            lane: artifact.lane,
+            available: artifact.available,
+            updatedAt: artifact.artifact?.updatedAt || null,
+            jsonPath: artifact.artifact?.paths.jsonPath || null,
+            markdownPath: artifact.artifact?.paths.markdownPath || null,
+            markdown: artifact.artifact?.markdown || null,
+            report: artifact.artifact?.report || null,
+        })),
+    };
 }

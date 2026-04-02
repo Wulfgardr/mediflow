@@ -104,7 +104,7 @@ export default function AiRolloutReadinessPanel() {
     const missingCount = lanes.filter((lane) => !lane.available).length;
 
     return (
-        <div className="apple-subsection space-y-4">
+        <div className="apple-subsection space-y-4" data-testid="ai-rollout-readiness-panel">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                     <div className="rounded-2xl bg-sky-100/90 p-2.5 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200">
@@ -184,7 +184,7 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
             tone === 'hold' && 'border-amber-200/70 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-900/10',
             tone === 'rollback' && 'border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10',
             tone === 'missing' && 'border-slate-200/70 bg-slate-50/75 dark:border-white/10 dark:bg-white/5',
-        )}>
+        )} data-testid={`ai-rollout-metric-${tone}`}>
             <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{label}</span>
             <span className="mt-2 block text-xs font-semibold text-slate-900 dark:text-white">{value}</span>
         </div>
@@ -203,7 +203,10 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
             : PauseCircle;
 
     return (
-        <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
+        <div
+            className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5"
+            data-testid={`ai-rollout-lane-${entry.lane}`}
+        >
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <h4 className="text-xs font-semibold text-slate-900 dark:text-white">{meta.label}</h4>
@@ -273,7 +276,10 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
                     />
 
                     {entry.markdown ? (
-                        <details className="mt-3 rounded-[18px] border border-slate-200/70 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5">
+                        <details
+                            className="mt-3 rounded-[18px] border border-slate-200/70 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5"
+                            data-testid={`ai-rollout-markdown-${entry.lane}`}
+                        >
                             <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                                 Preview markdown
                             </summary>
@@ -284,7 +290,10 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
                     ) : null}
                 </>
             ) : (
-                <div className="mt-4 rounded-[18px] border border-dashed border-slate-200/80 bg-slate-50/70 p-4 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                <div
+                    className="mt-4 rounded-[18px] border border-dashed border-slate-200/80 bg-slate-50/70 p-4 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+                    data-testid={`ai-rollout-missing-${entry.lane}`}
+                >
                     <p>Artifact locale mancante per questa lane. Nessun verdict persistito da mostrare.</p>
                     <p className="mt-2 font-mono text-[10px] text-slate-700 dark:text-slate-200">
                         npm run validate:ai-rollout-readiness -- --lane {entry.lane} --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
