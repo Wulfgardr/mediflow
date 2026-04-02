@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-04-03 Codex
+- Opened `WUL-139` as the first light operational consumer on top of `AI-08` by adding a non-blocking rollout guard note in `Settings` whenever the currently selected AI model matches a lane-aware artifact still marked `hold` or `rollback-required`, with a pure derivation helper, local coverage, and a dedicated smoke that drives the custom-model selector path: `lib/ai-rollout-model-guard.ts`, `lib/ai-rollout-model-guard.test.ts`, `components/settings/ai-rollout-guard-notice.tsx`, `app/settings/page.tsx`, `e2e/ai-rollout-guard-settings.spec.ts`, `package.json`
 - Opened `WUL-138` as the next `AI-08` regression-hardening slice by extracting a reusable rollout-readiness contract helper, adding explicit storage coverage for missing-vs-available lanes, and wiring a dedicated Settings Playwright smoke plus harness entrypoint so the read-only governance panel is protected against silent regressions: `lib/ai-rollout-readiness-storage.ts`, `lib/ai-rollout-readiness-storage.test.ts`, `app/api/system/ai-rollout-readiness/route.ts`, `components/settings/ai-rollout-readiness-panel.tsx`, `e2e/ai-rollout-readiness-panel.spec.ts`, `scripts/e2e-smoke.sh`, `package.json`
 
 ## 2026-04-02 Codex
