@@ -12,6 +12,8 @@ import {
 import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from './db';
 /* @Codex */
 import { dedupeDocumentInsightsForContext } from './document-insight-context';
+/* @Codex */
+import { renderDocumentEvidencePackContext } from './document-evidence-pack';
 import { searchICDHybrid, type ICDSearchResult } from './icd-service';
 import { notifyDbChange } from './live-query';
 import {
@@ -316,13 +318,16 @@ function buildSourceRecords(
             const fileName = typeof insight.fileName === 'string' ? insight.fileName.trim() : '';
             if (fileName) insightFileNames.add(fileName.toLowerCase());
 
-            const extractedDiagnoses = Array.isArray(insight.extractedData?.diagnoses)
+            const evidencePackContext = insight.evidencePack
+                ? renderDocumentEvidencePackContext(insight.evidencePack, 420)
+                : '';
+            const extractedDiagnoses = !evidencePackContext && Array.isArray(insight.extractedData?.diagnoses)
                 ? insight.extractedData.diagnoses
                     .map((item) => `${item.system} ${item.code} ${item.description}`)
                     .join(' | ')
                 : '';
             /* @Codex */
-            const extractedMedications = Array.isArray(insight.extractedData?.medications)
+            const extractedMedications = !evidencePackContext && Array.isArray(insight.extractedData?.medications)
                 ? insight.extractedData.medications.join(' | ')
                 : '';
 
@@ -332,7 +337,7 @@ function buildSourceRecords(
                 label: `Documento ${fileName || 'analizzato'}`,
                 date: normalizeDate(insight.date),
                 content: trimSnippet(
-                    [insight.summary, extractedDiagnoses, extractedMedications].filter(Boolean).join('\n'),
+                    [evidencePackContext, insight.summary, extractedDiagnoses, extractedMedications].filter(Boolean).join('\n'),
                     900,
                 ),
             });

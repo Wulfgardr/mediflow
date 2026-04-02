@@ -9,6 +9,8 @@ import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } f
 import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
+/* @Codex */
+import type { DocumentEvidencePack } from './document-evidence-pack';
 
 // Document insight from OCR + AI synthesis
 /* @Codex */
@@ -29,6 +31,8 @@ export interface DocumentInsight {
     fileName: string;
     rawMarkdown: string;  // DeepSeek-OCR output
     summary: string;      // Qwen synthesis on top of OCR text
+    /* @Codex */
+    evidencePack?: DocumentEvidencePack;
     quality?: {
         level: DocumentQualityLevel;
         reason?: string;

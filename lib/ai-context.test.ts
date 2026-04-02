@@ -102,6 +102,59 @@ async function withHarness() {
                                 'Pregabalin 75 mg 1 cp ore 8',
                             ],
                         },
+                        evidencePack: {
+                            schemaVersion: 'mediflow.document_evidence_pack.v2',
+                            source: {
+                                documentInsightId: 'doc-2',
+                                fileName: 'dimissione.pdf',
+                                documentDate: '2025-03-05T00:00:00.000Z',
+                                qualityLevel: 'green',
+                            },
+                            facts: [
+                                {
+                                    id: 'problem:1',
+                                    kind: 'problem',
+                                    label: 'Frattura pertrocanterica del femore sinistro',
+                                    excerpt: 'Frattura pertrocanterica del femore sinistro',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                    code: 'S72.1',
+                                    system: 'ICD-10',
+                                },
+                                {
+                                    id: 'medication:1',
+                                    kind: 'medication',
+                                    label: 'Duloxetina 60 mg 1 cp ore 20',
+                                    excerpt: 'Duloxetina 60 mg 1 cp ore 20',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                },
+                                {
+                                    id: 'medication:2',
+                                    kind: 'medication',
+                                    label: 'Pregabalin 75 mg 1 cp ore 8',
+                                    excerpt: 'Pregabalin 75 mg 1 cp ore 8',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                },
+                                {
+                                    id: 'followup:1',
+                                    kind: 'followup',
+                                    label: 'FKT domiciliare 2-3 volte alla settimana',
+                                    excerpt: 'FKT domiciliare 2-3 volte alla settimana',
+                                    sourceId: 'doc-2',
+                                    temporality: 'planned',
+                                    status: 'planned',
+                                    origin: 'documented',
+                                },
+                            ],
+                        },
                     },
                     {
                         id: 'doc-3',
@@ -238,9 +291,9 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
         assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
         assert.match(prompt, /referto-lab\.pdf: Sintesi: Azotemia in lieve aumento/);
-        assert.match(prompt, /dimissione\.pdf: Diagnosi documentate: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /dimissione\.pdf: Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
         assert.match(prompt, /Terapie documentate: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
-        assert.match(prompt, /FKT domiciliare 2-3/i);
+        assert.match(prompt, /Follow-up documentato: FKT domiciliare 2-3 volte alla settimana \[programmato, pianificato\]/i);
         assert.ok(!prompt.includes('ps.pdf'));
         assert.match(prompt, /eco-cuore\.pdf: Funzione sistolica conservata/);
         assert.ok(!prompt.includes('rx-polmoni.pdf'));

@@ -4,6 +4,8 @@ import {
     getAIInsightRuntimeSettings,
 } from '@/lib/ai-insight-settings';
 /* @Codex */
+import { renderDocumentEvidencePackContext } from '@/lib/document-evidence-pack';
+/* @Codex */
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 /* @Codex */
 import { dedupeDocumentInsightsForContext } from '@/lib/document-insight-context';
@@ -236,7 +238,15 @@ function renderStructuredDocumentData(insight: DocumentInsight): string[] {
 function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number): string {
     const fileName = compactText(insight.fileName, 80);
     const prioritizedParts = [
-        ...renderStructuredDocumentData(insight),
+        ...(insight.evidencePack
+            ? (() => {
+                const rendered = renderDocumentEvidencePackContext(
+                    insight.evidencePack,
+                    Math.min(320, maxChars),
+                );
+                return rendered ? rendered.split(' | ') : [];
+            })()
+            : renderStructuredDocumentData(insight)),
     ];
 
     const structuredEvidence = [

@@ -21,6 +21,8 @@ import {
     buildDocumentExcerpt,
     buildStoredDocumentExcerpt,
 } from './document-excerpt';
+/* @Codex */
+import { buildDocumentEvidencePack } from './document-evidence-pack';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
@@ -162,6 +164,17 @@ export async function synthesizeDocument(
             ? { appliedDiagnoses: appliedCodes }
             : undefined
     };
+
+    insight.evidencePack = buildDocumentEvidencePack({
+        documentInsightId: insight.id,
+        fileName: insight.fileName,
+        documentDate: insight.date.toISOString(),
+        qualityLevel: insight.quality?.level,
+        summary: insight.summary,
+        rawMarkdown: insight.rawMarkdown,
+        diagnoses: analysis.diagnoses,
+        medications: analysis.medications,
+    });
 
     existingInsights.unshift(insight);
     const nextInsights = existingInsights.slice(0, 3);

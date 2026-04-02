@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-04-02 Codex
+- Started `WUL-125` with the first canonical `document evidence pack v2` thin slice: added a shared reviewable fact pack shape for document-derived problems/medications/follow-up/care-setting/functional-status, persisted it on `DocumentInsight`, and wired `Patient Insight` context plus Smart Import document sources to consume the same pack with legacy fallback coverage: `lib/document-evidence-pack.ts`, `lib/document-evidence-pack.test.ts`, `lib/document-synthesis-service.ts`, `lib/ai-context.ts`, `lib/ai-context.test.ts`, `lib/patient-smart-import-service.ts`, `lib/db.ts`
+
 ## 2026-03-31 Codex
 - Added the `WUL-123` AI Patient Insight benchmark lane with a dedicated synthetic corpus, local scorer/validator, runbook, npm wiring, and plan/doc index updates so insight quality is now measured on focus, citations, preferred sources, stale leakage and incomplete-claim burden instead of JSON validity alone: `scripts/benchmark-patient-insight.ts`, `scripts/fixtures/patient-insight-benchmark-corpus.json`, `docs/patient-insight-benchmark.md`, `package.json`, `PLANS.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 - Hardened the shared `Patient Insight` prompt contract against stale chronic-background leakage and fake citation placeholders, with regression coverage for the new prompt rules: `lib/ai-task-contracts.ts`, `lib/ai-task-contracts.test.ts`
