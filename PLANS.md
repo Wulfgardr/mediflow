@@ -73,6 +73,13 @@ Nota operativa:
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`
+- `WUL-132` ha aperto il primo sweep reale `AI-07` su `Gemma 4`:
+  `gemma4:e2b` e `gemma4:e4b` sono benchmarkati su `M4 Max 36 GB` tramite
+  un runtime `Ollama HEAD` isolato, perche la build stabile `0.19.0`
+  dell'app locale non riesce ancora a pullare i manifest Gemma 4; risultato
+  corrente: entrambe passano la chamber contrattuale generativa ma falliscono
+  `Smart Import`, quindi `qwen3.5:35b-a3b` resta baseline protetta e `Gemma 4`
+  resta challenger `hold`
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)

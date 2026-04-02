@@ -173,6 +173,60 @@ Decisione chiave:
 - benchmarkare i generativi `ollama` nel contratto condiviso
 - trattare PII/NER come lane dedicate con benchmark propri
 
+#### Snapshot 2026-04-02: Gemma 4 su `M4 Max 36 GB`
+
+Workstream:
+
+- `WUL-132`
+
+Contesto pratico:
+
+- la build stabile locale `Ollama 0.19.0` non riesce ancora a pullare i
+  manifest `Gemma 4`
+- il benchmark reale e quindi stato eseguito su una build `HEAD` isolata di
+  `ollama`, esposta solo su `127.0.0.1:11435`, senza sostituire il runtime
+  operativo di default dell'app
+- i modelli effettivamente benchmarkati sono stati:
+  - `gemma4:e2b`
+  - `gemma4:e4b`
+  - baseline `qwen3.5:35b-a3b`
+
+Esito sintetico:
+
+- **shared contract chamber**:
+  - `gemma4:e2b` e `gemma4:e4b` passano `jsonValidRate=1` e
+    `contractValidRate=1` sul corpus condiviso
+  - `qwen3.5:35b-a3b` resta piu fragile sul benchmark contrattuale generale
+    (`0.857/0.857` nello sweep osservato)
+- **patient insight dedicated benchmark**:
+  - `qwen3.5:35b-a3b` resta il migliore per qualita clinica/focus
+    (`focusRecall=0.95`, `preferredSourceCoverage=1`)
+  - `gemma4:e4b` e promettente e molto piu veloce
+    (`focusRecall=0.8`, `preferredSourceCoverage=0.933`,
+    `avgLatencyMs=11662`), ma non supera ancora la baseline
+  - `gemma4:e2b` e veloce e disciplinato nel contratto, ma troppo debole sulla
+    resa insight (`focusRecall=0.35`, `currentStateRecall=0`)
+- **smart import / parliament fit**:
+  - nessun modello passa oggi entrambe le chamber
+  - `gemma4:e2b` fallisce soprattutto su `diagnosisRecall=0.4`,
+    `diagnosisQueryRecall=0.2`, `therapyStateRecall=0.6`
+  - `gemma4:e4b` migliora nettamente su `e2b`, ma fallisce ancora su
+    `diagnosisQueryRecall=0.9`, `therapyStateRecall=0.6` e leak proibiti
+    (`forbiddenLeakRate=0.222`)
+  - il parliament resta quindi in stato `hold` e mantiene
+    `qwen3.5:35b-a3b` come baseline protetta
+
+Decisione corrente:
+
+- tenere `gemma4:e4b` come challenger locale promettente
+- tenere `gemma4:e2b` solo come baseline di robustezza/latency, non come
+  candidato operativo per task clinici complessi
+- lasciare `gemma4:26b` e `gemma4:31b` in `hold` finche non viene giustificato
+  il sizing sul Mac corrente
+- non cambiare il default operativo per intuizione: `qwen3.5:35b-a3b` resta il
+  modello protetto fino a superamento reale delle lane `patient_insight` e
+  `smart_import`
+
 ### 7. Lane OpenMed esplorata
 
 Riferimento:
