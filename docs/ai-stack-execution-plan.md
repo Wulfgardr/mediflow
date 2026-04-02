@@ -328,6 +328,7 @@ Runbook canonico:
 - criteri di rollback
 - runbook lane-aware scritto su disco
 - validator CLI locale di readiness/rollout
+- artifact locali persistiti (`json` + `markdown`) per ogni verdict lane-aware
 
 ### Stop-rules
 

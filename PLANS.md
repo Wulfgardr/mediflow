@@ -87,6 +87,9 @@ Nota operativa:
   legge report benchmark gia esistenti e produce uno stato `hold` /
   `shadow-ready` / `rollback-required` senza introdurre ancora automazioni UI o
   runtime
+- `WUL-135` rende il validator reviewable anche fuori dal terminale:
+  persistenza locale canonica del verdict e report Markdown lane-aware,
+  senza ancora introdurre API o superfici UI dedicate
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)

@@ -165,6 +165,10 @@ Il validator:
 - applica i gate lane-aware di questa policy
 - restituisce uno stato tra `hold`, `shadow-ready`, `rollback-required`
 - distingue blocker di metrica da prerequisiti mancanti
+- persiste per default il verdict in locale come JSON + Markdown, in
+  `~/Library/Application Support/MediFlow/ai/rollout-readiness/<lane>/latest.json`
+  e `latest.md` su macOS (oppure sotto `MEDIFLOW_DATA_DIR` se impostata)
+- permette override esplicito con `--out` e `--markdown-out`
 
 Uso consigliato nella first thin slice:
 
