@@ -15,6 +15,10 @@ import {
     splitInsightDiagnostics,
     finalizePatientInsight,
 } from '@/lib/patient-insight';
+import {
+    AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    assertAiPatientInsightEnabledValue,
+} from '@/lib/ai-patient-insight-kill-switch';
 
 export type SummaryStage = 'connect' | 'context' | 'generate' | 'save';
 
@@ -125,6 +129,9 @@ export async function regeneratePatientSummary(
     const task = (async () => {
         const { AIService } = await import('@/lib/ai-service');
         const { buildPatientInsightContext } = await import('@/lib/ai-context');
+
+        const patientInsightKillSwitch = await db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
+        assertAiPatientInsightEnabledValue(patientInsightKillSwitch?.value);
 
         const ai = await AIService.create('clinical');
         const info = ai.getModelInfo();
