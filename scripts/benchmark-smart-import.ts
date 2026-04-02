@@ -13,6 +13,25 @@ import {
     type SmartImportTherapyExtraction,
 } from '../lib/ai-task-contracts.ts';
 
+type SmartImportBenchmarkArchetype =
+    | 'mixed-profile'
+    | 'discharge-letter'
+    | 'emergency-report'
+    | 'specialist-report'
+    | 'clinical-relation'
+    | 'referral'
+    | 'rehab-adi';
+
+const SMART_IMPORT_ARCHETYPES: SmartImportBenchmarkArchetype[] = [
+    'mixed-profile',
+    'discharge-letter',
+    'emergency-report',
+    'specialist-report',
+    'clinical-relation',
+    'referral',
+    'rehab-adi',
+];
+
 type ExpectedDiagnosis = {
     labelTokens: string[];
     icdQueryTokens?: string[];
@@ -26,6 +45,7 @@ type ExpectedTherapy = {
 
 type SmartImportBenchmarkEntry = {
     id: string;
+    archetype?: SmartImportBenchmarkArchetype;
     payload: Record<string, unknown>;
     expected: {
         diagnoses?: ExpectedDiagnosis[];
@@ -38,6 +58,7 @@ type SmartImportBenchmarkEntry = {
 
 type CaseResult = {
     id: string;
+    archetype: SmartImportBenchmarkArchetype;
     iteration: number;
     latencyMs: number;
     validJson: boolean;
@@ -48,8 +69,28 @@ type CaseResult = {
     dosageRecall: number;
     therapyStateRecall: number;
     sourceIdRate: number;
+    reviewUsefulnessRate: number;
     forbiddenLeakCount: number;
+    alreadyPresentLeakCount: number;
     error?: string;
+};
+
+type ArchetypeMetrics = {
+    archetype: SmartImportBenchmarkArchetype;
+    caseCount: number;
+    jsonValidRate: number;
+    contractValidRate: number;
+    diagnosisRecall: number;
+    diagnosisQueryRecall: number;
+    therapyRecall: number;
+    dosageRecall: number;
+    therapyStateRecall: number;
+    sourceIdRate: number;
+    reviewUsefulnessRate: number;
+    forbiddenLeakRate: number;
+    alreadyPresentLeakRate: number;
+    avgLatencyMs: number;
+    p95LatencyMs: number;
 };
 
 type ModelReport = {
@@ -64,10 +105,13 @@ type ModelReport = {
         dosageRecall: number;
         therapyStateRecall: number;
         sourceIdRate: number;
+        reviewUsefulnessRate: number;
         forbiddenLeakRate: number;
+        alreadyPresentLeakRate: number;
         avgLatencyMs: number;
         p95LatencyMs: number;
     };
+    archetypes?: ArchetypeMetrics[];
     cases?: CaseResult[];
     error?: string;
 };
@@ -77,6 +121,7 @@ export type SmartImportBenchmarkReport = {
     baseUrl: string;
     corpusPath: string;
     corpusSize: number;
+    corpusArchetypes: SmartImportBenchmarkArchetype[];
     iterations: number;
     installedModels: string[];
     targetModels: string[];
@@ -159,8 +204,112 @@ function percentile(values: number[], fraction: number): number {
     return Number(sorted[index].toFixed(1));
 }
 
+function normalizeArchetype(value: unknown): SmartImportBenchmarkArchetype {
+    return SMART_IMPORT_ARCHETYPES.includes(value as SmartImportBenchmarkArchetype)
+        ? value as SmartImportBenchmarkArchetype
+        : 'mixed-profile';
+}
+
+function getRecordArray(payload: Record<string, unknown>, key: string): Record<string, unknown>[] {
+    const value = payload[key];
+    if (!Array.isArray(value)) return [];
+
+    return value.filter((item): item is Record<string, unknown> => (
+        Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+    ));
+}
+
+function stringValue(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function buildProbeTokens(...values: Array<string | undefined>): string[] {
+    return Array.from(new Set(
+        values
+            .flatMap((value) => normalizeText(value || '').split(/\s+/))
+            .map((token) => token.trim())
+            .filter((token) => token.length >= 3 || /^[0-9]+$/.test(token))
+    ));
+}
+
+function matchesExistingText(existingTexts: string[], tokens: string[]): boolean {
+    if (tokens.length === 0) return false;
+    return existingTexts.some((text) => includesAllTokens(text, tokens));
+}
+
+function collectCurrentDiagnosisTexts(payload: Record<string, unknown>): string[] {
+    return getRecordArray(payload, 'currentDiagnoses')
+        .map((diagnosis) => [
+            stringValue(diagnosis.system),
+            stringValue(diagnosis.code),
+            stringValue(diagnosis.description),
+        ].filter(Boolean).join(' '))
+        .filter(Boolean);
+}
+
+function collectCurrentTherapies(payload: Record<string, unknown>) {
+    return getRecordArray(payload, 'currentActiveTherapies')
+        .map((therapy) => ({
+            label: [
+                stringValue(therapy.drugName),
+                stringValue(therapy.activePrinciple),
+                stringValue(therapy.aic),
+                stringValue(therapy.atc),
+            ].filter(Boolean).join(' '),
+            dosage: stringValue(therapy.dosage),
+        }))
+        .filter((therapy) => therapy.label.length > 0);
+}
+
+function hasValidSourceId(
+    suggestion: SmartImportDiagnosisExtraction | SmartImportTherapyExtraction,
+    allowedSourceIds: Set<string>
+): boolean {
+    const sourceId = 'sourceId' in suggestion ? suggestion.sourceId : undefined;
+    return typeof sourceId === 'string' && allowedSourceIds.has(sourceId);
+}
+
+function isDiagnosisAlreadyPresent(
+    diagnosis: SmartImportDiagnosisExtraction,
+    currentDiagnosisTexts: string[]
+): boolean {
+    return matchesExistingText(
+        currentDiagnosisTexts,
+        buildProbeTokens(diagnosis.label, diagnosis.icdQuery),
+    );
+}
+
+function matchCurrentTherapy(
+    therapy: Pick<SmartImportTherapyExtraction, 'drugMention' | 'activePrinciple' | 'drugQuery' | 'dosage'>,
+    currentTherapies: Array<{ label: string; dosage: string }>
+) {
+    const therapyTokens = buildProbeTokens(therapy.activePrinciple, therapy.drugMention, therapy.drugQuery);
+    if (therapyTokens.length === 0) {
+        return { related: false, exact: false };
+    }
+
+    const relatedMatches = currentTherapies.filter((existing) => includesAllTokens(existing.label, therapyTokens));
+    if (relatedMatches.length === 0) {
+        return { related: false, exact: false };
+    }
+
+    const dosageTokens = buildProbeTokens(therapy.dosage);
+    const exact = dosageTokens.length === 0
+        ? true
+        : relatedMatches.some((existing) => includesAllTokens(existing.dosage, dosageTokens));
+
+    return {
+        related: true,
+        exact,
+    };
+}
+
 function readCorpus(filePath: string): SmartImportBenchmarkEntry[] {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as SmartImportBenchmarkEntry[];
+    const rawEntries = JSON.parse(fs.readFileSync(filePath, 'utf8')) as SmartImportBenchmarkEntry[];
+    return rawEntries.map((entry) => ({
+        ...entry,
+        archetype: normalizeArchetype(entry.archetype),
+    }));
 }
 
 async function listInstalledModels(baseUrl: string): Promise<string[]> {
@@ -228,7 +377,7 @@ function findTherapyMatch(
     });
 }
 
-function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof parseSmartImportExtractionResponse>): Omit<CaseResult, 'id' | 'iteration' | 'latencyMs' | 'validJson' | 'validTask' | 'error'> {
+function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof parseSmartImportExtractionResponse>): Omit<CaseResult, 'id' | 'archetype' | 'iteration' | 'latencyMs' | 'validJson' | 'validTask' | 'error'> {
     const diagnoses = parsed.value.data.diagnoses;
     const therapies = parsed.value.data.therapies;
     const allowedSourceIds = new Set(
@@ -238,6 +387,8 @@ function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof p
                 .filter((value): value is string => typeof value === 'string' && value.length > 0)
             : [],
     );
+    const currentDiagnosisTexts = collectCurrentDiagnosisTexts(entry.payload);
+    const currentTherapies = collectCurrentTherapies(entry.payload);
 
     const expectedDiagnoses = entry.expected.diagnoses || [];
     const expectedTherapies = entry.expected.therapies || [];
@@ -263,12 +414,48 @@ function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof p
         const sourceId = 'sourceId' in suggestion ? suggestion.sourceId : undefined;
         return typeof sourceId === 'string' && allowedSourceIds.has(sourceId);
     }).length;
+    const usefulDiagnosisTargets = expectedDiagnoses.filter((expected) => (
+        !matchesExistingText(currentDiagnosisTexts, expected.labelTokens)
+    ));
+    const usefulDiagnosisHits = usefulDiagnosisTargets.filter((expected) => {
+        const match = findDiagnosisMatch(diagnoses, expected);
+        return Boolean(match && hasValidSourceId(match, allowedSourceIds));
+    }).length;
+    const usefulTherapyTargets = expectedTherapies.filter((expected) => {
+        if (expected.therapyState && expected.therapyState !== 'active') {
+            return true;
+        }
+        return !matchCurrentTherapy({
+            drugMention: expected.drugTokens.join(' '),
+            activePrinciple: expected.drugTokens.join(' '),
+            drugQuery: expected.drugTokens.join(' '),
+            dosage: expected.dosageTokens?.join(' '),
+        }, currentTherapies).exact;
+    });
+    const usefulTherapyHits = usefulTherapyTargets.filter((expected) => {
+        const match = findTherapyMatch(therapies, expected);
+        if (!match || !hasValidSourceId(match, allowedSourceIds)) return false;
+        if (expected.dosageTokens?.length && !includesAllTokens(match.dosage || '', expected.dosageTokens)) {
+            return false;
+        }
+        if (expected.therapyState && match.therapyState !== expected.therapyState) {
+            return false;
+        }
+        return true;
+    }).length;
 
     const forbiddenDiagnosisHits = (entry.expected.forbiddenDiagnosisTokens || []).filter((tokens) => (
         diagnoses.some((diagnosis) => includesAllTokens([diagnosis.label, diagnosis.icdQuery].join(' '), tokens))
     )).length;
     const forbiddenTherapyHits = (entry.expected.forbiddenTherapyTokens || []).filter((tokens) => (
         therapies.some((therapy) => includesAllTokens([therapy.drugMention, therapy.activePrinciple, therapy.drugQuery].join(' '), tokens))
+    )).length;
+    const alreadyPresentDiagnosisLeaks = diagnoses.filter((diagnosis) => (
+        isDiagnosisAlreadyPresent(diagnosis, currentDiagnosisTexts)
+    )).length;
+    const alreadyPresentTherapyLeaks = therapies.filter((therapy) => (
+        (therapy.therapyState || 'active') === 'active'
+        && matchCurrentTherapy(therapy, currentTherapies).exact
     )).length;
 
     return {
@@ -278,8 +465,44 @@ function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof p
         dosageRecall: toRate(dosageHits, dosageTargets.length),
         therapyStateRecall: toRate(therapyStateHits, therapyStateTargets.length),
         sourceIdRate: toRate(validSourceIdCount, suggestions.length),
+        reviewUsefulnessRate: toRate(
+            usefulDiagnosisHits + usefulTherapyHits,
+            usefulDiagnosisTargets.length + usefulTherapyTargets.length,
+        ),
         forbiddenLeakCount: forbiddenDiagnosisHits + forbiddenTherapyHits,
+        alreadyPresentLeakCount: alreadyPresentDiagnosisLeaks + alreadyPresentTherapyLeaks,
     };
+}
+
+function buildArchetypeBreakdown(cases: CaseResult[]): ArchetypeMetrics[] {
+    return SMART_IMPORT_ARCHETYPES
+        .map((archetype) => {
+            const archetypeCases = cases.filter((entry) => entry.archetype === archetype);
+            if (archetypeCases.length === 0) return null;
+
+            const latencies = archetypeCases.map((entry) => entry.latencyMs).filter((value) => value > 0);
+            const forbiddenTotal = archetypeCases.reduce((sum, entry) => sum + entry.forbiddenLeakCount, 0);
+            const alreadyPresentTotal = archetypeCases.reduce((sum, entry) => sum + entry.alreadyPresentLeakCount, 0);
+
+            return {
+                archetype,
+                caseCount: archetypeCases.length,
+                jsonValidRate: toRate(archetypeCases.filter((entry) => entry.validJson).length, archetypeCases.length),
+                contractValidRate: toRate(archetypeCases.filter((entry) => entry.validTask).length, archetypeCases.length),
+                diagnosisRecall: average(archetypeCases.map((entry) => entry.diagnosisRecall)),
+                diagnosisQueryRecall: average(archetypeCases.map((entry) => entry.diagnosisQueryRecall)),
+                therapyRecall: average(archetypeCases.map((entry) => entry.therapyRecall)),
+                dosageRecall: average(archetypeCases.map((entry) => entry.dosageRecall)),
+                therapyStateRecall: average(archetypeCases.map((entry) => entry.therapyStateRecall)),
+                sourceIdRate: average(archetypeCases.map((entry) => entry.sourceIdRate)),
+                reviewUsefulnessRate: average(archetypeCases.map((entry) => entry.reviewUsefulnessRate)),
+                forbiddenLeakRate: Number((forbiddenTotal / Math.max(1, archetypeCases.length)).toFixed(3)),
+                alreadyPresentLeakRate: Number((alreadyPresentTotal / Math.max(1, archetypeCases.length)).toFixed(3)),
+                avgLatencyMs: average(latencies),
+                p95LatencyMs: percentile(latencies, 0.95),
+            };
+        })
+        .filter((entry): entry is ArchetypeMetrics => Boolean(entry));
 }
 
 async function runModel(baseUrl: string, model: string, corpus: SmartImportBenchmarkEntry[], iterations: number, installedModels: string[]): Promise<ModelReport> {
@@ -305,6 +528,7 @@ async function runModel(baseUrl: string, model: string, corpus: SmartImportBench
 
                     cases.push({
                         id: entry.id,
+                        archetype: entry.archetype || 'mixed-profile',
                         iteration,
                         latencyMs: completion.latencyMs,
                         validJson: parsed.validJson,
@@ -314,6 +538,7 @@ async function runModel(baseUrl: string, model: string, corpus: SmartImportBench
                 } catch (error) {
                     cases.push({
                         id: entry.id,
+                        archetype: entry.archetype || 'mixed-profile',
                         iteration,
                         latencyMs: 0,
                         validJson: false,
@@ -324,7 +549,9 @@ async function runModel(baseUrl: string, model: string, corpus: SmartImportBench
                         dosageRecall: 0,
                         therapyStateRecall: 0,
                         sourceIdRate: 0,
+                        reviewUsefulnessRate: 0,
                         forbiddenLeakCount: 0,
+                        alreadyPresentLeakCount: 0,
                         error: error instanceof Error ? error.message : String(error),
                     });
                 }
@@ -333,11 +560,13 @@ async function runModel(baseUrl: string, model: string, corpus: SmartImportBench
 
         const latencies = cases.map((entry) => entry.latencyMs).filter((value) => value > 0);
         const forbiddenTotal = cases.reduce((sum, entry) => sum + entry.forbiddenLeakCount, 0);
+        const alreadyPresentTotal = cases.reduce((sum, entry) => sum + entry.alreadyPresentLeakCount, 0);
 
         return {
             model,
             status: 'completed',
             cases,
+            archetypes: buildArchetypeBreakdown(cases),
             metrics: {
                 jsonValidRate: toRate(cases.filter((entry) => entry.validJson).length, cases.length),
                 contractValidRate: toRate(cases.filter((entry) => entry.validTask).length, cases.length),
@@ -347,7 +576,9 @@ async function runModel(baseUrl: string, model: string, corpus: SmartImportBench
                 dosageRecall: average(cases.map((entry) => entry.dosageRecall)),
                 therapyStateRecall: average(cases.map((entry) => entry.therapyStateRecall)),
                 sourceIdRate: average(cases.map((entry) => entry.sourceIdRate)),
+                reviewUsefulnessRate: average(cases.map((entry) => entry.reviewUsefulnessRate)),
                 forbiddenLeakRate: Number((forbiddenTotal / Math.max(1, cases.length)).toFixed(3)),
+                alreadyPresentLeakRate: Number((alreadyPresentTotal / Math.max(1, cases.length)).toFixed(3)),
                 avgLatencyMs: average(latencies),
                 p95LatencyMs: percentile(latencies, 0.95),
             },
@@ -371,8 +602,26 @@ function chooseRecommendation(models: ModelReport[]) {
     }
 
     const ranked = [...completed].sort((left, right) => {
-        const leftScore = left.metrics.contractValidRate + left.metrics.diagnosisRecall + left.metrics.diagnosisQueryRecall + left.metrics.therapyRecall + left.metrics.dosageRecall + left.metrics.therapyStateRecall + left.metrics.sourceIdRate - left.metrics.forbiddenLeakRate;
-        const rightScore = right.metrics.contractValidRate + right.metrics.diagnosisRecall + right.metrics.diagnosisQueryRecall + right.metrics.therapyRecall + right.metrics.dosageRecall + right.metrics.therapyStateRecall + right.metrics.sourceIdRate - right.metrics.forbiddenLeakRate;
+        const leftScore = left.metrics.contractValidRate
+            + left.metrics.diagnosisRecall
+            + left.metrics.diagnosisQueryRecall
+            + left.metrics.therapyRecall
+            + left.metrics.dosageRecall
+            + left.metrics.therapyStateRecall
+            + left.metrics.sourceIdRate
+            + left.metrics.reviewUsefulnessRate
+            - left.metrics.forbiddenLeakRate
+            - left.metrics.alreadyPresentLeakRate;
+        const rightScore = right.metrics.contractValidRate
+            + right.metrics.diagnosisRecall
+            + right.metrics.diagnosisQueryRecall
+            + right.metrics.therapyRecall
+            + right.metrics.dosageRecall
+            + right.metrics.therapyStateRecall
+            + right.metrics.sourceIdRate
+            + right.metrics.reviewUsefulnessRate
+            - right.metrics.forbiddenLeakRate
+            - right.metrics.alreadyPresentLeakRate;
 
         if (rightScore !== leftScore) return rightScore - leftScore;
         return left.metrics.avgLatencyMs - right.metrics.avgLatencyMs;
@@ -380,7 +629,7 @@ function chooseRecommendation(models: ModelReport[]) {
 
     return {
         recommendedModel: ranked[0].model,
-        rationale: 'Chosen for the best combined contract validity, diagnosis/query recall, therapy/dosage recall, source tracing, and lowest forbidden leakage.',
+        rationale: 'Chosen for the best combined contract validity, diagnosis/query recall, therapy/dosage recall, source tracing, review usefulness, and lowest forbidden or already-present leakage.',
     };
 }
 
@@ -399,7 +648,7 @@ export async function runSmartImportBenchmark(options: {
 
     const corpus = readCorpus(corpusPath);
     const installedModels = await listInstalledModels(baseUrl);
-    const models = [];
+    const models: ModelReport[] = [];
 
     for (const model of targetModels) {
         models.push(await runModel(baseUrl, model, corpus, iterations, installedModels));
@@ -410,6 +659,7 @@ export async function runSmartImportBenchmark(options: {
         baseUrl,
         corpusPath,
         corpusSize: corpus.length,
+        corpusArchetypes: Array.from(new Set(corpus.map((entry) => entry.archetype || 'mixed-profile'))),
         iterations,
         installedModels,
         targetModels,

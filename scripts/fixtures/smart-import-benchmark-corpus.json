@@ -1,6 +1,7 @@
 [
   {
     "id": "smart-import-current-diagnoses-and-active-therapy",
+    "archetype": "mixed-profile",
     "maxTokens": 1100,
     "payload": {
       "patientId": "bench-smart-quality-1",
@@ -63,6 +64,7 @@
   },
   {
     "id": "smart-import-negation-family-history-guardrail",
+    "archetype": "mixed-profile",
     "maxTokens": 1100,
     "payload": {
       "patientId": "bench-smart-quality-2",
@@ -114,6 +116,7 @@
   },
   {
     "id": "smart-import-therapy-transition-and-uncertain",
+    "archetype": "mixed-profile",
     "maxTokens": 1100,
     "payload": {
       "patientId": "bench-smart-quality-3",
@@ -168,6 +171,346 @@
         {
           "drugTokens": ["furosemide"],
           "therapyState": "uncertain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-discharge-letter-switch-and-dimission-therapy",
+    "archetype": "discharge-letter",
+    "maxTokens": 1200,
+    "payload": {
+      "patientId": "bench-smart-doc-1",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "BA00",
+          "description": "Ipertensione arteriosa essenziale"
+        }
+      ],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Bisoprololo EG",
+          "activePrinciple": "Bisoprololo",
+          "dosage": "2,5 mg 1 cp/die",
+          "aic": "AIC-BISO-25",
+          "atc": "C07AB07"
+        },
+        {
+          "drugName": "Ramipril EG",
+          "activePrinciple": "Ramipril",
+          "dosage": "5 mg 1 cp/die",
+          "aic": "AIC-RAM-5",
+          "atc": "C09AA05"
+        }
+      ],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "doc:discharge-1",
+          "label": "Lettera di dimissione 16/03/2026",
+          "excerpt": "Sospendere bisoprololo 2,5 mg, introdurre nebivololo 5 mg e torasemide 10 mg"
+        }
+      ],
+      "sources": [
+        {
+          "id": "doc:discharge-1",
+          "kind": "document-insight",
+          "label": "Lettera di dimissione cardiologica",
+          "date": "2026-03-16T11:00:00.000Z",
+          "content": "Dimissione cardiologica: scompenso cardiaco cronico riacutizzato e fibrillazione atriale parossistica. Alla dimissione sospendere Bisoprololo 2,5 mg 1 cp/die e sostituire con Nebivololo 5 mg 1 cp/die; iniziare Torasemide 10 mg 1 cp al mattino. Confermare Ramipril 5 mg 1 cp/die."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["scompenso", "cardiaco"],
+          "icdQueryTokens": ["heart", "failure"]
+        },
+        {
+          "labelTokens": ["fibrillazione", "atriale"],
+          "icdQueryTokens": ["atrial", "fibrillation"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["bisoprololo"],
+          "dosageTokens": ["2", "5"],
+          "therapyState": "transition"
+        },
+        {
+          "drugTokens": ["nebivololo"],
+          "dosageTokens": ["5"],
+          "therapyState": "transition"
+        },
+        {
+          "drugTokens": ["torasemide"],
+          "dosageTokens": ["10"],
+          "therapyState": "active"
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-emergency-report-acute-episode-with-stop",
+    "archetype": "emergency-report",
+    "maxTokens": 1200,
+    "payload": {
+      "patientId": "bench-smart-doc-2",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "BA00",
+          "description": "Ipertensione arteriosa essenziale"
+        }
+      ],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "doc:ps-1",
+          "label": "Referto PS 14/03/2026",
+          "excerpt": "Tamsulosina 0,4 mg per 10 giorni; ketorolac sospeso dopo controllo del dolore"
+        }
+      ],
+      "sources": [
+        {
+          "id": "doc:ps-1",
+          "kind": "document-insight",
+          "label": "Referto pronto soccorso",
+          "date": "2026-03-14T20:10:00.000Z",
+          "content": "Accesso in pronto soccorso per colica renale destra da calcolo ureterale distale. Dimesso con Tamsulosina 0,4 mg 1 cps/die per 10 giorni; ketorolac sospeso dopo controllo del dolore. Nega dolore toracico e dispnea."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["colica", "renale"],
+          "icdQueryTokens": ["renal", "colic"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["tamsulosina"],
+          "dosageTokens": ["0", "4"],
+          "therapyState": "active"
+        },
+        {
+          "drugTokens": ["ketorolac"],
+          "therapyState": "inactive"
+        }
+      ],
+      "forbiddenDiagnosisTokens": [
+        ["dolore", "toracico"],
+        ["dispnea"]
+      ]
+    }
+  },
+  {
+    "id": "smart-import-specialist-report-existing-disease-and-dosage-update",
+    "archetype": "specialist-report",
+    "maxTokens": 1200,
+    "payload": {
+      "patientId": "bench-smart-doc-3",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "5A11",
+          "description": "Diabete mellito tipo 2"
+        }
+      ],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Insulina glargine",
+          "activePrinciple": "Insulina glargine",
+          "dosage": "12 UI la sera",
+          "aic": "AIC-GLAR-12",
+          "atc": "A10AE04"
+        },
+        {
+          "drugName": "Metformina",
+          "activePrinciple": "Metformina",
+          "dosage": "1000 mg 1 cp x 2/die",
+          "aic": "AIC-METF-1000",
+          "atc": "A10BA02"
+        }
+      ],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "doc:diab-visit-1",
+          "label": "Referto diabetologico 12/03/2026",
+          "excerpt": "Aumentare insulina glargine a 16 UI serali"
+        }
+      ],
+      "sources": [
+        {
+          "id": "doc:diab-visit-1",
+          "kind": "document-insight",
+          "label": "Referto diabetologico",
+          "date": "2026-03-12T09:20:00.000Z",
+          "content": "Diabete mellito tipo 2 noto. Segni di polineuropatia diabetica sensitivo-motoria. Aumentare insulina glargine a 16 UI serali; continuare Metformina 1000 mg 1 cp x 2/die."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["polineuropatia", "diabetica"],
+          "icdQueryTokens": ["diabetic", "polyneuropathy"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["insulina", "glargine"],
+          "dosageTokens": ["16"],
+          "therapyState": "active"
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-clinical-relation-cognitive-status-and-review-only-therapy",
+    "archetype": "clinical-relation",
+    "maxTokens": 1200,
+    "payload": {
+      "patientId": "bench-smart-doc-4",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "doc:geriatric-1",
+          "label": "Relazione geriatrica 11/03/2026",
+          "excerpt": "Quetiapina 25 mg la sera da rivalutare entro 7 giorni"
+        }
+      ],
+      "sources": [
+        {
+          "id": "doc:geriatric-1",
+          "kind": "document-insight",
+          "label": "Relazione geriatrica territoriale",
+          "date": "2026-03-11T15:00:00.000Z",
+          "content": "Relazione geriatrica territoriale: quadro compatibile con demenza vascolare moderata con disorientamento temporo-spaziale. Per agitazione serale proporre Quetiapina 25 mg la sera, da rivalutare entro 7 giorni. Necessaria supervisione nelle ADL."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["demenza", "vascolare"],
+          "icdQueryTokens": ["vascular", "dementia"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["quetiapina"],
+          "dosageTokens": ["25"],
+          "therapyState": "uncertain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-referral-known-condition-should-not-create-import-noise",
+    "archetype": "referral",
+    "maxTokens": 1100,
+    "payload": {
+      "patientId": "bench-smart-doc-5",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "5A00",
+          "description": "Ipotiroidismo autoimmune"
+        }
+      ],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Levotiroxina",
+          "activePrinciple": "Levotiroxina sodica",
+          "dosage": "75 mcg 1 cp/die",
+          "aic": "AIC-LEVO-75",
+          "atc": "H03AA01"
+        }
+      ],
+      "therapyCandidateHints": [],
+      "sources": [
+        {
+          "id": "doc:referral-1",
+          "kind": "document-insight",
+          "label": "Impegnativa SSN",
+          "date": "2026-03-10T08:00:00.000Z",
+          "content": "Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto; valutare TSH e FT4. Continuare terapia domiciliare come da piano in corso."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [],
+      "therapies": [],
+      "forbiddenDiagnosisTokens": [
+        ["ipotiroidismo"]
+      ],
+      "forbiddenTherapyTokens": [
+        ["levotiroxina"]
+      ]
+    }
+  },
+  {
+    "id": "smart-import-rehab-adi-pressure-ulcer-and-therapy-stop",
+    "archetype": "rehab-adi",
+    "maxTokens": 1200,
+    "payload": {
+      "patientId": "bench-smart-doc-6",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "8B11",
+          "description": "Esiti di ictus ischemico"
+        }
+      ],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Enoxaparina",
+          "activePrinciple": "Enoxaparina sodica",
+          "dosage": "4000 UI 1 fiala/die",
+          "aic": "AIC-ENOX-4000",
+          "atc": "B01AB05"
+        },
+        {
+          "drugName": "Clopidogrel",
+          "activePrinciple": "Clopidogrel",
+          "dosage": "75 mg 1 cp/die",
+          "aic": "AIC-CLOP-75",
+          "atc": "B01AC04"
+        }
+      ],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "doc:adi-1",
+          "label": "Relazione ADI 09/03/2026",
+          "excerpt": "Sospendere enoxaparina 4000 UI; proseguire clopidogrel 75 mg"
+        }
+      ],
+      "sources": [
+        {
+          "id": "doc:adi-1",
+          "kind": "document-insight",
+          "label": "Relazione ADI",
+          "date": "2026-03-09T13:30:00.000Z",
+          "content": "Relazione ADI: paziente con esiti di ictus ischemico ed emiparesi destra. Comparsa ulcera da pressione sacrale stadio II. Alla rivalutazione sospendere Enoxaparina 4000 UI; proseguire Clopidogrel 75 mg 1 cp/die."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": ["ulcera", "pressione", "sacrale"],
+          "icdQueryTokens": ["pressure", "ulcer"]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": ["enoxaparina"],
+          "dosageTokens": ["4000"],
+          "therapyState": "inactive"
         }
       ]
     }
