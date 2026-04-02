@@ -9,6 +9,14 @@ import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
+/* @Codex */
+import PatientDocumentImportReview from '@/components/patient-document-import-review';
+/* @Codex */
+import {
+    buildPatientDocumentReviewDraft,
+    type PatientDocumentReviewDraft,
+    type ReviewedPatientImportDefaults,
+} from '@/lib/patient-document-review';
 
 /* @Codex */
 type ImportedPatientDraft = {
@@ -17,6 +25,7 @@ type ImportedPatientDraft = {
     taxCode?: string;
     birthDate?: Date;
     address?: string;
+    phone?: string;
     notes?: string;
     diagnoses?: {
         code: string;
@@ -30,9 +39,15 @@ export default function NewPatientPage() {
     const router = useRouter();
     const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
     /* @Codex */
+    const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
+    /* @Codex */
+    const [formSeed, setFormSeed] = useState(0);
+    /* @Codex */
     const [importMeta, setImportMeta] = useState<{
         quality?: { level: string; reason?: string };
         diagnosisCount: number;
+        medicationCount: number;
+        reviewPending: boolean;
     } | null>(null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,23 +124,12 @@ export default function NewPatientPage() {
                 <PdfImporter onDataExtracted={(data) => {
                     const imported = data as ExtractedPatientData;
                     /* @Codex */
-                    setImportedData({
-                        firstName: imported.firstName,
-                        lastName: imported.lastName,
-                        taxCode: imported.taxCode,
-                        birthDate: imported.birthDate,
-                        address: imported.address,
-                        notes: imported.documentSummary || imported.notes,
-                        diagnoses: (imported.diagnoses || []).map((diagnosis) => ({
-                            code: diagnosis.code,
-                            description: diagnosis.description,
-                            system: diagnosis.system,
-                            date: new Date()
-                        }))
-                    });
+                    setPendingImportReview(buildPatientDocumentReviewDraft(imported));
                     setImportMeta({
                         quality: imported.documentQuality,
-                        diagnosisCount: imported.diagnoses?.length || 0
+                        diagnosisCount: imported.diagnoses?.length || 0,
+                        medicationCount: imported.medications?.length || 0,
+                        reviewPending: true,
                     });
                 }} />
             </div>
@@ -153,12 +157,14 @@ export default function NewPatientPage() {
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                                Importazione assistita completata
+                                {importMeta.reviewPending ? 'Importazione assistita pronta per review' : 'Importazione assistita applicata al form'}
                             </h3>
                             <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
                                 {importMeta.diagnosisCount > 0
-                                    ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici. Verificare la correttezza della codifica ICD prima della conferma finale.`
-                                    : 'Il documento è stato analizzato correttamente, ma non sono state individuate diagnosi codificabili automaticamente.'}
+                                    ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie candidate` : ''}. Verificare i contenuti nel passaggio intermedio prima della conferma finale.`
+                                    : importMeta.medicationCount > 0
+                                        ? `Sono state estratte ${importMeta.medicationCount} terapie candidate. Conferma o correggi i gruppi proposti prima di applicarli al form.`
+                                        : 'Il documento è stato analizzato correttamente, ma non sono stati individuati campi clinici strutturabili automaticamente.'}
                             </p>
                             {importMeta.quality?.reason && (
                                 <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">
@@ -170,10 +176,36 @@ export default function NewPatientPage() {
                 </div>
             )}
 
+            {/* @Codex */}
+            {pendingImportReview && (
+                <PatientDocumentImportReview
+                    draft={pendingImportReview}
+                    onDismiss={() => {
+                        setPendingImportReview(null);
+                        setImportMeta(null);
+                    }}
+                    onApply={(reviewedDefaults: ReviewedPatientImportDefaults) => {
+                        setImportedData({
+                            firstName: reviewedDefaults.firstName,
+                            lastName: reviewedDefaults.lastName,
+                            taxCode: reviewedDefaults.taxCode,
+                            birthDate: reviewedDefaults.birthDate,
+                            address: reviewedDefaults.address,
+                            phone: reviewedDefaults.phone,
+                            notes: reviewedDefaults.notes,
+                            diagnoses: reviewedDefaults.diagnoses,
+                        });
+                        setPendingImportReview(null);
+                        setImportMeta((current) => current ? { ...current, reviewPending: false } : current);
+                        setFormSeed((current) => current + 1);
+                    }}
+                />
+            )}
+
             <PatientForm
                 onSubmit={onSubmit}
                 defaultValues={importedData || undefined}
-                key={importedData ? 'loaded' : 'empty'}
+                key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
             />
         </div>
     );

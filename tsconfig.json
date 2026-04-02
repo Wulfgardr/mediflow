@@ -40,7 +40,9 @@
     ".next-e2e-smart-import/types/**/*.ts",
     ".next-e2e-smart-import/dev/types/**/*.ts",
     ".next-e2e-smart-import-wul126/types/**/*.ts",
-    ".next-e2e-smart-import-wul126/dev/types/**/*.ts"
+    ".next-e2e-smart-import-wul126/dev/types/**/*.ts",
+    ".next-e2e-wul127/types/**/*.ts",
+    ".next-e2e-wul127/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -68,6 +68,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 try {
                     const analysis = await analyzeDocumentContent(data.rawText);
                     data.diagnoses = analysis.diagnoses;
+                    data.medications = analysis.medications;
                     data.documentQuality = analysis.quality;
                     data.documentSummary = analysis.summary;
                     if (!data.notes && analysis.summary) {
