@@ -16,9 +16,11 @@ type RolloutLane =
 type RolloutArtifactPayload = {
     lanes: Array<{
         lane: RolloutLane;
-        updatedAt: string;
-        jsonPath: string;
-        markdownPath: string;
+        available: boolean;
+        updatedAt: string | null;
+        jsonPath: string | null;
+        markdownPath: string | null;
+        markdown: string | null;
         report: {
             status?: RolloutStatus;
             currentState?: string;
@@ -30,7 +32,7 @@ type RolloutArtifactPayload = {
                 owner?: string | null;
                 reportGeneratedAt?: string | null;
             };
-        };
+        } | null;
     }>;
 };
 
@@ -72,14 +74,6 @@ export default function AiRolloutReadinessPanel() {
         setState((prev) => ({ ...prev, status: 'loading', message: '' }));
         try {
             const response = await fetch('/api/system/ai-rollout-readiness', { cache: 'no-store' });
-            if (response.status === 404) {
-                setState({
-                    status: 'missing',
-                    payload: null,
-                    message: 'Nessun artifact di rollout readiness disponibile. Esegui il validator lane-aware da CLI per popolare i verdict locali.',
-                });
-                return;
-            }
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -104,9 +98,10 @@ export default function AiRolloutReadinessPanel() {
     }, []);
 
     const lanes = state.payload?.lanes || [];
-    const readyCount = lanes.filter((lane) => lane.report.status === 'shadow-ready').length;
-    const holdCount = lanes.filter((lane) => lane.report.status === 'hold').length;
-    const rollbackCount = lanes.filter((lane) => lane.report.status === 'rollback-required').length;
+    const readyCount = lanes.filter((lane) => lane.report?.status === 'shadow-ready').length;
+    const holdCount = lanes.filter((lane) => lane.report?.status === 'hold').length;
+    const rollbackCount = lanes.filter((lane) => lane.report?.status === 'rollback-required').length;
+    const missingCount = lanes.filter((lane) => !lane.available).length;
 
     return (
         <div className="apple-subsection space-y-4">
@@ -154,10 +149,20 @@ export default function AiRolloutReadinessPanel() {
 
             {state.status === 'ready' ? (
                 <div className="space-y-4">
-                    <div className="grid gap-3 md:grid-cols-3">
+                    {missingCount === lanes.length ? (
+                        <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/60 p-4 text-xs leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                            <p>Nessun verdict locale disponibile al momento. La governance AI resta comunque osservabile: tutte le lane note sono elencate qui sotto come `artifact missing`.</p>
+                            <p className="mt-2 font-mono text-[11px] text-slate-700 dark:text-slate-200">
+                                npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
+                            </p>
+                        </div>
+                    ) : null}
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <MetricCard label="Shadow-ready" value={String(readyCount)} tone="ready" />
                         <MetricCard label="Hold" value={String(holdCount)} tone="hold" />
                         <MetricCard label="Rollback richiesto" value={String(rollbackCount)} tone="rollback" />
+                        <MetricCard label="Artifact mancanti" value={String(missingCount)} tone="missing" />
                     </div>
 
                     <div className="grid gap-4 xl:grid-cols-2">
@@ -171,13 +176,14 @@ export default function AiRolloutReadinessPanel() {
     );
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'ready' | 'hold' | 'rollback' }) {
+function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'ready' | 'hold' | 'rollback' | 'missing' }) {
     return (
         <div className={cn(
             'rounded-[18px] border px-3 py-3',
             tone === 'ready' && 'border-emerald-200/70 bg-emerald-50/75 dark:border-emerald-500/20 dark:bg-emerald-900/10',
             tone === 'hold' && 'border-amber-200/70 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-900/10',
             tone === 'rollback' && 'border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10',
+            tone === 'missing' && 'border-slate-200/70 bg-slate-50/75 dark:border-white/10 dark:bg-white/5',
         )}>
             <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{label}</span>
             <span className="mt-2 block text-xs font-semibold text-slate-900 dark:text-white">{value}</span>
@@ -187,9 +193,9 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 
 function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] }) {
     const meta = LANE_META[entry.lane];
-    const status = entry.report.status || 'hold';
-    const blockers = entry.report.blockers || [];
-    const warnings = entry.report.warnings || [];
+    const status = entry.report?.status || (entry.available ? 'hold' : 'missing');
+    const blockers = entry.report?.blockers || [];
+    const warnings = entry.report?.warnings || [];
     const Icon = status === 'shadow-ready'
         ? CheckCircle2
         : status === 'rollback-required'
@@ -208,60 +214,83 @@ function LaneCard({ entry }: { entry: RolloutArtifactPayload['lanes'][number] })
                     status === 'shadow-ready' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
                     status === 'hold' && 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
                     status === 'rollback-required' && 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200',
+                    status === 'missing' && 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200',
                 )}>
                     <Icon className="h-3.5 w-3.5" />
                     {status}
                 </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <MiniMetric label="Current state" value={entry.report.currentState || 'n/d'} />
-                <MiniMetric label="Selected model" value={entry.report.selectedModel || 'n/d'} />
-                <MiniMetric label="Blocker" value={String(blockers.length)} />
-                <MiniMetric label="Warning" value={String(warnings.length)} />
-            </div>
+            {entry.available && entry.report ? (
+                <>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <MiniMetric label="Current state" value={entry.report.currentState || 'n/d'} />
+                        <MiniMetric label="Selected model" value={entry.report.selectedModel || 'n/d'} />
+                        <MiniMetric label="Blocker" value={String(blockers.length)} />
+                        <MiniMetric label="Warning" value={String(warnings.length)} />
+                    </div>
 
-            <div className="mt-4 space-y-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                <p>
-                    Benchmark fresh:{' '}
-                    <span className="font-medium text-slate-700 dark:text-slate-200">
-                        {entry.report.evidence?.benchmarkFresh ? 'yes' : 'no'}
-                    </span>
-                </p>
-                <p>
-                    Owner:{' '}
-                    <span className="font-medium text-slate-700 dark:text-slate-200">
-                        {entry.report.evidence?.owner || 'n/d'}
-                    </span>
-                </p>
-                <p>
-                    Aggiornato:{' '}
-                    <span className="font-mono text-slate-700 dark:text-slate-200">{entry.updatedAt}</span>
-                </p>
-                <p>
-                    JSON:{' '}
-                    <span className="font-mono text-slate-700 dark:text-slate-200">{entry.jsonPath}</span>
-                </p>
-                <p>
-                    Markdown:{' '}
-                    <span className="font-mono text-slate-700 dark:text-slate-200">{entry.markdownPath}</span>
-                </p>
-            </div>
+                    <div className="mt-4 space-y-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                        <p>
+                            Benchmark fresh:{' '}
+                            <span className="font-medium text-slate-700 dark:text-slate-200">
+                                {entry.report.evidence?.benchmarkFresh ? 'yes' : 'no'}
+                            </span>
+                        </p>
+                        <p>
+                            Owner:{' '}
+                            <span className="font-medium text-slate-700 dark:text-slate-200">
+                                {entry.report.evidence?.owner || 'n/d'}
+                            </span>
+                        </p>
+                        <p>
+                            Aggiornato:{' '}
+                            <span className="font-mono text-slate-700 dark:text-slate-200">{entry.updatedAt || 'n/d'}</span>
+                        </p>
+                        <p>
+                            JSON:{' '}
+                            <span className="font-mono text-slate-700 dark:text-slate-200">{entry.jsonPath || 'n/d'}</span>
+                        </p>
+                        <p>
+                            Markdown:{' '}
+                            <span className="font-mono text-slate-700 dark:text-slate-200">{entry.markdownPath || 'n/d'}</span>
+                        </p>
+                    </div>
 
-            <DetailList
-                className="mt-4"
-                title="Blocker"
-                emptyLabel="Nessun blocker attivo."
-                tone="blocker"
-                items={blockers.map((blocker) => `${blocker.id || 'unknown'}: ${blocker.message || 'n/d'}`)}
-            />
-            <DetailList
-                className="mt-3"
-                title="Warning"
-                emptyLabel="Nessun warning."
-                tone="warning"
-                items={warnings.map((warning) => `${warning.id || 'unknown'}: ${warning.message || 'n/d'}`)}
-            />
+                    <DetailList
+                        className="mt-4"
+                        title="Blocker"
+                        emptyLabel="Nessun blocker attivo."
+                        tone="blocker"
+                        items={blockers.map((blocker) => `${blocker.id || 'unknown'}: ${blocker.message || 'n/d'}`)}
+                    />
+                    <DetailList
+                        className="mt-3"
+                        title="Warning"
+                        emptyLabel="Nessun warning."
+                        tone="warning"
+                        items={warnings.map((warning) => `${warning.id || 'unknown'}: ${warning.message || 'n/d'}`)}
+                    />
+
+                    {entry.markdown ? (
+                        <details className="mt-3 rounded-[18px] border border-slate-200/70 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5">
+                            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                Preview markdown
+                            </summary>
+                            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                {entry.markdown}
+                            </pre>
+                        </details>
+                    ) : null}
+                </>
+            ) : (
+                <div className="mt-4 rounded-[18px] border border-dashed border-slate-200/80 bg-slate-50/70 p-4 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                    <p>Artifact locale mancante per questa lane. Nessun verdict persistito da mostrare.</p>
+                    <p className="mt-2 font-mono text-[10px] text-slate-700 dark:text-slate-200">
+                        npm run validate:ai-rollout-readiness -- --lane {entry.lane} --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

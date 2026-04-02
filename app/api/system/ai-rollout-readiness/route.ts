@@ -11,18 +11,15 @@ export async function GET() {
 
     try {
         const artifacts = readAiRolloutReadinessArtifacts();
-        if (artifacts.length === 0) {
-            return NextResponse.json({ error: 'AI rollout readiness artifacts not found.' }, { status: 404 });
-        }
-
         return NextResponse.json({
             lanes: artifacts.map((artifact) => ({
                 lane: artifact.lane,
-                updatedAt: artifact.updatedAt,
-                jsonPath: artifact.paths.jsonPath,
-                markdownPath: artifact.paths.markdownPath,
-                markdown: artifact.markdown,
-                report: artifact.report,
+                available: artifact.available,
+                updatedAt: artifact.artifact?.updatedAt || null,
+                jsonPath: artifact.artifact?.paths.jsonPath || null,
+                markdownPath: artifact.artifact?.paths.markdownPath || null,
+                markdown: artifact.artifact?.markdown || null,
+                report: artifact.artifact?.report || null,
             })),
         });
     } catch (error) {

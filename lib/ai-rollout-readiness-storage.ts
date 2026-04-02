@@ -60,8 +60,12 @@ export function readAiRolloutReadinessArtifact(lane: RolloutReadinessArtifactLan
 }
 
 export function readAiRolloutReadinessArtifacts() {
-    return AI_ROLLOUT_READINESS_LANES.flatMap((lane) => {
+    return AI_ROLLOUT_READINESS_LANES.map((lane) => {
         const artifact = readAiRolloutReadinessArtifact(lane);
-        return artifact ? [{ lane, ...artifact }] : [];
+        return {
+            lane,
+            available: Boolean(artifact),
+            artifact,
+        };
     });
 }
