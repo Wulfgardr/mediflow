@@ -3,11 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
+import { useLiveQuery } from '@/lib/live-query';
+import { db } from '@/lib/db';
 import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    AiDocumentSynthesisDisabledError,
+    isAiDocumentSynthesisEnabledValue,
+} from '@/lib/ai-document-synthesis-kill-switch';
 
 interface PdfImporterProps {
     onDataExtracted: (data: ExtractedPatientData) => void;
@@ -26,6 +33,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
     const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
+    const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
+    const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     /* @Codex */
     useEffect(() => {
@@ -61,7 +70,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             const data = await extractPatientDataSmart(file);
 
             /* @Codex */
-            if (!patientId && data.rawText) {
+            if (!patientId && data.rawText && documentSynthesisEnabled) {
                 setIsSynthesizing(true);
                 /* @Codex */
                 setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
@@ -75,7 +84,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                         data.notes = analysis.summary;
                     }
                 } catch (analysisError) {
-                    console.error('Document analysis error:', analysisError);
+                    if (!(analysisError instanceof AiDocumentSynthesisDisabledError)) {
+                        console.error('Document analysis error:', analysisError);
+                    }
                 } finally {
                     setIsSynthesizing(false);
                 }
@@ -86,7 +97,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             setSuccess(true);
 
             // Auto-save to archive if enabled and patientId is present
-            if (saveToArchive && patientId && data.rawText) {
+            if (saveToArchive && patientId && data.rawText && documentSynthesisEnabled) {
                 setIsSynthesizing(true);
                 /* @Codex */
                 setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
@@ -97,7 +108,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     setAiStage("Aggiornamento AI Patient Summary...");
                     await regeneratePatientSummary(patientId);
                 } catch (synthErr) {
-                    console.error('Synthesis error:', synthErr);
+                    if (!(synthErr instanceof AiDocumentSynthesisDisabledError)) {
+                        console.error('Synthesis error:', synthErr);
+                    }
                     // Don't fail the whole operation, just note the archive wasn't saved
                 } finally {
                     setIsSynthesizing(false);
@@ -227,6 +240,15 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     </div>
                 )}
             </div>
+
+            {!documentSynthesisEnabled && (
+                <div
+                    className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    data-testid="document-synthesis-disabled-note"
+                >
+                    La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi reviewable, terapie candidate e Archivio Intelligente non vengono generati.
+                </div>
+            )}
         </div>
     );
 }

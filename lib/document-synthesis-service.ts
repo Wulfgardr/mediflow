@@ -23,6 +23,10 @@ import {
 } from './document-excerpt';
 /* @Codex */
 import { buildDocumentEvidencePack } from './document-evidence-pack';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    assertAiDocumentSynthesisEnabledValue,
+} from './ai-document-synthesis-kill-switch';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
@@ -116,6 +120,9 @@ function mergeDiagnoses(
  * Analyze OCR text without persisting anything.
  */
 export async function analyzeDocumentContent(rawMarkdown: string): Promise<DocumentStructuredAnalysis> {
+    const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+    assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
+
     const ai = await AIService.create('clinical');
     const sliced = buildDocumentExcerpt(rawMarkdown, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1024);
@@ -130,6 +137,9 @@ export async function synthesizeDocument(
     fileName: string,
     patientId: string
 ): Promise<DocumentInsight> {
+    const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+    assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
+
     const analysis = await analyzeDocumentContent(rawMarkdown);
 
     const patient = await db.patients.get(patientId);

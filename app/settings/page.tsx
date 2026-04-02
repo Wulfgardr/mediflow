@@ -415,6 +415,8 @@ export default function SettingsPage() {
         aiHealth,
         patientInsightEnabled,
         setPatientInsightEnabled,
+        documentSynthesisEnabled,
+        setDocumentSynthesisEnabled,
         smartImportEnabled,
         setSmartImportEnabled,
         selectedInsightMode,
@@ -1172,6 +1174,47 @@ export default function SettingsPage() {
                                             checked={!patientInsightEnabled}
                                             onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
                                             aria-label="Disabilita Patient Insight localmente"
+                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                className={cn(
+                                    "rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(79,70,229,0.06)]",
+                                    documentSynthesisEnabled
+                                        ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                        : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
+                                )}
+                                data-testid="document-synthesis-kill-switch-card"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Kill switch Document Synthesis</p>
+                                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                            Se spento, OCR e import base restano disponibili, ma il path runtime rifiuta analisi clinica e archivio intelligente del documento in modo deterministico.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <label
+                                            htmlFor="documentSynthesisKillSwitch"
+                                            className={cn(
+                                                "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                                                documentSynthesisEnabled
+                                                    ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
+                                                    : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
+                                            )}
+                                        >
+                                            {documentSynthesisEnabled ? 'Enabled' : 'Disabled'}
+                                        </label>
+                                        <input
+                                            id="documentSynthesisKillSwitch"
+                                            type="checkbox"
+                                            checked={!documentSynthesisEnabled}
+                                            onChange={(e) => setDocumentSynthesisEnabled(!e.target.checked)}
+                                            aria-label="Disabilita Document Synthesis localmente"
                                             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
                                         />
                                     </div>

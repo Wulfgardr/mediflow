@@ -7,6 +7,11 @@ import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { useLiveQuery } from '@/lib/live-query';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    AiDocumentSynthesisDisabledError,
+    isAiDocumentSynthesisEnabledValue,
+} from '@/lib/ai-document-synthesis-kill-switch';
 /* @Codex */
 import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 /* @Codex */
@@ -45,6 +50,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         },
         [patientId]
     );
+    const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
+    const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
 
 
@@ -74,11 +81,21 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             rawText = await extractDocumentTextForSummary(file);
                         }
 
-                        if (rawText) {
+                        if (rawText && documentSynthesisEnabled) {
                             setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
-                            const insight = await synthesizeDocument(rawText, file.name, patientId);
-                            summary = insight.summary;
-                            shouldRefreshSummary = true;
+                            try {
+                                const insight = await synthesizeDocument(rawText, file.name, patientId);
+                                summary = insight.summary;
+                                shouldRefreshSummary = true;
+                            } catch (synthesisError) {
+                                if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
+                                    summary = 'Sintesi clinica documento disabilitata localmente.';
+                                } else {
+                                    throw synthesisError;
+                                }
+                            }
+                        } else if (rawText && !documentSynthesisEnabled) {
+                            summary = 'Sintesi clinica documento disabilitata localmente.';
                         } else if (extracted.notes) {
                             summary = extracted.notes;
                         } else {
@@ -127,7 +144,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         setIsProcessing(false);
         /* @Codex */
         setAiStage("");
-    }, [patientId, aiModels]);
+    }, [patientId, aiModels, documentSynthesisEnabled]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
@@ -170,6 +187,15 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}
                         </div>
                     )}
+                </div>
+            )}
+
+            {!documentSynthesisEnabled && (
+                <div
+                    className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    data-testid="document-upload-synthesis-disabled-note"
+                >
+                    La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.
                 </div>
             )}
 

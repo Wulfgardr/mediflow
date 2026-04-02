@@ -12,7 +12,10 @@ test('patient insight kill switch disables generation on patient detail', async 
 
   const killSwitch = page.getByLabel('Disabilita Patient Insight localmente');
   await killSwitch.check();
-  await page.getByRole('button', { name: 'Salva Configurazione' }).click();
+  const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
+  await saveButton.click();
+  await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
+  await expect(saveButton).toBeEnabled();
 
   const patientId = await page.evaluate(async () => {
     const response = await fetch('/api/patients', {
