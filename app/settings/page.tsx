@@ -20,6 +20,8 @@ import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller'
 /* @Codex */
 import AiModelParliamentPanel from '@/components/settings/ai-model-parliament-panel';
 /* @Codex */
+import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-panel';
+/* @Codex */
 import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 /* @Codex */
 import {
@@ -1297,6 +1299,7 @@ export default function SettingsPage() {
                         )}
 
                         <AiModelParliamentPanel />
+                        <AiRolloutReadinessPanel />
                     </div>
                 </div>
                     </section>
