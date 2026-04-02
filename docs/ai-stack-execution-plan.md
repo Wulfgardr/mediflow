@@ -327,6 +327,7 @@ Runbook canonico:
 - policy di fallback
 - criteri di rollback
 - runbook lane-aware scritto su disco
+- validator CLI locale di readiness/rollout
 
 ### Stop-rules
 

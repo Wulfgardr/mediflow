@@ -145,6 +145,35 @@ deve portare con se:
 - fallback e stop-rules citate esplicitamente
 - nota chiara su cosa e stato verificato e cosa no
 
+## Check eseguibile minimo
+
+Primo artifact eseguibile di `AI-08`:
+
+```bash
+npm run validate:ai-rollout-readiness -- \
+  --lane patient_insight \
+  --report /tmp/patient-insight.json \
+  --model qwen3.5:35b-a3b \
+  --fallback-written \
+  --owner leonardo \
+  --license-clear
+```
+
+Il validator:
+
+- legge un artifact benchmark gia prodotto
+- applica i gate lane-aware di questa policy
+- restituisce uno stato tra `hold`, `shadow-ready`, `rollback-required`
+- distingue blocker di metrica da prerequisiti mancanti
+
+Uso consigliato nella first thin slice:
+
+- `patient_insight`: report di `scripts/benchmark-patient-insight.ts`
+- `smart_import`: report di `scripts/benchmark-smart-import.ts`
+- `redaction`: artifact di `scripts/benchmark-redaction-validate.ts`
+- `clinical_entities`: artifact di `scripts/benchmark-clinical-entities-validate.ts`
+- `generative_challenger`: artifact di `scripts/benchmark-model-parliament.ts`
+
 ## Snapshot corrente
 
 Al `2026-04-02`, il quadro prudente e questo:
