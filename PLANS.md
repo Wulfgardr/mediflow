@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-03-29
+Ultimo aggiornamento: 2026-04-02
 
 ---
 
@@ -70,6 +70,9 @@ Nota operativa:
 - la sequenza esecutiva dettagliata e in [docs/ai-stack-execution-plan.md](./docs/ai-stack-execution-plan.md)
 - il contesto tecnico e i benchmark gia eseguiti restano documentati in [docs/ai-stack-reliability-review.md](./docs/ai-stack-reliability-review.md)
 - `AI-03` e ora tracciato in `WUL-123` come harness locale dedicato per corpus, scoring e validator di `Patient Insight`
+- `WUL-131` apre la governance del `document intelligence lab`: corpus
+  canonico `synthetic-only` in repo + vault locale privato per shadow
+  evaluation, come ponte tra `WUL-129` e `WUL-111`
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)

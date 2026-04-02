@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-03-23
+Ultimo aggiornamento: 2026-04-02
 
 ## Come usare questo indice
 
@@ -67,6 +67,7 @@ Ultimo aggiornamento: 2026-03-23
 | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
 | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |
 | [docs/patient-insight-benchmark.md](./patient-insight-benchmark.md) | Runbook operativo per misurare `AI Patient Insight` con corpus sintetico dedicato, scoring su focus/citations e validator locale anti-regressione. | Quando si toccano prompt, guardrail o context builder dell'insight e serve un benchmark piu utile del solo controllo JSON. |
+| [docs/document-intelligence-lab.md](./document-intelligence-lab.md) | Nota operativa per organizzare il document intelligence lab: corpus canonico `synthetic-only` in repo, vault locale privato fuori Git e shape minima dei casi multi-archetipo. | Quando si progettano nuovi archetipi documentali, shadow evaluation locale o benchmark cross-lane su document intelligence. |
 | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | Dossier tecnico trasversale sullo stato reale dello stack AI, sugli incidenti incontrati, sui benchmark gia eseguiti e sulle priorita di hardening. | Quando serve una vista unica su current state AI, colli di bottiglia, benchmark e prossime mosse affidabili. |
 | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | Piano operativo work-package per portare a terra benchmark resolver, hardening Smart Import/Insight, lane PII e rollout prudente dello stack AI. | Quando serve passare dal dossier AI alla sequenza concreta di implementazione con dipendenze ed exit criteria. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
@@ -117,6 +118,7 @@ Ultimo aggiornamento: 2026-03-23
 | [docs/adr/0029-ai-model-parliament-and-local-retention-policy.md](./adr/0029-ai-model-parliament-and-local-retention-policy.md) | Introduce il parlamento dei modelli AI locali per unire benchmark, retention e pruning esplicito dei modelli ridondanti senza toccare automaticamente i ruoli attivi nei settings. |
 | [docs/adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md](./adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md) | Separa `WUL-96` in lane benchmark dedicate: `OpenMed` prima su `redaction.v1`, `HUMADEX` primo confronto NER italiano e `OpenMed NER` solo baseline secondaria, senza gara diretta contro i generativi. |
 | [docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md](./adr/0031-clinical-entities-evidence-first-medication-problem-lane.md) | Apre la thin slice `clinical_entities.v1` limitata a `medication` e `problem`, con contratto evidence-first, corpus sintetico italiano e harness benchmark separato prima degli adapter reali `HUMADEX/OpenMed NER`. |
+| [docs/adr/0032-document-intelligence-corpus-and-private-shadow-vault.md](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md) | Formalizza la strategia a due livelli per la document intelligence: corpus canonico `synthetic-only` in repo e vault locale privato fuori Git per shadow evaluation e failure analysis. |
 
 ## Checklist manutenzione indice
 
