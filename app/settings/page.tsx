@@ -312,6 +312,8 @@ const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white
 /* @Codex */
 const SETTINGS_LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
 /* @Codex */
+const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
+/* @Codex */
 const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
     emerald: 'inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(5,150,105,0.22)] transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50',
     amber: 'inline-flex items-center gap-2 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(217,119,6,0.22)] transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50',
