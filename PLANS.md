@@ -80,6 +80,9 @@ Nota operativa:
   corrente: entrambe passano la chamber contrattuale generativa ma falliscono
   `Smart Import`, quindi `qwen3.5:35b-a3b` resta baseline protetta e `Gemma 4`
   resta challenger `hold`
+- `WUL-133` apre la prima thin slice vera di `AI-08`: runbook canonico
+  lane-aware per `shadow mode`, fallback, rollback e kill-switch, senza ancora
+  spostare nel prodotto la governance di rollout
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)
