@@ -16,6 +16,11 @@ import {
     type AIInsightManualConfig,
     type AIInsightMode,
 } from '@/lib/ai-insight-settings';
+import {
+    AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    isAiPatientInsightEnabledValue,
+    serializeAiPatientInsightKillSwitchState,
+} from '@/lib/ai-patient-insight-kill-switch';
 
 type HardwareProfile = 'low' | 'medium' | 'high' | 'custom';
 
@@ -53,6 +58,7 @@ export function useAiSettingsController() {
     const [isSavingAi, setIsSavingAi] = useState(false);
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [aiHealth, setAiHealth] = useState<AIHealthState | null>(null);
+    const [patientInsightEnabled, setPatientInsightEnabled] = useState(true);
 
     useEffect(() => {
         void loadAiConfig();
@@ -85,6 +91,7 @@ export function useAiSettingsController() {
             const legacyModel = await safeGet('aiModel');
             const genericUrl = await safeGet('aiUrl');
             const legacyUrl = await safeGet('ollamaUrl');
+            const patientInsightKillSwitch = await safeGet(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
@@ -103,6 +110,7 @@ export function useAiSettingsController() {
                 mode: insightSettings.mode,
                 manualConfig: insightSettings.manualConfig,
             });
+            setPatientInsightEnabled(isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value));
         } catch (e) {
             console.error('Failed to load AI config:', e);
         }
@@ -151,6 +159,10 @@ export function useAiSettingsController() {
             await db.settings.put({ key: 'aiModel', value: aiConfig.model_clinical });
             await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
             await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
+            await db.settings.put({
+                key: AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+                value: serializeAiPatientInsightKillSwitchState(patientInsightEnabled),
+            });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
         } catch (e) {
@@ -237,6 +249,8 @@ export function useAiSettingsController() {
         isSavingAi,
         aiTestStatus,
         aiHealth,
+        patientInsightEnabled,
+        setPatientInsightEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         applyHardwareProfile,

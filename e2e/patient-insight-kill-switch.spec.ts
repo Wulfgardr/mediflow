@@ -1,0 +1,46 @@
+/* @Codex */
+import { expect, test } from '@playwright/test';
+import { bootstrapUnlockedSession } from './utils';
+
+test('patient insight kill switch disables generation on patient detail', async ({ page }) => {
+  const pin = process.env.E2E_PIN || '1234';
+
+  await bootstrapUnlockedSession(page, pin);
+
+  await page.getByRole('link', { name: 'Impostazioni' }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+
+  const killSwitch = page.getByLabel('Disabilita Patient Insight localmente');
+  await killSwitch.check();
+  await page.getByRole('button', { name: 'Salva Configurazione' }).click();
+
+  const patientId = await page.evaluate(async () => {
+    const response = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: 'Kill',
+        lastName: 'Switch',
+        taxCode: `KILLSWITCH${Date.now()}`,
+        address: 'Via Test 1',
+        phone: '1234567890',
+      }),
+    });
+
+    const payload = await response.json() as { id?: string; error?: string };
+    if (!response.ok || !payload.id) {
+      throw new Error(payload.error || `Patient creation failed with HTTP ${response.status}`);
+    }
+
+    return payload.id;
+  });
+
+  await page.goto(`/patients/${patientId}`);
+  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}$`));
+
+  const disabledCard = page.getByTestId('patient-insight-disabled-card');
+  await expect(disabledCard).toBeVisible();
+  await expect(disabledCard).toContainText('Patient Insight disabilitata');
+  await expect(disabledCard).toContainText('Apri Impostazioni AI');
+  await expect(page.getByRole('button', { name: 'Genera Insight' })).toHaveCount(0);
+});

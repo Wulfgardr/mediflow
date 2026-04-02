@@ -2,13 +2,20 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
-import { Patient } from '@/lib/db';
+import { db, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
+import Link from 'next/link';
+import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
 /* @Codex */
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
+import {
+    AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    AiPatientInsightDisabledError,
+    isAiPatientInsightEnabledValue,
+} from '@/lib/ai-patient-insight-kill-switch';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -20,6 +27,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     const [error, setError] = useState<string | null>(null);
     /* @Codex */
     const [modelLabel, setModelLabel] = useState<string>("");
+    /* @Codex */
+    const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
 
     const abortControllerRef = useRef<AbortController | null>(null);
     /* @Codex */
@@ -35,6 +44,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     const diagnostics = splitInsightDiagnostics(patient.aiSummary || '');
     /* @Codex */
     const hasDiagnostics = Boolean(diagnostics.sourcesMarkdown || diagnostics.limitsMarkdown);
+    /* @Codex */
+    const patientInsightEnabled = isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value);
 
     /* @Codex */
     useEffect(() => {
@@ -46,6 +57,11 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     }, []);
 
     const generateInsight = async () => {
+        if (!patientInsightEnabled) {
+            setError("Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare nuovi insight.");
+            return;
+        }
+
         setIsGenerating(true);
         setError(null);
         setProgress("Inizializzazione...");
@@ -81,6 +97,10 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 return;
             }
             console.error("AI Insight Error:", err);
+            if (err instanceof AiPatientInsightDisabledError) {
+                setError("Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare nuovi insight.");
+                return;
+            }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const msg = (err as any)?.message || "Errore sconosciuto";
             setError(msg.includes('Failed to fetch')
@@ -110,6 +130,35 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
         }
     };
 
+
+    if (!patient.aiSummary && !isGenerating && !patientInsightEnabled) {
+        return (
+            <div
+                className="glass-panel overflow-hidden rounded-[28px] border-red-200/70 bg-red-50/20 p-6 backdrop-blur-xl dark:border-red-500/20 dark:bg-red-950/10"
+                data-testid="patient-insight-disabled-card"
+            >
+                <div className="flex flex-col items-center text-center space-y-5">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-red-100 text-red-600 shadow-[0_12px_24px_rgba(239,68,68,0.12)] dark:bg-red-500/10 dark:text-red-300">
+                        <AlertTriangle className="w-8 h-8" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Patient Insight disabilitata</h3>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia nuove generazioni finché il toggle non viene riattivato in Impostazioni.
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/settings#ai"
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                        Apri Impostazioni AI
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     if (!patient.aiSummary && !isGenerating) {
         return (
@@ -162,7 +211,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
                     <button
                         onClick={generateInsight}
-                        disabled={isGenerating}
+                        disabled={isGenerating || !patientInsightEnabled}
                         className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
                     >
                         {isGenerating ? (
@@ -170,7 +219,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         ) : (
                             <RefreshCw className="w-3.5 h-3.5" />
                         )}
-                        {isGenerating ? 'Analisi...' : 'Aggiorna'}
+                        {isGenerating ? 'Analisi...' : patientInsightEnabled ? 'Aggiorna' : 'Disabilitata'}
                     </button>
                 </div>
             </div>
@@ -180,6 +229,19 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     <div className="mb-4 flex items-center gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-600">
                         <AlertTriangle className="w-4 h-4 shrink-0" />
                         {error}
+                    </div>
+                )}
+
+                {!patientInsightEnabled && (
+                    <div
+                        className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
+                        data-testid="patient-insight-disabled-banner"
+                    >
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Patient Insight disabilitata localmente</p>
+                            <p className="mt-1">Puoi consultare l&apos;ultimo insight salvato, ma la rigenerazione resta bloccata finché non riattivi il toggle in Impostazioni.</p>
+                        </div>
                     </div>
                 )}
 
