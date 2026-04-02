@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "mediflow.document_case_pack.v1",
+  "id": "doc-lab-discharge-femur-001",
+  "archetype": "discharge-letter",
+  "title": "Dimissione ortopedica con follow-up e rumore anamnestico",
+  "sourceText": "Lettera di dimissione ortopedica del 20/03/2026. Diagnosi: frattura pertrocanterica del femore sinistro trattata chirurgicamente. Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino. Indicazioni: controllo ortopedico tra 7 giorni, fisioterapia domiciliare 3 volte/settimana, ADI infermieristica per medicazione ferita. Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti. Anamnesi remota: pregressa frattura di polso destro guarita. Familiarita: madre con carcinoma mammario.",
+  "ocrVariant": "Lettera di dimissione ortopedica del 20/03/2026. Diagnosi: frattura pertrocantcrica del femore sinistro trattata chirurgicamcnte. Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino. Indicazioni: controllo ortopedico tra 7 giomi, fisioterapia domiciliare 3 volte/settimana, ADl infermieristica per medicazione ferita. Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti.",
+  "goldFacts": [
+    {
+      "kind": "problem",
+      "label": "Frattura pertrocanterica del femore sinistro",
+      "excerpt": "Diagnosi: frattura pertrocanterica del femore sinistro trattata chirurgicamente.",
+      "temporality": "current",
+      "status": "active",
+      "origin": "documented",
+      "codingHints": {
+        "system": "ICD-10",
+        "code": "S72.1",
+        "icdQuery": "pertrochanteric fracture of left femur"
+      }
+    },
+    {
+      "kind": "medication",
+      "label": "Torasemide 10 mg 1 cp al mattino",
+      "excerpt": "Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino.",
+      "temporality": "current",
+      "status": "active",
+      "origin": "documented",
+      "codingHints": {
+        "aifaQuery": "torasemide 10 mg compressa"
+      }
+    },
+    {
+      "kind": "followup",
+      "label": "Controllo ortopedico tra 7 giorni",
+      "excerpt": "Indicazioni: controllo ortopedico tra 7 giorni.",
+      "temporality": "planned",
+      "status": "planned",
+      "origin": "documented"
+    },
+    {
+      "kind": "care_setting",
+      "label": "ADI infermieristica per medicazione ferita",
+      "excerpt": "ADI infermieristica per medicazione ferita.",
+      "temporality": "planned",
+      "status": "planned",
+      "origin": "documented"
+    },
+    {
+      "kind": "functional_status",
+      "label": "Deambulazione con deambulatore e ridotta autonomia nei trasferimenti",
+      "excerpt": "Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti.",
+      "temporality": "current",
+      "status": "uncertain",
+      "origin": "documented"
+    }
+  ],
+  "expectedEvidencePack": {
+    "requiredKinds": [
+      "problem",
+      "medication",
+      "followup",
+      "care_setting",
+      "functional_status"
+    ]
+  },
+  "expectedSmartImport": {
+    "diagnosisLabels": [
+      "Frattura pertrocanterica del femore sinistro"
+    ],
+    "therapyLabels": [
+      "Torasemide 10 mg 1 cp al mattino"
+    ],
+    "blockedLabels": [
+      "Pregressa frattura di polso destro",
+      "Carcinoma mammario materno"
+    ]
+  },
+  "negativeAssertions": [
+    {
+      "label": "Carcinoma mammario materno",
+      "reason": "family_history",
+      "note": "Non deve emergere come problema attivo del paziente."
+    },
+    {
+      "label": "Pregressa frattura di polso destro",
+      "reason": "historical_only",
+      "note": "Anamnesi remota non rilevante per il follow-up corrente."
+    }
+  ]
+}

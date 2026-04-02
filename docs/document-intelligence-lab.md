@@ -6,6 +6,11 @@ Ultimo aggiornamento: 2026-04-02
 Questa nota traduce [ADR 0032](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md)
 in una struttura operativa minima per i prossimi cicli AI documentali.
 
+Prima baseline concreta di questa policy:
+
+- contratto condiviso: [lib/document-intelligence-case-pack.ts](../lib/document-intelligence-case-pack.ts)
+- fixture esempio: [scripts/fixtures/document-intelligence-case-pack.example.json](../scripts/fixtures/document-intelligence-case-pack.example.json)
+
 ## Obiettivo
 
 Far crescere la document intelligence di MediFlow senza perdere:
@@ -81,6 +86,9 @@ Shape minima consigliata:
   "negativeAssertions": []
 }
 ```
+
+La shape sopra non sostituisce i corpora lane-specific attuali: serve come
+pacchetto sorgente canonico da cui derivare benchmark piu specializzati.
 
 ## Archetipi minimi da coprire
 
