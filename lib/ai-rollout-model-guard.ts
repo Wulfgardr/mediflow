@@ -16,6 +16,11 @@ export type AiRolloutGuardPayload = {
             blockers?: Array<{ id?: string; message?: string }>;
         } | null;
     }>;
+    localControls?: Array<{
+        lane: 'patient_insight' | 'smart_import' | 'document_synthesis';
+        label: string;
+        state: 'enabled' | 'disabled';
+    }>;
 };
 
 export type AiRolloutGuardSelection = {
@@ -32,6 +37,13 @@ export type AiRolloutModelGuard = {
     blockerMessages: string[];
 };
 
+export type AiRolloutLocalControlGuard = {
+    lane: 'patient_insight' | 'smart_import' | 'document_synthesis';
+    label: string;
+    roles: string[];
+    state: 'disabled';
+};
+
 const LANE_LABELS: Record<AiRolloutGuardLane, string> = {
     patient_insight: 'Patient Insight',
     smart_import: 'Smart Import',
@@ -44,6 +56,11 @@ function normalizeModelName(value?: string | null) {
     const normalized = value?.trim();
     return normalized ? normalized : null;
 }
+
+const LOCAL_CONTROL_LANES_BY_ROLE: Record<AiRolloutGuardSelection['roleId'], Array<'patient_insight' | 'smart_import' | 'document_synthesis'>> = {
+    clinical: ['patient_insight', 'smart_import', 'document_synthesis'],
+    reasoning: [],
+};
 
 function pickHigherSeverity(
     left: AiRolloutModelGuard['status'],
@@ -116,4 +133,33 @@ export function collectAiRolloutModelGuards(
         }
         return left.model.localeCompare(right.model);
     });
+}
+
+export function collectAiRolloutLocalControlGuards(
+    payload: AiRolloutGuardPayload | null,
+    selections: AiRolloutGuardSelection[],
+): AiRolloutLocalControlGuard[] {
+    if (!payload?.localControls?.length) return [];
+
+    const rolesByLane = new Map<'patient_insight' | 'smart_import' | 'document_synthesis', string[]>();
+    for (const selection of selections) {
+        for (const lane of LOCAL_CONTROL_LANES_BY_ROLE[selection.roleId]) {
+            const existing = rolesByLane.get(lane) || [];
+            if (!existing.includes(selection.roleLabel)) {
+                existing.push(selection.roleLabel);
+            }
+            rolesByLane.set(lane, existing);
+        }
+    }
+
+    return payload.localControls
+        .filter((control): control is NonNullable<AiRolloutGuardPayload['localControls']>[number] => control.state === 'disabled')
+        .filter((control) => (rolesByLane.get(control.lane)?.length || 0) > 0)
+        .map((control) => ({
+            lane: control.lane,
+            label: control.label,
+            roles: rolesByLane.get(control.lane) || [],
+            state: 'disabled' as const,
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label));
 }

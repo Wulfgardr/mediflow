@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+    collectAiRolloutLocalControlGuards,
     collectAiRolloutModelGuards,
     type AiRolloutGuardPayload,
     type AiRolloutGuardSelection,
@@ -41,7 +42,8 @@ export default function AiRolloutGuardNotice({
     }, [selectionKey]);
 
     const guards = collectAiRolloutModelGuards(payload, selections);
-    if (guards.length === 0) return null;
+    const localControlGuards = collectAiRolloutLocalControlGuards(payload, selections);
+    if (guards.length === 0 && localControlGuards.length === 0) return null;
 
     const tone = guards.some((guard) => guard.status === 'rollback-required') ? 'rollback' : 'hold';
 
@@ -104,6 +106,25 @@ export default function AiRolloutGuardNotice({
                                 Segnali attivi: {guard.blockerMessages.slice(0, 2).join(' | ')}
                             </p>
                         ) : null}
+                    </div>
+                ))}
+
+                {localControlGuards.map((guard) => (
+                    <div
+                        key={`local-${guard.lane}`}
+                        className="rounded-[18px] border border-white/50 bg-white/70 p-3 dark:border-white/10 dark:bg-white/5"
+                        data-testid={`ai-rollout-local-guard-${guard.lane}`}
+                    >
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white">{guard.label}</span>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                                disabled locally
+                            </span>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                            Lane productized attualmente spenta via kill switch locale. Ruoli interessati:{' '}
+                            <span className="font-medium text-slate-800 dark:text-slate-100">{guard.roles.join(', ')}</span>
+                        </p>
                     </div>
                 ))}
             </div>

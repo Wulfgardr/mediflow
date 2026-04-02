@@ -1,7 +1,11 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectAiRolloutModelGuards, type AiRolloutGuardPayload } from './ai-rollout-model-guard.ts';
+import {
+    collectAiRolloutLocalControlGuards,
+    collectAiRolloutModelGuards,
+    type AiRolloutGuardPayload,
+} from './ai-rollout-model-guard.ts';
 
 test('collectAiRolloutModelGuards reports hold verdict for selected challenger model', () => {
     const payload: AiRolloutGuardPayload = {
@@ -90,4 +94,27 @@ test('collectAiRolloutModelGuards ignores shadow-ready or unrelated selections',
     ]);
 
     assert.deepEqual(guards, []);
+});
+
+test('collectAiRolloutLocalControlGuards reports disabled productized lanes for the clinical selector only', () => {
+    const payload: AiRolloutGuardPayload = {
+        lanes: [],
+        localControls: [
+            { lane: 'patient_insight', label: 'Patient Insight', state: 'disabled' },
+            { lane: 'smart_import', label: 'Smart Import', state: 'enabled' },
+            { lane: 'document_synthesis', label: 'Document Synthesis', state: 'disabled' },
+        ],
+    };
+
+    const guards = collectAiRolloutLocalControlGuards(payload, [
+        { roleId: 'clinical', roleLabel: 'Radiologo & Clinico', model: 'qwen3.5:35b-a3b' },
+        { roleId: 'reasoning', roleLabel: 'Internista (Reasoning)', model: 'qwen3.5:35b-a3b' },
+    ]);
+
+    assert.equal(guards.length, 2);
+    assert.deepEqual(guards.map((guard) => guard.label), ['Document Synthesis', 'Patient Insight']);
+    assert.deepEqual(guards.map((guard) => guard.roles), [
+        ['Radiologo & Clinico'],
+        ['Radiologo & Clinico'],
+    ]);
 });

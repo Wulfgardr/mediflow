@@ -53,10 +53,20 @@ test('settings warns when selected AI model is still on hold in rollout readines
   const pin = process.env.E2E_PIN || '1234';
 
   await bootstrapUnlockedSession(page, pin);
+  await page.evaluate(async () => {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'disabled' }),
+    });
+  });
   await page.getByRole('link', { name: 'Impostazioni' }).click();
   await expect(page).toHaveURL(/\/settings$/);
 
-  await expect(page.getByTestId('ai-rollout-guard-notice')).toHaveCount(0);
+  const guardNotice = page.getByTestId('ai-rollout-guard-notice');
+  await expect(guardNotice).toBeVisible();
+  await expect(guardNotice).toContainText('Patient Insight');
+  await expect(guardNotice).toContainText('disabled locally');
 
   const clinicalSelector = page.getByTestId('ai-model-selector-clinical');
   const resetToRecommended = clinicalSelector.getByRole('button', { name: 'Torna ai consigliati' });
@@ -66,10 +76,12 @@ test('settings warns when selected AI model is still on hold in rollout readines
   await clinicalSelector.getByRole('button', { name: 'Usa un modello personalizzato' }).click();
   await clinicalSelector.getByPlaceholder('es. llama3').fill('gemma4:e4b');
 
-  const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('gemma4:e4b');
   await expect(guardNotice).toContainText('hold');
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');
+  await expect(guardNotice).toContainText('Patient Insight');
+  await expect(guardNotice).toContainText('disabled locally');
+  await expect(page.getByTestId('ai-rollout-local-guard-patient_insight')).toBeVisible();
 });
