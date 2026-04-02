@@ -22,6 +22,8 @@ import AiModelParliamentPanel from '@/components/settings/ai-model-parliament-pa
 /* @Codex */
 import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-panel';
 /* @Codex */
+import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
+/* @Codex */
 import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 /* @Codex */
 import {
@@ -33,6 +35,7 @@ import { useUIStyle } from '@/components/ui-style-provider';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
+    selectorId: 'clinical' | 'reasoning' | 'ocr';
     label: string;
     description: string;
     icon: ReactNode;
@@ -44,7 +47,7 @@ interface ModelSelectorProps {
     targetUrl: string;
 }
 
-function ModelSelector({ label, description, icon, color, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
+function ModelSelector({ selectorId, label, description, icon, color, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
     const [installedModels, setInstalledModels] = useState<string[]>([]);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(false);
@@ -190,7 +193,7 @@ function ModelSelector({ label, description, icon, color, value, onChange, recom
     const c = colorClasses[color];
 
     return (
-        <div className="apple-subsection space-y-4">
+        <div className="apple-subsection space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
             <div className="flex items-start gap-3">
                 <div className={`rounded-2xl p-2.5 ${c.iconBg} ${c.iconText}`}>
                     {icon}
@@ -1015,6 +1018,7 @@ export default function SettingsPage() {
                             </h3>
 
                             <ModelSelector
+                                selectorId="clinical"
                                 label="Radiologo & Clinico"
                                 description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
                                 icon={<Bot className="w-5 h-5" />}
@@ -1033,6 +1037,7 @@ export default function SettingsPage() {
                             />
 
                             <ModelSelector
+                                selectorId="reasoning"
                                 label="Internista (Reasoning)"
                                 description="Per riassunti narrativi, chat complesse e “Second Opinion”."
                                 icon={<Cpu className="w-5 h-5" />}
@@ -1051,6 +1056,7 @@ export default function SettingsPage() {
                             />
 
                             <ModelSelector
+                                selectorId="ocr"
                                 label="Segreteria (OCR)"
                                 description="Per importare documenti cartacei, referti scannerizzati e note."
                                 icon={<Upload className="w-5 h-5" />}
@@ -1064,6 +1070,21 @@ export default function SettingsPage() {
                                 ]}
                                 provider={aiConfig.provider}
                                 targetUrl={aiConfig.url}
+                            />
+
+                            <AiRolloutGuardNotice
+                                selections={[
+                                    {
+                                        roleId: 'clinical',
+                                        roleLabel: 'Radiologo & Clinico',
+                                        model: aiConfig.model_clinical,
+                                    },
+                                    {
+                                        roleId: 'reasoning',
+                                        roleLabel: 'Internista (Reasoning)',
+                                        model: aiConfig.model_reasoning,
+                                    },
+                                ]}
                             />
                         </div>
 
