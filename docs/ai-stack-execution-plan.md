@@ -310,6 +310,10 @@ Valutare challenger come `BioMistral` senza rompere la baseline.
 
 Portare le lane migliorate in uso senza regressioni silenziose.
 
+Runbook canonico:
+
+- [docs/ai-rollout-governance.md](./ai-rollout-governance.md)
+
 ### Scope
 
 - shadow mode
@@ -322,6 +326,7 @@ Portare le lane migliorate in uso senza regressioni silenziose.
 - check di rollout
 - policy di fallback
 - criteri di rollback
+- runbook lane-aware scritto su disco
 
 ### Stop-rules
 
