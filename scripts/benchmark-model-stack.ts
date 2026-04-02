@@ -85,6 +85,7 @@ function parseArgs(argv: string[]) {
         out: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
         iterations: 1,
+        models: null as string[] | null,
     };
 
     for (let index = 2; index < argv.length; index += 1) {
@@ -103,6 +104,12 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
+            index += 1;
+        } else if (value === '--models' && argv[index + 1]) {
+            args.models = argv[index + 1]
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
             index += 1;
         }
     }
@@ -141,6 +148,7 @@ export async function runModelStackBenchmark(options: {
     corpusPath?: string;
     baseUrl?: string;
     iterations?: number;
+    models?: string[];
 }): Promise<StackBenchmarkReport> {
     const registryPath = options.registryPath || DEFAULT_REGISTRY_PATH;
     const corpusPath = options.corpusPath || DEFAULT_CORPUS_PATH;
@@ -148,12 +156,16 @@ export async function runModelStackBenchmark(options: {
     const iterations = Math.max(1, options.iterations || 1);
 
     const registry = readRegistry(registryPath);
+    const allowedModels = options.models && options.models.length > 0
+        ? new Set(options.models)
+        : null;
     const runnableGenerativeCandidates = registry.candidates.filter((candidate) =>
         candidate.lane === 'generative'
         && candidate.runtime === 'ollama_chat'
         && candidate.executionStatus === 'runnable'
         && typeof candidate.runtimeModel === 'string'
         && candidate.runtimeModel.length > 0
+        && (!allowedModels || allowedModels.has(candidate.runtimeModel))
     );
 
     const benchmarkReport = runnableGenerativeCandidates.length > 0
@@ -229,6 +241,7 @@ async function main() {
         corpusPath: args.corpus,
         baseUrl: args.baseUrl,
         iterations: args.iterations,
+        models: args.models || undefined,
     });
 
     const output = JSON.stringify(report, null, 2);

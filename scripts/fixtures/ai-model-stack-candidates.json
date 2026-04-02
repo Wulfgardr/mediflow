@@ -42,6 +42,56 @@
       "notes": "Specialist medical challenger already present in the local runtime."
     },
     {
+      "id": "gemma4_e2b",
+      "label": "Gemma 4 E2B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:e2b",
+      "executionStatus": "runnable",
+      "notes": "Local challenger benchmarked on Apple Silicon via an isolated Ollama HEAD runtime because the stable 0.19.0 app build cannot yet pull Gemma 4 manifests."
+    },
+    {
+      "id": "gemma4_e4b",
+      "label": "Gemma 4 E4B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:e4b",
+      "executionStatus": "runnable",
+      "notes": "Primary Gemma 4 local challenger benchmarked on Apple Silicon via an isolated Ollama HEAD runtime because the stable 0.19.0 app build cannot yet pull Gemma 4 manifests."
+    },
+    {
+      "id": "gemma4_26b",
+      "label": "Gemma 4 26B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:26b",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "requires_head_ollama_runtime",
+        "not_installed",
+        "sizing_pending_on_m4_max_36gb"
+      ],
+      "notes": "Promising larger Gemma 4 challenger, but not yet installed or benchmarked on the current Mac."
+    },
+    {
+      "id": "gemma4_31b",
+      "label": "Gemma 4 31B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:31b",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "requires_head_ollama_runtime",
+        "not_installed",
+        "sizing_pending_on_m4_max_36gb"
+      ],
+      "notes": "Largest Gemma 4 local challenger, intentionally held until sizing on the current Mac is justified."
+    },
+    {
       "id": "biomistral_7b",
       "label": "BioMistral 7B",
       "lane": "generative",

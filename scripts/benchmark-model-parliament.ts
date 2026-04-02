@@ -125,6 +125,7 @@ function parseArgs(argv: string[]) {
         dbPath: null as string | null,
         keepChallengers: DEFAULT_KEEP_CHALLENGERS,
         protectModels: [] as string[],
+        models: null as string[] | null,
         applyPrune: false,
     };
 
@@ -162,6 +163,12 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--protect-models' && argv[index + 1]) {
             args.protectModels = argv[index + 1]
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+            index += 1;
+        } else if (value === '--models' && argv[index + 1]) {
+            args.models = argv[index + 1]
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
@@ -470,6 +477,7 @@ export async function runModelParliament(options: {
     dataDir?: string | null;
     keepChallengers?: number;
     protectModels?: string[];
+    models?: string[];
     applyPrune?: boolean;
 }): Promise<ParliamentReport> {
     const registryPath = options.registryPath || DEFAULT_REGISTRY_PATH;
@@ -485,6 +493,7 @@ export async function runModelParliament(options: {
         corpusPath: taskCorpusPath,
         baseUrl,
         iterations,
+        models: options.models,
     });
 
     const runnableModels = generative.candidates
@@ -671,6 +680,7 @@ async function main() {
         dataDir: args.dataDir,
         keepChallengers: args.keepChallengers,
         protectModels: args.protectModels,
+        models: args.models || undefined,
         applyPrune: args.applyPrune,
     });
 
