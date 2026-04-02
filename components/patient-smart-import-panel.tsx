@@ -62,6 +62,8 @@ function therapyStateBadgeClasses(state: TherapySuggestionState): string {
 function reviewStateLabel(state: SmartImportReviewState): string {
     if (state === 'already-present') return 'gia presente';
     if (state === 'update') return 'aggiornamento';
+    if (state === 'transition') return 'transizione';
+    if (state === 'inactive') return 'sospesa';
     if (state === 'uncertain') return 'incerto';
     return 'nuovo';
 }
@@ -70,6 +72,8 @@ function reviewStateBadgeClasses(state: SmartImportReviewState): string {
     if (state === 'new') return 'border-sky-200 bg-sky-50 text-sky-700';
     if (state === 'already-present') return 'border-slate-200 bg-slate-100 text-slate-700';
     if (state === 'update') return 'border-amber-200 bg-amber-50 text-amber-700';
+    if (state === 'transition') return 'border-amber-300 bg-amber-100 text-amber-800';
+    if (state === 'inactive') return 'border-rose-200 bg-rose-50 text-rose-700';
     return 'border-orange-200 bg-orange-50 text-orange-700';
 }
 
@@ -86,6 +90,14 @@ function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boole
 
     if (state === 'already-present') {
         return 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]';
+    }
+
+    if (state === 'transition') {
+        return 'border-amber-300/80 bg-amber-100/70 dark:border-amber-400/30 dark:bg-amber-950/15';
+    }
+
+    if (state === 'inactive') {
+        return 'border-rose-200/80 bg-rose-50/60 dark:border-rose-400/20 dark:bg-rose-950/10';
     }
 
     return 'border-orange-200/80 bg-orange-50/60 dark:border-orange-400/20 dark:bg-orange-950/10';
@@ -144,6 +156,94 @@ function countSelectedReviewItems(
     therapyIds: string[],
 ): number {
     return diagnosisIds.length + therapyIds.length;
+}
+
+function formatResolverScore(score: number): string {
+    return `${Math.round(score)}`;
+}
+
+function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImportSuggestion }) {
+    return (
+        <div className="space-y-2 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver ICD locale</p>
+                {diagnosis.resolver.queries.length > 0 && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                        {diagnosis.resolver.queries.join(' · ')}
+                    </span>
+                )}
+            </div>
+            {diagnosis.resolver.candidates.length > 0 ? (
+                <div className="space-y-2">
+                    {diagnosis.resolver.candidates.map((candidate) => (
+                        <div
+                            key={`${candidate.code}-${candidate.query}`}
+                            className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
+                        >
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                    {candidate.code}
+                                </span>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                    {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
+                                </span>
+                            </div>
+                            <p className="mt-1 text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.description}</p>
+                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Query: {candidate.query}</p>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nessun candidato ICD-11 locale affidabile.</p>
+            )}
+        </div>
+    );
+}
+
+function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSuggestion }) {
+    return (
+        <div className="space-y-2 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver AIFA locale</p>
+                {therapy.resolver.searchTerms.length > 0 && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                        {therapy.resolver.searchTerms.join(' · ')}
+                    </span>
+                )}
+            </div>
+            {therapy.resolver.candidates.length > 0 ? (
+                <div className="space-y-2">
+                    {therapy.resolver.candidates.map((candidate) => (
+                        <div
+                            key={`${candidate.aic}-${candidate.searchTerm}`}
+                            className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
+                        >
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                                    AIC {candidate.aic}
+                                </span>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                    {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
+                                </span>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'}`}>
+                                    {candidate.dosageAligned ? 'dosaggio coerente' : 'dosaggio divergente'}
+                                </span>
+                            </div>
+                            <p className="mt-1 text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.name}</p>
+                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                {[candidate.activePrinciple, candidate.packaging, candidate.atc ? `ATC ${candidate.atc}` : undefined]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                            </p>
+                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Search: {candidate.searchTerm}</p>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nessun candidato AIFA locale affidabile.</p>
+            )}
+        </div>
+    );
 }
 
 export default function PatientSmartImportPanel({ patient, entries = [] }: PatientSmartImportPanelProps) {
@@ -510,6 +610,8 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                             </div>
                                                         </div>
 
+                                                        <DiagnosisResolverPreview diagnosis={diagnosis} />
+
                                                         {isEditing && (
                                                             <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
                                                                 <label className="space-y-1">
@@ -647,6 +749,8 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                 &ldquo;<PrivacyBlur intensity="sm">{therapy.evidence.excerpt}</PrivacyBlur>&rdquo;
                                                             </div>
                                                         </div>
+
+                                                        <TherapyResolverPreview therapy={therapy} />
 
                                                         {isEditing && (
                                                             <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">

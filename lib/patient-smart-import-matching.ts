@@ -4,7 +4,13 @@ import {
 } from './ai-task-contracts';
 import { type AifaDrug, type Therapy } from './db';
 
-export type SmartImportReviewState = 'new' | 'already-present' | 'update' | 'uncertain';
+export type SmartImportReviewState =
+    | 'new'
+    | 'already-present'
+    | 'update'
+    | 'transition'
+    | 'inactive'
+    | 'uncertain';
 
 export interface SmartImportReview {
     state: SmartImportReviewState;
@@ -97,6 +103,26 @@ export function buildTherapyReview(
         dosage: suggestion.dosage || '',
         aic: suggestion.match?.aic,
     }));
+    const relatedExisting = findRelatedExistingTherapy(existing, suggestion);
+    const comparisonCandidate = exactMatch || relatedExisting;
+
+    if (suggestion.therapyState === 'transition') {
+        return {
+            state: 'transition',
+            summary: suggestion.matchType === 'catalog'
+                ? 'Transizione terapeutica documentata: richiede conferma manuale prima dell\'import'
+                : 'Cambio terapia documentato ma non ancora riconciliato con il catalogo',
+            comparison: comparisonCandidate ? formatTherapyComparison(comparisonCandidate) : undefined,
+        };
+    }
+
+    if (suggestion.therapyState === 'inactive') {
+        return {
+            state: 'inactive',
+            summary: 'Terapia sospesa o conclusa nelle fonti: non proporre import attivo',
+            comparison: comparisonCandidate ? formatTherapyComparison(comparisonCandidate) : undefined,
+        };
+    }
 
     if (exactMatch) {
         return {
@@ -106,7 +132,6 @@ export function buildTherapyReview(
         };
     }
 
-    const relatedExisting = findRelatedExistingTherapy(existing, suggestion);
     if (
         relatedExisting
         && suggestion.therapyState === 'active'

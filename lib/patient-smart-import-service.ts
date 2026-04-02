@@ -20,7 +20,9 @@ import {
     buildDiagnosisSearchQueries,
     buildTherapyReview,
     buildDrugSearchTerms,
+    hasDrugDosageConflict,
     rankIcdMatch,
+    rankDrugMatch,
     selectTherapyCatalogMatch,
     type SmartImportReview,
     type SmartImportReviewState,
@@ -34,6 +36,36 @@ export interface SmartImportEvidence {
     label: string;
     excerpt: string;
     date?: string;
+}
+
+export interface DiagnosisResolverCandidate {
+    code: string;
+    description: string;
+    query: string;
+    score: number;
+    selected: boolean;
+}
+
+export interface DiagnosisResolverTrace {
+    queries: string[];
+    candidates: DiagnosisResolverCandidate[];
+}
+
+export interface TherapyResolverCandidate {
+    aic: string;
+    name: string;
+    activePrinciple?: string;
+    packaging?: string;
+    atc?: string;
+    searchTerm: string;
+    score: number;
+    dosageAligned: boolean;
+    selected: boolean;
+}
+
+export interface TherapyResolverTrace {
+    searchTerms: string[];
+    candidates: TherapyResolverCandidate[];
 }
 
 export interface DiagnosisSmartImportSuggestion {
@@ -51,6 +83,7 @@ export interface DiagnosisSmartImportSuggestion {
     canApply: boolean;
     blockedReason?: string;
     review: SmartImportReview;
+    resolver: DiagnosisResolverTrace;
     reviewedLabel?: string;
 }
 
@@ -70,6 +103,7 @@ export interface TherapySmartImportSuggestion {
     canApply: boolean;
     blockedReason?: string;
     review: SmartImportReview;
+    resolver: TherapyResolverTrace;
     reviewedDrugName?: string;
     reviewedActivePrinciple?: string;
     reviewedDosage?: string;
@@ -137,6 +171,15 @@ function normalizeText(value: string): string {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
+}
+
+function buildDrugCandidateKey(candidate: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple' | 'packaging'>): string {
+    return [
+        normalizeText(candidate.aic || ''),
+        normalizeText(candidate.activePrinciple || ''),
+        normalizeText(candidate.name || ''),
+        normalizeText(candidate.packaging || ''),
+    ].join('|');
 }
 
 function formatDiagnosisComparison(diagnosis: Pick<Diagnosis, 'system' | 'code' | 'description'>): string {
@@ -422,26 +465,28 @@ async function resolveDiagnosisSuggestion(
 ): Promise<DiagnosisSmartImportSuggestion> {
     const source = sourceMap.get(suggestion.sourceId || '') || sourceMap.values().next().value as SmartImportSourceRecord | undefined;
     const query = suggestion.icdQuery || suggestion.label;
+    const resolverQueries = buildDiagnosisSearchQueries(suggestion);
+    let rankedCandidates: Array<{ result: ICDSearchResult; score: number; query: string }> = [];
     let match: DiagnosisSmartImportSuggestion['match'];
 
     try {
-        const rankedByCandidate = new Map<string, { result: ICDSearchResult; score: number }>();
-        for (const candidateQuery of buildDiagnosisSearchQueries(suggestion)) {
+        const rankedByCandidate = new Map<string, { result: ICDSearchResult; score: number; query: string }>();
+        for (const candidateQuery of resolverQueries) {
             const results = await diagnosisSearch(candidateQuery);
             for (const result of results) {
                 const score = rankIcdMatch(candidateQuery, suggestion.label, suggestion.explicitCode, result);
                 const key = `${result.code}|${normalizeText(result.description)}`;
                 const previous = rankedByCandidate.get(key);
                 if (!previous || score > previous.score) {
-                    rankedByCandidate.set(key, { result, score });
+                    rankedByCandidate.set(key, { result, score, query: candidateQuery });
                 }
             }
         }
 
-        const ranked = Array.from(rankedByCandidate.values())
+        rankedCandidates = Array.from(rankedByCandidate.values())
             .sort((left, right) => right.score - left.score);
 
-        const best = ranked[0];
+        const best = rankedCandidates[0];
         if (best && best.score >= 8 && best.result.code !== 'N/A') {
             match = {
                 code: best.result.code,
@@ -472,6 +517,18 @@ async function resolveDiagnosisSuggestion(
         review: {
             state: 'uncertain',
             summary: '',
+        },
+        resolver: {
+            queries: resolverQueries,
+            candidates: rankedCandidates.slice(0, 3).map((candidate) => ({
+                code: candidate.result.code,
+                description: candidate.result.description,
+                query: candidate.query,
+                score: candidate.score,
+                selected: Boolean(match)
+                    && candidate.result.code === match?.code
+                    && normalizeText(candidate.result.description) === normalizeText(match?.description || ''),
+            })),
         },
     };
 }
@@ -609,7 +666,13 @@ async function resolveTherapySuggestion(
     drugCatalogSearch: DrugCatalogSearchLoader
 ): Promise<TherapySmartImportSuggestion> {
     const source = sourceMap.get(suggestion.sourceId || '') || sourceMap.values().next().value as SmartImportSourceRecord | undefined;
-    const searchTerms = buildDrugSearchTerms(suggestion);
+    const searchTerms = buildDrugSearchTerms(suggestion).slice(0, 6);
+    const rankedByCandidate = new Map<string, {
+        candidate: AifaDrug;
+        score: number;
+        searchTerm: string;
+        dosageAligned: boolean;
+    }>();
     let match: TherapySmartImportSuggestion['match'];
     let matchType: TherapySmartImportSuggestion['matchType'] = 'none';
     const therapyState = classifyTherapyState(suggestion);
@@ -618,18 +681,39 @@ async function resolveTherapySuggestion(
         const candidates = await drugCatalogSearch(term);
         if (!candidates.length) continue;
 
-        const selected = selectTherapyCatalogMatch(suggestion, candidates);
-        if (selected) {
-            match = {
-                aic: selected.aic,
-                name: selected.name,
-                activePrinciple: selected.activePrinciple,
-                atc: selected.atc,
-                company: selected.company,
-            };
-            matchType = 'catalog';
-            break;
+        for (const candidate of candidates) {
+            const key = buildDrugCandidateKey(candidate);
+            const score = rankDrugMatch(candidate, suggestion);
+            const dosageAligned = !hasDrugDosageConflict(candidate, suggestion);
+            const previous = rankedByCandidate.get(key);
+
+            if (!previous || score > previous.score) {
+                rankedByCandidate.set(key, {
+                    candidate,
+                    score,
+                    searchTerm: term,
+                    dosageAligned,
+                });
+            }
         }
+    }
+
+    const rankedCandidates = Array.from(rankedByCandidate.values())
+        .sort((left, right) => right.score - left.score);
+    const selected = selectTherapyCatalogMatch(
+        suggestion,
+        rankedCandidates.map((item) => item.candidate),
+    );
+
+    if (selected) {
+        match = {
+            aic: selected.aic,
+            name: selected.name,
+            activePrinciple: selected.activePrinciple,
+            atc: selected.atc,
+            company: selected.company,
+        };
+        matchType = 'catalog';
     }
 
     if (!match && (suggestion.activePrinciple || suggestion.drugMention)) {
@@ -663,6 +747,26 @@ async function resolveTherapySuggestion(
         review: {
             state: 'uncertain',
             summary: '',
+        },
+        resolver: {
+            searchTerms,
+            candidates: rankedCandidates.slice(0, 3).map((item) => ({
+                aic: item.candidate.aic,
+                name: item.candidate.name,
+                activePrinciple: item.candidate.activePrinciple,
+                packaging: item.candidate.packaging,
+                atc: item.candidate.atc,
+                searchTerm: item.searchTerm,
+                score: item.score,
+                dosageAligned: item.dosageAligned,
+                selected: Boolean(match) && (
+                    (Boolean(match?.aic) && item.candidate.aic === match?.aic)
+                    || (
+                        normalizeText(item.candidate.name) === normalizeText(match?.name || '')
+                        && normalizeText(item.candidate.activePrinciple || '') === normalizeText(match?.activePrinciple || '')
+                    )
+                ),
+            })),
         },
     };
 }
@@ -734,11 +838,17 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
     const therapySuggestions = resolvedTherapies.map((therapy) => {
         const review = buildTherapyReview(currentTherapies, therapy);
         const canApply = review.state === 'new' ? therapy.canApply : false;
-        const blockedReason = review.state === 'already-present'
-            ? 'Terapia gia presente in storico'
-            : review.state === 'update'
-                ? 'Possibile aggiornamento di terapia gia presente'
-                : therapy.blockedReason;
+        let blockedReason = therapy.blockedReason;
+
+        if (review.state === 'already-present') {
+            blockedReason = 'Terapia gia presente in storico';
+        } else if (review.state === 'update') {
+            blockedReason = 'Possibile aggiornamento di terapia gia presente';
+        } else if (review.state === 'transition') {
+            blockedReason = 'Transizione terapeutica documentata: conferma manuale richiesta';
+        } else if (review.state === 'inactive') {
+            blockedReason = 'Terapia sospesa o conclusa nelle fonti correnti';
+        }
 
         return {
             ...therapy,

@@ -118,3 +118,62 @@ test('smart import review marks same therapy with different dosage as update ins
     assert.match(review.summary, /aggiornamento/i);
     assert.match(review.comparison || '', /2,5 mg 1 cp/i);
 });
+
+test('smart import review marks documented therapy switch as transition even when related therapy exists', () => {
+    const existing: Therapy[] = [
+        {
+            id: 'therapy-2',
+            patientId: 'patient-1',
+            drugName: 'Ramipril EG',
+            activePrinciple: 'Ramipril',
+            dosage: '5 mg 1 cp',
+            status: 'active',
+            createdAt: new Date('2026-04-01T08:00:00Z'),
+            updatedAt: new Date('2026-04-01T08:00:00Z'),
+            startDate: new Date('2026-03-20T08:00:00Z'),
+        },
+    ];
+
+    const suggestion: TherapyReviewCandidate = {
+        drugMention: 'Ramipril',
+        activePrinciple: 'Ramipril',
+        dosage: '2,5 mg 1 cp',
+        therapyState: 'transition',
+        matchType: 'catalog',
+        match: {
+            aic: 'AIC-RAM-25',
+            name: 'Ramipril EG',
+            activePrinciple: 'Ramipril',
+        },
+        canApply: false,
+        blockedReason: 'Passaggio terapeutico documentato',
+    };
+
+    const review = buildTherapyReview(existing, suggestion);
+
+    assert.equal(review.state, 'transition');
+    assert.match(review.summary, /transizione terapeutica/i);
+    assert.match(review.comparison || '', /Ramipril EG/i);
+});
+
+test('smart import review marks suspended therapy as inactive instead of uncertain', () => {
+    const suggestion: TherapyReviewCandidate = {
+        drugMention: 'Furosemide',
+        activePrinciple: 'Furosemide',
+        dosage: '25 mg',
+        therapyState: 'inactive',
+        matchType: 'catalog',
+        match: {
+            aic: 'AIC-FUR-25',
+            name: 'Lasix',
+            activePrinciple: 'Furosemide',
+        },
+        canApply: false,
+        blockedReason: 'Terapia sospesa alla dimissione',
+    };
+
+    const review = buildTherapyReview([], suggestion);
+
+    assert.equal(review.state, 'inactive');
+    assert.match(review.summary, /sospesa o conclusa/i);
+});
