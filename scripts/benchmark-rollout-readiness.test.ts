@@ -1,7 +1,12 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateRolloutReadiness } from './benchmark-rollout-readiness.ts';
+import { getAiRolloutReadinessArtifactPaths } from '../lib/ai-rollout-readiness-storage.ts';
+import {
+    buildRolloutReadinessMarkdown,
+    evaluateRolloutReadiness,
+    resolveRolloutReadinessOutputPaths,
+} from './benchmark-rollout-readiness.ts';
 
 const NOW = new Date().toISOString();
 
@@ -164,4 +169,68 @@ test('generative challenger stays on hold when parliament shows failed smart imp
     assert.equal(result.status, 'hold');
     assert.match(result.blockers.map((entry) => entry.message).join(' | '), /therapyStateRecall 0.6 < 0.95/);
     assert.equal(result.selectedModel, 'gemma4:e4b');
+});
+
+test('default output paths follow the canonical rollout readiness artifact location', () => {
+    const resolved = resolveRolloutReadinessOutputPaths('smart_import', null, null);
+    const expected = getAiRolloutReadinessArtifactPaths('smart_import');
+
+    assert.deepEqual(resolved.defaults, expected);
+    assert.equal(resolved.jsonOutPath, expected.jsonPath);
+    assert.equal(resolved.markdownOutPath, expected.markdownPath);
+});
+
+test('custom json output derives sibling markdown when markdown path is omitted', () => {
+    const resolved = resolveRolloutReadinessOutputPaths(
+        'patient_insight',
+        '/tmp/rollout/patient-insight-verdict.json',
+        null,
+    );
+
+    assert.equal(resolved.jsonOutPath, '/tmp/rollout/patient-insight-verdict.json');
+    assert.equal(resolved.markdownOutPath, '/tmp/rollout/patient-insight-verdict.md');
+});
+
+test('markdown report includes status, blockers, warnings and evidence', () => {
+    const report = evaluateRolloutReadiness({
+        lane: 'smart_import',
+        reportPath: '/tmp/smart-import.json',
+        report: {
+            generatedAt: NOW,
+            decision: { recommendedModel: 'qwen3.5:35b-a3b' },
+            models: [{
+                model: 'qwen3.5:35b-a3b',
+                status: 'completed',
+                metrics: {
+                    contractValidRate: 1,
+                    jsonValidRate: 1,
+                    diagnosisRecall: 1,
+                    diagnosisQueryRecall: 1,
+                    therapyRecall: 1,
+                    dosageRecall: 1,
+                    therapyStateRecall: 1,
+                    sourceIdRate: 1,
+                    forbiddenLeakRate: 0,
+                    alreadyPresentLeakRate: 0.2,
+                },
+            }],
+        },
+        currentState: 'hold',
+        fallbackWritten: true,
+        owner: 'leonardo',
+        licenseClear: true,
+        maxAgeDays: 30,
+    });
+
+    const markdown = buildRolloutReadinessMarkdown(report);
+
+    assert.match(markdown, /# AI Rollout Readiness/);
+    assert.match(markdown, /Status: `shadow-ready`/);
+    assert.match(markdown, /Lane: `smart_import`/);
+    assert.match(markdown, /## Blockers/);
+    assert.match(markdown, /No blocking conditions detected/);
+    assert.match(markdown, /## Warnings/);
+    assert.match(markdown, /already-present-leak-rate/);
+    assert.match(markdown, /## Evidence/);
+    assert.match(markdown, /Fallback written: yes/);
 });

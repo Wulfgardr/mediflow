@@ -4,13 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+    ensureAiRolloutReadinessArtifactDirectory,
+    getAiRolloutReadinessArtifactPaths,
+    type RolloutReadinessArtifactLane,
+} from '../lib/ai-rollout-readiness-storage.ts';
 
-export type RolloutLane =
-    | 'patient_insight'
-    | 'smart_import'
-    | 'redaction'
-    | 'clinical_entities'
-    | 'generative_challenger';
+export type RolloutLane = RolloutReadinessArtifactLane;
 
 export type RolloutCurrentState =
     | 'benchmark-only'
@@ -167,6 +167,7 @@ function parseArgs(argv: string[]) {
         report: null as string | null,
         model: null as string | null,
         out: null as string | null,
+        markdownOut: null as string | null,
         currentState: 'hold' as RolloutCurrentState,
         fallbackWritten: false,
         owner: null as string | null,
@@ -187,6 +188,9 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--out' && argv[index + 1]) {
             args.out = path.resolve(argv[index + 1]);
+            index += 1;
+        } else if (value === '--markdown-out' && argv[index + 1]) {
+            args.markdownOut = path.resolve(argv[index + 1]);
             index += 1;
         } else if (value === '--current-state' && argv[index + 1]) {
             args.currentState = argv[index + 1] as RolloutCurrentState;
@@ -261,6 +265,44 @@ function toBenchmarkEvidence(
 function chooseStatus(currentState: RolloutCurrentState, blockers: Blocker[]): RolloutStatus {
     if (blockers.length === 0) return 'shadow-ready';
     return isActiveState(currentState) ? 'rollback-required' : 'hold';
+}
+
+function toDisplayValue(value: boolean | number | string | null) {
+    if (typeof value === 'boolean') {
+        return value ? 'yes' : 'no';
+    }
+    if (value == null) {
+        return 'n/a';
+    }
+    return String(value);
+}
+
+function toMarkdownList(lines: string[], emptyLine: string) {
+    return lines.length > 0
+        ? lines.map((line) => `- ${line}`).join('\n')
+        : `- ${emptyLine}`;
+}
+
+function toSiblingMarkdownPath(jsonPath: string) {
+    const extension = path.extname(jsonPath);
+    if (!extension) {
+        return `${jsonPath}.md`;
+    }
+    return path.join(path.dirname(jsonPath), `${path.basename(jsonPath, extension)}.md`);
+}
+
+export function resolveRolloutReadinessOutputPaths(
+    lane: RolloutLane,
+    out: string | null,
+    markdownOut: string | null,
+) {
+    const defaults = getAiRolloutReadinessArtifactPaths(lane);
+    return {
+        defaults,
+        jsonOutPath: out || defaults.jsonPath,
+        markdownOutPath: markdownOut
+            || (out ? toSiblingMarkdownPath(out) : defaults.markdownPath),
+    };
 }
 
 function pickModel<T extends { model: string }>(
@@ -733,6 +775,45 @@ export function evaluateRolloutReadiness(options: EvaluateOptions): RolloutReadi
     };
 }
 
+export function buildRolloutReadinessMarkdown(report: RolloutReadinessReport) {
+    const blockers = toMarkdownList(
+        report.blockers.map((blocker) => `[${blocker.scope}] ${blocker.id}: ${blocker.message}`),
+        'No blocking conditions detected.',
+    );
+    const warnings = toMarkdownList(
+        report.warnings.map((warning) => `${warning.id}: ${warning.message}`),
+        'No warnings.',
+    );
+
+    return [
+        '# AI Rollout Readiness',
+        '',
+        '## Summary',
+        `- Status: \`${report.status}\``,
+        `- Lane: \`${report.lane}\``,
+        `- Current state: \`${report.currentState}\``,
+        `- Selected model: ${report.selectedModel ? `\`${report.selectedModel}\`` : 'n/a'}`,
+        `- Generated at: \`${report.generatedAt}\``,
+        `- Source report: \`${report.reportPath}\``,
+        '',
+        '## Blockers',
+        blockers,
+        '',
+        '## Warnings',
+        warnings,
+        '',
+        '## Evidence',
+        `- Benchmark generated at: ${report.evidence.reportGeneratedAt ? `\`${report.evidence.reportGeneratedAt}\`` : 'n/a'}`,
+        `- Benchmark fresh: ${toDisplayValue(report.evidence.benchmarkFresh)}`,
+        `- Benchmark age days: ${toDisplayValue(report.evidence.benchmarkAgeDays)}`,
+        `- Max age days: ${toDisplayValue(report.evidence.maxAgeDays)}`,
+        `- Fallback written: ${toDisplayValue(report.evidence.fallbackWritten)}`,
+        `- Kill-switch owner: ${report.evidence.owner ? `\`${report.evidence.owner}\`` : 'n/a'}`,
+        `- License clear: ${toDisplayValue(report.evidence.licenseClear)}`,
+        '',
+    ].join('\n');
+}
+
 async function main() {
     const args = parseArgs(process.argv);
     if (!isAllowedLane(args.lane)) {
@@ -757,12 +838,15 @@ async function main() {
         licenseClear: args.licenseClear,
         maxAgeDays: args.maxAgeDays,
     });
-
+    const outputPaths = resolveRolloutReadinessOutputPaths(args.lane, args.out, args.markdownOut);
     const output = JSON.stringify(readiness, null, 2);
-    if (args.out) {
-        fs.mkdirSync(path.dirname(args.out), { recursive: true });
-        fs.writeFileSync(args.out, output, 'utf8');
-    }
+    const markdown = buildRolloutReadinessMarkdown(readiness);
+
+    ensureAiRolloutReadinessArtifactDirectory(args.lane);
+    fs.mkdirSync(path.dirname(outputPaths.jsonOutPath), { recursive: true });
+    fs.writeFileSync(outputPaths.jsonOutPath, output, 'utf8');
+    fs.mkdirSync(path.dirname(outputPaths.markdownOutPath), { recursive: true });
+    fs.writeFileSync(outputPaths.markdownOutPath, markdown, 'utf8');
 
     process.stdout.write(`${output}\n`);
 
