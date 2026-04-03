@@ -31,6 +31,10 @@ quelle in:
 Per la sequenza operativa dei work package usa
 [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md).
 
+Per il failure mode documentale emerso sul campo il 2026-04-03, con recovery
+locale di allegati PDF e insight finale, usa anche
+[docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md).
+
 ## Executive summary
 
 Lo stack AI MediFlow oggi e coerente, ma non ancora omogeneamente affidabile.
