@@ -11,7 +11,7 @@ test('document import reconciles diagnoses and therapies before patient creation
   const firstName = `Smoke${suffix}`;
   const lastName = `Import${suffix}`;
   const taxCode = `TSTDOC80A01H${suffix}X`;
-  const diagnosisLabel = 'Disturbo depressivo maggiore, episodio singolo lieve';
+  const diagnosisLabel = 'Diabete mellito tipo 2';
 
   await page.route('**/api/ocr/extract', async (route) => {
     await route.fulfill({
@@ -27,7 +27,7 @@ test('document import reconciles diagnoses and therapies before patient creation
           taxCode,
           birthDate: '1980-01-01T00:00:00.000Z',
           address: 'Via Test 1, Roma',
-          rawMarkdown: `Referto clinico\nPaziente: ${firstName} ${lastName}\nICD-11 EF00 - ${diagnosisLabel}\nTerapia domiciliare: Lasix 25 mg 1 cp al mattino`
+          rawMarkdown: `Referto clinico\nPaziente: ${firstName} ${lastName}\nICD-11 5A11 - ${diagnosisLabel}\nTerapia alla dimissione: Humalog 4 U ai pasti principali`
         }
       })
     });
@@ -40,7 +40,7 @@ test('document import reconciles diagnoses and therapies before patient creation
       body: JSON.stringify({
         destinationEntities: [
           {
-            theCode: 'EF00',
+            theCode: '5A11',
             title: diagnosisLabel,
           },
         ],
@@ -55,10 +55,10 @@ test('document import reconciles diagnoses and therapies before patient creation
       body: JSON.stringify([
         {
           aic: '012345678',
-          name: 'Lasix 25 mg compresse',
-          activePrinciple: 'Furosemide',
-          packaging: '25 mg 30 compresse',
-          atc: 'C03CA01',
+          name: 'Humalog KwikPen',
+          activePrinciple: 'Insulina lispro',
+          packaging: '100 U/mL penna preriempita',
+          atc: 'A10AB04',
           company: 'Test Pharma',
         },
       ]),
@@ -83,36 +83,36 @@ test('document import reconciles diagnoses and therapies before patient creation
                   ? {
                       schemaVersion: 'mediflow.ai.extract.v1',
                       task: 'document_synthesis',
-                      summary: 'Episodio depressivo lieve con terapia diuretica domiciliare.',
+                      summary: 'Diabete mellito tipo 2 con terapia insulinica documentata.',
                       data: {
                         qualityLevel: 'green',
                         qualityReason: 'Documento leggibile con codice ICD esplicito',
-                        medications: ['Lasix 25 mg 1 cp al mattino'],
+                        medications: ['Humalog 4 U ai pasti principali'],
                         diagnoses: [
                           {
-                            code: 'EF00',
+                            code: '5A11',
                             description: diagnosisLabel,
                             system: 'ICD-11',
-                            evidence: 'ICD-11 EF00',
+                            evidence: 'ICD-11 5A11',
                             confidence: 'high',
                           },
                         ],
                         problemStatements: [
                           {
                             label: diagnosisLabel,
-                            icdQuery: 'major depressive disorder mild single episode',
+                            icdQuery: 'type 2 diabetes mellitus',
                             confidence: 'high',
-                            evidence: 'ICD-11 EF00',
+                            evidence: 'ICD-11 5A11',
                           },
                         ],
                         therapyCandidates: [
                           {
-                            drugMention: 'Lasix',
-                            drugQuery: 'furosemide',
-                            activePrinciple: 'Furosemide',
-                            dosage: '25 mg 1 cp al mattino',
+                            drugMention: 'Humalog',
+                            drugQuery: 'insulina lispro',
+                            activePrinciple: 'Insulina lispro',
+                            dosage: '4 U ai pasti principali',
                             confidence: 'high',
-                            evidence: 'Lasix 25 mg 1 cp al mattino',
+                            evidence: 'Terapia alla dimissione: Humalog 4 U ai pasti principali',
                             therapyState: 'active',
                           },
                         ],
@@ -157,15 +157,15 @@ test('document import reconciles diagnoses and therapies before patient creation
 
   await expect(page.getByRole('heading', { name: 'Importazione assistita pronta per review' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('heading', { name: 'Conferma cosa applicare al form' })).toBeVisible();
-  await expect(page.locator('input[value="Lasix 25 mg compresse"]').first()).toBeVisible();
-  await expect(page.locator('input[value="25 mg 1 cp al mattino"]').first()).toBeVisible();
+  await expect(page.locator('input[value="Humalog KwikPen"]').first()).toBeVisible();
+  await expect(page.locator('input[value="4 U ai pasti principali"]').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Applica al form' }).click();
 
   await expect(page.getByPlaceholder('RSSMRA80A01H501U')).toHaveValue(taxCode);
-  await expect(page.getByPlaceholder('Es. 8A80.0').first()).toHaveValue('EF00');
+  await expect(page.getByPlaceholder('Es. 8A80.0').first()).toHaveValue('5A11');
   await expect(page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)').first()).toHaveValue(
-    `EF00 - ${diagnosisLabel}`
+    `5A11 - ${diagnosisLabel}`
   );
 
   await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
@@ -173,12 +173,13 @@ test('document import reconciles diagnoses and therapies before patient creation
   await expect(page).toHaveURL(/\/$/);
   const search = page.getByPlaceholder('Cerca paziente...');
   await search.fill(lastName);
-  await expect(page.getByText(new RegExp(`${lastName} ${firstName}`))).toBeVisible();
-  await page.getByText(new RegExp(`${lastName} ${firstName}`)).click();
+  const patientLink = page.getByRole('link', { name: new RegExp(`${lastName} ${firstName}`) }).first();
+  await expect(patientLink).toBeVisible();
+  await patientLink.click();
 
   await expect(page).toHaveURL(/\/patients\/.+/);
-  await expect(page.getByText(/EF00/)).toBeVisible();
+  await expect(page.getByText(/5A11/)).toBeVisible();
   await expect(page.getByText(diagnosisLabel)).toBeVisible();
-  await expect(page.getByText('Lasix 25 mg compresse')).toBeVisible();
-  await expect(page.getByText('25 mg 1 cp al mattino')).toBeVisible();
+  await expect(page.getByText('Humalog KwikPen')).toBeVisible();
+  await expect(page.getByText('4 U ai pasti principali')).toBeVisible();
 });
