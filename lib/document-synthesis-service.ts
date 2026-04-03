@@ -35,7 +35,7 @@ import {
 } from './ai-document-synthesis-kill-switch';
 
 /* @Codex */
-const MAX_SYNTHESIS_CHARS = 8000;
+const MAX_SYNTHESIS_CHARS = 12000;
 
 /* @Codex */
 export interface SynthesizeDocumentOptions {
@@ -143,7 +143,7 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const ai = await AIService.create('clinical');
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
-    const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1024);
+    const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
     return parseStructuredAnalysisResponse(content, normalized.normalizedText);
 }
 

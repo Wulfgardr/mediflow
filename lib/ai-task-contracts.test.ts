@@ -134,6 +134,8 @@ test('document synthesis extraction falls back when model JSON is invalid', () =
     assert.equal(parsed.validTask, false);
     assert.equal(parsed.value.data.qualityLevel, 'yellow');
     assert.equal(parsed.value.data.medications.length, 0);
+    assert.equal(parsed.value.data.problemStatements.length, 0);
+    assert.equal(parsed.value.data.therapyCandidates.length, 0);
     assert.match(parsed.value.summary, /Referto clinico sintetico/);
 });
 
@@ -159,6 +161,8 @@ test('document synthesis extraction accepts legacy payloads used by historical U
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.qualityLevel, 'green');
     assert.equal(parsed.value.data.diagnoses.length, 1);
+    assert.equal(parsed.value.data.problemStatements.length, 0);
+    assert.equal(parsed.value.data.therapyCandidates.length, 0);
     assert.match(parsed.value.summary, /episodio depressivo lieve/i);
 });
 
@@ -180,11 +184,74 @@ test('document synthesis extraction normalizes structured diagnoses from shared 
                     confidence: 'high',
                 },
             ],
+            problemStatements: [
+                {
+                    label: 'BPCO riacutizzata',
+                    icdQuery: 'chronic obstructive pulmonary disease exacerbation',
+                    confidence: 'high',
+                    evidence: 'Riacutizzazione di BPCO in trattamento',
+                },
+            ],
+            therapyCandidates: [
+                {
+                    drugMention: 'Tiotropio',
+                    drugQuery: 'tiotropio',
+                    activePrinciple: 'tiotropio',
+                    dosage: '18 mcg 1 cps/die',
+                    confidence: 'high',
+                    evidence: 'Tiotropio 18 mcg 1 cps/die',
+                    therapyState: 'active',
+                },
+            ],
         },
     }), 'testo OCR');
 
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.medications.length, 1);
     assert.equal(parsed.value.data.diagnoses[0].system, 'ICD-10');
+    assert.equal(parsed.value.data.problemStatements.length, 1);
+    assert.equal(parsed.value.data.problemStatements[0].label, 'BPCO riacutizzata');
+    assert.equal(parsed.value.data.therapyCandidates.length, 1);
+    assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Tiotropio');
     assert.equal(parsed.value.data.qualityLevel, 'green');
+});
+
+test('document synthesis extraction repairs truncated envelope when only closing braces are missing', () => {
+    const truncated = `{
+  "schemaVersion": "mediflow.ai.extract.v1",
+  "task": "document_synthesis",
+  "summary": "Dimissione con terapia esplicita",
+  "data": {
+    "qualityLevel": "green",
+    "qualityReason": "Documento leggibile",
+    "medications": ["Humalog 4 U ai pasti principali"],
+    "diagnoses": [],
+    "problemStatements": [
+      {
+        "label": "Diabete mellito tipo 2",
+        "icdQuery": "type 2 diabetes mellitus",
+        "confidence": "high",
+        "evidence": "Diabete mellito tipo 2"
+      }
+    ],
+    "therapyCandidates": [
+      {
+        "drugMention": "Humalog",
+        "drugQuery": "Humalog insulin lispro",
+        "activePrinciple": "insulina lispro",
+        "dosage": "4 U ai pasti principali",
+        "confidence": "high",
+        "evidence": "Humalog 4 U ai pasti principali",
+        "therapyState": "active"
+      }
+    ]
+  }`;
+
+    const parsed = parseDocumentSynthesisExtractionResponse(truncated, 'testo OCR');
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.medications[0], 'Humalog 4 U ai pasti principali');
+    assert.equal(parsed.value.data.problemStatements[0].label, 'Diabete mellito tipo 2');
+    assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Humalog');
 });

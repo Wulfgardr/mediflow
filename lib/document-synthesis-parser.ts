@@ -1,6 +1,8 @@
 /* @Codex */
 import {
     parseDocumentSynthesisExtractionResponse,
+    type SmartImportDiagnosisExtraction,
+    type SmartImportTherapyExtraction,
     type DocumentDiagnosisSuggestionContract,
     type DocumentQualityLevel,
 } from './ai-task-contracts';
@@ -20,6 +22,8 @@ export type DocumentStructuredAnalysis = {
     };
     medications: string[];
     diagnoses: DocumentDiagnosisSuggestion[];
+    problemStatements: SmartImportDiagnosisExtraction[];
+    therapyCandidates: SmartImportTherapyExtraction[];
 };
 
 /* @Codex */
@@ -44,5 +48,7 @@ export function parseStructuredAnalysisResponse(response: string, rawMarkdown: s
         },
         medications: parsed.data.medications,
         diagnoses: parsed.data.diagnoses,
+        problemStatements: parsed.data.problemStatements,
+        therapyCandidates: parsed.data.therapyCandidates,
     };
 }

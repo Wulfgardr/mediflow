@@ -62,6 +62,29 @@ function qualityTone(level?: 'green' | 'yellow' | 'red') {
     };
 }
 
+/* @Codex */
+function therapyStateBadgeClasses(state: 'active' | 'transition' | 'uncertain' | 'inactive') {
+    if (state === 'transition') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200';
+    if (state === 'uncertain') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-200';
+    if (state === 'inactive') return 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300';
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200';
+}
+
+/* @Codex */
+function therapyStateLabel(state: 'active' | 'transition' | 'uncertain' | 'inactive') {
+    if (state === 'transition') return 'transizione';
+    if (state === 'uncertain') return 'incerta';
+    if (state === 'inactive') return 'non attiva';
+    return 'attiva';
+}
+
+/* @Codex */
+function therapyMatchLabel(matchType: 'catalog' | 'manual' | 'none') {
+    if (matchType === 'catalog') return 'match AIFA';
+    if (matchType === 'manual') return 'manuale';
+    return 'senza match';
+}
+
 export default function PatientDocumentImportReview({
     draft,
     onApply,
@@ -230,6 +253,11 @@ export default function PatientDocumentImportReview({
                                                     Evidenza: {diagnosis.evidence}
                                                 </p>
                                             )}
+                                            {diagnosis.blockedReason && (
+                                                <p className="text-[11px] text-amber-600 dark:text-amber-300">
+                                                    {diagnosis.blockedReason}
+                                                </p>
+                                            )}
                                         </div>
                                         <input
                                             type="checkbox"
@@ -275,9 +303,9 @@ export default function PatientDocumentImportReview({
                             </h3>
                         </div>
 
-                        <div className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-4 text-xs leading-relaxed text-amber-800 dark:border-amber-500/20 dark:bg-amber-950/10 dark:text-amber-200">
-                            In questa thin slice le terapie confermate non vengono ancora scritte come terapia strutturata:
-                            finiscono nelle note del paziente come promemoria documentale da riconciliare dopo il salvataggio.
+                        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/70 p-4 text-xs leading-relaxed text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-950/10 dark:text-emerald-200">
+                            Le terapie attive confermate con nome farmaco e posologia verranno salvate come terapia strutturata subito dopo la creazione della scheda.
+                            I casi incompleti o non attivi possono restare come promemoria nelle note solo se li mantieni selezionati.
                         </div>
 
                         <div className="space-y-3">
@@ -285,10 +313,33 @@ export default function PatientDocumentImportReview({
                                 <div key={medication.id} className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white">
-                                                Terapia proposta
-                                            </p>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                                    {medication.drugName || 'Terapia proposta'}
+                                                </p>
+                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
+                                                    {therapyStateLabel(medication.therapyState)}
+                                                </span>
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    {therapyMatchLabel(medication.matchType)}
+                                                </span>
+                                                {medication.confidence && (
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                        {medication.confidence}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400">{medication.sourceLabel}</p>
+                                            {medication.evidence && (
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    Evidenza: {medication.evidence}
+                                                </p>
+                                            )}
+                                            {medication.blockedReason && (
+                                                <p className="text-[11px] text-amber-600 dark:text-amber-300">
+                                                    {medication.blockedReason}
+                                                </p>
+                                            )}
                                         </div>
                                         <input
                                             type="checkbox"
@@ -301,14 +352,59 @@ export default function PatientDocumentImportReview({
                                         />
                                     </div>
 
-                                    <input
-                                        value={medication.label}
-                                        onChange={(event) => setLocalDraft((current) => ({
-                                            ...current,
-                                            medications: current.medications.map((item) => item.id === medication.id ? { ...item, label: event.target.value } : item),
-                                        }))}
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                                    />
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <input
+                                            value={medication.drugName}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                medications: current.medications.map((item) => item.id === medication.id ? { ...item, drugName: event.target.value } : item),
+                                            }))}
+                                            placeholder="Nome farmaco"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={medication.dosage || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                medications: current.medications.map((item) => item.id === medication.id ? { ...item, dosage: event.target.value } : item),
+                                            }))}
+                                            placeholder="Posologia"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={medication.activePrinciple || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                medications: current.medications.map((item) => item.id === medication.id ? { ...item, activePrinciple: event.target.value } : item),
+                                            }))}
+                                            placeholder="Principio attivo"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={medication.motivation || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                medications: current.medications.map((item) => item.id === medication.id ? { ...item, motivation: event.target.value } : item),
+                                            }))}
+                                            placeholder="Indicazione / contesto"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                    </div>
+
+                                    {(medication.aic || medication.atc) && (
+                                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                                            {medication.aic && (
+                                                <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10">
+                                                    AIC {medication.aic}
+                                                </span>
+                                            )}
+                                            {medication.atc && (
+                                                <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10">
+                                                    ATC {medication.atc}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

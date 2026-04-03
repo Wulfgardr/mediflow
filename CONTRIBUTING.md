@@ -100,6 +100,21 @@ npm run test:concurrency:patients
 
 Runbook: [docs/patient-concurrency-tests.md](./docs/patient-concurrency-tests.md)
 
+### Test import documentale nuova anagrafica
+
+Per verificare la lane di review documentale nel create-flow paziente:
+
+```bash
+npm run test:patient-document-import
+```
+
+Usalo quando tocchi:
+- `components/pdf-importer.tsx`
+- `components/patient-document-import-review.tsx`
+- `lib/patient-document-import-service.ts`
+- `lib/patient-document-review.ts`
+- la persistenza prudente delle terapie nel create-flow
+
 ---
 
 ## Mappa progetto
@@ -195,6 +210,7 @@ Una PR è considerata conclusa quando:
 - `npm run check:never-regress` passa
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
+- se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).

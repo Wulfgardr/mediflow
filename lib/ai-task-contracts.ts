@@ -96,6 +96,8 @@ export interface DocumentSynthesisExtractionData {
     qualityReason?: string;
     medications: string[];
     diagnoses: DocumentDiagnosisSuggestionContract[];
+    problemStatements: SmartImportDiagnosisExtraction[];
+    therapyCandidates: SmartImportTherapyExtraction[];
 }
 
 /* @Codex */
@@ -188,6 +190,8 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     qualityReason: string;
     medications: string[];
     diagnoses: DocumentDiagnosisSuggestionContract[];
+    problemStatements: SmartImportDiagnosisExtraction[];
+    therapyCandidates: SmartImportTherapyExtraction[];
 } | null {
     const rawJson = extractJsonObject(response);
     if (!rawJson) return null;
@@ -209,6 +213,16 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
                 .map(normalizeDocumentDiagnosis)
                 .filter((item): item is DocumentDiagnosisSuggestionContract => Boolean(item))
             : [];
+        const problemStatements = Array.isArray(parsed.problemStatements)
+            ? parsed.problemStatements
+                .map(normalizeSmartImportDiagnosis)
+                .filter((item): item is SmartImportDiagnosisExtraction => Boolean(item))
+            : [];
+        const therapyCandidates = Array.isArray(parsed.therapyCandidates)
+            ? parsed.therapyCandidates
+                .map(normalizeSmartImportTherapy)
+                .filter((item): item is SmartImportTherapyExtraction => Boolean(item))
+            : [];
 
         return {
             rawJson,
@@ -218,6 +232,8 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             qualityReason: normalizeCompactText(quality.reason, MAX_SHARED_SUMMARY_CHARS),
             medications,
             diagnoses,
+            problemStatements,
+            therapyCandidates,
         };
     } catch {
         return {
@@ -228,6 +244,8 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             qualityReason: '',
             medications: [],
             diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
         };
     }
 }
@@ -389,7 +407,54 @@ export function extractJsonObject(response: string): string | null {
         return null;
     }
 
-    return clean.slice(firstBrace, lastBrace + 1).trim();
+    const fragment = clean.slice(firstBrace, lastBrace + 1).trim();
+    const stack: string[] = [];
+    let inString = false;
+    let escaping = false;
+
+    for (const char of fragment) {
+        if (inString) {
+            if (escaping) {
+                escaping = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaping = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+        if (char === '{' || char === '[') {
+            stack.push(char);
+            continue;
+        }
+        if (char === '}' || char === ']') {
+            const expected = char === '}' ? '{' : '[';
+            if (stack[stack.length - 1] === expected) {
+                stack.pop();
+            }
+        }
+    }
+
+    if (inString) {
+        return fragment;
+    }
+
+    let repaired = fragment.replace(/,\s*$/g, '');
+    while (stack.length > 0) {
+        const opener = stack.pop();
+        repaired += opener === '{' ? '}' : ']';
+    }
+
+    return repaired;
 }
 
 export function parsePatientInsightExtractionResponse(response: string): AITaskParseResult<PatientInsightExtraction> {
@@ -512,6 +577,20 @@ export function parseDocumentSynthesisExtractionResponse(
                 .map(normalizeDocumentDiagnosis)
                 .filter((item): item is DocumentDiagnosisSuggestionContract => Boolean(item))
             : [];
+    const problemStatements = legacyPayload
+        ? legacyPayload.problemStatements
+        : Array.isArray(envelope.data.problemStatements)
+            ? envelope.data.problemStatements
+                .map(normalizeSmartImportDiagnosis)
+                .filter((item): item is SmartImportDiagnosisExtraction => Boolean(item))
+            : [];
+    const therapyCandidates = legacyPayload
+        ? legacyPayload.therapyCandidates
+        : Array.isArray(envelope.data.therapyCandidates)
+            ? envelope.data.therapyCandidates
+                .map(normalizeSmartImportTherapy)
+                .filter((item): item is SmartImportTherapyExtraction => Boolean(item))
+            : [];
 
     const summary = (legacyPayload?.summary || envelope.summary) || buildDocumentFallbackSummary(rawText);
     const qualityLevel = legacyPayload?.qualityLevel ?? normalizeQualityLevel(envelope.data.qualityLevel);
@@ -536,6 +615,8 @@ export function parseDocumentSynthesisExtractionResponse(
                 qualityReason,
                 medications,
                 diagnoses,
+                problemStatements,
+                therapyCandidates,
             },
         },
     };
@@ -677,6 +758,7 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
             'per le terapie usa drugQuery come chiave breve per ricerca catalogo AIFA, preferendo brand o principio attivo con strength se esplicita ma senza frequenza, orari o note accessorie',
             'drugMention e activePrinciple devono essere il piu possibile aderenti al testo sorgente; se il principio attivo e ovvio usa una forma compatibile con il catalogo locale AIFA',
             'in therapies includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
+            'se il documento distingue terapia alla dimissione, terapia domiciliare e terapia di degenza, considera correnti prima la dimissione, poi la domiciliare; non promuovere automaticamente come active i farmaci citati solo nel decorso di ricovero',
             'evidence deve essere un excerpt atomico riferito al singolo farmaco o alla singola diagnosi, non un riassunto di piu elementi',
             'se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain invece di active',
             'non marcare active una terapia futura, condizionale, da valutare o dipendente da controllo successivo',
@@ -710,16 +792,50 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
         "evidence": "breve citazione/parafrasi locale del passaggio rilevante",
         "confidence": "high|medium|low"
       }
+    ],
+    "problemStatements": [
+      {
+        "label": "problema clinico in italiano",
+        "icdQuery": "query breve in inglese per ICD-11",
+        "confidence": "high|medium|low",
+        "evidence": "breve evidenza testuale locale"
+      }
+    ],
+    "therapyCandidates": [
+      {
+        "drugMention": "farmaco o principio attivo menzionato",
+        "drugQuery": "chiave breve per catalogo AIFA",
+        "activePrinciple": "principio attivo se disponibile",
+        "dosage": "posologia se disponibile",
+        "motivation": "indicazione o contesto clinico se disponibile",
+        "therapyState": "active|transition|uncertain|inactive",
+        "reviewNote": "motivo breve se non immediatamente applicabile",
+        "confidence": "high|medium|low",
+        "evidence": "breve evidenza testuale locale"
+      }
     ]
   }`,
         [
             'qualityLevel usa green se il contenuto OCR e chiaro, yellow se ambiguo o parziale, red se insufficiente o rumoroso',
             'summary deve essere un riassunto clinico conciso in plain text, senza markdown',
-            'summary massimo 3 frasi brevi',
-            'in medications includi solo terapie esplicite nel testo OCR',
-            'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR',
+            'summary massimo 2 frasi brevi e non oltre 220 caratteri circa',
+            'in medications includi solo terapie esplicite e correnti nel testo OCR, senza duplicati e senza presidi, detergenti o indicazioni non farmacologiche',
+            'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR; se il documento non riporta codici espliciti restituisci diagnoses come array vuoto e non inventare placeholder o code vuoti',
+            'in problemStatements includi solo patologie attuali, attive o clinicamente rilevanti per la gestione corrente anche se prive di codice esplicito',
+            'problemStatements deve usare label in italiano clinico sintetico e icdQuery breve in inglese',
+            'escludi negazioni, familiarita, anamnesi remota risolta, counselling generico e fattori di rischio non trattati come problema clinico attivo',
+            'in therapyCandidates includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
+            'drugQuery deve essere una chiave breve per il catalogo AIFA, preferendo brand o principio attivo con strength se esplicita',
+            'se il documento contiene sezioni come terapia alla dimissione o terapia domiciliare, privilegia quelle rispetto ai farmaci descritti solo durante il ricovero',
+            'non marcare active antibiotici, profilassi, nutrizione enterale o terapie di degenza se non ricompaiono nella terapia alla dimissione o domiciliare',
+            'se una terapia domiciliare pre-ricovero sembra sostituita da una nuova terapia alla dimissione nello stesso ambito terapeutico, usa transition o uncertain per la terapia precedente',
+            'se una terapia ha durata breve, data di stop, oppure testo come fino al, poi stop, sospendere, usa transition o inactive invece di active',
+            'massimo 6 medications, massimo 4 problemStatements e massimo 6 therapyCandidates; se il documento contiene piu elementi tieni solo quelli piu correnti e clinicamente utili',
+            'se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain invece di active',
+            'evidence deve restare atomica e riferita al singolo problema o farmaco',
             'non inventare posologie, farmaci o codici mancanti',
-            'massimo 5 diagnosi e massimo 8 terapie',
+            'mantieni le stringhe molto compatte per restare entro il budget di output',
+            'massimo 4 diagnosi con codice esplicito, massimo 4 problemStatements e massimo 6 therapyCandidates',
         ],
         'DOCUMENTO OCR',
         rawText,

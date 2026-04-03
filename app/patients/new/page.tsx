@@ -33,6 +33,14 @@ type ImportedPatientDraft = {
         system: 'ICD-9' | 'ICD-10' | 'ICD-11';
         date: Date;
     }[];
+    therapies?: Array<{
+        drugName: string;
+        dosage: string;
+        activePrinciple?: string;
+        motivation?: string;
+        aic?: string;
+        atc?: string;
+    }>;
 };
 
 export default function NewPatientPage() {
@@ -96,6 +104,24 @@ export default function NewPatientPage() {
                 await db.checkups.bulkPut(toPut);
             }
 
+            if (Array.isArray(importedData?.therapies) && importedData.therapies.length > 0) {
+                const therapyItems = importedData.therapies.map((therapy) => ({
+                    id: uuidv4(),
+                    patientId,
+                    drugName: therapy.drugName,
+                    aic: therapy.aic,
+                    atc: therapy.atc,
+                    activePrinciple: therapy.activePrinciple,
+                    dosage: therapy.dosage,
+                    motivation: therapy.motivation,
+                    status: 'active' as const,
+                    startDate: new Date(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                }));
+                await db.therapies.bulkPut(therapyItems);
+            }
+
             router.push('/');
         } catch (error) {
             console.error("Failed to save patient", error);
@@ -127,8 +153,8 @@ export default function NewPatientPage() {
                     setPendingImportReview(buildPatientDocumentReviewDraft(imported));
                     setImportMeta({
                         quality: imported.documentQuality,
-                        diagnosisCount: imported.diagnoses?.length || 0,
-                        medicationCount: imported.medications?.length || 0,
+                        diagnosisCount: imported.reviewDiagnoses?.length || imported.diagnoses?.length || 0,
+                        medicationCount: imported.reviewTherapies?.length || imported.medications?.length || 0,
                         reviewPending: true,
                     });
                 }} />
@@ -194,6 +220,7 @@ export default function NewPatientPage() {
                             phone: reviewedDefaults.phone,
                             notes: reviewedDefaults.notes,
                             diagnoses: reviewedDefaults.diagnoses,
+                            therapies: reviewedDefaults.therapies,
                         });
                         setPendingImportReview(null);
                         setImportMeta((current) => current ? { ...current, reviewPending: false } : current);

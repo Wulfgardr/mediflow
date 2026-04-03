@@ -21,6 +21,25 @@ test('parses explicit medications from the model JSON payload', () => {
                 'Lasix 25 mg 1 cp al mattino',
             ],
             diagnoses: [],
+            problemStatements: [
+                {
+                    label: 'Scompenso cardiaco',
+                    icdQuery: 'heart failure',
+                    confidence: 'high',
+                    evidence: 'Scompenso cardiaco in terapia domiciliare',
+                },
+            ],
+            therapyCandidates: [
+                {
+                    drugMention: 'Lasix',
+                    drugQuery: 'furosemide',
+                    activePrinciple: 'furosemide',
+                    dosage: '25 mg 1 cp al mattino',
+                    confidence: 'high',
+                    evidence: 'Lasix 25 mg 1 cp al mattino',
+                    therapyState: 'active',
+                },
+            ],
         }),
         'terapia domiciliare esplicita',
     );
@@ -29,6 +48,8 @@ test('parses explicit medications from the model JSON payload', () => {
         'Lasix 25 mg 1 cp al mattino',
         'Metformina 500 mg x 2/die',
     ]);
+    assert.equal(analysis.problemStatements.length, 1);
+    assert.equal(analysis.therapyCandidates.length, 1);
     assert.equal(analysis.quality?.level, 'green');
 });
 
