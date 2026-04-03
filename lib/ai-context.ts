@@ -1,4 +1,4 @@
-import { db, type Diagnosis, type DocumentInsight } from '@/lib/db';
+import { db, type Attachment, type Diagnosis, type DocumentInsight } from '@/lib/db';
 import {
     estimateAIInsightComplexityScore,
     getAIInsightRuntimeSettings,
@@ -90,11 +90,42 @@ const CONTAMINATED_NOTE_MARKERS = [
     '**riassunto clinico:**',
 ];
 
+/* @Codex */
+const LOW_SIGNAL_ATTACHMENT_SUMMARIES = [
+    'nessuna informazione rilevante trovata.',
+    'allegato alla visita',
+    'documento allegato (analizzato)',
+    'sintesi clinica documento disabilitata localmente.',
+    'analisi completata (nessuna diagnosi esplicita rilevata)',
+];
+
+/* @Codex */
+const MAX_ATTACHMENT_TEXT_RECOVERY = 2;
+
+/* @Codex */
+export interface PatientInsightContextBuildOptions {
+    recoverAttachmentText?: (attachment: Attachment) => Promise<string>;
+}
+
+/* @Codex */
+interface AttachmentContextCandidate {
+    line: string;
+    recoveredDirectText: boolean;
+    omittedLowSignalSummary: boolean;
+}
+
 function compactText(value: string | null | undefined, maxChars = 220): string {
     const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
     if (!normalized) return '';
     if (normalized.length <= maxChars) return normalized;
     return `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}...`;
+}
+
+/* @Codex */
+function isLowSignalAttachmentSummary(value: string | null | undefined): boolean {
+    const normalized = (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!normalized) return true;
+    return LOW_SIGNAL_ATTACHMENT_SUMMARIES.some((candidate) => normalized === candidate);
 }
 
 function formatDate(value: unknown): string {
@@ -299,6 +330,112 @@ function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number
     return fileName ? `${fileName}: ${rendered}` : rendered;
 }
 
+/* @Codex */
+function renderRecoveredAttachmentContext(
+    fileName: string,
+    rawText: string,
+    maxChars: number,
+): string {
+    const excerpt = buildDocumentHighlightExcerpt(rawText, Math.min(320, maxChars))
+        || compactText(rawText, Math.min(maxChars, 320));
+    if (!excerpt) return '';
+
+    return fileName
+        ? `${fileName}: Estratto diretto allegato: ${excerpt}`
+        : `Estratto diretto allegato: ${excerpt}`;
+}
+
+/* @Codex */
+async function attachmentToFile(attachment: Attachment): Promise<File | null> {
+    const dataUrl = typeof attachment.data === 'string' ? attachment.data.trim() : '';
+    if (!dataUrl.startsWith('data:')) return null;
+
+    try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const fileName = compactText(attachment.name, 80) || 'attachment';
+        const mimeType = attachment.type || blob.type || 'application/octet-stream';
+        return new File([blob], fileName, { type: mimeType });
+    } catch {
+        return null;
+    }
+}
+
+/* @Codex */
+async function defaultRecoverAttachmentText(attachment: Attachment): Promise<string> {
+    const file = await attachmentToFile(attachment);
+    if (!file) return '';
+
+    const {
+        extractDocumentTextForSummary,
+        extractTextFromPdf,
+        isImageDocumentInput,
+        isPdfDocumentInput,
+    } = await import('@/lib/pdf-service');
+
+    if (isPdfDocumentInput(file)) {
+        try {
+            const extracted = await extractTextFromPdf(file);
+            if (extracted.trim().length >= 120) {
+                return extracted;
+            }
+        } catch {
+            // Fall through to OCR-backed extraction below.
+        }
+    }
+
+    if (!isPdfDocumentInput(file) && !isImageDocumentInput(file)) {
+        return '';
+    }
+
+    try {
+        return await extractDocumentTextForSummary(file);
+    } catch {
+        return '';
+    }
+}
+
+/* @Codex */
+async function buildAttachmentContextCandidate(
+    attachment: Attachment,
+    maxChars: number,
+    recoverAttachmentText: (attachment: Attachment) => Promise<string>,
+    allowRecovery: boolean,
+): Promise<AttachmentContextCandidate> {
+    const fileName = compactText(attachment.name, 80);
+    const summary = typeof attachment.summarySnapshot === 'string'
+        ? attachment.summarySnapshot.trim()
+        : '';
+    const hasLowSignalSummary = isLowSignalAttachmentSummary(summary);
+
+    if (summary && !hasLowSignalSummary) {
+        const rendered = compactText(summary, maxChars);
+        return {
+            line: fileName ? `${fileName}: ${rendered}` : rendered,
+            recoveredDirectText: false,
+            omittedLowSignalSummary: false,
+        };
+    }
+
+    if (allowRecovery && attachment.data) {
+        const recoveredText = compactText(await recoverAttachmentText(attachment), maxChars * 4);
+        const recoveredLine = renderRecoveredAttachmentContext(fileName, recoveredText, maxChars);
+        if (recoveredLine) {
+            return {
+                line: recoveredLine,
+                recoveredDirectText: true,
+                omittedLowSignalSummary: false,
+            };
+        }
+    }
+
+    return {
+        line: '',
+        recoveredDirectText: false,
+        omittedLowSignalSummary: hasLowSignalSummary || !summary,
+    };
+}
+
 function createSourceRefs(
     section: string,
     lines: string[],
@@ -325,7 +462,10 @@ function renderSourceRefs(refs: PatientInsightSourceRef[]): string {
 }
 
 /* @Codex */
-export async function buildPatientInsightContext(patientId: string): Promise<PatientInsightContextSnapshot> {
+export async function buildPatientInsightContext(
+    patientId: string,
+    options: PatientInsightContextBuildOptions = {},
+): Promise<PatientInsightContextSnapshot> {
     const patient = await db.patients.get(patientId);
     if (!patient) {
         return {
@@ -377,18 +517,13 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
     const parsedArchiveInsights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
         .sort((left, right) => compareDatesDesc(left.date, right.date));
     const dedupedArchiveInsights = dedupeDocumentInsightsForContext(parsedArchiveInsights);
-    const attachmentSummariesSource = attachments
-        .filter((attachment) => attachment.summarySnapshot?.trim())
-        .map((attachment) => ({
-            fileName: compactText(attachment.name, 80),
-            summarySnapshot: attachment.summarySnapshot,
-        }));
+    const recoverAttachmentText = options.recoverAttachmentText ?? defaultRecoverAttachmentText;
 
     const runtimeSettings = await getAIInsightRuntimeSettings({
         patientComplexityScore: estimateAIInsightComplexityScore({
             diagnoses: allDiagnoses.length,
             entries: activeEntries.length,
-            documents: dedupedArchiveInsights.insights.length + attachmentSummariesSource.length,
+            documents: dedupedArchiveInsights.insights.length + attachments.length,
         }),
     });
 
@@ -396,15 +531,28 @@ export async function buildPatientInsightContext(patientId: string): Promise<Pat
         .map((insight) => renderDocumentInsightContext(insight, runtimeSettings.maxDocumentSummaryChars))
         .filter(Boolean);
 
-    const attachmentSummaries = attachmentSummariesSource
-        .map((attachment) => {
-            const summary = compactText(attachment.summarySnapshot, runtimeSettings.maxDocumentSummaryChars);
-            if (!summary) return '';
-            return attachment.fileName ? `${attachment.fileName}: ${summary}` : summary;
-        })
+    const attachmentCandidates = await Promise.all(
+        attachments.map((attachment, index) => buildAttachmentContextCandidate(
+            attachment,
+            runtimeSettings.maxDocumentSummaryChars,
+            recoverAttachmentText,
+            index < MAX_ATTACHMENT_TEXT_RECOVERY,
+        )),
+    );
+    const attachmentSummaries = attachmentCandidates
+        .map((candidate) => candidate.line)
         .filter(Boolean);
 
     const limitations: string[] = [];
+    const recoveredAttachmentCount = attachmentCandidates.filter((candidate) => candidate.recoveredDirectText).length;
+    const omittedLowSignalAttachmentCount = attachmentCandidates.filter((candidate) => candidate.omittedLowSignalSummary).length;
+
+    if (recoveredAttachmentCount > 0) {
+        limitations.push('Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file per arricchire il contesto AI.');
+    }
+    if (omittedLowSignalAttachmentCount > 0) {
+        limitations.push('Gli allegati con snapshot generico o assente non sono stati usati come fonti documentali finche non esiste testo clinico recuperabile.');
+    }
     const seenDocuments = new Set<string>();
     const uniqueDocumentSummaries = [...archiveSummaries, ...attachmentSummaries]
         .filter((line) => {

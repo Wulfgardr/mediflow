@@ -1,5 +1,6 @@
 /* @Codex */
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
+import { splitDocumentIntoLines } from './document-excerpt';
 
 /* @Codex */
 export const DOCUMENT_EVIDENCE_PACK_SCHEMA_VERSION = 'mediflow.document_evidence_pack.v2';
@@ -95,9 +96,7 @@ function normalizeComparableText(value: string): string {
 }
 
 function splitDocumentLines(value: string): string[] {
-    return value
-        .replace(/\r/g, '\n')
-        .split(/\n+/)
+    return splitDocumentIntoLines(value)
         .map((line) => compactText(line, MAX_EXCERPT_CHARS))
         .filter((line) => line.length >= 8);
 }
@@ -306,10 +305,10 @@ export function renderDocumentEvidencePackLines(pack: DocumentEvidencePack): str
     };
 
     pushLine('Problemi documentati', byKind.get('problem'));
-    pushLine('Terapie documentate', byKind.get('medication'));
     pushLine('Follow-up documentato', byKind.get('followup'));
-    pushLine('Setting assistenziale', byKind.get('care_setting'));
     pushLine('Stato funzionale', byKind.get('functional_status'));
+    pushLine('Setting assistenziale', byKind.get('care_setting'));
+    pushLine('Terapie documentate', byKind.get('medication'));
 
     return lines;
 }

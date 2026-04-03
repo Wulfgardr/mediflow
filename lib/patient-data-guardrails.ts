@@ -4,6 +4,21 @@ export interface PatientIdentityLike {
     lastName: string;
 }
 
+const NON_NAME_ACTION_TOKENS = new Set([
+    'attivare',
+    'contattare',
+    'controllare',
+    'dimettere',
+    'gestire',
+    'monitorare',
+    'proseguire',
+    'ridurre',
+    'rivalutare',
+    'sospendere',
+    'valutare',
+    'verificare',
+]);
+
 /* @Codex */
 export function normalizePersonToken(value: string): string {
     return value
@@ -47,6 +62,7 @@ export function detectSuspiciousPersonNames(text: string | null | undefined, pat
             || (lastNameTokens.includes(firstToken) && firstNameTokens.includes(secondToken))
         );
         if (matchesPatientTokens) continue;
+        if (NON_NAME_ACTION_TOKENS.has(firstToken) || NON_NAME_ACTION_TOKENS.has(secondToken)) continue;
 
         matches.add(fullName);
     }

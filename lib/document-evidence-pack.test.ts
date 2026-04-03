@@ -88,3 +88,57 @@ test('buildDocumentEvidencePack falls back to inferred summary facts when raw te
     assert.ok(inferred.length >= 1);
     assert.match(inferred.map((fact) => fact.kind).join(','), /(followup|care_setting|functional_status)/);
 });
+
+test('renderDocumentEvidencePackContext preserves follow-up before medications under tight budgets', () => {
+    const pack = buildDocumentEvidencePack({
+        documentInsightId: 'doc-3',
+        fileName: 'dimissione-riabilitativa.pdf',
+        documentDate: '2025-03-07T12:00:00.000Z',
+        summary: 'Dimissione riabilitativa con FKT domiciliare e controllo ortopedico.',
+        rawMarkdown: [
+            'Indicazioni alla dimissione',
+            'Controllo ortopedico tra 10 giorni con eventuale rivalutazione clinica.',
+            'FKT domiciliare bisettimanale per recupero della mobilita.',
+            'Miglioramento del cammino con supporto di un ausilio, ancora ridotta autonomia sulle scale.',
+        ].join('\n'),
+        diagnoses: [],
+        medications: [
+            'Levotiroxina 100 mcg 1 cp al mattino',
+            'Colecalciferolo 25.000 UI settimanale',
+            'Pantoprazolo 20 mg 1 cp la sera',
+            'Pregabalin 75 mg 1 cps mattina e sera',
+            'Duloxetina 30 mg 1 cps dopo cena',
+        ],
+    });
+
+    const compact = renderDocumentEvidencePackContext(pack, 220);
+    assert.ok(compact.length <= 220);
+    assert.match(compact, /Follow-up documentato/i);
+    assert.doesNotMatch(compact, /Terapie documentate/i);
+});
+
+test('buildDocumentEvidencePack extracts follow-up from OCR-like single-line text', () => {
+    const pack = buildDocumentEvidencePack({
+        documentInsightId: 'doc-4',
+        fileName: 'ocr-lineare.pdf',
+        documentDate: '2025-03-08T12:00:00.000Z',
+        summary: 'Dimissione riabilitativa con indicazioni ortopediche.',
+        rawMarkdown: [
+            'Decorso clinico migliorato',
+            'Diagnosi alla dimissione',
+            'Esiti di frattura femorale sinistra',
+            'Terapia domiciliare',
+            'Pregabalin 75 mg 1 cp ore 8',
+            'Indicazioni alla dimissione',
+            'Controllo ortopedico tra 10 giorni.',
+            'FKT domiciliare bisettimanale.',
+            'Cammino con ausilio e ridotta autonomia sulle scale.',
+        ].join('  '),
+        diagnoses: [],
+        medications: ['Pregabalin 75 mg 1 cp ore 8'],
+    });
+
+    const lines = renderDocumentEvidencePackLines(pack).join('\n');
+    assert.match(lines, /Follow-up documentato: Controllo ortopedico tra 10 giorni/i);
+    assert.match(lines, /Stato funzionale: Cammino con ausilio/i);
+});

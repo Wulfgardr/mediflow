@@ -57,3 +57,23 @@ test('buildStoredDocumentExcerpt keeps high-signal sections in clinical order', 
     assert.ok(excerpt.indexOf('Diagnosi alla dimissione') < excerpt.indexOf('Terapia domiciliare'));
     assert.ok(excerpt.indexOf('Terapia domiciliare') < excerpt.indexOf('Indicazioni alla dimissione'));
 });
+
+test('buildStoredDocumentExcerpt rescues signal from OCR-like single-line documents', () => {
+    const excerpt = buildStoredDocumentExcerpt([
+        'Intestazione amministrativa ripetuta',
+        ...Array.from({ length: 40 }, (_, index) => `rumore ${index + 1}`),
+        'Diagnosi alla dimissione',
+        'Esiti di frattura femorale in recupero funzionale',
+        'Terapia domiciliare',
+        'Pregabalin 75 mg 1 cp ore 8',
+        'Indicazioni alla dimissione',
+        'Controllo ortopedico tra 10 giorni.',
+        'FKT domiciliare bisettimanale.',
+        'Cammino con ausilio e ridotta autonomia sulle scale.',
+    ].join('  '));
+
+    assert.match(excerpt, /Diagnosi alla dimissione/);
+    assert.match(excerpt, /Indicazioni alla dimissione/);
+    assert.match(excerpt, /Controllo ortopedico tra 10 giorni/);
+    assert.match(excerpt, /FKT domiciliare bisettimanale/);
+});
