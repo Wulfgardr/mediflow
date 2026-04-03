@@ -1,5 +1,6 @@
 /* @Codex */
 const MAX_STORED_DOCUMENT_CHARS = 3000;
+const LONG_DOCUMENT_LINE_CHARS = 240;
 
 /* @Codex */
 const DOCUMENT_SIGNAL_KEYWORDS = [
@@ -42,6 +43,43 @@ const DOCUMENT_SIGNAL_KEYWORDS = [
     'codice',
 ];
 
+const DOCUMENT_HEADING_SPLIT_REGEX = new RegExp(
+    `\\s{2,}(?=(?:${DOCUMENT_SIGNAL_KEYWORDS.join('|')})\\w*)`,
+    'iu',
+);
+const DOCUMENT_SENTENCE_SPLIT_REGEX = /(?<=[.;!?])\s+(?=[A-ZÀ-ÖØ-Þ0-9])/u;
+
+function splitLongDocumentLine(line: string): string[] {
+    let parts = [line.trim()];
+
+    for (const splitter of [DOCUMENT_HEADING_SPLIT_REGEX, DOCUMENT_SENTENCE_SPLIT_REGEX]) {
+        parts = parts.flatMap((part) => {
+            const trimmed = part.trim();
+            if (!trimmed) return [];
+            if (trimmed.length <= LONG_DOCUMENT_LINE_CHARS) return [trimmed];
+
+            const fragments = trimmed
+                .split(splitter)
+                .map((fragment) => fragment.trim())
+                .filter(Boolean);
+
+            return fragments.length > 1 ? fragments : [trimmed];
+        });
+    }
+
+    return parts;
+}
+
+/* @Codex */
+export function splitDocumentIntoLines(text: string): string[] {
+    return text
+        .replace(/\r/g, '\n')
+        .split(/\n+/)
+        .flatMap((line) => splitLongDocumentLine(line))
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
 /* @Codex */
 function isSignalHeading(line: string): boolean {
     const normalized = line.toLowerCase().trim().replace(/[:;\-–]+$/, '');
@@ -60,11 +98,7 @@ export function buildDocumentExcerpt(text: string, maxChars: number): string {
     if (!text) return '';
     if (text.length <= maxChars) return text;
 
-    const lines = text
-        .replace(/\r/g, '\n')
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean);
+    const lines = splitDocumentIntoLines(text);
     const scored = lines.map((line, index) => {
         const lower = line.toLowerCase();
         let score = Math.min(lower.length, 180);

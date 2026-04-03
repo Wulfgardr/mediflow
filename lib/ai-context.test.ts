@@ -36,7 +36,13 @@ function stubFilter(items: unknown[]) {
     return (() => ({ toArray: async () => items })) as unknown;
 }
 
-async function withHarness() {
+/* @Codex */
+interface HarnessOptions {
+    attachments?: unknown[];
+    documentInsights?: unknown;
+}
+
+async function withHarness(options: HarnessOptions = {}) {
     const dbModule = await import('./db');
     const settingsModule = await import('./ai-insight-settings');
 
@@ -68,7 +74,7 @@ async function withHarness() {
                         date: new Date('2025-02-10T00:00:00Z'),
                     },
                 ],
-                documentInsights: JSON.stringify([
+                documentInsights: options.documentInsights ?? JSON.stringify([
                     {
                         id: 'doc-1',
                         date: '2025-03-10T00:00:00Z',
@@ -234,7 +240,7 @@ async function withHarness() {
         },
     ]) as typeof dbModule.db.checkups.filter;
 
-    dbModule.db.attachments.filter = stubFilter([
+    dbModule.db.attachments.filter = stubFilter(options.attachments ?? [
         { id: 'attachment-1', patientId: 'patient-1', name: 'eco-cuore.pdf', summarySnapshot: 'Funzione sistolica conservata', createdAt: new Date('2025-03-14T00:00:00Z') },
         { id: 'attachment-2', patientId: 'patient-1', name: 'rx-polmoni.pdf', summarySnapshot: 'Addensamento basale da rivalutare', createdAt: new Date('2025-03-04T00:00:00Z') },
     ]) as typeof dbModule.db.attachments.filter;
@@ -302,6 +308,47 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.match(snapshot.limitations.join('\n'), /documenti ai sovrapposti sullo stesso episodio sono stati consolidati/i);
         assert.match(prompt, /\[TERAPIE ATTIVE\][\s\S]*Ramipril 5 mg\/die/i);
         assert.match(prompt, /sezione TERAPIE ATTIVE come fonte primaria della terapia corrente/i);
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext recovers direct attachment text when the stored snapshot is generic', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-generic',
+                patientId: 'patient-1',
+                name: 'lettera-dimissione.pdf',
+                type: 'application/pdf',
+                data: 'data:application/pdf;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1', {
+            recoverAttachmentText: async () => [
+                'Diagnosi di dimissione',
+                'Deficit della deambulazione in postumi di frattura pertrocanterica sx',
+                'Indicazioni alla dimissione',
+                'FKT domiciliare 2-3 volte alla settimana',
+                'Visita ortopedica di controllo con Rx anca sx e femore sx',
+            ].join('\n'),
+        });
+
+        assert.match(snapshot.prompt, /lettera-dimissione\.pdf: Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /Deficit della deambulazione in postumi di frattura pertrocanterica sx/i);
+        assert.match(snapshot.prompt, /FKT domiciliare 2-3 volte alla settima/i);
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file/i,
+        );
+        assert.ok(!snapshot.limitations.join('\n').includes('non sono stati usati come fonti documentali'));
     } finally {
         restore();
     }
