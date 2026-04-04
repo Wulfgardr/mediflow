@@ -62,6 +62,7 @@ Nota operativa:
 - [x] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
 - [ ] Eseguire `AI-04`: preparare ADR e thin slice lane `PII/redaction` locale in shadow mode, coerente con la valutazione OpenMed. Stato `WUL-96`: benchmark stack chiuso, ma `OpenMed redaction` resta `benchmark-only / not shadow-ready` per leak critici sulle email/mailbox (`email recall = 0.333` sul corpus v3, `0.143` sul corpus email-focused).
 - [ ] Eseguire `AI-05`: aggiungere input normalization tollerante per PDF e CDA/CCD prima delle lane semantiche.
+  Thin slice aperto in `WUL-110`: helper condiviso di normalizzazione documentale locale (OCR/testo + CDA/CCD) integrato prima di `document_synthesis`, senza sconfinare in NER/redaction/coding.
 - [ ] Eseguire `AI-06`: benchmarkare una lane NER clinica italiana deterministica (`HUMADEX`) solo se migliora auditabilita o coding. Stato `WUL-96`: corpus `clinical_entities.v2`, confronto reale, repeatability a 5 run e promotion gate completati; `HUMADEX` resta davanti a `OpenMed NER` (`0.6/0.7` precision/recall vs `0.5/0.6`), ma entrambi falliscono il gate (`promotionReady = false`) per leak sui case negativi e under-span su problemi composti, quindi la lane resta `benchmark-only`.
 - [ ] Eseguire `AI-07`: valutare challenger generativi solo dopo baseline e resolver stabili, senza cambiare il default per intuizione.
 - [ ] Eseguire `AI-08`: formalizzare rollout/shadow mode/stop-rules delle lane AI prima di qualunque attivazione operativa.

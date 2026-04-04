@@ -22,6 +22,8 @@ import {
     buildStoredDocumentExcerpt,
 } from './document-excerpt';
 /* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
+/* @Codex */
 import { buildDocumentEvidencePack } from './document-evidence-pack';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
@@ -124,9 +126,10 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const ai = await AIService.create('clinical');
-    const sliced = buildDocumentExcerpt(rawMarkdown, MAX_SYNTHESIS_CHARS);
+    const normalized = normalizeDocumentInput(rawMarkdown);
+    const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1024);
-    return parseStructuredAnalysisResponse(content, rawMarkdown);
+    return parseStructuredAnalysisResponse(content, normalized.normalizedText);
 }
 
 /**
@@ -140,6 +143,7 @@ export async function synthesizeDocument(
     const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
+    const normalized = normalizeDocumentInput(rawMarkdown);
     const analysis = await analyzeDocumentContent(rawMarkdown);
 
     const patient = await db.patients.get(patientId);
@@ -161,7 +165,7 @@ export async function synthesizeDocument(
         id: uuid(),
         date: new Date(),
         fileName,
-        rawMarkdown: buildStoredDocumentExcerpt(rawMarkdown),
+        rawMarkdown: buildStoredDocumentExcerpt(normalized.normalizedText),
         summary: analysis.summary,
         quality: analysis.quality,
         extractedData: analysis.diagnoses.length > 0 || analysis.medications.length > 0
