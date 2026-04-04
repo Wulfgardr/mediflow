@@ -11,7 +11,6 @@ import { revivePatientStructuredFields } from './patient-structured-fields';
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 /* @Codex */
 import type { DocumentEvidencePack } from './document-evidence-pack';
-
 // Document insight from OCR + AI synthesis
 /* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
@@ -27,6 +26,8 @@ export interface DocumentDiagnosisSuggestion {
 
 export interface DocumentInsight {
     id: string;
+    /* @Codex */
+    attachmentId?: string;
     date: Date;
     fileName: string;
     rawMarkdown: string;  // DeepSeek-OCR output
@@ -127,7 +128,7 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
     /* @Codex */
-    attachments: ['name', 'path', 'data', 'summarySnapshot']
+    attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
 };
 
 class ApiTable<T> {
@@ -627,6 +628,8 @@ export interface Attachment {
     path: string;
     data?: string; // Base64 content for storage
     summarySnapshot?: string;
+    /* @Codex */
+    parseEvidenceArtifactSnapshot?: string;
     createdAt: Date;
 }
 

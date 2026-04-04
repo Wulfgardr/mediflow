@@ -3,6 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStoredDocumentExcerpt } from './document-excerpt';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
+import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
+import {
+    buildDocumentParseEvidenceArtifact,
+    evaluateDocumentParseEvidenceArtifact,
+    projectDocumentEvidencePack,
+} from './document-parse-evidence-artifact';
 
 test('parses explicit medications from the model JSON payload', () => {
     const analysis = parseStructuredAnalysisResponse(
@@ -76,4 +82,123 @@ test('buildStoredDocumentExcerpt rescues signal from OCR-like single-line docume
     assert.match(excerpt, /Indicazioni alla dimissione/);
     assert.match(excerpt, /Controllo ortopedico tra 10 giorni/);
     assert.match(excerpt, /FKT domiciliare bisettimanale/);
+});
+
+test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence chamber on the baseline discharge case', () => {
+    const casePack = parseDocumentIntelligenceCasePack({
+        schemaVersion: 'mediflow.document_case_pack.v1',
+        id: 'doc-lab-discharge-femur-001',
+        archetype: 'discharge-letter',
+        title: 'Dimissione ortopedica con follow-up e rumore anamnestico',
+        sourceText: 'Lettera di dimissione ortopedica del 20/03/2026. Diagnosi: frattura pertrocanterica del femore sinistro trattata chirurgicamente. Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino. Indicazioni: controllo ortopedico tra 7 giorni, fisioterapia domiciliare 3 volte/settimana, ADI infermieristica per medicazione ferita. Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti. Anamnesi remota: pregressa frattura di polso destro guarita. Familiarita: madre con carcinoma mammario.',
+        ocrVariant: 'Lettera di dimissione ortopedica del 20/03/2026. Diagnosi: frattura pertrocantcrica del femore sinistro trattata chirurgicamcnte. Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino. Indicazioni: controllo ortopedico tra 7 giomi, fisioterapia domiciliare 3 volte/settimana, ADl infermieristica per medicazione ferita. Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti.',
+        goldFacts: [
+            {
+                kind: 'problem',
+                label: 'Frattura pertrocanterica del femore sinistro',
+                excerpt: 'Diagnosi: frattura pertrocanterica del femore sinistro trattata chirurgicamente.',
+                temporality: 'current',
+                status: 'active',
+                origin: 'documented',
+                codingHints: {
+                    system: 'ICD-10',
+                    code: 'S72.1',
+                    icdQuery: 'pertrochanteric fracture of left femur',
+                },
+            },
+            {
+                kind: 'medication',
+                label: 'Torasemide 10 mg 1 cp al mattino',
+                excerpt: 'Terapia alla dimissione: Torasemide 10 mg 1 cp al mattino.',
+                temporality: 'current',
+                status: 'active',
+                origin: 'documented',
+                codingHints: {
+                    aifaQuery: 'torasemide 10 mg compressa',
+                },
+            },
+            {
+                kind: 'followup',
+                label: 'Controllo ortopedico tra 7 giorni',
+                excerpt: 'Indicazioni: controllo ortopedico tra 7 giorni.',
+                temporality: 'planned',
+                status: 'planned',
+                origin: 'documented',
+            },
+            {
+                kind: 'care_setting',
+                label: 'ADI infermieristica per medicazione ferita',
+                excerpt: 'ADI infermieristica per medicazione ferita.',
+                temporality: 'planned',
+                status: 'planned',
+                origin: 'documented',
+            },
+            {
+                kind: 'functional_status',
+                label: 'Deambulazione con deambulatore e ridotta autonomia nei trasferimenti',
+                excerpt: 'Stato funzionale: deambulazione con deambulatore e ridotta autonomia nei trasferimenti.',
+                temporality: 'current',
+                status: 'uncertain',
+                origin: 'documented',
+            },
+        ],
+        expectedEvidencePack: {
+            requiredKinds: ['problem', 'medication', 'followup', 'care_setting', 'functional_status'],
+        },
+        negativeAssertions: [
+            {
+                label: 'Carcinoma mammario materno',
+                reason: 'family_history',
+                note: 'Non deve emergere come problema attivo del paziente.',
+            },
+            {
+                label: 'Pregressa frattura di polso destro',
+                reason: 'historical_only',
+                note: 'Anamnesi remota non rilevante per il follow-up corrente.',
+            },
+        ],
+    });
+
+    const diagnoses = casePack.goldFacts
+        .filter((fact) => fact.kind === 'problem' && fact.codingHints?.system && fact.codingHints?.code)
+        .map((fact) => ({
+            code: fact.codingHints?.code as string,
+            description: fact.label,
+            system: fact.codingHints?.system as 'ICD-9' | 'ICD-10' | 'ICD-11',
+            evidence: fact.excerpt,
+            confidence: 'high' as const,
+        }));
+    const medications = casePack.goldFacts
+        .filter((fact) => fact.kind === 'medication')
+        .map((fact) => fact.label);
+
+    const artifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: 'doc-1',
+        attachmentId: 'attachment-1',
+        fileName: 'dimissione.pdf',
+        documentDate: '2026-03-20T00:00:00.000Z',
+        qualityLevel: 'green',
+        qualityReason: 'Documento leggibile e coerente',
+        summary: 'Dimissione ortopedica con terapia, follow-up e setting domiciliare.',
+        rawMarkdown: casePack.sourceText,
+        diagnoses,
+        medications,
+    });
+
+    const evaluation = evaluateDocumentParseEvidenceArtifact(casePack, artifact);
+    const evidencePack = projectDocumentEvidencePack(artifact);
+
+    assert.deepEqual(evaluation.missingKinds, []);
+    assert.deepEqual(evaluation.leakedNegativeAssertions, []);
+    assert.deepEqual(
+        evaluation.presentKinds.sort(),
+        ['care_setting', 'followup', 'functional_status', 'medication', 'problem'].sort(),
+    );
+    assert.equal(artifact.source.attachmentId, 'attachment-1');
+    assert.equal(artifact.parseBundle.parserDiagnostics.lineCount, 1);
+    assert.equal(evidencePack.facts.length, artifact.evidenceMemory.facts.length);
+    assert.match(
+        evidencePack.facts.map((fact) => fact.label).join('\n'),
+        /Frattura pertrocanterica del femore sinistro/,
+    );
 });

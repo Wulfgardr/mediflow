@@ -11,6 +11,11 @@ import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 import { dedupeDocumentInsightsForContext } from '@/lib/document-insight-context';
 /* @Codex */
 import { normalizeDocumentInput } from '@/lib/document-input-normalization';
+/* @Codex */
+import {
+    parseDocumentParseEvidenceArtifactSnapshot,
+    projectDocumentInsightFromArtifact,
+} from '@/lib/document-parse-evidence-artifact';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -445,6 +450,15 @@ function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number
 }
 
 /* @Codex */
+function resolveDocumentInsightContextSource(
+    insight: DocumentInsight,
+    attachmentArtifactSnapshot: string | null | undefined,
+): DocumentInsight {
+    const artifact = parseDocumentParseEvidenceArtifactSnapshot(attachmentArtifactSnapshot);
+    return artifact ? projectDocumentInsightFromArtifact(artifact) : insight;
+}
+
+/* @Codex */
 function renderRecoveredAttachmentContext(
     fileName: string,
     createdAt: unknown,
@@ -653,6 +667,7 @@ export async function buildPatientInsightContext(
         .sort((left, right) => compareDatesDesc(left.date, right.date));
     const dedupedArchiveInsights = dedupeDocumentInsightsForContext(parsedArchiveInsights);
     const recoverAttachmentText = options.recoverAttachmentText ?? defaultRecoverAttachmentText;
+    const attachmentById = new Map(attachments.map((attachment) => [attachment.id, attachment] as const));
 
     const runtimeSettings = await getAIInsightRuntimeSettings({
         patientComplexityScore: estimateAIInsightComplexityScore({
@@ -662,17 +677,32 @@ export async function buildPatientInsightContext(
         }),
     });
 
+    const archivedAttachmentIds = new Set(
+        dedupedArchiveInsights.insights
+            .map((insight) => (typeof insight.attachmentId === 'string' ? insight.attachmentId.trim() : ''))
+            .filter(Boolean),
+    );
     const archiveSummaries = dedupedArchiveInsights.insights
-        .map((insight) => renderDocumentInsightContext(insight, runtimeSettings.maxDocumentSummaryChars))
+        .map((insight) => {
+            const attachmentId = typeof insight.attachmentId === 'string' ? insight.attachmentId.trim() : '';
+            const attachment = attachmentId ? attachmentById.get(attachmentId) : undefined;
+            const sourceInsight = resolveDocumentInsightContextSource(
+                insight,
+                attachment?.parseEvidenceArtifactSnapshot,
+            );
+            return renderDocumentInsightContext(sourceInsight, runtimeSettings.maxDocumentSummaryChars);
+        })
         .filter((candidate): candidate is DocumentContextCandidate => Boolean(candidate?.line));
 
     const attachmentCandidates = await Promise.all(
-        attachments.map((attachment, index) => buildAttachmentContextCandidate(
-            attachment,
-            runtimeSettings.maxDocumentSummaryChars,
-            recoverAttachmentText,
-            index < MAX_ATTACHMENT_TEXT_RECOVERY,
-        )),
+        attachments
+            .filter((attachment) => !archivedAttachmentIds.has(attachment.id))
+            .map((attachment, index) => buildAttachmentContextCandidate(
+                attachment,
+                runtimeSettings.maxDocumentSummaryChars,
+                recoverAttachmentText,
+                index < MAX_ATTACHMENT_TEXT_RECOVERY,
+            )),
     );
     const limitations: string[] = [];
     const recoveredAttachmentCount = attachmentCandidates.filter((candidate) => candidate.recoveredDirectText).length;

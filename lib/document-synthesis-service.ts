@@ -24,7 +24,11 @@ import {
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
 /* @Codex */
-import { buildDocumentEvidencePack } from './document-evidence-pack';
+import {
+    buildDocumentParseEvidenceArtifact,
+    projectDocumentEvidencePack,
+    type DocumentParseEvidenceArtifact,
+} from './document-parse-evidence-artifact';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     assertAiDocumentSynthesisEnabledValue,
@@ -32,6 +36,17 @@ import {
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 8000;
+
+/* @Codex */
+export interface SynthesizeDocumentOptions {
+    attachmentId?: string;
+}
+
+/* @Codex */
+export interface SynthesizeDocumentResult {
+    insight: DocumentInsight;
+    parseEvidenceArtifact: DocumentParseEvidenceArtifact;
+}
 
 /* @Codex */
 function parseExistingInsights(raw: unknown): DocumentInsight[] {
@@ -138,8 +153,9 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
 export async function synthesizeDocument(
     rawMarkdown: string,
     fileName: string,
-    patientId: string
-): Promise<DocumentInsight> {
+    patientId: string,
+    options: SynthesizeDocumentOptions = {},
+): Promise<SynthesizeDocumentResult> {
     const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
@@ -163,6 +179,7 @@ export async function synthesizeDocument(
 
     const insight: DocumentInsight = {
         id: uuid(),
+        attachmentId: options.attachmentId,
         date: new Date(),
         fileName,
         rawMarkdown: buildStoredDocumentExcerpt(normalized.normalizedText),
@@ -179,16 +196,19 @@ export async function synthesizeDocument(
             : undefined
     };
 
-    insight.evidencePack = buildDocumentEvidencePack({
+    const parseEvidenceArtifact = buildDocumentParseEvidenceArtifact({
         documentInsightId: insight.id,
+        attachmentId: options.attachmentId,
         fileName: insight.fileName,
         documentDate: insight.date.toISOString(),
         qualityLevel: insight.quality?.level,
+        qualityReason: insight.quality?.reason,
         summary: insight.summary,
         rawMarkdown: insight.rawMarkdown,
         diagnoses: analysis.diagnoses,
         medications: analysis.medications,
     });
+    insight.evidencePack = projectDocumentEvidencePack(parseEvidenceArtifact);
 
     existingInsights.unshift(insight);
     const nextInsights = existingInsights.slice(0, 3);
@@ -200,7 +220,10 @@ export async function synthesizeDocument(
         updatedAt: new Date()
     });
 
-    return insight;
+    return {
+        insight,
+        parseEvidenceArtifact,
+    };
 }
 
 /**

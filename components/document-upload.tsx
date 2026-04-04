@@ -18,6 +18,8 @@ import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocument
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+/* @Codex */
+import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
 
 interface DocumentUploadProps {
@@ -67,6 +69,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             try {
                 // Auto-extract analysis on upload
                 let summary = "Nessuna informazione rilevante trovata.";
+                let parseEvidenceArtifactSnapshot: string | undefined;
+                const attachmentId = uuidv4();
                 const isPdf = isPdfDocumentInput(file);
                 const isImage = isImageDocumentInput(file);
 
@@ -84,8 +88,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                         if (rawText && documentSynthesisEnabled) {
                             setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                             try {
-                                const insight = await synthesizeDocument(rawText, file.name, patientId);
+                                const result = await synthesizeDocument(rawText, file.name, patientId, { attachmentId });
+                                const insight = result.insight;
                                 summary = insight.summary;
+                                parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
                                 shouldRefreshSummary = true;
                             } catch (synthesisError) {
                                 if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
@@ -114,7 +120,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 });
 
                 await db.attachments.add({
-                    id: uuidv4(),
+                    id: attachmentId,
                     patientId: patientId,
                     name: file.name,
                     type: file.type,
@@ -122,6 +128,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     path: `uploads/${file.name}`,
                     data: base64Data,
                     summarySnapshot: summary,
+                    parseEvidenceArtifactSnapshot,
                     createdAt: new Date()
                 });
 
