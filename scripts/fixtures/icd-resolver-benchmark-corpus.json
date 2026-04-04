@@ -1,0 +1,70 @@
+[
+  {
+    "id": "icd-en-heart-failure",
+    "query": "heart failure",
+    "language": "en",
+    "expected": {
+      "top1Code": "BD1Z",
+      "topKCodes": ["BD1Z", "BD1Y", "BD1Z&XT5R", "BD1Z&XT8W"],
+      "notes": "English baseline query for generic heart failure."
+    }
+  },
+  {
+    "id": "icd-en-diabetes-type-2",
+    "query": "diabetes mellitus type 2",
+    "language": "en",
+    "expected": {
+      "top1Code": "5A11",
+      "topKCodes": ["5A11", "BD54/5A11", "5A24/5A11"],
+      "notes": "English baseline query for type 2 diabetes."
+    }
+  },
+  {
+    "id": "icd-en-chronic-kidney-disease",
+    "query": "chronic kidney disease",
+    "language": "en",
+    "expected": {
+      "top1Code": "GB61.Z",
+      "topKCodes": ["GB61.Z", "GB61.0", "GB61.1", "GB61.2", "GB61.4"],
+      "notes": "Stage-unspecified CKD should still recover stage candidates in top-k."
+    }
+  },
+  {
+    "id": "icd-en-atrial-fibrillation",
+    "query": "atrial fibrillation",
+    "language": "en",
+    "expected": {
+      "top1Code": "BC81.3Z",
+      "topKCodes": ["BC81.3Z", "BC81.3Y", "BC81.32", "BC81.31"],
+      "notes": "English baseline query for atrial fibrillation."
+    }
+  },
+  {
+    "id": "icd-it-heart-failure",
+    "query": "scompenso cardiaco",
+    "language": "it",
+    "expected": {
+      "topKCodes": ["BD1Z", "BD1Y", "BD1Z&XT5R", "BD1Z&XT8W"],
+      "notes": "Italian-only query expected to expose current English-first lookup gap."
+    }
+  },
+  {
+    "id": "icd-it-diabetes-type-2",
+    "query": "diabete mellito tipo 2",
+    "language": "it",
+    "expected": {
+      "topKCodes": ["5A11", "BD54/5A11", "5A24/5A11"],
+      "notes": "Italian-only query expected to expose current English-first lookup gap."
+    }
+  },
+  {
+    "id": "icd-mixed-atrial-fibrillation-chronic",
+    "query": "atrial fibrillation chronic",
+    "language": "mixed",
+    "expected": {
+      "top1Code": "BC81.32",
+      "topKCodes": ["BC81.32", "BC81.3Z&XT8W", "BC81.3Y&XT8W"],
+      "notes": "Hybrid query to probe chronic/permanent ranking."
+    }
+  }
+]
