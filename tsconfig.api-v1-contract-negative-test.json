@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-api-v1-contract-negative-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/api-v1-clinical-write-normalization.ts",
+    "lib/api-v1-clinical-write-normalization.test.ts",
+    "lib/status-normalization.ts"
+  ]
+}

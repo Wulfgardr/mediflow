@@ -8,10 +8,11 @@ import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
+import { normalizeCheckupCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
 import {
     checkupStatusFilterValues,
     normalizeCheckupStatus,
-    parseCheckupStatus,
 } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
@@ -87,28 +88,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
         /* @Codex */
-        const auditBody = body as Record<string, unknown>;
-        /* @Codex */
-        const normalizedStatus = body.status === undefined ? 'pending' : parseCheckupStatus(body.status);
-        if (body.status !== undefined && !normalizedStatus) {
-            return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
-        }
-        const newId = body.id || uuidv4();
-
-        await dbServer.insert(checkups).values({
+        const auditBody = body;
+        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+        const normalized = normalizeCheckupCreateInput(body, {
             id: newId,
             patientId: id,
-            date: new Date(body.date),
-            title: body.title,
-            /* @Codex */
-            notes: body.notes ?? null,
-            status: normalizedStatus ?? 'pending',
-            /* @Codex */
-            source: body.source ?? 'manual',
-            createdAt: new Date()
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(checkups).values(normalized.values);
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -117,7 +109,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             {
                 eventType: 'checkup.created',
                 subjectType: 'checkup',
-                subjectRef: String(newId),
+                subjectRef: normalized.values.id,
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
                 },
@@ -125,7 +117,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             '[MediFlow] Checkup audit write failed:',
         );
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/checkups error:', error);
         return NextResponse.json({ error: 'Failed to create checkup' }, { status: 500 });

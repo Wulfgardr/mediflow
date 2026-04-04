@@ -8,6 +8,8 @@ import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
+import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
@@ -76,19 +78,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
         /* @Codex */
-        const auditBody = body as Record<string, unknown>;
-        const newId = body.id || uuidv4();
-
-        await dbServer.insert(entries).values({
+        const auditBody = body;
+        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+        const normalized = normalizeEntryCreateInput(body, {
             id: newId,
             patientId: id,
-            type: body.type,
-            date: new Date(body.date),
-            content: body.content,
-            createdAt: new Date()
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(entries).values(normalized.values);
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -97,7 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             {
                 eventType: 'entry.created',
                 subjectType: 'entry',
-                subjectRef: String(newId),
+                subjectRef: normalized.values.id,
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
                 },
@@ -105,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             '[MediFlow] Entry audit write failed:',
         );
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/entries error:', error);
         return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 });
