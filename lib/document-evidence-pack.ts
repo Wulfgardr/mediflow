@@ -1,5 +1,7 @@
 /* @Codex */
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
+/* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
 import { splitDocumentIntoLines } from './document-excerpt';
 
 /* @Codex */
@@ -63,6 +65,7 @@ export interface BuildDocumentEvidencePackInput {
 
 const MAX_LABEL_CHARS = 160;
 const MAX_EXCERPT_CHARS = 220;
+const DOCUMENT_FACT_SENTENCE_SPLIT_REGEX = /(?<=[.;!?])\s+(?=[A-ZÀ-ÖØ-Þ0-9])/u;
 
 const STATUS_LABELS: Record<DocumentEvidenceStatus, string> = {
     active: 'attivo',
@@ -96,7 +99,8 @@ function normalizeComparableText(value: string): string {
 }
 
 function splitDocumentLines(value: string): string[] {
-    return splitDocumentIntoLines(value)
+    return splitDocumentIntoLines(normalizeDocumentInput(value).normalizedText)
+        .flatMap((line) => line.split(DOCUMENT_FACT_SENTENCE_SPLIT_REGEX))
         .map((line) => compactText(line, MAX_EXCERPT_CHARS))
         .filter((line) => line.length >= 8);
 }

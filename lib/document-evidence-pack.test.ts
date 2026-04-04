@@ -142,3 +142,35 @@ test('buildDocumentEvidencePack extracts follow-up from OCR-like single-line tex
     assert.match(lines, /Follow-up documentato: Controllo ortopedico tra 10 giorni/i);
     assert.match(lines, /Stato funzionale: Cammino con ausilio/i);
 });
+
+test('buildDocumentEvidencePack extracts follow-up from CDA-like XML narrative', () => {
+    const pack = buildDocumentEvidencePack({
+        documentInsightId: 'doc-5',
+        fileName: 'cda-dimissione.xml',
+        documentDate: '2025-03-09T12:00:00.000Z',
+        summary: 'Dimissione con follow-up ortopedico e ADI.',
+        rawMarkdown: `
+            <ClinicalDocument>
+              <component>
+                <structuredBody>
+                  <component>
+                    <section>
+                      <title>Indicazioni alla dimissione</title>
+                      <text>
+                        <paragraph>Controllo ortopedico tra 14 giorni</paragraph>
+                        <paragraph>ADI infermieristica da proseguire</paragraph>
+                      </text>
+                    </section>
+                  </component>
+                </structuredBody>
+              </component>
+            </ClinicalDocument>
+        `,
+        diagnoses: [],
+        medications: [],
+    });
+
+    const lines = renderDocumentEvidencePackLines(pack).join('\n');
+    assert.match(lines, /Follow-up documentato: Controllo ortopedico tra 14 giorni/i);
+    assert.match(lines, /Setting assistenziale: ADI infermieristica da proseguire/i);
+});
