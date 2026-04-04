@@ -102,6 +102,7 @@ export type PatientInsightBenchmarkReport = {
     corpusPath: string;
     corpusSize: number;
     iterations: number;
+    seed: number;
     installedModels: string[];
     targetModels: string[];
     models: ModelReport[];
@@ -131,6 +132,7 @@ function parseArgs(argv: string[]) {
         out: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
         iterations: 1,
+        seed: 7,
         models: null as string[] | null,
         validate: false,
         markdownOut: null as string | null,
@@ -160,6 +162,9 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
+            index += 1;
+        } else if (value === '--seed' && argv[index + 1]) {
+            args.seed = Number.parseInt(argv[index + 1], 10) || args.seed;
             index += 1;
         } else if (value === '--models' && argv[index + 1]) {
             args.models = argv[index + 1]
@@ -451,7 +456,7 @@ async function listInstalledModels(baseUrl: string): Promise<string[]> {
     }
 }
 
-async function generateCompletion(baseUrl: string, model: string, prompt: string, maxTokens: number) {
+async function generateCompletion(baseUrl: string, model: string, prompt: string, maxTokens: number, seed: number) {
     const normalizedBaseUrl = normalizeOllamaBaseUrl(baseUrl);
     const start = performance.now();
     const response = await fetch(`${normalizedBaseUrl}/api/chat`, {
@@ -463,8 +468,9 @@ async function generateCompletion(baseUrl: string, model: string, prompt: string
             stream: false,
             think: false,
             options: {
-                temperature: 0.2,
+                temperature: 0,
                 num_predict: maxTokens,
+                seed,
             },
         }),
     });
@@ -490,6 +496,7 @@ async function runModel(
     model: string,
     corpus: PatientInsightBenchmarkEntry[],
     iterations: number,
+    seed: number,
     installedModels: string[],
 ): Promise<ModelReport> {
     if (!installedModels.includes(model)) {
@@ -508,7 +515,7 @@ async function runModel(
                 const prompt = buildPatientInsightExtractionPrompt(entry.context);
 
                 try {
-                    const completion = await generateCompletion(baseUrl, model, prompt, entry.maxTokens ?? 1100);
+                    const completion = await generateCompletion(baseUrl, model, prompt, entry.maxTokens ?? 1100, seed);
                     const parsed = parsePatientInsightExtractionResponse(completion.content);
                     const scored = scoreCase(entry, parsed.value.data);
 
@@ -709,6 +716,7 @@ function renderMarkdownReport(report: PatientInsightBenchmarkReport): string {
         `Corpus: ${report.corpusPath}`,
         `Corpus size: ${report.corpusSize}`,
         `Iterations: ${report.iterations}`,
+        `Seed: ${report.seed}`,
         '',
         `Recommended model: ${report.decision.recommendedModel || 'none'}`,
         `Rationale: ${report.decision.rationale}`,
@@ -756,11 +764,13 @@ export async function runPatientInsightBenchmark(options: {
     corpusPath?: string;
     baseUrl?: string;
     iterations?: number;
+    seed?: number;
     models?: string[];
 }): Promise<PatientInsightBenchmarkReport> {
     const corpusPath = options.corpusPath || DEFAULT_CORPUS_PATH;
     const baseUrl = normalizeOllamaBaseUrl(options.baseUrl || process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434');
     const iterations = Math.max(1, options.iterations || 1);
+    const seed = options.seed ?? 7;
     const targetModels = options.models && options.models.length > 0
         ? options.models
         : [...DEFAULT_TARGET_MODELS];
@@ -770,7 +780,7 @@ export async function runPatientInsightBenchmark(options: {
     const models = [];
 
     for (const model of targetModels) {
-        models.push(await runModel(baseUrl, model, corpus, iterations, installedModels));
+        models.push(await runModel(baseUrl, model, corpus, iterations, seed, installedModels));
     }
 
     return {
@@ -779,6 +789,7 @@ export async function runPatientInsightBenchmark(options: {
         corpusPath,
         corpusSize: corpus.length,
         iterations,
+        seed,
         installedModels,
         targetModels,
         models,
@@ -792,6 +803,7 @@ async function main() {
         corpusPath: args.corpus,
         baseUrl: args.baseUrl,
         iterations: args.iterations,
+        seed: args.seed,
         models: args.models || undefined,
     });
 
