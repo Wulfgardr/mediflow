@@ -13,6 +13,15 @@ test('extractUsableOcrText keeps markdown-like OCR text and ignores structured J
     );
 });
 
+test('extractUsableOcrText normalizes noisy OCR-like headings before downstream parsing', () => {
+    assert.equal(
+        extractUsableOcrText({
+            rawMarkdown: 'ANAMNESI remota: ipertensione arteriosa.  TERAPIA domiciliare: Paracetamolo 1000 mg al bisogno.',
+        }),
+        'ANAMNESI remota:\nipertensione arteriosa.\n\nTERAPIA domiciliare:\nParacetamolo 1000 mg al bisogno.'
+    );
+});
+
 test('buildOcrFallbackResult promotes low-confidence OCR when usable local text exists', () => {
     const result = buildOcrFallbackResult({
         confidence: 0.2,
