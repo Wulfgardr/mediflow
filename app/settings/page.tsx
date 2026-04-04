@@ -24,6 +24,8 @@ import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-
 /* @Codex */
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
 /* @Codex */
+import NetworkOperatingModePanel from '@/components/settings/network-operating-mode-panel';
+/* @Codex */
 import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 /* @Codex */
 import {
@@ -637,11 +639,7 @@ export default function SettingsPage() {
                             <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{user?.displayName || 'Admin'}</p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
                         </div>
-                        <div className="apple-subsection min-w-[210px]">
-                            <p className="section-kicker">Approccio</p>
-                            <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">Local-first</p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Contenuto al centro, strumenti raccolti in famiglie operative.</p>
-                        </div>
+                        <NetworkOperatingModePanel />
                     </div>
                 </div>
             </div>

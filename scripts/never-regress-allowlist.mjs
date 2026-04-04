@@ -16,6 +16,21 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: 'pin:\\s*"0000"',
             reason: 'Native auth tests use a synthetic PIN literal to validate typed error mapping without hitting a live backend.',
         },
+        {
+            path: 'lib/network-identity.test.ts',
+            pattern: "username:\\s*'solo-user'",
+            reason: 'Network identity tests use a synthetic single-user fixture to validate login-hint derivation without real credentials.',
+        },
+        {
+            path: 'lib/network-identity.test.ts',
+            pattern: "username:\\s*'paired-user'",
+            reason: 'Network identity tests use a synthetic paired operator fixture to validate session-bound identity state without real credentials.',
+        },
+        {
+            path: 'lib/network-operating-mode.test.ts',
+            pattern: "username:\\s*'paired-user'",
+            reason: 'Network operating mode tests use a synthetic paired operator fixture to render the session-bound UI state without real credentials.',
+        },
     ],
     externalUrls: [
         {

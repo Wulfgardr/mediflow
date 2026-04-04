@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-03
+Ultimo aggiornamento: 2026-04-04
 
 ## Come usare questo indice
 
@@ -122,6 +122,11 @@ Ultimo aggiornamento: 2026-04-03
 | [docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md](./adr/0031-clinical-entities-evidence-first-medication-problem-lane.md) | Apre la thin slice `clinical_entities.v1` limitata a `medication` e `problem`, con contratto evidence-first, corpus sintetico italiano e harness benchmark separato prima degli adapter reali `HUMADEX/OpenMed NER`. |
 | [docs/adr/0032-document-intelligence-corpus-and-private-shadow-vault.md](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md) | Formalizza la strategia a due livelli per la document intelligence: corpus canonico `synthetic-only` in repo e vault locale privato fuori Git per shadow evaluation e failure analysis. |
 | [docs/adr/0033-ai-rollout-governance-lane-aware-shadow-mode.md](./adr/0033-ai-rollout-governance-lane-aware-shadow-mode.md) | Definisce la governance lane-aware di rollout AI con shadow mode, fallback, rollback e kill-switch prima di qualunque promozione prudente. |
+| [docs/adr/0034-local-only-default-and-network-home-base-opt-in.md](./adr/0034-local-only-default-and-network-home-base-opt-in.md) | Formalizza `WUL-117`: `local-only` resta il default, `network home-base` diventa una modalita esplicita su LAN fidata con nodo paired autorevole e thin slice iniziale read-only prima di replica, sync e identity model. |
+| [docs/adr/0035-network-replica-thin-slice-snapshot-mirror.md](./adr/0035-network-replica-thin-slice-snapshot-mirror.md) | Formalizza `WUL-120`: la replica iniziale `network home-base` resta uno snapshot mirror governato con fallback locale, stato deferred e manual review prima di qualsiasi sync record-level. |
+| [docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md](./adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md) | Formalizza `WUL-122`: pairing device e credenziali operatore restano separati, il nodo dichiara il login minimo richiesto e lo scope clinico `network` viene risolto in modo esplicito come contesto sessione o default ambulatoriale del nodo. |
+| [docs/adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md](./adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md) | Formalizza `WUL-121`: `AI locale` resta il default, il runtime centralizzato su nodo paired e opzionale e separato dal data plane, con fallback esplicito e attivazione bloccata finche benchmark lane-specific e rollout governance non promuovono la capability. |
+| [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md) | Formalizza `WUL-150`: bootstrap pairing PHI-safe senza token locale, conferma esplicita sul nodo, credenziale dedicata del device paired e primo data plane read-only che richiede paired client + sessione operatore. |
 
 ## Checklist manutenzione indice
 

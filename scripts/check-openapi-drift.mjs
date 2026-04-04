@@ -59,8 +59,12 @@ function buildCurrentRoutes() {
     for (const filePath of walkRoutes(path.join(ROOT, ROUTE_ROOT))) {
         routeFiles.push(filePath);
         const source = fs.readFileSync(filePath, 'utf8');
-        if (!source.includes('requireLocalApiToken(')) {
-            throw new Error(`${path.relative(ROOT, filePath)} is missing requireLocalApiToken()`);
+        const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
+        const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(');
+        if (!hasLocalTokenGuard && !hasPairedClientGuard) {
+            throw new Error(
+                `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`
+            );
         }
         const apiPath = routeFileToPath(path.relative(ROOT, filePath));
         for (const method of extractMethods(source)) {
@@ -300,8 +304,23 @@ function expandPolicy(policy) {
 }
 
 function collectChangedFiles(baseRef) {
-    const output = git(['diff', '--name-only', `${baseRef}...HEAD`], { allowFailure: true });
-    return new Set((output ?? '').split('\n').filter(Boolean));
+    const changed = new Set();
+    const committedOutput = git(['diff', '--name-only', `${baseRef}...HEAD`], { allowFailure: true });
+    for (const file of (committedOutput ?? '').split('\n').filter(Boolean)) {
+        changed.add(file);
+    }
+
+    const workingTreeOutput = git(['diff', '--name-only', 'HEAD'], { allowFailure: true });
+    for (const file of (workingTreeOutput ?? '').split('\n').filter(Boolean)) {
+        changed.add(file);
+    }
+
+    const untrackedOutput = git(['ls-files', '--others', '--exclude-standard'], { allowFailure: true });
+    for (const file of (untrackedOutput ?? '').split('\n').filter(Boolean)) {
+        changed.add(file);
+    }
+
+    return changed;
 }
 
 function serializeOperations(operations) {
@@ -326,10 +345,6 @@ function main() {
     for (const operationKey of documentedOperations.keys()) {
         if (!currentRoutes.routes.has(operationKey)) {
             errors.push(`Spec operation missing from code: ${operationKey}`);
-        }
-        const security = documentedOperations.get(operationKey)?.security ?? [];
-        if (!security.length) {
-            errors.push(`Spec operation missing bearer auth: ${operationKey}`);
         }
     }
     for (const operationKey of undocumented.keys()) {

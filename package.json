@@ -62,6 +62,7 @@
     "test:siss-prescription": "bash scripts/siss-prescription-test.sh",
     "test:redaction:resilience": "node --experimental-strip-types scripts/benchmark-redaction-resilience.ts",
     "test:pin-change": "bash scripts/pin-change-test.sh",
+    "test:network:home-base-readonly": "bash scripts/network-home-base-readonly-smoke.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",
