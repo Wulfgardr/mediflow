@@ -1,8 +1,8 @@
 /* @Codex */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
-async function createPatientFromForm(page: import('@playwright/test').Page, values: {
+async function createPatientFromForm(page: Page, values: {
   firstName: string;
   lastName: string;
   taxCode: string;
@@ -20,7 +20,7 @@ async function createPatientFromForm(page: import('@playwright/test').Page, valu
   await expect(page).toHaveURL(/\/$/);
 }
 
-async function openPatientFromHome(page: import('@playwright/test').Page, taxCode: string) {
+async function openPatientFromHome(page: Page, taxCode: string) {
   const search = page.getByTestId('patients-search-input');
   await search.fill(taxCode);
   await page.getByText(taxCode).click();
@@ -35,8 +35,23 @@ function smartImportTherapyInputId(drugMention: string, dosage: string, activePr
   return `smart-import-therapy-therapy:${drugMention}:${dosage}:${activePrinciple}`;
 }
 
-function smartImportCardFromInputId(page: import('@playwright/test').Page, inputId: string) {
+function smartImportCardFromInputId(page: Page, inputId: string) {
   return page.locator(`input[id="${inputId}"]`).locator('xpath=ancestor::div[contains(@class,"overflow-hidden")][1]');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function exactText(text: string): RegExp {
+  return new RegExp(`^${escapeRegExp(text)}$`);
+}
+
+function smartImportCardTitle(card: Locator, inputId: string, title: string): Locator {
+  return card
+    .locator(`label[for="${inputId}"], p.text-sm.font-bold`)
+    .filter({ hasText: exactText(title) })
+    .first();
 }
 
 function buildSmartImportPayload() {
@@ -256,15 +271,17 @@ test('smart import adds ICD diagnosis chips and therapy from patient notes after
     page,
     smartImportDiagnosisInputId('Ipertensione arteriosa essenziale', 'essential hypertension')
   );
+  const diagnosisInputId = smartImportDiagnosisInputId('Ipertensione arteriosa essenziale', 'essential hypertension');
+  const therapyInputId = smartImportTherapyInputId('Furosemide', '25 mg 1 cp al mattino', 'Furosemide');
   const therapyCard = smartImportCardFromInputId(
     page,
-    smartImportTherapyInputId('Furosemide', '25 mg 1 cp al mattino', 'Furosemide')
+    therapyInputId
   );
 
-  await expect(diagnosisCard.getByText('Ipertensione arteriosa essenziale', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(smartImportCardTitle(diagnosisCard, diagnosisInputId, 'Ipertensione arteriosa essenziale')).toBeVisible({ timeout: 20_000 });
   await expect(diagnosisCard.getByText('Nuova diagnosi con match ICD-11 pronto per revisione')).toBeVisible();
   await expect(diagnosisCard.getByText('Profilo attuale: ICD-11 BA00 · Essential hypertension')).toBeVisible();
-  await expect(therapyCard.getByText('Furosemide Sandoz', { exact: true })).toBeVisible();
+  await expect(smartImportCardTitle(therapyCard, therapyInputId, 'Furosemide Sandoz')).toBeVisible();
   await expect(therapyCard.getByText('Nuova terapia pronta per import con match catalogo AIFA')).toBeVisible();
   await diagnosisCard.getByRole('button', { name: 'Modifica' }).click();
   const diagnosisLabelInput = diagnosisCard.locator('label').filter({ hasText: 'Descrizione da importare' }).locator('input');
@@ -377,33 +394,45 @@ test('smart import keeps transition and uncertain therapies visible without trun
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
-  await expect(page.getByText('Forxiga', { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Slowmet', { exact: true })).toBeVisible();
-  await expect(page.getByText('Esapent', { exact: true })).toBeVisible();
-  await expect(page.getByText('Bisoprololo EG', { exact: true })).toBeVisible();
-  await expect(page.getByText('Nebivololo DOC', { exact: true })).toBeVisible();
-  await expect(page.getByText('Furosemide Sandoz', { exact: true })).toBeVisible();
-  await expect(page.getByText('Transizione beta-bloccante da confermare prima dell\'import')).toBeVisible();
-  await expect(page.getByText('Posologia riportata come da verificare')).toBeVisible();
-  await expect(page.getByText('incerto').first()).toBeVisible();
+  const forxigaInputId = smartImportTherapyInputId('Forxiga 10 mg', '10 mg 1 cp al mattino', 'Dapagliflozin');
+  const slowmetInputId = smartImportTherapyInputId('Slowmet 1000 mg', '1000 mg 1 cp x 2', 'Metformina');
+  const esapentInputId = smartImportTherapyInputId('Esapent 1000', '1000 mg 1 cps x 2', 'Omega-3-acid ethyl esters');
+  const bisoprololoInputId = smartImportTherapyInputId('Bisoprololo', '1,25 mg', 'Bisoprololo');
+  const nebivololoInputId = smartImportTherapyInputId('Nebivololo', '5 mg 1 cp', 'Nebivololo');
+  const furosemideInputId = smartImportTherapyInputId('Furosemide', 'dose da verificare', 'Furosemide');
 
-  const bisoprololoCard = smartImportCardFromInputId(
-    page,
-    smartImportTherapyInputId('Bisoprololo', '1,25 mg', 'Bisoprololo')
-  );
+  const forxigaCard = smartImportCardFromInputId(page, forxigaInputId);
+  const slowmetCard = smartImportCardFromInputId(page, slowmetInputId);
+  const esapentCard = smartImportCardFromInputId(page, esapentInputId);
+  const bisoprololoCard = smartImportCardFromInputId(page, bisoprololoInputId);
+  const nebivololoCard = smartImportCardFromInputId(page, nebivololoInputId);
+  const furosemideCard = smartImportCardFromInputId(page, furosemideInputId);
+
+  await expect(smartImportCardTitle(forxigaCard, forxigaInputId, 'Forxiga')).toBeVisible({ timeout: 20_000 });
+  await expect(smartImportCardTitle(slowmetCard, slowmetInputId, 'Slowmet')).toBeVisible();
+  await expect(smartImportCardTitle(esapentCard, esapentInputId, 'Esapent')).toBeVisible();
+  await expect(smartImportCardTitle(bisoprololoCard, bisoprololoInputId, 'Bisoprololo EG')).toBeVisible();
+  await expect(smartImportCardTitle(nebivololoCard, nebivololoInputId, 'Nebivololo DOC')).toBeVisible();
+  await expect(smartImportCardTitle(furosemideCard, furosemideInputId, 'Furosemide Sandoz')).toBeVisible();
+  await expect(
+    bisoprololoCard.getByText('Transizione terapeutica documentata: richiede conferma manuale prima dell\'import')
+  ).toBeVisible();
+  await expect(furosemideCard.getByText('Posologia riportata come da verificare')).toBeVisible();
+  await expect(furosemideCard.getByText('incerto', { exact: true })).toBeVisible();
+
   const bisoprololoCheckbox = page.locator(
-    `input[id="${smartImportTherapyInputId('Bisoprololo', '1,25 mg', 'Bisoprololo')}"]`
+    `input[id="${bisoprololoInputId}"]`
   );
   await expect(bisoprololoCheckbox).toBeDisabled();
   await bisoprololoCard.getByRole('button', { name: 'Scarta' }).click();
-  await expect(page.getByText('Bisoprololo EG')).toHaveCount(0);
+  await expect(smartImportCardTitle(bisoprololoCard, bisoprololoInputId, 'Bisoprololo EG')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Applica selezionati' }).click();
 
   await expect(page.getByText('Import completato: 0 diagnosi, 2 terapie.')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Esapent', { exact: true })).toBeVisible();
-  await expect(page.getByText('Nebivololo DOC', { exact: true })).toBeVisible();
-  await expect(page.getByText('Furosemide Sandoz', { exact: true })).toBeVisible();
+  await expect(smartImportCardTitle(esapentCard, esapentInputId, 'Esapent')).toBeVisible();
+  await expect(smartImportCardTitle(nebivololoCard, nebivololoInputId, 'Nebivololo DOC')).toBeVisible();
+  await expect(smartImportCardTitle(furosemideCard, furosemideInputId, 'Furosemide Sandoz')).toBeVisible();
 });
 
 test('smart import marks therapy dosage changes as update and keeps them editable but not directly applicable', async ({ page }) => {
@@ -491,7 +520,7 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   const updateCard = smartImportCardFromInputId(page, updateInputId);
   const updateCheckbox = page.locator(`input[id="${updateInputId}"]`);
 
-  await expect(updateCard.getByText('Bisoprololo EG', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(smartImportCardTitle(updateCard, updateInputId, 'Bisoprololo EG')).toBeVisible({ timeout: 20_000 });
   await expect(updateCard.getByText('aggiornamento', { exact: true })).toBeVisible();
   await expect(updateCard.getByText('Possibile aggiornamento di terapia gia presente: richiede revisione manuale')).toBeVisible();
   await expect(updateCard.getByText('Profilo attuale: Bisoprololo EG (Bisoprololo · 2,5 mg 1 cp · stato active)')).toBeVisible();
