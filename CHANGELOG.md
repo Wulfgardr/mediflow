@@ -5,6 +5,29 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-04-07
+
+### ✨ Aggiunto
+
+- **Home-base read-only eseguibile**: modalita `network-home-base`, overview Settings, pairing PHI-safe e primo data plane `/api/v1/network/patients*` protetto da `paired client + sessione operatore`.
+- **Document intelligence piu esplicita**: first slice runtime del `document evidence ledger` con artifact `parse/evidence` cifrato sugli allegati e primo consumer artifact-first in `AI Patient Insight`.
+- **Nuova anagrafica document-driven reviewable**: create-flow da documento con review esplicita, riconciliazione locale ICD/AIFA e persistenza prudente delle terapie confermate.
+- **Lane AI opt-in e shadow-only piu disciplinate**: comparator cloud `gpt-5.4` per engineering interno e adapter OpenMed `redaction.v1` separato dal runtime clinico.
+
+### 🧪 Migliorato
+
+- **Smart Import piu prudente**: normalizzazione therapy-state, guard su terapie `manual-only` o senza posologia sufficiente e soppressione dei duplicati referral-only quando la fonte non introduce novita clinica.
+- **Input documentali piu robusti**: normalizzazione condivisa per PDF/CDA/CCD e riuso della stessa recovery path nei consumer documentali principali.
+- **Resolver clinici benchmarkabili**: runner dedicati WHO ICD-11 e AIFA per misurare recall, latenza e mismatch reali sul catalogo locale.
+
+### 🔒 Hardening
+
+- **Shell locale piu resiliente ai drift di revisione**: fingerprint di sorgente, endpoint `/api/system/revision`, reload soft delle tab attive e reset `.next` source-aware nello start script.
+
+### 📚 Documentazione
+
+- **Repo/GitHub riallineati al runtime reale**: README, piani, walkthrough, topologia dati, roadmap e sintesi architetturale descrivono ora `home-base` read-only, artifact `parse/evidence`, comparator/shadow lane e guard di revisione della shell locale.
+
 ## [0.5.0] - 2026-03-29
 
 > Nota release: `v0.5.0` consolida il lavoro UI/AI entrato su `main` dopo `v0.4.0`. La shell macOS storica resta fuori scope e continua la **riscrittura controllata**; restano invarianti il contratto locale `/api/v1`, il trasporto TLS e i vincoli security/local-first.

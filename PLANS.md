@@ -5,23 +5,28 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-04
+Ultimo aggiornamento: 2026-04-07
 
 ---
 
 ## Focus corrente (prossime 2-6 settimane)
 
-### Post-v0.5.0 (stabilizzazione sul campo + home-base discovery)
+### Post-v0.5.0 (stabilizzazione sul campo + home-base/document intelligence)
 - [ ] Eseguire validazione sul campo delle superfici UI/AI rilasciate in `v0.5.0` e riversare bug/regressioni in Linear con priorita esplicite.
-- [ ] Mantenere affidabile il verify loop per le patch `0.5.x`: `lint`, `typecheck`, `build` verdi e benchmark CLI generativi eseguibili su `main`.
-- [ ] Preparare ADR + thin slice del nodo locale `home-base`: discovery, pairing esplicito e capability contract `/api/v1/network`.
-- [ ] Definire la prima slice read-only multi-device (Mac host -> iPhone/iPad client) senza rompere il modello local-first.
+- [ ] Mantenere affidabile il verify loop per le patch `0.5.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` quando si tocca il boundary paired.
+- [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).
+- [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback senza introdurre ancora write remoti.
+- [x] Portare su `main` la first slice runtime del `document evidence ledger` (`WUL-152`): artifact canonico `parse/evidence` cifrato sugli allegati, consumer iniziale in `Patient Insight`, `documentInsights` mantenuto come compat layer.
+- [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti.
+- [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
 Nota operativa:
 - `v0.5.0` e la release corrente formalizzata su `main` il `2026-03-29`
 - `v0.4.0` resta la baseline storica taggata su `main` il `2026-03-19`
 - `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo successivo sposta il focus su uso reale, rollout governance e architettura home-base
+- `WUL-150` ha spostato `home-base` da discovery teorica a first slice eseguibile: pairing PHI-safe, Settings overview e primo read path remoto protetto
+- `WUL-152` ha trasformato ADR 0040 in primo runtime concreto: `parse/evidence` cifrato sugli allegati, `documentInsights` come projection compatibile e consumer iniziale in `Patient Insight`
 - il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
 
 ### Contesto storico chiuso: Release gate v0.5.0 (consolidamento AI/UI)
@@ -200,7 +205,7 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
-- [ ] Pianificare il ciclo `post-v0.5`: nodo centrale locale/home-base, contratto `/api/v1/network`, pairing esplicito, replica/fallback offline, runtime AI centralizzabile e rebuild controllato della shell macOS.
+- [ ] Estendere il ciclo `post-v0.5`: pairing UX/home-base, replica/fallback offline, runtime AI centralizzabile e rebuild controllato della shell macOS.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 

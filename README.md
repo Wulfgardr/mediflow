@@ -12,6 +12,12 @@ MediFlow nasce da un problema semplice: i software clinici spesso sono lenti, op
 
 Qui l'obiettivo è l'opposto: lavorare bene, in locale, con controllo pieno dei dati.
 
+## Stato attuale di `main`
+
+- `main` contiene gia la first slice `network home-base` read-only: modalita esplicita in Settings, capability discovery, pairing PHI-safe e primo `/api/v1/network/patients*`, senza ancora write remoto o sync.
+- La document intelligence ha avviato la direzione `document evidence ledger`: l'upload documento puo produrre un artifact `parse/evidence` cifrato sugli allegati, mentre `patients.documentInsights` resta la projection/compat layer iniziale.
+- La shell locale si riallinea meglio dopo cambi branch/revision/worktree: fingerprint di sorgente, endpoint `/api/system/revision`, reload soft delle tab attive e reset selettivo della cache `.next`.
+
 ---
 
 ## Cosa garantisce
@@ -72,6 +78,7 @@ GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
 > [!IMPORTANT]
 > Nel ciclo `v0.5.0` il filone macOS/parity resta sospeso: la shell nativa continua la **riscrittura controllata** ("demolizione controllata").
 > Il contratto locale `/api/v1`, il trasporto TLS e i vincoli di sicurezza restano validi; la delivery di nuove feature native sul vecchio shell e congelata fino al rebuild.
+> In parallelo, `main` porta avanti la slice `home-base` read-only sul backend web/API (`/api/v1/network`) per preparare pairing, capability discovery e consultazione multi-device.
 
 - [docs/NATIVE.md](./docs/NATIVE.md)
 - [docs/native-testing.md](./docs/native-testing.md)

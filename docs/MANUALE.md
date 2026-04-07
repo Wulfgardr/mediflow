@@ -106,7 +106,7 @@ Se lavori su Mac, puoi usare anche il client nativo.
 
 * **Vantaggi**: avvio rapido, integrazione macOS, lock screen con PIN.
 * **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale.
-* **Nota**: è in fase alpha. In caso di problemi puoi sempre usare l'interfaccia web.
+* **Nota**: il vecchio shell macOS resta uno snapshot alpha mentre il lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi usa l'interfaccia web, che resta la superficie operativa primaria.
 
 ---
 

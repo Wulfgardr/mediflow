@@ -71,6 +71,8 @@ MediFlow espone due superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
+- `/api/v1/network/*` (home-base opt-in): paired/read-only-first, protetta da
+  credenziale device + sessione operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -80,6 +82,17 @@ Regole minime:
 
 - Web UI usa HTTP su localhost.
 - Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
+
+### Modalita network home-base
+
+Quando il nodo passa a `network-home-base`:
+
+- il default locale non cambia: la modalita rete resta un opt-in esplicito
+- `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
+  paired
+- il primo data plane remoto (`/api/v1/network/patients*`) resta read-only e
+  richiede sempre device paired + sessione operatore
+- write remoto, sync record-level e fallback automatico restano fuori scope
 
 ### Lockout autenticazione PIN
 
@@ -114,9 +127,24 @@ devono rispettare queste regole aggiuntive:
 - trattare l'output del modello come **non fidato** finche un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
+- trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
+  come artifact clinici locali, non come payload innocui di debug
 
 L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
 (es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
+
+## Comparator cloud opt-in
+
+Il comparator cloud documentato in [docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md](./docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md)
+non cambia il default `local-first`.
+
+Regole minime:
+
+- e ammesso solo come lane interna di engineering, mai come runtime clinico
+- usa solo case pack privati, redatti/minimizzati e fuori Git
+- richiede approvazione umana esplicita prima di qualunque export
+- non puo scrivere dati paziente, generare apply automatici o essere committato
+  nel repository
 
 ---
 
@@ -139,8 +167,10 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 - testo note/diario usato nei prompt AI
 - suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)
+- `summarySnapshot` o `parseEvidenceArtifactSnapshot` grezzi
 - token, PIN, chiavi o salt
 - prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
+- case pack privati/comparator cloud o output non minimizzati di shadow eval
 
 ### Puoi loggare (preferibile)
 - conteggi (es. numero record)
