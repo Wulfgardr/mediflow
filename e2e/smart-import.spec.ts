@@ -239,6 +239,42 @@ function buildCatalogWithoutDosagePayload() {
   };
 }
 
+function buildSwitchDriftPayload() {
+  return {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'smart_import',
+    summary: 'Switch terapeutico con drift del modello sul farmaco uscente.',
+    data: {
+      diagnoses: [],
+      therapies: [
+        {
+          drugMention: 'Bisoprololo',
+          drugQuery: 'Bisoprololo',
+          activePrinciple: 'Bisoprololo',
+          dosage: '1,25 mg',
+          motivation: 'Beta-bloccante in uscita',
+          therapyState: 'inactive',
+          reviewNote: 'Sospendere bisoprololo e passare a nebivololo',
+          confidence: 'medium',
+          evidence: 'Per ipotensione sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp.',
+          sourceId: 'patient-notes:1'
+        },
+        {
+          drugMention: 'Nebivololo',
+          drugQuery: 'Nebivololo',
+          activePrinciple: 'Nebivololo',
+          dosage: '5 mg 1 cp',
+          motivation: 'Nuovo beta-bloccante',
+          therapyState: 'transition',
+          confidence: 'medium',
+          evidence: 'Passare a nebivololo 5 mg 1 cp.',
+          sourceId: 'patient-notes:1'
+        }
+      ]
+    }
+  };
+}
+
 test('smart import adds ICD diagnosis chips and therapy from patient notes after operator review', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -706,4 +742,91 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
   await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('Posologia da verificare prima dell\'import')).toBeVisible();
   await expect(therapyCheckbox).toBeDisabled();
+});
+
+test('smart import normalizes outgoing switch therapy to transition even when model marks it inactive', async ({ page }) => {
+  const pin = process.env.E2E_PIN || '1234';
+  const suffix = `${Date.now()}`.slice(-4);
+  const firstName = `Switch${suffix}`;
+  const lastName = `Drift${suffix}`;
+  const taxCode = `SWTDRF80A01H${suffix}`;
+  const patientNotes = 'Per ipotensione sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp.';
+
+  await page.route('**/api/proxy/ollama/chat', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(buildSwitchDriftPayload())
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 180,
+          completion_tokens: 120
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/drugs?q=*', async (route) => {
+    const url = route.request().url();
+    if (url.includes('Bisoprololo')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            aic: '000000007',
+            name: 'Bisoprololo EG',
+            activePrinciple: 'Bisoprololo',
+            company: 'EG',
+            packaging: '1,25 mg compresse',
+            atc: 'C07AB07'
+          }
+        ])
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          aic: '000000008',
+          name: 'Nebivololo DOC',
+          activePrinciple: 'Nebivololo',
+          company: 'DOC',
+          packaging: '5 mg compresse',
+          atc: 'C07AB12'
+        }
+      ])
+    });
+  });
+
+  await bootstrapUnlockedSession(page, pin);
+  await createPatientFromForm(page, {
+    firstName,
+    lastName,
+    taxCode,
+    notes: patientNotes,
+  });
+
+  await openPatientFromHome(page, taxCode);
+  await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Analizza fonti' }).click();
+
+  const bisoprololoInputId = smartImportTherapyInputId('Bisoprololo', '1,25 mg', 'Bisoprololo');
+  const bisoprololoCard = smartImportCardFromInputId(page, bisoprololoInputId);
+  const bisoprololoCheckbox = page.locator(`input[id="${bisoprololoInputId}"]`);
+
+  await expect(smartImportCardTitle(bisoprololoCard, bisoprololoInputId, 'Bisoprololo EG')).toBeVisible({ timeout: 20_000 });
+  await expect(bisoprololoCard.getByText('transizione', { exact: true }).first()).toBeVisible();
+  await expect(bisoprololoCard.getByText('Transizione terapeutica documentata: richiede conferma manuale prima dell\'import')).toBeVisible();
+  await expect(bisoprololoCard.getByText('sospesa', { exact: true })).toHaveCount(0);
+  await expect(bisoprololoCheckbox).toBeDisabled();
 });
