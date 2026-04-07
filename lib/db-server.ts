@@ -41,6 +41,8 @@ try {
 /* @Codex */
 try {
     ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
+    /* @Codex */
+    ensureColumn('attachments', 'parse_evidence_artifact_snapshot', 'parse_evidence_artifact_snapshot TEXT');
 } catch (error) {
     console.warn('[MediFlow] Attachments schema check skipped:', error);
 }

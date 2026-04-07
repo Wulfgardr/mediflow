@@ -192,6 +192,8 @@ export const attachments = sqliteTable('attachments', {
     data: text('data'), // Base64 content
     /* @Codex */
     summarySnapshot: text('summary_snapshot'),
+    /* @Codex */
+    parseEvidenceArtifactSnapshot: text('parse_evidence_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

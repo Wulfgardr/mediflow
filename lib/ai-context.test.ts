@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import Module from 'node:module';
+import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './document-parse-evidence-artifact';
 
 const moduleWithResolve = Module as unknown as {
     _resolveFilename: (
@@ -349,6 +350,71 @@ test('buildPatientInsightContext recovers direct attachment text when the stored
             /Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file/i,
         );
         assert.ok(!snapshot.limitations.join('\n').includes('non sono stati usati come fonti documentali'));
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext prefers the attachment parse/evidence artifact over the legacy document projection', async () => {
+    const artifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: 'doc-artifact',
+        attachmentId: 'attachment-artifact',
+        fileName: 'lettera-dimissione.pdf',
+        documentDate: '2025-03-14T00:00:00.000Z',
+        qualityLevel: 'green',
+        qualityReason: 'Documento strutturato',
+        summary: 'Dimissione ortopedica con follow-up domiciliare.',
+        rawMarkdown: [
+            'Diagnosi di dimissione',
+            'Frattura pertrocanterica del femore sinistro',
+            'Indicazioni alla dimissione',
+            'FKT domiciliare 2-3 volte alla settimana',
+            'ADI infermieristica per medicazione ferita',
+        ].join('\n'),
+        diagnoses: [
+            {
+                code: 'S72.1',
+                description: 'Frattura pertrocanterica del femore sinistro',
+                system: 'ICD-10',
+                evidence: 'Diagnosi di dimissione: frattura pertrocanterica del femore sinistro',
+                confidence: 'high',
+            },
+        ],
+        medications: [],
+    });
+
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-artifact',
+                attachmentId: 'attachment-artifact',
+                date: '2025-03-14T00:00:00Z',
+                fileName: 'lettera-dimissione.pdf',
+                summary: 'Legacy summary da non usare come source of truth',
+                rawMarkdown: '',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-artifact',
+                patientId: 'patient-1',
+                name: 'lettera-dimissione.pdf',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(artifact),
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const prompt = snapshot.prompt;
+
+        assert.match(prompt, /lettera-dimissione\.pdf \(14\/03\/2025\): Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /Follow-up documentato: FKT domiciliare 2-3 volte alla settimana/i);
+        assert.ok(!prompt.includes('Legacy summary da non usare come source of truth'));
+        assert.equal((prompt.match(/lettera-dimissione\.pdf \(14\/03\/2025\):/gi) || []).length, 1);
     } finally {
         restore();
     }

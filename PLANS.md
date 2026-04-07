@@ -94,6 +94,11 @@ Nota operativa:
   `document_evidence_pack.v2` come pack compatto a un approccio
   `document evidence ledger`, con separazione esplicita tra recognition,
   source governance, decision layer e render/projection
+- `WUL-152` apre la prima slice runtime del nuovo approccio `document evidence
+  ledger`: introduce l'artifact canonico `parse/evidence` per documento
+  singolo, lo persiste come snapshot cifrato sugli `attachments`, mantiene
+  `patients.documentInsights` come projection/compat layer iniziale e porta il
+  primo consumer su `Patient Insight`
 - `WUL-132` ha aperto il primo sweep reale `AI-07` su `Gemma 4`:
   `gemma4:e2b` e `gemma4:e4b` sono benchmarkati su `M4 Max 36 GB` tramite
   un runtime `Ollama HEAD` isolato, perche la build stabile `0.19.0`

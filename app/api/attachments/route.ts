@@ -63,6 +63,8 @@ export async function POST(request: Request) {
             /* @Codex */
             data: body.data ?? null,
             summarySnapshot: body.summarySnapshot ?? null,
+            /* @Codex */
+            parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
             createdAt: new Date()
         });
 

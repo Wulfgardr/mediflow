@@ -14,6 +14,8 @@ import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocument
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+/* @Codex */
+import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
 
 export default function NewEntryPage() {
     const params = useParams();
@@ -55,6 +57,8 @@ export default function NewEntryPage() {
             // 1. Process and Upload Files
             for (const file of files) {
                 let summary = "Allegato alla visita";
+                let parseEvidenceArtifactSnapshot: string | undefined;
+                const attachmentId = uuidv4();
 
                 const isPdf = isPdfDocumentInput(file);
                 const isImage = isImageDocumentInput(file);
@@ -71,8 +75,10 @@ export default function NewEntryPage() {
 
                         if (rawText) {
                             setUploadProgress(`Sintesi documento (${aiModels.clinical})...`);
-                            const insight = await synthesizeDocument(rawText, file.name, id);
+                            const result = await synthesizeDocument(rawText, file.name, id, { attachmentId });
+                            const insight = result.insight;
                             summary = insight.summary;
+                            parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
                         } else if (extracted.notes && extracted.notes.length > 5) {
                             summary = extracted.notes;
                         } else {
@@ -91,7 +97,6 @@ export default function NewEntryPage() {
                     reader.readAsDataURL(file);
                 });
 
-                const attachmentId = uuidv4();
                 await db.attachments.add({
                     id: attachmentId,
                     patientId: id,
@@ -101,6 +106,7 @@ export default function NewEntryPage() {
                     path: `uploads/${file.name}`, // Placeholder path since we store in data
                     data: base64Data,
                     summarySnapshot: summary,
+                    parseEvidenceArtifactSnapshot,
                     createdAt: new Date()
                 });
                 attachmentIds.push(attachmentId);
