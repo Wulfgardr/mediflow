@@ -6,9 +6,9 @@ import type {
     NetworkPairedClientSummary,
     NetworkPairingConfirmationResponse,
     NetworkPairingIntentResponse,
-} from './api/v1/types.ts';
+} from './api/v1/types';
 /* @Codex */
-import { createConfirmedPairingResponse } from './network-contract.ts';
+import { createConfirmedPairingResponse } from './network-contract';
 
 /* @Codex */
 export const NETWORK_PAIRING_STATE_KEY = 'network.pairing.state';

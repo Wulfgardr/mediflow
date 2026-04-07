@@ -1,7 +1,7 @@
 /* @Codex */
-import type { NetworkIdentitySummary } from './api/v1/types.ts';
+import type { NetworkIdentitySummary } from './api/v1/types';
 /* @Codex */
-import type { ServerSession } from './server-session.ts';
+import type { ServerSession } from './server-session';
 
 export type NetworkIdentityUser = {
     id: string;

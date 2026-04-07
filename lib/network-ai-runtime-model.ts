@@ -3,7 +3,7 @@ import type {
     NetworkAiRuntimeHardwareProfile,
     NetworkAiRuntimeSummary,
     NetworkOperatingMode,
-} from './api/v1/types.ts';
+} from './api/v1/types';
 
 export type NetworkAiRuntimeInput = {
     operatingMode: NetworkOperatingMode;
