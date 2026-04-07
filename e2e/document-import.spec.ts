@@ -172,7 +172,7 @@ test('document import reconciles diagnoses and therapies before patient creation
   await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  const search = page.getByPlaceholder('Cerca paziente...');
+  const search = page.getByTestId('patients-search-input');
   await search.fill(lastName);
   const patientLink = page.getByRole('link', { name: new RegExp(`${lastName} ${firstName}`) }).first();
   await expect(patientLink).toBeVisible();

@@ -417,6 +417,7 @@ export default function PatientList() {
                         <input
                             id="patients-search"
                             name="patientsSearch"
+                            data-testid="patients-search-input"
                             type="text"
                             className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-[14px] shadow-sm outline-none transition-[border-color,background-color,box-shadow] placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 dark:border-white/10 dark:bg-white/5"
                             placeholder="Cerca paziente..."

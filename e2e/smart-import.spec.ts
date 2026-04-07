@@ -21,7 +21,7 @@ async function createPatientFromForm(page: import('@playwright/test').Page, valu
 }
 
 async function openPatientFromHome(page: import('@playwright/test').Page, taxCode: string) {
-  const search = page.getByPlaceholder('Cerca paziente...');
+  const search = page.getByTestId('patients-search-input');
   await search.fill(taxCode);
   await page.getByText(taxCode).click();
   await expect(page).toHaveURL(/\/patients\/.+/);

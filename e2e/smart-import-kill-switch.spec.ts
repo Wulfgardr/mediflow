@@ -32,7 +32,7 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
   await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
   await expect(page).toHaveURL(/\/$/);
 
-  const search = page.getByPlaceholder('Cerca paziente...');
+  const search = page.getByTestId('patients-search-input');
   await search.fill(taxCode);
   await page.getByText(taxCode).click();
   await expect(page).toHaveURL(/\/patients\/.+/);
