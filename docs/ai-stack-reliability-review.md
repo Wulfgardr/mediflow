@@ -360,7 +360,7 @@ npm run benchmark:smart-import -- --iterations 1 --models qwen3.5:35b-a3b
 
 Run eseguito:
 
-- 2026-04-07 22:16 Europe/Rome
+- 2026-04-07 23:32 Europe/Rome
 
 Corpus:
 
@@ -371,21 +371,23 @@ Risultati del run:
 - `jsonValidRate`: `1.0`
 - `contractValidRate`: `1.0`
 - `diagnosisRecall`: `0.9`
-- `diagnosisQueryRecall`: `0.9`
+- `diagnosisQueryRecall`: `0.8`
 - `therapyRecall`: `1.0`
 - `dosageRecall`: `1.0`
 - `therapyStateRecall`: `1.0`
 - `sourceIdRate`: `1.0`
-- `reviewUsefulnessRate`: `1.0`
-- `forbiddenLeakRate`: `0.222`
-- `alreadyPresentLeakRate`: `0.333`
-- `avgLatencyMs`: `14439.9`
-- `p95LatencyMs`: `24377.8`
+- `reviewUsefulnessRate`: `0.9`
+- `forbiddenLeakRate`: `0.0`
+- `alreadyPresentLeakRate`: `0.444`
+- `avgLatencyMs`: `13538.9`
+- `p95LatencyMs`: `23830.7`
 
 Interpretazione:
 
 - il contratto e stabile
 - il benchmark `smart-import` ora misura la lane dopo la normalizzazione locale
+  di `therapyState` e il filtro runtime dei duplicati `already-present`
+  in contesto “nessuna novita clinica”
   del `therapyState`, non solo il JSON grezzo del modello
 - l'hardening `AI-02` raggiunge i gate operativi su `therapyState` e dosaggio
 - il residuo piu rumoroso non e piu sugli switch, ma sui referral senza novita
@@ -405,9 +407,10 @@ Conclusione:
 - Smart Import oggi e usabile come extractor reviewable
 - i gate `AI-02` su `therapyStateRecall`, `contractValidRate` e `dosageRecall`
   sono chiusi sul baseline locale `qwen3.5:35b-a3b`
-- resta aperto un hardening successivo sul filtro “nessuna novita clinica”
-  per referral/continuazioni gia note, ma non e piu un blocco sul pacchetto
-  `AI-02`
+- il referral-only `smart-import-referral-known-condition-should-not-create-import-noise`
+  non perde piu nel benchmark visibile (`forbiddenLeakRate = 0`)
+- il residuo principale si sposta sui leak `already-present` ancora review-only
+  in alcuni casi `discharge-letter`, `specialist-report` e `rehab-adi`
 
 ## 2. Benchmark OpenMed PII / redaction
 

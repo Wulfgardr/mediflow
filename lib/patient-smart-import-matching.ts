@@ -43,6 +43,10 @@ const DRUG_QUERY_STOPWORDS = new Set([
 const INGREDIENT_STOPWORDS = new Set([
     'acetato', 'cloridrato', 'fosfato', 'potassio', 'sale', 'sesquidrato', 'sodica', 'sodico',
 ]);
+const NO_NOVELTY_BACKGROUND_MARKERS = /\b(gia noto|gia presente|profilo cronico|cronico|stabile|terapia domiciliare|domiciliar)\b/;
+const NO_NOVELTY_FOLLOW_UP_MARKERS = /\b(controllo|follow up|richiesta di visita|impegnativa|rivalutaz|valutare)\b/;
+const NO_NOVELTY_CONTINUATION_MARKERS = /\b(continuare|proseguire|mantenere|come da piano in corso|senza variazioni|senza novita|nessuna novita|nessun cambiamento)\b/;
+const NO_NOVELTY_CHANGE_MARKERS = /\b(nuov|peggior|riacut|acut|switch|passare a|sostit|sospend|interromp|inizia|introd|increment|aument|ridurr|modifica posolog|titolaz|decrement|dimission)\b/;
 
 function normalizeText(value: string | undefined): string {
     return (value || '')
@@ -59,6 +63,21 @@ export function hasUsableTherapyDosage(value: string | undefined): boolean {
     if (!normalized) return false;
 
     return !/da verificare|da confermare|non chiar|non nota|non disponibile|sconosciut|incert|dubb|valutar|\bn a\b/.test(normalized);
+}
+
+/* @Codex */
+export function isNoClinicalNoveltyContext(value: string | undefined): boolean {
+    const normalized = normalizeText(value);
+    if (!normalized) return false;
+    if (NO_NOVELTY_CHANGE_MARKERS.test(normalized)) return false;
+
+    const hasBackground = NO_NOVELTY_BACKGROUND_MARKERS.test(normalized);
+    const hasFollowUp = NO_NOVELTY_FOLLOW_UP_MARKERS.test(normalized);
+    const hasContinuation = NO_NOVELTY_CONTINUATION_MARKERS.test(normalized);
+
+    return (hasBackground && hasFollowUp)
+        || (hasBackground && hasContinuation)
+        || (hasFollowUp && hasContinuation);
 }
 
 /* @Codex */

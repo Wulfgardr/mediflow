@@ -6,6 +6,7 @@ import {
     classifyExtractedTherapyState,
     buildTherapyReview,
     hasDrugDosageConflict,
+    isNoClinicalNoveltyContext,
     hasUsableTherapyDosage,
     rankDrugCatalogSearchResult,
     rankDrugMatch,
@@ -330,6 +331,25 @@ test('smart import direct-apply dosage guard rejects empty or placeholder dosage
     assert.equal(hasUsableTherapyDosage('dose da verificare'), false);
     assert.equal(hasUsableTherapyDosage('Posologia da confermare'), false);
     assert.equal(hasUsableTherapyDosage('10 mg 1 cp al mattino'), true);
+});
+
+test('smart import detects referral-style continuation context as no clinical novelty', () => {
+    assert.equal(
+        isNoClinicalNoveltyContext(
+            'Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto. '
+            + 'Continuare terapia domiciliare come da piano in corso.'
+        ),
+        true,
+    );
+});
+
+test('smart import keeps dosage-change notes out of no-clinical-novelty suppression', () => {
+    assert.equal(
+        isNoClinicalNoveltyContext(
+            'Ridotto bisoprololo a 1,25 mg dopo rivalutazione pressoria con modifica posologica documentata.'
+        ),
+        false,
+    );
 });
 
 test('smart import promotes outgoing switch therapy from inactive to transition when evidence documents replacement', () => {

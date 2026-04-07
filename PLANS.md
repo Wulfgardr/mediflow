@@ -70,10 +70,10 @@ Nota operativa:
   persistibili e benchmark `smart-import` riallineato al behavior locale.
   Rieseguito il `2026-04-07` su `qwen3.5:35b-a3b` con
   `contractValidRate = 1`, `dosageRecall = 1`, `therapyStateRecall = 1`.
-  Residuo noto fuori scope `AI-02`: il case referral-only
+  Follow-up chiuso lo stesso giorno con un thin slice dedicato sul filtro
+  “nessuna novita clinica”: il case referral-only
   `smart-import-referral-known-condition-should-not-create-import-noise`
-  resta rumoroso (`forbiddenLeakRate = 0.222`) e va trattato come hardening
-  successivo sul filtro “nessuna novita clinica”.
+  ora va a `forbiddenLeakRate = 0` nella lane visibile di runtime/benchmark.
 - [x] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
 - [ ] Eseguire `AI-04`: preparare ADR e thin slice lane `PII/redaction` locale in shadow mode, coerente con la valutazione OpenMed. Stato `WUL-96`: benchmark stack chiuso, ma `OpenMed redaction` resta `benchmark-only / not shadow-ready` per leak critici sulle email/mailbox (`email recall = 0.333` sul corpus v3, `0.143` sul corpus email-focused).
 - [x] Eseguire `AI-05`: aggiungere input normalization tollerante per PDF e CDA/CCD prima delle lane semantiche.

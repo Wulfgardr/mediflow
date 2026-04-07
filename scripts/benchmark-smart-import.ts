@@ -11,6 +11,7 @@ import {
     parseSmartImportExtractionResponse,
     type SmartImportDiagnosisExtraction,
     type SmartImportTherapyExtraction,
+    type TherapySuggestionState,
 } from '../lib/ai-task-contracts.ts';
 
 type SmartImportBenchmarkArchetype =
@@ -136,6 +137,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_CORPUS_PATH = path.join(__dirname, 'fixtures', 'smart-import-benchmark-corpus.json');
 const DEFAULT_TARGET_MODELS = ['qwen3.5:35b-a3b', 'qwen3:32b'] as const;
+const NO_NOVELTY_BACKGROUND_MARKERS = /\b(gia noto|gia presente|profilo cronico|cronico|stabile|terapia domiciliare|domiciliar)\b/;
+const NO_NOVELTY_FOLLOW_UP_MARKERS = /\b(controllo|follow up|richiesta di visita|impegnativa|rivalutaz|valutare)\b/;
+const NO_NOVELTY_CONTINUATION_MARKERS = /\b(continuare|proseguire|mantenere|come da piano in corso|senza variazioni|senza novita|nessuna novita|nessun cambiamento)\b/;
+const NO_NOVELTY_CHANGE_MARKERS = /\b(nuov|peggior|riacut|acut|switch|passare a|sostit|sospend|interromp|inizia|introd|increment|aument|ridurr|modifica posolog|titolaz|decrement|dimission)\b/;
 
 function parseArgs(argv: string[]) {
     const args = {
@@ -232,7 +237,7 @@ function buildProbeTokens(...values: Array<string | undefined>): string[] {
     ));
 }
 
-function normalizeTherapyStateForBenchmark(therapy: SmartImportTherapyExtraction) {
+function normalizeTherapyStateForBenchmark(therapy: SmartImportTherapyExtraction): TherapySuggestionState {
     const probe = normalizeText([
         therapy.drugMention,
         therapy.drugQuery,
@@ -261,6 +266,20 @@ function normalizeTherapyStateForBenchmark(therapy: SmartImportTherapyExtraction
     if (/sospes|interrott|stop|terminat|conclus|discontinuat/.test(probe)) return 'inactive';
 
     return explicitState || 'active';
+}
+
+function isNoClinicalNoveltyContextForBenchmark(value: string): boolean {
+    const normalized = normalizeText(value);
+    if (!normalized) return false;
+    if (NO_NOVELTY_CHANGE_MARKERS.test(normalized)) return false;
+
+    const hasBackground = NO_NOVELTY_BACKGROUND_MARKERS.test(normalized);
+    const hasFollowUp = NO_NOVELTY_FOLLOW_UP_MARKERS.test(normalized);
+    const hasContinuation = NO_NOVELTY_CONTINUATION_MARKERS.test(normalized);
+
+    return (hasBackground && hasFollowUp)
+        || (hasBackground && hasContinuation)
+        || (hasFollowUp && hasContinuation);
 }
 
 function matchesExistingText(existingTexts: string[], tokens: string[]): boolean {
@@ -292,6 +311,18 @@ function collectCurrentTherapies(payload: Record<string, unknown>) {
         .filter((therapy) => therapy.label.length > 0);
 }
 
+function buildSourceContentMap(payload: Record<string, unknown>): Map<string, string> {
+    return new Map(
+        getRecordArray(payload, 'sources')
+            .map((source) => {
+                const id = stringValue(source.id);
+                const content = stringValue(source.content);
+                return id && content ? [id, content] : null;
+            })
+            .filter((entry): entry is [string, string] => Boolean(entry))
+    );
+}
+
 function hasValidSourceId(
     suggestion: SmartImportDiagnosisExtraction | SmartImportTherapyExtraction,
     allowedSourceIds: Set<string>
@@ -304,22 +335,31 @@ function isDiagnosisAlreadyPresent(
     diagnosis: SmartImportDiagnosisExtraction,
     currentDiagnosisTexts: string[]
 ): boolean {
-    return matchesExistingText(
-        currentDiagnosisTexts,
-        buildProbeTokens(diagnosis.label, diagnosis.icdQuery),
-    );
+    const tokenGroups = [
+        buildProbeTokens(diagnosis.label),
+        buildProbeTokens(diagnosis.icdQuery),
+        buildProbeTokens(diagnosis.explicitCode),
+    ].filter((tokens) => tokens.length > 0);
+
+    return tokenGroups.some((tokens) => matchesExistingText(currentDiagnosisTexts, tokens));
 }
 
 function matchCurrentTherapy(
     therapy: Pick<SmartImportTherapyExtraction, 'drugMention' | 'activePrinciple' | 'drugQuery' | 'dosage'>,
     currentTherapies: Array<{ label: string; dosage: string }>
 ) {
-    const therapyTokens = buildProbeTokens(therapy.activePrinciple, therapy.drugMention, therapy.drugQuery);
-    if (therapyTokens.length === 0) {
+    const therapyTokenGroups = [
+        buildProbeTokens(therapy.activePrinciple),
+        buildProbeTokens(therapy.drugMention),
+        buildProbeTokens(therapy.drugQuery),
+    ].filter((tokens) => tokens.length > 0);
+    if (therapyTokenGroups.length === 0) {
         return { related: false, exact: false };
     }
 
-    const relatedMatches = currentTherapies.filter((existing) => includesAllTokens(existing.label, therapyTokens));
+    const relatedMatches = currentTherapies.filter((existing) => (
+        therapyTokenGroups.some((tokens) => includesAllTokens(existing.label, tokens))
+    ));
     if (relatedMatches.length === 0) {
         return { related: false, exact: false };
     }
@@ -409,8 +449,8 @@ function findTherapyMatch(
 }
 
 function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof parseSmartImportExtractionResponse>): Omit<CaseResult, 'id' | 'archetype' | 'iteration' | 'latencyMs' | 'validJson' | 'validTask' | 'error'> {
-    const diagnoses = parsed.value.data.diagnoses;
-    const therapies = parsed.value.data.therapies.map((therapy) => ({
+    const rawDiagnoses = parsed.value.data.diagnoses;
+    const rawTherapies = parsed.value.data.therapies.map((therapy) => ({
         ...therapy,
         therapyState: normalizeTherapyStateForBenchmark(therapy),
     }));
@@ -423,6 +463,15 @@ function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof p
     );
     const currentDiagnosisTexts = collectCurrentDiagnosisTexts(entry.payload);
     const currentTherapies = collectCurrentTherapies(entry.payload);
+    const sourceContentById = buildSourceContentMap(entry.payload);
+    const diagnoses = rawDiagnoses.filter((diagnosis) => {
+        const context = [sourceContentById.get(diagnosis.sourceId || ''), diagnosis.evidence].filter(Boolean).join(' ');
+        return !(isDiagnosisAlreadyPresent(diagnosis, currentDiagnosisTexts) && isNoClinicalNoveltyContextForBenchmark(context));
+    });
+    const therapies = rawTherapies.filter((therapy) => {
+        const context = [sourceContentById.get(therapy.sourceId || ''), therapy.evidence].filter(Boolean).join(' ');
+        return !(matchCurrentTherapy(therapy, currentTherapies).exact && isNoClinicalNoveltyContextForBenchmark(context));
+    });
 
     const expectedDiagnoses = entry.expected.diagnoses || [];
     const expectedTherapies = entry.expected.therapies || [];

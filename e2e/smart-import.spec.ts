@@ -20,6 +20,40 @@ async function createPatientFromForm(page: Page, values: {
   await expect(page).toHaveURL(/\/$/);
 }
 
+async function createPatientViaApi(page: Page, payload: Record<string, unknown>): Promise<string> {
+  return await page.evaluate(async (body: Record<string, unknown>) => {
+    const response = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create patient: ${response.status}`);
+    }
+
+    const data = await response.json() as { id: string };
+    return data.id;
+  }, payload);
+}
+
+async function createTherapyViaApi(page: Page, payload: Record<string, unknown>): Promise<string> {
+  return await page.evaluate(async (body: Record<string, unknown>) => {
+    const response = await fetch('/api/therapies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const data = await response.json() as { id: string };
+    return data.id;
+  }, payload);
+}
+
 async function openPatientFromHome(page: Page, taxCode: string) {
   const search = page.getByTestId('patients-search-input');
   await search.fill(taxCode);
@@ -268,6 +302,38 @@ function buildSwitchDriftPayload() {
           therapyState: 'transition',
           confidence: 'medium',
           evidence: 'Passare a nebivololo 5 mg 1 cp.',
+          sourceId: 'patient-notes:1'
+        }
+      ]
+    }
+  };
+}
+
+function buildNoNoveltyReferralPayload() {
+  return {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'smart_import',
+    summary: 'Referral di controllo su quadro gia noto senza novita cliniche.',
+    data: {
+      diagnoses: [
+        {
+          label: 'Ipotiroidismo autoimmune',
+          icdQuery: 'autoimmune hypothyroidism',
+          evidence: 'Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto.',
+          confidence: 'medium',
+          sourceId: 'patient-notes:1',
+        }
+      ],
+      therapies: [
+        {
+          drugMention: 'Levotiroxina',
+          drugQuery: 'Levotiroxina',
+          activePrinciple: 'Levotiroxina sodica',
+          dosage: '75 mcg 1 cp/die',
+          motivation: 'Terapia domiciliare in continuita',
+          therapyState: 'active',
+          confidence: 'medium',
+          evidence: 'Continuare terapia domiciliare come da piano in corso.',
           sourceId: 'patient-notes:1'
         }
       ]
@@ -829,4 +895,102 @@ test('smart import normalizes outgoing switch therapy to transition even when mo
   await expect(bisoprololoCard.getByText('Transizione terapeutica documentata: richiede conferma manuale prima dell\'import')).toBeVisible();
   await expect(bisoprololoCard.getByText('sospesa', { exact: true })).toHaveCount(0);
   await expect(bisoprololoCheckbox).toBeDisabled();
+});
+
+test('smart import hides already-present referral duplicates when the source has no clinical novelty', async ({ page }) => {
+  const pin = process.env.E2E_PIN || '1234';
+  const suffix = `${Date.now()}`.slice(-4);
+  const referralNotes = 'Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto. Continuare terapia domiciliare come da piano in corso.';
+
+  await page.route('**/api/proxy/ollama/chat', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(buildNoNoveltyReferralPayload())
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 180,
+          completion_tokens: 110
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/icd/proxy?q=*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        destinationEntities: [
+          {
+            theCode: '5A00',
+            title: 'Autoimmune hypothyroidism'
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route('**/api/drugs?q=*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          aic: 'AIC-LEVO-75',
+          name: 'Levotiroxina Teva',
+          activePrinciple: 'Levotiroxina sodica',
+          company: 'Teva',
+          packaging: '75 mcg compresse',
+          atc: 'H03AA01'
+        }
+      ])
+    });
+  });
+
+  await bootstrapUnlockedSession(page, pin);
+
+  const patientId = await createPatientViaApi(page, {
+    firstName: `Referral${suffix}`,
+    lastName: `Noise${suffix}`,
+    taxCode: `RFRNSE80A01H${suffix}`,
+    birthDate: '1980-01-01T00:00:00.000Z',
+    notes: referralNotes,
+    diagnoses: [
+      {
+        system: 'ICD-11',
+        code: '5A00',
+        description: 'Ipotiroidismo autoimmune',
+        date: new Date().toISOString(),
+      },
+    ],
+  });
+
+  await createTherapyViaApi(page, {
+    patientId,
+    drugName: 'Levotiroxina Teva',
+    activePrinciple: 'Levotiroxina sodica',
+    dosage: '75 mcg 1 cp/die',
+    aic: 'AIC-LEVO-75',
+    atc: 'H03AA01',
+    status: 'active',
+    startDate: new Date('2026-04-01T08:00:00Z').toISOString(),
+  });
+
+  await page.goto(`/patients/${patientId}`);
+  await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Analizza fonti' }).click();
+
+  const diagnosisInputId = smartImportDiagnosisInputId('Ipotiroidismo autoimmune', 'autoimmune hypothyroidism');
+  const therapyInputId = smartImportTherapyInputId('Levotiroxina', '75 mcg 1 cp/die', 'Levotiroxina sodica');
+
+  await expect(page.locator(`input[id="${diagnosisInputId}"]`)).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.locator(`input[id="${therapyInputId}"]`)).toHaveCount(0);
+  await expect(page.getByText('Nessun match trovato')).toHaveCount(2);
 });

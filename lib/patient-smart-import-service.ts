@@ -22,6 +22,7 @@ import {
     buildTherapyReview,
     buildDrugSearchTerms,
     hasDrugDosageConflict,
+    isNoClinicalNoveltyContext,
     hasUsableTherapyDosage,
     rankIcdMatch,
     rankDrugMatch,
@@ -612,6 +613,18 @@ function canDirectlyApplyTherapySuggestion(
     return state === 'active' && matchType === 'catalog' && hasUsableTherapyDosage(dosage);
 }
 
+/* @Codex */
+function shouldSuppressNoNoveltyAlreadyPresentSuggestion(
+    sourceMap: Map<string, SmartImportSourceRecord>,
+    reviewState: SmartImportReviewState,
+    evidence: SmartImportEvidence
+): boolean {
+    if (reviewState !== 'already-present') return false;
+
+    const source = sourceMap.get(evidence.sourceId);
+    return isNoClinicalNoveltyContext([source?.content, evidence.excerpt].filter(Boolean).join(' '));
+}
+
 function buildTherapyBlockedReason(
     state: TherapySuggestionState,
     matchType: TherapySuggestionMatchType,
@@ -835,7 +848,11 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
         };
 
         return nextSuggestion;
-    }).sort(sortDiagnosisSuggestions);
+    }).filter((diagnosis) => !shouldSuppressNoNoveltyAlreadyPresentSuggestion(
+        sourceMap,
+        diagnosis.review.state,
+        diagnosis.evidence,
+    )).sort(sortDiagnosisSuggestions);
     const therapySuggestions = resolvedTherapies.map((therapy) => {
         const review = buildTherapyReview(currentTherapies, therapy);
         const canApply = review.state === 'new' ? therapy.canApply : false;
@@ -857,7 +874,11 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
             blockedReason,
             review,
         };
-    }).sort(sortTherapySuggestions);
+    }).filter((therapy) => !shouldSuppressNoNoveltyAlreadyPresentSuggestion(
+        sourceMap,
+        therapy.review.state,
+        therapy.evidence,
+    )).sort(sortTherapySuggestions);
 
     return {
         generatedAt: new Date().toISOString(),
