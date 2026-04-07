@@ -21,6 +21,7 @@ import {
     buildTherapyReview,
     buildDrugSearchTerms,
     hasDrugDosageConflict,
+    hasUsableTherapyDosage,
     rankIcdMatch,
     rankDrugMatch,
     selectTherapyCatalogMatch,
@@ -632,17 +633,20 @@ function classifyTherapyState(
 
 function canDirectlyApplyTherapySuggestion(
     state: TherapySuggestionState,
-    matchType: TherapySuggestionMatchType
+    matchType: TherapySuggestionMatchType,
+    dosage: string | undefined
 ): boolean {
-    return state === 'active' && matchType === 'catalog';
+    return state === 'active' && matchType === 'catalog' && hasUsableTherapyDosage(dosage);
 }
 
 function buildTherapyBlockedReason(
     state: TherapySuggestionState,
     matchType: TherapySuggestionMatchType,
+    dosage: string | undefined,
     reviewNote: string | undefined
 ): string | undefined {
     if (state === 'active') {
+        if (!hasUsableTherapyDosage(dosage)) return 'Posologia da verificare prima dell\'import';
         if (matchType === 'manual') return 'Match AIFA da confermare prima dell\'import';
         if (matchType === 'none') return 'Nessun match farmaco affidabile';
         return undefined;
@@ -741,8 +745,8 @@ async function resolveTherapySuggestion(
         matchType = 'manual';
     }
 
-    const canApply = canDirectlyApplyTherapySuggestion(therapyState, matchType);
-    const blockedReason = buildTherapyBlockedReason(therapyState, matchType, suggestion.reviewNote);
+    const canApply = canDirectlyApplyTherapySuggestion(therapyState, matchType, suggestion.dosage);
+    const blockedReason = buildTherapyBlockedReason(therapyState, matchType, suggestion.dosage, suggestion.reviewNote);
 
     return {
         id: `therapy:${suggestion.drugMention}:${suggestion.dosage || ''}:${suggestion.activePrinciple || ''}`,
@@ -966,6 +970,8 @@ export async function applyPatientSmartImportSelection(
     const appliedTherapyIds: string[] = [];
     for (const suggestion of selectedTherapies) {
         if (!suggestion.canApply || suggestion.matchType !== 'catalog' || !suggestion.match) continue;
+        const appliedDosage = suggestion.reviewedDosage?.trim() || suggestion.dosage?.trim() || '';
+        if (!hasUsableTherapyDosage(appliedDosage)) continue;
         if (therapyExists([...existingTherapies, ...therapyItems], suggestion)) continue;
 
         therapyItems.push({
@@ -975,7 +981,7 @@ export async function applyPatientSmartImportSelection(
             aic: suggestion.match?.aic,
             atc: suggestion.match?.atc,
             activePrinciple: suggestion.reviewedActivePrinciple?.trim() || suggestion.match?.activePrinciple || suggestion.activePrinciple,
-            dosage: suggestion.reviewedDosage?.trim() || suggestion.dosage || 'Posologia da verificare',
+            dosage: appliedDosage,
             motivation: suggestion.reviewedMotivation?.trim() || suggestion.motivation || suggestion.evidence.excerpt,
             status: 'active',
             startDate: new Date(),

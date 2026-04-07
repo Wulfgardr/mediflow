@@ -215,6 +215,30 @@ function buildManualOnlyTherapyPayload() {
   };
 }
 
+function buildCatalogWithoutDosagePayload() {
+  return {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'smart_import',
+    summary: 'Terapia con match catalogo ma posologia non ancora sufficiente.',
+    data: {
+      diagnoses: [],
+      therapies: [
+        {
+          drugMention: 'Forxiga',
+          drugQuery: 'Forxiga',
+          activePrinciple: 'Dapagliflozin',
+          dosage: '',
+          motivation: 'Terapia domiciliare riportata senza schema posologico',
+          therapyState: 'active',
+          confidence: 'medium',
+          evidence: 'Forxiga in terapia domiciliare, schema posologico non riportato.',
+          sourceId: 'patient-notes:1'
+        }
+      ]
+    }
+  };
+}
+
 test('smart import adds ICD diagnosis chips and therapy from patient notes after operator review', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -613,5 +637,73 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
   await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('Match AIFA da confermare prima dell\'import')).toBeVisible();
   await expect(therapyCard.getByText('Nessun candidato AIFA locale affidabile.')).toBeVisible();
+  await expect(therapyCheckbox).toBeDisabled();
+});
+
+test('smart import keeps catalog therapy without useful dosage consultive and disables direct apply', async ({ page }) => {
+  const pin = process.env.E2E_PIN || '1234';
+  const suffix = `${Date.now()}`.slice(-4);
+  const firstName = `Dosage${suffix}`;
+  const lastName = `Guard${suffix}`;
+  const taxCode = `DSGGRD80A01H${suffix}`;
+  const patientNotes = 'Forxiga in terapia domiciliare, schema posologico non riportato.';
+
+  await page.route('**/api/proxy/ollama/chat', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(buildCatalogWithoutDosagePayload())
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 150,
+          completion_tokens: 90
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/drugs?q=*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          aic: '000000010',
+          name: 'Forxiga',
+          activePrinciple: 'Dapagliflozin',
+          company: 'AstraZeneca',
+          packaging: '10 mg compresse rivestite con film',
+          atc: 'A10BK01'
+        }
+      ])
+    });
+  });
+
+  await bootstrapUnlockedSession(page, pin);
+  await createPatientFromForm(page, {
+    firstName,
+    lastName,
+    taxCode,
+    notes: patientNotes,
+  });
+
+  await openPatientFromHome(page, taxCode);
+  await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Analizza fonti' }).click();
+
+  const therapyInputId = smartImportTherapyInputId('Forxiga', '', 'Dapagliflozin');
+  const therapyCard = smartImportCardFromInputId(page, therapyInputId);
+  const therapyCheckbox = page.locator(`input[id="${therapyInputId}"]`);
+
+  await expect(smartImportCardTitle(therapyCard, therapyInputId, 'Forxiga')).toBeVisible({ timeout: 20_000 });
+  await expect(therapyCard.getByText('catalog', { exact: true })).toBeVisible();
+  await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
+  await expect(therapyCard.getByText('Posologia da verificare prima dell\'import')).toBeVisible();
   await expect(therapyCheckbox).toBeDisabled();
 });

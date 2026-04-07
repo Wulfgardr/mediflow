@@ -5,6 +5,7 @@ import {
     buildDiagnosisSearchQueries,
     buildTherapyReview,
     hasDrugDosageConflict,
+    hasUsableTherapyDosage,
     rankDrugCatalogSearchResult,
     rankDrugMatch,
     selectTherapyCatalogMatch,
@@ -320,4 +321,12 @@ test('smart import review keeps manual-only active therapy as consultive and not
 
     assert.equal(review.state, 'uncertain');
     assert.match(review.summary, /AIFA/i);
+});
+
+test('smart import direct-apply dosage guard rejects empty or placeholder dosage strings', () => {
+    assert.equal(hasUsableTherapyDosage(undefined), false);
+    assert.equal(hasUsableTherapyDosage(''), false);
+    assert.equal(hasUsableTherapyDosage('dose da verificare'), false);
+    assert.equal(hasUsableTherapyDosage('Posologia da confermare'), false);
+    assert.equal(hasUsableTherapyDosage('10 mg 1 cp al mattino'), true);
 });
