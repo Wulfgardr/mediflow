@@ -3,8 +3,10 @@ import Script from 'next/script';
 import './globals.css';
 /* @Codex */
 import PreviewProfileChrome from '@/components/preview-profile-chrome';
+import { AppRevisionGuard } from '@/components/app-revision-guard';
 import { MobileShellChrome } from '@/components/mobile-shell-chrome';
 import { Sidebar } from '@/components/sidebar';
+import { getAppFingerprint } from '@/lib/app-revision';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -37,16 +39,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  /* @Codex: expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
+  const appFingerprint = getAppFingerprint();
+
   return (
     <html lang="it" data-ui-style="clinical" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
+        <meta name="mediflow-app-fingerprint" content={appFingerprint} />
         <Script id="ui-style-bootstrap" strategy="beforeInteractive">
           {uiStyleBootstrapScript}
         </Script>
       </head>
       <body className={cn("antialiased overflow-x-hidden")} suppressHydrationWarning>
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
+          <AppRevisionGuard fingerprint={appFingerprint} />
           <SecurityProvider>
             <UIStyleProvider>
               {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}

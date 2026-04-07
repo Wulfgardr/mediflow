@@ -11,6 +11,105 @@ echo ""
 WATCHDOG_PID=""
 # @Codex
 QUIET_EXIT=""
+# @Codex
+MEDIFLOW_PORT="3000"
+# @Codex
+MEDIFLOW_URL="http://localhost:${MEDIFLOW_PORT}"
+# @Codex
+CURRENT_APP_REVISION="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+# @Codex
+CURRENT_APP_BRANCH="$(git branch --show-current 2>/dev/null || echo unknown)"
+# @Codex
+CURRENT_APP_STATUS="$(git status --porcelain=v1 2>/dev/null)"
+# @Codex
+if [ -n "$CURRENT_APP_STATUS" ]; then
+    CURRENT_APP_WORKTREE_HASH="$(printf '%s' "$CURRENT_APP_STATUS" | shasum -a 1 | awk '{print substr($1,1,12)}')"
+else
+    CURRENT_APP_WORKTREE_HASH="clean"
+fi
+# @Codex
+CURRENT_APP_SOURCE_FINGERPRINT="${CURRENT_APP_BRANCH}@${CURRENT_APP_REVISION}:${CURRENT_APP_WORKTREE_HASH}"
+# @Codex
+CURRENT_APP_FINGERPRINT="${CURRENT_APP_SOURCE_FINGERPRINT}"
+# @Codex
+NEXT_CACHE_REVISION_FILE="$DIR/.next/.mediflow-app-revision"
+# @Codex
+PORT_LISTENER_PID=""
+# @Codex
+PORT_LISTENER_CWD=""
+# @Codex
+PORT_LISTENER_COMMAND=""
+# @Codex
+PORT_STATUS="free"
+
+# /* @Codex */
+find_port_listener_pid() {
+    lsof -nP -iTCP:"$MEDIFLOW_PORT" -sTCP:LISTEN -Fp 2>/dev/null | sed -n 's/^p//p' | head -n 1
+}
+
+# @Codex
+find_process_cwd() {
+    local pid="$1"
+    lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
+}
+
+# @Codex
+find_process_command() {
+    local pid="$1"
+    ps -p "$pid" -o command= 2>/dev/null
+}
+
+# @Codex
+fetch_running_revision() {
+    curl -fsS "${MEDIFLOW_URL}/api/system/revision" 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision",""))' 2>/dev/null
+}
+
+# @Codex
+fetch_running_source_fingerprint() {
+    curl -fsS "${MEDIFLOW_URL}/api/system/revision" 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("sourceFingerprint",""))' 2>/dev/null
+}
+
+# @Codex
+inspect_mediflow_port() {
+    PORT_LISTENER_PID="$(find_port_listener_pid)"
+    PORT_LISTENER_CWD=""
+    PORT_LISTENER_COMMAND=""
+    PORT_STATUS="free"
+
+    if [ -z "$PORT_LISTENER_PID" ]; then
+        return
+    fi
+
+    PORT_LISTENER_CWD="$(find_process_cwd "$PORT_LISTENER_PID")"
+    PORT_LISTENER_COMMAND="$(find_process_command "$PORT_LISTENER_PID")"
+
+    if [ "$PORT_LISTENER_CWD" = "$DIR" ]; then
+        PORT_STATUS="mediflow_running"
+    else
+        PORT_STATUS="occupied_other"
+    fi
+}
+
+# @Codex
+reset_next_cache_if_revision_changed() {
+    local previous_revision=""
+    if [ -f "$NEXT_CACHE_REVISION_FILE" ]; then
+        previous_revision="$(cat "$NEXT_CACHE_REVISION_FILE" 2>/dev/null)"
+    fi
+
+    if [ -n "$previous_revision" ] && [ "$previous_revision" != "$CURRENT_APP_SOURCE_FINGERPRINT" ] && [ -d "$DIR/.next" ]; then
+        echo "   ♻️  Sorgente UI cambiato (${previous_revision} -> ${CURRENT_APP_SOURCE_FINGERPRINT}). Reset cache Next locale..."
+        rm -rf "$DIR/.next"
+    fi
+
+    mkdir -p "$DIR/.next"
+    printf '%s' "$CURRENT_APP_SOURCE_FINGERPRINT" > "$NEXT_CACHE_REVISION_FILE"
+}
+
+echo "   🌿 Branch: ${CURRENT_APP_BRANCH}"
+echo "   🧬 Revisione: ${CURRENT_APP_REVISION}"
+echo "   🪪 Sorgente: ${CURRENT_APP_SOURCE_FINGERPRINT}"
+echo ""
 
 # --- 1. Start Ollama (AI Engine) ---
 echo "🤖 [1/4] Controllo AI Engine (Ollama)..."
@@ -46,6 +145,21 @@ if command -v docker &> /dev/null; then
 else
     echo "   ⚠️  Docker non installato. Le diagnosi ICD-11 non saranno disponibili."
     echo "      Per abilitarle: installa Docker Desktop e rilancia."
+fi
+
+inspect_mediflow_port
+if [ "$PORT_STATUS" = "occupied_other" ]; then
+    echo ""
+    echo "   ❌ Porta ${MEDIFLOW_PORT} già occupata da un altro processo."
+    echo "      PID: ${PORT_LISTENER_PID}"
+    if [ -n "$PORT_LISTENER_COMMAND" ]; then
+        echo "      Comando: ${PORT_LISTENER_COMMAND}"
+    fi
+    if [ -n "$PORT_LISTENER_CWD" ]; then
+        echo "      Cartella: ${PORT_LISTENER_CWD}"
+    fi
+    echo "      Arresta quel processo oppure libera la porta ${MEDIFLOW_PORT} e rilancia MediFlow."
+    exit 1
 fi
 
 # /* @Codex */
@@ -96,22 +210,49 @@ cleanup() {
 
 trap cleanup SIGINT EXIT
 
-# Reuse existing dev server if already listening on 3000
-if lsof -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "   ✅ MediFlow risulta già attivo su http://localhost:3000"
-    echo "   ℹ️  Nessun nuovo server avviato per evitare conflitti di porta."
-    echo ""
-    open "http://localhost:3000"
-    QUIET_EXIT=1
-    exit 0
+if [ "$PORT_STATUS" = "mediflow_running" ]; then
+    RUNNING_APP_REVISION="$(fetch_running_revision)"
+    RUNNING_APP_SOURCE_FINGERPRINT="$(fetch_running_source_fingerprint)"
+    if [ -z "$RUNNING_APP_SOURCE_FINGERPRINT" ] || [ "$RUNNING_APP_SOURCE_FINGERPRINT" != "$CURRENT_APP_SOURCE_FINGERPRINT" ]; then
+        echo "   ♻️  Istanza MediFlow esistente ma non allineata alla revisione corrente."
+        echo "      PID: ${PORT_LISTENER_PID}"
+        echo "      Revisione in esecuzione: ${RUNNING_APP_REVISION:-sconosciuta}"
+        echo "      Sorgente in esecuzione: ${RUNNING_APP_SOURCE_FINGERPRINT:-sconosciuta}"
+        echo "      Sorgente richiesto: ${CURRENT_APP_SOURCE_FINGERPRINT}"
+        echo "   🔄 Arresto l'istanza precedente per evitare UI ibride o bundle stantii..."
+        kill "$PORT_LISTENER_PID" 2>/dev/null || true
+        sleep 2
+        inspect_mediflow_port
+        if [ "$PORT_STATUS" != "free" ]; then
+            echo "   ❌ Non sono riuscito a liberare la porta ${MEDIFLOW_PORT}. Arresta manualmente il processo e rilancia."
+            exit 1
+        fi
+    else
+        echo "   ✅ MediFlow risulta già attivo su ${MEDIFLOW_URL}"
+        echo "      PID: ${PORT_LISTENER_PID}"
+        echo "      Revisione: ${RUNNING_APP_REVISION}"
+        echo "      Sorgente: ${RUNNING_APP_SOURCE_FINGERPRINT}"
+        echo "   ⏭️  Riutilizzo l'istanza esistente senza avviare un secondo server."
+        echo ""
+        open "${MEDIFLOW_URL}"
+        QUIET_EXIT=1
+        exit 0
+    fi
 fi
 
-# Open browser after delay
-(sleep 5 && open "http://localhost:3000") &
+reset_next_cache_if_revision_changed
 
-echo "   📍 URL: http://localhost:3000"
+# Open browser after delay
+(sleep 5 && open "${MEDIFLOW_URL}") &
+
+echo "   📍 URL: ${MEDIFLOW_URL}"
 echo "   ⏹️  Premi CTRL+C per arrestare."
 echo ""
 
 # Start Dev Server
+MEDIFLOW_APP_REVISION="${CURRENT_APP_REVISION}" \
+MEDIFLOW_APP_BRANCH="${CURRENT_APP_BRANCH}" \
+MEDIFLOW_APP_WORKTREE_HASH="${CURRENT_APP_WORKTREE_HASH}" \
+MEDIFLOW_APP_SOURCE_FINGERPRINT="${CURRENT_APP_SOURCE_FINGERPRINT}" \
+MEDIFLOW_APP_FINGERPRINT="${CURRENT_APP_FINGERPRINT}" \
 npm run dev
