@@ -304,3 +304,20 @@ test('smart import review marks suspended therapy as inactive instead of uncerta
     assert.equal(review.state, 'inactive');
     assert.match(review.summary, /sospesa o conclusa/i);
 });
+
+test('smart import review keeps manual-only active therapy as consultive and not directly applicable', () => {
+    const suggestion: TherapyReviewCandidate = {
+        drugMention: 'Nutridrink',
+        activePrinciple: 'Formula nutrizionale orale',
+        dosage: '1 al di',
+        therapyState: 'active',
+        matchType: 'manual',
+        canApply: false,
+        blockedReason: 'Match AIFA da confermare prima dell\'import',
+    };
+
+    const review = buildTherapyReview([], suggestion);
+
+    assert.equal(review.state, 'uncertain');
+    assert.match(review.summary, /AIFA/i);
+});

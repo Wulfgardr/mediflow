@@ -114,6 +114,8 @@ export interface TherapySmartImportSuggestion {
     reviewedMotivation?: string;
 }
 
+type TherapySuggestionMatchType = TherapySmartImportSuggestion['matchType'];
+
 export interface PatientSmartImportAnalysis {
     generatedAt: string;
     model: {
@@ -628,8 +630,23 @@ function classifyTherapyState(
     return suggestion.therapyState || 'active';
 }
 
-function buildTherapyBlockedReason(state: TherapySuggestionState, reviewNote: string | undefined): string | undefined {
-    if (state === 'active') return undefined;
+function canDirectlyApplyTherapySuggestion(
+    state: TherapySuggestionState,
+    matchType: TherapySuggestionMatchType
+): boolean {
+    return state === 'active' && matchType === 'catalog';
+}
+
+function buildTherapyBlockedReason(
+    state: TherapySuggestionState,
+    matchType: TherapySuggestionMatchType,
+    reviewNote: string | undefined
+): string | undefined {
+    if (state === 'active') {
+        if (matchType === 'manual') return 'Match AIFA da confermare prima dell\'import';
+        if (matchType === 'none') return 'Nessun match farmaco affidabile';
+        return undefined;
+    }
     if (reviewNote) return reviewNote;
     if (state === 'transition') return 'Transizione terapeutica da confermare prima dell\'import';
     if (state === 'uncertain') return 'Terapia citata come incerta o da verificare';
@@ -724,8 +741,8 @@ async function resolveTherapySuggestion(
         matchType = 'manual';
     }
 
-    const blockedReason = buildTherapyBlockedReason(therapyState, suggestion.reviewNote)
-        || (matchType === 'none' ? 'Nessun match farmaco affidabile' : undefined);
+    const canApply = canDirectlyApplyTherapySuggestion(therapyState, matchType);
+    const blockedReason = buildTherapyBlockedReason(therapyState, matchType, suggestion.reviewNote);
 
     return {
         id: `therapy:${suggestion.drugMention}:${suggestion.dosage || ''}:${suggestion.activePrinciple || ''}`,
@@ -746,7 +763,7 @@ async function resolveTherapySuggestion(
         },
         matchType,
         match,
-        canApply: therapyState === 'active' && matchType !== 'none',
+        canApply,
         blockedReason,
         review: {
             state: 'uncertain',
@@ -948,7 +965,7 @@ export async function applyPatientSmartImportSelection(
     const therapyItems: Therapy[] = [];
     const appliedTherapyIds: string[] = [];
     for (const suggestion of selectedTherapies) {
-        if (!suggestion.canApply) continue;
+        if (!suggestion.canApply || suggestion.matchType !== 'catalog' || !suggestion.match) continue;
         if (therapyExists([...existingTherapies, ...therapyItems], suggestion)) continue;
 
         therapyItems.push({
