@@ -1,5 +1,5 @@
 /* @Codex */
-import type { TherapySuggestionState } from './ai-task-contracts.ts';
+import type { TherapySuggestionState } from './ai-task-contracts';
 
 /* @Codex */
 export const CLOUD_COMPARATOR_CASE_PACK_SCHEMA_VERSION = 'mediflow.cloud_comparator_case_pack.v1';

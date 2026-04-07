@@ -1,11 +1,11 @@
 /* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
 /* @Codex */
-import { dbServer } from './db-server.ts';
+import { dbServer } from './db-server';
 /* @Codex */
-import { patients, patientsToAmbulatories } from './schema.ts';
+import { patients, patientsToAmbulatories } from './schema';
 /* @Codex */
-import type { PatientDetail, PatientSummary } from './api/v1/types.ts';
+import type { PatientDetail, PatientSummary } from './api/v1/types';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;

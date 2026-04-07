@@ -1,15 +1,15 @@
 /* @Codex */
 import { eq } from 'drizzle-orm';
 /* @Codex */
-import { dbServer } from './db-server.ts';
+import { dbServer } from './db-server';
 /* @Codex */
-import { ambulatories, users } from './schema.ts';
+import { ambulatories, users } from './schema';
 /* @Codex */
-import type { NetworkIdentitySummary } from './api/v1/types.ts';
+import type { NetworkIdentitySummary } from './api/v1/types';
 /* @Codex */
-import type { ServerSession } from './server-session.ts';
+import type { ServerSession } from './server-session';
 /* @Codex */
-import { deriveNetworkIdentitySummary } from './network-identity-model.ts';
+import { deriveNetworkIdentitySummary } from './network-identity-model';
 
 export async function getNetworkIdentitySummary(
     session: ServerSession | null,

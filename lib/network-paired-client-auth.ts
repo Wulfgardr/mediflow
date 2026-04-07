@@ -6,7 +6,7 @@ import {
     NETWORK_PAIRED_CLIENT_ID_HEADER,
     NETWORK_PAIRED_CLIENT_TOKEN_HEADER,
     type StoredNetworkPairedClient,
-} from './network-pairing-model.ts';
+} from './network-pairing-model';
 
 function extractNetworkPairedClientCredentials(request: Request): {
     clientId: string;

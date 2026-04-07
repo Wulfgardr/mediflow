@@ -1,17 +1,17 @@
 /* @Codex */
 import { inArray } from 'drizzle-orm';
 /* @Codex */
-import { dbServer } from './db-server.ts';
+import { dbServer } from './db-server';
 /* @Codex */
-import type { NetworkAiRuntimeSummary, NetworkOperatingMode } from './api/v1/types.ts';
+import type { NetworkAiRuntimeSummary, NetworkOperatingMode } from './api/v1/types';
 /* @Codex */
-import { validateLocalTarget } from './local-target.ts';
+import { validateLocalTarget } from './local-target';
 /* @Codex */
-import { settings } from './schema.ts';
+import { settings } from './schema';
 /* @Codex */
-import { NETWORK_MODE_KEY, normalizeNetworkOperatingMode } from './network-contract.ts';
+import { NETWORK_MODE_KEY, normalizeNetworkOperatingMode } from './network-contract';
 /* @Codex */
-import { deriveNetworkAiRuntimeSummary } from './network-ai-runtime-model.ts';
+import { deriveNetworkAiRuntimeSummary } from './network-ai-runtime-model';
 
 const NETWORK_AI_RUNTIME_SETTINGS_KEYS = [
     NETWORK_MODE_KEY,
