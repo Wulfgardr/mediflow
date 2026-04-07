@@ -4,6 +4,8 @@
 Date: 2026-04-04  
 Status: Working benchmark note
 
+Ultima riesecuzione su `main`: 2026-04-07
+
 ## Scopo
 
 Documentare la thin slice `AI-01` / `WUL-109` per misurare i resolver reali che
@@ -209,6 +211,18 @@ Note pratiche:
 - il benchmark AIFA non richiede che il server Next sia attivo
 - il benchmark WHO non richiede UI né sessione web
 - entrambi i runner sono pensati per essere eseguiti direttamente da CLI
+
+## Snapshot recente su `main`
+
+Riesecuzione locale del `2026-04-07`:
+
+- WHO ICD-11: `top1Recall = 0.714`, `topKRecall = 0.714`,
+  `noResultRate = 0.286`; le query inglesi e miste passano, quelle italiane
+  pure restano a `0`.
+- AIFA locale: `top1MatchRate = 0.429`, `topKMatchRate = 0.429`,
+  `noResultRate = 0.571`, `stateBlindHitRate = 1`; i gap residui sono
+  soprattutto `strength`, `packaging` e combo, coerenti con il matcher SQL
+  attuale.
 
 ## Lettura pratica dei risultati
 

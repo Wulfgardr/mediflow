@@ -57,7 +57,12 @@ Nota operativa:
 - [x] Introdurre smart import reviewable nel profilo paziente da note/diario/documenti per diagnosi ICD-11 e terapie, mantenendo l'autofill automatico limitato ai soli ICD espliciti (ADR 0012).
 
 ### 0c) Affidabilita stack AI locale
-- [ ] Eseguire `AI-01`: benchmark headless dei resolver reali WHO ICD-11 e AIFA, con corpora sintetici e metriche top-k/latency/ambiguity.
+- [x] Eseguire `AI-01`: benchmark headless dei resolver reali WHO ICD-11 e AIFA, con corpora sintetici e metriche top-k/latency/ambiguity.
+  Completato in `WUL-109`; rieseguito su `main` il `2026-04-07`.
+  Snapshot corrente: WHO `top1/topKRecall = 0.714` con gap confinato alle
+  query italiane pure; AIFA `top1/topKMatchRate = 0.429`,
+  `noResultRate = 0.571`, `stateBlindHitRate = 1`, confermando che il
+  resolver resta un matcher di catalogo puro e non dosage/packaging-aware.
 - [ ] Eseguire `AI-02`: hardening Smart Import sui casi di switch terapeutico, applicabilita suggerimenti e policy `manual|blocked|uncertain`.
 - [x] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
 - [ ] Eseguire `AI-04`: preparare ADR e thin slice lane `PII/redaction` locale in shadow mode, coerente con la valutazione OpenMed. Stato `WUL-96`: benchmark stack chiuso, ma `OpenMed redaction` resta `benchmark-only / not shadow-ready` per leak critici sulle email/mailbox (`email recall = 0.333` sul corpus v3, `0.143` sul corpus email-focused).
