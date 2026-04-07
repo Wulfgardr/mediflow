@@ -144,7 +144,8 @@ Ogni futura proposta `hold -> shadow-ready` o `shadow-ready -> active-with-fallb
 deve portare con se:
 
 - issue Linear dedicata
-- branch/PR dedicata
+- branch/PR dedicata con naming `codex/<issue-id>-<slug>`
+- nuova conversazione Codex se la promozione apre una thin slice autonoma
 - benchmark report o riferimento al report persistito
 - corpus canonico usato
 - fallback e stop-rules citate esplicitamente

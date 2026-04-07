@@ -1,10 +1,17 @@
 # Document Intelligence Lab
 
 Stato documento: `SECONDARY`  
-Ultimo aggiornamento: 2026-04-02
+Ultimo aggiornamento: 2026-04-04
 
 Questa nota traduce [ADR 0032](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md)
 in una struttura operativa minima per i prossimi cicli AI documentali.
+
+Direzione architetturale aggiornata:
+
+- [ADR 0040](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md)
+  fissa la north star del prossimo ciclo: trattare il documento come
+  `evidence ledger`, con separazione tra recognition, source governance,
+  decision layer e render/projection.
 
 Prima baseline concreta di questa policy:
 
@@ -50,6 +57,16 @@ Vincoli:
 - mai committarlo
 - mai allegarlo a PR o issue pubbliche
 - non usarlo come training dataset operativo senza una nuova ADR esplicita
+
+Per la lane opzionale `cloud comparator shadow eval`, il vault privato ospita
+anche i `case pack` redatti/minimizzati dedicati al confronto `local vs GPT-5.4`
+descritti in
+[docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md) e
+governati da
+[ADR 0039](./adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md).
+Questi pack restano fuori Git e non diventano corpus canonico; possono pero
+portare `learningObjectives` e `hypothesisTags` per guidare la distillazione
+tecnica verso nuove euristiche e benchmark sintetici.
 
 ## Pacchetto di caso minimo
 

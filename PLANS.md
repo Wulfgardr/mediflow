@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-02
+Ultimo aggiornamento: 2026-04-04
 
 ---
 
@@ -74,6 +74,25 @@ Nota operativa:
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`
+- `WUL-151` apre la lane opzionale `cloud comparator shadow eval`:
+  `gpt-5.4` e ammesso solo su case pack privati redatti/minimizzati fuori Git,
+  con gate privacy esplicito, audit trail locale e obbligo di distillare ogni
+  delta utile in nuovi benchmark sintetici, euristiche o thin slice locali;
+  il report deve classificare i gap in `reasoning pattern`, `missing local
+  heuristic`, `retrieval/source hierarchy`, `contract/rendering`,
+  `review-safety` e `synthetic benchmark gap`, oltre a produrre una
+  `localEvolutionAgenda` con candidate thin slice e validation path; resta uno
+  strumento interno di engineering e non un percorso di promozione del modello
+  cloud nel runtime MediFlow; prima ricaduta runtime gia aperta:
+  `patient-insight-focus-recency`, con coda documentale unica per data/priorita
+  clinica e date esplicite sulle fonti documentali di `Patient Insight`;
+  seconda ricaduta runtime gia aperta: `patient-insight-source-hierarchy-recency`,
+  con de-prioritizzazione dei documenti cronici/stale quando una fonte piu
+  recente copre gia lo stesso dominio clinico
+- `ADR 0040` fissa la prossima north star della document intelligence: dal
+  `document_evidence_pack.v2` come pack compatto a un approccio
+  `document evidence ledger`, con separazione esplicita tra recognition,
+  source governance, decision layer e render/projection
 - `WUL-132` ha aperto il primo sweep reale `AI-07` su `Gemma 4`:
   `gemma4:e2b` e `gemma4:e4b` sono benchmarkati su `M4 Max 36 GB` tramite
   un runtime `Ollama HEAD` isolato, perche la build stabile `0.19.0`

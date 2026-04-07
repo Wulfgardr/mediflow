@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-04-03
+Ultimo aggiornamento: 2026-04-04
 
 ## Policy di consultazione (agent)
 
@@ -37,6 +37,7 @@ Documenti da consultare **al bisogno**:
 - Stato affidabilita stack AI e piano di hardening: [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md)
 - Piano esecutivo work-package per affidabilita AI: [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md)
 - Runbook governance rollout AI: [docs/ai-rollout-governance.md](./ai-rollout-governance.md)
+- Runbook `cloud comparator shadow eval`: [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md)
 
 ## Ordine di lettura consigliato
 
@@ -83,6 +84,7 @@ Documenti da consultare **al bisogno**:
 | Runbook benchmark resolver WHO/AIFA | [docs/resolver-benchmark.md](./resolver-benchmark.md) | `SECONDARY` | Guida operativa per benchmarkare i resolver reali WHO ICD-11 e AIFA su corpus sintetici, con metriche su recall, ambiguita, latenza e mismatch di dosage/packaging. |
 | Troubleshooting documentale `AI Patient Insight` | [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md) | `SECONDARY` | Runbook locale per diagnosticare e recuperare i casi in cui allegati PDF o diario clinico non entrano correttamente nel contesto o nel render finale di `Patient Insight`. |
 | Document intelligence lab | [docs/document-intelligence-lab.md](./document-intelligence-lab.md) | `SECONDARY` | Nota operativa per strutturare corpus documentali multi-archetipo e distinguere il corpus canonico `synthetic-only` dal vault locale privato di shadow evaluation. |
+| Runbook cloud comparator shadow eval | [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md) | `SECONDARY` | Workflow opt-in per confrontare baseline locale e `gpt-5.4` su case pack privati redatti/minimizzati, con report lane-specific, tassonomia di distillazione, `localEvolutionAgenda` e review strutturato dell approccio documentale. |
 | Stato affidabilita stack AI | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | `SECONDARY` | Dossier tecnico trasversale sullo stato reale delle lane AI, sui problemi incontrati, sui benchmark eseguiti e sul piano di hardening coerente con le ADR correnti. |
 | Piano esecutivo affidabilita AI | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | `SECONDARY` | Traduzione operativa del dossier AI in work package, dipendenze, exit criteria e stop-rules per portare a terra benchmarking, hardening e rollout delle lane AI. |
 | Governance rollout AI | [docs/ai-rollout-governance.md](./ai-rollout-governance.md) | `CANONICAL` | Runbook lane-aware per shadow mode, fallback, rollback e kill-switch delle lane AI locali prima di qualunque promozione prudente. |
@@ -124,6 +126,8 @@ Documenti da consultare **al bisogno**:
 | ADR thin slice identity network con credenziali nodo e scope esplicito | [docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md](./adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md) | `CANONICAL` | Governa `WUL-122`: pairing device e login operatore restano separati, l'identita minima riusa i `users` locali del nodo e lo scope clinico `network` viene risolto come `session-context-else-node-default`. |
 | ADR AI plane separato con runtime centralizzato opzionale | [docs/adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md](./adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md) | `CANONICAL` | Governa `WUL-121`: `AI locale` resta il default, il runtime centralizzato e solo una capability opzionale su LAN fidata paired, separata dal data plane e ancora gated da benchmark/rollout governance prima di qualunque routing remoto reale. |
 | ADR boundary auth del primo data plane network read-only | [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md) | `CANONICAL` | Governa `WUL-150`: bootstrap pairing PHI-safe, conferma locale esplicita, credenziale dedicata del device paired e primo accesso read-only ai pazienti che richiede sempre paired client + sessione operatore. |
+| ADR cloud comparator shadow eval opt-in | [docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md](./adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md) | `CANONICAL` | Governa `WUL-151`: comparatore cloud `gpt-5.4` solo opt-in, su case pack privati redatti/minimizzati fuori Git, con audit trail locale e tassonomia di distillazione obbligatoria verso benchmark sintetici e miglioramenti dello stack locale. |
+| ADR document intelligence evidence ledger | [docs/adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md) | `CANONICAL` | Fissa la north star della document intelligence: documento come `evidence ledger`, con separazione tra recognition, source governance, decision layer e render/projection. |
 
 ## File sovrapposti o secondari
 

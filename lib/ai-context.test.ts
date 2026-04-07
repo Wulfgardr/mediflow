@@ -296,12 +296,12 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.ok(prompt.indexOf('[DIARIO CLINICO RECENTE]') < prompt.indexOf('[DOCUMENTI RECENTI]'));
         assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
         assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
-        assert.match(prompt, /referto-lab\.pdf: Sintesi: Azotemia in lieve aumento/);
-        assert.match(prompt, /dimissione\.pdf: Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /eco-cuore\.pdf \(14\/03\/2025\): Funzione sistolica conservata/i);
+        assert.match(prompt, /referto-lab\.pdf \(10\/03\/2025\): Sintesi: Azotemia in lieve aumento/i);
+        assert.match(prompt, /dimissione\.pdf \(05\/03\/2025\): Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
         assert.match(prompt, /Terapie documentate: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
         assert.match(prompt, /Follow-up documentato: FKT domiciliare 2-3 volte alla settimana \[programmato, pianificato\]/i);
         assert.ok(!prompt.includes('ps.pdf'));
-        assert.match(prompt, /eco-cuore\.pdf: Funzione sistolica conservata/);
         assert.ok(!prompt.includes('rx-polmoni.pdf'));
         assert.match(snapshot.limitations.join('\n'), /note narrative della scheda sono state escluse/i);
         assert.match(snapshot.limitations.join('\n'), /contesto documentale AI e stato ridotto a 3 documenti/i);
@@ -341,7 +341,7 @@ test('buildPatientInsightContext recovers direct attachment text when the stored
             ].join('\n'),
         });
 
-        assert.match(snapshot.prompt, /lettera-dimissione\.pdf: Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /lettera-dimissione\.pdf \(14\/03\/2025\): Estratto diretto allegato:/i);
         assert.match(snapshot.prompt, /Deficit della deambulazione in postumi di frattura pertrocanterica sx/i);
         assert.match(snapshot.prompt, /FKT domiciliare 2-3 volte alla settima/i);
         assert.match(
@@ -349,6 +349,111 @@ test('buildPatientInsightContext recovers direct attachment text when the stored
             /Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file/i,
         );
         assert.ok(!snapshot.limitations.join('\n').includes('non sono stati usati come fonti documentali'));
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext promotes the most recent attachment evidence before older archive documents', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-1',
+                date: '2025-03-12T00:00:00Z',
+                fileName: 'profilo-terapia.pdf',
+                summary: 'Terapia antipertensiva invariata.',
+            },
+            {
+                id: 'doc-2',
+                date: '2025-03-11T00:00:00Z',
+                fileName: 'lettera-specialistica.pdf',
+                summary: 'Follow-up cardiologico stabile.',
+            },
+            {
+                id: 'doc-3',
+                date: '2025-03-10T00:00:00Z',
+                fileName: 'vecchio-lab.pdf',
+                summary: 'Esami ematici senza novita clinicamente rilevanti.',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-new',
+                patientId: 'patient-1',
+                name: 'follow-up-pneumo.pdf',
+                summarySnapshot: 'Controllo pneumologico ravvicinato da programmare per addensamento basale.',
+                createdAt: new Date('2025-03-13T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const documentRefs = snapshot.sourceRefs
+            .filter((ref) => ref.section === 'Documenti recenti')
+            .map((ref) => ref.promptLine);
+
+        assert.equal(documentRefs.length, 3);
+        assert.match(documentRefs[0] || '', /follow-up-pneumo\.pdf \(13\/03\/2025\): Controllo pneumologico ravvicinato/i);
+        assert.match(documentRefs[1] || '', /profilo-terapia\.pdf \(12\/03\/2025\): Sintesi: Terapia antipertensiva invariata/i);
+        assert.match(documentRefs[2] || '', /lettera-specialistica\.pdf \(11\/03\/2025\): Sintesi: Follow-up cardiologico stabile/i);
+        assert.ok(!snapshot.prompt.includes('vecchio-lab.pdf'));
+        assert.match(snapshot.limitations.join('\n'), /contesto documentale AI e stato ridotto a 3 documenti/i);
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext suppresses stale background documents when a newer source covers the same domain', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-1',
+                date: '2025-02-12T00:00:00Z',
+                fileName: 'profilo-cronico.pdf',
+                summary: 'BPCO stabile, follow-up annuale pneumologico senza urgenze.',
+            },
+            {
+                id: 'doc-2',
+                date: '2025-03-11T00:00:00Z',
+                fileName: 'lettera-specialistica.pdf',
+                summary: 'Follow-up cardiologico stabile.',
+            },
+            {
+                id: 'doc-3',
+                date: '2025-03-10T00:00:00Z',
+                fileName: 'vecchio-lab.pdf',
+                summary: 'Esami ematici senza novita clinicamente rilevanti.',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-new',
+                patientId: 'patient-1',
+                name: 'follow-up-pneumo.pdf',
+                summarySnapshot: 'Controllo pneumologico ravvicinato da programmare per addensamento basale.',
+                createdAt: new Date('2025-03-27T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const documentRefs = snapshot.sourceRefs
+            .filter((ref) => ref.section === 'Documenti recenti')
+            .map((ref) => ref.promptLine);
+
+        assert.equal(documentRefs.length, 3);
+        assert.match(documentRefs[0] || '', /follow-up-pneumo\.pdf \(27\/03\/2025\): Controllo pneumologico ravvicinato/i);
+        assert.match(documentRefs[1] || '', /lettera-specialistica\.pdf \(11\/03\/2025\): Sintesi: Follow-up cardiologico stabile/i);
+        assert.match(documentRefs[2] || '', /vecchio-lab\.pdf \(10\/03\/2025\): Sintesi: Esami ematici senza novita clinicamente rilevanti/i);
+        assert.ok(!snapshot.prompt.includes('profilo-cronico.pdf'));
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /Documenti cronici o stale sullo stesso dominio di fonti piu recenti sono stati de-prioritizzati/i,
+        );
     } finally {
         restore();
     }

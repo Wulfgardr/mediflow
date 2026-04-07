@@ -69,13 +69,14 @@ runtime dopo il parser locale.
 
 ## Policy gold del corpus
 
-Il corpus iniziale copre cinque famiglie di caso:
+Il corpus iniziale copre sei famiglie di caso:
 
 - follow-up cronico respiratorio con osservazioni recenti
 - diabete con follow-up laboratoristico e gap di aderenza
 - post-frattura con rischio di riaprire su anamnesi remota
 - accesso PS con rivalutazione anticoagulante e multi-fonte recente
 - documento ricco di riabilitazione con codifica strutturata scarsa
+- conflitto tra attachment recente e archivio documentale stale sullo stesso dominio clinico
 
 Regole gold correnti:
 
@@ -84,6 +85,9 @@ Regole gold correnti:
   alternative semanticamente equivalenti
 - le fonti recenti preferite sono esplicite per-case
 - le fonti stale o i topic fuori focus possono essere proibiti per-case
+- quando il contesto include date esplicite nelle fonti documentali, il benchmark
+  puo misurare se il modello privilegia davvero il documento piu recente invece
+  di rifugiarsi in un archivio cronico ma stale
 - il benchmark privilegia priorita clinica e tracciabilita, non esaustivita
   enciclopedica
 
@@ -265,6 +269,11 @@ Workstream attuale:
 
 - Issue Linear: `WUL-123`
 - Branch consigliato: `codex/wul-123-ai-insight-benchmark-framework`
+- Se da questo benchmark emerge una thin slice autonoma, apri una nuova issue
+  Linear e usa il template branch `codex/<issue-id>-<slug>` invece di
+  continuare sul branch del benchmark
+- Una thin slice autonoma richiede anche una nuova conversazione Codex, in
+  coerenza con il playbook Linear/Codex del repository
 
 Il benchmark non cambia il runtime operativo e non promuove automaticamente
 nuove policy cliniche. E solo una lane di misura locale per evitare regressioni
