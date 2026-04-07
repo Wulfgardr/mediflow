@@ -115,6 +115,24 @@ Usalo quando tocchi:
 - `lib/patient-document-review.ts`
 - la persistenza prudente delle terapie nel create-flow
 
+### Test document intelligence / parse-evidence
+
+Per verificare la first slice runtime del `document evidence ledger`:
+
+```bash
+npm run test:document-synthesis
+npm run test:ai-context
+npm run test:pdf-service
+```
+
+Usalo quando tocchi:
+- `lib/document-synthesis-service.ts`
+- `lib/document-parse-evidence-artifact.ts`
+- `lib/ai-context.ts`
+- `components/document-upload.tsx`
+- `app/api/attachments/route.ts`
+- la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
+
 ---
 
 ## Mappa progetto
@@ -127,6 +145,7 @@ Usalo quando tocchi:
 - Migrazioni: `drizzle/`
 - Client nativo macOS: `native/`
 - Script: `scripts/`
+- Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `Start_MediFlow.command`
 
 Documentazione tecnica:
 - [docs/README.md](./docs/README.md) (mappa canonica documentazione)
@@ -181,6 +200,13 @@ payload `409 VERSION_CONFLICT`), esegui anche:
 
 ```bash
 npm run test:concurrency:patients
+```
+
+Se cambi `/api/v1/network/*`, `lib/network-*` o il boundary pairing/sessione
+home-base, esegui anche:
+
+```bash
+npm run test:network:home-base-readonly
 ```
 
 ---

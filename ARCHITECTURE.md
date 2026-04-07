@@ -34,11 +34,18 @@ MediFlow è un **sistema ibrido locale**:
 - L'app Next.js fornisce:
   - web UI
   - route API locali
+  - overview/stato operativo del nodo locale
   - accesso al database SQLite locale
+  - contratto versionato `/api/v1/*`, inclusa la first slice `network` read-only
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
   - ICD-11 Docker API per ricerca diagnosi (localhost)
+  - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Il client nativo macOS (SwiftUI) usa lo stesso backend via proxy HTTPS locale.
+
+Il default resta **local-only sul singolo computer**. Se l'operatore attiva la
+modalita `network-home-base`, lo stesso nodo espone anche `/api/v1/network/*`
+con pairing esplicito e primo data plane read-only per client trusted su LAN.
 
 ### Porte locali (default)
 
@@ -48,6 +55,7 @@ MediFlow è un **sistema ibrido locale**:
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | inoltra verso :3000 |
 | Ollama (AI/OCR) | `http://127.0.0.1:11434` | opzionale |
 | ICD-11 (Docker) | `http://127.0.0.1:8888` | opzionale |
+| OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
 ---
 
@@ -57,6 +65,9 @@ MediFlow è un **sistema ibrido locale**:
 
 - Lo storage autorevole è un **singolo file SQLite** (`medical.db`).
 - I campi sensibili sono cifrati **lato client** (browser / client native) prima della scrittura su disco.
+- Anche gli artifact documentali (`attachments.summarySnapshot`,
+  `attachments.parseEvidenceArtifactSnapshot`) sono trattati come dati clinici e
+  persistiti cifrati.
 - I valori cifrati sono salvati come stringhe nel formato:
 
 ```
@@ -74,6 +85,10 @@ MediFlow espone due superfici API:
   - usata dai client native
   - deve essere versionata e stabile
   - protetta da **token locale** (trasporto su HTTPS locale via TLS proxy)
+- **Network API** (`/api/v1/network/*`):
+  - si attiva solo in modalita `network-home-base`
+  - resta read-only nella first thin slice
+  - richiede pairing esplicito del device + sessione operatore valida
 
 > Obiettivo: i client native non devono dipendere da scraping HTML o dettagli interni React/Next.
 
@@ -93,6 +108,7 @@ flowchart TB
   subgraph "Client"
     Web["Web UI (Browser)"]
     Mac["Native macOS (SwiftUI)"]
+    Peer["Paired client trusted LAN"]
   end
 
   subgraph "Transport"
@@ -111,6 +127,7 @@ flowchart TB
 
   Web -->|HTTP| Next
   Mac -->|HTTPS| TLS -->|HTTP| Next
+  Peer -->|HTTPS + paired creds| TLS
 
   Next --> DB
   Next --> Ollama
@@ -139,6 +156,8 @@ flowchart TB
   - versionato
   - documentato
   - retrocompatibile all'interno della stessa major
+- `local-only` come default e `network-home-base` come opt-in paired/read-only-first.
+- `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - Principio local-only: nessuna dipendenza cloud di default.
 
 ---

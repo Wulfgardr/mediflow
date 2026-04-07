@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-04
+Ultimo aggiornamento: 2026-04-07
 
 ## Come usare questo indice
 
@@ -30,11 +30,11 @@ Ultimo aggiornamento: 2026-04-04
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali). | Per capire flussi completi e integrazione moduli. |
-| [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali. | Per analisi data flow e impatti sicurezza. |
+| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali), con stato reale di `home-base`, document intelligence e shell locale. | Per capire flussi completi e integrazione moduli. |
+| [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato parity web/macOS su moduli core e gap operativi. | Per steering parity e release readiness. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
-| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa. | Per overview veloce in onboarding/review. |
+| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al main post-`v0.5.0`. | Per overview veloce in onboarding/review. |
 
 ## Native, setup e testing
 

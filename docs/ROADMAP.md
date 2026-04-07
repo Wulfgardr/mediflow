@@ -51,9 +51,14 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Modalita network home-base
 
-* **Nodo centrale locale**: pairing esplicito, capability discovery e lavoro su piu macchine senza rompere il local-first.
-* **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita.
-* **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud.
+* **Nodo centrale locale**: pairing esplicito, capability discovery e primo data plane read-only sono gia entrati su `main`; restano da estendere UX, replica e write boundary.
+* **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita ancora da promuovere oltre il mirror/snapshot governato.
+* **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud e ancora separata dal data plane clinico.
+
+### Document intelligence prudente
+
+* **Artifact `parse/evidence` su allegati**: la prima slice runtime del `document evidence ledger` e gia su `main`, con `patients.documentInsights` mantenuto come projection compatibile.
+* **Decision layer separati**: i prossimi step spingono source governance, recency, exclusions e reviewability senza introdurre import silenziosi o riscritture in blocco.
 
 ### Esperienza nativa
 
