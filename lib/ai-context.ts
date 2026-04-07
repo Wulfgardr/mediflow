@@ -9,6 +9,8 @@ import { renderDocumentEvidencePackContext } from '@/lib/document-evidence-pack'
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 /* @Codex */
 import { dedupeDocumentInsightsForContext } from '@/lib/document-insight-context';
+/* @Codex */
+import { normalizeDocumentInput } from '@/lib/document-input-normalization';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -283,7 +285,7 @@ function isGenericDocumentHeading(line: string): boolean {
 }
 
 function buildDocumentHighlightExcerpt(value: string, maxChars: number): string {
-    const lines = value
+    const lines = normalizeDocumentInput(value).normalizedText
         .replace(/\r/g, '\n')
         .split(/\n+/)
         .map((line) => compactText(line, 160))
@@ -539,7 +541,10 @@ async function buildAttachmentContextCandidate(
     }
 
     if (allowRecovery && attachment.data) {
-        const recoveredText = compactText(await recoverAttachmentText(attachment), maxChars * 4);
+        const recoveredText = compactText(
+            normalizeDocumentInput(await recoverAttachmentText(attachment)).normalizedText,
+            maxChars * 4,
+        );
         const recoveredLine = renderRecoveredAttachmentContext(fileName, attachment.createdAt, recoveredText, maxChars);
         if (recoveredLine) {
             const governanceText = normalizeComparableDocumentText(`${fileName} ${recoveredText}`);

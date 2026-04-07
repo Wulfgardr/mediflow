@@ -458,3 +458,50 @@ test('buildPatientInsightContext suppresses stale background documents when a ne
         restore();
     }
 });
+
+test('buildPatientInsightContext normalizes CDA-like recovered attachment text before rendering excerpts', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-cda',
+                patientId: 'patient-1',
+                name: 'dimissione-cda.xml',
+                type: 'application/xml',
+                data: 'data:application/xml;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-15T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1', {
+            recoverAttachmentText: async () => `
+                <ClinicalDocument>
+                  <component>
+                    <structuredBody>
+                      <component>
+                        <section>
+                          <title>Indicazioni alla dimissione</title>
+                          <text>
+                            <paragraph>Controllo ortopedico tra 14 giorni</paragraph>
+                            <paragraph>ADI infermieristica da proseguire</paragraph>
+                          </text>
+                        </section>
+                      </component>
+                    </structuredBody>
+                  </component>
+                </ClinicalDocument>
+            `,
+        });
+
+        assert.match(snapshot.prompt, /dimissione-cda\.xml \(15\/03\/2025\): Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /Controllo ortopedico tra 14 giorni/i);
+        assert.match(snapshot.prompt, /ADI infermieristica da proseguire/i);
+        assert.doesNotMatch(snapshot.prompt, /ClinicalDocument/);
+    } finally {
+        restore();
+    }
+});

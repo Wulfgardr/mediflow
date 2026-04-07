@@ -15,6 +15,7 @@
     "check:openapi:drift": "node scripts/check-openapi-drift.mjs",
     "check:never-regress": "node scripts/check-never-regress.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
+    "test:document-input-normalization": "bash scripts/document-input-normalization-test.sh",
     "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",
     "test:backup-scheduler": "bash scripts/backup-scheduler-test.sh",
     "test:patient-insight": "bash scripts/patient-insight-test.sh",

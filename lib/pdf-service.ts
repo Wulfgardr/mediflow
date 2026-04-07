@@ -1,4 +1,6 @@
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
+/* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -36,12 +38,12 @@ function looksLikeStructuredPayload(value: string): boolean {
 export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
     const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
     if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown)) {
-        return rawMarkdown;
+        return normalizeDocumentInput(rawMarkdown).normalizedText;
     }
 
     const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
     if (notes && !isOcrFailureNote(notes)) {
-        return notes;
+        return normalizeDocumentInput(notes).normalizedText;
     }
 
     return '';
@@ -357,12 +359,12 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
     if (isPdf) {
         const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
         if (!images.length) return "";
-        return await extractOcrFullTextFromImages(images);
+        return normalizeDocumentInput(await extractOcrFullTextFromImages(images), { sourceKind: 'ocr' }).normalizedText;
     }
 
     const base64 = await fileToBase64(file);
     const result = await callOcr(base64, 'full');
-    return result?.rawMarkdown || "";
+    return extractUsableOcrText(result);
 }
 
 /**
@@ -397,6 +399,9 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
                 }
 
                 ocrText = await extractOcrFullTextFromImages(images);
+                if (ocrText) {
+                    ocrText = normalizeDocumentInput(ocrText, { sourceKind: 'ocr' }).normalizedText;
+                }
                 if (aiResult && ocrText) {
                     aiResult.rawText = ocrText;
                 }

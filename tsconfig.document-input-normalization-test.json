@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./tmp-document-synthesis-test",
+    "outDir": "./tmp-document-input-normalization-test",
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2020",
@@ -10,12 +10,8 @@
     "isolatedModules": false
   },
   "include": [
-    "lib/document-excerpt.ts",
     "lib/document-input-normalization.ts",
-    "lib/document-evidence-pack.ts",
-    "lib/document-evidence-pack.test.ts",
-    "lib/document-synthesis-service.test.ts",
-    "lib/document-synthesis-parser.ts",
-    "lib/ai-task-contracts.ts"
+    "lib/document-input-normalization.test.ts",
+    "lib/document-excerpt.ts"
   ]
 }
