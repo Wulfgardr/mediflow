@@ -59,7 +59,7 @@ Nota operativa:
 ### 0c) Affidabilita stack AI locale
 - [ ] Eseguire `AI-01`: benchmark headless dei resolver reali WHO ICD-11 e AIFA, con corpora sintetici e metriche top-k/latency/ambiguity.
 - [ ] Eseguire `AI-02`: hardening Smart Import sui casi di switch terapeutico, applicabilita suggerimenti e policy `manual|blocked|uncertain`.
-- [ ] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
+- [x] Eseguire `AI-03`: introdurre corpus e scoring dedicati per `AI Patient Insight` (recency, focus, citation discipline, anti-moralizing).
 - [ ] Eseguire `AI-04`: preparare ADR e thin slice lane `PII/redaction` locale in shadow mode, coerente con la valutazione OpenMed. Stato `WUL-96`: benchmark stack chiuso, ma `OpenMed redaction` resta `benchmark-only / not shadow-ready` per leak critici sulle email/mailbox (`email recall = 0.333` sul corpus v3, `0.143` sul corpus email-focused).
 - [ ] Eseguire `AI-05`: aggiungere input normalization tollerante per PDF e CDA/CCD prima delle lane semantiche.
 - [ ] Eseguire `AI-06`: benchmarkare una lane NER clinica italiana deterministica (`HUMADEX`) solo se migliora auditabilita o coding. Stato `WUL-96`: corpus `clinical_entities.v2`, confronto reale, repeatability a 5 run e promotion gate completati; `HUMADEX` resta davanti a `OpenMed NER` (`0.6/0.7` precision/recall vs `0.5/0.6`), ma entrambi falliscono il gate (`promotionReady = false`) per leak sui case negativi e under-span su problemi composti, quindi la lane resta `benchmark-only`.
@@ -70,6 +70,7 @@ Nota operativa:
 - la sequenza esecutiva dettagliata e in [docs/ai-stack-execution-plan.md](./docs/ai-stack-execution-plan.md)
 - il contesto tecnico e i benchmark gia eseguiti restano documentati in [docs/ai-stack-reliability-review.md](./docs/ai-stack-reliability-review.md)
 - `AI-03` e ora tracciato in `WUL-123` come harness locale dedicato per corpus, scoring e validator di `Patient Insight`
+- `AI-03` e stato rieseguito localmente il `2026-04-04` sul baseline protetto `qwen3.5:35b-a3b`; il validator corrente passa con `contractValidRate = 1`, `focusRecall = 0.95`, `citationCoverageRate = 1` e `preferredSourceCoverage = 1`
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`

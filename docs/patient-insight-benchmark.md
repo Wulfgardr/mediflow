@@ -185,6 +185,19 @@ Il validator npm usa la baseline operativa corrente:
 
 - `qwen3.5:35b-a3b`
 
+Per default il benchmark usa anche una configurazione deterministica locale:
+
+- `temperature = 0`
+- `seed = 7`
+
+Questo serve a ridurre drift spurio tra run consecutivi sulla stessa macchina.
+Se devi esplorare variabilita o confronti non deterministici, puoi forzare un
+seed diverso da CLI:
+
+```bash
+npm run benchmark:patient-insight -- --models qwen3.5:35b-a3b --seed 13
+```
+
 Output opzionale su file:
 
 ```bash
