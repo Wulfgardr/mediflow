@@ -360,7 +360,7 @@ npm run benchmark:smart-import -- --iterations 1 --models qwen3.5:35b-a3b
 
 Run eseguito:
 
-- 2026-03-21 22:11 Europe/Rome
+- 2026-04-07 22:16 Europe/Rome
 
 Corpus:
 
@@ -370,34 +370,44 @@ Risultati del run:
 
 - `jsonValidRate`: `1.0`
 - `contractValidRate`: `1.0`
-- `diagnosisRecall`: `1.0`
-- `diagnosisQueryRecall`: `1.0`
+- `diagnosisRecall`: `0.9`
+- `diagnosisQueryRecall`: `0.9`
 - `therapyRecall`: `1.0`
 - `dosageRecall`: `1.0`
-- `therapyStateRecall`: `0.9`
+- `therapyStateRecall`: `1.0`
 - `sourceIdRate`: `1.0`
-- `forbiddenLeakRate`: `0`
-- `avgLatencyMs`: `36468.3`
-- `p95LatencyMs`: `55996.7`
+- `reviewUsefulnessRate`: `1.0`
+- `forbiddenLeakRate`: `0.222`
+- `alreadyPresentLeakRate`: `0.333`
+- `avgLatencyMs`: `14439.9`
+- `p95LatencyMs`: `24377.8`
 
 Interpretazione:
 
 - il contratto e stabile
-- l'estrazione di diagnosi, farmaci e dosaggi e buona nel corpus attuale
-- il punto debole residuo e la classificazione dello `therapyState`
+- il benchmark `smart-import` ora misura la lane dopo la normalizzazione locale
+  del `therapyState`, non solo il JSON grezzo del modello
+- l'hardening `AI-02` raggiunge i gate operativi su `therapyState` e dosaggio
+- il residuo piu rumoroso non e piu sugli switch, ma sui referral senza novita
+  clinica, che possono ancora produrre suggerimenti review-only inutili
 
-Caso residuo concreto:
+Guardrail chiusi in `AI-02`:
 
-- nello scenario di switch terapeutico il modello ha marcato il
-  `bisoprololo` come `inactive` invece di `transition`
-- il `nebivololo` e rimasto correttamente `transition`
-- la `furosemide` e rimasta correttamente `uncertain`
+- normalizzazione locale del farmaco in uscita da `inactive` a `transition`
+  quando l'evidenza documenta un passaggio terapeutico
+- terapie `manual-only` tenute consultive e non direttamente applicabili
+- terapie `catalog` senza posologia utile tenute consultive e non persistibili
+- titolazioni posologiche riportate come update/`active`, non come switch
+- terapie proposte o a breve rivalutazione tenute `uncertain`
 
 Conclusione:
 
 - Smart Import oggi e usabile come extractor reviewable
-- non e ancora abbastanza stabile per affidarsi ciecamente alla semantica degli
-  switch terapeutici
+- i gate `AI-02` su `therapyStateRecall`, `contractValidRate` e `dosageRecall`
+  sono chiusi sul baseline locale `qwen3.5:35b-a3b`
+- resta aperto un hardening successivo sul filtro “nessuna novita clinica”
+  per referral/continuazioni gia note, ma non e piu un blocco sul pacchetto
+  `AI-02`
 
 ## 2. Benchmark OpenMed PII / redaction
 
@@ -533,9 +543,8 @@ Motivo:
 Da fare:
 
 - `Patient Insight`: filtro finale contro claim troppo speculativi
-- `Smart Import`: normalizzazione locale dei casi di switch terapeutico
-- `Smart Import`: policy piu esplicita su quando una terapia resta `manual`
-  ma non va proposta come applicabile
+- `Smart Import`: filtro piu severo sui referral/documenti che non introducono
+  novita cliniche ma solo continuita di problemi/terapie gia noti
 
 Motivo:
 

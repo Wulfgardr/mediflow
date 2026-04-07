@@ -232,6 +232,37 @@ function buildProbeTokens(...values: Array<string | undefined>): string[] {
     ));
 }
 
+function normalizeTherapyStateForBenchmark(therapy: SmartImportTherapyExtraction) {
+    const probe = normalizeText([
+        therapy.drugMention,
+        therapy.drugQuery,
+        therapy.activePrinciple,
+        therapy.dosage,
+        therapy.motivation,
+        therapy.reviewNote,
+        therapy.evidence,
+    ].filter(Boolean).join(' '));
+    const explicitState = therapy.therapyState;
+    const switchLike = /switch|passa a|passare a|sostit|transizion|scal|titol|sospend(?:ere|e).*(?:iniz|pass|switch|sostit)/.test(probe);
+    const consultiveLike = /proporr|propost|considerar|eventual|se necessario|al bisogno|\bprn\b|rivalutar|da rivalutare|monitorare prima|trial terapeutico/.test(probe);
+    const titrationLike = /aumentar|incrementar|ridurr|decrementar|modifica posolog|titolaz|titolare|portare a/.test(probe);
+
+    if (explicitState === 'inactive' && switchLike) return 'transition';
+    if (consultiveLike && !switchLike) return 'uncertain';
+    if (titrationLike && !switchLike && !consultiveLike) return 'active';
+    if (explicitState === 'transition') return 'transition';
+    if (explicitState === 'uncertain') return 'uncertain';
+    if (explicitState === 'inactive') return 'inactive';
+
+    if (switchLike) return 'transition';
+    if (consultiveLike) return 'uncertain';
+    if (titrationLike) return 'active';
+    if (/da verificare|da confermare|incert|non chiar|dubb|valutar|\?/.test(probe)) return 'uncertain';
+    if (/sospes|interrott|stop|terminat|conclus|discontinuat/.test(probe)) return 'inactive';
+
+    return explicitState || 'active';
+}
+
 function matchesExistingText(existingTexts: string[], tokens: string[]): boolean {
     if (tokens.length === 0) return false;
     return existingTexts.some((text) => includesAllTokens(text, tokens));
@@ -379,7 +410,10 @@ function findTherapyMatch(
 
 function scoreCase(entry: SmartImportBenchmarkEntry, parsed: ReturnType<typeof parseSmartImportExtractionResponse>): Omit<CaseResult, 'id' | 'archetype' | 'iteration' | 'latencyMs' | 'validJson' | 'validTask' | 'error'> {
     const diagnoses = parsed.value.data.diagnoses;
-    const therapies = parsed.value.data.therapies;
+    const therapies = parsed.value.data.therapies.map((therapy) => ({
+        ...therapy,
+        therapyState: normalizeTherapyStateForBenchmark(therapy),
+    }));
     const allowedSourceIds = new Set(
         Array.isArray(entry.payload.sources)
             ? entry.payload.sources

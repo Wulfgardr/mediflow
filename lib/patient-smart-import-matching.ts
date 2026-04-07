@@ -75,13 +75,26 @@ export function classifyExtractedTherapyState(input: TherapyStateClassificationI
     ].filter(Boolean).join(' '));
 
     const switchLike = /switch|passa a|passare a|sostit|transizion|scal|titol|sospend(?:ere|e).*(?:iniz|pass|switch|sostit)/.test(probe);
-    if (explicitState === 'transition') return 'transition';
+    const consultiveLike = /proporr|propost|considerar|eventual|se necessario|al bisogno|\bprn\b|rivalutar|da rivalutare|monitorare prima|trial terapeutico/.test(probe);
+    const titrationLike = /aumentar|incrementar|ridurr|decrementar|modifica posolog|titolaz|titolare|portare a/.test(probe);
+
     if (explicitState === 'inactive' && switchLike) return 'transition';
+    if (consultiveLike && !switchLike) return 'uncertain';
+    if (titrationLike && !switchLike && !consultiveLike) return 'active';
+    if (explicitState === 'transition') return 'transition';
     if (explicitState === 'uncertain') return 'uncertain';
     if (explicitState === 'inactive') return 'inactive';
 
     if (switchLike) {
         return 'transition';
+    }
+
+    if (consultiveLike) {
+        return 'uncertain';
+    }
+
+    if (titrationLike) {
+        return 'active';
     }
 
     if (/da verificare|da confermare|incert|non chiar|dubb|valutar|\?/.test(probe)) {
