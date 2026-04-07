@@ -110,9 +110,34 @@ export interface PatientInsightContextBuildOptions {
 /* @Codex */
 interface AttachmentContextCandidate {
     line: string;
+    documentDate: unknown;
+    priorityScore: number;
+    domainTags: string[];
+    stableBackground: boolean;
     recoveredDirectText: boolean;
     omittedLowSignalSummary: boolean;
 }
+
+/* @Codex */
+interface DocumentContextCandidate {
+    line: string;
+    documentDate: unknown;
+    priorityScore: number;
+    domainTags: string[];
+    stableBackground: boolean;
+}
+
+const DOCUMENT_DOMAIN_RULES = [
+    { tag: 'respiratory', pattern: /\b(bpco|respirat|dispne|pneumo|polmon|torace|addens|spo2|saturaz|tosse)\w*/i },
+    { tag: 'cardio', pattern: /\b(cardio|cuore|pression|ipertens|fibrill|ecg)\w*/i },
+    { tag: 'anticoag_bleeding', pattern: /\b(anticoag|xarelto|warfarin|epistass|ematolog)\w*/i },
+    { tag: 'diabetes_renal', pattern: /\b(diabet|glicem|insulin|hba1c|creatinin|renale|nefro)\w*/i },
+    { tag: 'ortho_rehab', pattern: /\b(ortoped|frattur|femor|deambul|riabilit|fkt|cammino|mobilit|anca)\w*/i },
+    { tag: 'care_setting', pattern: /\b(adi|domiciliar|caregiver|assistenza|rsa)\w*/i },
+] as const;
+
+const STABLE_BACKGROUND_DOCUMENT_MARKERS = /\b(stabile|annuale|cronico|senza urgenz|follow[- ]?up annuale|monitoraggio annuale|senza novita|nessuna novita)\b/i;
+const DOCUMENT_SOURCE_GOVERNANCE_GAP_DAYS = 14;
 
 function compactText(value: string | null | undefined, maxChars = 220): string {
     const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
@@ -139,6 +164,18 @@ function compareDatesDesc(left: unknown, right: unknown): number {
     const leftTime = new Date(left as string | number | Date).getTime();
     const rightTime = new Date(right as string | number | Date).getTime();
     return rightTime - leftTime;
+}
+
+/* @Codex */
+function compareDatesAsc(left: unknown, right: unknown): number {
+    return compareDatesDesc(right, left);
+}
+
+/* @Codex */
+function buildDocumentSourceLabel(fileName: string, date: unknown): string {
+    const formattedDate = formatDate(date);
+    if (fileName && formattedDate) return `${fileName} (${formattedDate})`;
+    return fileName || formattedDate;
 }
 
 function buildAge(birthDate?: Date, taxCode?: string): string {
@@ -175,6 +212,14 @@ function normalizeComparableDocumentText(value: string): string {
         .trim();
 }
 
+/* @Codex */
+function extractDocumentDomainTags(value: string): string[] {
+    const tags = DOCUMENT_DOMAIN_RULES
+        .filter((rule) => rule.pattern.test(value))
+        .map((rule) => rule.tag);
+    return Array.from(new Set(tags));
+}
+
 function scoreNovelDocumentHighlight(line: string): number {
     const normalized = line.toLowerCase();
     let score = Math.max(0, 80 - normalized.length);
@@ -190,6 +235,41 @@ function scoreNovelDocumentHighlight(line: string): number {
     }
 
     return score;
+}
+
+/* @Codex */
+function isStableBackgroundDocumentContext(value: string): boolean {
+    return STABLE_BACKGROUND_DOCUMENT_MARKERS.test(value);
+}
+
+/* @Codex */
+function sharesDocumentDomain(
+    left: Pick<DocumentContextCandidate, 'domainTags'>,
+    right: Pick<DocumentContextCandidate, 'domainTags'>,
+): boolean {
+    if (left.domainTags.length === 0 || right.domainTags.length === 0) return false;
+    return left.domainTags.some((tag) => right.domainTags.includes(tag));
+}
+
+/* @Codex */
+function shouldSuppressStaleDocumentCandidate(
+    candidate: DocumentContextCandidate | AttachmentContextCandidate,
+    selected: DocumentContextCandidate | AttachmentContextCandidate,
+): boolean {
+    if (!sharesDocumentDomain(candidate, selected)) return false;
+
+    const selectedTime = new Date(selected.documentDate as string | number | Date).getTime();
+    const candidateTime = new Date(candidate.documentDate as string | number | Date).getTime();
+    if (!Number.isFinite(selectedTime) || !Number.isFinite(candidateTime) || selectedTime <= candidateTime) {
+        return false;
+    }
+
+    const ageGapDays = Math.floor((selectedTime - candidateTime) / (1000 * 60 * 60 * 24));
+    if (ageGapDays < DOCUMENT_SOURCE_GOVERNANCE_GAP_DAYS) return false;
+
+    if (candidate.stableBackground) return true;
+
+    return selected.priorityScore >= candidate.priorityScore + 20;
 }
 
 function isGenericDocumentHeading(line: string): boolean {
@@ -266,7 +346,28 @@ function renderStructuredDocumentData(insight: DocumentInsight): string[] {
     return parts;
 }
 
-function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number): string {
+/* @Codex */
+function scoreDocumentContextPriority(value: string): number {
+    const normalized = value.toLowerCase();
+    let score = 0;
+
+    if (/\b(follow[- ]?up|controll\w*|rivalut\w*|programma\w*|da ripetere|da effettuare|visita\w*|fkt|riabilit\w*)\b/i.test(normalized)) {
+        score += 60;
+    }
+    if (/\b(deambul\w*|cammino|cadut\w*|ausilio|ausili|barthel|tinetti|mobilit\w*|adi|domiciliar\w*|caregiver|assistenza)\b/i.test(normalized)) {
+        score += 35;
+    }
+    if (/\b(dimission\w*|pronto soccorso|\bps\b|ricover\w*|post[- ]?dimission\w*)\b/i.test(normalized)) {
+        score += 20;
+    }
+    if (/\b(sospend\w*|interrott\w*|stop|peggior\w*|anomali|rivalutare)\b/i.test(normalized)) {
+        score += 12;
+    }
+
+    return score;
+}
+
+function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number): DocumentContextCandidate | null {
     const fileName = compactText(insight.fileName, 80);
     const prioritizedParts = [
         ...(insight.evidencePack
@@ -326,13 +427,25 @@ function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number
     const rendered = selectedParts.length > 0
         ? selectedParts.join(' | ')
         : compactText(prioritizedParts[0] || '', limit);
-    if (!rendered) return '';
-    return fileName ? `${fileName}: ${rendered}` : rendered;
+    if (!rendered) return null;
+
+    const sourceLabel = buildDocumentSourceLabel(fileName, insight.date);
+    const line = sourceLabel ? `${sourceLabel}: ${rendered}` : rendered;
+    const governanceText = normalizeComparableDocumentText(`${fileName} ${rendered}`);
+
+    return {
+        line,
+        documentDate: insight.date,
+        priorityScore: scoreDocumentContextPriority(`${fileName} ${rendered}`),
+        domainTags: extractDocumentDomainTags(governanceText),
+        stableBackground: isStableBackgroundDocumentContext(governanceText),
+    };
 }
 
 /* @Codex */
 function renderRecoveredAttachmentContext(
     fileName: string,
+    createdAt: unknown,
     rawText: string,
     maxChars: number,
 ): string {
@@ -340,8 +453,9 @@ function renderRecoveredAttachmentContext(
         || compactText(rawText, Math.min(maxChars, 320));
     if (!excerpt) return '';
 
-    return fileName
-        ? `${fileName}: Estratto diretto allegato: ${excerpt}`
+    const sourceLabel = buildDocumentSourceLabel(fileName, createdAt);
+    return sourceLabel
+        ? `${sourceLabel}: Estratto diretto allegato: ${excerpt}`
         : `Estratto diretto allegato: ${excerpt}`;
 }
 
@@ -410,8 +524,15 @@ async function buildAttachmentContextCandidate(
 
     if (summary && !hasLowSignalSummary) {
         const rendered = compactText(summary, maxChars);
+        const sourceLabel = buildDocumentSourceLabel(fileName, attachment.createdAt);
+        const line = sourceLabel ? `${sourceLabel}: ${rendered}` : rendered;
+        const governanceText = normalizeComparableDocumentText(`${fileName} ${rendered}`);
         return {
-            line: fileName ? `${fileName}: ${rendered}` : rendered,
+            line,
+            documentDate: attachment.createdAt,
+            priorityScore: scoreDocumentContextPriority(`${fileName} ${rendered}`),
+            domainTags: extractDocumentDomainTags(governanceText),
+            stableBackground: isStableBackgroundDocumentContext(governanceText),
             recoveredDirectText: false,
             omittedLowSignalSummary: false,
         };
@@ -419,10 +540,15 @@ async function buildAttachmentContextCandidate(
 
     if (allowRecovery && attachment.data) {
         const recoveredText = compactText(await recoverAttachmentText(attachment), maxChars * 4);
-        const recoveredLine = renderRecoveredAttachmentContext(fileName, recoveredText, maxChars);
+        const recoveredLine = renderRecoveredAttachmentContext(fileName, attachment.createdAt, recoveredText, maxChars);
         if (recoveredLine) {
+            const governanceText = normalizeComparableDocumentText(`${fileName} ${recoveredText}`);
             return {
                 line: recoveredLine,
+                documentDate: attachment.createdAt,
+                priorityScore: scoreDocumentContextPriority(`${fileName} ${recoveredText}`),
+                domainTags: extractDocumentDomainTags(governanceText),
+                stableBackground: isStableBackgroundDocumentContext(governanceText),
                 recoveredDirectText: true,
                 omittedLowSignalSummary: false,
             };
@@ -431,6 +557,10 @@ async function buildAttachmentContextCandidate(
 
     return {
         line: '',
+        documentDate: attachment.createdAt,
+        priorityScore: 0,
+        domainTags: [],
+        stableBackground: false,
         recoveredDirectText: false,
         omittedLowSignalSummary: hasLowSignalSummary || !summary,
     };
@@ -529,7 +659,7 @@ export async function buildPatientInsightContext(
 
     const archiveSummaries = dedupedArchiveInsights.insights
         .map((insight) => renderDocumentInsightContext(insight, runtimeSettings.maxDocumentSummaryChars))
-        .filter(Boolean);
+        .filter((candidate): candidate is DocumentContextCandidate => Boolean(candidate?.line));
 
     const attachmentCandidates = await Promise.all(
         attachments.map((attachment, index) => buildAttachmentContextCandidate(
@@ -539,10 +669,6 @@ export async function buildPatientInsightContext(
             index < MAX_ATTACHMENT_TEXT_RECOVERY,
         )),
     );
-    const attachmentSummaries = attachmentCandidates
-        .map((candidate) => candidate.line)
-        .filter(Boolean);
-
     const limitations: string[] = [];
     const recoveredAttachmentCount = attachmentCandidates.filter((candidate) => candidate.recoveredDirectText).length;
     const omittedLowSignalAttachmentCount = attachmentCandidates.filter((candidate) => candidate.omittedLowSignalSummary).length;
@@ -554,21 +680,33 @@ export async function buildPatientInsightContext(
         limitations.push('Gli allegati con snapshot generico o assente non sono stati usati come fonti documentali finche non esiste testo clinico recuperabile.');
     }
     const seenDocuments = new Set<string>();
-    const uniqueDocumentSummaries = [...archiveSummaries, ...attachmentSummaries]
-        .filter((line) => {
-            const key = line.toLowerCase();
+    const uniqueDocumentCandidates = [...archiveSummaries, ...attachmentCandidates]
+        .filter((candidate): candidate is DocumentContextCandidate | AttachmentContextCandidate => Boolean(candidate.line))
+        .sort((left, right) => (
+            compareDatesDesc(left.documentDate, right.documentDate)
+            || right.priorityScore - left.priorityScore
+            || left.line.localeCompare(right.line, 'it')
+        ))
+        .filter((candidate) => {
+            const key = candidate.line.toLowerCase();
             if (seenDocuments.has(key)) return false;
             seenDocuments.add(key);
             return true;
         });
 
     const documentLines: string[] = [];
+    const selectedDocumentCandidates: Array<DocumentContextCandidate | AttachmentContextCandidate> = [];
     let documentContextChars = 0;
     let omittedDocumentCount = 0;
+    let staleDocumentSuppressionCount = 0;
 
-    for (const rawLine of uniqueDocumentSummaries) {
-        const line = rawLine;
+    for (const candidate of uniqueDocumentCandidates) {
+        const line = candidate.line;
         if (!line) continue;
+        if (selectedDocumentCandidates.some((selected) => shouldSuppressStaleDocumentCandidate(candidate, selected))) {
+            staleDocumentSuppressionCount += 1;
+            continue;
+        }
         if (documentLines.length >= runtimeSettings.maxDocuments) {
             omittedDocumentCount += 1;
             continue;
@@ -581,11 +719,15 @@ export async function buildPatientInsightContext(
         }
 
         documentLines.push(promptLine);
+        selectedDocumentCandidates.push(candidate);
         documentContextChars += promptLine.length;
     }
 
     if (omittedDocumentCount > 0) {
         limitations.push(`Il contesto documentale AI e stato ridotto a ${documentLines.length} documenti per rispettare il budget configurato.`);
+    }
+    if (staleDocumentSuppressionCount > 0) {
+        limitations.push('Documenti cronici o stale sullo stesso dominio di fonti piu recenti sono stati de-prioritizzati nel contesto AI.');
     }
     if (dedupedArchiveInsights.omittedCount > 0) {
         limitations.push('Documenti AI sovrapposti sullo stesso episodio sono stati consolidati per ridurre duplicazioni nel contesto.');

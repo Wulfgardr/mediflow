@@ -64,5 +64,19 @@
       "forbiddenTokens": [["fibromialgia"], ["ipotiroidismo"]],
       "maxIncompleteClaims": 1
     }
+  },
+  {
+    "id": "insight-recent-attachment-vs-stale-archive",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-pi-6) ---\nDATI BASE: Moretti Carlo | Eta: 76 | CF: MRTCRL50D22F205M\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n\n[PROFILO STRUTTURATO]\n[S1] ADI attiva con supporto caregiver serale.\n[S2] Tosse produttiva in riduzione, persiste facile affaticamento dopo episodio respiratorio recente.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 J44.9: BPCO (10/01/2026)\n[S4] ICD-10 I10: Ipertensione essenziale (10/01/2026)\n\n[TERAPIE ATTIVE]\n[S5] Tiotropio 18 mcg 1 cps/die\n[S6] Ramipril 5 mg 1 cp/die\n\n[OSSERVAZIONI RECENTI]\n[S7] SpO2 (59408-5) = 93 % [26/03/2026]\n\n[CONTROLLI PENDENTI]\n[S8] 02/04/2026: controllo MMG per rivalutazione respiratoria\n\n[DIARIO CLINICO RECENTE]\n[S9] [26/03/2026] NOTE: referto RX recente con addensamento basale destro; da organizzare valutazione pneumologica.\n\n[DOCUMENTI RECENTI]\n[S10] follow-up-pneumo.pdf (27/03/2026): controllo pneumologico ravvicinato da programmare per addensamento basale destro; valutare RX torace di controllo.\n[S11] profilo-cronico.pdf (12/02/2026): Sintesi: BPCO stabile, follow-up annuale pneumologico senza urgenze.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [[["addensamento", "basale"], ["quadro", "respiratorio"]], [["tosse", "produttiva"], ["affaticamento"], ["episodio", "respiratorio"]]],
+      "alertsAny": [[["addensamento", "basale"], ["spo2", "93"], ["saturazione", "93"]]],
+      "nextStepsAny": [[["controllo", "mmg"], ["rivalutazione", "respiratoria"], ["mmg", "rivalutazione"]], [["pneumologico"], ["valutazione", "pneumologica"]]],
+      "preferredSourceIds": ["S8", "S9", "S10"],
+      "forbiddenSourceIds": ["S11"],
+      "forbiddenTokens": [["annuale"], ["senza", "urgenze"]],
+      "maxIncompleteClaims": 1
+    }
   }
 ]
