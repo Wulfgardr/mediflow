@@ -39,13 +39,21 @@ const INGREDIENT_STOPWORDS = new Set([
     'acetato', 'cloridrato', 'fosfato', 'potassio', 'sale', 'sesquidrato', 'sodica', 'sodico',
 ]);
 
-function normalizeText(value: string): string {
-    return value
+function normalizeText(value: string | undefined): string {
+    return (value || '')
         .normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
+}
+
+/* @Codex */
+export function hasUsableTherapyDosage(value: string | undefined): boolean {
+    const normalized = normalizeText(value);
+    if (!normalized) return false;
+
+    return !/da verificare|da confermare|non chiar|non nota|non disponibile|sconosciut|incert|dubb|valutar|\bn a\b/.test(normalized);
 }
 
 function tokenize(value: string): string[] {
