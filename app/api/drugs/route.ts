@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
+import { type AifaDrug } from '@/lib/db';
 import { drugs } from '@/lib/schema';
 import { asc, sql } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { sortDrugCatalogSearchResults } from '@/lib/patient-smart-import-matching';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -12,7 +15,7 @@ export async function GET(request: Request) {
 
     // Basic search implementation or fetch all
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
+    const query = searchParams.get('q')?.trim();
 
     try {
         if (query) {
@@ -24,8 +27,18 @@ export async function GET(request: Request) {
                     OR ${drugs.aic} LIKE ${`%${query}%`}
                 `)
                 .orderBy(asc(drugs.name), asc(drugs.packaging))
-                .limit(50);
-            return NextResponse.json(results);
+                .limit(250);
+            const normalizedResults: AifaDrug[] = results.map((item) => ({
+                aic: item.aic,
+                name: item.name,
+                activePrinciple: item.activePrinciple || undefined,
+                company: item.company || undefined,
+                packaging: item.packaging || undefined,
+                class: item.class || undefined,
+                price: item.price ?? undefined,
+                atc: item.atc || undefined,
+            }));
+            return NextResponse.json(sortDrugCatalogSearchResults(query, normalizedResults).slice(0, 50));
         }
 
         // Return full count or limited set?

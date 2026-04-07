@@ -35,6 +35,9 @@ const DRUG_QUERY_STOPWORDS = new Set([
     'mattino', 'mezza', 'ogni', 'per', 'poi', 'pranzo', 'prima', 'sera', 'volta', 'volte',
     'verificare', 'confermare', 'dose', 'dosi', 'ore', 'uno', 'una', 'due', 'tre', 'quattro',
 ]);
+const INGREDIENT_STOPWORDS = new Set([
+    'acetato', 'cloridrato', 'fosfato', 'potassio', 'sale', 'sesquidrato', 'sodica', 'sodico',
+]);
 
 function normalizeText(value: string): string {
     return value
@@ -256,6 +259,112 @@ function extractCandidateDosageNeedles(candidate: Pick<AifaDrug, 'name' | 'packa
     ]));
 }
 
+function hasAdministrationDoseSyntax(suggestion: ParsedAiTherapy): boolean {
+    const probe = normalizeText(`${suggestion.dosage || ''} ${suggestion.drugMention || ''}`);
+    return /\b(ai pasti|colazione|pranzo|sera|mattino|ogni|q\d+h|sottocute|ore|die)\b/.test(probe);
+}
+
+function candidateRepresentsInjectableConcentration(candidate: Pick<AifaDrug, 'name' | 'packaging'>): boolean {
+    const probe = `${candidate.name || ''} ${candidate.packaging || ''}`;
+    return /\/\s*ml\b|soluzione iniettabile|siringh|cartucc|pen\b/i.test(probe);
+}
+
+function splitIngredientComponents(value: string): string[] {
+    return value
+        .split(/\s*\/\s*|\s*\+\s*|\s+\be\b\s+/i)
+        .map((item) => normalizeText(item))
+        .map((item) => item
+            .split(/\s+/)
+            .filter((token) => token.length > 2 && !INGREDIENT_STOPWORDS.has(token))
+            .slice(0, 1)
+            .join(' '))
+        .filter(Boolean);
+}
+
+function suggestionReferencesCatalogBrand(candidate: AifaDrug, suggestion: ParsedAiTherapy): boolean {
+    const normalizedCandidateName = normalizeText(candidate.name || '');
+    const normalizedMention = normalizeText(sanitizeDrugSearchText(suggestion.drugMention));
+    const normalizedQuery = normalizeText(sanitizeDrugSearchText(suggestion.drugQuery));
+
+    return Boolean(
+        normalizedCandidateName
+        && (normalizedCandidateName === normalizedMention || normalizedCandidateName === normalizedQuery),
+    );
+}
+
+function suggestionMentionsMultipleIngredients(suggestion: ParsedAiTherapy): boolean {
+    const probe = `${suggestion.drugMention || ''} ${suggestion.drugQuery || ''} ${suggestion.activePrinciple || ''}`;
+    return /\s*\/\s*|\s*\+\s*|\s+\be\b\s+/i.test(probe);
+}
+
+function candidateAddsUnexpectedCombinationIngredient(candidate: AifaDrug, suggestion: ParsedAiTherapy): boolean {
+    if (suggestionReferencesCatalogBrand(candidate, suggestion) || suggestionMentionsMultipleIngredients(suggestion)) {
+        return false;
+    }
+
+    const components = splitIngredientComponents(candidate.activePrinciple || '');
+    if (components.length <= 1) return false;
+
+    const suggestionProbe = normalizeText([
+        sanitizeDrugSearchText(suggestion.drugMention),
+        sanitizeDrugSearchText(suggestion.drugQuery),
+        sanitizeDrugSearchText(suggestion.activePrinciple || ''),
+    ].join(' '));
+
+    const matched = components.filter((component) => suggestionProbe.includes(component));
+    return matched.length > 0 && matched.length < components.length;
+}
+
+function overlapCount(candidate: string, tokens: string[]): number {
+    const haystack = normalizeText(candidate);
+    return tokens.reduce((count, token) => count + (haystack.includes(token) ? 1 : 0), 0);
+}
+
+/* @Codex */
+function queryLooksSingleIngredient(query: string): boolean {
+    if (/\s*\/\s*|\s*\+\s*|\s+\be\b\s+/i.test(query)) {
+        return false;
+    }
+
+    const tokens = uniqueTokens(tokenize(sanitizeDrugSearchText(query)))
+        .filter((token) => token.length >= 4 && !DRUG_QUERY_STOPWORDS.has(token));
+
+    return tokens.length > 0 && tokens.length <= 2;
+}
+
+/* @Codex */
+function candidateHasCombinationActivePrinciple(candidate: AifaDrug): boolean {
+    return splitIngredientComponents(candidate.activePrinciple || '').length > 1;
+}
+
+function hasStrongDrugIdentityMatch(candidate: AifaDrug, suggestion: ParsedAiTherapy): boolean {
+    if (candidateAddsUnexpectedCombinationIngredient(candidate, suggestion)) {
+        return false;
+    }
+
+    const candidateText = `${candidate.name} ${candidate.activePrinciple || ''}`;
+    const normalizedCandidateName = normalizeText(candidate.name || '');
+    const normalizedCandidatePrinciple = normalizeText(candidate.activePrinciple || '');
+    const normalizedMention = normalizeText(sanitizeDrugSearchText(suggestion.drugMention));
+    const normalizedPrinciple = normalizeText(sanitizeDrugSearchText(suggestion.activePrinciple || ''));
+    const mentionTokens = uniqueTokens(tokenize(sanitizeDrugSearchText(suggestion.drugMention))).filter((token) => token.length >= 4);
+    const principleTokens = uniqueTokens(tokenize(sanitizeDrugSearchText(suggestion.activePrinciple || ''))).filter((token) => token.length >= 4);
+
+    if (normalizedMention && (normalizedCandidateName === normalizedMention || normalizedCandidateName.includes(normalizedMention))) {
+        return true;
+    }
+    if (normalizedPrinciple && (normalizedCandidatePrinciple === normalizedPrinciple || normalizedCandidatePrinciple.includes(normalizedPrinciple))) {
+        return true;
+    }
+    if (mentionTokens.length > 0 && overlapCount(candidateText, mentionTokens) >= Math.min(2, mentionTokens.length)) {
+        return true;
+    }
+    if (principleTokens.length > 0 && overlapCount(candidateText, principleTokens) >= Math.min(2, principleTokens.length)) {
+        return true;
+    }
+    return false;
+}
+
 export function hasDrugDosageConflict(candidate: AifaDrug, suggestion: ParsedAiTherapy): boolean {
     const expectedNeedles = extractSuggestionDosageNeedles(suggestion);
     if (expectedNeedles.length === 0) return false;
@@ -263,7 +372,15 @@ export function hasDrugDosageConflict(candidate: AifaDrug, suggestion: ParsedAiT
     const candidateNeedles = extractCandidateDosageNeedles(candidate);
     if (candidateNeedles.length === 0) return false;
 
-    return !candidateNeedles.some((needle) => expectedNeedles.includes(needle));
+    if (candidateNeedles.some((needle) => expectedNeedles.includes(needle))) {
+        return false;
+    }
+
+    if (hasAdministrationDoseSyntax(suggestion) && candidateRepresentsInjectableConcentration(candidate)) {
+        return false;
+    }
+
+    return true;
 }
 
 export function rankDrugMatch(candidate: AifaDrug, suggestion: ParsedAiTherapy): number {
@@ -308,6 +425,78 @@ export function rankDrugMatch(candidate: AifaDrug, suggestion: ParsedAiTherapy):
     return score;
 }
 
+/* @Codex */
+export function rankDrugCatalogSearchResult(query: string, candidate: AifaDrug): number {
+    const normalizedQuery = normalizeText(sanitizeDrugSearchText(query) || query);
+    const queryTokens = uniqueTokens(tokenize(sanitizeDrugSearchText(query) || query))
+        .filter((token) => token.length >= 3 && !DRUG_QUERY_STOPWORDS.has(token));
+    const candidateText = `${candidate.name} ${candidate.activePrinciple || ''} ${candidate.packaging || ''} ${candidate.atc || ''}`;
+    const normalizedCandidateName = normalizeText(candidate.name || '');
+    const normalizedCandidatePrinciple = normalizeText(candidate.activePrinciple || '');
+    const candidateDosageNeedles = extractCandidateDosageNeedles(candidate);
+    const queryDosageNeedles = extractDosageNeedles(query);
+
+    let score = overlapCount(candidateText, queryTokens) * 9;
+
+    if (normalizedQuery) {
+        if (normalizeText(candidate.aic || '') === normalizedQuery) {
+            score += 120;
+        }
+        if (normalizedCandidateName === normalizedQuery) {
+            score += 90;
+        } else if (normalizedCandidateName.startsWith(normalizedQuery)) {
+            score += 42;
+        } else if (normalizedCandidateName.includes(normalizedQuery)) {
+            score += 18;
+        }
+
+        if (normalizedCandidatePrinciple === normalizedQuery) {
+            score += 110;
+        } else if (normalizedCandidatePrinciple.startsWith(normalizedQuery)) {
+            score += 64;
+        } else if (normalizedCandidatePrinciple.includes(normalizedQuery)) {
+            score += 28;
+        }
+
+        if (normalizeText(candidate.packaging || '').includes(normalizedQuery)) {
+            score += 12;
+        }
+        if (normalizeText(candidate.atc || '') === normalizedQuery) {
+            score += 80;
+        }
+    }
+
+    if (
+        queryDosageNeedles.length > 0
+        && candidateDosageNeedles.some((needle) => queryDosageNeedles.includes(needle))
+    ) {
+        score += 16;
+    }
+
+    if (queryLooksSingleIngredient(query)) {
+        if (candidateHasCombinationActivePrinciple(candidate)) {
+            score -= 40;
+        } else if (normalizedQuery && normalizedCandidatePrinciple.startsWith(normalizedQuery)) {
+            score += 24;
+        }
+    }
+
+    return score;
+}
+
+/* @Codex */
+export function sortDrugCatalogSearchResults(query: string, candidates: AifaDrug[]): AifaDrug[] {
+    return [...candidates].sort((left, right) => {
+        const scoreDiff = rankDrugCatalogSearchResult(query, right) - rankDrugCatalogSearchResult(query, left);
+        if (scoreDiff !== 0) return scoreDiff;
+
+        const nameDiff = (left.name || '').localeCompare(right.name || '', 'it', { sensitivity: 'base' });
+        if (nameDiff !== 0) return nameDiff;
+
+        return (left.packaging || '').localeCompare(right.packaging || '', 'it', { sensitivity: 'base' });
+    });
+}
+
 export function selectTherapyCatalogMatch(
     suggestion: ParsedAiTherapy,
     candidates: AifaDrug[]
@@ -319,12 +508,20 @@ export function selectTherapyCatalogMatch(
         }))
         .sort((left, right) => right.score - left.score);
 
-    const best = ranked[0];
-    if (!best || best.score < 7 || hasDrugDosageConflict(best.candidate, suggestion)) {
-        return undefined;
+    for (const entry of ranked) {
+        if (entry.score < 7) {
+            return undefined;
+        }
+        if (hasDrugDosageConflict(entry.candidate, suggestion)) {
+            continue;
+        }
+        if (!hasStrongDrugIdentityMatch(entry.candidate, suggestion)) {
+            continue;
+        }
+        return entry.candidate;
     }
 
-    return best.candidate;
+    return undefined;
 }
 
 export function buildDiagnosisSearchQueries(suggestion: ParsedAiDiagnosis): string[] {

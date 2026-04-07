@@ -5,8 +5,10 @@ import {
     buildDiagnosisSearchQueries,
     buildTherapyReview,
     hasDrugDosageConflict,
+    rankDrugCatalogSearchResult,
     rankDrugMatch,
     selectTherapyCatalogMatch,
+    sortDrugCatalogSearchResults,
     type TherapyReviewCandidate,
 } from './patient-smart-import-matching';
 
@@ -59,6 +61,31 @@ test('smart import catalog match prefers AIFA candidate whose packaging matches 
     );
 });
 
+test('drug catalog search ranking promotes monotherapy active principle for single-ingredient queries', () => {
+    const combinationProduct: AifaDrug = {
+        aic: 'AIC-ADI',
+        name: 'ADIABIN',
+        activePrinciple: 'METFORMINA CLORIDRATO/SITAGLIPTIN',
+        packaging: '50 mg/1000 mg compresse rivestite',
+        atc: 'A10BD07',
+    };
+    const metforminProduct: AifaDrug = {
+        aic: 'AIC-GLU',
+        name: 'GLUCOPHAGE',
+        activePrinciple: 'METFORMINA CLORIDRATO',
+        packaging: '1000 MG COMPRESSE RIVESTITE',
+        atc: 'A10BA02',
+    };
+
+    const ranked = sortDrugCatalogSearchResults('Metformina', [combinationProduct, metforminProduct]);
+
+    assert.equal(ranked[0].aic, 'AIC-GLU');
+    assert.ok(
+        rankDrugCatalogSearchResult('Metformina', metforminProduct)
+        > rankDrugCatalogSearchResult('Metformina', combinationProduct)
+    );
+});
+
 test('smart import catalog match rejects dosage-specific therapy when only conflicting AIFA strengths are available', () => {
     const suggestion = {
         drugMention: 'Metformina 500 mg',
@@ -81,6 +108,106 @@ test('smart import catalog match rejects dosage-specific therapy when only confl
 
     assert.equal(hasDrugDosageConflict(onlyWrongDose, suggestion), true);
     assert.equal(selected, undefined);
+});
+
+test('smart import catalog match rejects generic AIFA nutrition products when brand identity is missing', () => {
+    const suggestion = {
+        drugMention: 'Nutridrink',
+        drugQuery: 'Nutridrink',
+        activePrinciple: 'formula nutrizionale orale',
+        dosage: '1 al dì',
+        confidence: 'high' as const,
+        evidence: 'Nutridrink 1 al dì',
+        sourceId: 'entry:3',
+    };
+    const genericNutritionBag: AifaDrug = {
+        aic: 'AIC-FINOMEL',
+        name: 'FINOMEL',
+        activePrinciple: 'EMULSIONE LIPIDICA PER NUTRIZIONE PARENTERALE',
+        packaging: 'sacca 1200 ml',
+        atc: 'B05BA10',
+    };
+
+    const selected = selectTherapyCatalogMatch(suggestion, [genericNutritionBag]);
+
+    assert.equal(selected, undefined);
+});
+
+test('smart import catalog match allows insulin brand when extracted dosage is an administration schedule', () => {
+    const suggestion = {
+        drugMention: 'Humalog',
+        drugQuery: 'Humalog insulin lispro',
+        activePrinciple: 'Insulina lispro',
+        dosage: '4 U ai pasti principali',
+        confidence: 'high' as const,
+        evidence: 'Humalog 4 U ai pasti principali',
+        sourceId: 'entry:4',
+    };
+    const humalogPen: AifaDrug = {
+        aic: 'AIC-HUMA',
+        name: 'HUMALOG',
+        activePrinciple: 'INSULINA LISPRO',
+        packaging: 'KWIKPEN 100 U/ML SOLUZIONE INIETTABILE 5 PENNE PRERIEMPITE 3 ML',
+        atc: 'A10AB04',
+    };
+
+    const selected = selectTherapyCatalogMatch(suggestion, [humalogPen]);
+
+    assert.equal(hasDrugDosageConflict(humalogPen, suggestion), false);
+    assert.equal(selected?.aic, 'AIC-HUMA');
+});
+
+test('smart import catalog match rejects combination product when suggestion targets a single ingredient', () => {
+    const suggestion = {
+        drugMention: 'Metformina',
+        drugQuery: 'Metformina',
+        activePrinciple: 'Metformina',
+        dosage: '1000 mg x2',
+        confidence: 'high' as const,
+        evidence: 'Metformina 1000 mg x2',
+        sourceId: 'entry:5',
+    };
+    const combinationProduct: AifaDrug = {
+        aic: 'AIC-ADI',
+        name: 'ADIABIN',
+        activePrinciple: 'METFORMINA CLORIDRATO/SITAGLIPTIN',
+        packaging: '50 mg/1000 mg compresse rivestite',
+        atc: 'A10BD07',
+    };
+
+    const selected = selectTherapyCatalogMatch(suggestion, [combinationProduct]);
+
+    assert.equal(selected, undefined);
+});
+
+test('smart import catalog match skips rejected combo candidate and falls back to valid monotherapy candidate', () => {
+    const suggestion = {
+        drugMention: 'Metformina',
+        drugQuery: 'Metformina',
+        activePrinciple: 'Metformina',
+        dosage: '1000 mg x2',
+        confidence: 'high' as const,
+        evidence: 'Metformina 1000 mg x2',
+        sourceId: 'entry:6',
+    };
+    const combinationProduct: AifaDrug = {
+        aic: 'AIC-ADI',
+        name: 'ADIABIN',
+        activePrinciple: 'METFORMINA CLORIDRATO/SITAGLIPTIN',
+        packaging: '50 mg/1000 mg compresse rivestite',
+        atc: 'A10BD07',
+    };
+    const metforminProduct: AifaDrug = {
+        aic: 'AIC-GLU',
+        name: 'GLUCOPHAGE',
+        activePrinciple: 'METFORMINA CLORIDRATO',
+        packaging: '1000 MG COMPRESSE RIVESTITE',
+        atc: 'A10BA02',
+    };
+
+    const selected = selectTherapyCatalogMatch(suggestion, [combinationProduct, metforminProduct]);
+
+    assert.equal(selected?.aic, 'AIC-GLU');
 });
 
 test('smart import review marks same therapy with different dosage as update instead of new', () => {

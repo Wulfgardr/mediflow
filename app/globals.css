@@ -278,6 +278,26 @@ body[data-preview-profile-id='smart-import-review-v2'] {
     transform: translateY(-0.5px);
   }
 
+  /* @Codex */
+  .seeder-panel {
+    @apply rounded-[24px] border border-amber-200/70 backdrop-blur-md dark:border-amber-500/20 dark:bg-amber-900/10;
+    background: linear-gradient(135deg, rgba(255, 251, 235, 0.94), rgba(255, 255, 255, 0.8));
+    box-shadow: 0 14px 28px rgba(217, 119, 6, 0.08);
+  }
+
+  /* @Codex */
+  .seeder-subsection {
+    @apply rounded-[20px] border border-white/70 backdrop-blur-md dark:border-white/10 dark:bg-white/5;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+  }
+
+  /* @Codex */
+  .seeder-subsection-danger {
+    @apply border-red-200/70 dark:border-red-500/20 dark:bg-red-900/10;
+    background: linear-gradient(135deg, rgba(254, 242, 242, 0.92), rgba(255, 255, 255, 0.72));
+  }
+
   .section-kicker {
     @apply text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
   }

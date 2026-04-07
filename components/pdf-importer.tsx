@@ -10,6 +10,8 @@ import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synth
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+/* @Codex */
+import { enrichExtractedPatientDataForReview } from '@/lib/patient-document-import-service';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     AiDocumentSynthesisDisabledError,
@@ -78,6 +80,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     const analysis = await analyzeDocumentContent(data.rawText);
                     data.diagnoses = analysis.diagnoses;
                     data.medications = analysis.medications;
+                    data.problemStatements = analysis.problemStatements;
+                    data.therapyCandidates = analysis.therapyCandidates;
                     data.documentQuality = analysis.quality;
                     data.documentSummary = analysis.summary;
                     if (!data.notes && analysis.summary) {
@@ -89,6 +93,15 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     }
                 } finally {
                     setIsSynthesizing(false);
+                }
+            }
+
+            if (!patientId && documentSynthesisEnabled) {
+                try {
+                    setAiStage(`Riconciliazione ICD/AIFA (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                    Object.assign(data, await enrichExtractedPatientDataForReview(data));
+                } catch (reviewError) {
+                    console.error('Document review enrichment error:', reviewError);
                 }
             }
 
@@ -189,7 +202,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                         <p className="text-xs text-green-700">Controlla i campi compilati qui sotto.</p>
                         {!patientId && (
                             <p className="text-xs text-green-700">
-                                Le eventuali diagnosi ICD esplicite sono state precompilate nel form per revisione.
+                                Diagnosi e terapie candidate vengono prima riconciliate localmente e poi proposte in review prima del salvataggio.
                             </p>
                         )}
 

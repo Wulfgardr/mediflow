@@ -263,6 +263,36 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 4) Estrazione prudente di eventuali diagnosi con codice ICD esplicito  
 5) Salvataggio in `patients.documentInsights` (ultimi 3) e autofill deduplicato su `patients.diagnoses`
 
+### Import documento nella nuova anagrafica
+
+Nel create-flow `Nuova Anagrafica`, `components/pdf-importer.tsx` usa lo stesso
+OCR locale ma aggiunge una review intermedia esplicita prima del salvataggio.
+La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+
+Il flusso:
+
+1) OCR + analisi clinica del documento su un excerpt piu ampio del testo utile
+2) estrazione di:
+   - diagnosi con codice ICD esplicito
+   - problemi clinici reviewable senza codice esplicito
+   - terapie candidate reviewable
+3) riconciliazione locale reviewable:
+   - match ICD-11 per i problemi candidati
+   - match AIFA/ATC o fallback manuale per le terapie candidate
+4) review operatore su anagrafica, diagnosi e terapie prima di applicare i
+   default al form
+5) alla creazione della scheda, le terapie confermate e attive con posologia
+   sufficiente vengono persistite come record strutturati in `therapies`; i casi
+   incompleti o non attivi possono restare come nota documentale di supporto
+
+Vincoli:
+
+- anche in questo flusso non esiste import silenzioso da free-text a ICD o
+  terapia
+- la riconciliazione resta sempre locale e reviewable
+- una terapia manual-only o senza posologia sufficiente non viene promossa a
+  record strutturato solo perche compare nel documento
+
 ### Smart Import reviewable nel profilo paziente
 
 Nel profilo paziente il web client espone anche una CTA persistente di smart import

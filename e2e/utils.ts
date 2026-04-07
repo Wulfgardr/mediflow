@@ -107,3 +107,16 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
     throw new Error('Security overlay is still visible after E2E bootstrap');
   }
 }
+
+/* @Codex */
+export async function waitForUnlockedInteractiveShell(page: Page): Promise<void> {
+  const securityHeading = page.getByRole('heading', { name: 'MediFlow Sicurezza' });
+  const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
+  const securityOverlay = page.locator('div.fixed.inset-0.z-\\[9999\\]');
+
+  await expect(securityHeading).toBeHidden({ timeout: 10_000 });
+  await expect(setupHeading).toBeHidden({ timeout: 10_000 });
+  await expect(securityOverlay).toHaveCount(0, { timeout: 10_000 });
+  await page.waitForTimeout(250);
+  await expect(securityOverlay).toHaveCount(0, { timeout: 5_000 });
+}

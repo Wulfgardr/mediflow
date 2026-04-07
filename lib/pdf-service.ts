@@ -1,4 +1,10 @@
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
+import type {
+    SmartImportConfidence,
+    SmartImportDiagnosisExtraction,
+    SmartImportTherapyExtraction,
+    TherapySuggestionState,
+} from './ai-task-contracts';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
 
@@ -15,6 +21,10 @@ export interface ExtractedPatientData {
     medications?: string[];
     notes?: string;
     diagnoses?: DocumentDiagnosisSuggestion[];
+    problemStatements?: SmartImportDiagnosisExtraction[];
+    therapyCandidates?: SmartImportTherapyExtraction[];
+    reviewDiagnoses?: ExtractedPatientReviewDiagnosis[];
+    reviewTherapies?: ExtractedPatientReviewTherapy[];
     documentSummary?: string;
     documentQuality?: {
         level: DocumentQualityLevel;
@@ -23,6 +33,32 @@ export interface ExtractedPatientData {
     rawText: string;
     source: 'ai' | 'regex' | 'hybrid';  // Track extraction method
     confidence: number;  // 0-1 confidence score
+}
+
+export interface ExtractedPatientReviewDiagnosis {
+    label: string;
+    code: string;
+    description: string;
+    system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+    evidence?: string;
+    confidence?: SmartImportConfidence;
+    blockedReason?: string;
+    sourceType?: 'explicit_document_code' | 'reviewable_local_match';
+}
+
+export interface ExtractedPatientReviewTherapy {
+    drugName: string;
+    dosage?: string;
+    activePrinciple?: string;
+    motivation?: string;
+    aic?: string;
+    atc?: string;
+    confidence?: SmartImportConfidence;
+    therapyState: TherapySuggestionState;
+    matchType: 'catalog' | 'manual' | 'none';
+    evidence?: string;
+    blockedReason?: string;
+    sourceType?: 'document_explicit' | 'reviewable_local_match';
 }
 
 function isOcrFailureNote(value: string): boolean {
@@ -50,7 +86,7 @@ export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unkn
 }
 
 /* @Codex */
-const OCR_PAGE_LIMIT = 5;
+const OCR_PAGE_LIMIT = 6;
 /* @Codex */
 const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
 /* @Codex */
@@ -243,7 +279,7 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
 /* @Codex */
 async function selectPdfPagesForOcr(pdf: any, maxPages: number): Promise<number[]> {
     const total = pdf.numPages || 1;
-    const analysisPages = Math.min(total, Math.max(maxPages + 2, 7));
+    const analysisPages = Math.min(total, Math.max(maxPages + 3, 9));
     const keywords = [
         'diagnosi', 'terapia', 'farmac', 'prescr', 'anamnesi', 'esami', 'referto',
         'dimission', 'valutazione', 'conclusioni', 'paziente', 'medico'

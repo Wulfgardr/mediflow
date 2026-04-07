@@ -5,8 +5,9 @@ import { seedDatabase, nukeTestData } from '@/lib/seeder';
 import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const PANEL_CLASS = 'rounded-[24px] border border-amber-200/70 bg-[linear-gradient(135deg,rgba(255,251,235,0.94),rgba(255,255,255,0.8))] p-5 shadow-[0_14px_28px_rgba(217,119,6,0.08)] backdrop-blur-md dark:border-amber-500/20 dark:bg-amber-900/10';
-const SUBSECTION_CLASS = 'rounded-[20px] border border-white/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md dark:border-white/10 dark:bg-white/5';
+const PANEL_CLASS = 'seeder-panel p-5';
+const SUBSECTION_CLASS = 'seeder-subsection p-4';
+const DANGER_SUBSECTION_CLASS = 'seeder-subsection seeder-subsection-danger';
 
 export default function DataSeeder() {
     const [isOpen, setIsOpen] = useState(false);
@@ -229,7 +230,7 @@ export default function DataSeeder() {
             </button>
 
             {/* Danger Zone */}
-            <div className={`${SUBSECTION_CLASS} border-red-200/70 bg-[linear-gradient(135deg,rgba(254,242,242,0.92),rgba(255,255,255,0.72))] dark:border-red-500/20 dark:bg-red-900/10`}>
+            <div className={DANGER_SUBSECTION_CLASS}>
                 <div className="flex flex-col gap-3">
                     <label className="flex items-center gap-2 cursor-pointer group">
                         <input

@@ -20,10 +20,14 @@
 /tmp-parity-smoke
 /tmp-audit-test
 /tmp-auth-lockout-test
+/tmp-patient-document-import-test
+/tmp-real-import-data
+/tmp-real-pipeline
 /tmp/
 
 # next.js
 /.next/
+/.next-real-import/
 /out/
 
 # production

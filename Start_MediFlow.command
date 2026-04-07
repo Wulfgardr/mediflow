@@ -9,6 +9,8 @@ echo ""
 
 # @Codex
 WATCHDOG_PID=""
+# @Codex
+QUIET_EXIT=""
 
 # --- 1. Start Ollama (AI Engine) ---
 echo "🤖 [1/4] Controllo AI Engine (Ollama)..."
@@ -77,6 +79,9 @@ echo ""
 
 # Cleanup function
 cleanup() {
+    if [ -n "${QUIET_EXIT:-}" ]; then
+        exit 0
+    fi
     echo ""
     echo "🛑 Arresto in corso..."
     # @Codex
@@ -90,6 +95,16 @@ cleanup() {
 }
 
 trap cleanup SIGINT EXIT
+
+# Reuse existing dev server if already listening on 3000
+if lsof -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "   ✅ MediFlow risulta già attivo su http://localhost:3000"
+    echo "   ℹ️  Nessun nuovo server avviato per evitare conflitti di porta."
+    echo ""
+    open "http://localhost:3000"
+    QUIET_EXIT=1
+    exit 0
+fi
 
 # Open browser after delay
 (sleep 5 && open "http://localhost:3000") &
