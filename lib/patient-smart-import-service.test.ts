@@ -361,3 +361,33 @@ test('smart import keeps true inactive therapy as inactive when no switch contex
 
     assert.equal(state, 'inactive');
 });
+
+test('smart import normalizes dosage titration to active when no therapy replacement is documented', () => {
+    const state = classifyExtractedTherapyState({
+        drugMention: 'Insulina glargine',
+        drugQuery: 'Insulina glargine 16 UI',
+        activePrinciple: 'Insulina glargine',
+        dosage: '16 UI la sera',
+        motivation: 'Aumento posologia per controllo glicemico',
+        reviewNote: 'Modifica posologia in corso da 12 a 16 UI',
+        evidence: 'Aumentare insulina glargine a 16 UI serali.',
+        therapyState: 'transition',
+    });
+
+    assert.equal(state, 'active');
+});
+
+test('smart import normalizes proposed short-horizon therapy to uncertain instead of transition', () => {
+    const state = classifyExtractedTherapyState({
+        drugMention: 'Quetiapina 25 mg',
+        drugQuery: 'quetiapine 25mg',
+        activePrinciple: 'quetiapine',
+        dosage: '25 mg',
+        motivation: 'agitazione serale',
+        reviewNote: 'da rivalutare entro 7 giorni',
+        evidence: 'proporre Quetiapina 25 mg la sera',
+        therapyState: 'transition',
+    });
+
+    assert.equal(state, 'uncertain');
+});
