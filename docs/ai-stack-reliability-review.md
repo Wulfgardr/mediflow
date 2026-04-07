@@ -56,7 +56,8 @@ La fragilita residua non e piu soprattutto "il modello sbaglia tutto", ma:
 - differenza fra output generativo e resolver locali `ICD/AIFA`
 - therapy-state nelle transizioni
 - corpora e benchmark ancora troppo piccoli su alcune lane
-- assenza di benchmark headless dedicati per i resolver reali
+- quality gap misurabili sui resolver reali `ICD/AIFA`, soprattutto query
+  italiane pure WHO e matching `strength/packaging` AIFA
 
 ## Stack attuale
 
@@ -505,18 +506,27 @@ Siamo ancora deboli su:
 
 ## Soluzioni consigliate per aumentare l'affidabilita
 
-## Priorita 1: benchmarkare i resolver locali veri
+## Priorita 1 completata: benchmarkare i resolver locali veri
 
-Da fare:
+Stato `2026-04-07`:
 
-1. benchmark headless WHO ICD-11 con query realistiche italiane/inglesi
-2. benchmark headless AIFA con casi brand, principio attivo, strength e
-   packaging ambiguo
-3. misurare recall, precision, ambiguita residue e tempi di risposta
+1. benchmark headless WHO ICD-11 disponibile e rieseguibile da CLI
+2. benchmark headless AIFA disponibile e rieseguibile da CLI
+3. evidenza dei gap residui ora esplicita in
+   [docs/resolver-benchmark.md](./resolver-benchmark.md)
+
+Snapshot corrente:
+
+- WHO overall: `top1/topKRecall = 0.714`, con gap confinato alle query
+  italiane pure
+- AIFA overall: `top1/topKMatchRate = 0.429`, `noResultRate = 0.571`,
+  `stateBlindHitRate = 1`, quindi resolver ancora catalog-first e non
+  dosage/packaging-aware
 
 Motivo:
 
-- e il punto in cui l'estrazione reviewable diventa o non diventa davvero utile
+- il collo di bottiglia residuo non e piu l'assenza di harness, ma la qualita
+  semantica dei resolver locali
 
 ## Priorita 2: aggiungere guardrail locali post-model
 
@@ -728,7 +738,7 @@ Obiettivo:
 
 Passi:
 
-1. implementare benchmark headless sul resolver WHO reale
+1. mantenere benchmark headless sul resolver WHO reale rieseguibile da CLI
 2. misurare query:
    - italiane
    - inglesi
@@ -916,7 +926,7 @@ Ordine scorretto:
 
 Hardening `Smart Import`:
 
-1. benchmark resolver WHO/AIFA headless
+1. rieseguire benchmark resolver WHO/AIFA headless come baseline
 2. guardrail locale sugli switch terapeutici
 3. corpus sintetico allargato
 
