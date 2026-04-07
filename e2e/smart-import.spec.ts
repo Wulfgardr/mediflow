@@ -191,6 +191,30 @@ function buildTherapyUpdatePayload() {
   };
 }
 
+function buildManualOnlyTherapyPayload() {
+  return {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'smart_import',
+    summary: 'Terapia reviewable senza match AIFA affidabile.',
+    data: {
+      diagnoses: [],
+      therapies: [
+        {
+          drugMention: 'Nutridrink',
+          drugQuery: 'Nutridrink',
+          activePrinciple: 'Formula nutrizionale orale',
+          dosage: '1 al di',
+          motivation: 'Supporto nutrizionale domiciliare',
+          therapyState: 'active',
+          confidence: 'medium',
+          evidence: 'Nutridrink 1 al di dopo dimagrimento recente.',
+          sourceId: 'patient-notes:1'
+        }
+      ]
+    }
+  };
+}
+
 test('smart import adds ICD diagnosis chips and therapy from patient notes after operator review', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -530,4 +554,64 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   const dosageInput = updateCard.locator('label').filter({ hasText: 'Posologia' }).locator('input');
   await dosageInput.fill('1,25 mg 1 cp al mattino');
   await expect(dosageInput).toHaveValue('1,25 mg 1 cp al mattino');
+});
+
+test('smart import keeps manual-only therapy consultive and disables direct apply', async ({ page }) => {
+  const pin = process.env.E2E_PIN || '1234';
+  const suffix = `${Date.now()}`.slice(-4);
+  const firstName = `Manual${suffix}`;
+  const lastName = `Review${suffix}`;
+  const taxCode = `MNLRVW80A01H${suffix}`;
+  const patientNotes = 'Nutridrink 1 al di dopo dimagrimento recente.';
+
+  await page.route('**/api/proxy/ollama/chat', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(buildManualOnlyTherapyPayload())
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 160,
+          completion_tokens: 90
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/drugs?q=*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  await bootstrapUnlockedSession(page, pin);
+  await createPatientFromForm(page, {
+    firstName,
+    lastName,
+    taxCode,
+    notes: patientNotes,
+  });
+
+  await openPatientFromHome(page, taxCode);
+  await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Analizza fonti' }).click();
+
+  const therapyInputId = smartImportTherapyInputId('Nutridrink', '1 al di', 'Formula nutrizionale orale');
+  const therapyCard = smartImportCardFromInputId(page, therapyInputId);
+  const therapyCheckbox = page.locator(`input[id="${therapyInputId}"]`);
+
+  await expect(smartImportCardTitle(therapyCard, therapyInputId, 'Nutridrink')).toBeVisible({ timeout: 20_000 });
+  await expect(therapyCard.getByText('manual', { exact: true })).toBeVisible();
+  await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
+  await expect(therapyCard.getByText('Match AIFA da confermare prima dell\'import')).toBeVisible();
+  await expect(therapyCard.getByText('Nessun candidato AIFA locale affidabile.')).toBeVisible();
+  await expect(therapyCheckbox).toBeDisabled();
 });
