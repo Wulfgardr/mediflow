@@ -195,6 +195,7 @@ Deliverable minimi:
 
 1. sidecar locale Docker o Python service solo su `127.0.0.1`
 2. adapter MediFlow interno verso un contratto `redaction.v1`
+   - foundation adapter interno poi formalizzato in [docs/adr/0041-openmed-redaction-shadow-adapter.md](./adr/0041-openmed-redaction-shadow-adapter.md)
 3. corpus sintetico italiano con nomi, date, telefoni, indirizzi, `Codice Fiscale`
 4. benchmark con:
    - recall sui PII critici
