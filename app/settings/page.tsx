@@ -677,7 +677,7 @@ export default function SettingsPage() {
                 </aside>
 
                 <div className="space-y-10">
-                    <section id="appearance" className="space-y-4 scroll-mt-24">
+                    <section id="appearance" data-testid="settings-appearance-section" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
                             kicker="Interfaccia"
                             title="Stile visivo"
@@ -700,6 +700,7 @@ export default function SettingsPage() {
                                     <button
                                         type="button"
                                         onClick={() => setUIStyleMode('clinical')}
+                                        data-testid="ui-style-clinical"
                                         className={cn(
                                             "rounded-[24px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
                                             uiStyleMode === 'clinical'
@@ -719,6 +720,7 @@ export default function SettingsPage() {
                                     <button
                                         type="button"
                                         onClick={() => setUIStyleMode('liquid')}
+                                        data-testid="ui-style-liquid"
                                         className={cn(
                                             "rounded-[28px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
                                             uiStyleMode === 'liquid'
@@ -737,7 +739,7 @@ export default function SettingsPage() {
                                 </div>
                             </div>
 
-                            <div className="apple-subsection">
+                            <div className="apple-subsection" data-testid="ui-style-current-state">
                                 <p className="section-kicker">Stato corrente</p>
                                 <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
                                     {uiStyleMode === 'liquid' ? 'Liquid attivo' : 'Clinico attivo'}

@@ -104,7 +104,7 @@ test('document synthesis kill switch keeps OCR import available but disables cli
 
   await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
   await expect(page).toHaveURL(/\/$/);
-  const search = page.getByPlaceholder('Cerca paziente...');
+  const search = page.getByTestId('patients-search-input');
   await search.fill(lastName);
   await page.getByText(new RegExp(`${lastName} ${firstName}`)).click();
   await expect(page).toHaveURL(/\/patients\/.+/);
