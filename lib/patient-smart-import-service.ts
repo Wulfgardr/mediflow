@@ -18,6 +18,7 @@ import { searchICDHybrid, type ICDSearchResult } from './icd-service';
 import { notifyDbChange } from './live-query';
 import {
     buildDiagnosisSearchQueries,
+    classifyExtractedTherapyState,
     buildTherapyReview,
     buildDrugSearchTerms,
     hasDrugDosageConflict,
@@ -600,35 +601,7 @@ function sortTherapySuggestions(
 function classifyTherapyState(
     suggestion: ParsedAiTherapy,
 ): TherapySuggestionState {
-    if (suggestion.therapyState && suggestion.therapyState !== 'active') {
-        return suggestion.therapyState;
-    }
-
-    const probe = normalizeText([
-        suggestion.drugMention,
-        suggestion.drugQuery,
-        suggestion.activePrinciple,
-        suggestion.dosage,
-        suggestion.motivation,
-        suggestion.reviewNote,
-        suggestion.evidence,
-    ].filter(Boolean).join(' '));
-
-    if (
-        /switch|passa a|passare a|sostit|transizion|scal|titol|sospend(?:ere|e).*(iniz|pass|switch|sostit)/.test(probe)
-    ) {
-        return 'transition';
-    }
-
-    if (/da verificare|da confermare|incert|non chiar|dubb|valutar|\?/.test(probe)) {
-        return 'uncertain';
-    }
-
-    if (/sospes|interrott|stop|terminat|conclus|discontinuat/.test(probe)) {
-        return 'inactive';
-    }
-
-    return suggestion.therapyState || 'active';
+    return classifyExtractedTherapyState(suggestion);
 }
 
 function canDirectlyApplyTherapySuggestion(

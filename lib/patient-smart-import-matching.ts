@@ -29,6 +29,11 @@ export interface TherapyReviewCandidate {
     blockedReason?: string;
 }
 
+type TherapyStateClassificationInput = Pick<
+    ParsedAiTherapy,
+    'drugMention' | 'drugQuery' | 'activePrinciple' | 'dosage' | 'motivation' | 'reviewNote' | 'evidence' | 'therapyState'
+>;
+
 const DOSAGE_TOKEN_GLOBAL_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/gi;
 const DRUG_QUERY_STOPWORDS = new Set([
     'al', 'alla', 'alle', 'con', 'da', 'del', 'della', 'dopo', 'fare', 'giorno', 'giorni',
@@ -54,6 +59,40 @@ export function hasUsableTherapyDosage(value: string | undefined): boolean {
     if (!normalized) return false;
 
     return !/da verificare|da confermare|non chiar|non nota|non disponibile|sconosciut|incert|dubb|valutar|\bn a\b/.test(normalized);
+}
+
+/* @Codex */
+export function classifyExtractedTherapyState(input: TherapyStateClassificationInput): TherapyReviewCandidate['therapyState'] {
+    const explicitState = input.therapyState;
+    const probe = normalizeText([
+        input.drugMention,
+        input.drugQuery,
+        input.activePrinciple,
+        input.dosage,
+        input.motivation,
+        input.reviewNote,
+        input.evidence,
+    ].filter(Boolean).join(' '));
+
+    const switchLike = /switch|passa a|passare a|sostit|transizion|scal|titol|sospend(?:ere|e).*(?:iniz|pass|switch|sostit)/.test(probe);
+    if (explicitState === 'transition') return 'transition';
+    if (explicitState === 'inactive' && switchLike) return 'transition';
+    if (explicitState === 'uncertain') return 'uncertain';
+    if (explicitState === 'inactive') return 'inactive';
+
+    if (switchLike) {
+        return 'transition';
+    }
+
+    if (/da verificare|da confermare|incert|non chiar|dubb|valutar|\?/.test(probe)) {
+        return 'uncertain';
+    }
+
+    if (/sospes|interrott|stop|terminat|conclus|discontinuat/.test(probe)) {
+        return 'inactive';
+    }
+
+    return explicitState || 'active';
 }
 
 function tokenize(value: string): string[] {

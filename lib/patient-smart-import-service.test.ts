@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { type AifaDrug, type Therapy } from './db';
 import {
     buildDiagnosisSearchQueries,
+    classifyExtractedTherapyState,
     buildTherapyReview,
     hasDrugDosageConflict,
     hasUsableTherapyDosage,
@@ -329,4 +330,34 @@ test('smart import direct-apply dosage guard rejects empty or placeholder dosage
     assert.equal(hasUsableTherapyDosage('dose da verificare'), false);
     assert.equal(hasUsableTherapyDosage('Posologia da confermare'), false);
     assert.equal(hasUsableTherapyDosage('10 mg 1 cp al mattino'), true);
+});
+
+test('smart import promotes outgoing switch therapy from inactive to transition when evidence documents replacement', () => {
+    const state = classifyExtractedTherapyState({
+        drugMention: 'Bisoprololo',
+        drugQuery: 'Bisoprololo',
+        activePrinciple: 'Bisoprololo',
+        dosage: '1,25 mg',
+        motivation: 'Beta-bloccante in uscita',
+        reviewNote: 'Sospendere bisoprololo e passare a nebivololo',
+        evidence: 'Per ipotensione sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp.',
+        therapyState: 'inactive',
+    });
+
+    assert.equal(state, 'transition');
+});
+
+test('smart import keeps true inactive therapy as inactive when no switch context exists', () => {
+    const state = classifyExtractedTherapyState({
+        drugMention: 'Furosemide',
+        drugQuery: 'Furosemide',
+        activePrinciple: 'Furosemide',
+        dosage: '25 mg',
+        motivation: 'Sospesa alla dimissione',
+        reviewNote: 'Terapia sospesa',
+        evidence: 'Sospendere furosemide per ipotensione.',
+        therapyState: 'inactive',
+    });
+
+    assert.equal(state, 'inactive');
 });
