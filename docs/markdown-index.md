@@ -128,6 +128,7 @@ Ultimo aggiornamento: 2026-04-04
 | [docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md](./adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md) | Formalizza `WUL-122`: pairing device e credenziali operatore restano separati, il nodo dichiara il login minimo richiesto e lo scope clinico `network` viene risolto in modo esplicito come contesto sessione o default ambulatoriale del nodo. |
 | [docs/adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md](./adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md) | Formalizza `WUL-121`: `AI locale` resta il default, il runtime centralizzato su nodo paired e opzionale e separato dal data plane, con fallback esplicito e attivazione bloccata finche benchmark lane-specific e rollout governance non promuovono la capability. |
 | [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md) | Formalizza `WUL-150`: bootstrap pairing PHI-safe senza token locale, conferma esplicita sul nodo, credenziale dedicata del device paired e primo data plane read-only che richiede paired client + sessione operatore. |
+| [docs/adr/0041-openmed-redaction-shadow-adapter.md](./adr/0041-openmed-redaction-shadow-adapter.md) | Fissa il primo adapter interno OpenMed per la lane `PII/redaction`, con shape `redaction.v1`, auth locale, config localhost-only e shadow mode fuori da `/api/v1`. |
 
 ## Checklist manutenzione indice
 
