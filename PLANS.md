@@ -92,6 +92,29 @@ Nota operativa:
 - il contesto tecnico e i benchmark gia eseguiti restano documentati in [docs/ai-stack-reliability-review.md](./docs/ai-stack-reliability-review.md)
 - `AI-03` e ora tracciato in `WUL-123` come harness locale dedicato per corpus, scoring e validator di `Patient Insight`
 - `AI-03` e stato rieseguito localmente il `2026-04-04` sul baseline protetto `qwen3.5:35b-a3b`; il validator corrente passa con `contractValidRate = 1`, `focusRecall = 0.95`, `citationCoverageRate = 1` e `preferredSourceCoverage = 1`
+- `WUL-113` apre la comparazione fair dei challenger MLX nel solo stack
+  benchmark: i runner `ai-task-contracts`, `smart-import`, `model-stack` e
+  `model-parliament` ora distinguono `ollama_chat` e `mlx_chat`, mentre il
+  runtime applicativo resta invariato; primo seed MLX nel registry:
+  `mlx-community/medgemma-1.5-4b-it-bf16`, con challenger HF aggiornato
+  `Jackrong/MLX-Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-4bit`
+- `WUL-115` chiude la prima decisione reale sul challenger Jackrong MLX:
+  il `2026-04-08` il `9B` distillato passa il corpus contrattuale condiviso
+  (`jsonValidRate = 1`, `contractValidRate = 1`, `avgLatencyMs = 20500.8`),
+  ma su `smart_import` resta sotto la baseline protetta
+  `qwen3.5:35b-a3b` (`therapyRecall = 0.9`, `therapyStateRecall = 0.8`,
+  `avgLatencyMs = 18185.1` contro `1 / 1 / 14396.4`), quindi resta
+  challenger `benchmark-only` e non promotabile nel runtime operativo
+- `WUL-114` chiarisce che `TurboQuant` non e un semplice nuovo challenger
+  modello: oggi e un tema di runtime/KV cache. La raccomandazione fissata su
+  disco e `prototype`, ma solo come serving isolato `benchmark-only`
+  (`Ollama` con `OLLAMA_KV_CACHE_TYPE`, `MLX` con `kv-bits`), senza promozione
+  nel runtime applicativo o nel parliament corrente
+- `WUL-114` ha ora anche un primo harness eseguibile in repo:
+  `scripts/mlx-chat-batch-runner.py` confronta `baseline` e `kv_bits` su corpus
+  sintetico dedicato; smoke tecnico `2026-04-08` riuscito su
+  `mlx-community/Llama-3.2-3B-Instruct-4bit`, ma resta solo prova di
+  percorribilita del path `MLX` e non una decisione di promozione runtime
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`

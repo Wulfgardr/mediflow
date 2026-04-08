@@ -42,6 +42,26 @@
       "notes": "Specialist medical challenger already present in the local runtime."
     },
     {
+      "id": "medgemma_1_5_4b_it_mlx",
+      "label": "MedGemma 1.5 4B IT MLX",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "mlx_chat",
+      "runtimeModel": "mlx-community/medgemma-1.5-4b-it-bf16",
+      "executionStatus": "runnable",
+      "notes": "Current Apple MLX local chat candidate, benchmark-only for stack comparison and not a default runtime promotion."
+    },
+    {
+      "id": "jackrong_qwen3_5_9b_reasoning_distilled_v2_4bit_mlx",
+      "label": "Jackrong Qwen3.5 9B Distilled v2 MLX 4bit",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "mlx_chat",
+      "runtimeModel": "Jackrong/MLX-Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-4bit",
+      "executionStatus": "runnable",
+      "notes": "Primary MLX challenger for WUL-113/WUL-115 after the 2026-04-08 Hugging Face refresh; benchmark-only until both chambers are measured."
+    },
+    {
       "id": "gemma4_e2b",
       "label": "Gemma 4 E2B",
       "lane": "generative",

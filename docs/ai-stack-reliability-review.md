@@ -232,6 +232,91 @@ Decisione corrente:
   modello protetto fino a superamento reale delle lane `patient_insight` e
   `smart_import`
 
+#### Snapshot 2026-04-08: Jackrong Qwen3.5 9B via `mlx_chat`
+
+Workstream:
+
+- `WUL-115`
+
+Contesto pratico:
+
+- dopo `WUL-113` i runner benchmark locali possono confrontare in modo
+  simmetrico `ollama_chat` e `mlx_chat` senza cambiare il runtime operativo
+- il challenger misurato e
+  `Jackrong/MLX-Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-4bit`,
+  servito localmente via MLX su `127.0.0.1:8080`
+- il confronto reale e stato fatto contro le baseline locali gia installate
+  `qwen3.5:35b-a3b` e `phi4:14b`
+
+Esito sintetico:
+
+- **shared contract chamber**:
+  - tutti e tre i modelli passano `jsonValidRate = 1` e
+    `contractValidRate = 1`
+  - il Jackrong `9B` e competitivo sulla sola envelope
+    (`avgLatencyMs = 20500.8`), quasi allineato a `qwen3.5:35b-a3b`
+    (`20526.9`) e piu rapido di `phi4:14b` (`25235.2`)
+- **smart import dedicated benchmark**:
+  - `qwen3.5:35b-a3b` resta il migliore nel bilancio clinico complessivo
+    (`diagnosisRecall = 0.9`, `diagnosisQueryRecall = 0.9`,
+    `therapyRecall = 1`, `therapyStateRecall = 1`,
+    `avgLatencyMs = 14396.4`)
+  - il Jackrong `9B` passa il contratto anche qui (`jsonValidRate = 1`,
+    `contractValidRate = 1`) ma resta sotto baseline su terapia e stato
+    (`therapyRecall = 0.9`, `therapyStateRecall = 0.8`,
+    `reviewUsefulnessRate = 0.8`, `avgLatencyMs = 18185.1`)
+  - `phi4:14b` resta comparatore leggero utile ma non competitivo
+    (`diagnosisRecall = 0.8`, `diagnosisQueryRecall = 0.8`,
+    `alreadyPresentLeakRate = 0.667`)
+
+Decisione corrente:
+
+- tenere il Jackrong `9B` come challenger locale `benchmark-only`, non come
+  candidato da promuovere nel runtime applicativo
+- mantenere `qwen3.5:35b-a3b` come baseline protetta per le lane generative
+  operative
+- usare il Jackrong `9B` solo come riferimento MLX nei benchmark e nella coda
+  challenger, finche non supera davvero `smart_import`
+
+#### Snapshot 2026-04-08: TurboQuant come tema di serving, non di registry
+
+Workstream:
+
+- `WUL-114`
+
+Contesto pratico:
+
+- il paper
+  [TurboQuant](https://hf.co/papers/2504.19874) descrive una tecnica di
+  quantizzazione utile anche per la KV cache, non un semplice artifact modello
+  intercambiabile nel nostro harness
+- sulla macchina locale, `ollama 0.20.4` espone gia knob runtime
+  `OLLAMA_FLASH_ATTENTION` e `OLLAMA_KV_CACHE_TYPE`
+- sulla macchina locale, `mlx_lm 0.31.2` espone gia knob runtime
+  `--kv-bits`, `--kv-group-size` e `--quantized-kv-start`
+- il repo contiene ora un harness minimo eseguibile
+  `scripts/mlx-chat-batch-runner.py` con corpus sintetico dedicato, pensato
+  solo per A/B `baseline` vs `kv_bits` fuori dal runtime applicativo
+- su Hugging Face esistono gia esperimenti/community packages etichettati
+  `turboquant`, ma distribuiti su path eterogenei (`transformers`,
+  `llama.cpp`) e non ancora allineati al runtime MediFlow
+
+Decisione corrente:
+
+- non trattare `TurboQuant` come nuovo challenger da aggiungere al parliament o
+  al model registry operativo
+- considerarlo solo come possibile prototipo benchmark-only di serving/KV cache
+  quantization
+- trattare il primo smoke in repo (`2026-04-08`,
+  `mlx-community/Llama-3.2-3B-Instruct-4bit`, 1 case) solo come conferma di
+  percorribilita tecnica del path `MLX`, non come benchmark conclusivo
+- distinguere sempre:
+  - `Ollama`: fattibilita solo tramite runtime isolato con env vars dedicate
+  - `MLX`: fattibilita solo tramite runtime/CLI dedicati con parametri
+    espliciti di KV quantization
+- rinviare qualsiasi giudizio di valore sul prodotto a un eventuale benchmark
+  separato di memoria/latenza/contratto, fuori dal runtime applicativo
+
 ### 7. Lane OpenMed esplorata
 
 Riferimento:

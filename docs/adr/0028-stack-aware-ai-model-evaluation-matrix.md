@@ -15,7 +15,7 @@ Il report di scouting dei modelli propone candidati eterogenei:
 
 Il benchmark introdotto da
 [ADR 0027](./0027-ai-task-extraction-envelope-and-local-render.md) confronta
-oggi solo modelli `ollama` generativi contro il contratto condiviso
+oggi soprattutto modelli `ollama` generativi contro il contratto condiviso
 `mediflow.ai.extract.v1`.
 
 Se proviamo a "testare tutto" come se ogni modello fosse un sostituto drop-in
@@ -69,8 +69,11 @@ Adottiamo l'opzione 3.
 
 Introduciamo una matrice di valutazione stack-aware con queste regole:
 
-- i modelli generativi `ollama` eseguibili localmente vengono benchmarkati
-  tramite il corpus e il validator di ADR 0027
+- i modelli generativi eseguibili tramite runtime chat locali espliciti
+  (`ollama_chat`, `mlx_chat`) possono essere benchmarkati tramite il corpus e
+  il validator di ADR 0027
+- i report devono distinguere sempre runtime e modello; `mlx_chat` resta
+  benchmark-only finche una decisione separata non ne promuove l'uso operativo
 - i candidati non generativi vengono registrati con lane e status espliciti,
   senza essere forzati nel benchmark JSON
 - gli status ammessi per la prima thin slice sono:
@@ -96,7 +99,7 @@ Stop-rule minime:
 1. Aggiungere un registry locale dei candidati del report e dei baseline gia
    presenti nello stack.
 2. Riutilizzare `scripts/benchmark-ai-task-contracts.ts` per benchmarkare solo
-   i candidati `generative + ollama + runnable`.
+   i candidati `generative + local_chat_runtime + runnable`.
 3. Produrre un report unico che distingua:
    - modelli benchmarkati davvero
    - modelli mancanti nel runtime locale
