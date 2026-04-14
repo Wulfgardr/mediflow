@@ -43,5 +43,20 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: 'https://operatorisiss.servizirl.it/',
             reason: 'The SISS adapter foundation preserves the documented user-driven portal handoff as an explicit transport mode.',
         },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
+            pattern: 'https://www.aiom.it/linee-guida-aiom/',
+            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
+            pattern: 'https://easl.eu/news/easl-cpgs-hcc/',
+            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
+            pattern: 'https://interactiveguidelines.esmo.org/esmo-web-app/home/',
+            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
+        },
     ],
 };

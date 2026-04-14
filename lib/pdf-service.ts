@@ -1,5 +1,3 @@
-/// <reference path="./pdfjs-worker.d.ts" />
-
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
 import type {
     SmartImportConfidence,
