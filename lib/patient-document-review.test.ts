@@ -156,3 +156,86 @@ test('document review auto-selects only catalog therapies with plausible clinica
     assert.equal(nutridrink?.included, false);
     assert.match(nutridrink?.blockedReason || '', /AIFA/i);
 });
+
+test('document review accepts discharge therapies under the gestionali heading when clinically coherent', () => {
+    const data: ExtractedPatientData = {
+        rawText: [
+            'Diagnosi: Polimialgia reumatica, fibrillazione atriale persistente, ipertensione arteriosa',
+            'Indicazioni terapeutiche e gestionali alla dimissione.',
+            '- Pantorc 20 mg cp: 1 cp prima di colazione',
+            '- Blopress 16 mg cp: 1 cp dopo colazione',
+            '- Deltacortene dopo colazione secondo schema*',
+            '- Rytmonorm 150 mg cp: 1 cp dopo colazione',
+            '- Bisoprololo 1.25 mg cp: 1 cp dopo colazione + 1 cp dopo cena',
+        ].join('\n'),
+        source: 'regex',
+        confidence: 0.9,
+        reviewDiagnoses: [
+            {
+                label: 'Polymyalgia rheumatica',
+                code: 'FA22',
+                description: 'Polymyalgia rheumatica',
+                system: 'ICD-11',
+                confidence: 'high',
+                evidence: 'Polimialgia reumatica',
+                sourceType: 'reviewable_local_match',
+            },
+            {
+                label: 'Persistent atrial fibrillation',
+                code: 'BC81.31',
+                description: 'Persistent atrial fibrillation',
+                system: 'ICD-11',
+                confidence: 'high',
+                evidence: 'fibrillazione atriale persistente',
+                sourceType: 'reviewable_local_match',
+            },
+        ],
+        reviewTherapies: [
+            {
+                drugName: 'PANTORC',
+                dosage: '1 cp al mattino',
+                activePrinciple: 'PANTOPRAZOLO',
+                aic: '043517046',
+                atc: 'A02BC02',
+                confidence: 'high',
+                therapyState: 'active',
+                matchType: 'catalog',
+                evidence: 'Indicazioni terapeutiche alla dimissione - Pantorc 20 mg cp: 1 cp prima di colazione',
+                sourceType: 'reviewable_local_match',
+            },
+            {
+                drugName: 'DELTACORTENE',
+                dosage: 'Schema di tapering (25mg->5mg)',
+                activePrinciple: 'PREDNISONE',
+                aic: '010089035',
+                atc: 'H02AB07',
+                confidence: 'high',
+                therapyState: 'active',
+                matchType: 'catalog',
+                evidence: 'Indicazioni terapeutiche alla dimissione - Deltacortene dopo colazione secondo schema*',
+                sourceType: 'reviewable_local_match',
+            },
+            {
+                drugName: 'BISOPROLOLO ALMUS',
+                dosage: '1.25 mg (1 cp mattina + 1 cp sera)',
+                activePrinciple: 'BISOPROLOLO FUMARATO',
+                aic: '038810026',
+                atc: 'C07AB07',
+                confidence: 'high',
+                therapyState: 'active',
+                matchType: 'catalog',
+                evidence: 'Indicazioni terapeutiche alla dimissione - Bisoprololo 1.25 mg cp: 1 cp dopo colazione + 1 cp dopo cena',
+                sourceType: 'reviewable_local_match',
+            },
+        ],
+    };
+
+    const draft = buildPatientDocumentReviewDraft(data);
+    const pantorc = draft.medications.find((item) => item.drugName === 'PANTORC');
+    const deltacortene = draft.medications.find((item) => item.drugName === 'DELTACORTENE');
+    const bisoprololo = draft.medications.find((item) => item.drugName === 'BISOPROLOLO ALMUS');
+
+    assert.equal(pantorc?.included, false);
+    assert.equal(deltacortene?.included, true);
+    assert.equal(bisoprololo?.included, true);
+});

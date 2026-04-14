@@ -25,6 +25,15 @@ const DISCHARGE_DOCUMENT = [
     'RIVALUTAZIONE DIABETOLOGICA PER IMPOSTAZIONE TERAPIA',
 ].join('\n');
 
+const COLUMBUS_DIMISSIONE_DOCUMENT = [
+    'Indicazioni terapeutiche e gestionali alla dimissione.',
+    '- Pantorc 20 mg cp: 1 cp prima di colazione',
+    '- Blopress 16 mg cp: 1 cp dopo colazione',
+    '- Deltacortene dopo colazione secondo schema*',
+    '- Dal 14/04/2026 al 28/04/2026: Deltacortene 25 mg cp: 1/2 cp dopo colazione',
+    '- Dal 28/04/2026 al 13/05/2026: Deltacortene 5 mg cp: 2 cp dopo colazione',
+].join('\n');
+
 test('document import downgrades pre-admission home therapy when discharge therapy resets the same therapeutic area', () => {
     const therapies: ExtractedPatientReviewTherapy[] = [
         {
@@ -237,6 +246,17 @@ test('document import filters report-like therapy candidates before review recon
     }), true);
 });
 
+test('document import filters scheduling-only fragments from discharge taper instructions', () => {
+    assert.equal(isPlausibleTherapyCandidate({
+        drugMention: 'prima di colazione',
+        drugQuery: 'prima di colazione',
+    }), false);
+    assert.equal(isPlausibleTherapyCandidate({
+        drugMention: 'Dal 14/04/2026 al 28/04/2026',
+        drugQuery: 'Dal 14/04/2026 al 28/04/2026',
+    }), false);
+});
+
 test('document import drops manual inactive therapies from the final review list', () => {
     assert.equal(shouldRetainReviewTherapy({
         drugName: 'Novasource GI Balance Plus',
@@ -252,6 +272,52 @@ test('document import drops manual inactive therapies from the final review list
         evidence: 'Terapia alla dimissione - Ghemaxan 4000 UI',
         sourceType: 'reviewable_local_match',
     }), true);
+    assert.equal(shouldRetainReviewTherapy({
+        drugName: 'Dal 14/04/2026 al 28/04/2026',
+        therapyState: 'active',
+        matchType: 'manual',
+        evidence: 'Indicazioni terapeutiche alla dimissione - Dal 14/04/2026 al 28/04/2026',
+        sourceType: 'reviewable_local_match',
+    }), false);
+});
+
+test('document import keeps discharge therapies under the gestionali heading and ignores dated fragments', () => {
+    const candidates = fallbackTherapyCandidates({
+        rawText: COLUMBUS_DIMISSIONE_DOCUMENT,
+        source: 'hybrid',
+        confidence: 0.8,
+        medications: [],
+    });
+
+    const pantorc = candidates.find((candidate) => /Pantorc/i.test(candidate.drugMention));
+    const blopress = candidates.find((candidate) => /Blopress/i.test(candidate.drugMention));
+    const deltacortene = candidates.find((candidate) => /Deltacortene/i.test(candidate.drugMention));
+
+    assert.ok(pantorc);
+    assert.match(pantorc?.evidence || '', /Indicazioni terapeutiche alla dimissione/i);
+    assert.ok(blopress);
+    assert.match(blopress?.evidence || '', /Indicazioni terapeutiche alla dimissione/i);
+    assert.ok(deltacortene);
+    assert.equal(candidates.some((candidate) => /^(?:prima|dopo|dal|schema)\b/i.test(candidate.drugMention)), false);
+});
+
+test('document import grounds therapies inside the gestionali discharge heading as active discharge therapy', () => {
+    const reconciled = reconcileTherapyCandidatesWithDocumentContext(COLUMBUS_DIMISSIONE_DOCUMENT, [
+        {
+            drugName: 'Pantorc',
+            dosage: '20 mg 1 cp',
+            activePrinciple: 'Pantoprazolo',
+            confidence: 'high',
+            therapyState: 'active',
+            matchType: 'manual',
+            evidence: 'Pantorc 20 mg cp: 1 cp prima di colazione',
+            sourceType: 'reviewable_local_match',
+        },
+    ]);
+
+    assert.equal(reconciled[0]?.therapyState, 'active');
+    assert.match(reconciled[0]?.evidence || '', /Indicazioni terapeutiche alla dimissione/i);
+    assert.match(reconciled[0]?.evidence || '', /Pantorc/i);
 });
 
 test('document import merges contextual manual therapy with catalog match for the same drug', () => {

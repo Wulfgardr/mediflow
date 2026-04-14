@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-07
+Ultimo aggiornamento: 2026-04-10
 
 ## Come usare questo indice
 
@@ -133,6 +133,7 @@ Ultimo aggiornamento: 2026-04-07
 | [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md) | Formalizza `WUL-150`: bootstrap pairing PHI-safe senza token locale, conferma esplicita sul nodo, credenziale dedicata del device paired e primo data plane read-only che richiede paired client + sessione operatore. |
 | [docs/adr/0041-openmed-redaction-shadow-adapter.md](./adr/0041-openmed-redaction-shadow-adapter.md) | Fissa il primo adapter interno OpenMed per la lane `PII/redaction`, con shape `redaction.v1`, auth locale, config localhost-only e shadow mode fuori da `/api/v1`. |
 | [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md) | Formalizza il create-flow `Nuova Anagrafica` da documento con review esplicita, matching locale ICD/AIFA e persistenza strutturata solo delle terapie sufficientemente confermate. |
+| [docs/adr/0043-macos-oncology-backbone-prototype.md](./adr/0043-macos-oncology-backbone-prototype.md) | Formalizza il prototipo macOS della backbone oncologica come shell SwiftUI sintetica, locale e separata da backend, schema e contratti `/api/v1` del prodotto reale. |
 
 ## Checklist manutenzione indice
 

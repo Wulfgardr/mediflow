@@ -256,10 +256,23 @@ const THERAPY_PLAUSIBILITY_RULES: Array<{
         therapyTokens: ['pantopraz', 'gastroloc', 'omepraz', 'esomepraz'],
         contextTokens: ['duoden', 'ulcer', 'gastr', 'addom', 'chirurg'],
     },
+    {
+        family: 'cardio',
+        therapyTokens: ['blopress', 'candesartan', 'bisoprololo', 'rytmonorm', 'propafenone'],
+        contextTokens: ['fibrill', 'atrial', 'aritm', 'ipertens', 'pression'],
+    },
+    {
+        family: 'rheuma',
+        therapyTokens: ['deltacortene', 'prednison', 'prednisone'],
+        contextTokens: ['polymyalgia', 'reumat', 'fa22'],
+    },
 ];
 
 /* @Codex */
 const MANUAL_REVIEW_ONLY_THERAPY_FAMILIES = new Set(['nutrition']);
+
+/* @Codex */
+const CURRENT_THERAPY_EVIDENCE_REGEX = /\bterapia alla dimissione\b|\bterapia domiciliare\b|\bindicazioni terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b/i;
 
 /* @Codex */
 function buildClinicalContextProbe(data: ExtractedPatientData): string {
@@ -323,7 +336,7 @@ function buildTherapyDefaultSelection(data: ExtractedPatientData, medication: Ex
         };
     }
 
-    if (!/\bterapia alla dimissione\b|\bterapia domiciliare\b/i.test(medication.evidence || '')) {
+    if (!CURRENT_THERAPY_EVIDENCE_REGEX.test(medication.evidence || '')) {
         return {
             included: false,
             blockedReason: medication.blockedReason || 'Terapia non confermata come corrente nel documento',

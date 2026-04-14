@@ -43,31 +43,41 @@ const GENERIC_THERAPY_TOKENS = new Set([
     'cloridrato',
     'compressa',
     'compresse',
+    'dal',
     'dimissione',
+    'dopo',
     'dolore',
     'domiciliare',
+    'durante',
     'emulsione',
     'febbre',
     'fiala',
     'flacone',
     'fino',
     'formula',
+    'gestionali',
+    'giorni',
     'indicazioni',
     'iniettabile',
     'insulina',
     'mattino',
     'minuti',
+    'ogni',
     'orale',
     'ore',
     'pasti',
     'poi',
+    'prima',
     'prescrizioni',
     'principali',
     'profilassi',
+    'progressivo',
     'ripetibile',
     'ricovero',
+    'schema',
     'sera',
     'sesquidrato',
+    'settimane',
     'siringhe',
     'sodica',
     'sodio',
@@ -103,6 +113,7 @@ const THERAPY_SECTION_HEADING_RULES: Array<{
     pattern: RegExp;
 }> = [
     { section: 'discharge', label: 'Terapia alla dimissione', pattern: /^terapia alla dimissione\b[:\-–]?\s*(.*)$/i },
+    { section: 'discharge', label: 'Indicazioni terapeutiche alla dimissione', pattern: /^indicazioni\s+terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b[:.\-–]?\s*(.*)$/i },
     { section: 'home', label: 'Terapia domiciliare', pattern: /^(?:abituale\s+)?terapia domiciliare\b[:\-–]?\s*(.*)$/i },
     { section: 'followup', label: 'Controlli successivi', pattern: /^controlli successivi\b[:\-–]?\s*(.*)$/i },
     { section: 'followup', label: 'Indicazioni alla dimissione', pattern: /^indicazioni alla dimissione\b[:\-–]?\s*(.*)$/i },
@@ -116,6 +127,10 @@ const THERAPY_SUBHEADING_RULES: Array<{ label: string; pattern: RegExp }> = [
 
 /* @Codex */
 const NON_THERAPY_MENTION_PREFIX_REGEX = /^(?:rx|tc|rm|eco|ecg|visita|referto|v\/p)\b/i;
+/* @Codex */
+const NON_THERAPY_SCHEDULING_PREFIX_REGEX = /^(?:prima|dopo|durante|al|alla|alle|fino|schema|progressiv|scal|riduzion|taper(?:ing)?|poi|quindi)\b/i;
+/* @Codex */
+const NON_THERAPY_DATED_PREFIX_REGEX = /^(?:dal|dall[oa']?)\s+\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?\b/i;
 /* @Codex */
 const FALLBACK_THERAPY_SCHEDULE_REGEX = /\b(?:x\s*\d+|ore\s*\d+|ogni\s+\d+\s*ore|ai\s+pasti(?:\s+principali)?|al\s+d[iì]|alla\s+sera|al\s+mattino|a\s+pranzo|se\s+febbre(?:\/dolore)?|ripetibile)\b/gi;
 
@@ -278,25 +293,38 @@ function buildNormalizedTherapyTokenSet(values: Array<string | undefined>, limit
 }
 
 /* @Codex */
+function stripTherapyTemporalPrefix(value: string): string {
+    return value.replace(
+        /^(?:dal|dall[oa']?)\s+\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?\s+(?:al|alla|alle|fino\s+al(?:la|le)?)\s+\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?\s*:\s*/i,
+        '',
+    ).trim();
+}
+
+/* @Codex */
 function buildFallbackDrugMention(value: string): string {
     const primaryFragment = stripTherapyBulletPrefix(value)
+        .replace(/^\*+\s*/, '')
+        .replace(/^\s*/, '')
+        .replace(/\([^)]*\)/g, ' ')
+        .trim();
+    const normalizedFragment = stripTherapyTemporalPrefix(primaryFragment)
         .replace(/\([^)]*\)/g, ' ')
         .split(/\s*,\s*/)[0]
         .trim();
-    const compact = sanitizeDrugSearchText(primaryFragment)
+    const compact = sanitizeDrugSearchText(normalizedFragment)
         .replace(FALLBACK_THERAPY_SCHEDULE_REGEX, ' ')
         .replace(/\b(?:dolore|febbre|max|pasti|principali|ripetibile|sottocute|sottocuto)\b/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim();
-    return compact || sanitizeDrugSearchText(value) || stripTherapyBulletPrefix(value);
+    return compact || sanitizeDrugSearchText(normalizedFragment) || stripTherapyBulletPrefix(normalizedFragment);
 }
 
 /* @Codex */
 function buildFallbackDrugQuery(value: string): string {
-    const primaryFragment = stripTherapyBulletPrefix(value)
+    const primaryFragment = stripTherapyTemporalPrefix(stripTherapyBulletPrefix(value)
         .replace(/\([^)]*\)/g, ' ')
         .split(/\s*,\s*/)[0]
-        .trim();
+        .trim());
     const mention = buildFallbackDrugMention(primaryFragment);
     const dosageNeedle = primaryFragment.match(DOSAGE_NEEDLE_REGEX)?.[0]?.trim();
 
@@ -308,10 +336,25 @@ function buildFallbackDrugQuery(value: string): string {
 }
 
 /* @Codex */
+function isSchedulingOnlyTherapyFragment(value: string): boolean {
+    const mention = stripTherapyBulletPrefix(value);
+    if (!mention) return true;
+    if (NON_THERAPY_DATED_PREFIX_REGEX.test(mention)) return true;
+
+    const normalized = normalizeText(mention);
+    if (!normalized) return true;
+    if (NON_THERAPY_SCHEDULING_PREFIX_REGEX.test(normalized)) return true;
+
+    const therapyTokens = buildNormalizedTherapyTokenSet([mention], 2);
+    return therapyTokens.length === 0;
+}
+
+/* @Codex */
 export function isPlausibleTherapyCandidate(candidate: Pick<SmartImportTherapyExtraction, 'drugMention' | 'drugQuery'>): boolean {
     const mention = stripTherapyBulletPrefix(candidate.drugMention || candidate.drugQuery || '');
     if (!mention) return false;
     if (NON_THERAPY_MENTION_PREFIX_REGEX.test(mention)) return false;
+    if (isSchedulingOnlyTherapyFragment(mention)) return false;
     return true;
 }
 
@@ -518,7 +561,7 @@ function buildAtomicTherapyEvidenceSnippet(
             score: scoreTherapyLineMatch(normalizeText(segment.segment), therapy),
         }))
         .sort((left, right) => right.score - left.score)[0];
-    const content = stripTherapyBulletPrefix(bestSegment?.segment || stripped);
+    const content = stripTherapyBulletPrefix(bestSegment?.evidence || bestSegment?.segment || stripped);
     if (!content) return '';
 
     if (effectiveHeading && !normalizeText(content).includes(normalizeText(effectiveHeading))) {
@@ -1013,6 +1056,10 @@ function collapseManualTherapiesAgainstCatalog(items: ExtractedPatientReviewTher
 
 /* @Codex */
 export function shouldRetainReviewTherapy(item: ExtractedPatientReviewTherapy): boolean {
+    if (isSchedulingOnlyTherapyFragment(item.drugName)) {
+        return false;
+    }
+
     return !(
         item.matchType === 'manual'
         && item.therapyState === 'inactive'
@@ -1246,7 +1293,10 @@ async function resolveTherapyCandidates(
             .sort((left, right) => right.score - left.score)
             .map((item) => item.candidate);
         const sanitizedTherapy = sanitizeResolvedTherapyExtraction(therapy, ranked);
-        const selected = selectTherapyCatalogMatch(sanitizedTherapy, ranked);
+        const selectedCandidate = selectTherapyCatalogMatch(sanitizedTherapy, ranked);
+        const selected = selectedCandidate && candidateNameSupportsTherapyIdentity(selectedCandidate, sanitizedTherapy)
+            ? selectedCandidate
+            : undefined;
         const drugName = selected?.name || sanitizedTherapy.drugMention;
         const dosage = sanitizedTherapy.dosage || undefined;
         const matchType = selected
