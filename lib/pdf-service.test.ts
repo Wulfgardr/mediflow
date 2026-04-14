@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOcrFallbackResult, extractUsableOcrText } from './pdf-service';
+import { buildOcrFallbackResult, extractUsableOcrText, parsePatientData } from './pdf-service';
 
 test('extractUsableOcrText keeps markdown-like OCR text and ignores structured JSON payloads', () => {
     assert.equal(
@@ -41,4 +41,12 @@ test('buildOcrFallbackResult ignores pure OCR failure notes', () => {
     }, 'ai');
 
     assert.equal(result, null);
+});
+
+test('parsePatientData extracts name and birth date from signature-style discharge text', () => {
+    const parsed = parsePatientData('Sig. Pasquale Milone, nato il 23/02/1932.\nLettera di dimissione');
+
+    assert.equal(parsed.firstName, 'Pasquale');
+    assert.equal(parsed.lastName, 'Milone');
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1932-02-23');
 });

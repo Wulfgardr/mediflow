@@ -4,16 +4,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
 import {
     runAiTaskContractBenchmark,
     type AiTaskContractBenchmarkReport,
 } from './benchmark-ai-task-contracts.ts';
+import {
+    isLocalChatRuntime,
+    resolveLocalChatBaseUrls,
+    type LocalChatTarget,
+} from './local-chat-runtime.ts';
 
 type CandidateLane = 'generative' | 'pii' | 'clinical_entities' | 'embedding';
 type CandidateOrigin = 'current_stack' | 'report';
 type CandidateRuntime =
     | 'ollama_chat'
+    | 'mlx_chat'
     | 'external_chat_runtime'
     | 'transformers_token_classification'
     | 'transformers_encoder';
@@ -53,9 +58,11 @@ type StackBenchmarkReport = {
     registryPath: string;
     corpusPath: string;
     baseUrl: string;
+    mlxBaseUrl: string;
     iterations: number;
     schemaVersion: CandidateRegistry['schemaVersion'];
     benchmarkedRuntimeModels: string[];
+    benchmarkedTargetKeys: string[];
     summary: {
         totalCandidates: number;
         benchmarked: number;
@@ -67,6 +74,7 @@ type StackBenchmarkReport = {
         generative: {
             recommendedCandidateId: string | null;
             recommendedModel: string | null;
+            recommendedRuntime: CandidateRuntime | null;
             rationale: string;
         };
     };
@@ -84,8 +92,10 @@ function parseArgs(argv: string[]) {
         corpus: DEFAULT_CORPUS_PATH,
         out: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
+        mlxBaseUrl: process.env.MLX_BASE_URL || 'http://127.0.0.1:8080',
         iterations: 1,
         models: null as string[] | null,
+        mlxModels: null as string[] | null,
     };
 
     for (let index = 2; index < argv.length; index += 1) {
@@ -102,11 +112,20 @@ function parseArgs(argv: string[]) {
         } else if (value === '--base-url' && argv[index + 1]) {
             args.baseUrl = argv[index + 1];
             index += 1;
+        } else if (value === '--mlx-base-url' && argv[index + 1]) {
+            args.mlxBaseUrl = argv[index + 1];
+            index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
             index += 1;
         } else if (value === '--models' && argv[index + 1]) {
             args.models = argv[index + 1]
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+            index += 1;
+        } else if (value === '--mlx-models' && argv[index + 1]) {
+            args.mlxModels = argv[index + 1]
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
@@ -147,21 +166,30 @@ export async function runModelStackBenchmark(options: {
     registryPath?: string;
     corpusPath?: string;
     baseUrl?: string;
+    mlxBaseUrl?: string;
     iterations?: number;
     models?: string[];
+    mlxModels?: string[];
 }): Promise<StackBenchmarkReport> {
     const registryPath = options.registryPath || DEFAULT_REGISTRY_PATH;
     const corpusPath = options.corpusPath || DEFAULT_CORPUS_PATH;
-    const baseUrl = normalizeOllamaBaseUrl(options.baseUrl || process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434');
+    const baseUrls = resolveLocalChatBaseUrls({
+        baseUrl: options.baseUrl,
+        mlxBaseUrl: options.mlxBaseUrl,
+    });
     const iterations = Math.max(1, options.iterations || 1);
 
     const registry = readRegistry(registryPath);
-    const allowedModels = options.models && options.models.length > 0
-        ? new Set(options.models)
+    const requestedModels = [
+        ...(options.models || []),
+        ...(options.mlxModels || []),
+    ];
+    const allowedModels = requestedModels.length > 0
+        ? new Set(requestedModels)
         : null;
     const runnableGenerativeCandidates = registry.candidates.filter((candidate) =>
         candidate.lane === 'generative'
-        && candidate.runtime === 'ollama_chat'
+        && isLocalChatRuntime(candidate.runtime)
         && candidate.executionStatus === 'runnable'
         && typeof candidate.runtimeModel === 'string'
         && candidate.runtimeModel.length > 0
@@ -171,21 +199,26 @@ export async function runModelStackBenchmark(options: {
     const benchmarkReport = runnableGenerativeCandidates.length > 0
         ? await runAiTaskContractBenchmark({
             corpusPath,
-            baseUrl,
+            baseUrl: baseUrls.ollama,
+            mlxBaseUrl: baseUrls.mlx,
             iterations,
-            models: runnableGenerativeCandidates
-                .map((candidate) => candidate.runtimeModel)
-                .filter((model): model is string => typeof model === 'string' && model.length > 0),
+            targets: runnableGenerativeCandidates
+                .map((candidate) => (
+                    isLocalChatRuntime(candidate.runtime) && typeof candidate.runtimeModel === 'string' && candidate.runtimeModel.length > 0
+                        ? { runtime: candidate.runtime, model: candidate.runtimeModel }
+                        : null
+                ))
+                .filter((target): target is LocalChatTarget => Boolean(target)),
         })
         : null;
 
     const benchmarkByModel = new Map(
-        (benchmarkReport?.models || []).map((report) => [report.model, report]),
+        (benchmarkReport?.models || []).map((report) => [`${report.runtime}:${report.model}`, report]),
     );
 
     const candidates: CandidateReport[] = registry.candidates.map((candidate) => {
         const benchmark = candidate.runtimeModel
-            ? benchmarkByModel.get(candidate.runtimeModel)
+            ? benchmarkByModel.get(`${candidate.runtime}:${candidate.runtimeModel}`)
             : undefined;
 
         if (benchmark) {
@@ -210,23 +243,27 @@ export async function runModelStackBenchmark(options: {
     });
 
     const recommendedModel = benchmarkReport?.decision.recommendedModel || null;
-    const recommendedCandidate = recommendedModel
-        ? candidates.find((candidate) => candidate.runtimeModel === recommendedModel) || null
+    const recommendedRuntime = benchmarkReport?.decision.recommendedRuntime || null;
+    const recommendedCandidate = recommendedModel && recommendedRuntime
+        ? candidates.find((candidate) => candidate.runtime === recommendedRuntime && candidate.runtimeModel === recommendedModel) || null
         : null;
 
     return {
         generatedAt: new Date().toISOString(),
         registryPath,
         corpusPath,
-        baseUrl,
+        baseUrl: baseUrls.ollama,
+        mlxBaseUrl: baseUrls.mlx,
         iterations,
         schemaVersion: registry.schemaVersion,
         benchmarkedRuntimeModels: benchmarkReport?.targetModels || [],
+        benchmarkedTargetKeys: benchmarkReport?.targets.map((target) => `${target.runtime}:${target.model}`) || [],
         summary: summarizeCandidates(candidates),
         decisions: {
             generative: {
                 recommendedCandidateId: recommendedCandidate?.id || null,
                 recommendedModel,
+                recommendedRuntime,
                 rationale: benchmarkReport?.decision.rationale || 'No runnable generative candidate completed the benchmark.',
             },
         },
@@ -240,8 +277,10 @@ async function main() {
         registryPath: args.registry,
         corpusPath: args.corpus,
         baseUrl: args.baseUrl,
+        mlxBaseUrl: args.mlxBaseUrl,
         iterations: args.iterations,
         models: args.models || undefined,
+        mlxModels: args.mlxModels || undefined,
     });
 
     const output = JSON.stringify(report, null, 2);

@@ -140,6 +140,15 @@ function sanitizePersonValue(value: string | undefined): string | undefined {
 }
 
 /* @Codex */
+function stripPatientIdentityTail(value: string): string {
+    return value
+        .replace(/\s*,?\s*(?:nat[oa]|data\s+di\s+nascita|nato\s+a)\b.*$/i, '')
+        .replace(/\s*,?\s*(?:codice\s+fiscale|cf|indirizzo|telefono|cellulare|residente)\b.*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/* @Codex */
 function extractPatientName(text: string): { firstName?: string; lastName?: string } {
     const lines = text
         .split(/\r?\n/)
@@ -152,24 +161,28 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
     for (const line of lines) {
         const nameMatch = line.match(/^nome\s*[:.]?\s*(.+)$/i);
         if (!firstName && nameMatch) {
-            firstName = sanitizePersonValue(nameMatch[1]);
+            firstName = sanitizePersonValue(stripPatientIdentityTail(nameMatch[1]));
             continue;
         }
 
         const surnameMatch = line.match(/^cognome\s*[:.]?\s*(.+)$/i);
         if (!lastName && surnameMatch) {
-            lastName = sanitizePersonValue(surnameMatch[1]);
+            lastName = sanitizePersonValue(stripPatientIdentityTail(surnameMatch[1]));
             continue;
         }
 
-        const fullNameMatch = line.match(/^(?:cognome\s+e\s+nome|nome\s+e\s+cognome|paziente|assistito|sig(?:nor[ae]?|\.?ra)?)\s*[:.]?\s*(.+)$/i);
+        const fullNameMatch = line.match(/^(cognome\s+e\s+nome|nome\s+e\s+cognome|paziente|assistito|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
         if (fullNameMatch) {
-            const candidate = sanitizePersonValue(fullNameMatch[1]);
+            const label = fullNameMatch[1].toLowerCase();
+            const candidate = sanitizePersonValue(stripPatientIdentityTail(fullNameMatch[2]));
             if (!candidate) continue;
             const parts = candidate.split(/\s+/).filter(Boolean);
             if (parts.length >= 2) {
-                lastName ||= sanitizePersonValue(parts[0]);
-                firstName ||= sanitizePersonValue(parts.slice(1).join(' '));
+                const surnameFirst = /^cognome\s+e\s+nome$/i.test(label);
+                const given = surnameFirst ? parts.slice(-1).join(' ') : parts.slice(0, -1).join(' ');
+                const family = surnameFirst ? parts.slice(0, -1).join(' ') : parts.slice(-1).join(' ');
+                firstName ||= sanitizePersonValue(given);
+                lastName ||= sanitizePersonValue(family);
             }
         }
     }
@@ -238,6 +251,14 @@ async function callOcr(imageBase64: string, mode: 'full' | 'patient' | 'labs' = 
 /* @Codex */
 async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<string[]> {
     const buffer = await file.arrayBuffer();
+    try {
+        if (!(globalThis as any).pdfjsWorker) {
+            await import('pdfjs-dist/legacy/build/pdf.worker.js');
+        }
+    } catch {
+        // Fall back to the legacy fake-worker path if the side-effect import is unavailable.
+    }
+
     const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.js');
 
     try {
@@ -472,15 +493,13 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     let pdfText = '';
     if (isPdf) {
         try {
-            if (!ocrText) {
-                pdfText = await extractTextFromPdf(file);
-            }
+            pdfText = await extractTextFromPdf(file);
         } catch (e) {
             console.warn('[PDF Service] PDF text extraction failed', e);
         }
     }
 
-    const combinedText = ocrText || pdfText;
+    const combinedText = pdfText || ocrText;
 
     // If AI gave good results, validate with regex
     if (aiResult && aiResult.confidence > 0.7) {

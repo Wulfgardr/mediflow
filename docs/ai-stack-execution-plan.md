@@ -297,6 +297,16 @@ Valutare challenger come `BioMistral` senza rompere la baseline.
 ### Exit criteria
 
 - nessun challenger diventa default senza battere la baseline
+- stato corrente `2026-04-08`: il primo challenger MLX misurato davvero,
+  `Jackrong/MLX-Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-4bit`,
+  resta `keep as challenger` solo `benchmark-only` perche passa il corpus
+  contrattuale condiviso ma resta sotto `qwen3.5:35b-a3b` su `smart_import`
+- stato corrente `2026-04-08`: `TurboQuant` non entra come semplice challenger
+  modello; la sola strada sensata oggi e un prototipo benchmark-only di
+  serving/KV-cache quantization su runtime isolati `Ollama` o `MLX`
+- stato corrente `2026-04-08`: esiste ora un primo runner `MLX`
+  benchmark-only per A/B `baseline` vs `kv_bits`, ma il primo smoke attuale e
+  solo tecnico e non cambia la decisione di promozione
 
 ### Dipendenze
 

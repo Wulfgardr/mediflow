@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-07
+Ultimo aggiornamento: 2026-04-14
 
 ## Come usare questo indice
 
@@ -66,6 +66,7 @@ Ultimo aggiornamento: 2026-04-07
 | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | Valutazione comparativa tra OpenMed e lo stack AI locale MediFlow, con raccomandazione di fit per lane (`PII`, `NER`, runtime generativo). | Quando si esplorano toolkit AI esterni o si decide se introdurre sidecar locali specialistici. |
 | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
 | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |
+| [docs/turboquant-runtime-benchmark.md](./turboquant-runtime-benchmark.md) | Runbook operativo per eseguire la thin slice `WUL-114` su `MLX`, confrontando baseline e varianti `kv_bits` con corpus sintetico dedicato e output JSON comparabile. | Quando serve misurare davvero il path runtime/KV-cache `benchmark-only` di TurboQuant senza toccare il runtime applicativo o il parliament. |
 | [docs/resolver-benchmark.md](./resolver-benchmark.md) | Runbook operativo per benchmarkare i resolver reali WHO ICD-11 e AIFA su corpus sintetici, con metriche su recall, ambiguità, latenza e mismatch di dosage/packaging. | Quando serve misurare i resolver locali veri prima di ritoccare Smart Import, coding o rollout AI. |
 | [docs/patient-insight-benchmark.md](./patient-insight-benchmark.md) | Runbook operativo per misurare `AI Patient Insight` con corpus sintetico dedicato, scoring su focus/citations e validator locale anti-regressione. | Quando si toccano prompt, guardrail o context builder dell'insight e serve un benchmark piu utile del solo controllo JSON. |
 | [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md) | Runbook operativo locale per diagnosticare e recuperare i casi in cui allegati PDF o diario clinico non entrano correttamente nel contesto o nel render finale di `AI Patient Insight`. | Quando un caso reale mostra fallback, follow-up documentale assente o mismatch tra qualita del PDF e resa finale dell'insight. |
@@ -133,6 +134,8 @@ Ultimo aggiornamento: 2026-04-07
 | [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md) | Formalizza `WUL-150`: bootstrap pairing PHI-safe senza token locale, conferma esplicita sul nodo, credenziale dedicata del device paired e primo data plane read-only che richiede paired client + sessione operatore. |
 | [docs/adr/0041-openmed-redaction-shadow-adapter.md](./adr/0041-openmed-redaction-shadow-adapter.md) | Fissa il primo adapter interno OpenMed per la lane `PII/redaction`, con shape `redaction.v1`, auth locale, config localhost-only e shadow mode fuori da `/api/v1`. |
 | [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md) | Formalizza il create-flow `Nuova Anagrafica` da documento con review esplicita, matching locale ICD/AIFA e persistenza strutturata solo delle terapie sufficientemente confermate. |
+| [docs/adr/0043-macos-oncology-backbone-prototype.md](./adr/0043-macos-oncology-backbone-prototype.md) | Formalizza il prototipo macOS della backbone oncologica come shell SwiftUI sintetica, locale e separata da backend, schema e contratti `/api/v1` del prodotto reale. |
+| [docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md](./adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md) | Formalizza `WUL-114`: TurboQuant resta un tema di runtime/KV cache e non un semplice challenger modello; l'unica strada sensata oggi e un prototipo benchmark-only su serving isolato `Ollama`/`MLX`. |
 
 ## Checklist manutenzione indice
 

@@ -51,7 +51,7 @@ Vincoli ulteriori:
 - nessun pruning deve partire implicitamente dal salvataggio settings o dai test
   di connessione
 - le lane non generative (`PII`, `clinical_entities`, `embedding`) non vanno
-  forzate nella stessa logica di benchmark dei generativi `ollama`
+  forzate nella stessa logica di benchmark dei generativi locali
 
 ## Opzioni
 
@@ -88,7 +88,10 @@ Introduciamo un `AI model parliament` locale con queste regole:
 
 - il parlamento legge il candidate registry, i benchmark generativi e il
   benchmark `Smart Import`
-- il parlamento decide solo sui candidati `generative + ollama + runnable`
+- il parlamento decide sui candidati `generative + local_chat_runtime +
+  runnable`, distinguendo sempre `ollama_chat` e `mlx_chat`
+- i candidati `mlx_chat` restano benchmark-only e non cambiano il runtime app
+  o i settings senza una decisione separata
 - il parlamento produce un artifact unico con:
   - baseline raccomandato
   - challenger da mantenere
@@ -156,3 +159,4 @@ Rischi noti:
 - introdurre subito una UI di pruning in `app/settings/page.tsx`
 - benchmarkare nella stessa gara lane `PII`, `NER` o `embedding`
 - rimozione automatica di modelli non tracciati dal registry
+- introdurre pruning implicito dei modelli MLX/Hugging Face dentro questa ADR

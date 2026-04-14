@@ -80,6 +80,11 @@ export class AIService {
         };
     }
 
+    /* @Codex */
+    private isBrowserRuntime(): boolean {
+        return typeof window !== 'undefined';
+    }
+
     static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
         /* @Codex */
         const provider: AIProvider = 'ollama';
@@ -140,14 +145,20 @@ export class AIService {
             },
             ...(this.disableThinking ? { think: false } : {}),
         };
+        const endpoint = this.isBrowserRuntime()
+            ? '/api/proxy/ollama/chat'
+            : `${this.baseUrl}/api/chat`;
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (this.isBrowserRuntime()) {
+            headers['x-target-url'] = this.baseUrl;
+        }
 
         try {
-            const response = await fetch('/api/proxy/ollama/chat', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-target-url': this.baseUrl,
-                },
+                headers,
                 body: JSON.stringify(body),
                 signal // Allow cancellation
             });
@@ -214,9 +225,12 @@ export class AIService {
 
         const targetUrl = this.baseUrl; // already cleaned
         try {
-            const res = await fetch('/api/ai/models', {
-                headers: { 'x-target-url': targetUrl }
-            });
+            const res = await fetch(
+                this.isBrowserRuntime() ? '/api/ai/models' : `${targetUrl}/api/tags`,
+                this.isBrowserRuntime()
+                    ? { headers: { 'x-target-url': targetUrl } }
+                    : undefined,
+            );
             if (!res.ok) throw new Error("Failed to fetch models");
             const data = await res.json();
             return data.models || [];
@@ -234,11 +248,11 @@ export class AIService {
 
         const targetUrl = this.baseUrl;
 
-        const response = await fetch('/api/ai/pull', { // Use our new proxy route
+        const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, { // Use proxy in browser, direct Ollama on server
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-target-url': targetUrl
+                ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {})
             },
             body: JSON.stringify({ model: modelName })
         });

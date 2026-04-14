@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-04-07
+Ultimo aggiornamento: 2026-04-08
 
 ## Policy di consultazione (agent)
 
@@ -81,6 +81,7 @@ Documenti da consultare **al bisogno**:
 | Runbook benchmark OpenMed redaction | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | `SECONDARY` | Guida operativa per lanciare il benchmark `WUL-96` contro un sidecar locale OpenMed, con env vars, healthcheck e metrica attesa della lane `redaction.v1`. |
 | ADR OpenMed redaction shadow adapter | [docs/adr/0041-openmed-redaction-shadow-adapter.md](./adr/0041-openmed-redaction-shadow-adapter.md) | `CANONICAL` | Fissa il primo contratto interno autenticato `redaction.v1` verso OpenMed, tenendolo fuori da `/api/v1` e dai write path clinici autoritativi. |
 | Runbook benchmark clinical entities | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | `SECONDARY` | Guida operativa per eseguire la thin slice `clinical_entities.v1` con adapter locali benchmark-only, a partire da `HUMADEX`, senza toccare il runtime applicativo. |
+| Runbook benchmark runtime MLX TurboQuant | [docs/turboquant-runtime-benchmark.md](./turboquant-runtime-benchmark.md) | `SECONDARY` | Guida operativa per eseguire la thin slice `WUL-114` su `MLX`, confrontando `baseline` e varianti `kv_bits` con corpus sintetico dedicato e senza toccare il runtime applicativo. |
 | Runbook benchmark patient insight | [docs/patient-insight-benchmark.md](./patient-insight-benchmark.md) | `SECONDARY` | Guida operativa per misurare `AI Patient Insight` su corpus sintetico dedicato, con scoring su focus, citation discipline e leakage da fonti stale. |
 | Runbook benchmark resolver WHO/AIFA | [docs/resolver-benchmark.md](./resolver-benchmark.md) | `SECONDARY` | Guida operativa per benchmarkare i resolver reali WHO ICD-11 e AIFA su corpus sintetici, con metriche su recall, ambiguita, latenza e mismatch di dosage/packaging. |
 | Troubleshooting documentale `AI Patient Insight` | [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md) | `SECONDARY` | Runbook locale per diagnosticare e recuperare i casi in cui allegati PDF o diario clinico non entrano correttamente nel contesto o nel render finale di `Patient Insight`. |
@@ -130,6 +131,7 @@ Documenti da consultare **al bisogno**:
 | ADR cloud comparator shadow eval opt-in | [docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md](./adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md) | `CANONICAL` | Governa `WUL-151`: comparatore cloud `gpt-5.4` solo opt-in, su case pack privati redatti/minimizzati fuori Git, con audit trail locale e tassonomia di distillazione obbligatoria verso benchmark sintetici e miglioramenti dello stack locale. |
 | ADR document intelligence evidence ledger | [docs/adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md) | `CANONICAL` | Fissa la north star della document intelligence: documento come `evidence ledger`, con separazione tra recognition, source governance, decision layer e render/projection. |
 | ADR nuova anagrafica da documento reviewable | [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md) | `CANONICAL` | Fissa il create-flow document-driven della nuova anagrafica: review esplicita prima del salvataggio, riconciliazione locale ICD/AIFA e persistenza strutturata solo per le terapie abbastanza confermate. |
+| ADR TurboQuant come tema di runtime benchmark-only | [docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md](./adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md) | `CANONICAL` | Fissa `WUL-114`: TurboQuant non entra come semplice challenger modello; oggi e solo un possibile prototipo benchmark-only di serving/KV-cache quantization su runtime isolati `Ollama` o `MLX`. |
 
 ## File sovrapposti o secondari
 
