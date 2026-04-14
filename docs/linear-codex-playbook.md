@@ -159,7 +159,54 @@ Nota:
 
 ## Convenzioni obbligatorie (Linear <-> GitHub <-> Codex)
 
-## Branch naming
+### Charter operativo: chi decide cosa
+
+Leonardo mantiene ownership su priorita, direzione architetturale e approvazione finale.
+Codex, salvo override esplicito dell'utente, gestisce invece la meccanica operativa
+del delivery:
+
+- apertura/switch branch
+- cadenza e taglio dei commit
+- timing dei push
+- apertura e manutenzione della PR
+- riallineamento Linear su stato, link e verifica
+
+Obiettivo: togliere micro-decisioni ripetitive dal loop quotidiano e far si che
+ogni workstream abbia in automatico un audit trail coerente.
+
+### Rails di progettazione del workflow
+
+Queste regole prendono spunto anche dalle linee guida OpenAI sugli agent:
+modular ownership, tool boundaries chiare, guardrail prima dei side effect e
+tracciabilita by default.
+
+Riferimenti utili:
+
+- [Agents SDK: choose your starting point](https://developers.openai.com/api/docs/guides/agents#choose-your-starting-point)
+- [Orchestration and handoffs](https://developers.openai.com/api/docs/guides/agents/orchestration)
+- [Guardrails and human review](https://developers.openai.com/api/docs/guides/agents/guardrails-approvals)
+- [Using tools in the Agents SDK](https://developers.openai.com/api/docs/guides/tools#usage-in-the-agents-sdk)
+- [Tracing](https://developers.openai.com/api/docs/guides/agents/integrations-observability#tracing)
+- [Evaluate agent workflows](https://developers.openai.com/api/docs/guides/agent-evals)
+
+Traduzione pratica per MediFlow:
+
+1. **Ownership modulare**
+   Un issue = un obiettivo operativo chiaro. Un branch = un issue o un solo
+   slice davvero coeso.
+2. **Non splittare troppo presto**
+   Nuovi branch / nuove issue solo quando cambiano davvero contratto, policy,
+   rischio o ownership del lavoro. Se il lavoro resta un unico racconto
+   reviewable, rimane nello stesso branch.
+3. **Guardrail prima dei side effect**
+   Merge, azioni distruttive Git, update di stato finali su Linear e operazioni
+   che chiudono un capitolo richiedono prima scope check, verifica e contesto
+   scritto.
+4. **Trace before optimize**
+   Prima si rende il lavoro ricostruibile (issue, branch, PR, verifica), poi si
+   ottimizza la velocita del loop.
+
+### Branch naming
 
 Formato:
 
@@ -173,7 +220,7 @@ Esempio:
 codex/mf-123-ai-insight-source-hierarchy
 ```
 
-## Commit naming
+### Commit naming
 
 Includi sempre issue ID:
 
@@ -181,7 +228,7 @@ Includi sempre issue ID:
 feat(ai): enforce source hierarchy for insight generation [MF-123]
 ```
 
-## PR title/body
+### PR title/body
 
 Titolo:
 
@@ -197,6 +244,156 @@ Refs MF-120
 ```
 
 Questo collega automaticamente PR e issue, e puo aggiornare lo stato in Linear.
+
+### Politica operativa workstream -> branch -> PR
+
+#### 1) Unita minima di lavoro
+
+Default:
+
+- ogni lavoro non banale parte da una issue Linear
+- ogni issue attiva ha il suo branch dedicato
+- ogni branch punta a una sola PR
+
+Eccezioni ammesse:
+
+- typo minori
+- micro-fix documentali non decisionali
+- housekeeping locale senza impatto su comportamento, contratto o processo
+
+Se la modifica tocca behavior, API, sicurezza, docs canoniche, UX, ADR o tooling,
+non trattarla come eccezione: crea o identifica una issue.
+
+#### 2) Lifecycle del branch
+
+Appena l'issue e pronta per execution:
+
+1. sposta la issue in `In Progress`
+2. crea branch `codex/<issue-id>-<slug>`
+3. verifica che il working tree sia pulito o compatibile con il tema
+4. lavora solo su quel perimetro
+
+Stop immediato e split se:
+
+- compaiono file non correlati al tema
+- il diff supera ~300 LOC con piu preoccupazioni insieme
+- emergono due acceptance criteria indipendenti
+- serve una ADR separata per una sola parte del lavoro
+- il branch non e piu riassumibile in un unico titolo di PR
+
+#### 3) Politica commit
+
+Regole:
+
+- un commit = un passo logico leggibile
+- ogni commit deve poter essere spiegato in 1-3 frasi
+- ogni commit deve includere l'issue ID
+- niente commit miscuglio codice + refactor + docs non necessari
+- niente messaggi `wip`, `fix stuff`, `misc`, `temp`
+
+Buona euristica:
+
+- commit quando il slice e coerente e auto-rivedibile
+- non aspettare per forza la fine di tutto il branch
+- ma non committare stati rotti solo per ansia di checkpoint
+
+Checkpoint locali:
+
+- se serve un paracadute durante una modifica rischiosa, e accettabile creare
+  un commit temporaneo locale
+- prima della PR, quei commit vanno ripuliti con squash/reword se degradano la
+  leggibilita della storia
+
+#### 4) Politica push
+
+Push non significa "ho finito"; significa "esiste un checkpoint recuperabile".
+
+Codex deve fare push:
+
+- dopo il primo checkpoint stabile della branch
+- prima di un cambio di contesto o fine sessione
+- prima di aprire o aggiornare una PR per review
+- prima di interventi rischiosi che sarebbe costoso ricostruire
+
+Codex non deve accumulare lavoro locale non pushato per troppo tempo.
+Regola pratica: niente branch viva per piu di una sessione seria senza almeno un
+push coerente.
+
+Se il branch e volutamente incompleto:
+
+- push ammesso, ma la PR deve essere `Draft`
+- Linear o la PR devono rendere esplicito che il lavoro non e ancora review-ready
+
+#### 5) Politica PR
+
+Apri una PR `Draft` quando vale almeno una di queste condizioni:
+
+- il branch vivra per piu di una sessione
+- ci sono gia piu commit utili da leggere
+- il lavoro tocca aree rischiose o canoniche
+- vuoi visibilita precoce su scope, docs o ADR
+
+Promuovi la PR a review-ready solo quando:
+
+- il branch ha uno scope coerente e difendibile
+- i check minimi pertinenti sono stati eseguiti
+- la body documenta:
+  - `Fixes <ISSUE-ID>`
+  - contesto e scope
+  - verifica eseguita / non eseguita
+  - eventuale ADR o `no contract impact`
+
+#### 6) Politica merge e chiusura
+
+Default consigliato: **squash merge** per mantenere `main` pulita e leggibile.
+
+Eccezione:
+
+- mantieni commit multipli solo se la struttura dei commit aggiunge reale valore
+  di archeologia tecnica o decisionale
+
+Prima di chiudere il workstream:
+
+1. esegui scope check: `git diff --name-only main..HEAD`
+2. verifica che i file tocchino un solo tema dichiarato
+3. riallinea docs/ADR/OpenAPI se richiesto
+4. aggiorna PR e Linear con cosa e stato verificato
+5. solo dopo merge, porta la issue a `Done`
+
+#### 7) Politica di tracciabilita minima su Linear
+
+Ogni issue attiva dovrebbe rendere ricostruibili almeno questi punti:
+
+- perche esiste il lavoro
+- qual e lo scope
+- qual e il branch o la PR associata
+- cosa e stato verificato
+- cosa non e stato verificato
+- quale follow-up resta aperto, se esiste
+
+Stati consigliati:
+
+- `Triage`: idea ancora grezza
+- `Backlog`: valida ma non attiva
+- `Planned`: candidata al ciclo corrente
+- `In Progress`: branch aperto e lavoro in corso
+- `In Review`: PR aperta e scope stabilizzato
+- `Done`: merge completato e verifica riportata
+- `Canceled`: lavoro esplicitamente abbandonato
+
+#### 8) Regola d'oro per Codex
+
+Non aprire nuovi capitoli dentro un capitolo gia aperto.
+
+Se cambia davvero il lavoro, si cambia anche contenitore:
+
+- nuova issue
+- nuovo branch
+- nuova PR
+- spesso nuova conversazione Codex
+
+Questo e il modo piu semplice per tenere il repo igienico senza rallentare il
+delivery.
 
 ---
 
