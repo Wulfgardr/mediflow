@@ -9,32 +9,8 @@ import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
-
 /* @Codex */
-type ValidationSummary = {
-    total: number;
-    withErrors: number;
-    withWarnings: number;
-    errorCount: number;
-    warningCount: number;
-};
-
-/* @Codex */
-type ValidatePatientExportResponse = {
-    patientId: string;
-    hasErrors: boolean;
-    hasWarnings: boolean;
-    therapyMedication: ValidationSummary;
-    observationVitals: ValidationSummary;
-};
-
-/* @Codex */
-function buildValidationMessage(validation: ValidatePatientExportResponse): string {
-    return [
-        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
-        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
-    ].join('\n');
-}
+import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
 /* @Codex */
 function messageFromError(error: unknown, fallback: string): string {

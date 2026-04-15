@@ -1,13 +1,15 @@
 'use client';
 
 /* @Codex */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 /* @Codex */
-import { ExternalLink, FolderOpen, LoaderCircle, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
+import { ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
 /* @Codex */
 import { completeSissPortalHandoff } from '@/lib/siss';
 /* @Codex */
 import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
+/* @Codex */
+import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
 type Props = {
     patientId: string;
@@ -42,6 +44,12 @@ type BlockedCapabilityConfig = {
     label: string;
     caption: string;
     reason: string;
+};
+
+type FseReadinessState = {
+    loading: boolean;
+    error: string | null;
+    validation: ValidatePatientExportResponse | null;
 };
 
 const ACTIONS: ContextActionConfig[] = [
@@ -121,9 +129,55 @@ function isHandoffResponse(value: unknown): value is HandoffResponse {
 export default function SissPatientContextPanel({ patientId, patientTaxCode }: Props) {
     const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+    const [fseReadiness, setFseReadiness] = useState<FseReadinessState>({
+        loading: true,
+        error: null,
+        validation: null,
+    });
 
     const summary = buildSissPatientContextSummary({ patientTaxCode });
     const hasTaxCode = summary.patientFiscalCodeReady;
+
+    const refreshFseReadiness = async () => {
+        setFseReadiness((current) => ({
+            loading: true,
+            error: null,
+            validation: current.validation,
+        }));
+
+        try {
+            const response = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`);
+            const payload = await response.json().catch(() => null) as ValidatePatientExportResponse | { error?: string } | null;
+
+            if (!response.ok) {
+                const message = payload && 'error' in payload && typeof payload.error === 'string'
+                    ? payload.error
+                    : 'Pre-check FSE non disponibile';
+                setFseReadiness({
+                    loading: false,
+                    error: message,
+                    validation: null,
+                });
+                return;
+            }
+
+            setFseReadiness({
+                loading: false,
+                error: null,
+                validation: payload as ValidatePatientExportResponse,
+            });
+        } catch (error) {
+            setFseReadiness({
+                loading: false,
+                error: error instanceof Error ? error.message : 'Errore inatteso nel pre-check FSE',
+                validation: null,
+            });
+        }
+    };
+
+    useEffect(() => {
+        void refreshFseReadiness();
+    }, [patientId]);
 
     const startFlow = async (action: SissPatientContextAction) => {
         setActiveAction(action);
@@ -183,6 +237,15 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         }
     };
 
+    const validation = fseReadiness.validation;
+    const readinessTone = validation?.hasErrors
+        ? 'error'
+        : validation?.hasWarnings
+            ? 'warning'
+            : validation
+                ? 'success'
+                : 'neutral';
+
     return (
         <div className="rounded-[28px] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50 p-5 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -218,6 +281,82 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-slate-500">
                     API certificate non disponibili
                 </span>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 ${
+                    readinessTone === 'error'
+                        ? 'bg-rose-50 text-rose-700'
+                        : readinessTone === 'warning'
+                            ? 'bg-amber-50 text-amber-700'
+                            : readinessTone === 'success'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-white/70 text-slate-500'
+                }`}>
+                    {fseReadiness.loading
+                        ? 'Pre-check FSE in corso'
+                        : validation?.hasErrors
+                            ? 'FSE locale con blocchi'
+                            : validation?.hasWarnings
+                                ? 'FSE locale con warning'
+                                : validation
+                                    ? 'FSE locale pronta'
+                                    : 'Pre-check FSE non disponibile'}
+                </span>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                        <div className="text-sm font-semibold text-slate-900">Prontezza FSE locale</div>
+                        <p className="text-xs leading-5 text-slate-600">
+                            Questo controllo usa la validazione locale gia presente nel gestionale per stimare se il paziente e pronto per i profili FSE pilotati oggi.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void refreshFseReadiness()}
+                        disabled={fseReadiness.loading}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                        {fseReadiness.loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                        Aggiorna
+                    </button>
+                </div>
+
+                {fseReadiness.error ? (
+                    <p className="mt-3 text-xs font-medium text-rose-700">{fseReadiness.error}</p>
+                ) : validation ? (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div className={`rounded-xl border px-3 py-3 ${
+                            validation.therapyMedication.errorCount > 0
+                                ? 'border-rose-200 bg-rose-50'
+                                : validation.therapyMedication.warningCount > 0
+                                    ? 'border-amber-200 bg-amber-50'
+                                    : 'border-emerald-200 bg-emerald-50'
+                        }`}>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terapie</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                                {validation.therapyMedication.total} record
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">
+                                {validation.therapyMedication.errorCount} errori, {validation.therapyMedication.warningCount} warning
+                            </p>
+                        </div>
+                        <div className={`rounded-xl border px-3 py-3 ${
+                            validation.observationVitals.errorCount > 0
+                                ? 'border-rose-200 bg-rose-50'
+                                : validation.observationVitals.warningCount > 0
+                                    ? 'border-amber-200 bg-amber-50'
+                                    : 'border-emerald-200 bg-emerald-50'
+                        }`}>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Osservazioni</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                                {validation.observationVitals.total} record
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">
+                                {validation.observationVitals.errorCount} errori, {validation.observationVitals.warningCount} warning
+                            </p>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">

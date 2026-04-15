@@ -25,6 +25,7 @@ Lo stato presente è un comportamento di servizio locale che:
 
 - espone un mediatore backend locale per l'handoff contestuale verso i portali `operatorisiss`
 - apre dal paziente i moduli `Menu SISS`, `Ricetta Elettronica`, `FSE` e `Anagrafe`
+- mostra nel pannello contestuale un pre-check locale di prontezza FSE per terapie e osservazioni
 - copia il Codice Fiscale negli appunti quando il flusso lo richiede
 - delega comunque all'operatore il completamento manuale nel portale esterno
 
@@ -60,6 +61,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | `Ricetta Elettronica` | `Disponibile ora` | Apre la compilazione prescrittiva e prepara il CF negli appunti. |
 | `FSE` | `Disponibile ora` | Apertura contestuale via `portal-handoff` con CF pronto da incollare. |
 | `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` con CF pronto da incollare. |
+| Prontezza FSE locale | `Disponibile ora` | Il pannello paziente mostra il pre-check locale su terapie e osservazioni prima di un eventuale export/filone FSE. |
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
 | FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, regole privacy e contratti regionali ulteriori. |
 | SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato, non come route pronta nel prototipo. |

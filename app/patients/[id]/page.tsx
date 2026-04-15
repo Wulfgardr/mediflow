@@ -22,32 +22,8 @@ import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useUIStyle } from '@/components/ui-style-provider';
-
 /* @Codex */
-type ValidationSummary = {
-    total: number;
-    withErrors: number;
-    withWarnings: number;
-    errorCount: number;
-    warningCount: number;
-};
-
-/* @Codex */
-type ValidatePatientExportResponse = {
-    patientId: string;
-    hasErrors: boolean;
-    hasWarnings: boolean;
-    therapyMedication: ValidationSummary;
-    observationVitals: ValidationSummary;
-};
-
-/* @Codex */
-function buildValidationMessage(validation: ValidatePatientExportResponse): string {
-    return [
-        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
-        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
-    ].join('\n');
-}
+import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
 export default function PatientDetailPage() {
     const params = useParams();
