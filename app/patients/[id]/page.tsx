@@ -24,6 +24,8 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { useUIStyle } from '@/components/ui-style-provider';
 /* @Codex */
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
+/* @Codex */
+import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 
 export default function PatientDetailPage() {
     const params = useParams();
@@ -31,6 +33,10 @@ export default function PatientDetailPage() {
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const { uiStyleMode } = useUIStyle();
     const isLiquid = uiStyleMode === 'liquid';
+    /* @Codex */
+    const { hasFeature } = usePreviewProfileState();
+    /* @Codex */
+    const isSissContextPreviewEnabled = hasFeature('siss-context-preview');
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
@@ -286,12 +292,16 @@ export default function PatientDetailPage() {
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,0.95fr)]">
                 <div className="space-y-6">
-                    {/* @Codex */}
-                    <SissPatientContextPanel
+                    {isSissContextPreviewEnabled ? (
+                        <SissPatientContextPanel
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                        />
+                    ) : null}
+                    <TherapyManager
                         patientId={id}
-                        patientTaxCode={patient.taxCode}
+                        showLegacySissPrescriptionPanel={!isSissContextPreviewEnabled}
                     />
-                    <TherapyManager patientId={id} />
                     {/* @Codex */}
                     <ObservationManager patientId={id} />
 

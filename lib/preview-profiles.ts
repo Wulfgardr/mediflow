@@ -8,17 +8,19 @@ export type PreviewProfileId =
     | 'base'
     | 'liquid-glass-ui'
     | 'ai-stack-preview'
-    | 'smart-import-review-v2';
+    | 'smart-import-review-v2'
+    | 'siss-context-preview';
 
 /* @Codex */
-export type PreviewProfileKind = 'base' | 'liquid_glass' | 'ai_stack' | 'smart_import';
+export type PreviewProfileKind = 'base' | 'liquid_glass' | 'ai_stack' | 'smart_import' | 'siss_context';
 
 /* @Codex */
 export type PreviewProfileFlag =
     | 'liquid-shell'
     | 'frosted-sidebar'
     | 'ai-preview'
-    | 'smart-import-review';
+    | 'smart-import-review'
+    | 'siss-context-preview';
 
 /* @Codex */
 export interface PreviewProfile {
@@ -39,6 +41,7 @@ export const PREVIEW_PROFILE_FLAG_LABELS: Record<PreviewProfileFlag, string> = {
     'frosted-sidebar': 'Sidebar accentata',
     'ai-preview': 'Badge AI preview',
     'smart-import-review': 'Review import esplicita',
+    'siss-context-preview': 'Contesto paziente SISS',
 };
 
 /* @Codex */
@@ -78,6 +81,16 @@ export const PREVIEW_PROFILES: readonly PreviewProfile[] = [
         featureFlags: ['smart-import-review'],
         sourceBranch: 'WUL-124 / Smart Import',
         notes: 'Estendibile in futuro a preview locali su porte dedicate tramite targetUrl.',
+    },
+    {
+        id: 'siss-context-preview',
+        label: 'SISS Context Preview',
+        description: 'Preview del pannello contestuale SISS/FSE sul paziente, con readiness locale ed handoff assistito.',
+        kind: 'siss_context',
+        featureFlags: ['siss-context-preview'],
+        sourceBranch: 'WUL-178 / patient-context SISS',
+        sourceCommit: '532dc7f5',
+        notes: 'Attiva il nuovo pannello contestuale senza sostituire in modo permanente il flusso stabile del checkout.',
     },
 ];
 
