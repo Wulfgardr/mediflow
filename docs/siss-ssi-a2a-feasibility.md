@@ -187,17 +187,39 @@ Prima di dichiarare una vera integrazione nativa SISS/FSE, ci mancano ancora:
 - prova che il servizio scelto supporti davvero il grado di customizzazione UI
   desiderato
 
+## Priorita operativa raccomandata
+
+Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
+
+1. [WUL-181](https://linear.app/wulfgardr/issue/WUL-181/modulo-prescrittivo-regionale-boundary-ufficiale-e-first-slice-oltre):
+   `Modulo Prescrittivo Regionale`
+   - e il target con il valore clinico piu diretto
+   - ha gia una traccia pubblica documentale chiara nel portale SISS
+   - e il candidato migliore per una first slice `webapp-assisted`
+2. [WUL-182](https://linear.app/wulfgardr/issue/WUL-182/fse-consultazione-e-consenso-mappa-scenario-specific-per-integrazione):
+   `FSE consultazione e consenso`
+   - richiede un boundary piu delicato su consenso, ruoli e audit
+   - va affrontato solo dopo aver chiarito meglio il prescrittivo
+3. [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile):
+   `SGDT/PAI`
+   - resta un filone piu verticale e specifico
+   - oggi non e il candidato migliore per la prima integrazione ampia dentro
+     MediFlow
+
+`Certificati di malattia` restano per ora fuori da questa priorita, non perche
+irrilevanti, ma perche il materiale pubblico raccolto fin qui non basta ancora a
+tagliare una first slice seria come per prescrittivo/FSE/SGDT.
+
 ## Sequenza consigliata dopo `WUL-178`
 
 1. `WUL-180`: fissare il boundary ufficiale `SSI/A2A` e la mappa di
    fattibilita
 2. `WUL-177` / `WUL-179`: trasformare i riferimenti pubblici in corpus
    sincronizzato e interrogabile
-3. scegliere una sola capability target per la prima integrazione reale oltre
-   l'handoff:
-   - `Modulo Prescrittivo Regionale` via webapp ufficiale
-   - oppure `FSE` su scenario di consultazione/consenso
-   - oppure `SGDT` solo se il perimetro `PAI` e davvero utile al prodotto
+3. aprire la prima capability target in ordine di priorita:
+   - [WUL-181](https://linear.app/wulfgardr/issue/WUL-181/modulo-prescrittivo-regionale-boundary-ufficiale-e-first-slice-oltre)
+   - poi [WUL-182](https://linear.app/wulfgardr/issue/WUL-182/fse-consultazione-e-consenso-mappa-scenario-specific-per-integrazione)
+   - poi [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile)
 4. solo dopo, aprire il workstream runtime che gestisca credenziali,
    qualifica, audit, fallback e UI
 
