@@ -1,7 +1,7 @@
 <!-- Codex: created 2026-04-15 -->
 # ADR 0046: Il primo step oltre l'handoff per il prescrittivo regionale e `webapp-assisted`, non UI custom
 
-Date: 2026-04-15  
+Date: 2026-04-15
 Status: Accepted
 
 ## Problema

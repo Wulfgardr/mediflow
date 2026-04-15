@@ -1,7 +1,7 @@
 <!-- Codex: created 2026-04-15 -->
 # ADR 0045: L'integrazione nativa SISS oltre il `portal-handoff` richiede boundary `SSI` qualificato e scenari approvati
 
-Date: 2026-04-15  
+Date: 2026-04-15
 Status: Accepted
 
 ## Problema
