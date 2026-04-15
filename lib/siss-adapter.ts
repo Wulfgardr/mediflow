@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './audit';
 
 /* @Codex */
-export const SISS_ACTIONS = ['prescription.create', 'fse.lookup'] as const;
+export const SISS_ACTIONS = ['menu.open', 'prescription.create', 'fse.lookup', 'registry.lookup'] as const;
 export type SissAction = (typeof SISS_ACTIONS)[number];
 
 /* @Codex */
@@ -24,8 +24,10 @@ export type SissTransportMode = (typeof SISS_TRANSPORT_MODES)[number];
 
 /* @Codex */
 export const SISS_PORTAL_URLS: Record<SissAction, string> = {
+    'menu.open': 'https://operatorisiss.servizirl.it/menusiss/',
     'prescription.create': 'https://operatorisiss.servizirl.it/prescrizione/',
     'fse.lookup': 'https://operatorisiss.servizirl.it/fse/',
+    'registry.lookup': 'https://operatorisiss.servizirl.it/anagrafe/',
 };
 
 /* @Codex */

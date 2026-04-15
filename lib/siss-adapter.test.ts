@@ -57,7 +57,9 @@ test('invalid fiscal code fails before transport invocation', async () => {
             },
         ),
         (error: unknown) => {
-            assert.ok(error instanceof SissAdapterError);
+            if (!(error instanceof SissAdapterError)) {
+                return false;
+            }
             assert.equal(error.code, 'SISS_INVALID_INPUT');
             assert.equal(error.retryable, false);
             assert.equal(error.attempts, 0);
@@ -133,7 +135,9 @@ test('auth failures are surfaced without retry', async () => {
             },
         ),
         (error: unknown) => {
-            assert.ok(error instanceof SissAdapterError);
+            if (!(error instanceof SissAdapterError)) {
+                return false;
+            }
             assert.equal(error.code, 'SISS_AUTH_REQUIRED');
             assert.equal(error.retryable, false);
             assert.equal(error.attempts, 1);

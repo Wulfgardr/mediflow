@@ -12,7 +12,6 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import ICDAutocomplete from './icd-autocomplete';
 import DrugAutocomplete from './drug-autocomplete';
-import SissPrescriptionPanel from './siss-prescription-panel';
 import { AifaDrug } from '@/lib/db';
 
 const therapySchema = z.object({
@@ -174,12 +173,6 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                     </button>
                 )}
             </div>
-
-            <SissPrescriptionPanel
-                patientId={patientId}
-                patientTaxCode={patient?.taxCode}
-            />
-
             {isAdding && (
                 <div className="glass-panel p-4 animate-in fade-in slide-in-from-top-4">
                     <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">

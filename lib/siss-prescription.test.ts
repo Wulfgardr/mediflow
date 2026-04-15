@@ -11,7 +11,9 @@ test('createSissPrescriptionHandoff rejects patients without tax code', async ()
             patientTaxCode: '',
         }),
         (error: unknown) => {
-            assert.ok(error instanceof SissPrescriptionError);
+            if (!(error instanceof SissPrescriptionError)) {
+                return false;
+            }
             assert.equal(error.code, 'SISS_PATIENT_NOT_READY');
             assert.equal(error.status, 400);
             assert.equal(error.correlationId, null);
@@ -47,7 +49,9 @@ test('createSissPrescriptionHandoff maps adapter errors to API-safe failures', a
             },
         ),
         (error: unknown) => {
-            assert.ok(error instanceof SissPrescriptionError);
+            if (!(error instanceof SissPrescriptionError)) {
+                return false;
+            }
             assert.equal(error.code, 'SISS_HANDOFF_FAILED');
             assert.equal(error.status, 401);
             assert.match(error.correlationId ?? '', /^siss-/);

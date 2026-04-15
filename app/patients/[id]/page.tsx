@@ -13,6 +13,8 @@ import AIPatientInsight from '@/components/ai-patient-insight';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 /* @Codex */
 import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
+/* @Codex */
+import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import PatientActionModal from '@/components/patient-action-modal';
 import { useState } from 'react';
 
@@ -308,6 +310,11 @@ export default function PatientDetailPage() {
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,0.95fr)]">
                 <div className="space-y-6">
+                    {/* @Codex */}
+                    <SissPatientContextPanel
+                        patientId={id}
+                        patientTaxCode={patient.taxCode}
+                    />
                     <TherapyManager patientId={id} />
                     {/* @Codex */}
                     <ObservationManager patientId={id} />
