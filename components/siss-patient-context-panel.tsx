@@ -7,7 +7,7 @@ import { ExternalLink, FolderOpen, LoaderCircle, Search, ShieldAlert, ShieldChec
 /* @Codex */
 import { completeSissPortalHandoff } from '@/lib/siss';
 /* @Codex */
-import type { SissPatientContextAction } from '@/lib/siss-patient-context';
+import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context';
 
 type Props = {
     patientId: string;
@@ -89,7 +89,8 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
     const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
-    const hasTaxCode = typeof patientTaxCode === 'string' && patientTaxCode.trim().length > 0;
+    const summary = buildSissPatientContextSummary({ patientTaxCode });
+    const hasTaxCode = summary.patientFiscalCodeReady;
 
     const startFlow = async (action: SissPatientContextAction) => {
         setActiveAction(action);
@@ -130,7 +131,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
 
             const handoffResult = await completeSissPortalHandoff({
                 handoffUrl: payload.handoffUrl,
-                clipboardText: patientTaxCode ?? '',
+                clipboardText: payload.action === 'menu.open' ? undefined : patientTaxCode ?? '',
                 successMessage: payload.message,
             });
 
@@ -162,27 +163,42 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">
-                            Serve un codice fiscale valido nel profilo paziente prima di procedere.
+                            Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS puo comunque essere aperto.
                         </p>
                     )}
                 </div>
 
                 <div className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Modalita handoff
+                    {summary.transportMode}
                 </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-slate-500">
+                    Sessione browser SISS richiesta
+                </span>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 ${
+                    summary.patientFiscalCodeReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                }`}>
+                    {summary.patientFiscalCodeReady ? 'CF paziente pronto' : 'CF paziente mancante'}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-slate-500">
+                    API certificate non disponibili
+                </span>
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {ACTIONS.map((item) => {
                     const Icon = item.icon;
                     const isLoading = activeAction === item.action;
+                    const state = summary.actionStates.find((actionState) => actionState.action === item.action);
 
                     return (
                         <button
                             key={item.action}
                             type="button"
                             onClick={() => void startFlow(item.action)}
-                            disabled={Boolean(activeAction) || !hasTaxCode}
+                            disabled={Boolean(activeAction) || !state?.available}
                             className="flex min-h-28 flex-col items-start justify-between rounded-2xl border border-white/70 bg-white/80 p-4 text-left shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-100"
                         >
                             <div className="flex w-full items-center justify-between gap-3">
@@ -194,6 +210,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                             <div className="space-y-1">
                                 <div className="text-sm font-semibold text-slate-900">{item.label}</div>
                                 <p className="text-xs leading-5 text-slate-600">{item.caption}</p>
+                                {state?.reason && (
+                                    <p className="text-[11px] font-medium text-amber-700">{state.reason}</p>
+                                )}
                             </div>
                         </button>
                     );

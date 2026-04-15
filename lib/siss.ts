@@ -56,25 +56,26 @@ export interface OpenSissResult {
 
 export interface SissPortalHandoffInput {
     handoffUrl: string;
-    clipboardText: string;
+    clipboardText?: string;
     successMessage?: string;
 }
 
 export async function completeSissPortalHandoff(input: SissPortalHandoffInput): Promise<OpenSissResult> {
-    const normalizedText = input.clipboardText.trim().toUpperCase();
-    if (!normalizedText) {
-        return {
-            success: false,
-            opened: false,
-            message: 'Codice Fiscale mancante per questo paziente.',
-        };
-    }
-
     if (!input.handoffUrl.trim()) {
         return {
             success: false,
             opened: false,
             message: 'Portale SISS non disponibile per questa operazione.',
+        };
+    }
+
+    const normalizedText = (input.clipboardText ?? '').trim().toUpperCase();
+    if (!normalizedText) {
+        window.open(input.handoffUrl, '_blank', 'noopener,noreferrer');
+        return {
+            success: true,
+            opened: true,
+            message: input.successMessage ?? 'Portale SISS aperto.',
         };
     }
 
