@@ -8,6 +8,7 @@ export type SissPrescriptionHandoffResult = {
     status: 'handoff';
     mode: SissTransportMode;
     handoffUrl: string;
+    clipboardText: string | null;
     correlationId: string;
     message: string;
 };
@@ -60,8 +61,9 @@ export async function createSissPrescriptionHandoff(
             status: 'handoff',
             mode: result.mode,
             handoffUrl: result.handoffUrl,
+            clipboardText: result.clipboardText,
             correlationId: result.correlationId,
-            message: 'Flusso SISS pronto. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.',
+            message: result.message,
         };
     } catch (error) {
         if (error instanceof SissPrescriptionError) {

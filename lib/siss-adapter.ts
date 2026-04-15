@@ -1,6 +1,8 @@
 /* @Codex */
 import { randomUUID } from 'node:crypto';
 import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './audit';
+/* @Codex */
+import { SISS_ACTION_URLS } from './siss-urls';
 
 /* @Codex */
 export const SISS_ACTIONS = ['menu.open', 'prescription.create', 'fse.lookup', 'registry.lookup'] as const;
@@ -23,12 +25,7 @@ export const SISS_TRANSPORT_MODES = ['portal-handoff', 'certified-api'] as const
 export type SissTransportMode = (typeof SISS_TRANSPORT_MODES)[number];
 
 /* @Codex */
-export const SISS_PORTAL_URLS: Record<SissAction, string> = {
-    'menu.open': 'https://operatorisiss.servizirl.it/menusiss/',
-    'prescription.create': 'https://operatorisiss.servizirl.it/prescrizione/',
-    'fse.lookup': 'https://operatorisiss.servizirl.it/fse/',
-    'registry.lookup': 'https://operatorisiss.servizirl.it/anagrafe/',
-};
+export const SISS_PORTAL_URLS: Record<SissAction, string> = SISS_ACTION_URLS;
 
 /* @Codex */
 export type SissTransportRequest = {

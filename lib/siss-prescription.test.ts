@@ -31,6 +31,7 @@ test('createSissPrescriptionHandoff returns structured handoff payload', async (
     assert.equal(result.status, 'handoff');
     assert.equal(result.mode, 'portal-handoff');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['prescription.create']);
+    assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
     assert.match(result.correlationId, /^siss-/);
 });
 

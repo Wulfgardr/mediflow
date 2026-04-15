@@ -5,22 +5,8 @@
  * Since no public APIs are available, this module provides utility functions
  * for controlled browser handoff to SISS portals with patient data ready to paste.
  */
-
-// --- SISS Portal URLs ---
-export const SISS_URLS = {
-    // Main menu
-    MENU: 'https://operatorisiss.servizirl.it/menusiss/',
-
-    // Prescrizione Dematerializzata
-    PRESCRIZIONE: 'https://operatorisiss.servizirl.it/prescrizione/',
-    PRESCRIZIONE_COMPILA: 'https://operatorisiss.servizirl.it/prescrizione/#compila-ricetta-page-1',
-
-    // Fascicolo Sanitario Elettronico (for future use)
-    FSE: 'https://operatorisiss.servizirl.it/fse/',
-
-    // Anagrafe (for future use)
-    ANAGRAFE: 'https://operatorisiss.servizirl.it/anagrafe/',
-};
+/* @Codex */
+import { SISS_URLS } from './siss-urls';
 
 // --- Clipboard Utility ---
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -102,9 +88,10 @@ export async function completeSissPortalHandoff(input: SissPortalHandoffInput): 
  * @param codiceFiscale - The patient's Codice Fiscale
  * @returns Result object with success status and user-friendly message
  */
+/* @Codex */
 export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
     return await completeSissPortalHandoff({
-        handoffUrl: SISS_URLS.PRESCRIZIONE,
+        handoffUrl: SISS_URLS.PRESCRIZIONE_COMPILA,
         clipboardText: codiceFiscale,
     });
 }

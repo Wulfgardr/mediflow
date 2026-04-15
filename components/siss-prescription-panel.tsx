@@ -20,6 +20,7 @@ type HandoffResponse = {
     status: 'handoff';
     mode: 'portal-handoff' | 'certified-api';
     handoffUrl: string;
+    clipboardText: string | null;
     correlationId: string;
     message: string;
 };
@@ -32,6 +33,8 @@ function isHandoffResponse(value: unknown): value is HandoffResponse {
         value.status === 'handoff' &&
         'handoffUrl' in value &&
         typeof value.handoffUrl === 'string' &&
+        'clipboardText' in value &&
+        (typeof value.clipboardText === 'string' || value.clipboardText === null) &&
         'correlationId' in value &&
         typeof value.correlationId === 'string' &&
         'message' in value &&
@@ -45,7 +48,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
-    const hasTaxCode = typeof patientTaxCode === 'string' && patientTaxCode.trim().length > 0;
+    const hasTaxCode = /^[A-Z0-9]{11,16}$/.test((patientTaxCode ?? '').trim().toUpperCase());
 
     const startFlow = async () => {
         setIsSubmitting(true);
@@ -57,7 +60,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ patientId, patientTaxCode }),
+                body: JSON.stringify({ patientId }),
             });
 
             const payload = await response.json().catch(() => null) as HandoffResponse | {
@@ -86,7 +89,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
 
             const handoffResult = await completeSissPortalHandoff({
                 handoffUrl: payload.handoffUrl,
-                clipboardText: patientTaxCode ?? '',
+                clipboardText: payload.clipboardText ?? undefined,
                 successMessage: payload.message,
             });
 
@@ -114,7 +117,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                         Prescrizione SISS
                     </div>
                     <p className="text-sm text-slate-700">
-                        Avvia il flusso dal backend locale e poi completa l&apos;handoff sul portale SISS con il codice fiscale pronto per la copia.
+                        Avvia il flusso dal backend locale e apri direttamente la compilazione prescrittiva con il codice fiscale pronto da incollare.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">

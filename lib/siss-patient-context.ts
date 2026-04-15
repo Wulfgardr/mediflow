@@ -1,46 +1,12 @@
 /* @Codex */
+import type { SissAction, SissTransport } from './siss-adapter';
+/* @Codex */
 import {
-    createSissCorrelationId,
-    createSissPortalHandoffTransport,
-    executeSissAdapterRequest,
-    SissAdapterError,
-    type SissAction,
-    SISS_PORTAL_URLS,
-    type SissTransport,
-    type SissTransportMode,
-} from './siss-adapter';
-
-/* @Codex */
-export const SISS_PATIENT_CONTEXT_ACTIONS = ['menu.open', 'prescription.create', 'fse.lookup', 'registry.lookup'] as const;
-export type SissPatientContextAction = (typeof SISS_PATIENT_CONTEXT_ACTIONS)[number];
-
-/* @Codex */
-export type SissPatientContextHandoffResult = {
-    status: 'handoff';
-    action: SissPatientContextAction;
-    title: string;
-    mode: SissTransportMode;
-    handoffUrl: string;
-    correlationId: string;
-    message: string;
-};
-
-/* @Codex */
-export type SissPatientContextActionState = {
-    action: SissPatientContextAction;
-    requiresFiscalCode: boolean;
-    available: boolean;
-    reason: string | null;
-};
-
-/* @Codex */
-export type SissPatientContextSummary = {
-    transportMode: 'portal-handoff';
-    browserSessionRequired: true;
-    certifiedApiAvailable: false;
-    patientFiscalCodeReady: boolean;
-    actionStates: SissPatientContextActionState[];
-};
+    normalizeSissPatientTaxCode,
+    requiresSissPatientFiscalCode,
+    type SissPatientContextAction,
+    type SissPatientContextHandoffResult,
+} from './siss-patient-context-shared';
 
 /* @Codex */
 export class SissPatientContextError extends Error {
@@ -64,44 +30,6 @@ export class SissPatientContextError extends Error {
     }
 }
 
-function isPatientContextAction(value: string): value is SissPatientContextAction {
-    return SISS_PATIENT_CONTEXT_ACTIONS.includes(value as SissPatientContextAction);
-}
-
-/* @Codex */
-export function resolveSissPatientContextAction(value: unknown): SissPatientContextAction | null {
-    return typeof value === 'string' && isPatientContextAction(value) ? value : null;
-}
-
-function requiresFiscalCode(action: SissPatientContextAction): boolean {
-    return action !== 'menu.open';
-}
-
-/* @Codex */
-export function buildSissPatientContextSummary(input: {
-    patientTaxCode: string | null | undefined;
-}): SissPatientContextSummary {
-    const patientFiscalCodeReady = typeof input.patientTaxCode === 'string' && input.patientTaxCode.trim().length > 0;
-
-    return {
-        transportMode: 'portal-handoff',
-        browserSessionRequired: true,
-        certifiedApiAvailable: false,
-        patientFiscalCodeReady,
-        actionStates: SISS_PATIENT_CONTEXT_ACTIONS.map((action) => {
-            const actionNeedsFiscalCode = requiresFiscalCode(action);
-            return {
-                action,
-                requiresFiscalCode: actionNeedsFiscalCode,
-                available: actionNeedsFiscalCode ? patientFiscalCodeReady : true,
-                reason: actionNeedsFiscalCode && !patientFiscalCodeReady
-                    ? 'Richiede un codice fiscale valido nel profilo paziente.'
-                    : null,
-            };
-        }),
-    };
-}
-
 function describeSissAction(action: SissPatientContextAction): {
     title: string;
     message: string;
@@ -110,12 +38,12 @@ function describeSissAction(action: SissPatientContextAction): {
         case 'menu.open':
             return {
                 title: 'Menu SISS',
-                message: 'Menu SISS pronto.',
+                message: 'Menu SISS pronto dalla sessione browser attiva.',
             };
         case 'prescription.create':
             return {
                 title: 'Prescrizione',
-                message: 'Flusso prescrittivo SISS pronto. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.',
+                message: 'Compilazione prescrittiva SISS pronta. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.',
             };
         case 'fse.lookup':
             return {
@@ -148,7 +76,9 @@ export async function createSissPatientContextHandoff(
         });
     }
 
-    if (input.action === 'menu.open' && !input.patientTaxCode?.trim()) {
+    if (input.action === 'menu.open') {
+        /* @Codex */
+        const { createSissCorrelationId, SISS_PORTAL_URLS } = await import('./siss-adapter');
         const actionDescriptor = describeSissAction(input.action);
         return {
             status: 'handoff',
@@ -156,29 +86,34 @@ export async function createSissPatientContextHandoff(
             title: actionDescriptor.title,
             mode: 'portal-handoff',
             handoffUrl: SISS_PORTAL_URLS['menu.open'],
+            clipboardText: null,
             correlationId: createSissCorrelationId(),
-            message: 'Menu SISS aperto senza codice fiscale nel profilo paziente.',
+            message: actionDescriptor.message,
         };
     }
 
-    if (requiresFiscalCode(input.action) && !input.patientTaxCode?.trim()) {
-        throw new SissPatientContextError('Codice fiscale mancante nel profilo paziente.', {
+    const fiscalCode = normalizeSissPatientTaxCode(input.patientTaxCode);
+    if (requiresSissPatientFiscalCode(input.action) && !fiscalCode) {
+        throw new SissPatientContextError('Codice fiscale mancante o non valido nel profilo paziente.', {
             code: 'SISS_PATIENT_NOT_READY',
             status: 400,
         });
     }
 
     const actionDescriptor = describeSissAction(input.action);
-    const fiscalCode = input.patientTaxCode!.trim();
+    /* @Codex */
+    let sissAdapterModule: typeof import('./siss-adapter') | null = null;
 
     try {
-        const result = await executeSissAdapterRequest(
+        /* @Codex */
+        sissAdapterModule = await import('./siss-adapter');
+        const result = await sissAdapterModule.executeSissAdapterRequest(
             {
                 action: input.action as SissAction,
-                fiscalCode,
+                fiscalCode: fiscalCode!,
             },
             {
-                transport: deps.transport ?? createSissPortalHandoffTransport(),
+                transport: deps.transport ?? sissAdapterModule.createSissPortalHandoffTransport(),
             },
         );
 
@@ -197,6 +132,7 @@ export async function createSissPatientContextHandoff(
             title: actionDescriptor.title,
             mode: result.mode,
             handoffUrl,
+            clipboardText: fiscalCode!,
             correlationId: result.correlationId,
             message: actionDescriptor.message,
         };
@@ -205,7 +141,7 @@ export async function createSissPatientContextHandoff(
             throw error;
         }
 
-        if (error instanceof SissAdapterError) {
+        if (sissAdapterModule && error instanceof sissAdapterModule.SissAdapterError) {
             throw new SissPatientContextError(error.message, {
                 code: 'SISS_HANDOFF_FAILED',
                 status: resolveSissPatientContextStatus(error.status),

@@ -6,11 +6,14 @@ import test from 'node:test';
 import { SISS_PORTAL_URLS } from './siss-adapter';
 /* @Codex */
 import {
-    buildSissPatientContextSummary,
     createSissPatientContextHandoff,
-    resolveSissPatientContextAction,
     SissPatientContextError,
 } from './siss-patient-context';
+/* @Codex */
+import {
+    buildSissPatientContextSummary,
+    resolveSissPatientContextAction,
+} from './siss-patient-context-shared';
 
 test('resolveSissPatientContextAction accepts supported contextual actions only', () => {
     assert.equal(resolveSissPatientContextAction('fse.lookup'), 'fse.lookup');
@@ -19,9 +22,9 @@ test('resolveSissPatientContextAction accepts supported contextual actions only'
     assert.equal(resolveSissPatientContextAction('unknown.action'), null);
 });
 
-test('buildSissPatientContextSummary keeps menu available without fiscal code', () => {
+test('buildSissPatientContextSummary keeps menu available without a valid fiscal code', () => {
     const summary = buildSissPatientContextSummary({
-        patientTaxCode: '',
+        patientTaxCode: 'TEST-001',
     });
 
     const menu = summary.actionStates.find((item) => item.action === 'menu.open');
@@ -46,6 +49,7 @@ test('createSissPatientContextHandoff returns structured payload for FSE lookup'
     assert.equal(result.title, 'FSE');
     assert.equal(result.mode, 'portal-handoff');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['fse.lookup']);
+    assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
     assert.match(result.correlationId, /^siss-/);
 });
 
@@ -59,6 +63,7 @@ test('createSissPatientContextHandoff returns structured payload for registry lo
     assert.equal(result.action, 'registry.lookup');
     assert.equal(result.title, 'Anagrafe');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['registry.lookup']);
+    assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
 });
 
 test('createSissPatientContextHandoff opens menu even without fiscal code', async () => {
@@ -71,6 +76,19 @@ test('createSissPatientContextHandoff opens menu even without fiscal code', asyn
     assert.equal(result.action, 'menu.open');
     assert.equal(result.title, 'Menu SISS');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['menu.open']);
+    assert.equal(result.clipboardText, null);
+});
+
+test('createSissPatientContextHandoff opens menu even with an invalid fiscal code', async () => {
+    const result = await createSissPatientContextHandoff({
+        patientId: 'patient-ctx-menu-invalid',
+        patientTaxCode: 'TEST-001',
+        action: 'menu.open',
+    });
+
+    assert.equal(result.action, 'menu.open');
+    assert.equal(result.handoffUrl, SISS_PORTAL_URLS['menu.open']);
+    assert.equal(result.clipboardText, null);
 });
 
 test('createSissPatientContextHandoff rejects patients without tax code', async () => {

@@ -7,7 +7,7 @@ import { ExternalLink, FolderOpen, LoaderCircle, Search, ShieldAlert, ShieldChec
 /* @Codex */
 import { completeSissPortalHandoff } from '@/lib/siss';
 /* @Codex */
-import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context';
+import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
 
 type Props = {
     patientId: string;
@@ -26,6 +26,7 @@ type HandoffResponse = {
     title: string;
     mode: 'portal-handoff' | 'certified-api';
     handoffUrl: string;
+    clipboardText: string | null;
     correlationId: string;
     message: string;
 };
@@ -41,25 +42,25 @@ const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
         label: 'Prescrizione',
-        caption: 'Apri il prescrittivo con il contesto paziente pronto.',
+        caption: 'Apri direttamente la compilazione prescrittiva con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
         action: 'fse.lookup',
         label: 'FSE',
-        caption: 'Apri il fascicolo del paziente senza reinserire il codice fiscale.',
+        caption: 'Apri il fascicolo con il CF del paziente pronto da incollare.',
         icon: FolderOpen,
     },
     {
         action: 'registry.lookup',
         label: 'Anagrafe',
-        caption: 'Apri la ricerca anagrafica regionale del paziente.',
+        caption: 'Apri l\'anagrafe regionale con il CF del paziente pronto da incollare.',
         icon: Search,
     },
     {
         action: 'menu.open',
         label: 'Menu SISS',
-        caption: 'Apri il menu SISS con il codice fiscale gia copiato.',
+        caption: 'Apri il menu SISS dalla sessione browser attiva.',
         icon: SquareMenu,
     },
 ];
@@ -72,6 +73,8 @@ function isHandoffResponse(value: unknown): value is HandoffResponse {
         value.status === 'handoff' &&
         'handoffUrl' in value &&
         typeof value.handoffUrl === 'string' &&
+        'clipboardText' in value &&
+        (typeof value.clipboardText === 'string' || value.clipboardText === null) &&
         'correlationId' in value &&
         typeof value.correlationId === 'string' &&
         'message' in value &&
@@ -102,7 +105,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ patientId, patientTaxCode, action }),
+                body: JSON.stringify({ patientId, action }),
             });
 
             const payload = await response.json().catch(() => null) as HandoffResponse | {
@@ -131,7 +134,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
 
             const handoffResult = await completeSissPortalHandoff({
                 handoffUrl: payload.handoffUrl,
-                clipboardText: payload.action === 'menu.open' ? undefined : patientTaxCode ?? '',
+                clipboardText: payload.clipboardText ?? undefined,
                 successMessage: payload.message,
             });
 
@@ -159,7 +162,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         Contesto paziente SISS
                     </div>
                     <p className="text-sm text-slate-700">
-                        Apri rapidamente i moduli regionali del paziente dal gestionale con il codice fiscale pronto per l&apos;uso.
+                        Apri rapidamente i moduli regionali del paziente dal gestionale con il codice fiscale pronto da incollare, dove disponibile.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">
@@ -180,7 +183,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 <span className={`inline-flex items-center rounded-full px-3 py-1 ${
                     summary.patientFiscalCodeReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                 }`}>
-                    {summary.patientFiscalCodeReady ? 'CF paziente pronto' : 'CF paziente mancante'}
+                    {summary.patientFiscalCodeReady ? 'CF paziente valido' : 'CF paziente mancante o non valido'}
                 </span>
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-slate-500">
                     API certificate non disponibili

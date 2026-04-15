@@ -11,15 +11,14 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as { patientId?: unknown; patientTaxCode?: unknown };
+        const body = await request.json() as { patientId?: unknown };
         const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : '';
-        const patientTaxCode = typeof body.patientTaxCode === 'string' ? body.patientTaxCode : '';
         if (!patientId) {
             return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
         }
 
         const patient = await dbServer
-            .select({ id: patients.id })
+            .select({ id: patients.id, taxCode: patients.taxCode })
             .from(patients)
             .where(eq(patients.id, patientId))
             .get();
@@ -29,7 +28,7 @@ export async function POST(request: Request) {
 
         const result = await createSissPrescriptionHandoff({
             patientId: patient.id,
-            patientTaxCode,
+            patientTaxCode: patient.taxCode,
         });
 
         return NextResponse.json(result);

@@ -9,9 +9,10 @@ import { patients } from '@/lib/schema';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
+import { resolveSissPatientContextAction } from '@/lib/siss-patient-context-shared';
+/* @Codex */
 import {
     createSissPatientContextHandoff,
-    resolveSissPatientContextAction,
     SissPatientContextError,
 } from '@/lib/siss-patient-context';
 
@@ -22,11 +23,9 @@ export async function POST(request: Request) {
     try {
         const body = await request.json() as {
             patientId?: unknown;
-            patientTaxCode?: unknown;
             action?: unknown;
         };
         const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : '';
-        const patientTaxCode = typeof body.patientTaxCode === 'string' ? body.patientTaxCode : '';
         const action = resolveSissPatientContextAction(body.action);
 
         if (!patientId) {
@@ -38,7 +37,7 @@ export async function POST(request: Request) {
         }
 
         const patient = await dbServer
-            .select({ id: patients.id })
+            .select({ id: patients.id, taxCode: patients.taxCode })
             .from(patients)
             .where(eq(patients.id, patientId))
             .get();
@@ -48,7 +47,7 @@ export async function POST(request: Request) {
 
         const result = await createSissPatientContextHandoff({
             patientId: patient.id,
-            patientTaxCode,
+            patientTaxCode: patient.taxCode,
             action,
         });
 
