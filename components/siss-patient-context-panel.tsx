@@ -38,6 +38,12 @@ type ContextActionConfig = {
     icon: typeof ExternalLink;
 };
 
+type BlockedCapabilityConfig = {
+    label: string;
+    caption: string;
+    reason: string;
+};
+
 const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
@@ -62,6 +68,30 @@ const ACTIONS: ContextActionConfig[] = [
         label: 'Menu SISS',
         caption: 'Apri il menu SISS dalla sessione browser attiva.',
         icon: SquareMenu,
+    },
+];
+
+/* @Codex */
+const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
+    {
+        label: 'Prescrittivo nativo',
+        caption: 'Compilazione e invio direttamente dentro MediFlow.',
+        reason: 'Richiede una SSI qualificata SISS e un canale A2A/certificato; il prototipo attuale si ferma all\'handoff browser.',
+    },
+    {
+        label: 'FSE embedded',
+        caption: 'Consultazione del fascicolo dentro l\'interfaccia del gestionale.',
+        reason: 'Manca ancora uno stack regionale certificato per autenticazione, policy privacy e scambio documentale dentro l\'app.',
+    },
+    {
+        label: 'SGDT',
+        caption: 'Accesso contestuale ai percorsi territoriali regionali dal paziente aperto.',
+        reason: 'SGDT risulta un applicativo regionale centralizzato; nel prototipo non c\'e ancora un punto di integrazione paziente-scoped adottabile.',
+    },
+    {
+        label: 'Certificati di malattia',
+        caption: 'Emissione contestuale del certificato partendo dal paziente MediFlow.',
+        reason: 'La documentazione SISS esiste, ma non abbiamo ancora modellato scenario, tracciato e vincoli operativi in un adapter dedicato.',
     },
 ];
 
@@ -220,6 +250,33 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         </button>
                     );
                 })}
+            </div>
+
+            <div className="mt-5 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    Non ancora integrabile oggi
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {BLOCKED_CAPABILITIES.map((item) => (
+                        <div
+                            key={item.label}
+                            className="flex min-h-28 flex-col items-start justify-between rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-left"
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                                <ShieldAlert className="h-4 w-4" />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-sm font-semibold text-slate-900">{item.label}</div>
+                                <p className="text-xs leading-5 text-slate-600">{item.caption}</p>
+                                <p className="text-[11px] font-medium text-amber-700">{item.reason}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-xs leading-5 text-slate-600">
+                    Il salto da handoff assistito a integrazione nativa richiede un filone dedicato su qualifica SSI, canale A2A e requisiti regionali certificati.
+                </p>
             </div>
 
             {feedback && (

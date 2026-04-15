@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-14
+Ultimo aggiornamento: 2026-04-15
 
 ## Come usare questo indice
 
@@ -62,7 +62,7 @@ Ultimo aggiornamento: 2026-04-14
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
 | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | Benchmark v1 per facts osservazionali `LOINC/UCUM`, corpus sintetico e decisione `hybrid` default / `rules` fallback. | Quando si toccano osservazioni, import documentale codificato o decisioni di interoperabilità sui clinical facts. |
 | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | Matrice di allineamento tra baseline ufficiale GTW/FSE e stato MediFlow. | Per gap analysis ministeriale, priorità FSE e anti-drift tecnico. |
-| [docs/siss-baseline.md](./siss-baseline.md) | Baseline canonica SISS: stato attuale, target certificato, gap e sequenza di consegna. | Quando si lavora su `WUL-43`, `WUL-44` e `WUL-45`. |
+| [docs/siss-baseline.md](./siss-baseline.md) | Baseline canonica SISS: stato attuale, fonti ufficiali, matrice del prototipo contestuale, gap e sequenza di consegna. | Quando si lavora su `WUL-43`, `WUL-44`, `WUL-45` e `WUL-178`. |
 | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | Valutazione comparativa tra OpenMed e lo stack AI locale MediFlow, con raccomandazione di fit per lane (`PII`, `NER`, runtime generativo). | Quando si esplorano toolkit AI esterni o si decide se introdurre sidecar locali specialistici. |
 | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
 | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |
