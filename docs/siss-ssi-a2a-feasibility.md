@@ -196,6 +196,8 @@ Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
    - e il target con il valore clinico piu diretto
    - ha gia una traccia pubblica documentale chiara nel portale SISS
    - e il candidato migliore per una first slice `webapp-assisted`
+   - nota canonica dedicata:
+     [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md)
 2. [WUL-182](https://linear.app/wulfgardr/issue/WUL-182/fse-consultazione-e-consenso-mappa-scenario-specific-per-integrazione):
    `FSE consultazione e consenso`
    - richiede un boundary piu delicato su consenso, ruoli e audit
