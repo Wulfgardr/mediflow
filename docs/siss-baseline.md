@@ -6,7 +6,7 @@
 Questo documento fissa la baseline SISS di MediFlow per il filone `WUL-43`.
 Serve a separare chiaramente lo stato attuale, ancora basato su shortcut web,
 dal target certificato che verrà affrontato in modo controllato con i follow-up
-`WUL-45`, `WUL-44` e `WUL-178`.
+`WUL-45`, `WUL-44`, `WUL-178` e `WUL-180`.
 
 Riferimenti canonici:
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
@@ -17,6 +17,7 @@ Riferimenti canonici:
 - [docs/markdown-index.md](./markdown-index.md)
 - [docs/walkthrough.md](./walkthrough.md)
 - [docs/COMPLIANCE.md](./COMPLIANCE.md)
+- [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
 
 ## Stato attuale
 
@@ -115,9 +116,12 @@ La sequenza di lavoro per questo stream è:
    dopo che il mediator e le sue regole sono stati fissati
 4. `WUL-178`: launcher contestuale paziente per `Menu SISS`, `Ricetta`, `FSE`
    e `Anagrafe`, mantenendo il confine esplicito del `portal-handoff`
-5. filone successivo dedicato a `SSI qualificata / A2A / canale certificato`
-   se e solo se la documentazione tecnica disponibile e l'onboarding regionale
-   lo rendono concretamente perseguibile
+5. `WUL-180`: mappa di fattibilita ufficiale per separare `portal-handoff`,
+   `webapp ufficiale`, `A2A`, `SSI qualificata` e capability realmente
+   perseguibili
+6. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
+   certificato`, se e solo se la documentazione tecnica disponibile e
+   l'onboarding regionale lo rendono concretamente perseguibile
 
 Questa sequenza evita di legare l'UI a un comportamento SISS non ancora
 certificato.
@@ -135,4 +139,6 @@ Per questa baseline non sono inclusi:
 ## Nota operativa
 
 Se questa baseline cambia in modo sostanziale, il primo aggiornamento deve
-passare da `docs/README.md` e da un ADR dedicato al comportamento runtime.
+passare da `docs/README.md`, da
+[docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md) e da un ADR
+dedicato al comportamento runtime.

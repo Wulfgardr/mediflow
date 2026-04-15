@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-07
+Ultimo aggiornamento: 2026-04-15
 
 ---
 
@@ -14,6 +14,7 @@ Ultimo aggiornamento: 2026-04-07
 ### Post-v0.5.0 (stabilizzazione sul campo + home-base/document intelligence)
 - [ ] Eseguire validazione sul campo delle superfici UI/AI rilasciate in `v0.5.0` e riversare bug/regressioni in Linear con priorita esplicite.
 - [ ] Mantenere affidabile il verify loop per le patch `0.5.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` quando si tocca il boundary paired.
+- [ ] Fissare prima la mappa ufficiale `SSI/A2A` oltre il `portal-handoff` (`WUL-180`) prima di qualunque tentativo di prescrittivo nativo, `FSE` embedded o altri moduli SISS dentro MediFlow.
 - [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).
 - [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback senza introdurre ancora write remoti.
 - [x] Portare su `main` la first slice runtime del `document evidence ledger` (`WUL-152`): artifact canonico `parse/evidence` cifrato sugli allegati, consumer iniziale in `Patient Insight`, `documentInsights` mantenuto come compat layer.
