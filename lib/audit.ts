@@ -29,6 +29,7 @@ export const AUDIT_EVENT_TYPES = [
     'observation.created',
     'observation.updated',
     'observation.deleted',
+    'patient.siss.prescription.launch',
     'settings.updated',
 ] as const;
 

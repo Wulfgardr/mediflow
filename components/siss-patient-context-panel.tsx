@@ -55,8 +55,8 @@ type FseReadinessState = {
 const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
-        label: 'Prescrizione',
-        caption: 'Apri direttamente la compilazione prescrittiva con il CF pronto da incollare.',
+        label: 'Modulo prescrittivo',
+        caption: 'Apri la webapp ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
@@ -255,7 +255,10 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         Contesto paziente SISS
                     </div>
                     <p className="text-sm text-slate-700">
-                        Apri rapidamente i moduli regionali del paziente dal gestionale con il codice fiscale pronto da incollare, dove disponibile.
+                        Apri rapidamente i moduli regionali ufficiali dal gestionale con il codice fiscale del paziente pronto da incollare, dove disponibile.
+                    </p>
+                    <p className="text-xs leading-5 text-slate-600">
+                        Per il prescrittivo questa slice richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l'interfaccia regionale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">
@@ -272,6 +275,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
                 <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-slate-500">
                     Sessione browser SISS richiesta
+                </span>
+                <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-slate-500">
+                    Prescrittivo: webapp ufficiale regionale
                 </span>
                 <span className={`inline-flex items-center rounded-full px-3 py-1 ${
                     summary.patientFiscalCodeReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'

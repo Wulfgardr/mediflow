@@ -1,9 +1,10 @@
 /**
  * SISS Integration Utilities
  * Sistema Informativo Socio Sanitario - Regione Lombardia
- * 
- * Since no public APIs are available, this module provides utility functions
- * for controlled browser handoff to SISS portals with patient data ready to paste.
+ *
+ * This module provides utility functions for controlled browser handoff to the
+ * official regional web applications currently reachable from MediFlow. It does
+ * not implement a certified SISS backend integration.
  */
 /* @Codex */
 import { SISS_URLS } from './siss-urls';
@@ -84,14 +85,15 @@ export async function completeSissPortalHandoff(input: SissPortalHandoffInput): 
 }
 
 /**
- * Opens the SISS Prescrizione portal and copies the patient's CF to clipboard.
+ * Opens the official Modulo Prescrittivo Regionale web application and copies
+ * the patient's CF to clipboard.
  * @param codiceFiscale - The patient's Codice Fiscale
  * @returns Result object with success status and user-friendly message
  */
 /* @Codex */
 export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
     return await completeSissPortalHandoff({
-        handoffUrl: SISS_URLS.PRESCRIZIONE_COMPILA,
+        handoffUrl: SISS_URLS.PRESCRIZIONE_WEBAPP,
         clipboardText: codiceFiscale,
     });
 }

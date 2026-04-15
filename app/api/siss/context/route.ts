@@ -9,16 +9,23 @@ import { patients } from '@/lib/schema';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
+import { safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
 import { resolveSissPatientContextAction } from '@/lib/siss-patient-context-shared';
 /* @Codex */
 import {
     createSissPatientContextHandoff,
     SissPatientContextError,
 } from '@/lib/siss-patient-context';
+/* @Codex */
+import { buildSissPrescriptionLaunchAuditMetadata } from '@/lib/siss-audit';
 
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+
+    let auditPatientId: string | null = null;
+    let shouldAuditPrescriptionLaunch = false;
 
     try {
         const body = await request.json() as {
@@ -45,15 +52,45 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
         }
 
+        auditPatientId = patient.id;
+        shouldAuditPrescriptionLaunch = action === 'prescription.create';
+
         const result = await createSissPatientContextHandoff({
             patientId: patient.id,
             patientTaxCode: patient.taxCode,
             action,
         });
 
+        if (shouldAuditPrescriptionLaunch) {
+            await safeWriteAuditEventFromRequest(request, session, {
+                eventType: 'patient.siss.prescription.launch',
+                subjectType: 'patient',
+                subjectRef: patient.id,
+                redactedMetadata: buildSissPrescriptionLaunchAuditMetadata({
+                    entrypoint: 'patient-context',
+                    mode: result.mode,
+                    outcome: 'success',
+                }),
+            }, '[MediFlow] SISS patient-context prescription audit write failed:');
+        }
+
         return NextResponse.json(result);
     } catch (error) {
         if (error instanceof SissPatientContextError) {
+            if (shouldAuditPrescriptionLaunch && auditPatientId) {
+                await safeWriteAuditEventFromRequest(request, session, {
+                    eventType: 'patient.siss.prescription.launch',
+                    outcome: 'failure',
+                    subjectType: 'patient',
+                    subjectRef: auditPatientId,
+                    redactedMetadata: buildSissPrescriptionLaunchAuditMetadata({
+                        entrypoint: 'patient-context',
+                        outcome: 'failure',
+                        reasonCode: error.code,
+                    }),
+                }, '[MediFlow] SISS patient-context prescription audit write failed:');
+            }
+
             return NextResponse.json(
                 {
                     error: error.message,

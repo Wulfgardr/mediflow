@@ -182,6 +182,26 @@ Obiettivo minimo:
    continuita consentito dai documenti
 3. non duplicare in MediFlow la logica clinico-amministrativa del modulo
 
+## Aggiornamento runtime `WUL-184`
+
+La prima slice runtime coerente con questa decisione oggi fa tre cose:
+
+1. richiama la root ufficiale della webapp del `Modulo Prescrittivo
+   Regionale`, evitando deep-link non necessari alla compilazione interna
+2. prepara in locale il `CF` del paziente per ridurre l'attrito operativo
+3. scrive un audit locale `PHI-safe` del launch MediFlow, senza dichiarare una
+   integrazione prescrittiva nativa o certificata
+
+Questa implementazione resta quindi dentro il perimetro:
+
+- `webapp-assisted official path`
+
+e non sposta ancora MediFlow verso:
+
+- `UI prescrittiva custom`
+- `prefill clinico-amministrativo` non dimostrato
+- `consumo diretto dei WS SISS` senza onboarding/coerenza scenario
+
 ## Acceptance criteria per una futura issue runtime
 
 Una futura implementazione runtime dovra dimostrare almeno questo:

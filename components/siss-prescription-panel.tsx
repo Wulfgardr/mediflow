@@ -114,10 +114,13 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                 <div className="space-y-1">
                     <div className="flex items-center gap-2 text-sm font-semibold text-teal-800">
                         <ShieldCheck className="h-4 w-4" />
-                        Prescrizione SISS
+                        Modulo Prescrittivo Regionale
                     </div>
                     <p className="text-sm text-slate-700">
-                        Avvia il flusso dal backend locale e apri direttamente la compilazione prescrittiva con il codice fiscale pronto da incollare.
+                        Avvia il flusso dal backend locale e apri la webapp ufficiale del Modulo Prescrittivo Regionale con il codice fiscale pronto da incollare.
+                    </p>
+                    <p className="text-xs leading-5 text-slate-600">
+                        Questa slice resta webapp-assisted: MediFlow prepara il contesto paziente, ma l'atto prescrittivo resta nella sessione SISS ufficiale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">
@@ -137,7 +140,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                     ) : (
                         <ExternalLink className="h-4 w-4" />
                     )}
-                    Avvia prescrizione
+                    Apri modulo prescrittivo
                 </button>
             </div>
 

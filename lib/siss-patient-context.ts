@@ -42,8 +42,8 @@ function describeSissAction(action: SissPatientContextAction): {
             };
         case 'prescription.create':
             return {
-                title: 'Prescrizione',
-                message: 'Compilazione prescrittiva SISS pronta. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.',
+                title: 'Modulo Prescrittivo Regionale',
+                message: 'Webapp ufficiale del Modulo Prescrittivo Regionale pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.',
             };
         case 'fse.lookup':
             return {

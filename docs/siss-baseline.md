@@ -28,6 +28,7 @@ Lo stato presente è un comportamento di servizio locale che:
 - apre dal paziente i moduli `Menu SISS`, `Ricetta Elettronica`, `FSE` e `Anagrafe`
 - mostra nel pannello contestuale un pre-check locale di prontezza FSE per terapie e osservazioni
 - copia il Codice Fiscale negli appunti quando il flusso lo richiede
+- scrive un audit locale PHI-safe del launch verso il `Modulo Prescrittivo Regionale`
 - delega comunque all'operatore il completamento manuale nel portale esterno
 
 Questo significa che:
@@ -59,7 +60,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | Capacità | Stato | Note |
 | --- | --- | --- |
 | `Menu SISS` | `Disponibile ora` | Apertura dal paziente via `portal-handoff`, anche senza CF valido. |
-| `Ricetta Elettronica` | `Disponibile ora` | Apre la compilazione prescrittiva e prepara il CF negli appunti. |
+| `Ricetta Elettronica` | `Disponibile ora` | Richiama la webapp ufficiale del `Modulo Prescrittivo Regionale` in modalita `portal-handoff`, prepara il CF negli appunti e scrive audit locale PHI-safe del launch. |
 | `FSE` | `Disponibile ora` | Apertura contestuale via `portal-handoff` con CF pronto da incollare. |
 | `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` con CF pronto da incollare. |
 | Prontezza FSE locale | `Disponibile ora` | Il pannello paziente mostra il pre-check locale su terapie e osservazioni prima di un eventuale export/filone FSE. |
@@ -99,7 +100,7 @@ Oggi mancano ancora:
 - canale certificato oltre il mediatore locale di `portal-handoff`
 - contratto errori e retry policy SISS
 - gestione credenziali/certificati dedicata
-- audit SISS con correlazione di richiesta
+- audit SISS esteso agli altri flussi contestuali e ai futuri scenari certificati
 - test sintetici del flusso certificato end-to-end
 
 Il file `lib/siss.ts` e il pulsante nel profilo paziente restano quindi un
