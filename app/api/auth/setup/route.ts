@@ -4,6 +4,8 @@ import { users, settings } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 /* @Codex */
+import { auditSourceSurfaceFromRequest } from '@/lib/audit';
+/* @Codex */
 import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
 
 export async function POST(request: Request) {
@@ -46,7 +48,11 @@ export async function POST(request: Request) {
         }
 
         /* @Codex */
-        const session = createSession({ id: userId, username, role: 'admin' });
+        const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');
+        const session = createSession(
+            { id: userId, username, role: 'admin' },
+            sourceSurface === 'native' ? 'native' : 'web',
+        );
         const response = NextResponse.json({ success: true });
         response.cookies.set(SESSION_COOKIE_NAME, session.id, {
             httpOnly: true,

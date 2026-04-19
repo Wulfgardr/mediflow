@@ -1,38 +1,30 @@
-// Codex: created 2026-02-01
 import SwiftUI
-import AppKit
 
 @main
 struct MediFlowMacApp: App {
+    @StateObject private var store = OncologyPrototypeStore()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(SecuritySession.shared)
+            OncologyPrototypeRootView()
+                .environmentObject(store)
+                .frame(minWidth: 1280, minHeight: 840)
         }
         .commands {
-            CommandGroup(replacing: .appTermination) {
-                Button("Esci MediFlow") {
-                    NSApp.terminate(nil)
+            CommandMenu("Prototype") {
+                Button("Reset demo") {
+                    store.resetDemo()
                 }
-                .keyboardShortcut("q")
-            }
-            CommandGroup(after: .windowList) {
-                Button("Chiudi finestra") {
-                    NSApp.keyWindow?.performClose(nil)
+                Button("Riapri onboarding") {
+                    store.reopenOnboarding()
                 }
-                .keyboardShortcut("w")
-            }
-            CommandGroup(after: .appInfo) {
-                Button("Blocca") {
-                    SecuritySession.shared.lock()
-                }
-                .keyboardShortcut("l")
             }
         }
 
         Settings {
-            SettingsView(settings: SettingsStore.shared)
-                .environmentObject(SecuritySession.shared)
+            PrototypeSettingsView()
+                .environmentObject(store)
+                .frame(width: 520, height: 520)
         }
     }
 }

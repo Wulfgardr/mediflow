@@ -1,0 +1,47 @@
+[
+  {
+    "id": "bp-hr-spo2-explicit",
+    "text": "PA 120/80 mmHg, FC 72 bpm, SpO2 96% in aria ambiente.",
+    "expected": [
+      { "code": "8480-6", "unitCode": "mm[Hg]", "value": "120", "reviewable": false },
+      { "code": "8462-4", "unitCode": "mm[Hg]", "value": "80", "reviewable": false },
+      { "code": "8867-4", "unitCode": "/min", "value": "72", "reviewable": false },
+      { "code": "59408-5", "unitCode": "%", "value": "96", "reviewable": false }
+    ]
+  },
+  {
+    "id": "temperature-weight-explicit",
+    "text": "Temperatura corporea 37.2 °C, peso 80 kg.",
+    "expected": [
+      { "code": "8310-5", "unitCode": "Cel", "value": "37.2", "reviewable": false },
+      { "code": "29463-7", "unitCode": "kg", "value": "80", "reviewable": false }
+    ]
+  },
+  {
+    "id": "glucose-explicit",
+    "text": "Glicemia capillare 110 mg/dL a digiuno.",
+    "expected": [
+      { "code": "2339-0", "unitCode": "mg/dL", "value": "110", "reviewable": false }
+    ]
+  },
+  {
+    "id": "blood-pressure-reviewable-missing-unit",
+    "text": "Pressione arteriosa 140/90, dato riferito dal caregiver.",
+    "expected": [
+      { "code": "8480-6", "unitCode": "mm[Hg]", "value": "140", "reviewable": true },
+      { "code": "8462-4", "unitCode": "mm[Hg]", "value": "90", "reviewable": true }
+    ]
+  },
+  {
+    "id": "heart-rate-explicit",
+    "text": "Frequenza cardiaca 88 bpm, ritmo regolare.",
+    "expected": [
+      { "code": "8867-4", "unitCode": "/min", "value": "88", "reviewable": false }
+    ]
+  },
+  {
+    "id": "no-observation-noise",
+    "text": "Paziente stanco, da rivalutare domani. Nessun parametro vitale riportato.",
+    "expected": []
+  }
+]

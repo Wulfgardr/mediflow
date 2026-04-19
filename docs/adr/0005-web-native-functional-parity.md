@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-06 -->
 # ADR 0005: Web/native functional parity on a shared local contract
 
 Date: 2026-02-06

@@ -1,0 +1,242 @@
+{
+  "schemaVersion": "mediflow.ai.model-stack-candidates.v1",
+  "candidates": [
+    {
+      "id": "qwen2_5_32b",
+      "label": "Qwen2.5 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen2.5:32b",
+      "executionStatus": "runnable",
+      "notes": "Contract benchmark baseline from ADR 0027."
+    },
+    {
+      "id": "qwen3_32b",
+      "label": "Qwen3 32B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3:32b",
+      "executionStatus": "runnable",
+      "notes": "Local contract benchmark baseline after the native Ollama chat transport fix."
+    },
+    {
+      "id": "qwen3_5_35b_a3b",
+      "label": "Qwen3.5 35B A3B",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3.5:35b-a3b",
+      "executionStatus": "runnable",
+      "notes": "Current default text-only model from ADR 0013."
+    },
+    {
+      "id": "medgemma_1_5_4b_it",
+      "label": "MedGemma 1.5 4B IT",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "ollama_chat",
+      "runtimeModel": "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:latest",
+      "executionStatus": "runnable",
+      "notes": "Specialist medical challenger already present in the local runtime."
+    },
+    {
+      "id": "medgemma_1_5_4b_it_mlx",
+      "label": "MedGemma 1.5 4B IT MLX",
+      "lane": "generative",
+      "origin": "current_stack",
+      "runtime": "mlx_chat",
+      "runtimeModel": "mlx-community/medgemma-1.5-4b-it-bf16",
+      "executionStatus": "runnable",
+      "notes": "Current Apple MLX local chat candidate, benchmark-only for stack comparison and not a default runtime promotion."
+    },
+    {
+      "id": "jackrong_qwen3_5_9b_reasoning_distilled_v2_4bit_mlx",
+      "label": "Jackrong Qwen3.5 9B Distilled v2 MLX 4bit",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "mlx_chat",
+      "runtimeModel": "Jackrong/MLX-Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-4bit",
+      "executionStatus": "runnable",
+      "notes": "Primary MLX challenger for WUL-113/WUL-115 after the 2026-04-08 Hugging Face refresh; benchmark-only until both chambers are measured."
+    },
+    {
+      "id": "gemma4_e2b",
+      "label": "Gemma 4 E2B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:e2b",
+      "executionStatus": "runnable",
+      "notes": "Local challenger benchmarked on Apple Silicon via an isolated Ollama HEAD runtime because the stable 0.19.0 app build cannot yet pull Gemma 4 manifests."
+    },
+    {
+      "id": "gemma4_e4b",
+      "label": "Gemma 4 E4B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:e4b",
+      "executionStatus": "runnable",
+      "notes": "Primary Gemma 4 local challenger benchmarked on Apple Silicon via an isolated Ollama HEAD runtime because the stable 0.19.0 app build cannot yet pull Gemma 4 manifests."
+    },
+    {
+      "id": "gemma4_26b",
+      "label": "Gemma 4 26B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:26b",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "requires_head_ollama_runtime",
+        "not_installed",
+        "sizing_pending_on_m4_max_36gb"
+      ],
+      "notes": "Promising larger Gemma 4 challenger, but not yet installed or benchmarked on the current Mac."
+    },
+    {
+      "id": "gemma4_31b",
+      "label": "Gemma 4 31B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "gemma4:31b",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "requires_head_ollama_runtime",
+        "not_installed",
+        "sizing_pending_on_m4_max_36gb"
+      ],
+      "notes": "Largest Gemma 4 local challenger, intentionally held until sizing on the current Mac is justified."
+    },
+    {
+      "id": "biomistral_7b",
+      "label": "BioMistral 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "not_installed",
+        "local_runtime_packaging_pending"
+      ],
+      "notes": "Most plausible biomedical generative challenger from the report once a local packaging decision exists."
+    },
+    {
+      "id": "meditron_7b",
+      "label": "Meditron 7B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "external_chat_runtime",
+      "executionStatus": "gated_access",
+      "blockers": [
+        "gated_hf_access",
+        "english_first_fit"
+      ],
+      "notes": "Kept out of the first runnable sweep because gating and language fit are unresolved."
+    },
+    {
+      "id": "openmed_pii_it_clinicallongformer",
+      "label": "OpenMed PII Italian ClinicalLongformer",
+      "lane": "pii",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "shadow_validation_failed",
+        "email_mailbox_recall_too_low"
+      ],
+      "notes": "WUL-96 benchmark stack is complete, but the model remains benchmark-only / not shadow-ready: full-corpus email recall is 0.333 and email-focused recall is 0.143, with critical mailbox leaks still present."
+    },
+    {
+      "id": "humadex_italian_medical_ner",
+      "label": "HUMADEX Italian Medical NER",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "runtimeModel": "HUMADEX/italian_medical_ner",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "benchmark_only",
+        "promotion_gate_failed",
+        "negative_case_leaks",
+        "false_positive_context_tokens",
+        "under_span_problem_phrases",
+        "corpus_scope_still_expanding"
+      ],
+      "notes": "Current corpus v2 benchmark makes HUMADEX the leading deterministic candidate and the result is stable over 5 repeat runs: contractValidRate=1, spanPrecision=0.6, spanRecall=0.7, criticalRecall=0.7, evidenceCoverage=1, negativeCaseLeakRate=1. Promotion gate still fails on negative-case leaks and under-span problem phrases, so the lane remains benchmark-only."
+    },
+    {
+      "id": "openmed_ner_secondary_baseline",
+      "label": "OpenMed NER Secondary Baseline",
+      "lane": "clinical_entities",
+      "origin": "report",
+      "runtime": "transformers_token_classification",
+      "runtimeModel": "disease_detection_superclinical + pharma_detection_superclinical",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "benchmark_only",
+        "promotion_gate_failed",
+        "negative_case_leaks",
+        "secondary_baseline_only",
+        "problem_span_underextension",
+        "lab_values_misclassified_as_medication"
+      ],
+      "notes": "Measured on the same clinical_entities.v2 harness with openmed==0.6.3 and now repeated across 5 runs: contractValidRate=1, spanPrecision=0.5, spanRecall=0.6, criticalRecall=0.6, evidenceCoverage=1, negativeCaseLeakRate=1. Useful only as a secondary baseline; currently weaker than HUMADEX and also fails the promotion gate."
+    },
+    {
+      "id": "biobit",
+      "label": "bioBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Potential Italian biomedical embedding backbone, but license clarity is required first."
+    },
+    {
+      "id": "medbit",
+      "label": "medBIT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "license_blocked",
+      "blockers": [
+        "license_unclear",
+        "adapter_missing"
+      ],
+      "notes": "Same integration path as bioBIT, with licensing still unresolved."
+    },
+    {
+      "id": "biomedbert_pubmedbert",
+      "label": "BiomedBERT PubMedBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_biomedical_fit"
+      ],
+      "notes": "Possible English-heavy retrieval/reranking baseline with clear licensing."
+    },
+    {
+      "id": "bio_clinicalbert",
+      "label": "Bio ClinicalBERT",
+      "lane": "embedding",
+      "origin": "report",
+      "runtime": "transformers_encoder",
+      "executionStatus": "integration_required",
+      "blockers": [
+        "adapter_missing",
+        "english_clinical_fit"
+      ],
+      "notes": "English clinical encoder, useful only if a dual-language retrieval lane becomes necessary."
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+/* @Codex */
+import { and, desc, eq } from 'drizzle-orm';
+/* @Codex */
+import { dbServer } from './db-server';
+/* @Codex */
+import { patients, patientsToAmbulatories } from './schema';
+/* @Codex */
+import type { PatientDetail, PatientSummary } from './api/v1/types';
+
+function toIsoString(value: unknown): string | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function toPatientSummary(patient: typeof patients.$inferSelect): PatientSummary {
+    return {
+        id: patient.id,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        birthDate: toIsoString(patient.birthDate),
+        taxCode: patient.taxCode,
+        isAdi: patient.isAdi ?? null,
+        isArchived: patient.isArchived ?? null,
+        version: patient.version,
+        updatedAt: toIsoString(patient.updatedAt),
+    };
+}
+
+function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
+    return {
+        id: patient.id,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        birthDate: toIsoString(patient.birthDate),
+        taxCode: patient.taxCode,
+        address: patient.address ?? null,
+        phone: patient.phone ?? null,
+        caregiver: patient.caregiver ?? null,
+        exemptions: patient.exemptions ?? null,
+        diagnoses: patient.diagnoses ?? null,
+        monitoringProfile: patient.monitoringProfile ?? null,
+        statusReason: patient.statusReason ?? null,
+        notes: patient.notes ?? null,
+        aiSummary: patient.aiSummary ?? null,
+        documentInsights: patient.documentInsights ?? null,
+        isAdi: patient.isAdi ?? null,
+        isArchived: patient.isArchived ?? null,
+        version: patient.version,
+        ambulatoryId: patient.ambulatoryId ?? null,
+        createdAt: toIsoString(patient.createdAt),
+        updatedAt: toIsoString(patient.updatedAt),
+    };
+}
+
+/* @Codex */
+export async function listNetworkScopedPatients(scopeAmbulatoryId: string): Promise<PatientSummary[]> {
+    const rows = await dbServer
+        .select({ patient: patients })
+        .from(patients)
+        .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
+        .where(eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId))
+        .orderBy(desc(patients.updatedAt));
+
+    return rows.map((row) => toPatientSummary(row.patient));
+}
+
+/* @Codex */
+export async function getNetworkScopedPatientDetail(
+    patientId: string,
+    scopeAmbulatoryId: string
+): Promise<PatientDetail | null> {
+    const row = await dbServer
+        .select({ patient: patients })
+        .from(patients)
+        .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
+        .where(and(
+            eq(patients.id, patientId),
+            eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
+        ))
+        .get();
+
+    return row ? toPatientDetail(row.patient) : null;
+}

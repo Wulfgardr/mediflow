@@ -1,0 +1,102 @@
+[
+  {
+    "id": "clinical-entities-diabetes-metformin",
+    "inputText": "Paziente con diabete mellito tipo 2 in trattamento con metformina 850 mg due volte al giorno.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "diabete mellito tipo 2", "critical": true },
+        { "type": "medication", "text": "metformina 850 mg", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-heart-failure-loop-diuretic",
+    "inputText": "Scompenso cardiaco cronico. Terapia attuale: furosemide 25 mg al mattino e bisoprololo 1,25 mg.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Scompenso cardiaco cronico", "critical": true },
+        { "type": "medication", "text": "furosemide 25 mg", "critical": true },
+        { "type": "medication", "text": "bisoprololo 1,25 mg", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-copd-laba-lama",
+    "inputText": "BPCO con dispnea da sforzo. Assume umeclidinio/vilanterolo una inalazione al giorno.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "BPCO", "critical": true },
+        { "type": "problem", "text": "dispnea da sforzo", "critical": true },
+        { "type": "medication", "text": "umeclidinio/vilanterolo", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-osteoporosis-denosumab",
+    "inputText": "Osteoporosi post-menopausale. Prosegue denosumab 60 mg sottocute ogni 6 mesi.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Osteoporosi post-menopausale", "critical": true },
+        { "type": "medication", "text": "denosumab 60 mg", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-af-hypertension-anticoagulation",
+    "inputText": "Ipertensione arteriosa e fibrillazione atriale permanente. Terapia in corso: apixaban 5 mg due volte al giorno e bisoprololo 2,5 mg.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Ipertensione arteriosa", "critical": true },
+        { "type": "problem", "text": "fibrillazione atriale permanente", "critical": true },
+        { "type": "medication", "text": "apixaban 5 mg", "critical": true },
+        { "type": "medication", "text": "bisoprololo 2,5 mg", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-diabetes-hba1c-semaglutide",
+    "inputText": "Diabete mellito tipo 2 scarsamente controllato; HbA1c 8,2%. Avviata semaglutide 0,25 mg una volta a settimana.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Diabete mellito tipo 2", "critical": true },
+        { "type": "medication", "text": "semaglutide 0,25 mg", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-low-back-pain-no-drug",
+    "inputText": "Lombalgia meccanica in miglioramento. Terapia consigliata: stretching quotidiano e riposo; nessun farmaco attivo.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Lombalgia meccanica", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-asthma-inhaled-combination",
+    "inputText": "Asma persistente lieve. Prosegue salmeterolo/fluticasone due inalazioni al giorno.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "Asma persistente lieve", "critical": true },
+        { "type": "medication", "text": "salmeterolo/fluticasone", "critical": true }
+      ]
+    }
+  },
+  {
+    "id": "clinical-entities-labs-no-entities",
+    "inputText": "Controllo programmato. Creatinina 1,0 mg/dL, Hb 13,4 g/dL. Nessuna terapia in corso.",
+    "gold": {
+      "entities": []
+    }
+  },
+  {
+    "id": "clinical-entities-dvt-rivaroxaban",
+    "inputText": "Pregressa trombosi venosa profonda, attualmente in terapia con rivaroxaban 20 mg la sera.",
+    "gold": {
+      "entities": [
+        { "type": "problem", "text": "trombosi venosa profonda", "critical": true },
+        { "type": "medication", "text": "rivaroxaban 20 mg", "critical": true }
+      ]
+    }
+  }
+]

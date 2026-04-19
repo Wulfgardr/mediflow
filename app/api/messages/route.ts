@@ -5,6 +5,7 @@ import { eq, asc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -37,13 +38,16 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         const newId = body.id || uuidv4();
+        const normalized = normalizeStoredMessagePayload(body as Record<string, unknown>);
 
         await dbServer.insert(messages).values({
             id: newId,
             conversationId: body.conversationId,
             role: body.role,
             content: body.content,
-            metadata: body.metadata ? JSON.stringify(body.metadata) : undefined,
+            metadata: normalized.metadata,
+            attachmentType: normalized.attachmentType,
+            attachmentBase64: normalized.attachmentBase64,
             createdAt: new Date()
         });
 

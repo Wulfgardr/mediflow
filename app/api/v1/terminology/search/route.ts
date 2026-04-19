@@ -5,6 +5,11 @@ import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import {
+    applyTerminologyRegistryVersion,
+    findTerminologyRegistryEntry,
+    loadTerminologyRegistry,
+} from '@/lib/terminology-registry';
+import {
     normalizeTerminologySystem,
     searchStaticTerminology,
     type TerminologyItem,
@@ -80,13 +85,17 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Invalid terminology system' }, { status: 400 });
         }
 
+        const registryEntry = findTerminologyRegistryEntry(await loadTerminologyRegistry(), system);
+
         if (system === 'ATC') {
             const items = await searchAtc(q, limit);
-            return NextResponse.json(items);
+            return NextResponse.json(items.map((item) => applyTerminologyRegistryVersion(item, registryEntry)));
         }
 
         if (system === 'LOINC' || system === 'UCUM') {
-            return NextResponse.json(searchStaticTerminology(system, q, limit));
+            return NextResponse.json(
+                searchStaticTerminology(system, q, limit).map((item) => applyTerminologyRegistryVersion(item, registryEntry)),
+            );
         }
 
         return NextResponse.json([], { status: 200 });

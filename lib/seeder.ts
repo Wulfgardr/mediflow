@@ -436,7 +436,7 @@ export async function nukeTestData(full: boolean = false): Promise<{ deleted: nu
         if (testPatientIds.size > 0) {
             // 1. Delete Patients
             for (const p of testPatients) {
-                await db.patients.delete(p.id);
+                await db.patients.delete(p.id, { version: p.version });
             }
             deletedCount = testPatients.length;
 

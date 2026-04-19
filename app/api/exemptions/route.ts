@@ -67,6 +67,7 @@ export async function GET(request: Request) {
         const q = searchParams.get('q')?.trim();
         const countOnly = searchParams.get('count') === '1';
         const codesQuery = searchParams.get('codes');
+        const all = searchParams.get('all') === '1';
 
         if (countOnly) {
             const row = await dbServer
@@ -89,6 +90,14 @@ export async function GET(request: Request) {
                 .select()
                 .from(exemptions)
                 .where(inArray(exemptions.code, codes))
+                .orderBy(asc(exemptions.code));
+            return NextResponse.json(rows);
+        }
+
+        if (all) {
+            const rows = await dbServer
+                .select()
+                .from(exemptions)
                 .orderBy(asc(exemptions.code));
             return NextResponse.json(rows);
         }

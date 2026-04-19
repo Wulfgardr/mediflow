@@ -2,7 +2,17 @@
 
 MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
 
-Qui troverai i confini di sicurezza e aspettative minime per chi contribuisca, risulta fondamentale conoscere un minimo gli argomenti in questa pagina, forse ancora più delle competenze informatiche.
+Questo documento definisce confini di sicurezza e aspettative minime per chi contribuisce.
+
+---
+
+## Riferimenti correlati
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
+- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dato e trust boundaries)
+- [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
+- [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
+- [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
 
 ---
 
@@ -61,6 +71,8 @@ MediFlow espone due superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
+- `/api/v1/network/*` (home-base opt-in): paired/read-only-first, protetta da
+  credenziale device + sessione operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -69,7 +81,31 @@ Regole minime:
 ### Trasporto
 
 - Web UI usa HTTP su localhost.
-- Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi `docs/local-api-tls.md`).
+- Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
+
+### Modalita network home-base
+
+Quando il nodo passa a `network-home-base`:
+
+- il default locale non cambia: la modalita rete resta un opt-in esplicito
+- `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
+  paired
+- il primo data plane remoto (`/api/v1/network/patients*`) resta read-only e
+  richiede sempre device paired + sessione operatore
+- write remoto, sync record-level e fallback automatico restano fuori scope
+
+### Lockout autenticazione PIN
+
+La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/adr/0017-auth-lockout-policy.md).
+
+- Si applica a `/api/auth/login`, condiviso tra lock screen web e unlock macOS.
+- Soglia: `5` tentativi falliti nella stessa finestra di `15 minuti`.
+- Durata lockout: `15 minuti`.
+- Reset completo su login valido; se la finestra precedente scade, il conteggio riparte da `1`.
+- Contratto risposta:
+  - `401 AUTH_INVALID_CREDENTIALS` finché il lockout non è attivo
+  - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
+- Il bearer token `/api/v1` già bootstrapato non introduce una policy separata: il controllo avviene sul PIN condiviso prima dell'emissione della sessione web o dell'unlock native.
 
 ---
 
@@ -82,23 +118,78 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
+## AI locale e import clinico guidato
+
+I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
+devono rispettare queste regole aggiuntive:
+
+- usare solo servizi locali allowlisted (`localhost`, `127.0.0.1`)
+- trattare l'output del modello come **non fidato** finche un operatore non lo conferma
+- non eseguire import silenziosi da testo libero verso diagnosi o terapie
+- mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
+- trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
+  come artifact clinici locali, non come payload innocui di debug
+
+L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
+(es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
+
+## Comparator cloud opt-in
+
+non cambia il default `local-first`.
+
+Regole minime:
+
+- e ammesso solo come lane interna di engineering, mai come runtime clinico
+- usa solo case pack privati, redatti/minimizzati e fuori Git
+- richiede approvazione umana esplicita prima di qualunque export
+- non puo scrivere dati paziente, generare apply automatici o essere committato
+  nel repository
+
 ---
 
 ## Logging e redazione
 
 I dati sanitari non devono trapelare dai log.
 
+La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./docs/adr/0015-audit-taxonomy-minimum-catalog.md).
+
+### Audit record vs log applicativi
+
+- Gli audit record sono strutturati, versionati e append-only.
+- I log applicativi restano piu poveri e devono limitarsi a dati tecnici
+  redatti.
+- Non usare log testuali liberi come sostituto del catalogo audit.
+
 ### Non loggare
 - campi paziente decifrati
 - testo OCR grezzo
+- testo note/diario usato nei prompt AI
+- suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)
+- `summarySnapshot` o `parseEvidenceArtifactSnapshot` grezzi
 - token, PIN, chiavi o salt
+- prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
+- case pack privati/comparator cloud o output non minimizzati di shadow eval
 
 ### Puoi loggare (preferibile)
 - conteggi (es. numero record)
 - timing (latenza)
 - status code / classi di errore
 - identificatori redatti (es. prime 6 chars di un id)
+- numeri di versione e flag booleane
+- nomi di superfici tecniche (`web`, `native`, `api`, `job`)
+
+### Audit v1
+
+Quando implementi o estendi il writer audit:
+
+- usa il catalogo `audit.v1` dell'ADR 0015
+- consenti solo `eventType`, `outcome`, `actorRef`, `subjectRef` redatto,
+  `sourceSurface`, timestamp e metadati strutturati
+- mantieni fuori dal catalogo qualsiasi testo libero, payload clinico o
+  informazione necessaria solo al rendering UI
+- se un valore puo identificare un paziente al di fuori del database locale,
+  redigilo o hashalo prima di loggare o esportare
 
 Se aggiungi log:
 - assumi che possano finire in crash report
@@ -123,6 +214,7 @@ Controlli consigliati prima di release o merge rilevanti:
 npm run lint
 npm run build
 npm audit
+npm run check:never-regress
 npx tsc --noEmit
 ```
 

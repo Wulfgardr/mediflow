@@ -1,0 +1,33 @@
+/* @Codex */
+export const AI_PATIENT_INSIGHT_KILL_SWITCH_KEY = 'aiPatientInsightKillSwitch';
+
+export type AiPatientInsightKillSwitchState = 'enabled' | 'disabled';
+
+export class AiPatientInsightDisabledError extends Error {
+    constructor() {
+        super('AI Patient Insight is disabled by the local rollout kill switch.');
+        this.name = 'AiPatientInsightDisabledError';
+    }
+}
+
+export function resolveAiPatientInsightKillSwitchState(value: unknown): AiPatientInsightKillSwitchState {
+    if (value === 'disabled' || value === false || value === 'false' || value === 0 || value === '0') {
+        return 'disabled';
+    }
+
+    return 'enabled';
+}
+
+export function isAiPatientInsightEnabledValue(value: unknown): boolean {
+    return resolveAiPatientInsightKillSwitchState(value) === 'enabled';
+}
+
+export function serializeAiPatientInsightKillSwitchState(enabled: boolean): AiPatientInsightKillSwitchState {
+    return enabled ? 'enabled' : 'disabled';
+}
+
+export function assertAiPatientInsightEnabledValue(value: unknown): void {
+    if (!isAiPatientInsightEnabledValue(value)) {
+        throw new AiPatientInsightDisabledError();
+    }
+}

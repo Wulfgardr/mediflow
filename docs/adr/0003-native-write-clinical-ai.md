@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-01 -->
 # ADR 0003: Native write operations + clinical tools
 
 Date: 2026-02-01

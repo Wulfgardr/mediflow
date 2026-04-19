@@ -4,9 +4,12 @@ import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 /* @Codex */
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -65,6 +68,8 @@ export async function PUT(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
         const body = await request.json();
 
@@ -127,6 +132,21 @@ export async function PUT(
             })
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)));
 
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'checkup.updated',
+                subjectType: 'checkup',
+                subjectRef: checkupId,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body as Record<string, unknown>),
+                },
+            },
+            '[MediFlow] Checkup audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/checkups/[checkupId] error:', error);
@@ -143,6 +163,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
         const existing = await dbServer.select({ id: checkups.id }).from(checkups)
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
@@ -152,6 +174,19 @@ export async function DELETE(
         }
 
         await dbServer.delete(checkups).where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'checkup.deleted',
+                subjectType: 'checkup',
+                subjectRef: checkupId,
+            },
+            '[MediFlow] Checkup audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/checkups/[checkupId] error:', error);

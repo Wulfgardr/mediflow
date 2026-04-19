@@ -29,6 +29,8 @@ export async function POST(request: Request) {
         await dbServer.insert(conversations).values({
             id: body.id || uuidv4(),
             title: body.title,
+            /* @Codex */
+            isDeleted: false,
             updatedAt: new Date(),
             createdAt: new Date()
         });

@@ -5,6 +5,8 @@ import { observations } from '@/lib/schema';
 import { desc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 /* @Codex */
 function parseDate(value: unknown): Date | null {
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
 
         const patientId = typeof body.patientId === 'string' ? body.patientId : null;
         const codeSystem = typeof body.codeSystem === 'string' ? body.codeSystem.trim().toUpperCase() : null;
@@ -84,10 +86,24 @@ export async function POST(request: Request) {
             createdAt: new Date(),
         });
 
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'observation.created',
+                subjectType: 'observation',
+                subjectRef: id,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body, ['id']),
+                },
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
+
         return NextResponse.json({ id }, { status: 201 });
     } catch (error) {
         console.error('API POST /observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }
 }
-

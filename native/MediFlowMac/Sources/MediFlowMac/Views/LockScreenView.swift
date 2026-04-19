@@ -20,16 +20,20 @@ struct LockScreenView: View {
                 if security.requiresSetup {
                     TextField("Nome", text: $displayName)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("lockscreen-display-name-field")
                     TextField("Ambulatorio", text: $ambulatoryName)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("lockscreen-ambulatory-name-field")
                 }
 
                 SecureField("PIN", text: $pin)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("lockscreen-pin-field")
 
                 if security.requiresSetup {
                     SecureField("Conferma PIN", text: $confirmPin)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("lockscreen-confirm-pin-field")
                 }
             }
             .frame(maxWidth: 320)
@@ -53,6 +57,7 @@ struct LockScreenView: View {
                         Task { await security.refreshSetupStatus() }
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier("lockscreen-retry-health-button")
                     /* @Codex */
                     if health.canRepair {
                         Button(isRepairing ? "Ripristino in corso..." : "Ripristina DB da legacy") {
@@ -65,6 +70,7 @@ struct LockScreenView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isRepairing)
+                        .accessibilityIdentifier("lockscreen-repair-legacy-button")
                     }
                 }
                 .frame(maxWidth: 360)
@@ -76,10 +82,12 @@ struct LockScreenView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isWorking || pin.isEmpty || (security.requiresSetup && pin != confirmPin) || security.healthIssue != nil || isRepairing)
+            .accessibilityIdentifier("lockscreen-submit-button")
 
             if let error = security.errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
+                    .accessibilityIdentifier("lockscreen-error-message")
             }
         }
         .padding(40)

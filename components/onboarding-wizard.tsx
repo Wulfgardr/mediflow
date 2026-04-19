@@ -117,7 +117,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                     <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Nome e Cognome</label>
                                     <div className="relative">
                                         <User className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                                        <input type="text" value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} placeholder="es. Dott. Leonardo Pegollo" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" autoFocus />
+                                        <input type="text" value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} placeholder="es. Dott. Nome Medico" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" autoFocus />
                                     </div>
                                 </div>
                                 <div>

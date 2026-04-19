@@ -1,33 +1,31 @@
 'use client';
 
-'use client';
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Activity, Settings, PlusCircle, ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical, Plus, Building2, CornerDownRight } from 'lucide-react';
+import { 
+  LayoutDashboard, Users, Activity, Settings, PlusCircle, 
+  ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical, 
+  Plus, Building2, Eye, EyeOff 
+} from 'lucide-react';
+
 import { cn } from '@/lib/utils';
-// import { useLiveQuery } from '@/lib/live-query';
-// import { db } from '@/lib/db';
+import { db, Ambulatory } from '@/lib/db';
+import { useLiveQuery } from '@/lib/live-query';
+
 import { NewVisitModal } from '@/components/new-visit-modal';
 import { AddAmbulatoryModal } from '@/components/add-ambulatory-modal';
 import SystemStatus from '@/components/system-status';
 import { usePrivacy } from '@/components/privacy-provider';
-import { Eye, EyeOff } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useSecurity } from '@/components/security-provider';
-
-import { db, Ambulatory } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
+import { useUIStyle } from '@/components/ui-style-provider';
 
 // Helper to read cookie
 function useCookie(name: string) {
-    const [value, setValue] = useState<string | null>(null);
-    useEffect(() => {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        if (match && match[2] !== value) setValue(match[2]);
-    }, [name, value]);
-    return value;
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match?.[2] ?? null;
 }
 
 // Recursive Tree Component
@@ -130,40 +128,30 @@ function AmbulatoryTree() {
                 <div
                     onClick={() => activate(node.id)}
                     className={cn(
-                        // @Codex: improve readability and allow two-line ambulatory names
-                        "flex items-start gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer text-[13px] leading-snug transition-all select-none group relative border border-transparent min-w-0",
+                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0",
                         isActive
-                            ? "bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-bold border-blue-200/50 dark:border-blue-800/50 shadow-sm"
-                            : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300",
-                        isTest && !isActive && "text-amber-600 dark:text-amber-500"
+                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold border-blue-500/20"
+                            : "hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400",
+                        isTest && !isActive && "text-amber-600/80 dark:text-amber-500/80"
                     )}
-                    style={{ paddingLeft: `${level * 16 + 12}px` }}
+                    style={{ paddingLeft: `${level * 12 + 12}px` }}
                 >
-                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-blue-500 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />}
+                    {isActive && <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-full" />}
 
                     <button
                         onClick={(e) => toggle(node.id, e)}
-                        className={cn("mt-0.5 p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition-colors shrink-0", !hasChildren && "invisible")}
+                        className={cn("mt-0.5 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 transition-colors shrink-0", !hasChildren && "invisible")}
                     >
-                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </button>
 
-                    {isTest ? <FlaskConical className="w-5 h-5 shrink-0 mt-0.5" /> : (isExpanded ? <FolderOpen className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" /> : <Folder className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />)}
-
-                    {/* Color dot for visual consistency with clustered view */}
-                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${(() => {
-                        const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-fuchsia-500'];
-                        let hash = 0;
-                        for (let i = 0; i < node.id.length; i++) { hash = ((hash << 5) - hash) + node.id.charCodeAt(i); hash |= 0; }
-                        return colors[Math.abs(hash) % colors.length];
-                    })()}`}></div>
+                    {isTest ? <FlaskConical className="w-4 h-4 shrink-0 mt-0.5 opacity-70" /> : (isExpanded ? <FolderOpen className="w-4 h-4 text-blue-500/70 shrink-0 mt-0.5" /> : <Folder className="w-4 h-4 text-blue-500/70 shrink-0 mt-0.5" />)}
 
                     <span className="flex-1 min-w-0 clamp-2 pr-1" title={node.name}>{node.name}</span>
                 </div>
                 {isExpanded && hasChildren && (
                     <div className="relative">
-                        {/* Vertical line guide for hierarchy */}
-                        <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-800" style={{ left: `${level * 16 + 20}px` }} />
+                        <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200/50 dark:bg-gray-800/50" style={{ left: `${level * 12 + 18}px` }} />
                         {node.children.map((child: TreeAmbulatory) => <TreeNode key={child.id} node={child} level={level + 1} />)}
                     </div>
                 )}
@@ -173,60 +161,50 @@ function AmbulatoryTree() {
 
     return (
         <div className="flex flex-col h-full mt-4">
-            {/* LARGE CONTEXT HEADER */}
+            {/* AMBIENTE DI LAVORO - Disciplined Context Header */}
             {breadcrumbs.length > 0 ? (
-                <div className="mb-8 px-1">
-                    <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-2 px-1">
+                <div className="mb-6 px-1">
+                    <p className="section-kicker mb-2 px-1">
                         Ambiente di Lavoro
                     </p>
-                    <div className="bg-gradient-to-br from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-800 rounded-2xl p-5 shadow-xl shadow-blue-500/20 text-white relative overflow-hidden group border border-blue-500/20">
-                        <div className="absolute -top-6 -right-6 p-4 opacity-10 group-hover:opacity-20 transition-all duration-500 group-hover:scale-110">
-                            <Building2 className="w-24 h-24 transform rotate-12" />
-                        </div>
+                    <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/10 shadow-sm relative overflow-hidden group">
                         <div className="relative z-10 flex flex-col gap-1">
-                            <h2 className="text-xl font-bold tracking-tight leading-tight line-clamp-2">
+                            <h2 className="text-base font-bold tracking-tight leading-tight line-clamp-2 text-gray-900 dark:text-gray-100">
                                 {breadcrumbs[breadcrumbs.length - 1].name}
                             </h2>
-                            <div className="flex flex-wrap items-center gap-1.5 text-blue-100 text-xs mt-2 font-medium">
+                            <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 text-[11px] mt-1.5 font-medium">
+                                <Building2 className="w-3 h-3 opacity-50" />
                                 {breadcrumbs.length > 1 ? (
-                                    <>
-                                        <span className="opacity-80 bg-black/10 px-1.5 py-0.5 rounded">{breadcrumbs[breadcrumbs.length - 2].name}</span>
-                                        <div className="opacity-50 flex items-center"><CornerDownRight className="w-3 h-3" /></div>
-                                    </>
+                                    <span className="truncate">{breadcrumbs[breadcrumbs.length - 2].name}</span>
                                 ) : (
-                                    <span className="opacity-80 bg-black/10 px-1.5 py-0.5 rounded">Sede Principale</span>
+                                    <span>Sede Principale</span>
                                 )}
-                                <span className="uppercase tracking-widest text-[10px] opacity-60 ml-auto border border-white/20 px-1.5 py-0.5 rounded-full">
-                                    {breadcrumbs.length > 1 ? "Reparto" : "HUB"}
-                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="mb-6 mx-1 px-4 py-6 bg-gray-50/50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/10 text-center flex flex-col items-center gap-2">
-                    <Building2 className="w-8 h-8 text-gray-300" />
-                    <p className="text-xs text-gray-500 font-medium">Nessuna sede selezionata</p>
+                <div className="mb-6 mx-1 px-4 py-5 bg-black/5 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10 text-center flex flex-col items-center gap-2">
+                    <Building2 className="w-6 h-6 text-gray-300" />
+                    <p className="text-[11px] text-gray-400 font-medium">Nessuna sede selezionata</p>
                 </div>
             )}
 
             {/* Tree Section Header */}
-            <div className="flex items-center justify-between px-2 mb-3">
-                <p className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                    <LayoutDashboard className="w-3.5 h-3.5" />
-                    Mappa
+            <div className="flex items-center justify-between px-2 mb-2">
+                <p className="section-kicker flex items-center gap-2">
+                    Struttura
                 </p>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="group flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-lg transition-all"
+                    className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
                     title="Nuovo Ambulatorio"
                 >
-                    <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                    <span className="text-[11px] font-bold">AGGIUNGI</span>
+                    <Plus className="w-3.5 h-3.5" />
                 </button>
             </div>
 
-            <div className="space-y-1 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
+            <div className="space-y-0.5 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
                 {buildTree(ambulatories).map(root => (
                     <TreeNode key={root.id} node={root} />
                 ))}
@@ -246,28 +224,42 @@ export function Sidebar() {
     const [showNewVisitModal, setShowNewVisitModal] = useState(false);
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
     const { user } = useSecurity();
+    const { uiStyleMode } = useUIStyle();
+    const isLiquid = uiStyleMode === 'liquid';
 
     const profile = {
         doctor: user?.displayName || 'Medico',
-        clinic: user?.ambulatoryName || 'Ambulatorio'
     };
 
     const links = [
         { href: '/', name: 'Pazienti', icon: Users },
         { name: 'Diario Clinico', href: '/diary', icon: LayoutDashboard },
         { name: 'Scale & Test', href: '/scales', icon: Activity },
-        // { name: 'AI Assistant', href: '/assistant', icon: Brain, highlight: true },
         { name: 'Impostazioni', href: '/settings', icon: Settings },
     ];
 
     return (
         <>
-            {/* @Codex: widen sidebar for clearer navigation */}
             <aside className="w-80 h-screen fixed left-0 top-0 p-4 z-50">
-                <div className="h-full glass-panel flex flex-col p-4 bg-white/80 dark:bg-[#0d1117]/90 backdrop-blur-xl border-r border-gray-200 dark:border-[#30363d]">
-                    <div className="mb-6 p-2">
+                <div className={cn(
+                    "relative h-full glass-panel flex flex-col overflow-hidden p-4",
+                    isLiquid ? "rounded-[34px]" : "rounded-[28px]"
+                )}>
+                    {isLiquid && (
+                        <>
+                            <div className="liquid-orb -left-10 top-0 h-28 w-28 bg-sky-300/30" />
+                            <div className="liquid-orb right-2 top-8 h-24 w-24 bg-violet-300/22" />
+                            <div className="liquid-orb bottom-20 left-12 h-24 w-24 bg-emerald-200/18" />
+                        </>
+                    )}
+                    <div className="mb-6 px-2 pt-2">
                         <div className="flex justify-between items-center mb-1">
-                            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                            <h1 className={cn(
+                                "text-lg font-black tracking-tight",
+                                isLiquid
+                                    ? "bg-[linear-gradient(135deg,#0A84FF,#5AC8FA_55%,#5E5CE6)] bg-clip-text text-transparent"
+                                    : "text-gray-900 dark:text-white"
+                            )}>
                                 MediFlow
                             </h1>
                             <button
@@ -275,26 +267,30 @@ export function Sidebar() {
                                 title={isPrivacyMode ? "Disattiva Privacy Mode" : "Attiva Privacy Mode"}
                                 className={cn(
                                     "p-1.5 rounded-lg transition-colors",
-                                    isPrivacyMode ? "bg-blue-100 text-blue-600" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                    isPrivacyMode ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5"
                                 )}
                             >
                                 {isPrivacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
-                        <div className="text-[10px] leading-tight text-gray-400 font-medium">
-                            <span className="block text-gray-700 dark:text-gray-300 font-bold truncate">
-                                {profile?.doctor || 'Medico'}
-                            </span>
-                            {/* Removed redundant clinic name since we show Context now */}
-                            <span className="truncate block opacity-50">Gestione Clinica</span>
+                        <div className="flex items-center gap-2 mt-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{profile.doctor.charAt(0)}</span>
+                            </div>
+                            <div className="min-w-0">
+                                <span className="block text-[13px] text-gray-900 dark:text-gray-100 font-bold truncate">
+                                    {profile?.doctor}
+                                </span>
+                                <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Sessione Attiva</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="mb-4">
+                    <div className="mb-4 px-2">
                         <ThemeToggle />
                     </div>
 
-                    <nav className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+                    <nav className="space-y-1 flex-1 overflow-y-auto pr-1">
                         {links.map((link) => {
                             const Icon = link.icon;
                             const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
@@ -304,33 +300,44 @@ export function Sidebar() {
                                     key={link.href}
                                     href={link.href}
                                     className={cn(
-                                        // @Codex: increase tap targets and readability
-                                        "flex items-center gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-200 group text-[15px] font-medium",
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-[border-color,background-color,color,box-shadow] duration-200 group text-[14px] font-medium",
                                         isActive
-                                            ? "bg-blue-50 text-blue-700 font-semibold shadow-sm dark:bg-blue-900/20 dark:text-blue-400"
-                                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                                            ? isLiquid
+                                                ? "border border-white/60 bg-white/70 text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-white/10 dark:text-white font-semibold"
+                                                : "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold"
+                                            : "text-gray-500 hover:bg-black/5 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
                                     )}
                                 >
-                                    <Icon className={cn("w-5 h-5", isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300")} />
+                                    <Icon className={cn(
+                                        "w-4.5 h-4.5",
+                                        isActive
+                                            ? isLiquid
+                                                ? "text-sky-500 dark:text-sky-300"
+                                                : "text-blue-600 dark:text-blue-400"
+                                            : "text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"
+                                    )} />
                                     <span>{link.name}</span>
                                 </Link>
                             );
                         })}
 
-                        {/* AMBULATORY SEPARATOR */}
-                        <div className="my-4 border-b border-gray-100 dark:border-white/5"></div>
+                        <div className="my-4 mx-2 border-b border-gray-100 dark:border-white/5"></div>
 
-                        {/* AMBULATORY FILE EXPLORER */}
                         <div className="">
                             <AmbulatoryTree />
                         </div>
                     </nav>
 
-                    <div className="mt-auto pt-4 border-t border-gray-100/50 space-y-3">
+                    <div className="mt-auto pt-4 space-y-3">
                         <SystemStatus />
                         <button
                             onClick={() => setShowNewVisitModal(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-2.5 rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all active:scale-95 text-sm font-medium"
+                            className={cn(
+                                "w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold",
+                                isLiquid
+                                    ? "ui-btn-primary"
+                                    : "rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
+                            )}
                         >
                             <PlusCircle className="w-4 h-4" />
                             <span>Nuova Visita</span>
@@ -338,6 +345,7 @@ export function Sidebar() {
                     </div>
                 </div>
             </aside>
+
             <NewVisitModal isOpen={showNewVisitModal} onClose={() => setShowNewVisitModal(false)} />
         </>
     );

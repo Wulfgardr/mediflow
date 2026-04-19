@@ -5,6 +5,8 @@ import { eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -36,6 +38,8 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        /* @Codex */
+        const auditBody = body as Record<string, unknown>;
         const newId = body.id || uuidv4();
 
         await dbServer.insert(entries).values({
@@ -46,6 +50,21 @@ export async function POST(request: Request) {
             content: body.content,
             createdAt: new Date()
         });
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'entry.created',
+                subjectType: 'entry',
+                subjectRef: String(newId),
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody, ['id']),
+                },
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

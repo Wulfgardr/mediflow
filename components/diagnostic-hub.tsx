@@ -123,9 +123,10 @@ export default function DiagnosticHub() {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+        <div className="glass-panel p-6 md:p-7 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
+                    <p className="section-kicker">Controlli runtime</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-indigo-500" />
                         Diagnostica di Sistema
@@ -135,7 +136,7 @@ export default function DiagnosticHub() {
                 <button
                     onClick={runAll}
                     disabled={isRunningAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm font-bold shadow-md shadow-indigo-200 dark:shadow-none"
+                    className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#4F46E5,#818CF8)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(79,70,229,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                     Esegui Test Completo
@@ -146,7 +147,7 @@ export default function DiagnosticHub() {
                 {checks.map(check => {
                     const res = results[check.id] || { status: 'idle' };
                     return (
-                        <div key={check.id} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 hover:border-indigo-100 transition-all">
+                        <div key={check.id} className="group flex items-center justify-between gap-4 p-4 rounded-[22px] border border-white/70 bg-white/72 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md hover:border-white hover:shadow-[0_14px_28px_rgba(15,23,42,0.06)] transition-all dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20">
                             <div className="flex items-center gap-4">
                                 <div className={cn(
                                     "p-2 rounded-lg transition-colors",
@@ -168,7 +169,7 @@ export default function DiagnosticHub() {
 
                             <div className="flex items-center gap-4">
                                 {res.status === 'ok' && (
-                                    <span className="text-xs font-mono text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                    <span className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-mono text-green-600 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300">
                                         {res.latency}ms
                                     </span>
                                 )}
@@ -180,7 +181,7 @@ export default function DiagnosticHub() {
                                 <button
                                     onClick={() => runCheck(check)}
                                     disabled={res.status === 'running'}
-                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    className="rounded-full bg-indigo-50 p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:hover:bg-indigo-900/20"
                                     title="Esegui singolo test"
                                 >
                                     <Play className="w-3 h-3" />

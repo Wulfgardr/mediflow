@@ -1,10 +1,15 @@
-<!-- Codex: created 2026-02-01 -->
 # Setup rapido client nativo
 
 Questo script automatizza:
 - generazione certificato locale
 - avvio proxy TLS
 - creazione config per il client macOS
+
+Riferimenti correlati:
+- [docs/NATIVE.md](./NATIVE.md)
+- [docs/local-api-tls.md](./local-api-tls.md)
+- [docs/native-launch.md](./native-launch.md)
+- [docs/native-testing.md](./native-testing.md)
 
 ## Uso
 

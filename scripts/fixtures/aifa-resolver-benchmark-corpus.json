@@ -1,0 +1,83 @@
+[
+  {
+    "id": "aifa-brand-averelix",
+    "query": "AVERELIX",
+    "category": "brand",
+    "expected": {
+      "matchTokens": ["clopidogrel"],
+      "dosageTokens": ["75 mg"],
+      "packagingTokens": ["28 compresse"],
+      "topKAics": ["042402014"],
+      "state": "active",
+      "notes": "Exact brand query should recover a clopidogrel 75 mg package immediately."
+    }
+  },
+  {
+    "id": "aifa-active-clopidogrel",
+    "query": "clopidogrel",
+    "category": "active-principle",
+    "expected": {
+      "matchTokens": ["clopidogrel"],
+      "dosageTokens": ["75 mg"],
+      "state": "active",
+      "notes": "Active-principle query should recover clopidogrel even with many generic packages."
+    }
+  },
+  {
+    "id": "aifa-strength-bisoprololo-5mg",
+    "query": "bisoprololo 5 mg",
+    "category": "strength",
+    "expected": {
+      "matchTokens": ["bisoprololo"],
+      "dosageTokens": ["5 mg"],
+      "rejectTokenGroups": [["2,5 mg"]],
+      "state": "active",
+      "notes": "Current resolver does not search packaging/strength and should expose dosage-ordering weakness."
+    }
+  },
+  {
+    "id": "aifa-strength-ramipril-5mg",
+    "query": "ramipril 5 mg",
+    "category": "strength",
+    "expected": {
+      "matchTokens": ["ramipril"],
+      "dosageTokens": ["5 mg"],
+      "rejectTokenGroups": [["2,5 mg"]],
+      "state": "active",
+      "notes": "Ramipril query highlights dosage ambiguity and alphabetical ranking bias."
+    }
+  },
+  {
+    "id": "aifa-packaging-clopidogrel-100",
+    "query": "clopidogrel 100 compresse",
+    "category": "packaging",
+    "expected": {
+      "matchTokens": ["clopidogrel"],
+      "dosageTokens": ["75 mg"],
+      "packagingTokens": ["100 compresse"],
+      "state": "active",
+      "notes": "Packaging-specific query should reveal that current resolver ignores packaging tokens."
+    }
+  },
+  {
+    "id": "aifa-combo-ramipril-amlodipina",
+    "query": "ramipril amlodipina",
+    "category": "combo",
+    "expected": {
+      "matchTokens": ["ramipril", "amlodipina"],
+      "state": "active",
+      "notes": "Combination query should recover fixed-dose combo products like ALAMUT."
+    }
+  },
+  {
+    "id": "aifa-state-suspended-clopidogrel",
+    "query": "clopidogrel",
+    "category": "state",
+    "expected": {
+      "matchTokens": ["clopidogrel"],
+      "dosageTokens": ["75 mg"],
+      "state": "suspended",
+      "notes": "Diagnostic case: the catalog resolver is state-blind and will still match a suspended therapy query."
+    }
+  }
+]

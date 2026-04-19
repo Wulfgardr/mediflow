@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Patient, ClinicalEntry, Therapy } from './db';
+/* @Codex */
+import type { Patient, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
 export interface JsPDFWithAutoTable extends jsPDF {
@@ -11,10 +12,15 @@ export const generatePatientReport = (
     patient: Patient,
     entries: ClinicalEntry[],
     lastScales: ClinicalEntry[],
-    therapies: Therapy[] = []
+    therapies: Therapy[] = [],
+    /* @Codex */
+    observations: Observation[] = []
 ) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const topMargin = 20;
+    const bottomMargin = 18;
 
     // --- STYLING CONSTANTS ---
     const COLORS = {
@@ -48,6 +54,58 @@ export const generatePatientReport = (
 
     // --- PATIENT INFO GRID ---
     let currentY = 40;
+
+    /* @Codex */
+    const ensureSpace = (minimumHeight: number) => {
+        if (currentY + minimumHeight > pageHeight - bottomMargin) {
+            doc.addPage();
+            currentY = topMargin;
+        }
+    };
+
+    /* @Codex */
+    const startSection = (title: string, minimumHeight: number = 24) => {
+        ensureSpace(minimumHeight);
+        doc.setFontSize(12);
+        doc.setTextColor(...COLORS.primary);
+        doc.setFont("helvetica", "bold");
+        doc.text(title, 14, currentY);
+        currentY += 2;
+    };
+
+    /* @Codex */
+    const renderEmptyState = (message: string) => {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...COLORS.lightText);
+        doc.text(message, 14, currentY + 6);
+        currentY += 12;
+    };
+
+    /* @Codex */
+    const formatDate = (value: Date | string | undefined) => {
+        if (!value) return 'N/D';
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? 'N/D' : date.toLocaleDateString('it-IT');
+    };
+
+    /* @Codex */
+    const parseDiagnoses = (value: unknown) => {
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        if (typeof value !== 'string' || value.trim().length === 0) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    };
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
@@ -87,8 +145,14 @@ export const generatePatientReport = (
 
     // Notes Section
     if (patient.notes) {
+        /* @Codex */
+        const noteLines = doc.splitTextToSize(patient.notes, pageWidth - 36);
+        /* @Codex */
+        const noteHeight = Math.max(16, 10 + (noteLines.length * 5));
+
+        ensureSpace(noteHeight + 10);
         doc.setFillColor(255, 252, 235); // Light yellow bg
-        doc.roundedRect(14, currentY, pageWidth - 28, 16, 2, 2, 'F');
+        doc.roundedRect(14, currentY, pageWidth - 28, noteHeight, 2, 2, 'F');
 
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...COLORS.accent);
@@ -96,23 +160,55 @@ export const generatePatientReport = (
 
         doc.setFont("helvetica", "normal");
         doc.setTextColor(60, 60, 60);
-        doc.text(patient.notes, 18, currentY + 11, { maxWidth: pageWidth - 36 });
+        doc.text(noteLines, 18, currentY + 11);
 
-        currentY += 22;
+        currentY += noteHeight + 6;
     } else {
         currentY += 5;
     }
 
-    // --- ACTIVE THERAPY (NEW) ---
+    // --- ICD DIAGNOSES ---
+    /* @Codex */
+    const diagnoses = parseDiagnoses(patient.diagnoses);
+
+    startSection("Diagnosi ICD", 28);
+
+    if (diagnoses.length > 0) {
+        const diagnosisData = diagnoses.map((diagnosis) => [
+            diagnosis.system || '-',
+            diagnosis.code || '-',
+            diagnosis.description || '-',
+            formatDate(diagnosis.date)
+        ]);
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Sistema', 'Codice', 'Descrizione', 'Data']],
+            body: diagnosisData,
+            theme: 'striped',
+            headStyles: { fillColor: COLORS.secondary, fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 3 },
+            columnStyles: {
+                0: { cellWidth: 24 },
+                1: { cellWidth: 28 },
+                3: { cellWidth: 24 },
+                2: { cellWidth: 'auto' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        renderEmptyState("Nessuna diagnosi ICD presente.");
+    }
+
+    // --- ACTIVE THERAPY ---
+    /* @Codex */
     const activeTherapies = therapies.filter(t => t.status === 'active');
 
-    if (activeTherapies.length > 0) {
-        doc.setFontSize(12);
-        doc.setTextColor(...COLORS.primary);
-        doc.setFont("helvetica", "bold");
-        doc.text("Terapia Farmacologica Attiva", 14, currentY);
-        currentY += 2;
+    startSection("Terapia Farmacologica Attiva", 24);
 
+    if (activeTherapies.length > 0) {
         const therapyData = activeTherapies.map(t => [
             t.drugName,
             t.activePrinciple || '-',
@@ -135,58 +231,88 @@ export const generatePatientReport = (
             margin: { left: 14, right: 14 }
         });
 
-        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 12;
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        renderEmptyState("Nessuna terapia attiva registrata.");
     }
 
     // --- CLINICAL DIARY ---
-    // Force page break check logic not needed as autotable handles it, but we set Y
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.primary);
-    doc.setFont("helvetica", "bold");
-    doc.text("Diario Clinico (Ultime Attività)", 14, currentY);
-    currentY += 2;
+    startSection("Diario Clinico (Ultime Attività)", 24);
 
-    const diaryData = entries.slice(0, 30).map(e => [ // Increased limit to 30
-        new Date(e.date).toLocaleDateString('it-IT'),
-        e.type.toUpperCase(),
-        e.content // Autotable will wrap this
-    ]);
+    /* @Codex */
+    const diaryEntries = entries.filter((entry) => entry.type !== 'scale' && !entry.deletedAt).slice(0, 30);
 
-    autoTable(doc, {
-        startY: currentY + 4,
-        head: [['Data', 'Tipo', 'Contenuto']],
-        body: diaryData,
-        theme: 'striped',
-        headStyles: { fillColor: COLORS.primary },
-        styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' }, // Enabled text wrapping
-        columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 25, fontStyle: 'bold' },
-            2: { cellWidth: 'auto' } // Auto width for content to take remaining space
-        },
-        margin: { left: 14, right: 14 }
-    });
+    if (diaryEntries.length > 0) {
+        const diaryData = diaryEntries.map(e => [
+            new Date(e.date).toLocaleDateString('it-IT'),
+            e.type.toUpperCase(),
+            e.content
+        ]);
 
-    // Get Y after diary
-    currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 12;
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Data', 'Tipo', 'Contenuto']],
+            body: diaryData,
+            theme: 'striped',
+            headStyles: { fillColor: COLORS.primary },
+            styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' }, // Enabled text wrapping
+            columnStyles: {
+                0: { cellWidth: 25 },
+                1: { cellWidth: 25, fontStyle: 'bold' },
+                2: { cellWidth: 'auto' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        renderEmptyState("Nessun elemento nel diario clinico.");
+    }
+
+    // --- LAB OBSERVATIONS (LOINC + UCUM) ---
+    startSection("Osservazioni Codificate (LOINC + UCUM)", 30);
+
+    /* @Codex */
+    if (observations.length > 0) {
+        const observationData = observations.map((observation) => [
+            formatDate(observation.observedAt),
+            observation.codeSystem || '-',
+            observation.code || '-',
+            observation.display || '-',
+            observation.value || '-',
+            observation.unitCode || '-',
+            observation.notes || '-'
+        ]);
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['Data', 'Sistema', 'Codice LOINC', 'Parametro', 'Valore', 'Unità UCUM', 'Note']],
+            body: observationData,
+            theme: 'plain',
+            headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50] },
+            styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+            columnStyles: {
+                0: { cellWidth: 22 },
+                1: { cellWidth: 18 },
+                2: { cellWidth: 26 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 18 },
+                6: { cellWidth: 'auto' },
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable.finalY + 8;
+    } else {
+        renderEmptyState("Nessuna osservazione codificata disponibile.");
+    }
 
     // --- RECENT SCALES ---
-    // Only show if there's space, otherwise new page
+    startSection("Valutazioni Recenti (Scale)", 24);
+
     if (lastScales.length > 0) {
-        // Check if we need new page
-        if (currentY > 250) {
-            doc.addPage();
-            currentY = 20;
-        }
-
-        doc.setFontSize(12);
-        doc.setTextColor(...COLORS.primary);
-        doc.setFont("helvetica", "bold");
-        doc.text("Valutazioni Recenti (Scale)", 14, currentY);
-        currentY += 2;
-
         const scaleData = lastScales.map(s => [
-            new Date(s.date).toLocaleDateString('it-IT'),
+            formatDate(s.date),
             s.metadata?.title || 'Scala',
             s.metadata?.score || '-',
             s.metadata?.interpretation || '-'
@@ -204,6 +330,8 @@ export const generatePatientReport = (
             tableLineColor: [200, 200, 200],
             tableLineWidth: 0.1,
         });
+    } else {
+        renderEmptyState("Nessuna valutazione recente disponibile.");
     }
 
     // Save

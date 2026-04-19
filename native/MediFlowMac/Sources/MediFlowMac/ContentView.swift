@@ -2,16 +2,6 @@
 import SwiftUI
 
 struct ContentView: View {
-    private enum PatientViewMode: String, CaseIterable {
-        case active
-        case archived
-    }
-
-    private enum PatientSortMode: String, CaseIterable {
-        case recent
-        case alpha
-    }
-
     @StateObject private var viewModel = PatientsViewModel()
     @StateObject private var settings = SettingsStore.shared
     @EnvironmentObject private var security: SecuritySession
@@ -21,9 +11,15 @@ struct ContentView: View {
     /* @Codex */
     @State private var patientSearchQuery = ""
     /* @Codex */
-    @State private var patientViewMode: PatientViewMode = .active
+    @State private var patientViewMode: PatientListViewMode = .active
     /* @Codex */
-    @State private var patientSortMode: PatientSortMode = .recent
+    @State private var patientSortMode: PatientListSortMode = .recent
+    /* @Codex */
+    @State private var editingPatient: PatientDetail?
+    /* @Codex */
+    @State private var pendingDeletePatient: PatientSummary?
+    /* @Codex */
+    @State private var isLoadingPatientEditor = false
 
     var body: some View {
         Group {
@@ -43,6 +39,7 @@ struct ContentView: View {
                                 }
                             }
                             .labelsHidden()
+                            .accessibilityIdentifier("patients-ambulatory-picker")
 
                             if let message = viewModel.ambulatoriesErrorMessage {
                                 Text(message)
@@ -55,20 +52,23 @@ struct ContentView: View {
                             /* @Codex */
                             VStack(alignment: .leading, spacing: 8) {
                                 Picker("Stato pazienti", selection: $patientViewMode) {
-                                    Text("Attivi").tag(PatientViewMode.active)
-                                    Text("Archiviati").tag(PatientViewMode.archived)
+                                    Text("Attivi").tag(PatientListViewMode.active)
+                                    Text("Archiviati").tag(PatientListViewMode.archived)
                                 }
                                 .pickerStyle(.segmented)
+                                .accessibilityIdentifier("patients-status-filter")
 
                                 HStack(spacing: 10) {
                                     TextField("Cerca nome, cognome o CF", text: $patientSearchQuery)
                                         .textFieldStyle(.roundedBorder)
+                                        .accessibilityIdentifier("patients-search-field")
 
                                     Picker("Ordina", selection: $patientSortMode) {
-                                        Text("Recenti").tag(PatientSortMode.recent)
-                                        Text("A-Z").tag(PatientSortMode.alpha)
+                                        Text("Recenti").tag(PatientListSortMode.recent)
+                                        Text("A-Z").tag(PatientListSortMode.alpha)
                                     }
                                     .pickerStyle(.menu)
+                                    .accessibilityIdentifier("patients-sort-picker")
                                 }
                             }
 
@@ -113,6 +113,27 @@ struct ContentView: View {
                                     }
                                 }
                                 .opacity(patient.isArchived == true ? 0.6 : 1)
+                                .accessibilityIdentifier("patient-row-\(patient.id)")
+                                .contextMenu {
+                                    Button("Modifica") {
+                                        Task { await startEditing(patientId: patient.id) }
+                                    }
+
+                                    Button(patient.isArchived == true ? "Riattiva" : "Archivia") {
+                                        Task {
+                                            await setArchive(
+                                                for: patient,
+                                                isArchived: patient.isArchived != true
+                                            )
+                                        }
+                                    }
+
+                                    Divider()
+
+                                    Button("Elimina", role: .destructive) {
+                                        pendingDeletePatient = patient
+                                    }
+                                }
                             }
                         }
                     }
@@ -122,12 +143,38 @@ struct ContentView: View {
                         Button("Nuovo paziente") {
                             showingNewPatient = true
                         }
+                        .accessibilityIdentifier("patients-new-button")
                         Button("Ricarica") {
                             Task { await viewModel.loadInitial() }
                         }
+                        .accessibilityIdentifier("patients-refresh-button")
+                        Button("Modifica") {
+                            guard let selectedPatient else { return }
+                            Task { await startEditing(patientId: selectedPatient.id) }
+                        }
+                        .disabled(selectedPatient == nil || isLoadingPatientEditor)
+                        .accessibilityIdentifier("patients-edit-button")
+                        Button(selectedPatient?.isArchived == true ? "Riattiva" : "Archivia") {
+                            guard let selectedPatient else { return }
+                            Task {
+                                await setArchive(
+                                    for: selectedPatient,
+                                    isArchived: selectedPatient.isArchived != true
+                                )
+                            }
+                        }
+                        .disabled(selectedPatient == nil)
+                        .accessibilityIdentifier("patients-archive-button")
+                        Button("Elimina", role: .destructive) {
+                            guard let selectedPatient else { return }
+                            pendingDeletePatient = selectedPatient
+                        }
+                        .disabled(selectedPatient == nil)
+                        .accessibilityIdentifier("patients-delete-button")
                         Button("Impostazioni") {
                             showingSettings = true
                         }
+                        .accessibilityIdentifier("patients-settings-button")
                     }
                     .overlay(alignment: .bottom) {
                         if let errorMessage = viewModel.errorMessage {
@@ -178,6 +225,39 @@ struct ContentView: View {
                 .environmentObject(security)
             }
         }
+        /* @Codex */
+        .sheet(item: $editingPatient) { patient in
+            GlassPanelWindow(
+                title: "Modifica paziente",
+                subtitle: "Aggiorna anagrafica e stato cartella",
+                minSize: CGSize(width: 620, height: 640),
+                expandedSize: CGSize(width: 760, height: 840)
+            ) {
+                EditPatientView(patient: patient) {
+                    Task {
+                        await viewModel.loadPatients()
+                        syncSelectedPatientIfHidden()
+                    }
+                }
+                .environmentObject(security)
+            }
+        }
+        /* @Codex */
+        .alert(
+            "Eliminare questo paziente?",
+            isPresented: Binding(
+                get: { pendingDeletePatient != nil },
+                set: { if !$0 { pendingDeletePatient = nil } }
+            )
+        ) {
+            Button("Elimina", role: .destructive) {
+                guard let patient = pendingDeletePatient else { return }
+                Task { await deletePatient(patient) }
+            }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            Text("L'operazione è irreversibile e rimuove la cartella clinica.")
+        }
         .task {
             if security.isUnlocked {
                 await viewModel.loadInitial()
@@ -208,45 +288,18 @@ struct ContentView: View {
 
     /* @Codex */
     private var filteredPatients: [PatientSummary] {
-        let query = patientSearchQuery
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        let terms = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        PatientsFiltering.apply(
+            patients: viewModel.patients,
+            query: patientSearchQuery,
+            viewMode: patientViewMode,
+            sortMode: patientSortMode
+        )
+    }
 
-        let statusFiltered = viewModel.patients.filter { patient in
-            switch patientViewMode {
-            case .active:
-                return patient.isArchived != true
-            case .archived:
-                return patient.isArchived == true
-            }
-        }
-
-        let searchFiltered = statusFiltered.filter { patient in
-            guard !terms.isEmpty else { return true }
-            let searchableText = "\(patient.lastName) \(patient.firstName) \(patient.taxCode)".lowercased()
-            return terms.allSatisfy { searchableText.contains($0) }
-        }
-
-        switch patientSortMode {
-        case .alpha:
-            return searchFiltered.sorted { lhs, rhs in
-                let lastNameOrder = lhs.lastName.localizedCaseInsensitiveCompare(rhs.lastName)
-                if lastNameOrder != .orderedSame { return lastNameOrder == .orderedAscending }
-                let firstNameOrder = lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName)
-                if firstNameOrder != .orderedSame { return firstNameOrder == .orderedAscending }
-                return lhs.taxCode.localizedCaseInsensitiveCompare(rhs.taxCode) == .orderedAscending
-            }
-        case .recent:
-            return searchFiltered.sorted { lhs, rhs in
-                let lhsDate = lhs.updatedAt ?? Date.distantPast
-                let rhsDate = rhs.updatedAt ?? Date.distantPast
-                if lhsDate != rhsDate { return lhsDate > rhsDate }
-                let lastNameOrder = lhs.lastName.localizedCaseInsensitiveCompare(rhs.lastName)
-                if lastNameOrder != .orderedSame { return lastNameOrder == .orderedAscending }
-                return lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName) == .orderedAscending
-            }
-        }
+    /* @Codex */
+    private var selectedPatient: PatientSummary? {
+        guard let selectedPatientId else { return nil }
+        return viewModel.patients.first(where: { $0.id == selectedPatientId })
     }
 
     /* @Codex */
@@ -254,6 +307,66 @@ struct ContentView: View {
         guard let selectedPatientId else { return }
         if !filteredPatients.contains(where: { $0.id == selectedPatientId }) {
             self.selectedPatientId = nil
+        }
+    }
+
+    /* @Codex */
+    @MainActor
+    private func startEditing(patientId: String) async {
+        if isLoadingPatientEditor { return }
+        isLoadingPatientEditor = true
+        defer { isLoadingPatientEditor = false }
+
+        do {
+            editingPatient = try await LocalAPIClient.shared.fetchPatient(id: patientId)
+            viewModel.errorMessage = nil
+        } catch {
+            if let localError = error as? LocalAPIError {
+                viewModel.errorMessage = localError.localizedDescription
+            } else {
+                viewModel.errorMessage = "Impossibile aprire la scheda paziente."
+            }
+        }
+    }
+
+    /* @Codex */
+    @MainActor
+    private func setArchive(for patient: PatientSummary, isArchived: Bool) async {
+        do {
+            try await LocalAPIClient.shared.updatePatient(
+                id: patient.id,
+                payload: UpdatePatientPayload(version: patient.version, isArchived: isArchived)
+            )
+            await viewModel.loadPatients()
+            syncSelectedPatientIfHidden()
+            viewModel.errorMessage = nil
+        } catch {
+            if let localError = error as? LocalAPIError {
+                viewModel.errorMessage = localError.localizedDescription
+            } else {
+                viewModel.errorMessage = "Aggiornamento stato paziente fallito."
+            }
+        }
+    }
+
+    /* @Codex */
+    @MainActor
+    private func deletePatient(_ patient: PatientSummary) async {
+        pendingDeletePatient = nil
+        do {
+            try await LocalAPIClient.shared.deletePatient(id: patient.id, expectedVersion: patient.version)
+            await viewModel.loadPatients()
+            if selectedPatientId == patient.id {
+                selectedPatientId = nil
+            }
+            syncSelectedPatientIfHidden()
+            viewModel.errorMessage = nil
+        } catch {
+            if let localError = error as? LocalAPIError {
+                viewModel.errorMessage = localError.localizedDescription
+            } else {
+                viewModel.errorMessage = "Eliminazione paziente fallita."
+            }
         }
     }
 

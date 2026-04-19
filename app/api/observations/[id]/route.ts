@@ -4,6 +4,8 @@ import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 /* @Codex */
 function parseDate(value: unknown): Date | undefined {
@@ -104,6 +106,22 @@ export async function PUT(
         }
 
         await dbServer.update(observations).set(updateData).where(eq(observations.id, id));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'observation.updated',
+                subjectType: 'observation',
+                subjectRef: id,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body),
+                },
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /observations/[id] error:', error);
@@ -130,10 +148,22 @@ export async function DELETE(
         }
 
         await dbServer.delete(observations).where(eq(observations.id, id));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'observation.deleted',
+                subjectType: 'observation',
+                subjectRef: id,
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /observations/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete observation' }, { status: 500 });
     }
 }
-

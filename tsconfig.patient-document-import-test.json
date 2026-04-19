@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-patient-document-import-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/ai-task-contracts.ts",
+    "lib/db.ts",
+    "lib/document-excerpt.ts",
+    "lib/icd-service.ts",
+    "lib/patient-document-import-service.ts",
+    "lib/patient-document-import-service.test.ts",
+    "lib/patient-document-review.ts",
+    "lib/patient-document-review.test.ts",
+    "lib/patient-smart-import-matching.ts",
+    "lib/pdf-service.ts"
+  ]
+}

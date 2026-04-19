@@ -2,8 +2,8 @@
 
 > [!IMPORTANT]
 > **Stato documento: CANONICAL (topologia dati e percorsi digitali end-to-end).**
-> Per principi stabili e confini, prevale `ARCHITECTURE.md`.
-> Per policy di sicurezza e redazione, prevale `SECURITY.md`.
+> Per principi stabili e confini, prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Per policy di sicurezza e redazione, prevale [SECURITY.md](../SECURITY.md).
 
 Questo documento mappa in modo operativo:
 
@@ -11,6 +11,11 @@ Questo documento mappa in modo operativo:
 - dove viene cifrato/decifrato
 - dove viene persistito
 - quali controlli di sicurezza lo proteggono
+
+Riferimenti rapidi:
+- [docs/walkthrough.md](./walkthrough.md)
+- [docs/README.md](./README.md)
+- [docs/markdown-index.md](./markdown-index.md)
 
 ---
 
@@ -23,26 +28,31 @@ flowchart TB
     WebCrypto["Web Crypto AES-256-GCM"]
     NativeUI["Native macOS Client (SwiftUI arm64)"]
     NativeCrypto["SecuritySession + CryptoService (RAM only)"]
+    PairedClient["Paired Apple client (iPhone/iPad/macOS)"]
   end
   subgraph "Transport"
     HttpLocal["HTTP localhost :3000"]
     TLSProxy["TLS Proxy https://127.0.0.1:3443"]
+    LanTLS["HTTPS trusted LAN :3443"]
   end
   subgraph "Next.js Backend"
     AuthAPI["Auth API (/api/auth/*)"]
     WebAPI["Web API (/api/*)"]
     V1API["Native API v1 (/api/v1/*)"]
+    NetworkAPI["Network API v1 (/api/v1/network/*)"]
     TokenSvc["Local API token service"]
   end
   subgraph "Local Services"
     Ollama["Ollama :11434"]
     ICD["ICD-11 Docker :8888"]
+    OpenMed["OpenMed redaction :18080 (shadow)"]
   end
   subgraph "Local Filesystem"
     SQLite[("medical.db (SQLite)")]
     LocalToken[("local-api-token (0600)")]
     NativeCfg[("native-config.json")]
     TLSCert[("TLS cert.pem + key.pem")]
+    Settings[("settings JSON")]
   end
   WebUI -->|"encrypt/decrypt"| WebCrypto
   WebUI -->|"session cookie"| HttpLocal
@@ -51,16 +61,25 @@ flowchart TB
   NativeUI -->|"encrypt/decrypt"| NativeCrypto
   NativeUI -->|"Bearer token"| TLSProxy
   TLSProxy -->|"forward"| V1API
+  PairedClient -->|"paired creds + session"| LanTLS
+  LanTLS -->|"forward"| NetworkAPI
   WebAPI --> SQLite
   AuthAPI --> SQLite
   V1API --> SQLite
+  NetworkAPI --> SQLite
   V1API -->|"token check"| TokenSvc
   TokenSvc --> LocalToken
   WebAPI --> Ollama
   WebAPI --> ICD
+  WebAPI --> OpenMed
   NativeUI --> NativeCfg
   TLSProxy --> TLSCert
+  NetworkAPI --> Settings
 ```
+
+Nota operativa: i client paired non accedono direttamente al database. Il nodo
+autorevole resta il Mac `home-base`, che espone solo superfici documentate e
+oggi ancora `read-only-first`.
 
 ---
 
@@ -118,6 +137,7 @@ erDiagram
         text phone "ENC"
         text notes "ENC"
         text aiSummary "ENC"
+        text documentInsights "ENC compat projection"
         bool isArchived
         text ambulatoryId FK
     }
@@ -163,6 +183,7 @@ erDiagram
         text name "ENC"
         text data "ENC"
         text summarySnapshot "ENC"
+        text parseEvidenceArtifactSnapshot "ENC"
     }
     CONVERSATIONS {
         text id PK
@@ -175,6 +196,9 @@ erDiagram
         text content "ENC"
     }
 ```
+
+Nota operativa: stati `network.mode`, pairing intents, paired client trusted,
+backup scheduler e alcuni guardrail AI vivono in `settings` JSON versionati.
 
 ---
 
@@ -256,12 +280,75 @@ sequenceDiagram
     OCR->>LLM: Richiesta OCR multimodale
     LLM-->>OCR: Testo estratto
     OCR-->>API: OCR markdown
-    API->>Synth: Genera sintesi clinica
-    Synth->>LLM: Prompt MedGemma
-    LLM-->>Synth: Sintesi
-    Synth-->>API: Summary
-    API->>DB: Salva documentInsights cifrato
+    API->>Synth: Analisi clinica strutturata
+    Synth->>LLM: Prompt Qwen text-only
+    LLM-->>Synth: Summary + quality + ICD espliciti
+    Synth-->>API: Insight + autofill prudente + parse/evidence artifact
+    API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights e diagnosi
     API-->>UI: Esito + dati
+```
+
+### 4.5 Documento archiviato -> Patient Insight artifact-first
+
+```mermaid
+sequenceDiagram
+    participant Upload as Document Upload
+    participant Attach as attachments
+    participant Artifact as parse/evidence artifact
+    participant Insight as AI Patient Insight
+    Upload->>Attach: Salva attachment + summarySnapshot cifrato
+    Upload->>Artifact: Persiste parseEvidenceArtifactSnapshot cifrato
+    Insight->>Attach: Legge allegati recenti
+    Insight->>Artifact: Prova prima il context artifact-first
+    Artifact-->>Insight: facts/evidence/provenance
+    Insight-->>Insight: Fallback a documentInsights solo se l'artifact manca
+```
+
+### 4.6 Profilo paziente -> smart import reviewable
+
+```mermaid
+sequenceDiagram
+    participant Clinician as Medico
+    participant UI as Web UI
+    participant AI as AIService
+    participant ICD as ICD local proxy
+    participant Drugs as AIFA local catalog
+    participant DB as SQLite
+    Clinician->>UI: Avvia smart import dal profilo paziente
+    UI->>DB: Legge note, diario, documentInsights, terapie/diagnosi correnti
+    UI->>AI: Prompt strutturato con fonti locali
+    AI-->>UI: Suggerimenti reviewable (diagnosi + terapie)
+    UI->>ICD: Match locale ICD-11 per diagnosi free-text
+    UI->>Drugs: Match locale farmaci/AIC/ATC
+    UI-->>Clinician: Mostra proposte con evidenze e selezione esplicita
+    Clinician->>UI: Conferma solo i suggerimenti validi
+    UI->>DB: Aggiorna diagnoses + therapies con dedupe
+```
+
+Nota operativa: questo flusso non sostituisce ADR 0011. L'autofill automatico
+resta limitato ai soli ICD espliciti nei documenti; diagnosi free-text e terapie
+richiedono sempre conferma umana in questa thin slice.
+
+Nota aggiuntiva: se una fonte e solo referral/follow-up senza novita clinica e
+una diagnosi o terapia e gia presente, il suggerimento viene soppresso per
+ridurre rumore operativo.
+
+### 4.7 Modalita `network-home-base` -> paired client read-only
+
+```mermaid
+sequenceDiagram
+    participant Client as Paired client
+    participant Pair as /api/v1/network/pairing-intents
+    participant Node as Nodo home-base
+    participant Session as Sessione operatore
+    participant Data as /api/v1/network/patients*
+    Client->>Pair: POST pairing intent (bootstrap PHI-safe)
+    Node-->>Client: pairing secret + intent pending
+    Client->>Node: POST confirm intent
+    Node-->>Client: paired client token
+    Client->>Session: Login operatore sul nodo
+    Client->>Data: GET patients / patient detail
+    Data-->>Client: payload read-only se paired client + sessione sono validi
 ```
 
 ---
@@ -273,6 +360,7 @@ sequenceDiagram
 | `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
+| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only first |
 | `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
@@ -297,5 +385,8 @@ sequenceDiagram
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
 - `/api/v1/*` resta versionata e compatibile per client native.
+- `network-home-base` resta opt-in, paired e read-only-first.
 - Token locale e sessione devono restare separati (web cookie vs native bearer).
 - Proxy verso servizi locali sempre allowlist localhost.
+- `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
+  cifrati, non log di debug.

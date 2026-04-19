@@ -21,13 +21,30 @@
 }
 
 :root {
-  --background: #f0f4f8;
-  /* Soft blue-grey background */
-  --foreground: #1e293b;
+  --background: #f4f6fb;
+  --foreground: #1d1d1f;
+  --ui-canvas-background: linear-gradient(180deg, #fbfcff 0%, #f4f6fb 54%, #eef2fa 100%);
 
-  --glass-border: rgba(255, 255, 255, 0.4);
+  /* Glass Chrome (Shell) */
+  --glass-border: rgba(255, 255, 255, 0.45);
   --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  --glass-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --glass-card-shadow: 0 10px 28px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  
+  /* Clinical Paper (Content) */
+  --paper-bg: #ffffff;
+  --paper-border: rgba(0, 0, 0, 0.06);
+  --paper-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --ui-chip-bg: rgba(15, 23, 42, 0.04);
+  --ui-chip-border: rgba(15, 23, 42, 0.06);
+  --ui-panel-radius: 28px;
+  --ui-card-radius: 24px;
+  --ui-subsection-radius: 22px;
+  --ui-orb-opacity: 0;
+  --ui-btn-primary-bg: linear-gradient(135deg, #0A84FF, #0A84FF);
+  --ui-btn-primary-shadow: 0 14px 30px rgba(10, 132, 255, 0.22);
+  --ui-btn-primary-radius: 18px;
 
   /* Apple System Colors (Light) */
   --apple-blue: #007AFF;
@@ -35,66 +52,135 @@
   --system-gray-6: #F2F2F7;
 }
 
+:root[data-ui-style='liquid'] {
+  --background: #edf4ff;
+  --ui-canvas-background:
+    radial-gradient(circle at 10% 10%, rgba(96, 165, 250, 0.24) 0, transparent 24%),
+    radial-gradient(circle at 84% 4%, rgba(244, 114, 182, 0.18) 0, transparent 22%),
+    radial-gradient(circle at 56% 18%, rgba(45, 212, 191, 0.12) 0, transparent 18%),
+    linear-gradient(180deg, #fbfdff 0%, #eef4ff 52%, #e7efff 100%);
+  --glass-border: rgba(255, 255, 255, 0.62);
+  --glass-bg: rgba(255, 255, 255, 0.74);
+  --glass-panel-shadow: 0 28px 64px rgba(87, 98, 182, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  --glass-card-shadow: 0 18px 40px rgba(115, 128, 202, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.54);
+  --paper-shadow: 0 12px 30px rgba(148, 163, 184, 0.12);
+  --ui-chip-bg: rgba(255, 255, 255, 0.72);
+  --ui-chip-border: rgba(255, 255, 255, 0.55);
+  --ui-panel-radius: 32px;
+  --ui-card-radius: 28px;
+  --ui-subsection-radius: 24px;
+  --ui-orb-opacity: 1;
+  --ui-btn-primary-bg: linear-gradient(145deg, #0A84FF, #5AC8FA 58%, #5E5CE6);
+  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.28);
+  --ui-btn-primary-radius: 28px;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
+  font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
-  /* Subtle mesh gradient background */
-  background-image:
-    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  letter-spacing: -0.01em;
+  background-image: var(--ui-canvas-background);
   background-size: 100% 100%;
   background-attachment: fixed;
 }
 
+body[data-preview-profile-id='liquid-glass-ui'] {
+  --glass-bg: rgba(255, 255, 255, 0.52);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  background-image:
+    radial-gradient(circle at 8% 8%, rgba(90, 200, 250, 0.24) 0, transparent 26%),
+    radial-gradient(circle at 78% 2%, rgba(125, 211, 252, 0.22) 0, transparent 22%),
+    radial-gradient(circle at 92% 78%, rgba(236, 72, 153, 0.12) 0, transparent 20%),
+    linear-gradient(180deg, #fcfdff 0%, #eef4ff 52%, #e7eefb 100%);
+}
+
+body[data-preview-profile-id='ai-stack-preview'] {
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(99, 102, 241, 0.18) 0, transparent 28%),
+    radial-gradient(circle at 78% 0%, rgba(56, 189, 248, 0.14) 0, transparent 24%),
+    linear-gradient(180deg, #fbfcff 0%, #f2f4ff 54%, #eaf0ff 100%);
+}
+
+body[data-preview-profile-id='smart-import-review-v2'] {
+  background-image:
+    radial-gradient(circle at 10% 8%, rgba(16, 185, 129, 0.16) 0, transparent 24%),
+    radial-gradient(circle at 82% 4%, rgba(251, 191, 36, 0.12) 0, transparent 22%),
+    linear-gradient(180deg, #fcfdfb 0%, #f5f8f2 54%, #edf3ea 100%);
+}
+
 /* Ensure selected text is readable in dark mode */
 ::selection {
-  background: rgba(99, 102, 241, 0.5);
-  /* indigo-500/50 */
-  color: #fff;
+  background: rgba(0, 122, 255, 0.2);
+  color: inherit;
 }
 
-/* Manually handle dark mode via class */
-/* Manually handle dark mode via class */
 /* Manually handle dark mode via class */
 :root.dark {
-  /* GitHub Dark Mode Palette */
-  --background: #0d1117;
-  /* GitHub Base */
-  --foreground: #c9d1d9;
-  /* GitHub Text */
+  /* High contrast dark palette */
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --ui-canvas-background: linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
+
+  /* Glass Chrome (Dark Shell) */
+  --glass-bg: rgba(28, 28, 30, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  
+  /* Clinical Paper (Dark Content) */
+  --paper-bg: #1c1c1e;
+  --paper-border: rgba(255, 255, 255, 0.08);
+  --paper-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+  --ui-chip-bg: rgba(255, 255, 255, 0.05);
+  --ui-chip-border: rgba(255, 255, 255, 0.1);
 
   /* Semantic Layers */
-  --card: #161b22;
-  /* GitHub Card/Header */
-  --card-foreground: #c9d1d9;
-  --popover: #161b22;
-  --popover-foreground: #c9d1d9;
+  --card: #1c1c1e;
+  --card-foreground: #f5f5f7;
+  --popover: #1c1c1e;
+  --popover-foreground: #f5f5f7;
 
   /* Controls & Inputs */
-  --input: #010409;
-  /* GitHub Input Bg */
-  --border: #30363d;
-  /* GitHub Border */
+  --input: #2c2c2e;
+  --border: #3a3a3c;
 
   /* Semantic Text */
-  --muted: #8b949e;
-  /* GitHub Muted */
-  --muted-foreground: #8b949e;
+  --muted: #8e8e93;
+  --muted-foreground: #8e8e93;
 
   /* Semantic Colors */
-  --primary: #58a6ff;
-  /* GitHub Blue */
-  --apple-blue: #58a6ff;
-  --apple-gray: #8b949e;
-  --system-gray-6: #161b22;
+  --primary: #0a84ff;
+  --apple-blue: #0a84ff;
+  --apple-gray: #8e8e93;
+  --system-gray-6: #1c1c1e;
 }
 
-:root.dark body {
-  background-image: none;
-  background-color: var(--background);
+:root.dark[data-ui-style='liquid'] {
+  --ui-canvas-background:
+    radial-gradient(circle at 12% 10%, rgba(10, 132, 255, 0.14) 0, transparent 26%),
+    radial-gradient(circle at 82% 0%, rgba(147, 51, 234, 0.11) 0, transparent 22%),
+    radial-gradient(circle at 54% 16%, rgba(45, 212, 191, 0.08) 0, transparent 18%),
+    linear-gradient(180deg, #020308 0%, #0b0f18 100%);
+  --glass-bg: rgba(23, 24, 32, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-panel-shadow: 0 28px 60px rgba(2, 6, 23, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-card-shadow: 0 18px 38px rgba(2, 6, 23, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ui-chip-bg: rgba(255, 255, 255, 0.08);
+  --ui-chip-border: rgba(255, 255, 255, 0.14);
+  --ui-orb-opacity: 1;
+  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.34);
+}
+
+:root.dark body[data-preview-profile-id='liquid-glass-ui'] {
+  --glass-bg: rgba(20, 28, 40, 0.72);
+  --glass-border: rgba(125, 211, 252, 0.14);
+  background-image:
+    radial-gradient(circle at 10% 8%, rgba(56, 189, 248, 0.16) 0, transparent 24%),
+    radial-gradient(circle at 82% 4%, rgba(14, 165, 233, 0.12) 0, transparent 22%),
+    linear-gradient(180deg, #02050a 0%, #07111c 100%);
 }
 
 /* Ensure input/card backgrounds are readable in dark mode */
@@ -108,47 +194,126 @@ body {
 
 /* Fix native select options in dark mode */
 :root.dark select option {
-  background-color: #161b22;
-  color: #c9d1d9;
-}
-
-/* Light mode overrides (default) - applied when NOT .dark */
-:root:not(.dark) body {
-  background-color: #f3f4f6;
-  background-image:
-    radial-gradient(at 40% 20%, hsla(210, 100%, 96%, 1) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189, 100%, 96%, 1) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, hsla(341, 100%, 96%, 1) 0px, transparent 50%);
+  background-color: #1c1c1e;
+  color: #f5f5f7;
 }
 
 @layer utilities {
+  .liquid-hero {
+    @apply relative overflow-hidden;
+    border-radius: var(--ui-panel-radius);
+  }
+
+  .liquid-orb {
+    @apply pointer-events-none absolute rounded-full blur-3xl transition-opacity duration-300;
+    opacity: var(--ui-orb-opacity);
+  }
+
+  /* Disciplined Glass: The Chrome */
   .glass {
-    @apply backdrop-blur-md bg-white/70 dark:bg-[#161b22]/90 border border-white/50 dark:border-[#30363d] shadow-xl;
-    /* @Codex */
-    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.05));
-    /* @Codex */
-    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    @apply border backdrop-blur-xl;
+    border-radius: var(--ui-card-radius);
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-card-shadow);
   }
 
-  .glass-card {
-    @apply backdrop-blur-xl bg-white/60 dark:bg-[#161b22] border border-white/40 dark:border-[#30363d] shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl;
-    /* @Codex */
-    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.2));
-    /* @Codex */
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  }
-
-  /* @Codex */
-  .glass-card:hover {
-    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  /* Clinical Paper: The Content */
+  .clinical-paper {
+    @apply border;
+    border-radius: var(--ui-card-radius);
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
+    box-shadow: var(--paper-shadow);
   }
 
   .glass-panel {
-    @apply backdrop-blur-2xl bg-white/80 dark:bg-[#0d1117] border border-white/30 dark:border-[#30363d] shadow-lg rounded-3xl;
-    /* @Codex */
-    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.2));
-    /* @Codex */
-    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    @apply border backdrop-blur-3xl;
+    border-radius: var(--ui-panel-radius);
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-panel-shadow);
+  }
+
+  /* Disciplined Glass Card: premium but calmer than the shell chrome */
+  .glass-card {
+    @apply border backdrop-blur-xl;
+    border-radius: var(--ui-card-radius);
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-card-shadow);
+  }
+
+  .glass-card:hover {
+    box-shadow: var(--glass-panel-shadow);
+    transform: translateY(-1px);
+  }
+
+  .apple-subsection {
+    @apply border p-4 md:p-5;
+    border-radius: var(--ui-subsection-radius);
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
+  .apple-chip {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
+    background-color: var(--ui-chip-bg);
+    border-color: var(--ui-chip-border);
+    color: var(--apple-gray);
+  }
+
+  .apple-list-row {
+    @apply flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-sm;
+    background-color: var(--paper-bg);
+    border-color: var(--paper-border);
+    transition-property: border-color, background-color, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
+
+  .apple-list-row:hover {
+    @apply border-gray-300 dark:border-gray-600;
+    transform: translateY(-0.5px);
+  }
+
+  /* @Codex */
+  .seeder-panel {
+    @apply rounded-[24px] border border-amber-200/70 backdrop-blur-md dark:border-amber-500/20 dark:bg-amber-900/10;
+    background: linear-gradient(135deg, rgba(255, 251, 235, 0.94), rgba(255, 255, 255, 0.8));
+    box-shadow: 0 14px 28px rgba(217, 119, 6, 0.08);
+  }
+
+  /* @Codex */
+  .seeder-subsection {
+    @apply rounded-[20px] border border-white/70 backdrop-blur-md dark:border-white/10 dark:bg-white/5;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+  }
+
+  /* @Codex */
+  .seeder-subsection-danger {
+    @apply border-red-200/70 dark:border-red-500/20 dark:bg-red-900/10;
+    background: linear-gradient(135deg, rgba(254, 242, 242, 0.92), rgba(255, 255, 255, 0.72));
+  }
+
+  .section-kicker {
+    @apply text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
+  }
+
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold text-white active:scale-[0.98];
+    border-radius: var(--ui-btn-primary-radius);
+    background: var(--ui-btn-primary-bg);
+    box-shadow: var(--ui-btn-primary-shadow);
+    transition-property: opacity, transform, box-shadow, background-color;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
+
+  .ui-btn-primary:hover {
+    transform: translateY(-1px);
   }
 
   /* @Codex */
@@ -160,18 +325,6 @@ body {
   }
 }
 
-/* @Codex */
-:root.dark .glass,
-:root.dark .glass-card,
-:root.dark .glass-panel {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-/* @Codex */
-:root.dark .glass-card:hover {
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
 
 /* Progress bar widths (used by analytics/settings pages) */
 /* These allow dynamic widths via CSS custom properties */

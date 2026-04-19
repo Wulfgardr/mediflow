@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -28,7 +34,21 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-e2e/types/**/*.ts",
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-e2e-smart-import/types/**/*.ts",
+    ".next-e2e-smart-import/dev/types/**/*.ts",
+    ".next-e2e-smart-import-wul126/types/**/*.ts",
+    ".next-e2e-smart-import-wul126/dev/types/**/*.ts",
+    ".next-e2e-wul127/types/**/*.ts",
+    ".next-e2e-wul127/dev/types/**/*.ts",
+    ".next-real-import/types/**/*.ts",
+    ".next-real-import/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "scripts/**/*.ts",
+    "scripts/**/*.mts"
+  ]
 }

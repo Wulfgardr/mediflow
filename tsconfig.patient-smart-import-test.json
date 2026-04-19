@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-patient-smart-import-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/patient-smart-import-matching.ts",
+    "lib/patient-smart-import-service.test.ts",
+    "lib/db.ts",
+    "lib/ai-task-contracts.ts"
+  ]
+}

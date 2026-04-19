@@ -2,162 +2,167 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (deep dive tecnico).**
-> Per confini stabili e decisioni architetturali prevale `ARCHITECTURE.md`.
-> Per il flusso operativo end-to-end prevale `docs/walkthrough.md`.
+> Per i confini stabili prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Per il flusso operativo reale prevale [docs/walkthrough.md](./walkthrough.md).
 
-> Stack tecnico, sicurezza e flussi dati.
-> Documento per chi deve implementare, mantenere o estendere MediFlow.
-
-Per confini stabili e decisioni di alto livello, consulta prima `ARCHITECTURE.md`.
+Questo file serve a dare una lettura più discorsiva del sistema reale, senza
+sovrapporsi ai documenti canonici.
 
 ---
 
-## 1. Visione d'insieme
+## 1. Snapshot tecnico attuale
 
-MediFlow non è una semplice web app: è un **sistema ibrido locale** pensato per privacy, affidabilità e continuità operativa.
+MediFlow oggi va letto così:
 
-### Topologia ibrida locale
+- **web app locale** come superficie primaria;
+- **SQLite cifrato** come storage autorevole;
+- **`/api/v1`** come contratto condiviso per i client Apple;
+- **`home-base` read-only-first** come prima thin slice multi-device;
+- **document intelligence reviewable** con artifact `parse/evidence`;
+- **stack AI locale governato** e separato dalle lane `benchmark-only`;
+- **SISS/FSE** dentro un boundary esplicito di handoff e `webapp-assisted`.
 
-Il sistema è composto da tre layer che convivono sul `localhost` del medico:
+### Topologia logica
 
 ```mermaid
-graph TD
-    subgraph "Layer 1: Interfaccia (Frontend)"
-        Native[App nativa macOS]
-        Web[Web app Next.js]
+flowchart TD
+    subgraph "Interfaccia"
+        Web["Web app Next.js"]
+        Mac["Shell macOS esistente"]
+        Peer["Client paired iPhone/iPad/macOS"]
     end
 
-    subgraph "Layer 2: Core & Dati (Backend Locale)"
-        Proxy["TLS Proxy (:3443)"]
-        NextAPI["Next.js Server (:3000)"]
-        DB[(SQLite: medical.db)]
+    subgraph "Core locale"
+        TLS["TLS Proxy :3443"]
+        Next["Next.js :3000"]
+        DB[("SQLite medical.db")]
     end
 
-    subgraph "Layer 3: Motori AI (Servizi)"
-        Ollama["Ollama (AI + OCR)"]
-        ICD["ICD-11 Docker (:8888)"]
+    subgraph "Servizi locali"
+        Ollama["Ollama :11434"]
+        ICD["ICD-11 Docker :8888"]
+        OpenMed["OpenMed redaction :18080"]
     end
 
-    Native -->|HTTPS| Proxy
-    Proxy -->|HTTP| NextAPI
-    Web -->|HTTP| NextAPI
-    NextAPI --> DB
-    NextAPI --> Ollama
-    NextAPI --> ICD
-    
-    style Native fill:#333,stroke:#fff,color:#fff
-    style Web fill:#61dafb,stroke:#333
-    style DB fill:#eee,stroke:#333
-    style Ollama fill:#ff9900,stroke:#333
+    Web --> Next
+    Mac --> TLS --> Next
+    Peer --> TLS
+    Next --> DB
+    Next --> Ollama
+    Next --> ICD
+    Next --> OpenMed
 ```
 
-1. **Layer Interfaccia**: l'utente usa browser (Chrome/Safari) o app nativa (SwiftUI).
-2. **Layer Core**: Next.js gestisce la logica, le API e parla con il database SQLite.
-3. **Layer Servizi**: Container Docker e processi locali forniscono l'intelligenza (AI) e gli standard (ICD-11).
+La cosa importante è questa: i client non parlano con un database remoto.
+Parlano con un **nodo locale** che resta autorevole e che, quando serve, espone
+solo un perimetro documentato.
 
 ---
 
-## 2. Stack tecnico
+## 2. Dato, chiavi e persistenza
 
-Una selezione pragmatica per performance e mantenibilità.
+Il dato clinico sensibile viene cifrato lato client prima della persistenza.
 
-| Ruolo | Tecnologia | Versione | Perché |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | React / Next.js | 16 / 15 | Standard industriale, rapido, component-based. |
-| **UI** | Tailwind CSS | v4 | Styling rapido e consistente. |
-| **Database** | SQLite | 3.x | File singolo, zero config, perfetto per local-first. |
-| **ORM** | Drizzle | Ultima | Type-safe, leggero, ottime migrazioni. |
-| **AI Runtime** | Ollama | Locale | Esegue LLM (Gemma, Llama) su GPU Apple Silicon. |
-| **Native** | SwiftUI | 5.0 | UI nativa performante per macOS. |
+Schema essenziale:
 
----
+1. l'utente sblocca con il PIN;
+2. il PIN deriva la KEK;
+3. la KEK sblocca la master key in RAM;
+4. i campi clinici vengono cifrati in `AES-256-GCM`;
+5. su disco finiscono valori nel formato `ENC:<iv_b64>:<cipher_b64>`.
 
-## 3. Sicurezza e crittografia (Zero-Knowledge)
-
-La sicurezza è il pilastro fondamentale. **Nessun dato chiaro tocca mai il disco.**
-
-### Protocollo di cifratura
-
-1. **PIN Utente**: L'unica chiave che non viene mai salvata.
-2. **Master Key (AES-256)**: Generata al setup, cifrata con il PIN.
-3. **Sessione**: Quando l'utente fa login, il PIN decifra la Master Key in RAM.
-
-### Flusso di Scrittura
-
-Quando salvi una nota clinica:
-
-1. Il Frontend prende il testo `"Paziente iperteso"`.
-2. Usa la *Master Key* (in memoria) per cifrarlo con **AES-256-GCM**.
-3. Genera una stringa: `ENC:base64(iv):base64(ciphertext)`.
-4. Invia questa stringa al Database.
-
-Il database `medical.db` contiene solo stringhe senza senso. Se rubano il file, non leggono nulla.
-
-```mermaid
-sequenceDiagram
-    participant Medico
-    participant Browser
-    participant RAM as Memoria Volatile
-    participant DB as Disco Fisso
-
-    Medico->>Browser: Inserisce PIN
-    Browser->>RAM: Deriva Chiave (PBKDF2)
-    Browser->>DB: Legge Chiave Master Cifrata
-    DB-->>Browser: OK
-    Browser->>RAM: Decifra Chiave Master
-    Note right of RAM: Ora la chiave è attiva (solo in RAM)
-    
-    Medico->>Browser: Scrive "Paziente OK"
-    Browser->>RAM: Cifra con Chiave Master
-    Browser->>DB: Salva "A8d%j9s..."
-```
+Questo vale sia per il dato strutturato sia per gli snapshot documentali
+sensibili, compresi `summarySnapshot` e `parseEvidenceArtifactSnapshot`.
 
 ---
 
-## 4. Pipeline AI & OCR
+## 3. API e boundary operativi
 
-La pipeline documentale resta locale: nessun upload a servizi cloud per default.
+Le superfici principali sono tre:
 
-### Flusso Documentale
+| Surface | Auth | Ruolo |
+| --- | --- | --- |
+| `/api/*` | sessione web | CRUD web e overview locale |
+| `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, oggi read-only-first |
 
-1. **Upload**: Il medico carica un PDF/JPG.
-2. **OCR (DeepSeek-VLM)**:
-    * Il file passa a Ollama.
-    * Il modello multimodale "guarda" l'immagine ed estrae il testo strutturato.
-3. **Sintesi (MedGemma)**:
-    * Il testo estratto viene passato a un LLM clinico (MedGemma).
-    * Prompt: *"Sei un medico esperto. Riassumi questo referto..."*
-4. **Salvataggio**:
-    * Testo e Riassunto vengono cifrati e salvati nel DB.
+Punti da non perdere:
 
----
-
-## 5. Struttura del Database
-
-Principali tabelle in `lib/schema.ts`:
-
-* `patients`: Anagrafica base. Molti campi sono cifrati (`notes`, `phone`).
-* `entries`: Il diario clinico. Visite, note, tutto cronologico.
-* `therapies`: Farmaci attivi.
-* `ambulatories`: Per gestire multi-sede.
+- `local-only` resta il default;
+- `home-base` è opt-in;
+- il pairing è esplicito;
+- non esistono ancora write remoti o sync automatici;
+- i client iPadOS/iOS rientrano in questo stesso disegno, non in una scorciatoia tipo “DB remoto”.
 
 ---
 
-## 6. API v1 (per client nativo)
+## 4. Document intelligence e AI
 
-Questi endpoint restituiscono solo JSON puro (niente HTML/React Server Components) e sono ottimizzati per Swift.
+La pipeline documentale non è più solo “upload e riassunto”.
 
-| Endpoint | Metodo | Scopo |
-| :--- | :--- | :--- |
-| `/api/v1/patients` | GET/POST | Lista pazienti / Crea paziente |
-| `/api/v1/patients/[id]` | GET | Dettaglio completo (cifrato) |
-| `/api/v1/patients/[id]/entries` | GET/POST | Diario clinico |
-| `/api/v1/patients/[id]/therapies` | GET/POST | Terapie attive |
-| `/api/v1/ambulatories` | GET | Lista ambulatori (per i colori) |
+Oggi la direzione è:
+
+1. normalizzazione input;
+2. OCR locale;
+3. estrazione/sintesi locale;
+4. persistenza di artifact cifrati sul singolo allegato;
+5. consumer reviewable su `Patient Insight`, smart import e create-flow documentale.
+
+Lato governance, MediFlow tiene separati:
+
+- **runtime operativo**;
+- **lane benchmark-only**;
+- **sidecar specialistici**;
+- **shadow/comparator opt-in**.
+
+In altre parole: lo stack AI può crescere, ma non viene promosso nel flusso
+clinico solo perché “sembra andare bene”.
 
 ---
 
-## 7. Prossimi passi (engineering)
+## 5. Apple clients
 
-* [ ] Backup automatico schedulato.
-* [ ] Export GDPR-compliant (JSON/CSV leggibile).
+La direzione Apple oggi è più chiara di prima:
+
+- la **web app** resta la base forte;
+- la shell **macOS** storica è da preservare come snapshot, non da usare come
+  tela infinita per tutto il seguito;
+- il lavoro nuovo ruota attorno a **`/api/v1` + TLS locale + home-base**;
+- **iPadOS / iOS** sono previsti dentro questo stesso modello paired,
+  read-only-first.
+
+Questa distinzione conta: evita sia il finto “solo web”, sia il finto
+“app universale già pronta”.
+
+---
+
+## 6. Sistemi regionali: cosa diciamo davvero
+
+Sul filone SISS/FSE il punto non è “fare vedere un bottone”.
+Il punto è mantenere un boundary corretto.
+
+Oggi MediFlow può:
+
+- preparare il contesto paziente;
+- fare handoff contestuale;
+- richiamare il percorso prescrittivo ufficiale in modalità `webapp-assisted`;
+- eseguire pre-check locali dove sensato.
+
+Oggi MediFlow **non** dichiara ancora:
+
+- una integrazione regionale nativa certificata;
+- un consumo libero di REST/WS regionali;
+- una UI prescrittiva custom che sostituisce il modulo ufficiale.
+
+Questo boundary non è cosmetico: evita di raccontare come pronto qualcosa che
+dipende ancora da scenari approvati, qualifica `SSI` e provisioning reale.
+
+---
+
+## 7. Dove guardare dopo questo file
+
+- [ARCHITECTURE.md](../ARCHITECTURE.md)
+- [docs/walkthrough.md](./walkthrough.md)
+- [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
+- [docs/system_architecture.md](./system_architecture.md)
+- [docs/ROADMAP.md](./ROADMAP.md)

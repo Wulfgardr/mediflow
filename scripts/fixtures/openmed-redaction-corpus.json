@@ -1,0 +1,79 @@
+[
+  {
+    "id": "it-baseline-full-demographics",
+    "text": "Paziente: Mario Rossi, nato il 15/01/1984, Codice Fiscale RSSMRA84A15H501Z, telefono 3471234567, email mario.rossi@example.it, indirizzo Via Roma 12, Milano.",
+    "expected": [
+      { "text": "Mario", "type": "name", "critical": true },
+      { "text": "Rossi", "type": "name", "critical": true },
+      { "text": "15/01/1984", "type": "date", "critical": true },
+      { "text": "RSSMRA84A15H501Z", "type": "national_id", "critical": true },
+      { "text": "3471234567", "type": "phone", "critical": true },
+      { "text": "mario.rossi@example.it", "type": "email", "critical": true },
+      { "text": "Via Roma 12", "type": "address", "critical": true },
+      { "text": "Milano", "type": "city", "critical": false }
+    ]
+  },
+  {
+    "id": "it-caregiver-contacts",
+    "text": "Contatto caregiver: Giulia Verdi, residente in Piazza Garibaldi 8, Torino, tel. 0112345678, email giulia.verdi@pec.it.",
+    "expected": [
+      { "text": "Giulia", "type": "name", "critical": true },
+      { "text": "Verdi", "type": "name", "critical": true },
+      { "text": "Piazza Garibaldi 8", "type": "address", "critical": true },
+      { "text": "Torino", "type": "city", "critical": false },
+      { "text": "0112345678", "type": "phone", "critical": true },
+      { "text": "giulia.verdi@pec.it", "type": "email", "critical": true }
+    ]
+  },
+  {
+    "id": "it-referto-with-month-name",
+    "text": "Referto sintetico: la signora Anna Bianchi (CF BNCNNA90C41F205X) e stata visitata il 3 marzo 2026. Cellulare: +39 333 555 7788. Email: anna.bianchi@demo.it.",
+    "expected": [
+      { "text": "Anna", "type": "name", "critical": true },
+      { "text": "Bianchi", "type": "name", "critical": true },
+      { "text": "BNCNNA90C41F205X", "type": "national_id", "critical": true },
+      { "text": "3 marzo 2026", "type": "date", "critical": true },
+      { "text": "+39 333 555 7788", "type": "phone", "critical": true },
+      { "text": "anna.bianchi@demo.it", "type": "email", "critical": true }
+    ]
+  },
+  {
+    "id": "it-follow-up-address-and-phone",
+    "text": "Promemoria follow-up per Luca D'Amico, nato il 22-11-1975, indirizzo Corso Italia 44, Napoli. Tel 0819988776.",
+    "expected": [
+      { "text": "Luca", "type": "name", "critical": true },
+      { "text": "D'Amico", "type": "name", "critical": true },
+      { "text": "22-11-1975", "type": "date", "critical": true },
+      { "text": "Corso Italia 44", "type": "address", "critical": true },
+      { "text": "Napoli", "type": "city", "critical": false },
+      { "text": "0819988776", "type": "phone", "critical": true }
+    ]
+  },
+  {
+    "id": "it-plus-address-weak-spot",
+    "text": "Scheda contatto: Sara Conti, email sara.conti+trial@example.com, domicilio Viale Europa 5, Bologna, numero 3204445566, CF CNTSRA88E50A944Q.",
+    "expected": [
+      { "text": "Sara", "type": "name", "critical": true },
+      { "text": "Conti", "type": "name", "critical": true },
+      { "text": "sara.conti+trial@example.com", "type": "email", "critical": true },
+      { "text": "Viale Europa 5", "type": "address", "critical": true },
+      { "text": "Bologna", "type": "city", "critical": false },
+      { "text": "3204445566", "type": "phone", "critical": true },
+      { "text": "CNTSRA88E50A944Q", "type": "national_id", "critical": true }
+    ],
+    "notes": "Known weak spot candidate for Italian address detection."
+  },
+  {
+    "id": "it-visit-note-codice-fiscale",
+    "text": "Nota ambulatoriale: Nicolo Esposito, nato il 7 luglio 1992, residente in Via delle Rose 7, Palermo. Telefono 0911234567. Codice Fiscale SPSNCL92L07G273K.",
+    "expected": [
+      { "text": "Nicolo", "type": "name", "critical": true },
+      { "text": "Esposito", "type": "name", "critical": true },
+      { "text": "7 luglio 1992", "type": "date", "critical": true },
+      { "text": "Via delle Rose 7", "type": "address", "critical": true },
+      { "text": "Palermo", "type": "city", "critical": false },
+      { "text": "0911234567", "type": "phone", "critical": true },
+      { "text": "SPSNCL92L07G273K", "type": "national_id", "critical": true }
+    ]
+  }
+]

@@ -132,11 +132,6 @@ export default function AssistantPage() {
 
         if (viewMode === 'trash') {
             if (!confirm("Sei sicuro di voler eliminare questa chat definitivamente?")) return;
-            // Delete associated messages first
-            const allMessages = await db.messages.toArray();
-            const messagesToDelete = allMessages.filter((m: { conversationId: string }) => m.conversationId === id);
-            await db.messages.bulkDelete(messagesToDelete.map((m: { id: string }) => m.id));
-            // Then delete the conversation
             await db.conversations.delete(id);
         }
 
@@ -148,9 +143,6 @@ export default function AssistantPage() {
 
         await refreshConversations();
     };
-
-    // Schema check required. Let's look at `lib/db.ts` first before applying complex logic.
-    // Assuming for now we only have `isArchived`. I will implement "Trash" as `isDeleted` flag in DB.
 
     const moveToTrash = async (e: React.MouseEvent, conversation: Conversation) => {
         e.preventDefault();

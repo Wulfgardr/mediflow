@@ -2,6 +2,11 @@
 
 > Guida pratica per partire in pochi minuti.
 
+Riferimenti utili:
+- [README.md](../README.md) (onboarding rapido progetto)
+- [docs/COMPLIANCE.md](./COMPLIANCE.md) (quadro privacy/GDPR/FHIR)
+- [docs/ROADMAP.md](./ROADMAP.md) (direzione prodotto)
+
 ---
 
 ## 1. Installazione e avvio
@@ -101,14 +106,14 @@ Se lavori su Mac, puoi usare anche il client nativo.
 
 * **Vantaggi**: avvio rapido, integrazione macOS, lock screen con PIN.
 * **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale.
-* **Nota**: è in fase alpha. In caso di problemi puoi sempre usare l'interfaccia web.
+* **Nota**: il vecchio shell macOS resta uno snapshot alpha mentre il lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi usa l'interfaccia web, che resta la superficie operativa primaria.
 
 ---
 
 ## FAQ
 
 **Posso usarlo su iPad?**
-Stiamo lavorando ai client dedicati. Per ora il computer principale è l'home base.
+Stiamo lavorando ai client dedicati. Per ora il computer principale resta l'home base; iPadOS e iPhone sono in definizione sopra il contratto locale `/api/v1`, senza accesso diretto al database remoto.
 
 **Se mi si rompe il computer?**
 I dati sono nel file `medical.db`.

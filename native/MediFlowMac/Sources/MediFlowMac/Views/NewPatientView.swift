@@ -16,6 +16,8 @@ struct NewPatientView: View {
     @State private var address = ""
     @State private var phone = ""
     @State private var caregiver = ""
+    /* @Codex */
+    @State private var exemptionCodes: [String] = []
     @State private var notes = ""
     @State private var isAdi = false
     @State private var isArchived = false
@@ -44,6 +46,11 @@ struct NewPatientView: View {
                     TextField("Indirizzo", text: $address)
                     TextField("Telefono", text: $phone)
                     TextField("Caregiver", text: $caregiver)
+                }
+
+                /* @Codex */
+                Section("Esenzioni") {
+                    ExemptionSearchField(selectedCodes: $exemptionCodes)
                 }
 
                 Section("Note") {
@@ -89,6 +96,9 @@ struct NewPatientView: View {
             let encryptedAddress = try security.encryptString(address)
             let encryptedPhone = try security.encryptString(phone)
             let encryptedCaregiver = try security.encryptString(caregiver)
+            // @Codex Persist an explicit empty list when the user clears every exemption.
+            let exemptionsPayload = ExemptionCodesCodec.encode(exemptionCodes) ?? "[]"
+            let encryptedExemptions = try security.encryptString(exemptionsPayload)
             let encryptedNotes = try security.encryptString(notes)
 
             let payload = CreatePatientPayload(
@@ -100,7 +110,7 @@ struct NewPatientView: View {
                 phone: encryptedPhone,
                 caregiver: encryptedCaregiver,
                 /* @Codex */
-                exemptions: nil,
+                exemptions: encryptedExemptions,
                 notes: encryptedNotes,
                 isAdi: isAdi,
                 isArchived: isArchived,

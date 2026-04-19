@@ -1,9 +1,9 @@
 'use client';
 
 import { useLiveQuery } from '@/lib/live-query';
-import { db } from '@/lib/db';
+import { db, type Checkup, type ClinicalEntry } from '@/lib/db';
 import { useParams } from 'next/navigation';
-import { User, Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, HeartHandshake, Info, Ticket, Download } from 'lucide-react';
+import { Phone, MapPin, Calendar, Plus, FileText, Activity, Pencil, Download } from 'lucide-react';
 import Timeline from '@/components/timeline';
 import DocumentUpload from '@/components/document-upload';
 import TherapyManager from '@/components/therapy-manager';
@@ -11,58 +11,45 @@ import TherapyManager from '@/components/therapy-manager';
 import ObservationManager from '@/components/observation-manager';
 import AIPatientInsight from '@/components/ai-patient-insight';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
+/* @Codex */
+import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
+/* @Codex */
+import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import PatientActionModal from '@/components/patient-action-modal';
 import { useState } from 'react';
 
 import Link from 'next/link';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import PrivacyBlur from '@/components/privacy-blur';
-
+import { useUIStyle } from '@/components/ui-style-provider';
 /* @Codex */
-type ValidationSummary = {
-    total: number;
-    withErrors: number;
-    withWarnings: number;
-    errorCount: number;
-    warningCount: number;
-};
-
+import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
-type ValidatePatientExportResponse = {
-    patientId: string;
-    hasErrors: boolean;
-    hasWarnings: boolean;
-    therapyMedication: ValidationSummary;
-    observationVitals: ValidationSummary;
-};
-
-/* @Codex */
-function buildValidationMessage(validation: ValidatePatientExportResponse): string {
-    return [
-        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
-        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
-    ].join('\n');
-}
+import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 
 export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const { uiStyleMode } = useUIStyle();
+    const isLiquid = uiStyleMode === 'liquid';
+    /* @Codex */
+    const { hasFeature } = usePreviewProfileState();
+    /* @Codex */
+    const isSissContextPreviewEnabled = hasFeature('siss-context-preview');
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
         async () => {
-            const items = await db.entries.filter((e: any) => e.patientId === id).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const items = await db.entries.filter((entry: ClinicalEntry) => entry.patientId === id).toArray();
+            return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         },
         [id]
     );
     const checkups = useLiveQuery(
         async () => {
-            const items = await db.checkups.filter((c: any) => c.patientId === id).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.filter((c: any) => c.status !== 'completed').sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const items = await db.checkups.filter((checkup: Checkup) => checkup.patientId === id).toArray();
+            return items.filter((checkup) => checkup.status !== 'completed').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         },
         [id]
     );
@@ -73,6 +60,34 @@ export default function PatientDetailPage() {
 
     /* @Codex */
     const exemptionCodes = Array.isArray(patient.exemptions) ? patient.exemptions : [];
+    /* @Codex */
+    const diagnosisItems = Array.isArray(patient.diagnoses) ? patient.diagnoses : [];
+    /* @Codex */
+    const birthYear = patient.birthDate
+        ? new Date(patient.birthDate).getFullYear()
+        : estimateBirthYearFromTaxCode(patient.taxCode);
+    /* @Codex */
+    const birthDateLabel = patient.birthDate
+        ? new Date(patient.birthDate).toLocaleDateString('it-IT')
+        : birthYear
+            ? `Stima da codice fiscale (${birthYear})`
+            : 'Non disponibile';
+    /* @Codex */
+    const ageLabel = birthYear ? `${calculateAge(birthYear)} anni` : 'Età non disponibile';
+    /* @Codex */
+    const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
+    /* @Codex */
+    const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
+    /* @Codex */
+    const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
+    /* @Codex */
+    const visibleDiagnoses = diagnosisItems.slice(0, 4);
+    /* @Codex */
+    const hiddenDiagnoses = diagnosisItems.slice(4);
+    /* @Codex */
+    const visibleExemptions = exemptionCodes.slice(0, 6);
+    /* @Codex */
+    const hiddenExemptions = exemptionCodes.slice(6);
 
     /* @Codex */
     const handleExportConfirm = async () => {
@@ -118,294 +133,271 @@ export default function PatientDetailPage() {
     };
 
     return (
-        <div className="space-y-8">
-            {/* ... (Header Card unchanged) ... */}
-
-            {/* Same layout... */}
-
-            {/* Note: In the lower section, replacing the placeholder */}
-
-            {/* ... */}
-
-            {/* Patient Header Card */}
-            {/* Patient Header Card */}
-            <div className="glass-panel p-8 relative">
-                {/* Background Decoration */}
-                <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
-                    <div className="absolute top-0 right-0 p-6 opacity-30">
-                        <User className="w-32 h-32 text-blue-900/10" />
-                    </div>
-                </div>
-
-                <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-blue-500/30">
-                        {patient.firstName[0]}{patient.lastName[0]}
-                    </div>
-
-                    <div className="flex-1 space-y-4">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
-                                    <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
-                                </h1>
-                                <p className="text-gray-500 dark:text-gray-400 font-mono tracking-wide flex items-center gap-2">
-                                    <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
-                                </p>
-                            </div>
-
-                            <Link
-                                href={`/patients/${id}/edit`}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white/60 hover:bg-white text-gray-700 rounded-lg text-sm font-medium transition-colors border border-gray-200/50"
-                            >
-                                <Pencil className="w-4 h-4" />
-                                Modifica
-                            </Link>
-                        </div>
-
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-300">
-                            <div className="flex items-center gap-2 bg-white/50 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent dark:border-white/10">
-                                <Calendar className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                                {patient.birthDate
-                                    ? new Date(patient.birthDate).toLocaleDateString('it-IT')
-                                    : (patient.taxCode && estimateBirthYearFromTaxCode(patient.taxCode)
-                                        ? `Stima: ${estimateBirthYearFromTaxCode(patient.taxCode)} (~${calculateAge(estimateBirthYearFromTaxCode(patient.taxCode)!)} anni)`
-                                        : 'Data nascita assente')}
-                            </div>
-                            <div className="flex items-center gap-2 bg-white/50 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent dark:border-white/10">
-                                <MapPin className="w-4 h-4 text-green-500 dark:text-green-400" />
-                                <PrivacyBlur intensity="sm">{patient.address || 'Nessun indirizzo'}</PrivacyBlur>
-                            </div>
-                            {patient.phone && (
-                                <div className="flex items-center gap-2 bg-white/50 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent dark:border-white/10">
-                                    <Phone className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-                                    <PrivacyBlur intensity="sm">{patient.phone}</PrivacyBlur>
+        <div className="space-y-6">
+            {/* Top Functional Layer: Liquid Glass Header */}
+            <div className="relative z-20 -mx-4 -mt-2 px-4 pb-4 md:mx-0 md:mt-0 md:px-0">
+                <div className={`glass-panel overflow-hidden rounded-[32px] backdrop-blur-2xl ${
+                    isLiquid
+                        ? 'border-white/40 bg-white/70 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-white/10'
+                        : 'border-black/5 bg-white/84 shadow-[0_22px_48px_-20px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/8'
+                }`}>
+                    <div className="liquid-orb -left-10 -top-10 h-40 w-40 bg-sky-400/20 blur-3xl" />
+                    <div className="liquid-orb -bottom-10 right-0 h-40 w-40 bg-rose-400/15 blur-3xl" />
+                    
+                    <div className="relative z-10 p-6 md:p-8">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                            {/* Identity & Status Layer */}
+                            <div className="flex items-center gap-5">
+                                <div className={`flex h-20 w-20 shrink-0 items-center justify-center text-2xl font-semibold text-white ${
+                                    isLiquid
+                                        ? 'rounded-[30px] bg-[linear-gradient(145deg,#0A84FF,#5AC8FA_58%,#34C759)] shadow-[0_20px_40px_rgba(10,132,255,0.25)]'
+                                        : 'rounded-[24px] bg-sky-600 shadow-[0_14px_28px_rgba(10,132,255,0.18)]'
+                                }`}>
+                                    {patient.firstName[0]}{patient.lastName[0]}
                                 </div>
-                            )}
-                            {patient.caregiver && (
-                                <div className="flex items-center gap-2 bg-pink-50/80 dark:bg-pink-900/20 px-3 py-1.5 rounded-lg border border-pink-100 dark:border-pink-900/30 text-pink-700 dark:text-pink-300">
-                                    <HeartHandshake className="w-4 h-4" />
-                                    <PrivacyBlur intensity="sm">{patient.caregiver}</PrivacyBlur>
-                                </div>
-                            )}
-
-                            {patient.isAdi && (
-                                <div className="px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-bold border border-green-200 dark:border-green-800">
-                                    Paziente ADI
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Diagnoses / ICD */}
-
-
-                        {(patient.notes) && (
-                            <div className="mt-2 p-3 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-xl text-sm text-amber-900 dark:text-amber-100 flex gap-2 items-start">
-                                <Info className="w-4 h-4 mt-0.5 text-amber-500 dark:text-amber-400 shrink-0" />
-                                <div className="flex-1">
-                                    <PrivacyBlur>{patient.notes}</PrivacyBlur>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* @Codex */}
-                        {exemptionCodes.length > 0 && (
-                            <div className="mt-3 p-3 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
-                                    <Ticket className="w-3.5 h-3.5" />
-                                    Esenzioni associate
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {exemptionCodes.slice(0, 10).map((code) => (
-                                        <span
-                                            key={code}
-                                            className="font-mono text-xs px-2 py-1 rounded-md bg-white dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-200"
-                                        >
-                                            {code}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                                            <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
+                                        </h1>
+                                        {patient.isAdi && (
+                                            <span className="inline-flex items-center rounded-[18px] bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                ADI
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                                        <span className="font-mono tracking-tight"><PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur></span>
+                                        <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                        <span>{ageLabel}</span>
+                                        <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                        <span className="flex items-center gap-1.5">
+                                            <Calendar className="h-3.5 w-3.5" />
+                                            {birthDateLabel}
                                         </span>
-                                    ))}
-                                    {exemptionCodes.length > 10 && (
-                                        <span className="text-xs text-indigo-600 dark:text-indigo-300 px-2 py-1">
-                                            +{exemptionCodes.length - 10} altri
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Integrated Control Layer */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Link
+                                    href={`/patients/${id}/entries/new`}
+                                    className={`ui-btn-primary h-11 px-6 ${isLiquid ? 'rounded-[28px]' : 'rounded-2xl'}`}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Nuova visita
+                                </Link>
+
+                                <div className={`flex h-11 items-center overflow-hidden p-1 ${
+                                    isLiquid
+                                        ? 'rounded-[28px] border border-white/60 bg-white/35 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5'
+                                        : 'rounded-2xl border border-slate-200/80 bg-white/92 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-white/8'
+                                }`}>
+                                    <button
+                                        onClick={() => setIsExportModalOpen(true)}
+                                        className="flex h-full items-center gap-2 rounded-[22px] px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/10"
+                                    >
+                                        <Download className="h-3.5 w-3.5" />
+                                        Export FHIR
+                                    </button>
+                                    <div className="mx-1 h-5 w-px bg-slate-300/50 dark:bg-white/10" />
+                                    <button
+                                        onClick={async () => {
+                                            const therapies = await db.therapies.filter((t) => t.patientId === id).toArray();
+                                            const observations = await db.observations.filter((o) => o.patientId === id).toArray();
+                                            import('@/lib/report-service').then((m) => {
+                                                m.generatePatientReport(patient, nonScaleEntries, scaleEntries, therapies, observations);
+                                            });
+                                        }}
+                                        className="flex h-full items-center gap-2 rounded-[22px] px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/10"
+                                        >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        Report PDF
+                                    </button>
+                                    <div className="mx-1 h-5 w-px bg-slate-300/50 dark:bg-white/10" />
+                                    <Link
+                                        href={`/patients/${id}/edit`}
+                                        className="flex h-8 w-8 items-center justify-center rounded-[18px] text-slate-600 transition-colors hover:bg-white/70 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                                        title="Modifica scheda"
+                                        aria-label="Modifica scheda"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Clinical Visibility Layer */}
+                        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Quadro Clinico</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {diagnosisItems.length > 0 ? (
+                                        visibleDiagnoses.map((d) => (
+                                            <span key={`${d.system}-${d.code}`} className="inline-flex items-center gap-1.5 rounded-[18px] border border-rose-100 bg-rose-50/50 px-2.5 py-1 text-xs font-medium text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
+                                                {d.code} · {d.description}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-xs italic text-slate-400">Nessuna diagnosi codificata</span>
+                                    )}
+                                    {hiddenDiagnoses.length > 0 && (
+                                        <span className="inline-flex items-center rounded-[18px] bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-white/10">
+                                            +{hiddenDiagnoses.length}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                        )}
 
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Esenzioni & Stato</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {exemptionCodes.length > 0 ? (
+                                        <>
+                                            {visibleExemptions.map((c) => (
+                                                <span key={c} className="inline-flex items-center rounded-[18px] border border-sky-100 bg-sky-50/50 px-2.5 py-1 font-mono text-xs font-bold text-sky-700 dark:border-sky-900/30 dark:bg-sky-900/20 dark:text-sky-300">
+                                                    {c}
+                                                </span>
+                                            ))}
+                                            {hiddenExemptions.length > 0 && (
+                                                <span className="inline-flex items-center rounded-[18px] bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-white/10">
+                                                    +{hiddenExemptions.length}
+                                                </span>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <span className="text-xs italic text-slate-400">Nessuna esenzione</span>
+                                    )}
+                                </div>
+                            </div>
 
-
-
-
-
-                    </div>
-
-                    <div className="flex flex-col gap-3 min-w-[200px]">
-                        <button
-                            onClick={() => setIsExportModalOpen(true)}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                        >
-                            <Download className="w-4 h-4" />
-                            Export FHIR
-                        </button>
-
-                        <button
-                            onClick={async () => {
-                                // Filter 'scale' type entries for the scales section
-                                const scaleEntries = entries?.filter(e => e.type === 'scale') || [];
-
-                                // Fetch therapies for the report
-                                // Fetch therapies for the report
-                                const therapies = await db.therapies.filter((t: any) => t.patientId === id).toArray();
-
-                                import('@/lib/report-service').then(mod => {
-                                    if (patient && entries) {
-                                        mod.generatePatientReport(patient, entries, scaleEntries, therapies);
-                                    }
-                                });
-                            }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Scarica Report PDF
-                        </button>
-
-                        <Link
-                            href={`/patients/${id}/entries/new`}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Nuova Visita
-                        </Link>
-
-                        <button
-                            onClick={async () => {
-                                const { openSissPrescrizione } = await import('@/lib/siss');
-                                const result = await openSissPrescrizione(patient.taxCode);
-                                if (result.success) {
-                                    // Show a simple browser alert for now (could be replaced with toast)
-                                    alert(result.message);
-                                } else {
-                                    alert("⚠️ " + result.message);
-                                }
-                            }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95"
-                            title="Apri SISS e copia CF negli appunti"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Prescrizione SISS
-                        </button>
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Contatti Rapidi</span>
+                                <div className="flex items-center gap-4 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                    <div className="flex items-center gap-1.5">
+                                        <Phone className="h-3.5 w-3.5 text-slate-400" />
+                                        <PrivacyBlur intensity="sm">{patient.phone || 'n/d'}</PrivacyBlur>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                        <PrivacyBlur intensity="sm">{patient.address || 'n/d'}</PrivacyBlur>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                {/* Main Timeline Column */}
-                <div className="lg:col-span-2 space-y-8">
-
-                    {/* Therapies Section */}
-                    <TherapyManager patientId={id} />
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,0.95fr)]">
+                <div className="space-y-6">
+                    {isSissContextPreviewEnabled ? (
+                        <SissPatientContextPanel
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                        />
+                    ) : null}
+                    <TherapyManager
+                        patientId={id}
+                        showLegacySissPrescriptionPanel={!isSissContextPreviewEnabled}
+                    />
                     {/* @Codex */}
                     <ObservationManager patientId={id} />
 
-                    <div className="space-y-6">
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                            Diario Clinico
-                        </h2>
+                    <div className="glass-panel rounded-[28px] p-6 md:p-7">
+                        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="section-kicker">Percorso clinico</p>
+                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white">
+                                    <FileText className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                    Diario clinico
+                                </h2>
+                            </div>
+                            <span className="apple-chip self-start md:self-auto">{nonScaleEntries.length} voci attive</span>
+                        </div>
                         {entries && <Timeline entries={entries} />}
                     </div>
                 </div>
 
-                {/* Sidebar / Stats Column */}
                 <div className="space-y-6">
-
-                    {/* NEW AI Insight Location */}
                     <AIPatientInsight patient={patient} />
-
-                    {/* Document Insights - Archivio Intelligente */}
+                    {/* @Codex */}
+                    <PatientSmartImportPanel patient={patient} entries={entries} />
                     <DocumentInsightsPanel patient={patient} />
 
-                    {/* Quick Scales Widget */}
-                    <div className="glass-panel p-6">
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            Valutazioni Rapide
-                        </h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            <Link
-                                href={`/patients/${id}/scales/tinetti`}
-                                className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-white/10 bg-white dark:bg-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 hover:shadow-md transition-all group"
-                            >
-                                <span className="text-gray-700 dark:text-gray-200 font-medium group-hover:text-blue-700 dark:group-hover:text-blue-400">Tinetti</span>
-                                <Plus className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
+                    <div className="glass-panel rounded-[28px] p-6">
+                        <div className="mb-4">
+                            <p className="section-kicker">Strumenti di scheda</p>
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                                <Activity className="h-5 w-5 text-sky-500" />
+                                Valutazioni rapide
+                            </h3>
+                        </div>
+                        <div className="space-y-3">
+                            <Link href={`/patients/${id}/scales/tinetti`} className="apple-list-row">
+                                <span>Tinetti</span>
+                                <Plus className="h-4 w-4 text-sky-500" />
                             </Link>
-                            <Link
-                                href={`/patients/${id}/scales/mmse`}
-                                className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-white/10 bg-white dark:bg-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 hover:shadow-md transition-all group"
-                            >
-                                <span className="text-gray-700 dark:text-gray-200 font-medium group-hover:text-blue-700 dark:group-hover:text-blue-400">MMSE</span>
-                                <Plus className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
+                            <Link href={`/patients/${id}/scales/mmse`} className="apple-list-row">
+                                <span>MMSE</span>
+                                <Plus className="h-4 w-4 text-sky-500" />
                             </Link>
-                            <Link
-                                href={`/patients/${id}/scales/adl`}
-                                className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-white/10 bg-white dark:bg-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 hover:shadow-md transition-all group"
-                            >
-                                <span className="text-gray-700 dark:text-gray-200 font-medium group-hover:text-blue-700 dark:group-hover:text-blue-400">ADL (Katz)</span>
-                                <Plus className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
+                            <Link href={`/patients/${id}/scales/adl`} className="apple-list-row">
+                                <span>ADL (Katz)</span>
+                                <Plus className="h-4 w-4 text-sky-500" />
                             </Link>
-                            <Link
-                                href={`/patients/${id}/scales/gds`}
-                                className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-white/10 bg-white dark:bg-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 hover:shadow-md transition-all group"
-                            >
-                                <span className="text-gray-700 dark:text-gray-200 font-medium group-hover:text-blue-700 dark:group-hover:text-blue-400">GDS</span>
-                                <Plus className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
+                            <Link href={`/patients/${id}/scales/gds`} className="apple-list-row">
+                                <span>GDS</span>
+                                <Plus className="h-4 w-4 text-sky-500" />
                             </Link>
-
-                            <Link
-                                href={`/scales`}
-                                className="text-xs text-center text-gray-400 hover:text-blue-600 mt-2 block"
-                            >
-                                Vedi tutte le scale...
+                            <Link href={`/scales`} className="block pt-1 text-xs font-medium text-slate-500 transition-colors hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-300">
+                                Vedi tutte le scale
                             </Link>
                         </div>
                     </div>
 
-                    <div className="glass-panel p-6">
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-4">Documenti & Referti</h3>
+                    <div className="glass-panel rounded-[28px] p-6">
+                        <div className="mb-4">
+                            <p className="section-kicker">Archivio paziente</p>
+                            <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Documenti e referti</h3>
+                        </div>
                         <DocumentUpload patientId={id} />
                     </div>
 
-                    <div className="glass-panel p-6">
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-indigo-500" />
-                            Prossimi Controlli
-                        </h3>
+                    <div className="glass-panel rounded-[28px] p-6">
+                        <div className="mb-4">
+                            <p className="section-kicker">Pianificazione</p>
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                                <Calendar className="h-5 w-5 text-indigo-500" />
+                                Prossimi controlli
+                            </h3>
+                        </div>
 
                         {!checkups || checkups.length === 0 ? (
-                            <div className="text-center py-4">
-                                <p className="text-sm text-gray-400 italic mb-2">Nessun controllo programmato.</p>
-                                <Link href={`/patients/${id}/edit`} className="text-xs text-indigo-600 font-bold hover:underline">
-                                    + Aggiungi
+                            <div className="rounded-[24px] border border-dashed border-slate-200 px-4 py-6 text-center dark:border-white/10">
+                                <p className="text-sm italic text-slate-500 dark:text-slate-400">Nessun controllo programmato.</p>
+                                <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-sky-600 hover:underline dark:text-sky-300">
+                                    Aggiungi o pianifica
                                 </Link>
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {checkups.map(checkup => (
-                                    <div key={checkup.id} className="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-500/20 relative group">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 rounded-full">
-                                                {new Date(checkup.date).toLocaleDateString()}
-                                            </span>
+                                {checkups.map((checkup) => (
+                                    <div key={checkup.id} className="rounded-[24px] border border-slate-200/80 bg-white/78 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{checkup.title}</p>
+                                                {checkup.notes && (
+                                                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{checkup.notes}</p>
+                                                )}
+                                            </div>
+                                            <span className="apple-chip shrink-0">{new Date(checkup.date).toLocaleDateString('it-IT')}</span>
                                         </div>
-                                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{checkup.title}</p>
-                                        {checkup.notes && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{checkup.notes}</p>}
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit`} className="block text-center text-xs text-indigo-600 font-bold hover:underline mt-2">
-                                    Gestisci Controlli
+                                <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-slate-500 transition-colors hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-300">
+                                    Gestisci controlli
                                 </Link>
                             </div>
                         )}

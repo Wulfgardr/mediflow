@@ -15,13 +15,22 @@ final class SettingsStore: ObservableObject {
         self.baseURLString = LocalAPISettings.loadBaseURLString()
         self.tlsPin = LocalAPISettings.loadTLSPin()
         /* @Codex */
-        self.token = LocalAPITokenProvider.shared.token() ?? ""
+        switch LocalAPITokenProvider.shared.resolveToken() {
+        case .resolved(let token, _):
+            self.token = token
+        case .failure:
+            self.token = ""
+        }
     }
 
     /* @Codex */
     func refreshTokenFromKeychain() {
-        if let token = LocalAPITokenProvider.shared.token(allowKeychain: true) {
+        switch LocalAPITokenProvider.shared.resolveKeychainToken(allowInteraction: true) {
+        case .resolved(let token, _):
             self.token = token
+            errorMessage = nil
+        case .failure(let failure):
+            errorMessage = failure.localizedDescription
         }
     }
 
@@ -38,8 +47,6 @@ final class SettingsStore: ObservableObject {
 
         do {
             try KeychainService.saveToken(token)
-            /* @Codex */
-            LocalAPITokenProvider.shared.cache(token: token)
             errorMessage = nil
             return true
         } catch {
@@ -52,8 +59,6 @@ final class SettingsStore: ObservableObject {
         do {
             try KeychainService.deleteToken()
             token = ""
-            /* @Codex */
-            LocalAPITokenProvider.shared.cache(token: "")
             errorMessage = nil
         } catch {
             errorMessage = "Errore nella rimozione del token."

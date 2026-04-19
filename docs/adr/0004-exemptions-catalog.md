@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-06 -->
 # ADR 0004: Exemptions catalog and patient code mapping
 
 Date: 2026-02-06

@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "mediflow.cloud_comparator_case_pack.v1",
+  "id": "cloud-comparator-dispnea-001",
+  "title": "Dispnea recente con focus documentale e terapia attiva",
+  "origin": {
+    "storage": "private-shadow-vault",
+    "sourceKind": "document-bundle",
+    "createdAt": "2026-04-04T20:15:00.000Z",
+    "operatorRef": "op-redacted-01"
+  },
+  "privacy": {
+    "directIdentifiersRemoved": true,
+    "quasiIdentifiersMinimized": true,
+    "operatorReviewed": true,
+    "cloudExportApproved": true,
+    "minimizationSummary": "Rimossi identificativi diretti, recapiti e date inutili; mantenuta solo la temporalita clinica necessaria al confronto.",
+    "approvedAt": "2026-04-04T20:20:00.000Z"
+  },
+  "patientInsight": {
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: cloud-compare-1) ---\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Dai priorita ai fatti clinici recenti e ai follow-up pendenti.\n- Non promuovere anamnesi remota o familiarita come problema attivo.\n\n[PROFILO STRUTTURATO]\n[S1] Eta 70-79, assistenza domiciliare infermieristica attiva.\n[S2] Limitazione funzionale recente per dispnea da sforzo.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 J44.9: BPCO.\n[S4] ICD-10 I10: Ipertensione essenziale.\n\n[OSSERVAZIONI RECENTI]\n[S5] SpO2 = 91 % [18/03/2026]\n[S6] Frequenza cardiaca = 96 /min [18/03/2026]\n\n[CONTROLLI PENDENTI]\n[S7] Controllo MMG entro 10 giorni per rivalutazione dispnea.\n\n[DOCUMENTI RECENTI]\n[S8] Lettera di dimissione: riacutizzazione BPCO, follow-up pneumologico precoce consigliato.\n\n[ANAMNESI REMOTA]\n[S9] Pregressa frattura di polso guarita.\n--- FINE CONTESTO ---",
+    "expected": {
+      "currentStateAny": [
+        [
+          "bpco"
+        ],
+        [
+          "dispnea"
+        ]
+      ],
+      "alertsAny": [
+        [
+          [
+            "spo2",
+            "91"
+          ],
+          [
+            "saturazione",
+            "91"
+          ]
+        ]
+      ],
+      "nextStepsAny": [
+        [
+          [
+            "controllo",
+            "mmg"
+          ],
+          [
+            "rivalutazione",
+            "dispnea"
+          ]
+        ],
+        [
+          [
+            "follow-up",
+            "pneumologico"
+          ],
+          [
+            "pneumologico"
+          ]
+        ]
+      ],
+      "preferredSourceIds": [
+        "S5",
+        "S7",
+        "S8"
+      ],
+      "forbiddenTokens": [
+        [
+          "ipertensione"
+        ],
+        [
+          "frattura",
+          "polso"
+        ]
+      ],
+      "maxIncompleteClaims": 1
+    }
+  },
+  "smartImport": {
+    "maxTokens": 1100,
+    "payload": {
+      "patientId": "cloud-compare-1",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:visit-1",
+          "label": "VISIT 20/03/2026",
+          "excerpt": "Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die"
+        }
+      ],
+      "sources": [
+        {
+          "id": "patient-notes:1",
+          "kind": "patient-notes",
+          "label": "Note paziente",
+          "content": "Diabete mellito tipo 2 in scarso compenso e ipertensione arteriosa in follow-up territoriale."
+        },
+        {
+          "id": "entry:visit-1",
+          "kind": "clinical-entry",
+          "label": "VISIT 20/03/2026",
+          "date": "2026-03-20T09:00:00.000Z",
+          "content": "Terapia domiciliare attiva: Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die."
+        },
+        {
+          "id": "insight:diab-1",
+          "kind": "document-insight",
+          "label": "Documento controllo diabetologico",
+          "date": "2026-03-10T09:00:00.000Z",
+          "content": "Controllo diabetologico recente: diabete mellito tipo 2 non compensato."
+        }
+      ]
+    },
+    "expected": {
+      "diagnoses": [
+        {
+          "labelTokens": [
+            "diabete",
+            "tipo",
+            "2"
+          ],
+          "icdQueryTokens": [
+            "type",
+            "2",
+            "diabetes"
+          ]
+        },
+        {
+          "labelTokens": [
+            "ipertensione"
+          ],
+          "icdQueryTokens": [
+            "essential",
+            "hypertension"
+          ]
+        }
+      ],
+      "therapies": [
+        {
+          "drugTokens": [
+            "metformina"
+          ],
+          "dosageTokens": [
+            "850",
+            "2"
+          ],
+          "therapyState": "active"
+        },
+        {
+          "drugTokens": [
+            "ramipril"
+          ],
+          "dosageTokens": [
+            "5"
+          ],
+          "therapyState": "active"
+        }
+      ]
+    }
+  },
+  "distillation": {
+    "syntheticArchetypeHints": [
+      "discharge-letter",
+      "mixed-profile"
+    ],
+    "learningObjectives": [
+      "Capire se il comparatore cloud preserva meglio focus, recency e hierarchy rispetto alla baseline locale.",
+      "Isolare quali gap del locale dipendono da euristiche, source hierarchy o render reviewable."
+    ],
+    "hypothesisTags": [
+      "focus-recency",
+      "source-hierarchy",
+      "reviewable-smart-import"
+    ],
+    "followupQuestions": [
+      "Il delta migliore del cloud dipende da focus/recency o solo da disciplina citazionale?",
+      "Quale nuovo caso sintetico deve bloccare il failure pattern prima del prossimo rollout locale?"
+    ]
+  }
+}

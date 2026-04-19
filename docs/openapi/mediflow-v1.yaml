@@ -1,0 +1,1573 @@
+openapi: 3.1.0
+info:
+  title: MediFlow Local API v1
+  version: 1.6.0
+  summary: Stable patient contract plus first executable home-base network slice with explicit pairing review, paired-client auth boundary, read-only remote patient access, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  description: |
+    OpenAPI contract for the client-facing local API defined by ADR 0010.
+    Current thin slice covers stable patient reads plus compare-on-write patient
+    mutations on `PUT /api/v1/patients/{id}` and `DELETE /api/v1/patients/{id}`.
+    It also introduces the first documented `/api/v1/network/*` contract slice
+    for home-base discovery, session gating, capability discovery, explicit
+    pairing bootstrap/review on trusted local networks, and the first read-only
+    remote patient data plane behind a dedicated paired-client auth boundary.
+    The session summary now includes PHI-safe replica planning metadata for
+    snapshot mirror, deferred fallback, and manual review states. A dedicated
+    identity summary distinguishes device pairing from operator login and
+    declares the effective ambulatory scope. A dedicated AI runtime summary now
+    separates `AI plane` and `data plane`, while real replication, sync, remote
+    inference routing, and advanced identity scoping remain follow-up
+    workstreams.
+servers:
+  - url: https://127.0.0.1:3443
+    description: Local HTTPS endpoint for native clients via TLS proxy.
+  - url: http://127.0.0.1:3000
+    description: Direct local development endpoint.
+tags:
+  - name: Patients
+    description: Stable patient read contract plus compare-on-write patient mutations shared across web/native flows.
+  - name: Network
+    description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
+paths:
+  /api/v1/patients:
+    get:
+      tags:
+        - Patients
+      operationId: listPatients
+      summary: List patients
+      description: Returns patient summaries ordered by most recently updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ambulatoryId
+          in: query
+          required: false
+          description: Filter patients assigned to a specific ambulatory.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient summaries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/patients/{id}:
+    get:
+      tags:
+        - Patients
+      operationId: getPatient
+      summary: Get patient detail
+      description: Returns the full stable patient payload for a specific patient id.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Patients
+      operationId: updatePatient
+      summary: Update patient detail
+      description: |
+        Updates a patient using optimistic concurrency. Clients MUST send the last
+        observed `version`. The server atomically compares it and returns `409`
+        with PHI-safe metadata when the record changed or disappeared.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMutationRequest'
+            examples:
+              archivePatient:
+                value:
+                  version: 7
+                  isArchived: true
+              updateDemographics:
+                value:
+                  version: 7
+                  firstName: Mario
+                  lastName: Rossi
+                  phone: "+39 333 1234567"
+      responses:
+        '200':
+          description: Patient updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Patients
+      operationId: deletePatient
+      summary: Delete patient
+      description: |
+        Deletes a patient using optimistic concurrency. Clients MUST send the last
+        observed `version`. The server returns `409` with PHI-safe metadata when
+        the record changed or disappeared before the delete could commit.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDeleteRequest'
+            examples:
+              deletePatient:
+                value:
+                  version: 7
+      responses:
+        '200':
+          description: Patient deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/node:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkNode
+      summary: Get home-base node summary
+      description: |
+        Returns PHI-safe metadata for the local node that may act as a trusted
+        home-base candidate. This is not a trust bootstrap by itself.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: PHI-safe home-base candidate summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkNodeSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/session:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkSession
+      summary: Get network session gate state
+      description: |
+        Returns the current network operating mode and pairing gate seen by the
+        local node. This endpoint distinguishes simple connectivity from a future
+        trusted paired session.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current PHI-safe network session gate state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkSessionSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/capabilities:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkCapabilities
+      summary: List home-base capabilities
+      description: |
+        Returns the versionable capability matrix exposed by the current node.
+        Capabilities may be `available`, `disabled`, `planned`, or `unavailable`
+        while only the first read-only remote patient surface is live; sync,
+        cache, and broader replica flows remain follow-up workstreams.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Versionable capability matrix for the current node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkCapabilitiesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/identity:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkIdentity
+      summary: Get network identity and scope summary
+      description: |
+        Returns the PHI-safe identity model for the current node. This summary
+        makes explicit that device pairing is separate from operator login and
+        declares the effective ambulatory scope resolved by the node.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current PHI-safe network identity summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkIdentitySummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/ai-runtime:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkAiRuntime
+      summary: Get AI runtime routing summary
+      description: |
+        Returns the PHI-safe AI runtime posture declared by the current node.
+        This summary keeps `AI plane` separate from the shared `data plane` and
+        only describes local-vs-centralized capability plus fallback policy.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current PHI-safe AI runtime summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkAiRuntimeSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/pairing-intents:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPairingIntents
+      summary: List pending pairing intents
+      description: |
+        Returns the pending pairing bootstrap intents waiting for explicit local
+        confirmation on the home-base node.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Pending pairing intents.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NetworkPairingIntentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPairingIntent
+      summary: Create pairing bootstrap intent
+      description: |
+        Requests an explicit pairing bootstrap intent for a trusted LAN client.
+        This does not complete trust by itself. If the node is still in
+        `local-only` mode, the server returns a PHI-safe `409` gate response.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPairingIntentRequest'
+            examples:
+              ipadPairing:
+                value:
+                  deviceName: Front Desk iPad
+                  clientPlatform: ipados
+                  appVersion: 0.5.0
+                  requestedCapabilities:
+                    - network.replica.readonly-patients
+      responses:
+        '201':
+          description: Pairing bootstrap intent created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPairingIntentResponse'
+        '400':
+          $ref: '#/components/responses/InvalidNetworkPairingIntent'
+        '409':
+          $ref: '#/components/responses/NetworkModeDisabled'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/pairing-intents/{intentId}/confirm:
+    post:
+      tags:
+        - Network
+      operationId: confirmNetworkPairingIntent
+      summary: Confirm pairing intent and mint paired-client credentials
+      description: |
+        Confirms a pending pairing intent on the local node, emits the one-time
+        paired-client token, and persists a device-specific trust record
+        distinct from the generic local API token.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          description: Pending pairing intent identifier.
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Pairing confirmed and paired-client credentials minted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPairingConfirmationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/PairingIntentNotFound'
+        '409':
+          description: Pairing confirmation is blocked by node mode or expiry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkErrorResponse'
+              examples:
+                localOnlyGate:
+                  value:
+                    error: Conflict
+                    code: NETWORK_MODE_DISABLED
+                    message: Home-base network mode is not enabled on this node.
+                expiredIntent:
+                  value:
+                    error: Conflict
+                    code: PAIRING_INTENT_EXPIRED
+                    message: Pairing intent has expired and must be requested again.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatients
+      summary: List patients through the paired home-base data plane
+      description: |
+        Returns read-only patient summaries scoped by the effective ambulatory
+        resolved on the home-base node. This route requires both a valid paired
+        client credential and an operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Read-only scoped patient summaries from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientSummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatient
+      summary: Get patient detail through the paired home-base data plane
+      description: |
+        Returns read-only patient detail from the paired node, limited to the
+        effective ambulatory scope resolved by the home-base. This route
+        requires both a valid paired client credential and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Read-only scoped patient detail from the paired node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token
+      description: "Local API token expected in `Authorization: Bearer <token>`."
+    pairedClientId:
+      type: apiKey
+      in: header
+      name: x-mediflow-paired-client-id
+      description: Explicit paired-device identifier minted during local pairing confirmation.
+    pairedClientToken:
+      type: apiKey
+      in: header
+      name: x-mediflow-paired-client-token
+      description: One-time paired-device token minted during local pairing confirmation.
+    sessionCookieAuth:
+      type: apiKey
+      in: cookie
+      name: mediflow_session
+      description: Operator session cookie required for the remote read-only network data plane.
+  responses:
+    BadRequest:
+      description: Request payload is invalid or missing required mutation metadata.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missingVersion:
+              value:
+                error: Version is required
+            noFields:
+              value:
+                error: No valid fields to update
+    InvalidNetworkPairingIntent:
+      description: Network pairing intent payload is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NetworkErrorResponse'
+          examples:
+            missingDeviceName:
+              value:
+                error: Bad Request
+                code: PAIRING_REQUEST_INVALID
+                message: deviceName is required.
+    Unauthorized:
+      description: Missing or invalid local API token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                error: Unauthorized
+    NetworkDataPlaneUnauthorized:
+      description: Missing or invalid paired client credential, or missing operator session cookie.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                error: Unauthorized
+    Forbidden:
+      description: Request is authenticated but blocked by missing scope or missing granted capability.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                error: Forbidden
+    NotFound:
+      description: Requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error: Not found
+    PairingIntentNotFound:
+      description: Requested pairing intent was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NetworkErrorResponse'
+          examples:
+            notFound:
+              value:
+                error: Not Found
+                code: PAIRING_INTENT_NOT_FOUND
+                message: Pairing intent not found.
+    NetworkModeDisabled:
+      description: |
+        Pairing bootstrap is disabled because the node still operates in
+        `local-only` mode.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NetworkErrorResponse'
+          examples:
+            localOnlyGate:
+              value:
+                error: Conflict
+                code: NETWORK_MODE_DISABLED
+                message: Home-base network mode is not enabled on this node.
+    PatientVersionConflict:
+      description: |
+        Compare-on-write conflict. The payload exposes only PHI-safe metadata so
+        clients can refresh, inspect the version delta, and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PatientVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: patient
+                recordId: patient_123
+                expectedVersion: 7
+                currentVersion: 8
+                currentUpdatedAt: '2026-03-16T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: patient_123
+                  version: 8
+                  updatedAt: '2026-03-16T10:15:00.000Z'
+                  isArchived: false
+            deletedElsewhere:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: patient
+                recordId: patient_123
+                expectedVersion: 7
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
+    InternalServerError:
+      description: Unexpected server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            patientListFailure:
+              value:
+                error: Failed to fetch patients
+            patientDetailFailure:
+              value:
+                error: Failed to fetch patient
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    NetworkErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - message
+      properties:
+        error:
+          type: string
+          enum:
+            - Bad Request
+            - Conflict
+            - Not Found
+        code:
+          type: string
+          enum:
+            - PAIRING_REQUEST_INVALID
+            - NETWORK_MODE_DISABLED
+            - PAIRING_INTENT_NOT_FOUND
+            - PAIRING_INTENT_EXPIRED
+        message:
+          type: string
+    NetworkNodeSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - nodeId
+        - displayName
+        - role
+        - operatingMode
+        - protocolVersion
+        - transport
+      properties:
+        nodeId:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          const: home-base-candidate
+        operatingMode:
+          type: string
+          enum:
+            - local-only
+            - network-home-base
+        protocolVersion:
+          type: string
+        transport:
+          type: object
+          additionalProperties: false
+          required:
+            - apiBasePath
+            - tlsRequired
+            - localTlsPort
+          properties:
+            apiBasePath:
+              type: string
+              const: /api/v1
+            tlsRequired:
+              type: boolean
+              const: true
+            localTlsPort:
+              type: integer
+              const: 3443
+    NetworkSessionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - nodeId
+        - operatingMode
+        - sessionState
+        - pairingState
+        - trustedSession
+        - degradedReason
+        - authMode
+        - protocolVersion
+        - replica
+      properties:
+        nodeId:
+          type: string
+        operatingMode:
+          type: string
+          enum:
+            - local-only
+            - network-home-base
+        sessionState:
+          type: string
+          enum:
+            - local-only
+            - network-unpaired
+            - network-paired-online
+            - network-paired-offline-degraded
+        pairingState:
+          type: string
+          enum:
+            - disabled
+            - required
+            - paired
+        trustedSession:
+          type: boolean
+        degradedReason:
+          type:
+            - string
+            - 'null'
+        authMode:
+          type: string
+          enum:
+            - bearer-token
+            - paired-client-plus-session
+        protocolVersion:
+          type: string
+        replica:
+          $ref: '#/components/schemas/NetworkReplicaSummary'
+    NetworkReplicaSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - strategy
+        - state
+        - authority
+        - pendingAction
+        - conflictMode
+        - backupBoundary
+        - lastSnapshotAt
+        - lastReconciledAt
+      properties:
+        strategy:
+          type: string
+          const: encrypted-snapshot-mirror
+        state:
+          type: string
+          enum:
+            - local-only
+            - unpaired
+            - online
+            - offline-deferred
+            - conflict-review
+        authority:
+          type: string
+          enum:
+            - local-device
+            - paired-home-base
+        pendingAction:
+          type: string
+          enum:
+            - none
+            - pairing-required
+            - queue-snapshot
+            - manual-review
+        conflictMode:
+          type: string
+          const: restore-preflight-plus-version-check
+        backupBoundary:
+          type: string
+          const: artifact-v1-remains-backup-only
+        lastSnapshotAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        lastReconciledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    NetworkIdentityOperatorSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - username
+        - displayName
+        - role
+        - authChannel
+      properties:
+        userId:
+          type:
+            - string
+            - 'null'
+        username:
+          type:
+            - string
+            - 'null'
+        displayName:
+          type:
+            - string
+            - 'null'
+        role:
+          type:
+            - string
+            - 'null'
+        authChannel:
+          type: string
+          enum:
+            - web
+            - native
+            - system
+            - none
+    NetworkIdentityScopeSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - policy
+        - effectiveAmbulatoryId
+        - effectiveAmbulatoryName
+        - defaultAmbulatoryId
+        - defaultAmbulatoryName
+        - source
+      properties:
+        policy:
+          type: string
+          const: session-context-else-node-default
+        effectiveAmbulatoryId:
+          type:
+            - string
+            - 'null'
+        effectiveAmbulatoryName:
+          type:
+            - string
+            - 'null'
+        defaultAmbulatoryId:
+          type:
+            - string
+            - 'null'
+        defaultAmbulatoryName:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum:
+            - session-context
+            - node-default
+            - none
+    NetworkIdentityAuditSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - actorType
+        - actorBinding
+      properties:
+        actorType:
+          type: string
+          enum:
+            - user
+            - system
+        actorBinding:
+          type: string
+          enum:
+            - session-user
+            - token-only
+    NetworkIdentitySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - identityModel
+        - pairingBoundary
+        - credentialState
+        - loginMode
+        - usernameHint
+        - displayNameHint
+        - operator
+        - scope
+        - audit
+        - limitations
+      properties:
+        identityModel:
+          type: string
+          const: paired-device-plus-node-credentials
+        pairingBoundary:
+          type: string
+          const: device-pairing-separate-from-operator-login
+        credentialState:
+          type: string
+          enum:
+            - session-bound
+            - node-credentials-required
+        loginMode:
+          type: string
+          enum:
+            - single-local-user-default
+            - explicit-username-required
+        usernameHint:
+          type:
+            - string
+            - 'null'
+        displayNameHint:
+          type:
+            - string
+            - 'null'
+        operator:
+          $ref: '#/components/schemas/NetworkIdentityOperatorSummary'
+        scope:
+          $ref: '#/components/schemas/NetworkIdentityScopeSummary'
+        audit:
+          $ref: '#/components/schemas/NetworkIdentityAuditSummary'
+        limitations:
+          type: array
+          items:
+            type: string
+    NetworkAiRuntimeLocalRuntime:
+      type: object
+      additionalProperties: false
+      required:
+        - provider
+        - state
+        - targetPolicy
+        - hardwareProfile
+        - clinicalModel
+        - reasoningModel
+        - ocrModel
+      properties:
+        provider:
+          type: string
+          const: ollama
+        state:
+          type: string
+          enum:
+            - configured
+            - misconfigured
+        targetPolicy:
+          type: string
+          const: loopback-only
+        hardwareProfile:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - custom
+            - unknown
+        clinicalModel:
+          type:
+            - string
+            - 'null'
+        reasoningModel:
+          type:
+            - string
+            - 'null'
+        ocrModel:
+          type:
+            - string
+            - 'null'
+    NetworkAiRuntimeCentralRuntime:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - capabilityStatus
+        - requiresPairing
+        - executionTarget
+      properties:
+        state:
+          type: string
+          enum:
+            - disabled
+            - available
+            - unavailable
+        capabilityStatus:
+          type: string
+          enum:
+            - disabled
+            - available
+            - unavailable
+        requiresPairing:
+          type: boolean
+          const: true
+        executionTarget:
+          type: string
+          const: paired-home-base
+    NetworkAiRuntimeSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - plane
+        - mode
+        - localRuntime
+        - centralRuntime
+        - fallbackPolicy
+        - rolloutGate
+        - surfaces
+        - guardrails
+      properties:
+        plane:
+          type: string
+          const: ai-plane-separate-from-data-plane
+        mode:
+          type: string
+          enum:
+            - local-ai
+            - centralized-available
+            - centralized-unavailable
+        localRuntime:
+          $ref: '#/components/schemas/NetworkAiRuntimeLocalRuntime'
+        centralRuntime:
+          $ref: '#/components/schemas/NetworkAiRuntimeCentralRuntime'
+        fallbackPolicy:
+          type: string
+          const: client-local-runtime-else-ai-unavailable
+        rolloutGate:
+          type: string
+          const: lane-benchmarks-and-rollout-governance-required
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - patient-insight
+              - smart-import
+              - document-synthesis
+        guardrails:
+          type: array
+          items:
+            type: string
+    NetworkCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - status
+        - requiresPairing
+        - description
+      properties:
+        key:
+          type: string
+          enum:
+            - network.pairing.bootstrap
+            - network.replica.readonly-patients
+            - network.replica.sync
+            - network.ai.central-runtime
+            - network.catalogs.sync
+            - local.backup.artifact.v1
+            - local.backup.scheduler.macos
+        status:
+          type: string
+          enum:
+            - available
+            - disabled
+            - planned
+            - unavailable
+        requiresPairing:
+          type: boolean
+        description:
+          type: string
+    NetworkCapabilitiesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - nodeId
+        - operatingMode
+        - protocolVersion
+        - capabilities
+      properties:
+        nodeId:
+          type: string
+        operatingMode:
+          type: string
+          enum:
+            - local-only
+            - network-home-base
+        protocolVersion:
+          type: string
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkCapability'
+    NetworkPairingIntentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceName
+        - clientPlatform
+      properties:
+        deviceName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        clientPlatform:
+          type: string
+          enum:
+            - macos
+            - ios
+            - ipados
+        appVersion:
+          type:
+            - string
+            - 'null'
+        requestedCapabilities:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+    NetworkPairingRequesterSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceName
+        - clientPlatform
+        - appVersion
+      properties:
+        deviceName:
+          type: string
+        clientPlatform:
+          type: string
+          enum:
+            - macos
+            - ios
+            - ipados
+        appVersion:
+          type:
+            - string
+            - 'null'
+    NetworkPairingIntentResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - intentId
+        - status
+        - nodeId
+        - nodeDisplayName
+        - protocolVersion
+        - requestedAt
+        - expiresAt
+        - requestedBy
+        - requestedCapabilities
+      properties:
+        intentId:
+          type: string
+        status:
+          type: string
+          const: pending-home-base-confirmation
+        nodeId:
+          type: string
+        nodeDisplayName:
+          type: string
+        protocolVersion:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        requestedBy:
+          $ref: '#/components/schemas/NetworkPairingRequesterSummary'
+        requestedCapabilities:
+          type: array
+          items:
+            type: string
+    NetworkPairedClientSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - clientId
+        - deviceName
+        - clientPlatform
+        - appVersion
+        - grantedCapabilities
+        - pairedAt
+        - lastSeenAt
+      properties:
+        clientId:
+          type: string
+        deviceName:
+          type: string
+        clientPlatform:
+          type: string
+          enum:
+            - macos
+            - ios
+            - ipados
+        appVersion:
+          type:
+            - string
+            - 'null'
+        grantedCapabilities:
+          type: array
+          items:
+            type: string
+        pairedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    NetworkPairedClientAuthHeaders:
+      type: object
+      additionalProperties: false
+      required:
+        - clientIdHeader
+        - clientTokenHeader
+        - sessionCookie
+      properties:
+        clientIdHeader:
+          type: string
+          const: x-mediflow-paired-client-id
+        clientTokenHeader:
+          type: string
+          const: x-mediflow-paired-client-token
+        sessionCookie:
+          type: string
+          const: mediflow_session
+    NetworkPairingConfirmationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - intentId
+        - status
+        - nodeId
+        - nodeDisplayName
+        - protocolVersion
+        - pairedAt
+        - pairedClientToken
+        - pairedClient
+        - authHeaders
+      properties:
+        intentId:
+          type: string
+        status:
+          type: string
+          const: paired
+        nodeId:
+          type: string
+        nodeDisplayName:
+          type: string
+        protocolVersion:
+          type: string
+        pairedAt:
+          type: string
+          format: date-time
+        pairedClientToken:
+          type: string
+        pairedClient:
+          $ref: '#/components/schemas/NetworkPairedClientSummary'
+        authHeaders:
+          $ref: '#/components/schemas/NetworkPairedClientAuthHeaders'
+    PatientSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - firstName
+        - lastName
+        - taxCode
+        - version
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        taxCode:
+          type: string
+        isAdi:
+          type:
+            - boolean
+            - 'null'
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PatientDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - firstName
+        - lastName
+        - taxCode
+        - version
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        taxCode:
+          type: string
+        address:
+          type:
+            - string
+            - 'null'
+        phone:
+          type:
+            - string
+            - 'null'
+        caregiver:
+          type:
+            - string
+            - 'null'
+        exemptions:
+          type:
+            - string
+            - 'null'
+        diagnoses:
+          type:
+            - string
+            - 'null'
+        monitoringProfile:
+          type:
+            - string
+            - 'null'
+        statusReason:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        aiSummary:
+          type:
+            - string
+            - 'null'
+        documentInsights:
+          type:
+            - string
+            - 'null'
+        isAdi:
+          type:
+            - boolean
+            - 'null'
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        ambulatoryId:
+          type:
+            - string
+            - 'null'
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PatientMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial patient update payload. At least one field other than `version`
+        must be provided.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        firstName:
+          type: string
+        lastName:
+          type: string
+        taxCode:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        address:
+          type:
+            - string
+            - 'null'
+        phone:
+          type:
+            - string
+            - 'null'
+        caregiver:
+          type:
+            - string
+            - 'null'
+        exemptions:
+          type:
+            - string
+            - 'null'
+        diagnoses:
+          type:
+            - string
+            - 'null'
+        monitoringProfile:
+          type:
+            - string
+            - 'null'
+        statusReason:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        aiSummary:
+          type:
+            - string
+            - 'null'
+        documentInsights:
+          type:
+            - string
+            - 'null'
+        isAdi:
+          type: boolean
+        isArchived:
+          type: boolean
+        ambulatoryId:
+          type:
+            - string
+            - 'null'
+    PatientDeleteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+    MutationSuccessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          const: true
+    PatientConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - updatedAt
+        - isArchived
+      description: PHI-safe server snapshot for the currently stored patient row.
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        isArchived:
+          type:
+            - boolean
+            - 'null'
+    PatientVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: patient
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/PatientConflictSnapshot'
+            - type: 'null'

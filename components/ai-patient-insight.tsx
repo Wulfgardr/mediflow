@@ -1,12 +1,21 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, RefreshCw, AlertTriangle, X } from 'lucide-react';
-import { Patient } from '@/lib/db';
+import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
+import { db, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
+import Link from 'next/link';
+import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
+/* @Codex */
+import { splitInsightDiagnostics } from '@/lib/patient-insight';
+import {
+    AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    AiPatientInsightDisabledError,
+    isAiPatientInsightEnabledValue,
+} from '@/lib/ai-patient-insight-kill-switch';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -18,8 +27,25 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     const [error, setError] = useState<string | null>(null);
     /* @Codex */
     const [modelLabel, setModelLabel] = useState<string>("");
+    /* @Codex */
+    const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
 
     const abortControllerRef = useRef<AbortController | null>(null);
+    /* @Codex */
+    const parsedInsight = parsePatientInsight(patient.aiSummary || "");
+    /* @Codex */
+    const hasStructuredInsight = Boolean(
+        parsedInsight.summary ||
+        parsedInsight.alerts.length ||
+        parsedInsight.nextSteps.length ||
+        parsedInsight.gaps.length
+    );
+    /* @Codex */
+    const diagnostics = splitInsightDiagnostics(patient.aiSummary || '');
+    /* @Codex */
+    const hasDiagnostics = Boolean(diagnostics.sourcesMarkdown || diagnostics.limitsMarkdown);
+    /* @Codex */
+    const patientInsightEnabled = isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value);
 
     /* @Codex */
     useEffect(() => {
@@ -31,6 +57,11 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     }, []);
 
     const generateInsight = async () => {
+        if (!patientInsightEnabled) {
+            setError("Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare nuovi insight.");
+            return;
+        }
+
         setIsGenerating(true);
         setError(null);
         setProgress("Inizializzazione...");
@@ -66,6 +97,10 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 return;
             }
             console.error("AI Insight Error:", err);
+            if (err instanceof AiPatientInsightDisabledError) {
+                setError("Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare nuovi insight.");
+                return;
+            }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const msg = (err as any)?.message || "Errore sconosciuto";
             setError(msg.includes('Failed to fetch')
@@ -96,121 +131,254 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
     };
 
 
+    if (!patient.aiSummary && !isGenerating && !patientInsightEnabled) {
+        return (
+            <div
+                className="glass-panel overflow-hidden rounded-[28px] border-red-200/70 bg-red-50/20 p-6 backdrop-blur-xl dark:border-red-500/20 dark:bg-red-950/10"
+                data-testid="patient-insight-disabled-card"
+            >
+                <div className="flex flex-col items-center text-center space-y-5">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-red-100 text-red-600 shadow-[0_12px_24px_rgba(239,68,68,0.12)] dark:bg-red-500/10 dark:text-red-300">
+                        <AlertTriangle className="w-8 h-8" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Patient Insight disabilitata</h3>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia nuove generazioni finché il toggle non viene riattivato in Impostazioni.
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/settings#ai"
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                        Apri Impostazioni AI
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     if (!patient.aiSummary && !isGenerating) {
         return (
-            <div className="glass-panel p-6 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-transparent border-indigo-100 dark:border-indigo-500/20 flex flex-col items-center text-center space-y-4">
-                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
-                    <Sparkles className="w-6 h-6" />
-                </div>
-                <div>
-                    <h3 className="font-bold text-gray-800 dark:text-white">Genera Patient Insight</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                        Usa l&apos;intelligenza artificiale per analizzare diario, documenti e terapie e creare un riassunto clinico aggiornato.
-                    </p>
-                </div>
-
-                {error && (
-                    <div className="text-xs text-red-500 bg-red-50 p-2 rounded-lg border border-red-100 max-w-sm">
-                        {error}
+            <div className="glass-panel overflow-hidden rounded-[28px] border-indigo-100/50 bg-indigo-50/10 p-6 backdrop-blur-xl dark:border-indigo-500/20 dark:bg-indigo-950/10">
+                <div className="flex flex-col items-center text-center space-y-5">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white shadow-[0_12px_24px_rgba(99,102,241,0.2)]">
+                        <Sparkles className="w-8 h-8" />
                     </div>
-                )}
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-500">Intelligenza Clinica</p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Genera insight clinico</h3>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                            Ottieni un quadro clinico sintetico e orientato all&apos;azione basato sull&apos;intero storico del paziente.
+                        </p>
+                    </div>
 
-                <button
-                    onClick={generateInsight}
-                    className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
-                >
-                    <Sparkles className="w-4 h-4" />
-                    Genera Insight
-                </button>
+                    {error && (
+                        <div className="text-xs text-red-500 bg-red-50 p-3 rounded-[20px] border border-red-100 max-w-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={generateInsight}
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        Genera Insight
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="glass-panel p-6 relative overflow-hidden border-indigo-100 dark:border-indigo-500/20 shadow-lg shadow-indigo-100/50 dark:shadow-none">
-            {/* Background Decoration */}
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <Sparkles className="w-32 h-32 text-indigo-900 dark:text-indigo-400" />
-            </div>
-
-            <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-md shadow-indigo-200 dark:shadow-none">
-                        <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-xl text-gray-800 dark:text-white">AI Patient Insight</h3>
-                        {modelLabel && (
-                            <p className="text-[10px] text-gray-500">Modello: {modelLabel}</p>
-                        )}
-                    </div>
-                </div>
-
-                <button
-                    onClick={generateInsight}
-                    disabled={isGenerating}
-                    className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-                    title="Rigenera analisi"
-                >
-                    {isGenerating ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="w-4 h-4" />
-                    )}
-                    <span className="text-sm font-medium">{isGenerating ? 'Analisi...' : 'Aggiorna'}</span>
-                </button>
-            </div>
-
-            {error && (
-                <div className="mb-4 text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    {error}
-                </div>
-            )}
-
-            {isGenerating ? (
-                <div className="py-8 text-center space-y-3">
-                    <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-                    <p className="text-indigo-800 dark:text-indigo-300 font-medium animate-pulse">Generazione insight clinico...</p>
-                    <p className="text-xs text-gray-500 font-medium mb-4">{progress}</p>
-
-                    {/* Progress Bar */}
-                    <div className="w-full max-w-[200px] mx-auto h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-4">
-                        <div className="h-full bg-indigo-500 w-1/3 animate-[shimmer_1s_infinite_linear] relative">
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent translate-x-[-100%] animate-[shimmer_1.5s_infinite]"></div>
+        <div className="glass-panel overflow-hidden rounded-[28px] border-white/40 bg-white/60 p-0 backdrop-blur-2xl dark:border-white/10 dark:bg-white/5">
+            <div className="border-b border-slate-200/50 p-5 dark:border-white/5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                            <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Insight clinico AI</h3>
+                            {modelLabel && (
+                                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel}</p>
+                            )}
                         </div>
                     </div>
-                    <style jsx>{`
-                        @keyframes shimmer {
-                            0% { transform: translateX(-100%); }
-                            100% { transform: translateX(300%); }
-                        }
-                    `}</style>
 
                     <button
-                        onClick={stopGeneration}
-                        className="mt-2 px-4 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-full border border-red-200 transition-colors flex items-center gap-1 mx-auto"
+                        onClick={generateInsight}
+                        disabled={isGenerating || !patientInsightEnabled}
+                        className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
                     >
-                        <X className="w-3 h-3" /> Interrompi
+                        {isGenerating ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        {isGenerating ? 'Analisi...' : patientInsightEnabled ? 'Aggiorna' : 'Disabilitata'}
                     </button>
                 </div>
-            ) : (
-                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 prose-headings:text-indigo-900 dark:prose-headings:text-indigo-300 prose-strong:text-indigo-700 dark:prose-strong:text-indigo-400 leading-relaxed bg-white/50 dark:bg-black/20 p-4 rounded-xl border border-indigo-50/50 dark:border-indigo-500/10">
-                    <PrivacyBlur>
-                        <ReactMarkdown>
-                            {(patient.aiSummary || "")
-                                .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '') // Clean on render
-                                .replace(/^Plan:\s*/gim, '')
-                                .trim()}
-                        </ReactMarkdown>
-                    </PrivacyBlur>
-                </div>
-            )}
-
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center gap-2 text-[10px] text-gray-400">
-                <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Generato da IA locale. Verificare sempre le informazioni.</span>
             </div>
+
+            <div className="p-5">
+                {error && (
+                    <div className="mb-4 flex items-center gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-600">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        {error}
+                    </div>
+                )}
+
+                {!patientInsightEnabled && (
+                    <div
+                        className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
+                        data-testid="patient-insight-disabled-banner"
+                    >
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Patient Insight disabilitata localmente</p>
+                            <p className="mt-1">Puoi consultare l&apos;ultimo insight salvato, ma la rigenerazione resta bloccata finché non riattivi il toggle in Impostazioni.</p>
+                        </div>
+                    </div>
+                )}
+
+                {isGenerating ? (
+                    <div className="py-12 text-center space-y-4">
+                        <div className="relative mx-auto h-16 w-16">
+                            <RefreshCw className="w-16 h-16 text-indigo-500/20 animate-[spin_3s_linear_infinite]" />
+                            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-indigo-500 animate-pulse" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Generazione in corso</p>
+                            <p className="text-[10px] font-medium text-indigo-500 uppercase tracking-widest">{progress}</p>
+                        </div>
+
+                        <div className="mx-auto w-48 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950/30">
+                            <div className="h-1 bg-indigo-500 animate-[shimmer_1.5s_infinite_linear]" style={{ width: '40%' }} />
+                        </div>
+                        
+                        <button
+                            onClick={stopGeneration}
+                            className="mt-4 text-[10px] font-bold uppercase tracking-wider text-red-500 hover:text-red-600"
+                        >
+                            Interrompi
+                        </button>
+                    </div>
+                ) : hasStructuredInsight ? (
+                    <div className="space-y-5">
+                        {parsedInsight.nextSteps.length > 0 && (
+                            <div className="rounded-[24px] bg-indigo-50/50 p-4 dark:bg-indigo-500/5">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                                    Prossimi passi
+                                </p>
+                                <div className="mt-3 space-y-2">
+                                    {parsedInsight.nextSteps.map((step, index) => (
+                                        <div
+                                            key={`${index}-${step}`}
+                                            className="flex gap-3 text-sm font-medium text-slate-800 dark:text-slate-100"
+                                        >
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] text-indigo-600 dark:bg-indigo-900/40">
+                                                {index + 1}
+                                            </span>
+                                            <PrivacyBlur intensity="sm">{step}</PrivacyBlur>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {parsedInsight.summary && (
+                            <div className="px-1">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    Quadro Clinico
+                                </p>
+                                <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">
+                                    <PrivacyBlur intensity="sm">{parsedInsight.summary}</PrivacyBlur>
+                                </p>
+                            </div>
+                        )}
+
+                        {parsedInsight.alerts.length > 0 && (
+                            <div className="rounded-[24px] border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/10 dark:bg-amber-900/10">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">
+                                    Attenzioni
+                                </p>
+                                <ul className="mt-3 space-y-2 text-sm font-medium text-amber-900 dark:text-amber-100">
+                                    {parsedInsight.alerts.map((item, index) => (
+                                        <li key={`${index}-${item}`} className="flex gap-2">
+                                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                            <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {parsedInsight.gaps.length > 0 && (
+                            <div className="px-1">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    Gap Informativi
+                                </p>
+                                <ul className="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
+                                    {parsedInsight.gaps.map((item, index) => (
+                                        <li key={`${index}-${item}`} className="flex gap-2">
+                                            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                            <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="prose prose-sm max-w-none rounded-[24px] border border-slate-200/50 bg-slate-50/30 p-4 text-slate-700 dark:border-white/5 dark:bg-white/5 dark:text-slate-300">
+                        <PrivacyBlur>
+                            <ReactMarkdown>{diagnostics.mainMarkdown || parsedInsight.fallbackMarkdown}</ReactMarkdown>
+                        </PrivacyBlur>
+                    </div>
+                )}
+
+                {hasDiagnostics && (
+                    <details className="mt-5 rounded-[24px] border border-slate-100 bg-slate-50/50 dark:border-white/5 dark:bg-white/5">
+                        <summary className="flex cursor-pointer items-center justify-between p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            Fonti e Avvisi
+                        </summary>
+                        <div className="p-4 pt-0 space-y-3 text-xs text-slate-500 dark:text-slate-400">
+                            {diagnostics.sourcesMarkdown && (
+                                <div className="prose prose-xs max-w-none dark:prose-invert">
+                                    <PrivacyBlur intensity="sm">
+                                        <ReactMarkdown>{diagnostics.sourcesMarkdown}</ReactMarkdown>
+                                    </PrivacyBlur>
+                                </div>
+                            )}
+                            {diagnostics.limitsMarkdown && (
+                                <div className="prose prose-xs max-w-none dark:prose-invert border-t border-slate-200/50 pt-3 dark:border-white/5">
+                                    <PrivacyBlur intensity="sm">
+                                        <ReactMarkdown>{diagnostics.limitsMarkdown}</ReactMarkdown>
+                                    </PrivacyBlur>
+                                </div>
+                            )}
+                        </div>
+                    </details>
+                )}
+            </div>
+
+            <div className="bg-slate-50 p-4 text-[9px] font-medium uppercase tracking-wider text-slate-400 dark:bg-white/5">
+                <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Supporto decisionale IA locale • Non sostituisce il giudizio clinico</span>
+                </div>
+            </div>
+            
+            <style jsx>{`
+                @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(400%); }
+                }
+            `}</style>
         </div>
     );
 

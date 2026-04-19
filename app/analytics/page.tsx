@@ -2,10 +2,21 @@
 
 import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
-import { useState, useMemo } from 'react';
-import { ArrowLeft, Users, Activity, Clock, Filter } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowLeft, Activity, Clock, Filter, ShieldCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { differenceInYears } from 'date-fns';
+
+/* @Codex */
+type AuditSummary = {
+    days: number;
+    totalEvents: number;
+    distinctActors: number;
+    outcomes: Record<'success' | 'failure' | 'denied', number>;
+    sourceSurfaces: Record<'web' | 'native' | 'api' | 'job', number>;
+    topEventTypes: Array<{ eventType: string; count: number }>;
+    isTruncated: boolean;
+};
 
 export default function AnalyticsPage() {
     const patients = useLiveQuery(async () => {
@@ -16,7 +27,49 @@ export default function AnalyticsPage() {
 
     // Filters
     const [ageRange, setAgeRange] = useState<[number, number]>([0, 120]);
+    const [auditDays, setAuditDays] = useState(30);
+    const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
+    const [auditLoading, setAuditLoading] = useState(true);
+    const [auditError, setAuditError] = useState<string | null>(null);
     // Gender filter removed as unused for now
+
+    useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
+
+        async function loadAuditSummary() {
+            setAuditLoading(true);
+            setAuditError(null);
+
+            try {
+                const response = await fetch(`/api/system/audit?view=summary&days=${auditDays}&limit=500`, {
+                    signal: controller.signal,
+                });
+                if (!response.ok) {
+                    throw new Error(response.status === 403
+                        ? 'Solo gli admin possono consultare il cruscotto audit.'
+                        : 'Impossibile caricare il riepilogo audit.');
+                }
+
+                const payload = await response.json() as AuditSummary;
+                if (!active) return;
+                setAuditSummary(payload);
+            } catch (error) {
+                if (controller.signal.aborted || !active) return;
+                setAuditError(error instanceof Error ? error.message : 'Impossibile caricare il riepilogo audit.');
+                setAuditSummary(null);
+            } finally {
+                if (active) setAuditLoading(false);
+            }
+        }
+
+        void loadAuditSummary();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [auditDays]);
 
     // Derived Stats
     const stats = useMemo(() => {
@@ -123,6 +176,20 @@ export default function AnalyticsPage() {
                 <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-mono text-sm">
                     {stats?.total} Pazienti Selezionati
                 </div>
+
+                <div className="w-full md:w-auto">
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Finestra Audit</label>
+                    <select
+                        aria-label="Finestra audit"
+                        value={auditDays}
+                        onChange={(event) => setAuditDays(Number(event.target.value))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
+                    >
+                        <option value={7}>Ultimi 7 giorni</option>
+                        <option value={30}>Ultimi 30 giorni</option>
+                        <option value={90}>Ultimi 90 giorni</option>
+                    </select>
+                </div>
             </div>
 
             {/* KPI Cards */}
@@ -176,6 +243,72 @@ export default function AnalyticsPage() {
                         {stats?.topPathologies[0]?.count || 0} casi registrati
                     </p>
                 </div>
+            </div>
+
+            <div className="glass-panel p-6 space-y-6">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                            Audit Operativo
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                            KPI PHI-safe sugli ultimi {auditDays} giorni da `audit_events`.
+                        </p>
+                    </div>
+                </div>
+
+                {auditLoading ? (
+                    <div className="rounded-xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500">Caricamento riepilogo audit...</div>
+                ) : auditError ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{auditError}</span>
+                    </div>
+                ) : auditSummary ? (
+                    <>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Eventi Totali</p>
+                                <p className="mt-2 text-3xl font-bold text-emerald-950">{auditSummary.totalEvents}</p>
+                            </div>
+                            <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Failure + Denied</p>
+                                <p className="mt-2 text-3xl font-bold text-amber-950">
+                                    {auditSummary.outcomes.failure + auditSummary.outcomes.denied}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Attori Distinti</p>
+                                <p className="mt-2 text-3xl font-bold text-sky-950">{auditSummary.distinctActors}</p>
+                            </div>
+                            <div className="rounded-2xl border border-violet-100 bg-violet-50/80 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Evento Top</p>
+                                <p className="mt-2 text-sm font-semibold text-violet-950">
+                                    {auditSummary.topEventTypes[0]?.eventType ?? 'Nessuno'}
+                                </p>
+                                <p className="mt-1 text-xs text-violet-700">
+                                    {auditSummary.topEventTypes[0]?.count ?? 0} occorrenze
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white/80 p-4 text-sm text-gray-600">
+                            <p className="font-semibold text-gray-800">Distribuzione</p>
+                            <div className="mt-3 flex flex-wrap gap-4">
+                                <span>Success: <strong>{auditSummary.outcomes.success}</strong></span>
+                                <span>Failure: <strong>{auditSummary.outcomes.failure}</strong></span>
+                                <span>Denied: <strong>{auditSummary.outcomes.denied}</strong></span>
+                                <span>Web/API/Native: <strong>{auditSummary.sourceSurfaces.web}/{auditSummary.sourceSurfaces.api}/{auditSummary.sourceSurfaces.native}</strong></span>
+                            </div>
+                            {auditSummary.isTruncated && (
+                                <p className="mt-3 text-xs text-amber-700">
+                                    Riepilogo basato su un campione locale limitato agli ultimi 500 eventi filtrati.
+                                </p>
+                            )}
+                        </div>
+                    </>
+                ) : null}
             </div>
 
             {/* Charts Section */}

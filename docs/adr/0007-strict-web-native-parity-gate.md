@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-19 -->
 # ADR 0007: Strict web/native parity come release gate operativo
 
 Date: 2026-02-19  
@@ -57,7 +56,6 @@ La parity web/macOS diventa un gate operativo esplicito sui moduli core:
 - indipendenza operativa: ciascun client completa i workflow del modulo senza aprire l'altro client
 
 La verifica avviene su matrice versionata (`docs/parity-matrix.md`) e piano
-esecutivo in `PLANS.md` (sezione parity).
 
 ## Conseguenze
 
