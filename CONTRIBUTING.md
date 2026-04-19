@@ -276,23 +276,3 @@ Una PR è considerata conclusa quando:
 Se qualcosa non è chiaro, leggi prima la documentazione e poi fai **una domanda mirata**.
 
 ---
-
-## Export OSS (repo pubblica)
-
-Per preparare la versione pubblica filtrata:
-
-```bash
-npm run prepare:oss
-```
-
-Note operative:
-- lo script copia la repo privata verso la destinazione OSS (`medical-record-app-oss` di default)
-- esclude file/cartelle interni (es. orchestrazione agentica, attribution, piano operativo, workspace privati)
-- ripulisce i riferimenti testuali ai documenti interni che non devono apparire nella repo pubblica
-- declassa i link markdown verso file non presenti in OSS con suffix ` (private)` per evitare reference rotte
-
-Destinazione custom (utile per dry-run):
-
-```bash
-MEDIFLOW_OSS_TARGET_DIR=/tmp/medical-record-app-oss-test npm run prepare:oss
-```

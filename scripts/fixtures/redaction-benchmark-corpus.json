@@ -1,0 +1,180 @@
+[
+  {
+    "id": "redaction-discharge-note-full-pii",
+    "inputText": "La paziente Maria Rossi, nata il 12/03/1978, residente in Via Garibaldi 14, Milano, CF RSSMRA78C52F205X, telefono 333 1234567, email maria.rossi@example.it, riferisce cefalea persistente.",
+    "gold": {
+      "redactedText": "La paziente [PERSON], nata il [DATE], residente in [ADDRESS], CF [TAX_ID], telefono [PHONE], email [EMAIL], riferisce cefalea persistente.",
+      "entities": [
+        { "type": "person", "text": "Maria Rossi", "critical": true },
+        { "type": "date", "text": "12/03/1978", "critical": true },
+        { "type": "address", "text": "Via Garibaldi 14, Milano", "critical": true },
+        { "type": "tax_id", "text": "RSSMRA78C52F205X", "critical": true },
+        { "type": "phone", "text": "333 1234567", "critical": true },
+        { "type": "email", "text": "maria.rossi@example.it", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "Maria Rossi",
+        "12/03/1978",
+        "Via Garibaldi 14, Milano",
+        "RSSMRA78C52F205X",
+        "333 1234567",
+        "maria.rossi@example.it"
+      ]
+    }
+  },
+  {
+    "id": "redaction-referral-note-with-organization",
+    "inputText": "Inviare il sig. Luca Bianchi il 05-11-1966 presso Poliambulatorio Aurora, Corso Italia 88, Brescia. Contatto: 02 4455667. Documento paziente: BNCLCU66S05B157Q.",
+    "gold": {
+      "redactedText": "Inviare il sig. [PERSON] il [DATE] presso [ORGANIZATION], [ADDRESS]. Contatto: [PHONE]. Documento paziente: [TAX_ID].",
+      "entities": [
+        { "type": "person", "text": "Luca Bianchi", "critical": true },
+        { "type": "date", "text": "05-11-1966", "critical": true },
+        { "type": "organization", "text": "Poliambulatorio Aurora", "critical": false },
+        { "type": "address", "text": "Corso Italia 88, Brescia", "critical": true },
+        { "type": "phone", "text": "02 4455667", "critical": true },
+        { "type": "tax_id", "text": "BNCLCU66S05B157Q", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "Luca Bianchi",
+        "05-11-1966",
+        "Corso Italia 88, Brescia",
+        "02 4455667",
+        "BNCLCU66S05B157Q"
+      ]
+    }
+  },
+  {
+    "id": "redaction-clinical-mail-compact",
+    "inputText": "Mail del 21/09/2025: giulia.verdi@asl.example.it segnala che la paziente Giulia Verdi e rintracciabile al 3479988776 e vive in Piazza Liberta 3, Pavia.",
+    "gold": {
+      "redactedText": "Mail del [DATE]: [EMAIL] segnala che la paziente [PERSON] e rintracciabile al [PHONE] e vive in [ADDRESS].",
+      "entities": [
+        { "type": "date", "text": "21/09/2025", "critical": true },
+        { "type": "email", "text": "giulia.verdi@asl.example.it", "critical": true },
+        { "type": "person", "text": "Giulia Verdi", "critical": true },
+        { "type": "phone", "text": "3479988776", "critical": true },
+        { "type": "address", "text": "Piazza Liberta 3, Pavia", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "21/09/2025",
+        "giulia.verdi@asl.example.it",
+        "Giulia Verdi",
+        "3479988776",
+        "Piazza Liberta 3, Pavia"
+      ]
+    }
+  },
+  {
+    "id": "redaction-written-date-and-pec",
+    "inputText": "Il paziente Carlo Neri, nato il 3 maggio 1982, recapito PEC carlo.neri@pec.it, abita in Viale Europa 5, Roma.",
+    "gold": {
+      "redactedText": "Il paziente [PERSON], nato il [DATE], recapito PEC [EMAIL], abita in [ADDRESS].",
+      "entities": [
+        { "type": "person", "text": "Carlo Neri", "critical": true },
+        { "type": "date", "text": "3 maggio 1982", "critical": true },
+        { "type": "email", "text": "carlo.neri@pec.it", "critical": true },
+        { "type": "address", "text": "Viale Europa 5, Roma", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "Carlo Neri",
+        "3 maggio 1982",
+        "carlo.neri@pec.it",
+        "Viale Europa 5, Roma"
+      ]
+    }
+  },
+  {
+    "id": "redaction-cap-address-and-mobile",
+    "inputText": "Contattare Anna Blu al 3209988776 oppure via mail anna.blu@studio.it. Indirizzo: Via XX Settembre 12, 00187 Roma. CF BLUNNA80A41H501K.",
+    "gold": {
+      "redactedText": "Contattare [PERSON] al [PHONE] oppure via mail [EMAIL]. Indirizzo: [ADDRESS]. CF [TAX_ID].",
+      "entities": [
+        { "type": "person", "text": "Anna Blu", "critical": true },
+        { "type": "phone", "text": "3209988776", "critical": true },
+        { "type": "email", "text": "anna.blu@studio.it", "critical": true },
+        { "type": "address", "text": "Via XX Settembre 12, 00187 Roma", "critical": true },
+        { "type": "tax_id", "text": "BLUNNA80A41H501K", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "Anna Blu",
+        "3209988776",
+        "anna.blu@studio.it",
+        "Via XX Settembre 12, 00187 Roma",
+        "BLUNNA80A41H501K"
+      ]
+    }
+  },
+  {
+    "id": "redaction-two-persons-and-clinic-email",
+    "inputText": "La signora Elena Gallo accompagna Marco Riva alla visita del 14/02/2026. Per conferma scrivere a segreteria@clinicaverde.it o chiamare 031445566.",
+    "gold": {
+      "redactedText": "La signora [PERSON] accompagna [PERSON] alla visita del [DATE]. Per conferma scrivere a [EMAIL] o chiamare [PHONE].",
+      "entities": [
+        { "type": "person", "text": "Elena Gallo", "critical": true },
+        { "type": "person", "text": "Marco Riva", "critical": true },
+        { "type": "date", "text": "14/02/2026", "critical": true },
+        { "type": "email", "text": "segreteria@clinicaverde.it", "critical": true },
+        { "type": "phone", "text": "031445566", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "Elena Gallo",
+        "Marco Riva",
+        "14/02/2026",
+        "segreteria@clinicaverde.it",
+        "031445566"
+      ]
+    }
+  },
+  {
+    "id": "redaction-clinic-referrals-mailbox",
+    "inputText": "Inviare gli esiti a diabetologia.referti@asl.example.it per il paziente Paolo Fanti, nato il 01/01/1971.",
+    "gold": {
+      "redactedText": "Inviare gli esiti a [EMAIL] per il paziente [PERSON], nato il [DATE].",
+      "entities": [
+        { "type": "email", "text": "diabetologia.referti@asl.example.it", "critical": true },
+        { "type": "person", "text": "Paolo Fanti", "critical": true },
+        { "type": "date", "text": "01/01/1971", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "diabetologia.referti@asl.example.it",
+        "Paolo Fanti",
+        "01/01/1971"
+      ]
+    }
+  },
+  {
+    "id": "redaction-pec-followup-mailbox",
+    "inputText": "Follow-up del 18/07/2026: la signora Laura Bruni richiede risposta via PEC a laura.bruni@pec.it.",
+    "gold": {
+      "redactedText": "Follow-up del [DATE]: la signora [PERSON] richiede risposta via PEC a [EMAIL].",
+      "entities": [
+        { "type": "date", "text": "18/07/2026", "critical": true },
+        { "type": "person", "text": "Laura Bruni", "critical": true },
+        { "type": "email", "text": "laura.bruni@pec.it", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "18/07/2026",
+        "Laura Bruni",
+        "laura.bruni@pec.it"
+      ]
+    }
+  },
+  {
+    "id": "redaction-two-mails-and-phone",
+    "inputText": "Per conferma inviare email a segreteria.oncologia@ospedale.example.it o a cup.territoriale@pec.it; reperibilita 0551234567.",
+    "gold": {
+      "redactedText": "Per conferma inviare email a [EMAIL] o a [EMAIL]; reperibilita [PHONE].",
+      "entities": [
+        { "type": "email", "text": "segreteria.oncologia@ospedale.example.it", "critical": true },
+        { "type": "email", "text": "cup.territoriale@pec.it", "critical": true },
+        { "type": "phone", "text": "0551234567", "critical": true }
+      ],
+      "forbiddenTokens": [
+        "segreteria.oncologia@ospedale.example.it",
+        "cup.territoriale@pec.it",
+        "0551234567"
+      ]
+    }
+  }
+]

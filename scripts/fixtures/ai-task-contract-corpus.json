@@ -1,0 +1,131 @@
+[
+  {
+    "id": "insight-copd-followup",
+    "task": "patient_insight",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-1) ---\nDATI BASE: Bianchi Giulia | Eta: 74 | CF: BNCGLI50A41F205X\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n\n[PROFILO STRUTTURATO]\n[S1] ADI attiva, monitoraggio domiciliare infermieristico.\n[S2] Note scheda: dispnea da sforzo moderato e limitazione funzionale recente.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 J44.9: BPCO (14/03/2026)\n[S4] ICD-10 I10: Ipertensione essenziale (11/01/2026)\n\n[TERAPIE ATTIVE]\n[S5] Tiotropio 18 mcg 1 cps/die\n[S6] Ramipril 5 mg 1 cp/die\n\n[OSSERVAZIONI RECENTI]\n[S7] SpO2 (59408-5) = 91 % [18/03/2026]\n[S8] Frequenza cardiaca (8867-4) = 96 /min [18/03/2026]\n\n[CONTROLLI PENDENTI]\n[S9] 28/03/2026: controllo MMG per rivalutazione dispnea\n\n[DIARIO CLINICO RECENTE]\n[S10] [18/03/2026] VISIT: peggioramento della dispnea nelle ultime due settimane, senza febbre.\n\n[DOCUMENTI RECENTI]\n[S11] lettera_dimissione_bpco.pdf: riacutizzazione BPCO trattata con broncodilatatori; consigliato follow-up precoce.\n--- FINE CONTESTO ---"
+  },
+  {
+    "id": "insight-diabetes-checkup",
+    "task": "patient_insight",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-2) ---\nDATI BASE: Verdi Paolo | Eta: 68 | CF: VRDPLA57M10F205Z\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n\n[PROFILO STRUTTURATO]\n[S1] ADI no.\n[S2] Profilo monitoraggio: diabete con follow-up trimestrale.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 E11.9: Diabete mellito tipo 2 (02/02/2026)\n[S4] ICD-10 N18.3: Malattia renale cronica stadio 3 (15/02/2026)\n\n[TERAPIE ATTIVE]\n[S5] Metformina 500 mg 1 cp x 2/die\n[S6] Insulina glargine 16 UI serale\n\n[OSSERVAZIONI RECENTI]\n[S7] Glicemia (2339-0) = 182 mg/dL [19/03/2026]\n[S8] Peso (29463-7) = 84 kg [19/03/2026]\n\n[CONTROLLI PENDENTI]\n[S9] 04/04/2026: prelievo HbA1c e creatinina\n\n[DIARIO CLINICO RECENTE]\n[S10] [19/03/2026] NOTE: riferisce aderenza incerta alla dieta nelle ultime settimane.\n--- FINE CONTESTO ---"
+  },
+  {
+    "id": "insight-fracture-history-priority",
+    "task": "patient_insight",
+    "maxTokens": 1100,
+    "context": "--- CONTESTO PAZIENTE (ID: bench-3) ---\nDATI BASE: Gialli Rosella | Eta: 67 | CF: GRLSLL59S66H501O\n\nREGOLE HARD:\n- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].\n- Non usare mai note narrative contaminate da precedenti output AI come fonte clinica.\n- Non inventare fonti, nomi di persona o dettagli non presenti.\n- Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti.\n- Usa diagnosi codificate e profilo strutturato come contesto di sfondo: evita cataloghi anamnestici se non cambiano la gestione attuale.\n- Se una fonte storica o sociale non e chiaramente attiva o rilevante oggi, omettila oppure marcala come [DATI-INCOMPLETI].\n\n[PROFILO STRUTTURATO]\n[S1] Anagrafica clinica: Gialli Rosella, eta 67, CF GRLSLL59S66H501O.\n[S2] ADI: si.\n\n[DIAGNOSI CODIFICATE]\n[S3] ICD-10 C50.9: Storia personale di neoplasia maligna del seno (12/05/2018)\n[S4] ICD-10 E66.9: Obesita (18/09/2024)\n[S5] ICD-10 R73.0: Tolleranza alterata al glucosio (18/09/2024)\n[S6] ICD-10 Z72.0: Uso di tabacco (18/09/2024)\n[S7] ICD-10 Z72.1: Consumo di alcol (18/09/2024)\n\n[TERAPIE ATTIVE]\nNessuna terapia attiva registrata.\n\n[OSSERVAZIONI RECENTI]\nNessuna osservazione recente.\n\n[CONTROLLI PENDENTI]\n[S8] 26/03/2026: controllo ortopedico post-intervento femore sinistro\n\n[DIARIO CLINICO RECENTE]\n[S9] [20/03/2026] NOTE: dimessa dopo intervento per frattura pertrocanterica del femore sinistro; recupero funzionale da rivalutare.\n\n[DOCUMENTI RECENTI]\n[S10] lettera_dimissione_ortopedia.pdf: frattura pertrocanterica femore sinistro trattata chirurgicamente; consigliato follow-up ortopedico e riabilitazione motoria.\n--- FINE CONTESTO ---"
+  },
+  {
+    "id": "smart-import-notes-and-docs",
+    "task": "smart_import",
+    "maxTokens": 900,
+    "payload": {
+      "patientId": "bench-smart-1",
+      "currentDiagnoses": [
+        {
+          "system": "ICD-11",
+          "code": "BA00",
+          "description": "Primary hypertension"
+        }
+      ],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Ramipril",
+          "activePrinciple": "ramipril",
+          "dosage": "5 mg 1 cp/die",
+          "aic": "123456",
+          "atc": "C09AA05"
+        }
+      ],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:1",
+          "label": "VISIT 18/03/2026",
+          "excerpt": "Metformina 500 mg x 2/die da proseguire"
+        },
+        {
+          "sourceId": "entry:1",
+          "label": "VISIT 18/03/2026",
+          "excerpt": "Valutare poi semaglutide settimanale se HbA1c resta elevata"
+        }
+      ],
+      "sources": [
+        {
+          "id": "patient-notes:1",
+          "kind": "patient-notes",
+          "label": "Note paziente",
+          "content": "Diabete mellito tipo 2 noto da anni, scarso controllo recente."
+        },
+        {
+          "id": "entry:1",
+          "kind": "clinical-entry",
+          "label": "VISIT 18/03/2026",
+          "date": "2026-03-18T09:00:00.000Z",
+          "content": "HbA1c elevata. Metformina 500 mg x 2/die da proseguire. Valutare poi semaglutide settimanale se scarso compenso."
+        },
+        {
+          "id": "insight:1",
+          "kind": "document-insight",
+          "label": "Documento lettera diabetologica",
+          "date": "2026-03-10T09:00:00.000Z",
+          "content": "Controllo diabetologico: suggerita intensificazione terapeutica, compatibile con diabete tipo 2 non compensato."
+        }
+      ]
+    }
+  },
+  {
+    "id": "smart-import-therapy-transition",
+    "task": "smart_import",
+    "maxTokens": 900,
+    "payload": {
+      "patientId": "bench-smart-2",
+      "currentDiagnoses": [],
+      "currentActiveTherapies": [
+        {
+          "drugName": "Furosemide",
+          "activePrinciple": "furosemide",
+          "dosage": "25 mg 1 cp/die",
+          "aic": "222222",
+          "atc": "C03CA01"
+        }
+      ],
+      "therapyCandidateHints": [
+        {
+          "sourceId": "entry:2",
+          "label": "NOTE 17/03/2026",
+          "excerpt": "sospendere amlodipina e passare a bisoprololo 1,25 mg"
+        }
+      ],
+      "sources": [
+        {
+          "id": "entry:2",
+          "kind": "clinical-entry",
+          "label": "NOTE 17/03/2026",
+          "date": "2026-03-17T11:00:00.000Z",
+          "content": "Per edema declive sospendere amlodipina e passare a bisoprololo 1,25 mg dopo rivalutazione pressoria."
+        },
+        {
+          "id": "attachment:1",
+          "kind": "attachment-summary",
+          "label": "Allegato piano terapeutico",
+          "date": "2026-03-16T08:30:00.000Z",
+          "content": "Piano aggiornato con indicazione a rivalutare la terapia antipertensiva."
+        }
+      ]
+    }
+  },
+  {
+    "id": "document-synthesis-discharge",
+    "task": "document_synthesis",
+    "maxTokens": 1100,
+    "rawText": "Lettera di dimissione. Paziente ricoverato per riacutizzazione di BPCO. Diagnosi: ICD-10 J44.1 riacutizzazione di broncopneumopatia cronica ostruttiva. Terapia alla dimissione: tiotropio 18 mcg 1 cps/die, prednisone 25 mg per 5 giorni. Follow-up pneumologico consigliato entro 7 giorni."
+  },
+  {
+    "id": "document-synthesis-outpatient",
+    "task": "document_synthesis",
+    "maxTokens": 1100,
+    "rawText": "Referto ambulatoriale diabetologico. Diabete mellito tipo 2 con scarso compenso, ICD-10 E11.9. Terapia consigliata: metformina 500 mg due volte al giorno; valutare GLP-1 agonista. Emoglobina glicata 8,4%. Documento leggibile e coerente."
+  }
+]
