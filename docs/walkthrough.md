@@ -118,6 +118,31 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
+## Preview profiles locali
+
+Su checkout non-production MediFlow espone anche una registry locale di
+`Preview Profiles`, selezionabile dalle `Impostazioni`.
+
+Obiettivo: provare fette sperimentali senza cambiare branch o worktree e senza
+spostare per errore il profilo stabile.
+
+Profili attuali:
+
+- `Base`: nessun toggle sperimentale
+- `Liquid Glass UI`: direzione visiva piu liquida e piu separata dal contenuto clinico
+- `AI Stack Preview`: superfici locali dedicate a stack AI e diagnostica
+- `Smart Import Review v2`: percorsi review-first dell'import operatore
+- `SISS Context Preview`: pannello contestuale SISS/FSE sul paziente
+
+Implementazione principale:
+
+- `lib/preview-profiles.ts`
+- `components/preview-profile-chrome.tsx`
+- `app/settings/page.tsx`
+
+Questi profili non cambiano i boundary canonici: servono a verificare fette
+locali, non a dichiararle automaticamente come parte consolidata del prodotto.
+
 ---
 
 ## Data layer e cifratura

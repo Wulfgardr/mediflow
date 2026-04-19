@@ -34,6 +34,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/siss-urls.ts',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'The canonical SISS URL registry is an explicit, user-driven integration boundary and is documented as such.',
+        },
+        {
             path: 'lib/siss.ts',
             pattern: 'https://operatorisiss.servizirl.it/',
             reason: 'Explicit, user-driven SISS portal integration is allowed and documented.',

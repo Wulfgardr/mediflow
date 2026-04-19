@@ -28,7 +28,7 @@ flowchart TB
     WebCrypto["Web Crypto AES-256-GCM"]
     NativeUI["Native macOS Client (SwiftUI arm64)"]
     NativeCrypto["SecuritySession + CryptoService (RAM only)"]
-    PairedClient["Paired client trusted LAN"]
+    PairedClient["Paired Apple client (iPhone/iPad/macOS)"]
   end
   subgraph "Transport"
     HttpLocal["HTTP localhost :3000"]
@@ -76,6 +76,10 @@ flowchart TB
   TLSProxy --> TLSCert
   NetworkAPI --> Settings
 ```
+
+Nota operativa: i client paired non accedono direttamente al database. Il nodo
+autorevole resta il Mac `home-base`, che espone solo superfici documentate e
+oggi ancora `read-only-first`.
 
 ---
 

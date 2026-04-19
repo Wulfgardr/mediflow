@@ -22,6 +22,11 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 4. **Document intelligence prudente**: `documentInsights` resta compat layer,
    mentre gli allegati possono gia persistere un artifact `parse/evidence`
    cifrato consumato in priorita da `AI Patient Insight`.
+5. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
+   congelata per rebuild e filone iPadOS/iOS ricondotto allo stesso boundary
+   `home-base + /api/v1`.
+6. **Preview profiles locali**: alcune fette UI/AI/import/SISS sono verificabili
+   come preview locali senza cambiare il checkout stabile.
 
 ---
 

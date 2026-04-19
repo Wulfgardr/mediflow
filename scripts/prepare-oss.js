@@ -14,9 +14,9 @@ const TO_EXCLUDE_BY_NAME = [
     '.next',
     '.vscode',
     '.DS_Store',
+    '__pycache__',
     '.env',
     '.env.local',
-    'scripts',
     'oss-assets',
     'brain',
     '.gemini',
@@ -25,14 +25,55 @@ const TO_EXCLUDE_BY_NAME = [
 
 const TO_EXCLUDE_BY_PATH = [
     'AGENTS.md',
+    'PLANS.md',
     'docs/agent-attribution.md',
+    'docs/ai-rollout-governance.md',
+    'docs/ai-stack-execution-plan.md',
+    'docs/ai-stack-reliability-review.md',
+    'docs/apple-docs-mcp.md',
+    'docs/clinical-entities-benchmark.md',
+    'docs/clinical-facts-benchmark-observations.md',
+    'docs/cloud-comparator-shadow-eval.md',
+    'docs/document-intelligence-lab.md',
+    'docs/e2e-smoke.md',
+    'docs/adr/0027-ai-task-extraction-envelope-and-local-render.md',
+    'docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md',
+    'docs/adr/0029-ai-model-parliament-and-local-retention-policy.md',
+    'docs/adr/0030-openmed-redaction-and-italian-ner-benchmark-lanes.md',
+    'docs/adr/0031-clinical-entities-evidence-first-medication-problem-lane.md',
+    'docs/adr/0032-document-intelligence-corpus-and-private-shadow-vault.md',
+    'docs/adr/0033-ai-rollout-governance-lane-aware-shadow-mode.md',
+    'docs/adr/0037-network-ai-plane-optional-central-runtime-on-trusted-lan.md',
+    'docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md',
+    'docs/adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md',
+    'docs/adr/0041-openmed-redaction-shadow-adapter.md',
+    'docs/adr/0043-macos-oncology-backbone-prototype.md',
+    'docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md',
     'docs/private',
     'docs/linear-codex-playbook.md',
     'docs/linear-seed-issues.csv',
     'docs/linear-import-open.linear.csv',
     'docs/linear-import-open.mf-core-q2.linear.csv',
     'docs/linear-import-open.mf-parity-q2.linear.csv',
-    'docs/linear-import-open.mf-fse-q2.linear.csv'
+    'docs/linear-import-open.mf-fse-q2.linear.csv',
+    'scripts/cloud-comparator-shadow-eval.test.ts',
+    'scripts/cloud-comparator-shadow-eval.ts',
+    'scripts/codex-mcp-apple-docs-validate.sh',
+    'scripts/linear-import-all.sh',
+    'scripts/linear-import-via-api.mjs',
+    'scripts/mcp-apple-docs-smoke.mjs',
+    'scripts/prepare-linear-import.mjs',
+    'scripts/prepare-oss.js',
+    'scripts/prepare-oss.mjs',
+    'docs/openmed-redaction-benchmark.md',
+    'docs/openmed-toolkit-evaluation.md',
+    'docs/parity-click-map-macos.md',
+    'docs/parity-smoke.md',
+    'docs/patient-concurrency-tests.md',
+    'docs/patient-insight-benchmark.md',
+    'docs/patient-insight-document-troubleshooting.md',
+    'docs/resolver-benchmark.md',
+    'docs/turboquant-runtime-benchmark.md'
 ];
 
 const REPLACEMENTS = [
@@ -44,6 +85,36 @@ const REPLACEMENTS = [
 
 const MARKDOWN_LINK_PATTERN = /(!?)\[([^\]]*)\]\(([^)]+)\)/g;
 const INLINE_DOC_REF_PATTERN = /`([^`\n]*?\.md(?:#[^`\n]+)?)`/g;
+const OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS = [
+    'benchmark:cloud-comparator',
+    'linear:import:all',
+    'linear:import:api',
+    'linear:prepare-import',
+    'mcp:apple-docs:test',
+    'mcp:apple-docs:validate',
+    'prepare:oss',
+    'test:cloud-comparator'
+];
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const PRIVATE_MARKDOWN_LINE_PATTERNS = [
+    ...TO_EXCLUDE_BY_PATH
+        .filter((excludedPath) => excludedPath.endsWith('.md'))
+        .map((excludedPath) => new RegExp(escapeRegExp(path.basename(excludedPath)))),
+    /docs\/private\//,
+    /oss-assets\/README\.md/,
+    /^<!-- Codex: created .* -->$/,
+    /^Fonte canonica del protocollo operativo:$/,
+    /^Questo progetto traccia il codice generato da agent\.$/,
+    /^## Attribution \(Codex \/ agent\)$/,
+    /^Se il codice e scritto principalmente da Codex, marcature richieste:$/,
+    /^Se il codice è scritto principalmente da Codex, marcature richieste:$/,
+    /^- Blocco: `\/\* @Codex \*\/`$/,
+    /^- Riga: `\/\/ @Codex`$/,
+    /^Per aggiunte non banali, aggiungi una entry in `docs\/agent-attribution\.md`\.$/
+];
 
 function normalizePathForMatch(inputPath) {
     return inputPath.split(path.sep).join('/');
@@ -130,6 +201,7 @@ function sanitizeMarkdownReferences(targetDir) {
     let updatedFiles = 0;
     let strippedLinks = 0;
     let downgradedInlineRefs = 0;
+    let removedInternalLines = 0;
 
     for (const markdownFile of markdownFiles) {
         const original = fs.readFileSync(markdownFile, 'utf8');
@@ -165,6 +237,18 @@ function sanitizeMarkdownReferences(targetDir) {
             return `\`${docRef}\` (private)`;
         });
 
+        const filteredLines = [];
+        for (const line of content.split('\n')) {
+            if (PRIVATE_MARKDOWN_LINE_PATTERNS.some((pattern) => pattern.test(line))) {
+                removedInternalLines += 1;
+                continue;
+            }
+            filteredLines.push(line);
+        }
+        content = filteredLines.join('\n');
+        content = content.replace(/\n{3,}/g, '\n\n');
+        content = content.replace(/\n---\n(?:\s*\n)*---\n/g, '\n---\n');
+
         if (content !== original) {
             fs.writeFileSync(markdownFile, content, 'utf8');
             updatedFiles += 1;
@@ -173,8 +257,49 @@ function sanitizeMarkdownReferences(targetDir) {
 
     console.log(
         `Sanitized markdown references: ${updatedFiles} files, ` +
-        `${strippedLinks} link(s) downgraded, ${downgradedInlineRefs} inline ref(s) downgraded.`
+        `${strippedLinks} link(s) downgraded, ${downgradedInlineRefs} inline ref(s) downgraded, ` +
+        `${removedInternalLines} internal line(s) removed.`
     );
+}
+
+function sanitizePackageJsonForOss(targetDir) {
+    const packageJsonPath = path.join(targetDir, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) return;
+
+    const original = fs.readFileSync(packageJsonPath, 'utf8');
+    const parsed = JSON.parse(original);
+
+    if (parsed.private === true) {
+        parsed.private = false;
+    }
+
+    if (parsed.scripts && typeof parsed.scripts === 'object') {
+        for (const scriptName of OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS) {
+            delete parsed.scripts[scriptName];
+        }
+    }
+
+    const sanitized = `${JSON.stringify(parsed, null, 2)}\n`;
+    if (sanitized !== original) {
+        fs.writeFileSync(packageJsonPath, sanitized, 'utf8');
+        console.log('Sanitized package.json for OSS.');
+    }
+}
+
+function sanitizeContributingForOss(targetDir) {
+    const contributingPath = path.join(targetDir, 'CONTRIBUTING.md');
+    if (!fs.existsSync(contributingPath)) return;
+
+    const original = fs.readFileSync(contributingPath, 'utf8');
+    const sanitized = original
+        .replace(/\n## Export OSS \(repo pubblica\)[\s\S]*$/m, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\s+$/g, '\n');
+
+    if (sanitized !== original) {
+        fs.writeFileSync(contributingPath, sanitized, 'utf8');
+        console.log('Sanitized CONTRIBUTING.md for OSS.');
+    }
 }
 
 function copyRecursive(src, dest, relPath = '') {
@@ -241,6 +366,8 @@ try {
 
     console.log('Sanitizing internal markdown references...');
     sanitizeMarkdownReferences(TARGET_DIR);
+    sanitizePackageJsonForOss(TARGET_DIR);
+    sanitizeContributingForOss(TARGET_DIR);
 
     console.log('Done! Open Source version ready at: ' + TARGET_DIR);
 } catch (e) {

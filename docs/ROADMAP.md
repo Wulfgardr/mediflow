@@ -4,6 +4,10 @@
 > v0.5.0 (release corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
+> [!NOTE]
+> Per chi arriva dalla `v0.3` pubblica, il salto da leggere oggi è `0.3 -> 0.5`.
+> `v0.4.0` resta una tappa tecnica decisiva, ma non è più la cornice narrativa giusta per il frontespizio del progetto.
+
 ---
 
 ## Fatto (v0.3.0)
@@ -42,6 +46,7 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 * **Governance AI locale piu esplicita**: task contract condiviso, benchmark headless, model stack/model parliament e separazione netta tra runtime operativo e lane `benchmark-only`.
 * **Release hygiene ripristinata**: `lint` torna confinato ai sorgenti e i benchmark CLI generativi tornano eseguibili su `main`.
 * **Narrativa prodotto riallineata**: `v0.4.0` resta la baseline storica, `v0.5.0` chiude il consolidamento AI/UI e il ciclo successivo si sposta su home-base e client native.
+* **Boundary piu chiari**: SISS/FSE, multi-device e stack AI vengono raccontati per quello che sono davvero, senza attribuire a MediFlow integrazioni o automatismi non ancora dimostrati.
 
 > Nota: le lane `benchmark-only` (`OpenMed redaction`, `clinical_entities`, challenger generativi non promossi) restano fuori dal runtime operativo e dal claim principale della release.
 
@@ -64,7 +69,13 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 * **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
 * **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
-* **App iPad/iPhone**: consultazione rapida in mobilita coerente con il modello home-base.
+* **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
+
+### Profili locali di preview
+
+* **Preview profilo interfaccia**: confronto tra baseline clinica e direzione `Liquid`.
+* **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
+* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
 
 ### Interazione vocale
 

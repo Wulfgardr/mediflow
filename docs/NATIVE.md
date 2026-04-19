@@ -5,6 +5,7 @@
 > [!IMPORTANT]
 > Dopo `v0.4.0` il filone macOS/parity e **congelato**: la shell nativa entra in **riscrittura controllata** ("demolizione controllata").
 > Questo documento resta canonico per capire lo snapshot esistente, il contratto `/api/v1`, il trasporto TLS locale e i vincoli security da preservare nel rebuild.
+> La direzione Apple, pero, e oggi piu ampia: macOS resta il nodo di partenza, mentre iPadOS/iOS rientrano nello stesso disegno `home-base + paired client` descritto nei documenti canonici.
 
 Riferimenti correlati:
 
@@ -23,6 +24,7 @@ Il client nativo documentato qui non e piu la base per nuova delivery incrementa
 * **Snapshot operativo esistente**: il vecchio client ha gia superato il read-only e contiene CRUD clinico essenziale, tooling AI locale e lock screen con PIN.
 * **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
 * **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
+* **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
 
 Lo snapshot corrente supporta comunque:
 

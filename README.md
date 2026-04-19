@@ -1,31 +1,48 @@
 # MediFlow v0.5.0
 
 > Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
-> Offline, privata, veloce.
+> Dati locali, flusso rapido, cloud solo se scelto e documentato.
 
 ---
 
 ## Perché esiste
 
 Sono **Leo**, medico di distretto.
-MediFlow nasce da un problema semplice: i software clinici spesso sono lenti, opachi e troppo dipendenti da internet.
+MediFlow nasce da un problema molto concreto: nel lavoro clinico quotidiano i software sono spesso lenti, poco leggibili e troppo dipendenti da internet.
 
-Qui l'obiettivo è l'opposto: lavorare bene, in locale, con controllo pieno dei dati.
+Qui l'idea è l'opposto: lavorare bene, in locale, con controllo pieno dei dati e con una struttura abbastanza solida da crescere senza diventare opaca.
 
-## Stato attuale di `main`
+## Dove siamo adesso
 
-- `main` contiene gia la first slice `network home-base` read-only: modalita esplicita in Settings, capability discovery, pairing PHI-safe e primo `/api/v1/network/patients*`, senza ancora write remoto o sync.
-- La document intelligence ha avviato la direzione `document evidence ledger`: l'upload documento puo produrre un artifact `parse/evidence` cifrato sugli allegati, mentre `patients.documentInsights` resta la projection/compat layer iniziale.
-- La shell locale si riallinea meglio dopo cambi branch/revision/worktree: fingerprint di sorgente, endpoint `/api/system/revision`, reload soft delle tab attive e reset selettivo della cache `.next`.
+`v0.5` è il punto che mette in ordine il salto vero rispetto alla `v0.3` esposta pubblicamente.
+`v0.4` resta una tappa tecnica importante, ma non è più il frontespizio giusto per raccontare lo stato del progetto.
 
----
+Su `main`, oggi, ci sono già queste cose:
 
-## Cosa garantisce
+- **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso operativo quotidiano più leggibile;
+- **contratto locale `/api/v1`** più esplicito, stabile e riusabile per i client Apple;
+- **document intelligence reviewable**: smart import, nuova anagrafica da documento e primo artifact `parse/evidence`;
+- **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
+- **modalità `network home-base` read-only**: pairing esplicito, capability discovery e primo accesso remoto ai pazienti da client paired;
+- **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
+- **preview profiles locali** per provare interfaccia, stack AI, review import e contesto SISS senza cambiare checkout.
 
-1. **Dati sotto controllo**: tutto resta sul tuo computer (SQLite cifrato), anche senza connessione.
-2. **Privacy reale**: cifratura *zero-knowledge* (AES-256-GCM). Senza PIN i dati non sono leggibili.
-3. **AI locale**: OCR e sintesi cliniche via modelli locali (Ollama), senza egress verso servizi esterni di default.
-4. **Focus operativo**: interfaccia clinica pulita, pensata per fare in fretta e con meno attrito.
+## Cosa cambia rispetto alla `v0.3`
+
+Il salto, in breve, è questo:
+
+1. **Più struttura sul dato**: SQLite locale, backup artifact, audit trail, contratti API più chiari.
+2. **Più prudenza sui flussi AI**: niente automatismi opachi; import, insight e sintesi restano reviewable e separati dalle lane sperimentali.
+3. **Più chiarezza sui boundary**: home-base, FSE/SISS, runtime AI, rebuild native e multi-device sono raccontati per quello che sono davvero.
+4. **Più continuità operativa**: la web app resta la base forte, mentre il lavoro Apple-native rientra in un disegno coerente invece di restare un ramo laterale.
+
+## Confini dichiarati, senza ambiguità
+
+- **Local-first di default**: nessuna dipendenza cloud obbligatoria.
+- **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
+- **Apple clients**: oggi la superficie più solida è la web app sul Mac; la shell macOS storica è congelata e va verso un rebuild controllato; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
+- **SISS/FSE**: oggi MediFlow orchestra il contesto e richiama i percorsi ufficiali. Non dichiara ancora una integrazione nativa regionale certificata.
+- **Preview profiles**: sono toggle locali di prova, utili per verificare fette sperimentali, non claim di prodotto già consolidati.
 
 ---
 
@@ -33,74 +50,69 @@ Qui l'obiettivo è l'opposto: lavorare bene, in locale, con controllo pieno dei 
 
 ### 🩺 Per il medico
 
-Vuoi solo installarlo e usarlo?
 - Manuale operativo: [docs/MANUALE.md](./docs/MANUALE.md)
+- FAQ rapida: [docs/FAQ.md](./docs/FAQ.md)
 
 ### 🧑‍💻 Per sviluppatori / contributori
 
-Inizia da qui (ordine consigliato):
+Inizia da qui:
 
-1. **Indice canonico della documentazione (cosa è fonte di verità)**
+1. **Mappa canonica della documentazione**
    - [docs/README.md](./docs/README.md)
-   - [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown + sintesi)
+   - [docs/markdown-index.md](./docs/markdown-index.md)
 
-2. **Visione e confini dell'architettura**
+2. **Visione e confini**
    - [ARCHITECTURE.md](./ARCHITECTURE.md)
-
-3. **Sicurezza (policy, redaction, scanning, disclosure)**
    - [SECURITY.md](./SECURITY.md)
 
-4. **Come contribuire e come avviare il progetto**
-   - [CONTRIBUTING.md](./CONTRIBUTING.md)
+3. **Flusso reale del sistema**
+   - [docs/walkthrough.md](./docs/walkthrough.md)
+   - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md)
+   - [docs/system_architecture.md](./docs/system_architecture.md)
 
-5. **Decisioni architetturali (ADR)**
-   - [docs/adr/](./docs/adr/README.md)
-
-6. **Piano di lavoro in corso (engineering plan, non product roadmap)**
+4. **Roadmap e stato**
+   - [docs/ROADMAP.md](./docs/ROADMAP.md)
    - [PLANS.md](./PLANS.md)
 
-7. **Walkthrough end-to-end (web + native + servizi locali)**
-   - [docs/walkthrough.md](./docs/walkthrough.md)
+5. **Decisioni architetturali**
+   - [docs/adr/](./docs/adr/README.md)
 
-8. **Approfondimenti tecnici**
-   - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md)
-   - [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
-   - [docs/system_architecture.md](./docs/system_architecture.md)
+6. **Apple clients, parity e testing**
+   - [docs/NATIVE.md](./docs/NATIVE.md)
+   - [docs/native-testing.md](./docs/native-testing.md)
+   - [docs/parity-smoke.md](./docs/parity-smoke.md)
+   - [docs/parity-click-map-macos.md](./docs/parity-click-map-macos.md)
+
+7. **Compliance, terminologie e boundary regionali**
+   - [docs/COMPLIANCE.md](./docs/COMPLIANCE.md)
    - [docs/FSE2-terminology-roadmap.md](./docs/FSE2-terminology-roadmap.md)
+   - [docs/siss-baseline.md](./docs/siss-baseline.md)
+   - [docs/siss-ssi-a2a-feasibility.md](./docs/siss-ssi-a2a-feasibility.md)
+   - [docs/siss-modulo-prescrittivo-regionale.md](./docs/siss-modulo-prescrittivo-regionale.md)
 
-### ⚖️ Compliance & privacy
+---
 
-GDPR, sicurezza dei dati e interoperabilità (FHIR R4):
-- [docs/COMPLIANCE.md](./docs/COMPLIANCE.md)
-
-### 🍏 Client nativo macOS
+## 🍏 Direzione Apple: macOS, iPadOS, iOS
 
 > [!IMPORTANT]
-> Nel ciclo `v0.5.0` il filone macOS/parity resta sospeso: la shell nativa continua la **riscrittura controllata** ("demolizione controllata").
-> Il contratto locale `/api/v1`, il trasporto TLS e i vincoli di sicurezza restano validi; la delivery di nuove feature native sul vecchio shell e congelata fino al rebuild.
-> In parallelo, `main` porta avanti la slice `home-base` read-only sul backend web/API (`/api/v1/network`) per preparare pairing, capability discovery e consultazione multi-device.
+> Il progetto non sta scegliendo tra web app e app Apple: sta costruendo uno stack unico.
+> La web app resta la superficie primaria di oggi; il contratto `/api/v1`, il trasporto TLS locale e il boundary `home-base` sono la base comune per il seguito.
 
-- [docs/NATIVE.md](./docs/NATIVE.md)
-- [docs/native-testing.md](./docs/native-testing.md)
-- [docs/parity-smoke.md](./docs/parity-smoke.md)
-- [docs/parity-click-map-macos.md](./docs/parity-click-map-macos.md)
-- [docs/native-setup.md](./docs/native-setup.md)
-- [docs/native-launch.md](./docs/native-launch.md)
-- [docs/local-api-tls.md](./docs/local-api-tls.md)
+Situazione attuale:
 
-### 🗺 Roadmap prodotto
-
-- [docs/ROADMAP.md](./docs/ROADMAP.md)
+- **macOS**: esiste uno shell storico, ma non è il punto su cui stratificare le prossime feature;
+- **iPadOS / iOS**: rientrano nel filone paired-client sul nodo `home-base`, ancora in definizione operativa;
+- **multi-device**: la first slice già disponibile è `read-only-first`, con pairing esplicito e senza write remoto o sync automatico.
 
 ---
 
 ## Installazione rapida (computer)
 
-### Prerequisiti (minimi)
+### Prerequisiti minimi
 
-- Node.js (consigliato: **v20+**)
+- Node.js (**v20+** consigliato)
 - Docker Desktop (**opzionale**, solo per ICD-11)
-- Ollama (**opzionale**, solo per AI/OCR)
+- Ollama (**opzionale**, solo per AI/OCR locale)
 
 ### Avvio tutto-in-uno
 
@@ -114,10 +126,10 @@ npm install
 
 Apri: `http://localhost:3000`
 
-> Lo script avvia anche Ollama e ICD-11 (se disponibili).  
-> Se non sono installati, MediFlow resta utilizzabile con funzionalità ridotte.
+> Lo script avvia anche Ollama e ICD-11 se presenti.
+> Se non sono installati, MediFlow resta usabile con funzionalità ridotte.
 
-### Verifiche rapide (per dev)
+### Verifiche rapide
 
 ```bash
 npm run lint
@@ -130,9 +142,9 @@ npm run build
 
 MediFlow è un progetto open source rilasciato con licenza MIT.
 
-È progettato per essere **Privacy by Design**, ma l'uso in ambiente clinico reale richiede che tu faccia le tue valutazioni di conformità (DPIA, registro trattamenti, misure organizzative, ecc.) come Titolare del Trattamento.
+È pensato in ottica **Privacy by Design**, ma l'uso in ambiente clinico reale richiede comunque valutazioni organizzative e legali del Titolare del Trattamento.
 
-**Per impostazione predefinita, i dati non lasciano il dispositivo.**  
+**Per impostazione predefinita, i dati non lasciano il dispositivo.**
 La garanzia tecnica è nel progetto; la conformità operativa dipende anche dal contesto in cui viene usato.
 
 ---

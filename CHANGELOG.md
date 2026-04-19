@@ -5,7 +5,7 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-04-07
+## [Unreleased] - 2026-04-19
 
 ### ✨ Aggiunto
 
@@ -27,6 +27,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 ### 📚 Documentazione
 
 - **Repo/GitHub riallineati al runtime reale**: README, piani, walkthrough, topologia dati, roadmap e sintesi architetturale descrivono ora `home-base` read-only, artifact `parse/evidence`, comparator/shadow lane e guard di revisione della shell locale.
+- **Narrativa `v0.5` riallineata tra private e OSS**: README, FAQ, roadmap, architettura e mappe documentali chiariscono che il salto pubblico rilevante e `v0.3 -> v0.5`, esplicitano preview profiles locali, boundary SISS attuale e direzione `macOS + iPadOS/iPhone` tramite `home-base`.
+- **Export OSS piu netto**: la preparazione della repo pubblica omette anche il piano operativo di breve e ripulisce i riferimenti ai documenti interni di orchestrazione/attribution, lasciando in pubblico solo materiale di prodotto, architettura e uso reale.
 
 ## [0.5.0] - 2026-03-29
 
@@ -74,7 +76,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Patient PDF report**: report esteso con sezioni cliniche più complete e copertura automatica sulle sezioni generate.
 - **Clinical facts benchmark**: introdotto il corpus sintetico per osservazioni `LOINC/UCUM`, con decisione `hybrid` di default e fallback `rules` tracciato.
 - **Stabilizzazione web/core pre-version-bump**: normalizzazione condivisa dei payload paziente, parsing condiviso dei campi strutturati, gate `typecheck` stabile e scomposizione incrementale dei file più densi (`SecurityProvider`, `SettingsPage`).
-- **Tooling di progetto**: playbook Linear/Codex, import backlog automatizzato e controllo più esplicito del flusso OSS/private.
+- **Tooling di progetto**: playbook operativo interno, import backlog automatizzato e controllo piu esplicito del flusso OSS/private.
 
 ### 🐛 Risolto
 
@@ -129,7 +131,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 ### 🙏 Tributo OpenHospital
 
 - Questo rilascio è anche un tributo a OpenHospital: non una copia 1:1, ma un percorso di apprendimento e adattamento di pratiche mature (guardrail, integrità dati, contratti API espliciti, auditabilità) al modello local-first/zero-knowledge di MediFlow.
-- La traiettoria di allineamento resta esplicita e incrementale, con evidenza operativa nel workspace locale `docs/private/openhospital-alignment/`.
+- La traiettoria di allineamento resta esplicita e incrementale, con evidenza operativa mantenuta nel workspace privato di lavoro.
 
 ### 🗓 Timeline (ieri e oggi)
 

@@ -41,7 +41,13 @@ MediFlow è un **sistema ibrido locale**:
   - Ollama per AI/OCR (localhost)
   - ICD-11 Docker API per ricerca diagnosi (localhost)
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
-- Il client nativo macOS (SwiftUI) usa lo stesso backend via proxy HTTPS locale.
+- Strategia client Apple:
+  - la web app sul Mac resta la superficie primaria di oggi
+  - la shell nativa macOS esistente resta uno snapshot da preservare, non il ramo da stratificare
+  - i futuri client iPadOS/iPhone condividono lo stesso boundary `home-base + /api/v1`, non un accesso diretto al database remoto
+- Le integrazioni regionali (`SISS`, `FSE`) restano dentro un boundary esplicito:
+  handoff contestuale e percorsi `webapp-assisted` finché non esiste un canale
+  qualificato `SSI/A2A` documentato e sostenibile.
 
 Il default resta **local-only sul singolo computer**. Se l'operatore attiva la
 modalita `network-home-base`, lo stesso nodo espone anche `/api/v1/network/*`
@@ -108,7 +114,7 @@ flowchart TB
   subgraph "Client"
     Web["Web UI (Browser)"]
     Mac["Native macOS (SwiftUI)"]
-    Peer["Paired client trusted LAN"]
+    Peer["Paired Apple client (iPhone/iPad/macOS)"]
   end
 
   subgraph "Transport"
@@ -159,6 +165,8 @@ flowchart TB
 - `local-only` come default e `network-home-base` come opt-in paired/read-only-first.
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - Principio local-only: nessuna dipendenza cloud di default.
+- Boundary SISS/FSE: oggi orchestrazione locale + percorsi ufficiali; niente claim
+  di integrazione regionale nativa certificata fuori dal perimetro documentato.
 
 ---
 

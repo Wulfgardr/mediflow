@@ -1,114 +1,62 @@
-# MediFlow (Presentation)
+# MediFlow v0.5.0
 
-Hi, I am Leo, a community care physician from Italy.
-MediFlow started from a practical need: manage clinical data, therapies and notes with full local control, without cloud dependency by default.
+> Cartella clinica local-first.
+> Privata, veloce, concreta.
 
-MediFlow is a local-first medical record system focused on **privacy**, **speed** and **clinical usability**.
-The base product is in Italian (AIFA references, local workflows), but the architecture is modular and open to adaptation.
+MediFlow nasce da un'esigenza semplice: gestire dati clinici, terapie, note e documenti senza dipendere dal cloud per fare il lavoro quotidiano.
 
-MediFlow also draws inspiration from mature open-source healthcare projects (including OpenHospital), adapted to its own local-first and zero-knowledge direction.
+Il progetto è pensato prima di tutto per il contesto italiano, ma la struttura resta modulare e leggibile.
 
 ![MediFlow Screenshot](screenshot.png)
 
-## Core Philosophy
+## Cosa trovi oggi
 
-* **Privacy First**: patient data stays on device unless explicitly exported.
-* **Speed by Design**: local-first architecture keeps interactions immediate.
-* **Clinical Focus**: tools built around real daily workflows.
+- **web app locale** come superficie primaria;
+- **SQLite cifrato** con approccio zero-knowledge;
+- **backup, audit e contratto `/api/v1`** più espliciti;
+- **AI locale** per insight e OCR, senza egress di default;
+- **import documentale reviewable** e smart import prudente;
+- **modalità `home-base` read-only** per client Apple paired;
+- **boundary SISS/FSE dichiarato bene**: handoff contestuale e percorso prescrittivo `webapp-assisted`, non integrazione regionale nativa già risolta;
+- **preview profiles locali** per verificare fette sperimentali senza sporcare il checkout stabile.
 
----
+## Il salto da `v0.3` a `v0.5`, in breve
 
-## Compliance & GDPR (Work in Progress)
+Per chi arriva dalla `v0.3` pubblica, il salto vero è qui:
 
-The project follows **Privacy by Design** and **Data Minimization** principles:
+- più struttura sul dato;
+- più chiarezza sui boundary;
+- più prudenza sui flussi AI;
+- più direzione sul lavoro multi-device;
+- meno storytelling ambiguo su ciò che è già pronto e ciò che è ancora in definizione.
 
-* **Local-first architecture**
-* **Encryption at rest**
-* **Zero-knowledge key handling**
+## Cose che non stiamo fingendo
 
-Full GDPR compliance also depends on legal and organizational processes outside software scope.
-MediFlow provides technical controls and workflows, but does not replace legal validation by the Data Controller.
+- **No cloud obbligatorio**: il default resta locale.
+- **No app iPad/iPhone già finite**: la direzione c'è, ma il perimetro operativo è ancora `home-base + paired client`, read-only-first.
+- **No integrazione SISS/FSE certificata dichiarata senza prove**: oggi il percorso reale è contestuale e `webapp-assisted` sui canali ufficiali.
 
----
+## Documentazione
 
-## Key Features (v0.3.x)
+- [FAQ](./docs/FAQ.md)
+- [Roadmap](./docs/ROADMAP.md)
+- [Compliance](./docs/COMPLIANCE.md)
+- [Document map](./docs/README.md)
 
-### 1. Onboarding and Security
+> La repo OSS pubblica solo il materiale destinato a stare davvero in chiaro.
+> I documenti interni di orchestrazione e il piano engineering restano fuori da questa facciata.
 
-A new **Onboarding Wizard** guides you through the initial setup:
+## Avvio rapido
 
-* **Privacy acceptance** flow
-* **Doctor/clinic profile setup**
-* **Mandatory secure PIN** for key protection
-
-### 2. Data Integrity (Backup and Restore)
-
-* **Export**: encrypted backup to `.mediflow` JSON.
-* **Import**: restore flow for device migration (destructive operation).
-
-### 3. AI and ICD Integration
-
-* **ICD-11 and ICD-9** support.
-* **Local AI (Ollama)** for summaries/OCR without cloud egress by default.
-
----
-
-## Process Architecture
-
-### System Orchestration (Docker)
-
-Container interactions in the all-in-one deployment:
-
-```mermaid
-graph TD
-    subgraph Docker_Host_Mac
-        subgraph MediFlow_Network
-            App["Next.js App (Port 3000)"]
-            ICD["ICD-API (Port 8888)"]
-            Ollama["Ollama AI (Port 11434)"]
-
-            App -->|REST Proxy| ICD
-            App -->|REST Proxy| Ollama
-        end
-        
-        Browser["User Browser"] -->|HTTP| App
-        Browser -->|Direct Fetch - Mixed| ICD
-    end
-
-    Volume["Ollama Models (Volume)"] -.-> Ollama
+```bash
+git clone https://github.com/Wulfgardr/mediflow
+cd mediflow
+npm install
+./Start_MediFlow.command
 ```
 
-### Security and Privacy Cycle
+Apri `http://localhost:3000`.
 
-Local-first flow used for data protection:
-
-```mermaid
-graph LR
-    Input["Dati Sensibili (Paziente/Note)"] -->|Input UI| Encrypt["AES-GCM (Browser Crypto API)"]
-    Encrypt -->|Ciphertext| Store["IndexedDB (Storage Locale)"]
-    
-    subgraph Backup_Process
-        Store -->|Raw Export| JSON["File .mediflow (Encrypted JSON)"]
-        Keys["Protezione Chiavi (Salt + Wrapped Key)"] --> JSON
-    end
-
-    JSON -->|User Responsibility| Safe["Chiavetta USB / Vault"]
-```
-
----
-
-## Technical Overview
-
-* **Stack**: Next.js, Tailwind CSS, local services.
-* **Architecture**: local hybrid model (app + local APIs/services).
-
-## Getting Started (Developers)
-
-1. **Clone**: `git clone https://github.com/Wulfgardr/mediflow.git`
-2. **Install**: `npm install`
-3. **Run**: `npm run dev`
-4. **Setup Drugs**: Go to Settings -> Upload `confezioni.csv` (available from AIFA).
-
-## License
+## Licenza
 
 MIT License.

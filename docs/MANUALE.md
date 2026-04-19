@@ -113,7 +113,7 @@ Se lavori su Mac, puoi usare anche il client nativo.
 ## FAQ
 
 **Posso usarlo su iPad?**
-Stiamo lavorando ai client dedicati. Per ora il computer principale è l'home base.
+Stiamo lavorando ai client dedicati. Per ora il computer principale resta l'home base; iPadOS e iPhone sono in definizione sopra il contratto locale `/api/v1`, senza accesso diretto al database remoto.
 
 **Se mi si rompe il computer?**
 I dati sono nel file `medical.db`.
