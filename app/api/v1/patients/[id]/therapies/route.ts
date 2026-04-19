@@ -4,14 +4,18 @@ import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
+import { normalizeTherapyCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
 import {
     normalizeTherapyStatus,
-    parseTherapyStatus,
     therapyStatusFilterValues,
 } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -89,39 +93,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
-        const { id } = await params;
-        const body = await request.json();
         /* @Codex */
-        const normalizedStatus = body.status === undefined ? 'active' : parseTherapyStatus(body.status);
-        if (body.status !== undefined && !normalizedStatus) {
-            return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
-        }
-        const newId = body.id || uuidv4();
-
-        await dbServer.insert(therapies).values({
+        const auditSession = await requireLocalApiActorSession(request);
+        const { id } = await params;
+        const body = await request.json() as Record<string, unknown>;
+        /* @Codex */
+        const auditBody = body;
+        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+        const normalized = normalizeTherapyCreateInput(body, {
             id: newId,
             patientId: id,
-            drugName: body.drugName,
-            /* @Codex */
-            aic: typeof body.aic === 'string' ? body.aic : null,
-            /* @Codex */
-            atc: typeof body.atc === 'string' ? body.atc : null,
-            /* @Codex */
-            activePrinciple: body.activePrinciple ?? null,
-            dosage: body.dosage,
-            /* @Codex */
-            motivation: body.motivation ?? null,
-            /* @Codex */
-            diagnosisCode: body.diagnosisCode ?? null,
-            /* @Codex */
-            diagnosisName: body.diagnosisName ?? null,
-            status: normalizedStatus ?? 'active',
-            startDate: new Date(body.startDate),
-            endDate: body.endDate ? new Date(body.endDate) : null,
-            createdAt: new Date()
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        await dbServer.insert(therapies).values(normalized.values);
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'therapy.created',
+                subjectType: 'therapy',
+                subjectRef: normalized.values.id,
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody, ['id']),
+                },
+            },
+            '[MediFlow] Therapy audit write failed:',
+        );
+
+        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/therapies error:', error);
         return NextResponse.json({ error: 'Failed to create therapy' }, { status: 500 });

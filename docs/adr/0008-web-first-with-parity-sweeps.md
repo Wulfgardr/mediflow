@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-19 -->
 # ADR 0008: Web-first delivery con parity sweep periodici su macOS
 
 Date: 2026-02-19  
@@ -49,7 +48,6 @@ Modello operativo:
 - sviluppo ordinario: **web-first**
 - convergenza: **parity sweep dedicati** (come finestra corrente)
 - drift ammesso solo temporaneamente, mai permanente sui moduli core
-- backlog parity obbligatoriamente tracciato in `docs/parity-matrix.md` e `PLANS.md`
 
 Parita target per moduli core:
 - stesse funzioni (`view/add/edit/delete/filter`)
@@ -67,6 +65,5 @@ Parita target per moduli core:
 ## First Thin Slice
 
 1. Marcare ADR 0007 come superseded.
-2. Formalizzare in `PLANS.md` il modello web-first + parity sweep.
 3. Mantenere baseline e gap in `docs/parity-matrix.md`.
 4. Eseguire sweep corrente su `P1 -> P6` con check capability-by-capability.

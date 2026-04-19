@@ -2,6 +2,13 @@
 
 > GDPR, privacy e standard clinici in pratica.
 
+Riferimenti correlati:
+
+- [SECURITY.md](../SECURITY.md) (policy sicurezza e redazione)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) (confini architetturali stabili)
+- [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
+- [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md) (mappa documentale)
+
 ---
 
 ## 1. GDPR e privacy

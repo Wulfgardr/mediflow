@@ -3,18 +3,49 @@
 
 import { encryptData, decryptData } from './security';
 import { notifyDbChange } from './live-query';
-
+/* @Codex */
+import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
+/* @Codex */
+import { revivePatientStructuredFields } from './patient-structured-fields';
+/* @Codex */
+import type { BackupRestorePreflightResult } from './backup-restore-preflight';
+/* @Codex */
+import type { DocumentEvidencePack } from './document-evidence-pack';
 // Document insight from OCR + AI synthesis
+/* @Codex */
+export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
+
+/* @Codex */
+export interface DocumentDiagnosisSuggestion {
+    code: string;
+    description: string;
+    system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+    evidence?: string;
+    confidence?: 'high' | 'medium' | 'low';
+}
+
 export interface DocumentInsight {
     id: string;
+    /* @Codex */
+    attachmentId?: string;
     date: Date;
     fileName: string;
     rawMarkdown: string;  // DeepSeek-OCR output
-    summary: string;      // MedGemma synthesis
+    summary: string;      // Qwen synthesis on top of OCR text
+    /* @Codex */
+    evidencePack?: DocumentEvidencePack;
+    quality?: {
+        level: DocumentQualityLevel;
+        reason?: string;
+    };
     extractedData?: {
         diagnosis?: string;
         medications?: string[];
         labs?: Record<string, string>;
+        diagnoses?: DocumentDiagnosisSuggestion[];
+    };
+    autofill?: {
+        appliedDiagnoses?: string[];
     };
 }
 
@@ -41,6 +72,8 @@ export interface Patient {
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
     ambulatoryId?: string;
+    /* @Codex */
+    version?: number;
 }
 
 export interface PatientAmbulatory {
@@ -93,9 +126,9 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     observations: ['notes'],
     conversations: ['title'],
-    messages: ['content', 'reasoning'],
+    messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
     /* @Codex */
-    attachments: ['name', 'path', 'data', 'summarySnapshot']
+    attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
 };
 
 class ApiTable<T> {
@@ -191,6 +224,11 @@ class ApiTable<T> {
     }
 
     /* @Codex */
+    private buildVersionConflictError(payload: PatientVersionConflictPayload): ApiConflictError {
+        return new ApiConflictError(payload);
+    }
+
+    /* @Codex */
     private emitChange() {
         notifyDbChange();
     }
@@ -220,20 +258,46 @@ class ApiTable<T> {
 
     /* @Codex */
     async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
+        /* @Codex */
+        const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
+        if (this.tableName === 'patients' && typeof maybeVersion !== 'number') {
+            throw new Error('Missing required version for patient update');
+        }
+
         const encryptedChanges = await this.encryptItem(changes as T, true);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(encryptedChanges)
         });
-        if (!res.ok) throw new Error("Failed to update item");
+        if (!res.ok) {
+            const payload = await res.json().catch(() => null);
+            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+                throw this.buildVersionConflictError(payload);
+            }
+            throw new Error("Failed to update item");
+        }
         if (!options?.suppressNotify) this.emitChange();
     }
 
     /* @Codex */
-    async delete(id: string, options?: { suppressNotify?: boolean }): Promise<void> {
-        const res = await fetch(`${this.endpoint}/${id}`, { method: 'DELETE' });
+    async delete(id: string, options?: { suppressNotify?: boolean; version?: number }): Promise<void> {
+        if (this.tableName === 'patients' && typeof options?.version !== 'number') {
+            throw new Error('Missing required version for patient delete');
+        }
+
+        const init: RequestInit = { method: 'DELETE' };
+        if (typeof options?.version === 'number') {
+            init.headers = { 'Content-Type': 'application/json' };
+            init.body = JSON.stringify({ version: options.version });
+        }
+
+        const res = await fetch(`${this.endpoint}/${id}`, init);
         if (!res.ok) {
+            const payload = await res.json().catch(() => null);
+            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+                throw this.buildVersionConflictError(payload);
+            }
             throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
         }
         if (!options?.suppressNotify) this.emitChange();
@@ -291,7 +355,16 @@ class ApiTable<T> {
             throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
         }
 
-        await Promise.all(ids.map((id) => this.delete(id, { suppressNotify: true })));
+        await Promise.all(items.map((item) => {
+            const id = this.getItemIdentifier(item);
+            if (!id) {
+                throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
+            }
+            const version = this.tableName === 'patients'
+                ? this.getPatientVersion(item)
+                : undefined;
+            return this.delete(id, { suppressNotify: true, version });
+        }));
         if (ids.length > 0) this.emitChange();
     }
 
@@ -302,6 +375,13 @@ class ApiTable<T> {
         const record = item as Record<string, unknown>;
         const candidate = record.id ?? record.key ?? record.code ?? record.aic;
         return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : null;
+    }
+
+    /* @Codex */
+    private getPatientVersion(item: unknown): number | undefined {
+        if (this.tableName !== 'patients' || !item || typeof item !== 'object') return undefined;
+        const record = item as Record<string, unknown>;
+        return typeof record.version === 'number' ? record.version : undefined;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -369,6 +449,10 @@ class ApiTable<T> {
                 }
             }
         }
+
+        if (this.tableName === 'patients' && item && typeof item === 'object') {
+            return revivePatientStructuredFields(item);
+        }
         return item;
     }
 }
@@ -426,38 +510,55 @@ class MedicalApiClient {
 
 export const db = new MedicalApiClient();
 
+/* @Codex */
+export class ApiConflictError extends Error {
+    readonly payload: PatientVersionConflictPayload;
+
+    constructor(payload: PatientVersionConflictPayload) {
+        super('Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova.');
+        this.name = 'ApiConflictError';
+        this.payload = payload;
+    }
+}
+
+/* @Codex */
+export class BackupRestorePreflightError extends Error {
+    readonly preflight: BackupRestorePreflightResult;
+
+    constructor(message: string, preflight: BackupRestorePreflightResult) {
+        super(message);
+        this.name = 'BackupRestorePreflightError';
+        this.preflight = preflight;
+    }
+}
+
 export async function exportRawDatabase() {
-    console.warn("Export raw database not yet implemented for SQLite adapter");
-    return new Blob(["SQLite Backup Not Implemented"], { type: "text/plain" });
+    const response = await fetch('/api/system/backup-restore', { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`Failed to export backup: ${response.status} ${response.statusText}`);
+    }
+    return await response.text();
 }
 
 export async function importRawDatabase(jsonString: string) {
-    try {
-        const data = JSON.parse(jsonString);
+    const response = await fetch('/api/system/backup-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonString,
+    });
 
-        if (data.patients && Array.isArray(data.patients)) {
-            await db.patients.bulkPut(data.patients);
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const errorMessage = typeof payload?.error === 'string'
+            ? payload.error
+            : `Restore failed: ${response.status} ${response.statusText}`;
+        if (payload?.preflight && typeof payload.preflight === 'object') {
+            throw new BackupRestorePreflightError(
+                errorMessage,
+                payload.preflight as BackupRestorePreflightResult,
+            );
         }
-        if (data.entries && Array.isArray(data.entries)) {
-            await db.entries.bulkPut(data.entries);
-        }
-        if (data.checkups && Array.isArray(data.checkups)) {
-            await db.checkups.bulkPut(data.checkups);
-        }
-        if (data.therapies && Array.isArray(data.therapies)) {
-            await db.therapies.bulkPut(data.therapies);
-        }
-        /* @Codex */
-        if (data.observations && Array.isArray(data.observations)) {
-            await db.observations.bulkPut(data.observations);
-        }
-        if (data.settings && Array.isArray(data.settings)) {
-            await db.settings.bulkPut(data.settings);
-        }
-        console.log("Import completed");
-    } catch (e) {
-        console.error("Import failed", e);
-        throw e;
+        throw new Error(errorMessage);
     }
 }
 
@@ -527,6 +628,8 @@ export interface Attachment {
     path: string;
     data?: string; // Base64 content for storage
     summarySnapshot?: string;
+    /* @Codex */
+    parseEvidenceArtifactSnapshot?: string;
     createdAt: Date;
 }
 

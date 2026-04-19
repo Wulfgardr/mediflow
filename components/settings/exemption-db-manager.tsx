@@ -99,18 +99,19 @@ export default function ExemptionDbManager() {
     const percent = total > 0 ? Math.round((progress / total) * 100) : 0;
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+        <div className="glass-panel p-6 md:p-7 space-y-5">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                     <Database className="w-6 h-6" />
                 </div>
                 <div>
+                    <p className="section-kicker">Catalogo amministrativo</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Codifiche Esenzioni</h2>
                     <p className="text-xs text-gray-500">Catalogo locale per ricerca rapida in anagrafica paziente.</p>
                 </div>
             </div>
 
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl flex items-center justify-between">
+            <div className="rounded-[22px] border border-emerald-200/60 bg-emerald-50/80 p-4 flex items-center justify-between dark:border-emerald-500/20 dark:bg-emerald-900/10">
                 <div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-wider">Codici Indicizzati</p>
                     <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
@@ -130,9 +131,9 @@ export default function ExemptionDbManager() {
                     setIsDragging(false);
                 }}
                 onDrop={onDrop}
-                className={`rounded-xl border-2 border-dashed p-5 transition-all ${isDragging
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                    : 'border-gray-300 dark:border-gray-600 bg-gray-50/70 dark:bg-gray-700/30'
+                className={`rounded-[24px] border-2 border-dashed p-5 transition-all ${isDragging
+                    ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-900/20'
+                    : 'border-slate-300 bg-white/72 dark:border-white/15 dark:bg-white/5'
                     }`}
             >
                 <input
@@ -156,7 +157,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="px-4 py-2 text-sm rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors"
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/85 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-white/5 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                         >
                             Seleziona file
                         </button>
@@ -181,9 +182,9 @@ export default function ExemptionDbManager() {
             </div>
 
             {message && (
-                <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${message.type === 'success'
-                    ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                <div className={`p-3 rounded-[18px] text-sm flex items-center gap-2 border ${message.type === 'success'
+                    ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/20 dark:text-green-300'
+                    : 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-900/20 dark:text-red-300'
                     }`}>
                     {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     {message.text}
@@ -193,14 +194,14 @@ export default function ExemptionDbManager() {
             <div className="pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <button
                     onClick={refreshStats}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/75 px-3 py-1.5 text-xs text-gray-500 shadow-[0_8px_18px_rgba(15,23,42,0.04)] hover:text-gray-700 dark:bg-white/5 dark:hover:text-gray-300"
                 >
                     <RefreshCw className="w-3 h-3" />
                     Aggiorna conteggio
                 </button>
                 <button
                     onClick={handleClear}
-                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                    className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs text-red-500 hover:text-red-700 dark:bg-red-900/10"
                 >
                     <Trash2 className="w-3 h-3" />
                     Svuota catalogo

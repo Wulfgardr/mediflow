@@ -36,8 +36,8 @@ final class SecuritySession: ObservableObject {
                 healthIssue = AuthHealthIssue(
                     title: "Database non disponibile",
                     message: friendlyHealthMessage(code: status.error?.code, fallback: status.error?.message),
-                    detail: status.db?.dbPath ?? status.db?.dataDir,
-                    canRepair: status.db?.legacyExists == true
+                    detail: friendlyDbDetail(state: status.db?.state),
+                    canRepair: shouldOfferLegacyRepair(code: status.error?.code, state: status.db?.state)
                 )
                 return
             }
@@ -46,7 +46,7 @@ final class SecuritySession: ObservableObject {
             requiresSetup = !status.isSetup
         } catch {
             /* @Codex */
-            if let urlError = error as? URLError, urlError.code == .cancelled {
+            if case LocalAPIError.transport(.tlsHandshakeFailed) = error {
                 healthIssue = AuthHealthIssue(
                     title: "Handshake TLS fallito",
                     message: "Il certificato locale e il PIN TLS non coincidono. Rigenera la configurazione locale e riprova.",
@@ -84,8 +84,15 @@ final class SecuritySession: ObservableObject {
             healthIssue = nil
             scheduleAutoLock()
             return true
+        } catch let error as AuthFlowError {
+            errorMessage = error.localizedDescription
+            return false
         } catch {
-            errorMessage = "PIN non valido"
+            if let localError = error as? LocalAPIError {
+                errorMessage = localError.localizedDescription
+            } else {
+                errorMessage = "PIN non valido"
+            }
             return false
         }
     }
@@ -122,10 +129,10 @@ final class SecuritySession: ObservableObject {
                     errorMessage = "Setup già completato. Inserisci il PIN esistente."
                 }
                 return unlocked
-            case .httpStatus:
-                errorMessage = error.localizedDescription
-                return false
             }
+        } catch let error as LocalAPIError {
+            errorMessage = error.localizedDescription
+            return false
         } catch {
             errorMessage = "Setup fallito"
             return false
@@ -147,7 +154,11 @@ final class SecuritySession: ObservableObject {
             await refreshSetupStatus()
             return true
         } catch {
-            errorMessage = "Ripristino fallito"
+            if let localError = error as? LocalAPIError {
+                errorMessage = localError.localizedDescription
+            } else {
+                errorMessage = "Ripristino fallito"
+            }
             return false
         }
     }
@@ -165,6 +176,32 @@ final class SecuritySession: ObservableObject {
             return "Impossibile verificare lo stato di sicurezza."
         default:
             return fallback ?? "Verifica il file medical.db e la cartella dati."
+        }
+    }
+
+    /* @Codex */
+    private func friendlyDbDetail(state: AuthDbState?) -> String? {
+        switch state {
+        case .missing:
+            return "Stato archivio: assente"
+        case .schemaMissing:
+            return "Stato archivio: schema mancante"
+        case .unavailable:
+            return "Stato archivio: non disponibile"
+        default:
+            return nil
+        }
+    }
+
+    /* @Codex */
+    private func shouldOfferLegacyRepair(code: String?, state: AuthDbState?) -> Bool {
+        switch code {
+        case "DB_SCHEMA_MISSING", "DB_QUERY_FAILED":
+            return true
+        case "DATA_DIR_UNAVAILABLE":
+            return false
+        default:
+            return state == .missing || state == .schemaMissing
         }
     }
 

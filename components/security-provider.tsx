@@ -1,17 +1,45 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
     generateMasterKey,
     deriveKeyFromPin,
     wrapMasterKey,
     unwrapMasterKey
 } from '@/lib/security';
+/* @Codex */
+import {
+    createPinRotationBundle,
+    formatPinChangeFailure,
+    type PinChangeFailurePayload,
+    validatePinChangeInput,
+} from '@/lib/pin-change';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
 /* @Codex */
-import { AuthHealthScreen, AuthHealthPayload } from '@/components/auth-health-screen';
+import { AuthHealthScreen } from '@/components/auth-health-screen';
+/* @Codex */
+import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
+/* @Codex */
+import {
+    clearSecuritySession,
+    persistSecuritySession,
+    restoreSecuritySession,
+} from '@/lib/client-security-session';
+/* @Codex */
+import { notifyDbChange } from '@/lib/live-query';
+/* @Codex */
+import {
+    checkAuthHealthRequest,
+    changePinRequest,
+    loginWithPinRequest,
+    logoutSecuritySession,
+    repairLegacyDbRequest,
+    setupSecurityRequest,
+    type AuthHealthPayload,
+    type LoginFailurePayload,
+} from '@/lib/client-auth-api';
 
 export interface User {
     id: string;
@@ -26,10 +54,56 @@ interface SecurityContextType {
     isLocked: boolean;
     requiresSetup: boolean;
     user: User | null;
+    authErrorMessage: string | null;
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
+    changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
     lock: () => void;
     updateUser: (data: Partial<User>) => void;
+}
+
+/* @Codex */
+function formatLockedUntil(lockedUntil?: string) {
+    if (!lockedUntil) return 'Accesso temporaneamente bloccato. Riprova più tardi.';
+    const date = new Date(lockedUntil);
+    if (Number.isNaN(date.getTime())) return 'Accesso temporaneamente bloccato. Riprova più tardi.';
+    return `Accesso bloccato fino alle ${new Intl.DateTimeFormat('it-IT', {
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date)}.`;
+}
+
+/* @Codex */
+function formatLoginFailure(payload: LoginFailurePayload | null, status: number) {
+    if (payload?.code === 'AUTH_LOCKED') {
+        return payload.message || formatLockedUntil(payload.lockedUntil);
+    }
+    if (payload?.code === 'INVALID_CREDENTIALS' || payload?.code === 'AUTH_INVALID_CREDENTIALS') {
+        if (payload.message) return payload.message;
+        if (typeof payload.remainingAttempts === 'number' && payload.remainingAttempts > 0) {
+            return `PIN non valido. Tentativi rimasti: ${payload.remainingAttempts}.`;
+        }
+        return 'PIN non valido.';
+    }
+    if (status === 423) return formatLockedUntil(payload?.lockedUntil);
+    if (status === 401) return 'PIN non valido.';
+    return payload?.message || payload?.error || 'Errore durante il login.';
+}
+
+/* @Codex */
+function canOfferLegacyRepair(health: AuthHealthPayload | null): boolean {
+    if (!health?.hasSession) return false;
+
+    switch (health.error?.code) {
+        case 'DB_SCHEMA_MISSING':
+        case 'DB_QUERY_FAILED':
+            return true;
+        case 'DATA_DIR_UNAVAILABLE':
+        case 'AUTH_CHECK_FAILED':
+            return false;
+        default:
+            return health.db?.state === 'missing' || health.db?.state === 'schema-missing';
+    }
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
@@ -39,30 +113,33 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [requiresSetup, setRequiresSetup] = useState<boolean | null>(null); // null = loading
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
+    /* @Codex */
+    const masterKeyRef = useRef<CryptoKey | null>(null);
     /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
 
-    // Inactivity Timeout
-    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
-    const activityTimerRef = useRef<NodeJS.Timeout | null>(null);
+    /* @Codex */
+    const setActiveMasterKey = (key: CryptoKey | null) => {
+        masterKeyRef.current = key;
+        db.setKey(key);
+        notifyDbChange();
+    };
 
     const lock = () => {
         setIsLocked(true);
+        setAuthErrorMessage(null);
         // @Codex - clear server session when locking
-        void fetch('/api/auth/logout', { method: 'POST' });
+        logoutSecuritySession();
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
     };
 
-    const resetTimer = () => {
-        if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-        if (isAuthenticated && !isLocked) {
-            activityTimerRef.current = setTimeout(() => {
-                lock();
-            }, INACTIVITY_TIMEOUT_MS);
-        }
-    };
+    useInactivityLock({
+        enabled: isAuthenticated && !isLocked,
+        onTimeout: lock,
+    });
 
     // Initial check
     useEffect(() => {
@@ -73,46 +150,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         init();
     }, []);
 
-    useEffect(() => {
-        const handleActivity = () => resetTimer();
-
-        // Listen to user events
-        if (typeof window !== 'undefined') {
-            window.addEventListener('mousemove', handleActivity);
-            window.addEventListener('keydown', handleActivity);
-            window.addEventListener('click', handleActivity);
-            window.addEventListener('touchstart', handleActivity);
-
-            resetTimer(); // Start initial timer
-        }
-
-        return () => {
-            if (typeof window !== 'undefined') {
-                window.removeEventListener('mousemove', handleActivity);
-                window.removeEventListener('keydown', handleActivity);
-                window.removeEventListener('click', handleActivity);
-                window.removeEventListener('touchstart', handleActivity);
-            }
-            if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuthenticated, isLocked]);
-
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
-            /* @Codex */
-            const res = await fetch('/api/auth/check', { cache: 'no-store' });
-            /* @Codex */
-            const text = await res.text();
-            /* @Codex */
-            let data: AuthHealthPayload | null = null;
-            if (text) {
-                try {
-                    data = JSON.parse(text) as AuthHealthPayload;
-                } catch (error) {
-                    console.warn('Auth check returned non-JSON payload', error);
-                }
-            }
+            const { response: res, payload: data } = await checkAuthHealthRequest();
             /* @Codex */
             if (!data) {
                 setAuthHealth({
@@ -160,9 +200,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 setRequiresSetup(false);
                 // @Codex - if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
-                    sessionStorage.removeItem('mediflow_session_key');
-                    sessionStorage.removeItem('mediflow_user');
-                    db.setKey(null);
+                    clearSecuritySession();
+                    setActiveMasterKey(null);
                     setIsAuthenticated(false);
                     setIsLocked(true);
                     return;
@@ -188,9 +227,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (isRepairing) return;
         setIsRepairing(true);
         try {
-            const res = await fetch('/api/system/repair-db', { method: 'POST' });
+            const { response: res, payload } = await repairLegacyDbRequest();
             if (!res.ok) {
-                const payload = await res.json().catch(() => null);
                 throw new Error(payload?.error || 'Ripristino fallito');
             }
             await checkAuthStatus();
@@ -202,37 +240,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // --- Session Persistence Helpers ---
-    const saveSession = async (key: CryptoKey, userData: User) => {
-        try {
-            const jwk = await window.crypto.subtle.exportKey('jwk', key);
-            sessionStorage.setItem('mediflow_session_key', JSON.stringify(jwk));
-            sessionStorage.setItem('mediflow_user', JSON.stringify(userData));
-        } catch (e) {
-            console.error("Failed to save session", e);
-        }
-    };
-
     const restoreSession = async (): Promise<boolean> => {
         try {
-            const jwkStr = sessionStorage.getItem('mediflow_session_key');
-            const userStr = sessionStorage.getItem('mediflow_user');
+            const session = await restoreSecuritySession<User>();
+            if (!session) return false;
 
-            if (!jwkStr || !userStr) return false;
-
-            const jwk = JSON.parse(jwkStr);
-            const key = await window.crypto.subtle.importKey(
-                'jwk',
-                jwk,
-                { name: 'AES-GCM', length: 256 },
-                true,
-                ['encrypt', 'decrypt']
-            );
-
-            const userData = JSON.parse(userStr);
-
-            db.setKey(key);
-            setUser(userData);
+            setActiveMasterKey(session.key);
+            setUser(session.userData);
             setIsAuthenticated(true);
             setIsLocked(false);
             return true;
@@ -244,15 +258,27 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (pin: string): Promise<boolean> => {
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'admin', password: pin })
-            });
+            setAuthErrorMessage(null);
+            const { response: res, payload } = await loginWithPinRequest(pin);
 
-            if (!res.ok) return false;
+            if (!res.ok) {
+                setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+                return false;
+            }
 
-            const data = await res.json();
+            const data = payload as {
+                encryptedMasterKey: string;
+                salt: string | number[];
+                id: string;
+                username: string;
+                displayName?: string;
+                ambulatoryName?: string;
+                role: string;
+            } | null;
+            if (!data) {
+                setAuthErrorMessage('Errore durante il login.');
+                return false;
+            }
             const { encryptedMasterKey, salt, ...userData } = data;
 
             // Convert salt from B64 string
@@ -268,19 +294,61 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const kek = await deriveKeyFromPin(pin, saltBytes);
             const masterKey = await unwrapMasterKey(encryptedMasterKey, kek);
 
-            db.setKey(masterKey);
+            setActiveMasterKey(masterKey);
             setUser(userData);
             setIsAuthenticated(true);
             setIsLocked(false);
+            setAuthErrorMessage(null);
 
             // Persist session
-            await saveSession(masterKey, userData);
+            try {
+                await persistSecuritySession(masterKey, userData);
+            } catch (e) {
+                console.error("Failed to save session", e);
+            }
 
             return true;
 
         } catch (e) {
             console.error("Login failed", e);
+            setAuthErrorMessage('Errore durante il login.');
             return false;
+        }
+    };
+
+    /* @Codex */
+    const changePin = async (currentPin: string, newPin: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+        if (!isAuthenticated || isLocked) {
+            return { ok: false, message: "Sessione non disponibile. Effettua di nuovo l'accesso." };
+        }
+
+        const masterKey = masterKeyRef.current;
+        if (!masterKey) {
+            return { ok: false, message: "Chiave di sessione non disponibile. Effettua di nuovo l'accesso." };
+        }
+
+        const validationError = validatePinChangeInput(currentPin, newPin);
+        if (validationError) {
+            return { ok: false, message: validationError };
+        }
+
+        try {
+            const rotation = await createPinRotationBundle(masterKey, newPin);
+            const { response: res, payload } = await changePinRequest({
+                currentPin,
+                newPin,
+                encryptedMasterKey: rotation.encryptedMasterKey,
+                salt: rotation.salt,
+            });
+
+            if (!res.ok) {
+                return { ok: false, message: formatPinChangeFailure((payload as PinChangeFailurePayload | null) ?? null, res.status) };
+            }
+
+            return { ok: true };
+        } catch (e) {
+            console.error('Change PIN failed', e);
+            return { ok: false, message: 'Errore durante il cambio PIN.' };
         }
     };
 
@@ -302,28 +370,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const saltB64 = btoa(String.fromCharCode(...salt));
 
             // Send to Server
-            const res = await fetch('/api/auth/setup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: 'admin',
-                    password: pin,
-                    encryptedMasterKey,
-                    salt: saltB64,
-                    displayName,
-                    ambulatoryName
-                })
+            const { response: res, payload } = await setupSecurityRequest({
+                username: 'admin',
+                password: pin,
+                encryptedMasterKey,
+                salt: saltB64,
+                displayName,
+                ambulatoryName
             });
 
             /* @Codex */
             if (!res.ok) {
-                let payload: any = null;
-                try {
-                    payload = await res.json();
-                } catch {
-                    payload = null;
-                }
-
                 if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
                     setRequiresSetup(false);
                     const success = await login(pin);
@@ -339,7 +396,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Set Active
-            db.setKey(masterKey);
+            setActiveMasterKey(masterKey);
             setRequiresSetup(false);
             setIsAuthenticated(true);
             setIsLocked(false);
@@ -347,7 +404,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             // Persist
             const userData: User = { id: 'admin', username: 'admin', role: 'admin', displayName, ambulatoryName };
             setUser(userData);
-            await saveSession(masterKey, userData);
+            try {
+                await persistSecuritySession(masterKey, userData);
+            } catch (sessionError) {
+                console.error("Failed to save session", sessionError);
+            }
         } catch (e) {
             console.error("Setup failed", e);
             alert("Errore configurazione: " + e);
@@ -360,7 +421,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             <AuthHealthScreen
                 health={authHealth}
                 onRetry={() => checkAuthStatus()}
-                onRepair={authHealth.hasSession ? repairFromLegacy : undefined}
+                onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
                 isRepairing={isRepairing}
             />
         );
@@ -387,8 +448,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             isLocked,
             requiresSetup: false,
             user,
+            authErrorMessage,
             login,
             setupPin,
+            changePin,
             lock,
             updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
         }}>

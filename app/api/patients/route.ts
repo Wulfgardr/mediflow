@@ -6,19 +6,41 @@ import { desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
+/* @Codex */
+import {
+    auditContextFromSession,
+    listChangedFields,
+    requestIdFromRequest,
+    withAuditContextMetadata,
+    writeAuditEvent,
+} from '@/lib/audit';
 
 /* @Codex */
-function normalizeExemptionsValue(value: unknown): string | null {
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
-}
-
-/* @Codex */
-function normalizeDiagnosesValue(value: unknown): string | null {
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return null;
+async function recordPatientAuditEvent(
+    request: Request,
+    session: Awaited<ReturnType<typeof requireSession>>,
+    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
+    subjectRef: string,
+    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
+): Promise<void> {
+    try {
+        const context = auditContextFromSession(session);
+        await writeAuditEvent({
+            eventType,
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'patient',
+            subjectRef,
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
+        });
+    } catch (error) {
+        console.error('[MediFlow] Patient audit write failed:', error);
+    }
 }
 
 export async function GET() {
@@ -70,7 +92,7 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
         const newId = body.id || uuidv4();
 
         const cookieStore = await cookies();
@@ -84,39 +106,30 @@ export async function POST(request: Request) {
             }
         }
 
-        await dbServer.insert(patients).values({
-            id: newId,
-            firstName: body.firstName,
-            lastName: body.lastName,
-            taxCode: body.taxCode,
-            birthDate: body.birthDate ? new Date(body.birthDate) : null,
-            address: body.address,
-            phone: body.phone,
-            /* @Codex */
-            caregiver: body.caregiver ?? null,
-            /* @Codex */
-            exemptions: normalizeExemptionsValue(body.exemptions),
-            /* @Codex */
-            diagnoses: normalizeDiagnosesValue(body.diagnoses),
-            /* @Codex */
-            monitoringProfile: typeof body.monitoringProfile === 'string' ? body.monitoringProfile : null,
-            /* @Codex */
-            statusReason: typeof body.statusReason === 'string' ? body.statusReason : null,
-            notes: body.notes || null,
-            isAdi: body.isAdi || false,
+        const normalized = normalizePatientCreateInput(body, {
+            id: typeof newId === 'string' ? newId : uuidv4(),
             ambulatoryId: ambulatoryId || null,
-            updatedAt: new Date(),
-            createdAt: new Date()
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(patients).values(normalized.values);
 
         /* @Codex */
-        if (ambulatoryId) {
+        if (normalized.values.ambulatoryId) {
             await dbServer.insert(patientsToAmbulatories)
-                .values({ patientId: newId, ambulatoryId })
+                .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
                 .onConflictDoNothing();
         }
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        /* @Codex */
+        await recordPatientAuditEvent(request, session, 'patient.created', normalized.values.id, {
+            changedFields: listChangedFields(body, ['id', 'version']),
+            resourceVersion: 1,
+        });
+
+        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
         console.error("API POST /patients error:", error);
         return NextResponse.json({ error: "Failed to create patient" }, { status: 500 });

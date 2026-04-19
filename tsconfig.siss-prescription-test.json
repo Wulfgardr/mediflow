@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-siss-prescription-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/siss-adapter.ts",
+    "lib/siss-adapter.test.ts",
+    "lib/siss-patient-context.ts",
+    "lib/siss-patient-context.test.ts",
+    "lib/siss-prescription.ts",
+    "lib/siss-prescription.test.ts"
+  ]
+}

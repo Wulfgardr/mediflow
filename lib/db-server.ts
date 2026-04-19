@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
+import { ensureAuditSqliteSchema } from '@/lib/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 
 // Ensure the data directory exists in production or use project root for dev
@@ -31,7 +32,17 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
 }
 /* @Codex */
 try {
+    ensureColumn('users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
+    ensureColumn('users', 'first_failed_login_at', 'first_failed_login_at INTEGER');
+    ensureColumn('users', 'locked_until', 'locked_until INTEGER');
+} catch (error) {
+    console.warn('[MediFlow] Users schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
+    /* @Codex */
+    ensureColumn('attachments', 'parse_evidence_artifact_snapshot', 'parse_evidence_artifact_snapshot TEXT');
 } catch (error) {
     console.warn('[MediFlow] Attachments schema check skipped:', error);
 }
@@ -44,6 +55,8 @@ try {
     ensureColumn('patients', 'monitoring_profile', 'monitoring_profile TEXT');
     /* @Codex */
     ensureColumn('patients', 'status_reason', 'status_reason TEXT');
+    /* @Codex */
+    ensureColumn('patients', 'version', 'version INTEGER NOT NULL DEFAULT 1');
 } catch (error) {
     console.warn('[MediFlow] Patients schema check skipped:', error);
 }
@@ -66,6 +79,12 @@ try {
     ensureColumn('therapies', 'diagnosis_name', 'diagnosis_name TEXT');
 } catch (error) {
     console.warn('[MediFlow] Therapies schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureColumn('conversations', 'is_deleted', 'is_deleted INTEGER NOT NULL DEFAULT 0');
+} catch (error) {
+    console.warn('[MediFlow] Conversations schema check skipped:', error);
 }
 /* @Codex */
 try {
@@ -123,5 +142,11 @@ try {
     sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
 } catch (error) {
     console.warn('[MediFlow] Observations schema check skipped:', error);
+}
+/* @Codex */
+try {
+    ensureAuditSqliteSchema(sqlite);
+} catch (error) {
+    console.warn('[MediFlow] Audit schema check skipped:', error);
 }
 export const dbServer = drizzle(sqlite);

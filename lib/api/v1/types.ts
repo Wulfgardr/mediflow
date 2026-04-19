@@ -8,6 +8,8 @@ export type PatientSummary = {
     taxCode: string;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
+    version: number;
     updatedAt: string | null;
 };
 
@@ -35,6 +37,8 @@ export type PatientDetail = {
     documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
+    version: number;
     ambulatoryId: string | null;
     createdAt: string | null;
     updatedAt: string | null;
@@ -128,4 +132,261 @@ export type ExemptionSummary = {
     isSpecialist: boolean | null;
     isNational: boolean | null;
     updatedAt: string | null;
+};
+
+/* @Codex */
+export type NetworkOperatingMode = 'local-only' | 'network-home-base';
+
+/* @Codex */
+export type NetworkSessionState =
+    | 'local-only'
+    | 'network-unpaired'
+    | 'network-paired-online'
+    | 'network-paired-offline-degraded';
+
+/* @Codex */
+export type NetworkReplicaState =
+    | 'local-only'
+    | 'unpaired'
+    | 'online'
+    | 'offline-deferred'
+    | 'conflict-review';
+
+/* @Codex */
+export type NetworkReplicaAuthority = 'local-device' | 'paired-home-base';
+
+/* @Codex */
+export type NetworkReplicaPendingAction =
+    | 'none'
+    | 'pairing-required'
+    | 'queue-snapshot'
+    | 'manual-review';
+
+/* @Codex */
+export type NetworkReplicaSummary = {
+    strategy: 'encrypted-snapshot-mirror';
+    state: NetworkReplicaState;
+    authority: NetworkReplicaAuthority;
+    pendingAction: NetworkReplicaPendingAction;
+    conflictMode: 'restore-preflight-plus-version-check';
+    backupBoundary: 'artifact-v1-remains-backup-only';
+    lastSnapshotAt: string | null;
+    lastReconciledAt: string | null;
+};
+
+/* @Codex */
+export type NetworkIdentityCredentialState = 'session-bound' | 'node-credentials-required';
+
+/* @Codex */
+export type NetworkIdentityLoginMode = 'single-local-user-default' | 'explicit-username-required';
+
+/* @Codex */
+export type NetworkIdentityAuthChannel = 'web' | 'native' | 'system' | 'none';
+
+/* @Codex */
+export type NetworkIdentityScopeSource = 'session-context' | 'node-default' | 'none';
+
+/* @Codex */
+export type NetworkIdentityOperatorSummary = {
+    userId: string | null;
+    username: string | null;
+    displayName: string | null;
+    role: string | null;
+    authChannel: NetworkIdentityAuthChannel;
+};
+
+/* @Codex */
+export type NetworkIdentityScopeSummary = {
+    policy: 'session-context-else-node-default';
+    effectiveAmbulatoryId: string | null;
+    effectiveAmbulatoryName: string | null;
+    defaultAmbulatoryId: string | null;
+    defaultAmbulatoryName: string | null;
+    source: NetworkIdentityScopeSource;
+};
+
+/* @Codex */
+export type NetworkIdentityAuditSummary = {
+    actorType: 'user' | 'system';
+    actorBinding: 'session-user' | 'token-only';
+};
+
+/* @Codex */
+export type NetworkIdentitySummary = {
+    identityModel: 'paired-device-plus-node-credentials';
+    pairingBoundary: 'device-pairing-separate-from-operator-login';
+    credentialState: NetworkIdentityCredentialState;
+    loginMode: NetworkIdentityLoginMode;
+    usernameHint: string | null;
+    displayNameHint: string | null;
+    operator: NetworkIdentityOperatorSummary;
+    scope: NetworkIdentityScopeSummary;
+    audit: NetworkIdentityAuditSummary;
+    limitations: string[];
+};
+
+/* @Codex */
+export type NetworkAiRuntimeMode =
+    | 'local-ai'
+    | 'centralized-available'
+    | 'centralized-unavailable';
+
+/* @Codex */
+export type NetworkAiRuntimeLocalState = 'configured' | 'misconfigured';
+
+/* @Codex */
+export type NetworkAiRuntimeCentralState = 'disabled' | 'available' | 'unavailable';
+
+/* @Codex */
+export type NetworkAiRuntimeHardwareProfile = 'low' | 'medium' | 'high' | 'custom' | 'unknown';
+
+/* @Codex */
+export type NetworkAiRuntimeSurface =
+    | 'patient-insight'
+    | 'smart-import'
+    | 'document-synthesis';
+
+/* @Codex */
+export type NetworkAiRuntimeSummary = {
+    plane: 'ai-plane-separate-from-data-plane';
+    mode: NetworkAiRuntimeMode;
+    localRuntime: {
+        provider: 'ollama';
+        state: NetworkAiRuntimeLocalState;
+        targetPolicy: 'loopback-only';
+        hardwareProfile: NetworkAiRuntimeHardwareProfile;
+        clinicalModel: string | null;
+        reasoningModel: string | null;
+        ocrModel: string | null;
+    };
+    centralRuntime: {
+        state: NetworkAiRuntimeCentralState;
+        capabilityStatus: NetworkCapabilityStatus;
+        requiresPairing: true;
+        executionTarget: 'paired-home-base';
+    };
+    fallbackPolicy: 'client-local-runtime-else-ai-unavailable';
+    rolloutGate: 'lane-benchmarks-and-rollout-governance-required';
+    surfaces: NetworkAiRuntimeSurface[];
+    guardrails: string[];
+};
+
+/* @Codex */
+export type NetworkCapabilityStatus = 'available' | 'disabled' | 'planned' | 'unavailable';
+
+/* @Codex */
+export type NetworkCapabilityKey =
+    | 'network.pairing.bootstrap'
+    | 'network.replica.readonly-patients'
+    | 'network.replica.sync'
+    | 'network.ai.central-runtime'
+    | 'network.catalogs.sync'
+    | 'local.backup.artifact.v1'
+    | 'local.backup.scheduler.macos';
+
+/* @Codex */
+export type NetworkNodeSummary = {
+    nodeId: string;
+    displayName: string;
+    role: 'home-base-candidate';
+    operatingMode: NetworkOperatingMode;
+    protocolVersion: string;
+    transport: {
+        apiBasePath: '/api/v1';
+        tlsRequired: true;
+        localTlsPort: 3443;
+    };
+};
+
+/* @Codex */
+export type NetworkSessionSummary = {
+    nodeId: string;
+    operatingMode: NetworkOperatingMode;
+    sessionState: NetworkSessionState;
+    pairingState: 'disabled' | 'required' | 'paired';
+    trustedSession: boolean;
+    degradedReason: string | null;
+    authMode: 'bearer-token' | 'paired-client-plus-session';
+    protocolVersion: string;
+    replica: NetworkReplicaSummary;
+};
+
+/* @Codex */
+export type NetworkCapability = {
+    key: NetworkCapabilityKey;
+    status: NetworkCapabilityStatus;
+    requiresPairing: boolean;
+    description: string;
+};
+
+/* @Codex */
+export type NetworkCapabilitiesResponse = {
+    nodeId: string;
+    operatingMode: NetworkOperatingMode;
+    protocolVersion: string;
+    capabilities: NetworkCapability[];
+};
+
+/* @Codex */
+export type NetworkPairingIntentRequest = {
+    deviceName: string;
+    clientPlatform: 'macos' | 'ios' | 'ipados';
+    appVersion?: string | null;
+    requestedCapabilities?: string[];
+};
+
+/* @Codex */
+export type NetworkPairingIntentResponse = {
+    intentId: string;
+    status: 'pending-home-base-confirmation';
+    nodeId: string;
+    nodeDisplayName: string;
+    protocolVersion: string;
+    requestedAt: string;
+    expiresAt: string;
+    requestedBy: {
+        deviceName: string;
+        clientPlatform: 'macos' | 'ios' | 'ipados';
+        appVersion: string | null;
+    };
+    requestedCapabilities: string[];
+};
+
+/* @Codex */
+export type NetworkPairedClientSummary = {
+    clientId: string;
+    deviceName: string;
+    clientPlatform: 'macos' | 'ios' | 'ipados';
+    appVersion: string | null;
+    grantedCapabilities: string[];
+    pairedAt: string;
+    lastSeenAt: string | null;
+};
+
+/* @Codex */
+export type NetworkPairingConfirmationResponse = {
+    intentId: string;
+    status: 'paired';
+    nodeId: string;
+    nodeDisplayName: string;
+    protocolVersion: string;
+    pairedAt: string;
+    pairedClientToken: string;
+    pairedClient: NetworkPairedClientSummary;
+    authHeaders: {
+        clientIdHeader: 'x-mediflow-paired-client-id';
+        clientTokenHeader: 'x-mediflow-paired-client-token';
+        sessionCookie: 'mediflow_session';
+    };
+};
+
+/* @Codex */
+export type NetworkErrorResponse = {
+    error: 'Bad Request' | 'Conflict' | 'Not Found';
+    code:
+        | 'PAIRING_REQUEST_INVALID'
+        | 'NETWORK_MODE_DISABLED'
+        | 'PAIRING_INTENT_NOT_FOUND'
+        | 'PAIRING_INTENT_EXPIRED';
+    message: string;
 };

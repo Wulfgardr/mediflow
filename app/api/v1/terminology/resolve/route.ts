@@ -5,6 +5,11 @@ import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import {
+    applyTerminologyRegistryVersion,
+    findTerminologyRegistryEntry,
+    loadTerminologyRegistry,
+} from '@/lib/terminology-registry';
+import {
     normalizeTerminologySystem,
     resolveStaticTerminology,
     type TerminologyItem,
@@ -53,16 +58,18 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'system and code are required' }, { status: 400 });
         }
 
+        const registryEntry = findTerminologyRegistryEntry(await loadTerminologyRegistry(), system);
+
         if (system === 'ATC') {
             const item = await resolveAtc(code);
             if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-            return NextResponse.json(item);
+            return NextResponse.json(applyTerminologyRegistryVersion(item, registryEntry));
         }
 
         if (system === 'LOINC' || system === 'UCUM') {
             const item = resolveStaticTerminology(system, code);
             if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-            return NextResponse.json(item);
+            return NextResponse.json(applyTerminologyRegistryVersion(item, registryEntry));
         }
 
         return NextResponse.json({ error: 'System not supported yet' }, { status: 400 });

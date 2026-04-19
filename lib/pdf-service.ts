@@ -1,3 +1,12 @@
+import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
+import type {
+    SmartImportConfidence,
+    SmartImportDiagnosisExtraction,
+    SmartImportTherapyExtraction,
+    TherapySuggestionState,
+} from './ai-task-contracts';
+/* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -11,13 +20,183 @@ export interface ExtractedPatientData {
     diagnosis?: string;
     medications?: string[];
     notes?: string;
+    diagnoses?: DocumentDiagnosisSuggestion[];
+    problemStatements?: SmartImportDiagnosisExtraction[];
+    therapyCandidates?: SmartImportTherapyExtraction[];
+    reviewDiagnoses?: ExtractedPatientReviewDiagnosis[];
+    reviewTherapies?: ExtractedPatientReviewTherapy[];
+    documentSummary?: string;
+    documentQuality?: {
+        level: DocumentQualityLevel;
+        reason?: string;
+    };
     rawText: string;
     source: 'ai' | 'regex' | 'hybrid';  // Track extraction method
     confidence: number;  // 0-1 confidence score
 }
 
+export interface ExtractedPatientReviewDiagnosis {
+    label: string;
+    code: string;
+    description: string;
+    system: 'ICD-9' | 'ICD-10' | 'ICD-11';
+    evidence?: string;
+    confidence?: SmartImportConfidence;
+    blockedReason?: string;
+    sourceType?: 'explicit_document_code' | 'reviewable_local_match';
+}
+
+export interface ExtractedPatientReviewTherapy {
+    drugName: string;
+    dosage?: string;
+    activePrinciple?: string;
+    motivation?: string;
+    aic?: string;
+    atc?: string;
+    confidence?: SmartImportConfidence;
+    therapyState: TherapySuggestionState;
+    matchType: 'catalog' | 'manual' | 'none';
+    evidence?: string;
+    blockedReason?: string;
+    sourceType?: 'document_explicit' | 'reviewable_local_match';
+}
+
+function isOcrFailureNote(value: string): boolean {
+    return /^OCR extraction failed:/i.test(value.trim());
+}
+
+function looksLikeStructuredPayload(value: string): boolean {
+    const trimmed = value.trim();
+    return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
+}
+
 /* @Codex */
-const OCR_PAGE_LIMIT = 5;
+export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
+    const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
+    if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown)) {
+        return normalizeDocumentInput(rawMarkdown).normalizedText;
+    }
+
+    const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
+    if (notes && !isOcrFailureNote(notes)) {
+        return normalizeDocumentInput(notes).normalizedText;
+    }
+
+    return '';
+}
+
+/* @Codex */
+const OCR_PAGE_LIMIT = 6;
+/* @Codex */
+const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
+/* @Codex */
+const PERSON_PLACEHOLDER_TOKENS = new Set([
+    'NOME',
+    'COGNOME',
+    'COGNOME E NOME',
+    'NOME E COGNOME',
+    'PAZIENTE',
+    'ASSISTITO',
+    'SIG',
+    'SIG.',
+    'SIGRA',
+    'SIG.RA'
+]);
+
+/* @Codex */
+export function isPdfDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
+    return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+}
+
+/* @Codex */
+export function isImageDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
+    return file.type.startsWith('image/') || IMAGE_EXTENSION_REGEX.test(file.name || '');
+}
+
+/* @Codex */
+function sanitizePersonValue(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+
+    const normalized = value
+        .replace(/\s+/g, ' ')
+        .replace(/^[\s:;.,-]+|[\s:;.,-]+$/g, '')
+        .trim();
+
+    if (!normalized || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(normalized)) {
+        return undefined;
+    }
+
+    const upper = normalized.toUpperCase();
+    if (PERSON_PLACEHOLDER_TOKENS.has(upper)) {
+        return undefined;
+    }
+
+    const tokens = upper.split(/\s+/);
+    if (tokens.every((token) => PERSON_PLACEHOLDER_TOKENS.has(token))) {
+        return undefined;
+    }
+
+    return normalized;
+}
+
+/* @Codex */
+function stripPatientIdentityTail(value: string): string {
+    return value
+        .replace(/\s*,?\s*(?:nat[oa]|data\s+di\s+nascita|nato\s+a)\b.*$/i, '')
+        .replace(/\s*,?\s*(?:codice\s+fiscale|cf|indirizzo|telefono|cellulare|residente)\b.*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/* @Codex */
+function extractPatientName(text: string): { firstName?: string; lastName?: string } {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    let firstName: string | undefined;
+    let lastName: string | undefined;
+
+    for (const line of lines) {
+        const nameMatch = line.match(/^nome\s*[:.]?\s*(.+)$/i);
+        if (!firstName && nameMatch) {
+            firstName = sanitizePersonValue(stripPatientIdentityTail(nameMatch[1]));
+            continue;
+        }
+
+        const surnameMatch = line.match(/^cognome\s*[:.]?\s*(.+)$/i);
+        if (!lastName && surnameMatch) {
+            lastName = sanitizePersonValue(stripPatientIdentityTail(surnameMatch[1]));
+            continue;
+        }
+
+        const fullNameMatch = line.match(/^(cognome\s+e\s+nome|nome\s+e\s+cognome|paziente|assistito|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
+        if (fullNameMatch) {
+            const label = fullNameMatch[1].toLowerCase();
+            const candidate = sanitizePersonValue(stripPatientIdentityTail(fullNameMatch[2]));
+            if (!candidate) continue;
+            const parts = candidate.split(/\s+/).filter(Boolean);
+            if (parts.length >= 2) {
+                const surnameFirst = /^cognome\s+e\s+nome$/i.test(label);
+                const given = surnameFirst ? parts.slice(-1).join(' ') : parts.slice(0, -1).join(' ');
+                const family = surnameFirst ? parts.slice(0, -1).join(' ') : parts.slice(-1).join(' ');
+                firstName ||= sanitizePersonValue(given);
+                lastName ||= sanitizePersonValue(family);
+            }
+        }
+    }
+
+    if (!firstName || !lastName) {
+        const cleanText = text.replace(/\s+/g, ' ');
+        const fallbackName = cleanText.match(/(?:^|\b)nome\s*[:.]?\s*([A-Za-zÀ-ÖØ-öø-ÿ' -]{2,60}?)(?=\s+(?:cognome|codice|cf|nato|nata|data|indirizzo|telefono|medico|$))/i);
+        const fallbackSurname = cleanText.match(/(?:^|\b)cognome\s*[:.]?\s*([A-Za-zÀ-ÖØ-öø-ÿ' -]{2,60}?)(?=\s+(?:nome|codice|cf|nato|nata|data|indirizzo|telefono|medico|$))/i);
+        firstName ||= sanitizePersonValue(fallbackName?.[1]);
+        lastName ||= sanitizePersonValue(fallbackSurname?.[1]);
+    }
+
+    return { firstName, lastName };
+}
 
 /**
  * Extract text from PDF (server-side via pdfjs)
@@ -72,7 +251,15 @@ async function callOcr(imageBase64: string, mode: 'full' | 'patient' | 'labs' = 
 /* @Codex */
 async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<string[]> {
     const buffer = await file.arrayBuffer();
-    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf');
+    try {
+        if (!(globalThis as any).pdfjsWorker) {
+            await import('pdfjs-dist/legacy/build/pdf.worker.js');
+        }
+    } catch {
+        // Fall back to the legacy fake-worker path if the side-effect import is unavailable.
+    }
+
+    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.js');
 
     try {
         if (pdfjsLib?.GlobalWorkerOptions) {
@@ -113,7 +300,7 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
 /* @Codex */
 async function selectPdfPagesForOcr(pdf: any, maxPages: number): Promise<number[]> {
     const total = pdf.numPages || 1;
-    const analysisPages = Math.min(total, Math.max(maxPages + 2, 7));
+    const analysisPages = Math.min(total, Math.max(maxPages + 3, 9));
     const keywords = [
         'diagnosi', 'terapia', 'farmac', 'prescr', 'anamnesi', 'esami', 'referto',
         'dimission', 'valutazione', 'conclusioni', 'paziente', 'medico'
@@ -171,6 +358,11 @@ function mapOcrToPatientData(
     rawText: string,
     source: 'ai' | 'hybrid' | 'regex'
 ): ExtractedPatientData {
+    const fallbackText = rawText || extractUsableOcrText(data);
+    const notes = typeof data?.notes === 'string' && !isOcrFailureNote(data.notes)
+        ? data.notes.trim() || undefined
+        : undefined;
+
     return {
         firstName: data?.firstName,
         lastName: data?.lastName,
@@ -180,17 +372,42 @@ function mapOcrToPatientData(
         phone: data?.phone,
         diagnosis: data?.diagnosis,
         medications: data?.medications,
-        notes: data?.notes || data?.rawMarkdown?.slice(0, 500),
-        rawText,
+        notes: notes || (fallbackText ? fallbackText.slice(0, 500) : undefined),
+        rawText: fallbackText,
         source,
         confidence: data?.confidence || 0.6
     };
 }
 
 /* @Codex */
+export function buildOcrFallbackResult(
+    data: any,
+    source: 'ai' | 'hybrid' | 'regex',
+    rawText = ''
+): ExtractedPatientData | null {
+    if (!data || typeof data !== 'object') return null;
+
+    const result = mapOcrToPatientData(data, rawText, source);
+    const hasMeaningfulContent = Boolean(
+        result.firstName ||
+        result.lastName ||
+        result.taxCode ||
+        result.birthDate ||
+        result.address ||
+        result.phone ||
+        result.diagnosis ||
+        result.notes ||
+        result.rawText ||
+        result.medications?.length
+    );
+
+    return hasMeaningfulContent ? result : null;
+}
+
+/* @Codex */
 export async function extractDocumentTextForSummary(file: File): Promise<string> {
-    const isPdf = file.type === 'application/pdf';
-    const isImage = file.type.startsWith('image/');
+    const isPdf = isPdfDocumentInput(file);
+    const isImage = isImageDocumentInput(file);
 
     if (!isPdf && !isImage) {
         return "";
@@ -199,24 +416,24 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
     if (isPdf) {
         const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
         if (!images.length) return "";
-        return await extractOcrFullTextFromImages(images);
+        return normalizeDocumentInput(await extractOcrFullTextFromImages(images), { sourceKind: 'ocr' }).normalizedText;
     }
 
     const base64 = await fileToBase64(file);
     const result = await callOcr(base64, 'full');
-    return result?.rawMarkdown || "";
+    return extractUsableOcrText(result);
 }
 
 /**
  * Smart extraction: AI-OCR first, regex validation/fallback
- * Supports both PDF and images (JPG, PNG)
+ * Supports PDF and locally processable image inputs.
  */
 export async function extractPatientDataSmart(file: File): Promise<ExtractedPatientData> {
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
+    const isImage = isImageDocumentInput(file);
+    const isPdf = isPdfDocumentInput(file);
 
     if (!isImage && !isPdf) {
-        throw new Error('Unsupported file type. Use PDF or images (JPG, PNG).');
+        throw new Error("Formato non supportato. Usa un PDF o un'immagine comune elaborabile localmente.");
     }
 
     /* @Codex */
@@ -228,8 +445,9 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
         if (isPdf) {
             const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
             if (images.length) {
+                let patientData: any = null;
                 try {
-                    const patientData = await callOcr(images[0], 'patient');
+                    patientData = await callOcr(images[0], 'patient');
                     if (patientData && patientData.confidence > 0.5) {
                         aiResult = mapOcrToPatientData(patientData, '', 'ai');
                     }
@@ -238,8 +456,14 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
                 }
 
                 ocrText = await extractOcrFullTextFromImages(images);
+                if (ocrText) {
+                    ocrText = normalizeDocumentInput(ocrText, { sourceKind: 'ocr' }).normalizedText;
+                }
                 if (aiResult && ocrText) {
                     aiResult.rawText = ocrText;
+                }
+                if (!aiResult && patientData) {
+                    aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
                 }
             }
         } else if (isImage) {
@@ -247,6 +471,18 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
             const patientData = await callOcr(base64, 'patient');
             if (patientData && patientData.confidence > 0.5) {
                 aiResult = mapOcrToPatientData(patientData, patientData.rawMarkdown || '', 'ai');
+            }
+            try {
+                const fullResult = await callOcr(base64, 'full');
+                ocrText = extractUsableOcrText(fullResult);
+                if (aiResult && ocrText) {
+                    aiResult.rawText = ocrText;
+                }
+            } catch (e) {
+                console.warn('[PDF Service] OCR full extraction failed for image', e);
+            }
+            if (!aiResult && patientData) {
+                aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
             }
         }
     } catch (e) {
@@ -257,15 +493,13 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     let pdfText = '';
     if (isPdf) {
         try {
-            if (!ocrText) {
-                pdfText = await extractTextFromPdf(file);
-            }
+            pdfText = await extractTextFromPdf(file);
         } catch (e) {
             console.warn('[PDF Service] PDF text extraction failed', e);
         }
     }
 
-    const combinedText = ocrText || pdfText;
+    const combinedText = pdfText || ocrText;
 
     // If AI gave good results, validate with regex
     if (aiResult && aiResult.confidence > 0.7) {
@@ -306,7 +540,7 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     // Last resort: return AI result even with low confidence
     if (aiResult) return aiResult;
 
-    throw new Error('Could not extract data from document');
+    throw new Error('Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.');
 }
 
 /**
@@ -356,22 +590,9 @@ export function parsePatientData(text: string): ExtractedPatientData {
     }
 
     // 3. NAME
-    const nameRegex = /(?:nome)\s*[:\.]?\s*([a-zA-Z\s]+)/i;
-    const surnameMatch = cleanText.match(/(?:cognome)\s*[:\.]?\s*([a-zA-Z\s]+)/i);
-    const patientMatch = cleanText.match(/(?:paziente|sig|sig\.ra)\s*[:\.]?\s*([a-zA-Z\s]+)/i);
-
-    const matchName = cleanText.match(nameRegex);
-
-    if (matchName && surnameMatch) {
-        data.firstName = matchName[1].trim();
-        data.lastName = surnameMatch[1].trim();
-    } else if (patientMatch) {
-        const parts = patientMatch[1].trim().split(/\s+/);
-        if (parts.length >= 2) {
-            data.lastName = parts[0];
-            data.firstName = parts.slice(1).join(' ');
-        }
-    }
+    const extractedName = extractPatientName(text);
+    data.firstName = extractedName.firstName;
+    data.lastName = extractedName.lastName;
 
     // 4. NOTES / DIAGNOSIS (Improved with Context Window)
     // Keywords to start capture

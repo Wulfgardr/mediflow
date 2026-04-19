@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-01 -->
 # ADR 0001: Native macOS client prototype
 
 Date: 2026-02-01

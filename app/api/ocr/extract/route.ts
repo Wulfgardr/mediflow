@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractDocumentWithAI } from '@/lib/ocr-service';
+import { AIService } from '@/lib/ai-service';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { validateLocalTarget } from '@/lib/local-target';
+
+/* @Codex */
+async function loadOcrRuntimeSettings() {
+    const rows = await dbServer
+        .select()
+        .from(settings)
+        .where(inArray(settings.key, ['aiUrl', 'ollamaUrl', 'aiModel_ocr']));
+
+    const getValue = (key: string) => rows.find(row => row.key === key)?.value || null;
+    const configuredModel = getValue('aiModel_ocr') || 'deepseek-ocr';
+    const baseUrl = (getValue('aiUrl') || getValue('ollamaUrl') || 'http://127.0.0.1:11434')
+        .replace(/\/v1\/?$/, '')
+        .replace(/\/$/, '');
+
+    return {
+        configuredModel,
+        baseUrl,
+    };
+}
 
 /**
  * POST /api/ocr/extract
@@ -36,7 +57,17 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const result = await extractDocumentWithAI(image, mode);
+        const { configuredModel, baseUrl } = await loadOcrRuntimeSettings();
+        const validation = validateLocalTarget(baseUrl);
+        if (!validation.ok) {
+            return NextResponse.json(
+                { error: `Configured OCR endpoint not allowed: ${validation.reason}` },
+                { status: 400 }
+            );
+        }
+
+        const ai = new AIService('ollama', validation.url.toString(), configuredModel);
+        const result = await extractDocumentWithAI(image, mode, ai);
 
         return NextResponse.json({
             success: true,
@@ -64,20 +95,17 @@ export async function GET(request: NextRequest) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const rows = await dbServer
-            .select()
-            .from(settings)
-            .where(inArray(settings.key, ['aiUrl', 'ollamaUrl', 'aiModel_ocr']));
+        const { configuredModel, baseUrl } = await loadOcrRuntimeSettings();
+        const validation = validateLocalTarget(baseUrl);
+        if (!validation.ok) {
+            return NextResponse.json({
+                available: false,
+                model: configuredModel,
+                message: `Configured OCR endpoint not allowed: ${validation.reason}`
+            });
+        }
 
-        const getValue = (key: string) => rows.find(row => row.key === key)?.value || null;
-        const configuredUrl = getValue('aiUrl') || getValue('ollamaUrl');
-        const configuredModel = getValue('aiModel_ocr') || 'deepseek-ocr';
-
-        const baseUrl = (configuredUrl || 'http://127.0.0.1:11434')
-            .replace(/\/v1\/?$/, '')
-            .replace(/\/$/, '');
-
-        const res = await fetch(`${baseUrl}/api/tags`);
+        const res = await fetch(`${validation.url.toString().replace(/\/$/, '')}/api/tags`);
         if (!res.ok) {
             return NextResponse.json({
                 available: false,

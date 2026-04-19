@@ -1,26 +1,13 @@
 /**
  * SISS Integration Utilities
  * Sistema Informativo Socio Sanitario - Regione Lombardia
- * 
- * Since no public APIs are available, this module provides utility functions
- * for quick-linking to SISS portals with patient data ready to paste.
+ *
+ * This module provides utility functions for controlled browser handoff to the
+ * official regional web applications currently reachable from MediFlow. It does
+ * not implement a certified SISS backend integration.
  */
-
-// --- SISS Portal URLs ---
-export const SISS_URLS = {
-    // Main menu
-    MENU: 'https://operatorisiss.servizirl.it/menusiss/',
-
-    // Prescrizione Dematerializzata
-    PRESCRIZIONE: 'https://operatorisiss.servizirl.it/prescrizione/',
-    PRESCRIZIONE_COMPILA: 'https://operatorisiss.servizirl.it/prescrizione/#compila-ricetta-page-1',
-
-    // Fascicolo Sanitario Elettronico (for future use)
-    FSE: 'https://operatorisiss.servizirl.it/fse/',
-
-    // Anagrafe (for future use)
-    ANAGRAFE: 'https://operatorisiss.servizirl.it/anagrafe/',
-};
+/* @Codex */
+import { SISS_URLS } from './siss-urls';
 
 // --- Clipboard Utility ---
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -50,42 +37,65 @@ async function copyToClipboard(text: string): Promise<boolean> {
 // --- Open SISS Prescrizione ---
 export interface OpenSissResult {
     success: boolean;
+    opened: boolean;
     message: string;
 }
 
-/**
- * Opens the SISS Prescrizione portal and copies the patient's CF to clipboard.
- * @param codiceFiscale - The patient's Codice Fiscale
- * @returns Result object with success status and user-friendly message
- */
-export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
-    if (!codiceFiscale) {
+export interface SissPortalHandoffInput {
+    handoffUrl: string;
+    clipboardText?: string;
+    successMessage?: string;
+}
+
+export async function completeSissPortalHandoff(input: SissPortalHandoffInput): Promise<OpenSissResult> {
+    if (!input.handoffUrl.trim()) {
         return {
             success: false,
-            message: "Codice Fiscale mancante per questo paziente."
+            opened: false,
+            message: 'Portale SISS non disponibile per questa operazione.',
         };
     }
 
-    // Normalize CF (uppercase, trim)
-    const normalizedCF = codiceFiscale.trim().toUpperCase();
+    const normalizedText = (input.clipboardText ?? '').trim().toUpperCase();
+    if (!normalizedText) {
+        window.open(input.handoffUrl, '_blank', 'noopener,noreferrer');
+        return {
+            success: true,
+            opened: true,
+            message: input.successMessage ?? 'Portale SISS aperto.',
+        };
+    }
 
-    // Copy to clipboard
-    const copied = await copyToClipboard(normalizedCF);
+    const copied = await copyToClipboard(normalizedText);
+    window.open(input.handoffUrl, '_blank', 'noopener,noreferrer');
 
     if (!copied) {
         return {
             success: false,
-            message: "Impossibile copiare il CF negli appunti. Copia manualmente: " + normalizedCF
+            opened: true,
+            message: `Portale SISS aperto, ma non sono riuscito a copiare il CF. Copia manualmente: ${normalizedText}`,
         };
     }
 
-    // Open SISS in new tab
-    window.open(SISS_URLS.PRESCRIZIONE, '_blank', 'noopener,noreferrer');
-
     return {
         success: true,
-        message: `CF "${normalizedCF}" copiato! Incollalo nel modulo SISS (Cmd+V).`
+        opened: true,
+        message: input.successMessage ?? `CF "${normalizedText}" copiato! Incollalo nel modulo SISS (Cmd+V).`,
     };
+}
+
+/**
+ * Opens the official Modulo Prescrittivo Regionale web application and copies
+ * the patient's CF to clipboard.
+ * @param codiceFiscale - The patient's Codice Fiscale
+ * @returns Result object with success status and user-friendly message
+ */
+/* @Codex */
+export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
+    return await completeSissPortalHandoff({
+        handoffUrl: SISS_URLS.PRESCRIZIONE_WEBAPP,
+        clipboardText: codiceFiscale,
+    });
 }
 
 /**
@@ -93,27 +103,9 @@ export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenS
  * @param codiceFiscale - The patient's Codice Fiscale
  */
 export async function openSissFse(codiceFiscale: string): Promise<OpenSissResult> {
-    if (!codiceFiscale) {
-        return {
-            success: false,
-            message: "Codice Fiscale mancante per questo paziente."
-        };
-    }
-
-    const normalizedCF = codiceFiscale.trim().toUpperCase();
-    const copied = await copyToClipboard(normalizedCF);
-
-    if (!copied) {
-        return {
-            success: false,
-            message: "Impossibile copiare il CF. Copia manualmente: " + normalizedCF
-        };
-    }
-
-    window.open(SISS_URLS.FSE, '_blank', 'noopener,noreferrer');
-
-    return {
-        success: true,
-        message: `CF "${normalizedCF}" copiato! Cercalo nel FSE.`
-    };
+    return await completeSissPortalHandoff({
+        handoffUrl: SISS_URLS.FSE,
+        clipboardText: codiceFiscale,
+        successMessage: `CF "${codiceFiscale.trim().toUpperCase()}" copiato! Cercalo nel FSE.`,
+    });
 }

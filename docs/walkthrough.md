@@ -7,6 +7,15 @@
 Questo documento offre la vista end-to-end del progetto: web app Next.js, backend locale SQLite, servizi AI/OCR e client nativo macOS.
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
+> [!IMPORTANT]
+> Dopo `v0.4.0` la delivery macOS e congelata per un rebuild controllato della shell nativa.
+> Le sezioni native qui sotto descrivono lo snapshot corrente e i confini da preservare (`/api/v1`, TLS locale, security/sessione), non una roadmap di estensione del client storico.
+
+> [!IMPORTANT]
+> Su `main` esistono gia due slice post-`v0.5.0` che cambiano il quadro operativo:
+> `network home-base` read-only su `/api/v1/network/*` e il primo artifact
+> `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
+
 ---
 
 ## Scopo e obiettivi
@@ -17,10 +26,11 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 - Riassumere sicurezza, cifratura e trasporto locale.
 
 Se serve il dettaglio di singoli moduli, consulta anche:
-- `docs/topologia-dati-flussi.md`
-- `docs/system_architecture.md`
-- `docs/native-setup.md`
-- `docs/native-launch.md`
+- [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
+- [docs/system_architecture.md](./system_architecture.md)
+- [docs/native-setup.md](./native-setup.md)
+- [docs/native-launch.md](./native-launch.md)
+- [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md)
 
 ---
 
@@ -36,6 +46,10 @@ graph TB
         API[LocalAPIClient]
     end
 
+    subgraph "Paired LAN Client"
+        PEER["Trusted client (macOS/iPhone/iPad)"]
+    end
+
     subgraph "Transport Layer"
         TLS["TLS Proxy :3443"]
     end
@@ -43,6 +57,7 @@ graph TB
     subgraph "Next.js Backend :3000"
         AUTH["/api/auth/*"]
         V1["/api/v1/*"]
+        NET["/api/v1/network/*"]
         WEBAPI["/api/* (web UI)"]
         DB[(SQLite DB)]
     end
@@ -50,6 +65,7 @@ graph TB
     subgraph "Local Services"
         OLLAMA["Ollama :11434"]
         ICD["ICD-11 Docker :8888"]
+        OPENMED["OpenMed redaction :18080 (shadow)"]
     end
 
     UI --> SEC
@@ -57,13 +73,17 @@ graph TB
     SEC --> API
     API --> KC
     API -->|HTTPS + Pinning| TLS
+    PEER -->|HTTPS + paired creds| TLS
     TLS -->|HTTP localhost| V1
+    TLS -->|HTTP localhost| NET
     TLS -->|HTTP localhost| AUTH
     WEBAPI --> DB
     V1 --> DB
+    NET --> DB
     AUTH --> DB
     WEBAPI --> OLLAMA
     WEBAPI --> ICD
+    WEBAPI --> OPENMED
 ```
 
 ---
@@ -76,6 +96,7 @@ graph TB
 | TLS Proxy | `3443` | HTTPS locale per il client macOS |
 | Ollama | `11434` | AI clinica + OCR |
 | ICD-11 (Docker) | `8888` | Diagnosi ICD-11 |
+| OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
 
 ---
 
@@ -97,6 +118,31 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
+## Preview profiles locali
+
+Su checkout non-production MediFlow espone anche una registry locale di
+`Preview Profiles`, selezionabile dalle `Impostazioni`.
+
+Obiettivo: provare fette sperimentali senza cambiare branch o worktree e senza
+spostare per errore il profilo stabile.
+
+Profili attuali:
+
+- `Base`: nessun toggle sperimentale
+- `Liquid Glass UI`: direzione visiva piu liquida e piu separata dal contenuto clinico
+- `AI Stack Preview`: superfici locali dedicate a stack AI e diagnostica
+- `Smart Import Review v2`: percorsi review-first dell'import operatore
+- `SISS Context Preview`: pannello contestuale SISS/FSE sul paziente
+
+Implementazione principale:
+
+- `lib/preview-profiles.ts`
+- `components/preview-profile-chrome.tsx`
+- `app/settings/page.tsx`
+
+Questi profili non cambiano i boundary canonici: servono a verificare fette
+locali, non a dichiararle automaticamente come parte consolidata del prodotto.
+
 ---
 
 ## Data layer e cifratura
@@ -106,6 +152,9 @@ graph TB
 - File: `medical.db`
 - Schema: `lib/schema.ts`
 - Accesso server: `lib/db-server.ts`
+- `patients.documentInsights` resta la projection compatibile dei documenti analizzati
+- `attachments.summarySnapshot` e `attachments.parseEvidenceArtifactSnapshot`
+  sono snapshot clinici cifrati associati al singolo allegato
 
 ### Cifratura lato client (web)
 
@@ -179,6 +228,11 @@ Usata da `LocalAPIClient` nel client nativo macOS. Richiede token:
 Authorization: Bearer <MEDIFLOW_LOCAL_API_TOKEN>
 ```
 
+Bootstrap token lato macOS:
+- ordine canonico `Keychain -> native-config.json -> local-api-token`
+- fallback secondari ammessi solo se il token nel Portachiavi non esiste; errori Keychain restano espliciti
+- `LocalAPIClient` prefligge il bootstrap secure-first prima della rete sugli endpoint autenticati; vedi ADR 0014
+
 Endpoint principali:
 - `app/api/v1/ambulatories/route.ts`
 - `app/api/v1/patients/route.ts`
@@ -197,6 +251,59 @@ Endpoint principali:
 Tipi condivisi:
 - `lib/api/v1/types.ts`
 
+### API v1/network per `home-base` read-only
+
+La first thin slice `network home-base` si attiva solo in modalita
+`network-home-base` dal pannello Settings.
+
+Surface attuale:
+
+- summary PHI-safe di nodo, sessione, capability, identita e AI runtime
+- pairing bootstrap/confirm
+- primo data plane remoto read-only su pazienti (`/api/v1/network/patients*`)
+
+Boundary attuale:
+
+- `POST /api/v1/network/pairing-intents` e bootstrap PHI-safe
+- il read path remoto richiede `paired client` + sessione operatore valida
+- write remoto, sync record-level e fallback automatico restano fuori scope
+
+### Backup e restore artifact v1
+
+La voce `Backup` in `app/settings/page.tsx` usa `components/backup-restore-ui.tsx`
+per esportare un artifact JSON `.mediflow` v1 con manifest e checksum.
+
+La thin slice `WUL-30` aggiunge anche `components/backup-scheduler-ui.tsx`, che
+permette di configurare un backup automatico notturno macOS via `launchd`
+utente. Il job usa `scripts/run-scheduled-backup.mjs`, scrive un artifact `.mediflow`
+v1 nella cartella destinazione e aggiorna in `settings` lo stato dell'ultimo run.
+La thin slice `WUL-31` completa il lifecycle minimo con retention `keep-last-N`
+solo sui file `mediflow-backup-v1-*` generati dallo scheduler, piu anteprima
+dry-run e apply manuale dalla stessa UI.
+
+Flusso:
+
+1) il client web richiama `GET /api/system/backup-restore`
+2) il server legge direttamente SQLite, costruisce lo snapshot canonico e
+   arricchisce `patients` con `assignedAmbulatoryIds` quando esistono link
+   many-to-many aggiuntivi
+3) il server serializza l'artifact con manifest, counts e checksum `sha256`
+4) il restore invia il file alla stessa route server-side
+5) il server valida format, versione, scope, checksum e riferimenti interni
+6) il server svuota le tabelle supportate e reinserisce i record direttamente in SQLite
+
+Per il backup automatico:
+
+1) la UI salva `enabled`, orario e cartella destinazione in `settings`
+2) `app/api/system/backup-scheduler/route.ts` installa o rimuove il `LaunchAgent`
+3) `launchd` esegue il runner headless locale all'orario scelto
+4) il runner legge `medical.db`, genera l'artifact v1, applica la retention sui
+   soli file scheduler-owned e salva esito/path ultimo run
+
+Nota: `patients.ambulatoryId` e gli eventuali `assignedAmbulatoryIds` vengono
+re-materializzati in `patients_to_ambulatories`; le preferenze non esportabili
+restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflight.md](./adr/0016-backup-artifact-v1-manifest-preflight.md).
+
 ---
 
 ## AI e OCR
@@ -208,13 +315,89 @@ Tipi condivisi:
 - `lib/ocr-service.ts`: OCR multimodale
 - `lib/pdf-service.ts`: estrazione testo PDF (fallback regex)
 - `lib/document-synthesis-service.ts`: sintesi clinica + salvataggio
+- `lib/document-parse-evidence-artifact.ts`: artifact canonico `parse/evidence`
+  per allegato
+- `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
+  locale shadow-only per la lane `redaction.v1`
 
 ### Flusso OCR + Sintesi
 
-1) Utente carica PDF/immagine  
-2) OCR via DeepSeek-OCR (Ollama)  
-3) Sintesi via MedGemma  
-4) Salvataggio in `patients.documentInsights` (ultimi 3)
+1) Utente carica PDF/immagine
+2) Normalizzazione input locale (PDF/immagine/CDA/CCD quando presente)
+3) OCR via DeepSeek-OCR (Ollama)
+4) Analisi testuale e sintesi via Qwen (`qwen3.5:35b-a3b` di default)
+5) Costruzione di:
+   - `summarySnapshot` leggibile
+   - `parse/evidence artifact` canonico per l'allegato
+   - `documentInsights` come projection/compat layer iniziale
+6) Estrazione prudente di eventuali diagnosi con codice ICD esplicito
+7) Persistenza cifrata sugli allegati + refresh di `AI Patient Insight`
+
+### Import documento nella nuova anagrafica
+
+Nel create-flow `Nuova Anagrafica`, `components/pdf-importer.tsx` usa lo stesso
+OCR locale ma aggiunge una review intermedia esplicita prima del salvataggio.
+La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+
+Il flusso:
+
+1) OCR + analisi clinica del documento su un excerpt piu ampio del testo utile
+2) estrazione di:
+   - diagnosi con codice ICD esplicito
+   - problemi clinici reviewable senza codice esplicito
+   - terapie candidate reviewable
+3) riconciliazione locale reviewable:
+   - match ICD-11 per i problemi candidati
+   - match AIFA/ATC o fallback manuale per le terapie candidate
+4) review operatore su anagrafica, diagnosi e terapie prima di applicare i
+   default al form
+5) alla creazione della scheda, le terapie confermate e attive con posologia
+   sufficiente vengono persistite come record strutturati in `therapies`; i casi
+   incompleti o non attivi possono restare come nota documentale di supporto
+
+Vincoli:
+
+- anche in questo flusso non esiste import silenzioso da free-text a ICD o
+  terapia
+- la riconciliazione resta sempre locale e reviewable
+- una terapia manual-only o senza posologia sufficiente non viene promossa a
+  record strutturato solo perche compare nel documento
+
+### Smart Import reviewable nel profilo paziente
+
+Nel profilo paziente il web client espone anche una CTA persistente di smart import
+quando esistono fonti utili (`patient.notes`, diario clinico, `documentInsights`,
+summary di allegati).
+
+Il flusso:
+
+1) raccoglie le fonti cliniche locali gia presenti  
+2) le invia al modello clinico locale piu capace configurato  
+3) produce suggerimenti reviewable per:
+   - diagnosi candidate con match ICD-11 locale
+   - terapie candidate con match catalogo AIFA/ATC o fallback manuale
+4) applica solo gli elementi confermati dall'operatore su `patients.diagnoses`
+   e `therapies`, con dedupe esplicito
+5) se la fonte e solo referral/follow-up senza novita clinica e la diagnosi o
+   terapia e gia presente, il suggerimento viene soppresso invece di essere
+   riproposto come rumore operativo
+
+Vincolo: l'autofill automatico dei documenti non cambia e resta limitato ai soli
+ICD espliciti previsti da ADR 0011; patologie free-text e terapie richiedono sempre
+review umana in questa slice.
+
+### Guard revisione shell web
+
+La shell web espone un fingerprint stabile della sorgente locale tramite
+`lib/app-revision.ts` e `/api/system/revision`.
+
+Comportamento:
+
+- `AppRevisionGuard` controlla il fingerprint quando la tab torna visibile e a
+  intervalli regolari
+- se branch/revision/worktree cambiano, la tab fa un reload soft una sola volta
+- `Start_MediFlow.command` resetta `.next` quando la sorgente cambia e rifiuta
+  di riusare la porta `3000` se occupata da un worktree diverso
 
 ---
 
@@ -305,16 +488,21 @@ sequenceDiagram
 
 ## Limitazioni attuali
 
-- Editing pazienti via native non completo (solo creazione).  
-- Offline sync non presente.  
-- Bonjour discovery non presente.  
-- Multi-user limitato (admin singolo).
+- `home-base` e ancora read-only-first: niente write remoto, sync record-level o
+  fallback automatico promotable.
+- `documentInsights` resta un compat layer: il `document evidence ledger` e
+  solo alla prima slice runtime.
+- Il vecchio shell macOS resta congelato: la parity non riparte su quello
+  snapshot.
+- Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 
 ---
 
 ## Prossimi passi suggeriti
 
-1) PATCH/PUT per editing da native  
-2) Autodiscovery locale (Bonjour)  
-3) Cache locale offline in Swift  
-4) Target iOS/iPadOS
+1) Estendere la UX `home-base`: pairing guidato, replica governata e fallback
+   dichiarato senza rompere il local-first
+2) Portare altri consumer sul `parse/evidence artifact` prima di cambiare i
+   contratti persistiti piu ampi
+3) Riavviare il filone native sul nuovo shell, non su quello storico
+4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first

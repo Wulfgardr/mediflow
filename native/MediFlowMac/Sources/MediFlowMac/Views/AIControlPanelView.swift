@@ -3,6 +3,11 @@ import SwiftUI
 
 struct AIControlPanelView: View {
     /* @Codex */
+    private static let staleLegacyDefaults: Set<String> = [
+        "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
+        "qwen2.5:32b"
+    ]
+    /* @Codex */
     private let embedded: Bool
 
     init(embedded: Bool = false) {
@@ -270,16 +275,28 @@ struct AIControlPanelView: View {
     private var clinicalSuggestions: [ModelSuggestion] {
         [
             ModelSuggestion(
-                name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
-                description: "MedGemma 1.5 4B (Bilanciato)"
+                name: "qwen3.5:35b-a3b",
+                description: "Qwen 3.5 35B A3B (Default consigliato)"
             ),
             ModelSuggestion(
-                name: "hf.co/unsloth/medgemma-2b-GGUF",
-                description: "MedGemma 2B (Veloce)"
+                name: "qwen2.5:32b",
+                description: "Qwen 2.5 32B (Alternativa)"
+            ),
+            ModelSuggestion(
+                name: "qwen2.5:14b",
+                description: "Qwen 2.5 14B (Bilanciato)"
+            ),
+            ModelSuggestion(
+                name: "qwen2.5:7b",
+                description: "Qwen 2.5 7B (Leggero)"
+            ),
+            ModelSuggestion(
+                name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
+                description: "MedGemma 1.5 4B (Specialistico medico, non default)"
             ),
             ModelSuggestion(
                 name: "mlx-community/medgemma-1.5-4b-it-bf16",
-                description: "MedGemma 1.5 4B MLX (Apple Silicon)"
+                description: "MedGemma 1.5 4B MLX (Specialistico Apple Silicon, non default)"
             )
         ]
     }
@@ -287,8 +304,12 @@ struct AIControlPanelView: View {
     private var reasoningSuggestions: [ModelSuggestion] {
         [
             ModelSuggestion(
+                name: "qwen3.5:35b-a3b",
+                description: "Qwen 3.5 35B A3B (Default)"
+            ),
+            ModelSuggestion(
                 name: "qwen2.5:32b",
-                description: "Qwen 2.5 32B (Potente)"
+                description: "Qwen 2.5 32B (Alternativa potente)"
             ),
             ModelSuggestion(
                 name: "qwen2.5:14b",
@@ -344,13 +365,14 @@ struct AIControlPanelView: View {
             /* @Codex */
             let defaultClinical = provider == .mlx
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
-            modelClinical = modelClinicalValue ?? modelLegacy ?? defaultClinical
+                : "qwen3.5:35b-a3b"
+            let normalizedLegacyClinical = normalizeLegacyClinicalModel(modelLegacy, provider: provider)
+            modelClinical = modelClinicalValue ?? normalizedLegacyClinical ?? defaultClinical
 
             /* @Codex */
             let defaultReasoning = provider == .mlx
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "qwen2.5:32b"
+                : "qwen3.5:35b-a3b"
             modelReasoning = try await LocalAPIClient.shared.fetchSetting(key: "aiModel_reasoning") ?? defaultReasoning
             modelOCR = try await LocalAPIClient.shared.fetchSetting(key: "aiModel_ocr") ?? "deepseek-ocr"
         } catch {
@@ -432,7 +454,7 @@ struct AIControlPanelView: View {
                 /* @Codex */
                 let requiredModels = Array(Set(ollamaTasks.map { $0.model }))
                 let fallbackRequired = shouldFallbackToOllama
-                    ? Array(Set(requiredModels + ["hf.co/unsloth/medgemma-1.5-4b-it-GGUF", "qwen2.5:32b", "deepseek-ocr"]))
+                    ? Array(Set(requiredModels + ["qwen3.5:35b-a3b", "qwen2.5:14b", "deepseek-ocr"]))
                     : requiredModels
                 missingModels = missingModelsList(from: modelNames, required: fallbackRequired)
                 let base = missingModels.isEmpty ? "Ollama raggiungibile e modelli presenti." : "Ollama raggiungibile, alcuni modelli mancano."
@@ -489,6 +511,13 @@ struct AIControlPanelView: View {
         provider == .mlx ? "http://127.0.0.1:8080/v1" : "http://127.0.0.1:11434/v1"
     }
 
+    /* @Codex */
+    private func normalizeLegacyClinicalModel(_ model: String?, provider: Provider) -> String? {
+        guard provider != .mlx else { return model }
+        guard let model else { return nil }
+        return Self.staleLegacyDefaults.contains(model) ? nil : model
+    }
+
     private func applyHardwareProfile(_ profile: HardwareProfile) {
         /* @Codex */
         let mlxDefault = "mlx-community/medgemma-1.5-4b-it-bf16"
@@ -500,7 +529,7 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-2b-GGUF"
+                modelClinical = "qwen2.5:7b"
                 modelReasoning = "qwen2.5:7b"
             }
         case .medium:
@@ -508,7 +537,7 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                modelClinical = "qwen2.5:14b"
                 modelReasoning = "qwen2.5:14b"
             }
         case .high:
@@ -516,8 +545,8 @@ struct AIControlPanelView: View {
                 modelClinical = mlxDefault
                 modelReasoning = mlxDefault
             } else {
-                modelClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
-                modelReasoning = "qwen2.5:32b"
+                modelClinical = "qwen3.5:35b-a3b"
+                modelReasoning = "qwen3.5:35b-a3b"
             }
         case .custom:
             break

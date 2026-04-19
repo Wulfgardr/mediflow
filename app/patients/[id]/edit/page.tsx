@@ -1,6 +1,6 @@
 'use client';
 
-import { db } from '@/lib/db';
+import { ApiConflictError, db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
@@ -9,31 +9,14 @@ import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
+/* @Codex */
+import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
 /* @Codex */
-type ValidationSummary = {
-    total: number;
-    withErrors: number;
-    withWarnings: number;
-    errorCount: number;
-    warningCount: number;
-};
-
-/* @Codex */
-type ValidatePatientExportResponse = {
-    patientId: string;
-    hasErrors: boolean;
-    hasWarnings: boolean;
-    therapyMedication: ValidationSummary;
-    observationVitals: ValidationSummary;
-};
-
-/* @Codex */
-function buildValidationMessage(validation: ValidatePatientExportResponse): string {
-    return [
-        `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,
-        `Osservazioni: ${validation.observationVitals.total} record, ${validation.observationVitals.errorCount} errori, ${validation.observationVitals.warningCount} warning`,
-    ].join('\n');
+function messageFromError(error: unknown, fallback: string): string {
+    if (error instanceof ApiConflictError) return error.message;
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
 }
 
 export default function EditPatientPage() {
@@ -52,12 +35,19 @@ export default function EditPatientPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {
+        if (!patient || typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
+
         try {
             const { statusReason, checkups, ...cleanData } = data;
+            const patientVersion = patient.version;
 
             await db.patients.update(id, {
                 ...cleanData,
                 birthDate: new Date(cleanData.birthDate),
+                version: patientVersion,
                 updatedAt: new Date(),
             });
 
@@ -93,7 +83,7 @@ export default function EditPatientPage() {
             router.push(`/patients/${id}`);
         } catch (error) {
             console.error("Failed to update patient", error);
-            alert("Errore durante l'aggiornamento.");
+            alert(messageFromError(error, "Errore durante l'aggiornamento."));
         }
     };
 
@@ -102,6 +92,11 @@ export default function EditPatientPage() {
 
     const handleAction = async (data: ActionData) => {
         if (!patient) return;
+        if (typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
+        const patientVersion = patient.version;
 
         if (actionType === 'export') {
             try {
@@ -148,53 +143,80 @@ export default function EditPatientPage() {
         }
 
         if (actionType === 'delete') {
-            await db.patients.delete(id);
-            router.push('/'); // Redirect to dashboard
+            try {
+                await db.patients.delete(id, { version: patientVersion });
+                router.push('/'); // Redirect to dashboard
+            } catch (error) {
+                alert(messageFromError(error, "Errore durante l'eliminazione."));
+            }
         } else { // This is for archive
-            await db.patients.update(id, {
-                isArchived: true,
-                updatedAt: new Date()
-            });
-            router.push('/'); // Redirect to dashboard
+            try {
+                await db.patients.update(id, {
+                    isArchived: true,
+                    version: patientVersion,
+                    updatedAt: new Date()
+                });
+                router.push('/'); // Redirect to dashboard
+            } catch (error) {
+                alert(messageFromError(error, "Errore durante l'archiviazione."));
+            }
         }
     };
 
     const handleRestore = async () => {
         if (!confirm("Sei sicuro di voler ripristinare questo paziente tra quelli attivi?")) return;
+        if (!patient || typeof patient.version !== 'number') {
+            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            return;
+        }
 
-        await db.patients.update(id, {
-            isArchived: false,
-            updatedAt: new Date()
-        });
+        try {
+            await db.patients.update(id, {
+                isArchived: false,
+                version: patient.version,
+                updatedAt: new Date()
+            });
+        } catch (error) {
+            alert(messageFromError(error, "Errore durante il ripristino."));
+        }
         // Stay on page but refresh UI (automatic via liveQuery)
     };
 
     if (!patient) return <div className="p-8 text-center text-gray-500">Caricamento...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto pb-10">
-            <div className="mb-6 flex items-center gap-4">
-                <Link href={`/patients/${id}`} className="p-2 hover:bg-white/50 rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600" />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Modifica Paziente</h1>
-                    <p className="text-gray-500 text-sm">Aggiorna le informazioni anagrafiche e di contatto</p>
+        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
+            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
+                <div className="flex items-center gap-5">
+                    <Link href={`/patients/${id}`} className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
+                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
+                    </Link>
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Modalita modifica</p>
+                        </div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Modifica Paziente</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Aggiornamento dati clinici e anagrafici</p>
+                    </div>
                 </div>
             </div>
 
             {patient.isArchived && (
-                <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                    <Archive className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/20 p-6 flex items-start gap-4 shadow-xl shadow-amber-500/5">
+                    <div className="p-3 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600">
+                        <Archive className="w-6 h-6 shrink-0" />
+                    </div>
                     <div>
-                        <h3 className="font-bold text-amber-800">Paziente Archiviato</h3>
-                        <p className="text-sm text-amber-700 mt-1">
-                            Questo paziente è attualmente in archivio.
+                        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-200">Paziente Archiviato</h3>
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                            Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
                         </p>
                         <button
                             onClick={handleRestore}
-                            className="mt-3 text-sm font-semibold text-amber-700 hover:text-amber-800 underline"
+                            className="mt-4 text-xs font-black uppercase tracking-widest text-amber-800 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors flex items-center gap-1.5"
                         >
+                            <RotateCcw className="w-3.5 h-3.5" />
                             Ripristina in elenco Attivi
                         </button>
                     </div>
@@ -209,28 +231,33 @@ export default function EditPatientPage() {
             />
 
             {/* Danger Zone */}
-            <div className="mt-12 pt-8 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-red-600 flex items-center gap-2 mb-4">
-                    <ShieldAlert className="w-5 h-5" />
-                    Zona Pericolo
-                </h3>
-
-                <div className="bg-red-50 p-6 rounded-2xl border border-red-100 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="mt-20 pt-10 border-t border-slate-200 dark:border-white/10">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <ShieldAlert className="w-5 h-5 text-red-500" />
+                    </div>
                     <div>
-                        <h4 className="font-bold text-gray-800">Gestione Stato Paziente</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                            Puoi archiviare il paziente se non è più in carico, oppure eliminarlo (spostandolo nel cestino).
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500/60">Azioni sensibili</p>
+                        <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Zona Pericolo</h3>
+                    </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[32px] border-red-100 dark:border-red-900/20 bg-red-50/30 dark:bg-red-950/5 flex flex-col lg:flex-row items-center justify-between gap-8">
+                    <div className="max-w-md">
+                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Manutenzione Scheda</h4>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
                         </p>
                     </div>
 
-                    <div className="flex gap-3 w-full md:w-auto">
+                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                         <button
                             type="button"
                             onClick={() => {
                                 setActionType('export');
                                 setIsActionModalOpen(true);
                             }}
-                            className="px-4 py-2 text-blue-600 font-medium hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 flex items-center gap-2"
+                            className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-blue-600 dark:text-blue-400 font-bold border border-slate-200 dark:border-white/10 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                         >
                             <Download className="w-4 h-4" />
                             Export FHIR
@@ -242,7 +269,7 @@ export default function EditPatientPage() {
                                     setActionType('archive');
                                     setIsActionModalOpen(true);
                                 }}
-                                className="flex-1 md:flex-none px-4 py-2 bg-white text-amber-600 font-bold border-2 border-amber-200 rounded-xl hover:bg-amber-50 hover:border-amber-300 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-amber-600 dark:text-amber-400 font-bold border border-amber-200 dark:border-amber-900/30 rounded-2xl hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                             >
                                 <Archive className="w-4 h-4" />
                                 Archivia
@@ -250,7 +277,7 @@ export default function EditPatientPage() {
                         ) : (
                             <button
                                 onClick={handleRestore}
-                                className="flex-1 md:flex-none px-4 py-2 bg-white text-green-600 font-bold border-2 border-green-200 rounded-xl hover:bg-green-50 hover:border-green-300 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-900/30 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                             >
                                 <RotateCcw className="w-4 h-4" />
                                 Ripristina
@@ -261,7 +288,7 @@ export default function EditPatientPage() {
                                 setActionType('delete');
                                 setIsActionModalOpen(true);
                             }}
-                            className="flex-1 md:flex-none px-4 py-2 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-700 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            className="flex-1 lg:flex-none px-6 py-3 bg-red-600 text-white font-bold rounded-2xl shadow-xl shadow-red-500/20 hover:bg-red-700 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
                             <Trash2 className="w-4 h-4" />
                             Elimina

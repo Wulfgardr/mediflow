@@ -17,6 +17,22 @@ Se vuoi cambiare confini di sicurezza, scrivi prima un ADR (vedi sotto).
 
 ---
 
+## Igiene workflow e tracciabilita
+
+Per i lavori non banali, il default operativo e questo:
+
+- una issue Linear per ogni unita di delivery
+- un branch dedicato per ogni issue attiva
+- commit piccoli, leggibili e con issue ID
+- push su checkpoint stabili, non solo a fine lavoro
+- PR `Draft` appena il workstream supera una singola sessione o un solo commit utile
+- verifica esplicita di cosa e stato testato e cosa no
+
+Se durante il lavoro lo scope cambia davvero, non allargare il branch in modo
+silenzioso: apri un nuovo capitolo con nuova issue / nuovo branch / nuova PR.
+
+---
+
 ## Prerequisiti
 
 - Node.js **v20+** consigliato
@@ -55,13 +71,81 @@ npm run lint
 npm run build
 ```
 
-### Type checking (consigliato)
-
-Questo repository non espone ancora uno script dedicato; puoi eseguire:
+Per visualizzare anche warning non bloccanti:
 
 ```bash
-npx tsc --noEmit
+npm run lint:full
 ```
+
+### Type checking (consigliato)
+
+Questo repository espone uno script dedicato:
+
+```bash
+npm run typecheck
+```
+
+### Contract guard OpenAPI
+
+Per verificare drift e breaking change non autorizzati sulla superficie `/api/v1`:
+
+```bash
+npm run check:openapi:drift
+```
+
+### Never-regress guard
+
+Per bloccare regressioni sui guardrail minimi di sicurezza:
+
+```bash
+npm run check:never-regress
+```
+
+Il guard fallisce se trova:
+- credenziali di default hardcoded nel runtime
+- endpoint runtime non locali o telemetry default-on
+- rotture delle invarianti zero-knowledge minime
+
+### Test concorrenza pazienti
+
+Per verificare i conflitti cross-client su `patients.version`:
+
+```bash
+npm run test:concurrency:patients
+```
+
+### Test import documentale nuova anagrafica
+
+Per verificare la lane di review documentale nel create-flow paziente:
+
+```bash
+npm run test:patient-document-import
+```
+
+Usalo quando tocchi:
+- `components/pdf-importer.tsx`
+- `components/patient-document-import-review.tsx`
+- `lib/patient-document-import-service.ts`
+- `lib/patient-document-review.ts`
+- la persistenza prudente delle terapie nel create-flow
+
+### Test document intelligence / parse-evidence
+
+Per verificare la first slice runtime del `document evidence ledger`:
+
+```bash
+npm run test:document-synthesis
+npm run test:ai-context
+npm run test:pdf-service
+```
+
+Usalo quando tocchi:
+- `lib/document-synthesis-service.ts`
+- `lib/document-parse-evidence-artifact.ts`
+- `lib/ai-context.ts`
+- `components/document-upload.tsx`
+- `app/api/attachments/route.ts`
+- la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
 
 ---
 
@@ -75,11 +159,14 @@ npx tsc --noEmit
 - Migrazioni: `drizzle/`
 - Client nativo macOS: `native/`
 - Script: `scripts/`
+- Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `Start_MediFlow.command`
 
 Documentazione tecnica:
-- `docs/walkthrough.md`
-- `docs/system_architecture.md`
-- `docs/ARCHITETTURA.md`
+- [docs/README.md](./docs/README.md) (mappa canonica documentazione)
+- [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
+- [docs/walkthrough.md](./docs/walkthrough.md)
+- [docs/system_architecture.md](./docs/system_architecture.md)
+- [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
 
 ---
 
@@ -113,6 +200,29 @@ Se aggiungi un nuovo endpoint:
 - evita leakage di campi cifrati nei log
 - mantieni contratti stabili per i client native
 
+Per `/api/v1/*` vale ADR 0010 (`spec-first` OpenAPI):
+- ogni PR con impatto contrattuale deve aggiornare la spec OpenAPI nello stesso diff
+  oppure dichiarare esplicitamente `no contract impact`
+- cambi breaking o deprecazioni richiedono ADR/update ADR prima del merge e non
+  vanno introdotti come modifica silenziosa a `v1`
+- il guard automatico usa `docs/openapi/contract-policy.json` per distinguere
+  endpoint gia documentati, endpoint implementati ma fuori slice stabile e
+  override breaking tracciati
+
+Se cambi la concorrenza ottimistica dei pazienti (`patients.version`, compare-on-write,
+payload `409 VERSION_CONFLICT`), esegui anche:
+
+```bash
+npm run test:concurrency:patients
+```
+
+Se cambi `/api/v1/network/*`, `lib/network-*` o il boundary pairing/sessione
+home-base, esegui anche:
+
+```bash
+npm run test:network:home-base-readonly
+```
+
 ---
 
 ## Processo ADR (obbligatorio per cambi non banali)
@@ -136,25 +246,21 @@ Una PR è considerata conclusa quando:
 
 - `npm run lint` passa
 - `npm run build` passa
-- (consigliato) `npx tsc --noEmit` passa
+- (consigliato) `npm run typecheck` passa
+- `npm run check:never-regress` passa
+- se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
+- se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
+- se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
+- Se cambia `/api/v1/*`, la documentazione contrattuale (spec OpenAPI o nota esplicita
+  `no contract impact`) deve stare nello stesso diff.
 - Se cambiano comportamenti/contratti, documentazione aggiornata:
   - README / ARCHITECTURE / ADR (quando appropriato)
-
----
-
-## Attribution (Codex / agent)
-
-Questo progetto traccia il codice generato da agent.
-
-Se il codice è scritto principalmente da Codex, marcature richieste:
-
-- Blocco: `/* @Codex */`
-- Riga: `// @Codex`
-
-Per aggiunte non banali, aggiungi una entry in `docs/agent-attribution.md`.
+- Se aggiungi/rimuovi/rinomini `.md`, aggiorna anche:
+  - `docs/README.md` (se cambia ownership o priorità)
+  - `docs/markdown-index.md` (lista + sintesi file)
 
 ---
 
@@ -168,3 +274,5 @@ Per aggiunte non banali, aggiungi una entry in `docs/agent-attribution.md`.
   - note di verifica (comandi eseguiti)
 
 Se qualcosa non è chiaro, leggi prima la documentazione e poi fai **una domanda mirata**.
+
+---

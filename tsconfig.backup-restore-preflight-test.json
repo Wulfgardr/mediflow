@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-backup-restore-preflight-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/backup-artifact.ts",
+    "lib/backup-artifact.test.ts",
+    "lib/backup-restore-preflight.ts",
+    "lib/backup-restore-preflight.test.ts",
+    "lib/data-dir.ts"
+  ]
+}

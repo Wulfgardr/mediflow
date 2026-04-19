@@ -1,14 +1,14 @@
 > [!WARNING]
 > Documento storico mantenuto per compatibilità.
-> La roadmap prodotto canonica e aggiornata è: `docs/ROADMAP.md`.
-> Aggiorna solo `docs/ROADMAP.md`.
+> La roadmap prodotto canonica e aggiornata è: [docs/ROADMAP.md](./ROADMAP.md).
+> Aggiorna solo [docs/ROADMAP.md](./ROADMAP.md).
 
 # Roadmap MediFlow (storica)
 
 > Snapshot storico pre-riordino roadmap.
 
 Questa versione è mantenuta solo come riferimento storico.
-Per la versione attiva consulta `docs/ROADMAP.md`.
+Per la versione attiva consulta [docs/ROADMAP.md](./ROADMAP.md).
 
 ---
 

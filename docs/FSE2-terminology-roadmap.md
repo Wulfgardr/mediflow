@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-18 -->
 # Roadmap Codifiche Cliniche per FSE 2.0 / EDS (Italia)
 
 ## Scopo
@@ -23,9 +22,10 @@ local-first e zero-knowledge.
 - Diff piccoli e reversibili, con migrazioni esplicite.
 
 Riferimenti interni:
-- `ARCHITECTURE.md`
-- `SECURITY.md`
-- `docs/adr/0005-web-native-functional-parity.md`
+- [ARCHITECTURE.md](../ARCHITECTURE.md)
+- [SECURITY.md](../SECURITY.md)
+- [docs/adr/0005-web-native-functional-parity.md](./adr/0005-web-native-functional-parity.md)
+- [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md)
 
 ---
 

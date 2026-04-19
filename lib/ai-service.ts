@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 
 export type AIProvider = 'ollama';
 
@@ -20,16 +21,54 @@ export interface ChatMessageContent {
     image_url?: { url: string }; // base64 data URL or http URL
 }
 
+function normalizeOllamaImage(url: string): string {
+    if (url.startsWith('data:')) {
+        const [, data] = url.split(',', 2);
+        return data || url;
+    }
+    return url;
+}
+
+function toOllamaMessages(messages: ChatMessage[]) {
+    return messages.map((message) => {
+        if (typeof message.content === 'string') {
+            return {
+                role: message.role,
+                content: message.content,
+            };
+        }
+
+        const textParts: string[] = [];
+        const images: string[] = [];
+
+        for (const item of message.content) {
+            if (item.type === 'text' && item.text) {
+                textParts.push(item.text);
+            } else if (item.type === 'image_url' && item.image_url?.url) {
+                images.push(normalizeOllamaImage(item.image_url.url));
+            }
+        }
+
+        return {
+            role: message.role,
+            content: textParts.join('\n\n').trim(),
+            ...(images.length > 0 ? { images } : {})
+        };
+    });
+}
+
 export class AIService {
     public provider: AIProvider;
     private baseUrl: string;
     private model: string;
+    private disableThinking: boolean;
 
-    constructor(provider: AIProvider, baseUrl: string, model: string) {
+    constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false) {
         // Clean URL: Handle /v1, /v (typo), and trailing slash
         this.baseUrl = baseUrl.replace(/\/v1?\/?$/, '').replace(/\/$/, '');
         this.provider = provider;
         this.model = model;
+        this.disableThinking = disableThinking;
     }
 
     /* @Codex */
@@ -41,9 +80,15 @@ export class AIService {
         };
     }
 
+    /* @Codex */
+    private isBrowserRuntime(): boolean {
+        return typeof window !== 'undefined';
+    }
+
     static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
         /* @Codex */
         const provider: AIProvider = 'ollama';
+        await ensureTextModelDefaultsUpgraded();
 
         const defaultUrl = "http://127.0.0.1:11434";
 
@@ -69,61 +114,51 @@ export class AIService {
         // 2. Fallback to legacy 'aiModel' (which was serving as global previously)
         const modelLegacy = await db.settings.get('aiModel');
 
-        // Defaults if DB is empty
-        /* @Codex */
-        const defaultClinical = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF";
-        const defaultOcr = "deepseek-ocr"; // DeepSeek-OCR 3B via Ollama
-        /* @Codex */
-        const defaultReasoning = "qwen2.5:32b"; // Assuming Qwen is generally available or user will configure
-
         let model = "";
 
         if (task === 'clinical') {
-            model = modelClinical?.value || modelLegacy?.value || defaultClinical;
+            model = resolveTextModel(modelClinical?.value, modelLegacy?.value);
         } else if (task === 'ocr') {
             // OCR task: DeepSeek-OCR for document understanding
-            model = modelOcr?.value || defaultOcr;
+            model = modelOcr?.value || DEFAULT_OCR_MODEL;
         } else { // reasoning
-            model = modelReasoning?.value || defaultReasoning;
-            // "Legacy Fallback": If no specific reasoning model is set, check if legacy model is set.
-            if (!modelReasoning?.value && modelLegacy?.value) {
-                model = modelLegacy.value;
-            }
+            model = resolveTextModel(modelReasoning?.value, modelLegacy?.value);
         }
 
         console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
 
-        return new AIService(provider, url, model);
+        return new AIService(provider, url, model, task === 'clinical');
     }
 
     /**
-     * Unified Chat Completion (OpenAI Compatible)
-     * Used for both chat and single-prompt generation (wrapped)
+     * Unified chat entrypoint backed by the native Ollama chat API.
      */
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number): Promise<{ content: string; stats: AIStats }> {
         const start = Date.now();
-
-        // OpenAI Format
         const body = {
             model: this.model,
-            messages: messages,
+            messages: toOllamaMessages(messages),
             stream: false,
-            // formatted options for OpenAI-compatible providers
-            temperature: 0.4,
-            max_tokens: maxTokens || 4096
+            options: {
+                temperature: 0.4,
+                num_predict: maxTokens || 4096,
+            },
+            ...(this.disableThinking ? { think: false } : {}),
         };
-
-        // Target Endpoint: /v1/chat/completions (OpenAI-compatible)
-        // We use our Proxy to forward the request to the correct local URL
-        const targetUrl = `${this.baseUrl}/v1/chat/completions`;
+        const endpoint = this.isBrowserRuntime()
+            ? '/api/proxy/ollama/chat'
+            : `${this.baseUrl}/api/chat`;
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (this.isBrowserRuntime()) {
+            headers['x-target-url'] = this.baseUrl;
+        }
 
         try {
-            const response = await fetch('/api/proxy/ai/chat', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-target-url': targetUrl
-                },
+                headers,
                 body: JSON.stringify(body),
                 signal // Allow cancellation
             });
@@ -134,17 +169,17 @@ export class AIService {
             }
 
             const data = await response.json();
-
-            // OpenAI format response parsing
-            const content = data.choices?.[0]?.message?.content || "";
+            const content = data.message?.content || data.choices?.[0]?.message?.content || "";
             const usage = data.usage || {};
+            const tokensIn = data.prompt_eval_count || usage.prompt_tokens || 0;
+            const tokensOut = data.eval_count || usage.completion_tokens || 0;
 
             return {
                 content,
                 stats: {
                     latency: Date.now() - start,
-                    tokensIn: usage.prompt_tokens || 0,
-                    tokensOut: usage.completion_tokens || 0
+                    tokensIn,
+                    tokensOut,
                 }
             };
 
@@ -190,9 +225,12 @@ export class AIService {
 
         const targetUrl = this.baseUrl; // already cleaned
         try {
-            const res = await fetch('/api/ai/models', {
-                headers: { 'x-target-url': targetUrl }
-            });
+            const res = await fetch(
+                this.isBrowserRuntime() ? '/api/ai/models' : `${targetUrl}/api/tags`,
+                this.isBrowserRuntime()
+                    ? { headers: { 'x-target-url': targetUrl } }
+                    : undefined,
+            );
             if (!res.ok) throw new Error("Failed to fetch models");
             const data = await res.json();
             return data.models || [];
@@ -210,11 +248,11 @@ export class AIService {
 
         const targetUrl = this.baseUrl;
 
-        const response = await fetch('/api/ai/pull', { // Use our new proxy route
+        const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, { // Use proxy in browser, direct Ollama on server
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-target-url': targetUrl
+                ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {})
             },
             body: JSON.stringify({ model: modelName })
         });
