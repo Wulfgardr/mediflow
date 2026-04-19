@@ -1,0 +1,573 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import Module from 'node:module';
+import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './document-parse-evidence-artifact';
+
+const moduleWithResolve = Module as unknown as {
+    _resolveFilename: (
+        request: string,
+        parent: NodeModule | null,
+        isMain: boolean,
+        options?: unknown,
+    ) => string;
+};
+
+const originalResolveFilename = moduleWithResolve._resolveFilename;
+moduleWithResolve._resolveFilename = function resolveFilename(
+    request: string,
+    parent: NodeModule | null,
+    isMain: boolean,
+    options?: unknown,
+) {
+    if (request.startsWith('@/')) {
+        return originalResolveFilename.call(
+            this,
+            path.join(process.cwd(), 'tmp-ai-context-test', request.slice(6)),
+            parent,
+            isMain,
+            options,
+        );
+    }
+
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
+function stubFilter(items: unknown[]) {
+    return (() => ({ toArray: async () => items })) as unknown;
+}
+
+/* @Codex */
+interface HarnessOptions {
+    attachments?: unknown[];
+    documentInsights?: unknown;
+}
+
+async function withHarness(options: HarnessOptions = {}) {
+    const dbModule = await import('./db');
+    const settingsModule = await import('./ai-insight-settings');
+
+    const original = {
+        getPatient: dbModule.db.patients.get,
+        entryFilter: dbModule.db.entries.filter,
+        therapyFilter: dbModule.db.therapies.filter,
+        observationFilter: dbModule.db.observations.filter,
+        checkupFilter: dbModule.db.checkups.filter,
+        attachmentFilter: dbModule.db.attachments.filter,
+        runtimeSettings: settingsModule.getAIInsightRuntimeSettings,
+    };
+
+    dbModule.db.patients.get = (async (id: string) => (
+        id === 'patient-1'
+            ? {
+                id,
+                firstName: 'Giulia',
+                lastName: 'Bianchi',
+                birthDate: new Date('1980-01-01T00:00:00Z'),
+                taxCode: 'BNCGLI80A41H501T',
+                notes: '**Quadro attuale:** stale ai output [S1]',
+                monitoringProfile: 'Controllo PA domiciliare',
+                diagnoses: [
+                    {
+                        code: 'I10',
+                        description: 'Ipertensione essenziale',
+                        system: 'ICD-10',
+                        date: new Date('2025-02-10T00:00:00Z'),
+                    },
+                ],
+                documentInsights: options.documentInsights ?? JSON.stringify([
+                    {
+                        id: 'doc-1',
+                        date: '2025-03-10T00:00:00Z',
+                        fileName: 'referto-lab.pdf',
+                        summary: 'Azotemia in lieve aumento',
+                    },
+                    {
+                        id: 'doc-2',
+                        date: '2025-03-05T00:00:00Z',
+                        fileName: 'dimissione.pdf',
+                        summary: 'Follow-up cardiologico stabile',
+                        rawMarkdown: [
+                            'Diagnosi di dimissione',
+                            'Deficit della deambulazione in postumi di frattura pertrocanterica sx',
+                            'Terapia farmacologica alla dimissione',
+                            'Duloxetina 60 mg 1 cp ore 20',
+                            'Pregabalin 75 mg 1 cp ore 8',
+                            'Indicazioni alla dimissione',
+                            'FKT domiciliare 2-3 volte alla settimana',
+                        ].join('\n'),
+                        extractedData: {
+                            diagnoses: [
+                                {
+                                    code: 'S72.1',
+                                    description: 'Frattura pertrocanterica del femore sinistro',
+                                    system: 'ICD-10',
+                                },
+                            ],
+                            medications: [
+                                'Duloxetina 60 mg 1 cp ore 20',
+                                'Pregabalin 75 mg 1 cp ore 8',
+                            ],
+                        },
+                        evidencePack: {
+                            schemaVersion: 'mediflow.document_evidence_pack.v2',
+                            source: {
+                                documentInsightId: 'doc-2',
+                                fileName: 'dimissione.pdf',
+                                documentDate: '2025-03-05T00:00:00.000Z',
+                                qualityLevel: 'green',
+                            },
+                            facts: [
+                                {
+                                    id: 'problem:1',
+                                    kind: 'problem',
+                                    label: 'Frattura pertrocanterica del femore sinistro',
+                                    excerpt: 'Frattura pertrocanterica del femore sinistro',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                    code: 'S72.1',
+                                    system: 'ICD-10',
+                                },
+                                {
+                                    id: 'medication:1',
+                                    kind: 'medication',
+                                    label: 'Duloxetina 60 mg 1 cp ore 20',
+                                    excerpt: 'Duloxetina 60 mg 1 cp ore 20',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                },
+                                {
+                                    id: 'medication:2',
+                                    kind: 'medication',
+                                    label: 'Pregabalin 75 mg 1 cp ore 8',
+                                    excerpt: 'Pregabalin 75 mg 1 cp ore 8',
+                                    sourceId: 'doc-2',
+                                    temporality: 'current',
+                                    status: 'active',
+                                    origin: 'documented',
+                                },
+                                {
+                                    id: 'followup:1',
+                                    kind: 'followup',
+                                    label: 'FKT domiciliare 2-3 volte alla settimana',
+                                    excerpt: 'FKT domiciliare 2-3 volte alla settimana',
+                                    sourceId: 'doc-2',
+                                    temporality: 'planned',
+                                    status: 'planned',
+                                    origin: 'documented',
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        id: 'doc-3',
+                        date: '2025-03-05T00:00:00Z',
+                        fileName: 'ps.pdf',
+                        summary: 'Accesso in PS per frattura pertrocanterica femore sinistro',
+                        rawMarkdown: [
+                            'Verbale di pronto soccorso',
+                            'Frattura pertrocanterica femore sinistro',
+                            'Dimissione con controllo ortopedico',
+                        ].join('\n'),
+                        extractedData: {
+                            diagnoses: [
+                                {
+                                    code: 'S72.1',
+                                    description: 'Frattura pertrocanterica del femore sinistro',
+                                    system: 'ICD-10',
+                                },
+                            ],
+                        },
+                    },
+                ]),
+            }
+            : undefined
+    )) as typeof dbModule.db.patients.get;
+
+    dbModule.db.entries.filter = stubFilter([
+        {
+            id: 'entry-1',
+            patientId: 'patient-1',
+            date: new Date('2025-03-12T00:00:00Z'),
+            type: 'note',
+            content: 'Dolore toracico riferito in riduzione',
+            createdAt: new Date('2025-03-12T00:00:00Z'),
+            updatedAt: new Date('2025-03-12T00:00:00Z'),
+        },
+    ]) as typeof dbModule.db.entries.filter;
+
+    dbModule.db.therapies.filter = stubFilter([
+        {
+            id: 'therapy-1',
+            patientId: 'patient-1',
+            drugName: 'Ramipril',
+            dosage: '5 mg/die',
+            status: 'active',
+            startDate: new Date('2025-03-11T00:00:00Z'),
+            endDate: null,
+            createdAt: new Date('2025-03-11T00:00:00Z'),
+        },
+    ]) as typeof dbModule.db.therapies.filter;
+
+    dbModule.db.observations.filter = stubFilter([
+        {
+            id: 'obs-1',
+            patientId: 'patient-1',
+            codeSystem: 'LOINC',
+            code: '8480-6',
+            display: 'Pressione sistolica',
+            unitSystem: 'UCUM',
+            unitCode: 'mm[Hg]',
+            value: '138',
+            notes: 'Controllo domiciliare',
+            observedAt: new Date('2025-03-13T00:00:00Z'),
+            createdAt: new Date('2025-03-13T00:00:00Z'),
+        },
+    ]) as typeof dbModule.db.observations.filter;
+
+    dbModule.db.checkups.filter = stubFilter([
+        {
+            id: 'checkup-1',
+            patientId: 'patient-1',
+            date: new Date('2025-03-20T00:00:00Z'),
+            title: 'Controllo cardiologico',
+            notes: 'Da confermare',
+            status: 'pending',
+            createdAt: new Date('2025-03-01T00:00:00Z'),
+        },
+    ]) as typeof dbModule.db.checkups.filter;
+
+    dbModule.db.attachments.filter = stubFilter(options.attachments ?? [
+        { id: 'attachment-1', patientId: 'patient-1', name: 'eco-cuore.pdf', summarySnapshot: 'Funzione sistolica conservata', createdAt: new Date('2025-03-14T00:00:00Z') },
+        { id: 'attachment-2', patientId: 'patient-1', name: 'rx-polmoni.pdf', summarySnapshot: 'Addensamento basale da rivalutare', createdAt: new Date('2025-03-04T00:00:00Z') },
+    ]) as typeof dbModule.db.attachments.filter;
+
+    settingsModule.getAIInsightRuntimeSettings = (async () => ({
+        mode: 'full_auto',
+        resolvedProfile: 'balanced',
+        maxDocuments: 3,
+        maxDocumentSummaryChars: 260,
+        maxDocumentContextChars: 1000,
+        outputMaxTokens: 256,
+    })) as typeof settingsModule.getAIInsightRuntimeSettings;
+
+    return () => {
+        dbModule.db.patients.get = original.getPatient;
+        dbModule.db.entries.filter = original.entryFilter;
+        dbModule.db.therapies.filter = original.therapyFilter;
+        dbModule.db.observations.filter = original.observationFilter;
+        dbModule.db.checkups.filter = original.checkupFilter;
+        dbModule.db.attachments.filter = original.attachmentFilter;
+        settingsModule.getAIInsightRuntimeSettings = original.runtimeSettings;
+    };
+}
+
+test('buildPatientInsightContext orders structured domains and documents deterministically', async () => {
+    const restore = await withHarness();
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const prompt = snapshot.prompt;
+        const sections = snapshot.sourceRefs.map((ref) => ref.section);
+
+        assert.equal(snapshot.outputMaxTokens, 256);
+        assert.deepEqual(sections, [
+            'Profilo strutturato',
+            'Profilo strutturato',
+            'Profilo strutturato',
+            'Diagnosi codificate',
+            'Terapie attive',
+            'Osservazioni recenti',
+            'Controlli pendenti',
+            'Diario clinico recente',
+            'Documenti recenti',
+            'Documenti recenti',
+            'Documenti recenti',
+        ]);
+        assert.ok(prompt.indexOf('[PROFILO STRUTTURATO]') < prompt.indexOf('[DIAGNOSI CODIFICATE]'));
+        assert.ok(prompt.indexOf('[DIAGNOSI CODIFICATE]') < prompt.indexOf('[TERAPIE ATTIVE]'));
+        assert.ok(prompt.indexOf('[TERAPIE ATTIVE]') < prompt.indexOf('[OSSERVAZIONI RECENTI]'));
+        assert.ok(prompt.indexOf('[OSSERVAZIONI RECENTI]') < prompt.indexOf('[CONTROLLI PENDENTI]'));
+        assert.ok(prompt.indexOf('[CONTROLLI PENDENTI]') < prompt.indexOf('[DIARIO CLINICO RECENTE]'));
+        assert.ok(prompt.indexOf('[DIARIO CLINICO RECENTE]') < prompt.indexOf('[DOCUMENTI RECENTI]'));
+        assert.match(prompt, /Dai priorita clinica a documenti recenti, diario clinico recente, osservazioni recenti e controlli pendenti/i);
+        assert.match(prompt, /evita cataloghi anamnestici se non cambiano la gestione attuale/i);
+        assert.match(prompt, /eco-cuore\.pdf \(14\/03\/2025\): Funzione sistolica conservata/i);
+        assert.match(prompt, /referto-lab\.pdf \(10\/03\/2025\): Sintesi: Azotemia in lieve aumento/i);
+        assert.match(prompt, /dimissione\.pdf \(05\/03\/2025\): Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /Terapie documentate: Duloxetina 60 mg 1 cp ore 20; Pregabalin 75 mg 1 cp ore 8/i);
+        assert.match(prompt, /Follow-up documentato: FKT domiciliare 2-3 volte alla settimana \[programmato, pianificato\]/i);
+        assert.ok(!prompt.includes('ps.pdf'));
+        assert.ok(!prompt.includes('rx-polmoni.pdf'));
+        assert.match(snapshot.limitations.join('\n'), /note narrative della scheda sono state escluse/i);
+        assert.match(snapshot.limitations.join('\n'), /contesto documentale AI e stato ridotto a 3 documenti/i);
+        assert.match(snapshot.limitations.join('\n'), /documenti ai sovrapposti sullo stesso episodio sono stati consolidati/i);
+        assert.match(prompt, /\[TERAPIE ATTIVE\][\s\S]*Ramipril 5 mg\/die/i);
+        assert.match(prompt, /sezione TERAPIE ATTIVE come fonte primaria della terapia corrente/i);
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext recovers direct attachment text when the stored snapshot is generic', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-generic',
+                patientId: 'patient-1',
+                name: 'lettera-dimissione.pdf',
+                type: 'application/pdf',
+                data: 'data:application/pdf;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1', {
+            recoverAttachmentText: async () => [
+                'Diagnosi di dimissione',
+                'Deficit della deambulazione in postumi di frattura pertrocanterica sx',
+                'Indicazioni alla dimissione',
+                'FKT domiciliare 2-3 volte alla settimana',
+                'Visita ortopedica di controllo con Rx anca sx e femore sx',
+            ].join('\n'),
+        });
+
+        assert.match(snapshot.prompt, /lettera-dimissione\.pdf \(14\/03\/2025\): Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /Deficit della deambulazione in postumi di frattura pertrocanterica sx/i);
+        assert.match(snapshot.prompt, /FKT domiciliare 2-3 volte alla settima/i);
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file/i,
+        );
+        assert.ok(!snapshot.limitations.join('\n').includes('non sono stati usati come fonti documentali'));
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext prefers the attachment parse/evidence artifact over the legacy document projection', async () => {
+    const artifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: 'doc-artifact',
+        attachmentId: 'attachment-artifact',
+        fileName: 'lettera-dimissione.pdf',
+        documentDate: '2025-03-14T00:00:00.000Z',
+        qualityLevel: 'green',
+        qualityReason: 'Documento strutturato',
+        summary: 'Dimissione ortopedica con follow-up domiciliare.',
+        rawMarkdown: [
+            'Diagnosi di dimissione',
+            'Frattura pertrocanterica del femore sinistro',
+            'Indicazioni alla dimissione',
+            'FKT domiciliare 2-3 volte alla settimana',
+            'ADI infermieristica per medicazione ferita',
+        ].join('\n'),
+        diagnoses: [
+            {
+                code: 'S72.1',
+                description: 'Frattura pertrocanterica del femore sinistro',
+                system: 'ICD-10',
+                evidence: 'Diagnosi di dimissione: frattura pertrocanterica del femore sinistro',
+                confidence: 'high',
+            },
+        ],
+        medications: [],
+    });
+
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-artifact',
+                attachmentId: 'attachment-artifact',
+                date: '2025-03-14T00:00:00Z',
+                fileName: 'lettera-dimissione.pdf',
+                summary: 'Legacy summary da non usare come source of truth',
+                rawMarkdown: '',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-artifact',
+                patientId: 'patient-1',
+                name: 'lettera-dimissione.pdf',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(artifact),
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const prompt = snapshot.prompt;
+
+        assert.match(prompt, /lettera-dimissione\.pdf \(14\/03\/2025\): Problemi documentati: ICD-10 S72\.1: Frattura pertrocanterica del femore sinistro/i);
+        assert.match(prompt, /Follow-up documentato: FKT domiciliare 2-3 volte alla settimana/i);
+        assert.ok(!prompt.includes('Legacy summary da non usare come source of truth'));
+        assert.equal((prompt.match(/lettera-dimissione\.pdf \(14\/03\/2025\):/gi) || []).length, 1);
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext promotes the most recent attachment evidence before older archive documents', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-1',
+                date: '2025-03-12T00:00:00Z',
+                fileName: 'profilo-terapia.pdf',
+                summary: 'Terapia antipertensiva invariata.',
+            },
+            {
+                id: 'doc-2',
+                date: '2025-03-11T00:00:00Z',
+                fileName: 'lettera-specialistica.pdf',
+                summary: 'Follow-up cardiologico stabile.',
+            },
+            {
+                id: 'doc-3',
+                date: '2025-03-10T00:00:00Z',
+                fileName: 'vecchio-lab.pdf',
+                summary: 'Esami ematici senza novita clinicamente rilevanti.',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-new',
+                patientId: 'patient-1',
+                name: 'follow-up-pneumo.pdf',
+                summarySnapshot: 'Controllo pneumologico ravvicinato da programmare per addensamento basale.',
+                createdAt: new Date('2025-03-13T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const documentRefs = snapshot.sourceRefs
+            .filter((ref) => ref.section === 'Documenti recenti')
+            .map((ref) => ref.promptLine);
+
+        assert.equal(documentRefs.length, 3);
+        assert.match(documentRefs[0] || '', /follow-up-pneumo\.pdf \(13\/03\/2025\): Controllo pneumologico ravvicinato/i);
+        assert.match(documentRefs[1] || '', /profilo-terapia\.pdf \(12\/03\/2025\): Sintesi: Terapia antipertensiva invariata/i);
+        assert.match(documentRefs[2] || '', /lettera-specialistica\.pdf \(11\/03\/2025\): Sintesi: Follow-up cardiologico stabile/i);
+        assert.ok(!snapshot.prompt.includes('vecchio-lab.pdf'));
+        assert.match(snapshot.limitations.join('\n'), /contesto documentale AI e stato ridotto a 3 documenti/i);
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext suppresses stale background documents when a newer source covers the same domain', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([
+            {
+                id: 'doc-1',
+                date: '2025-02-12T00:00:00Z',
+                fileName: 'profilo-cronico.pdf',
+                summary: 'BPCO stabile, follow-up annuale pneumologico senza urgenze.',
+            },
+            {
+                id: 'doc-2',
+                date: '2025-03-11T00:00:00Z',
+                fileName: 'lettera-specialistica.pdf',
+                summary: 'Follow-up cardiologico stabile.',
+            },
+            {
+                id: 'doc-3',
+                date: '2025-03-10T00:00:00Z',
+                fileName: 'vecchio-lab.pdf',
+                summary: 'Esami ematici senza novita clinicamente rilevanti.',
+            },
+        ]),
+        attachments: [
+            {
+                id: 'attachment-new',
+                patientId: 'patient-1',
+                name: 'follow-up-pneumo.pdf',
+                summarySnapshot: 'Controllo pneumologico ravvicinato da programmare per addensamento basale.',
+                createdAt: new Date('2025-03-27T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const documentRefs = snapshot.sourceRefs
+            .filter((ref) => ref.section === 'Documenti recenti')
+            .map((ref) => ref.promptLine);
+
+        assert.equal(documentRefs.length, 3);
+        assert.match(documentRefs[0] || '', /follow-up-pneumo\.pdf \(27\/03\/2025\): Controllo pneumologico ravvicinato/i);
+        assert.match(documentRefs[1] || '', /lettera-specialistica\.pdf \(11\/03\/2025\): Sintesi: Follow-up cardiologico stabile/i);
+        assert.match(documentRefs[2] || '', /vecchio-lab\.pdf \(10\/03\/2025\): Sintesi: Esami ematici senza novita clinicamente rilevanti/i);
+        assert.ok(!snapshot.prompt.includes('profilo-cronico.pdf'));
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /Documenti cronici o stale sullo stesso dominio di fonti piu recenti sono stati de-prioritizzati/i,
+        );
+    } finally {
+        restore();
+    }
+});
+
+test('buildPatientInsightContext normalizes CDA-like recovered attachment text before rendering excerpts', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-cda',
+                patientId: 'patient-1',
+                name: 'dimissione-cda.xml',
+                type: 'application/xml',
+                data: 'data:application/xml;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-15T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1', {
+            recoverAttachmentText: async () => `
+                <ClinicalDocument>
+                  <component>
+                    <structuredBody>
+                      <component>
+                        <section>
+                          <title>Indicazioni alla dimissione</title>
+                          <text>
+                            <paragraph>Controllo ortopedico tra 14 giorni</paragraph>
+                            <paragraph>ADI infermieristica da proseguire</paragraph>
+                          </text>
+                        </section>
+                      </component>
+                    </structuredBody>
+                  </component>
+                </ClinicalDocument>
+            `,
+        });
+
+        assert.match(snapshot.prompt, /dimissione-cda\.xml \(15\/03\/2025\): Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /Controllo ortopedico tra 14 giorni/i);
+        assert.match(snapshot.prompt, /ADI infermieristica da proseguire/i);
+        assert.doesNotMatch(snapshot.prompt, /ClinicalDocument/);
+    } finally {
+        restore();
+    }
+});

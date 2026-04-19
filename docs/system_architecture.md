@@ -2,161 +2,128 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (sintesi rapida).**
-> La visione architetturale stabile resta `ARCHITECTURE.md`.
-> Il walkthrough operativo canonico resta `docs/walkthrough.md`.
+> La visione architetturale stabile resta [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
 
-Panoramica tecnica rapida di componenti, topologia e flussi principali.
-Per il dettaglio completo usa `docs/walkthrough.md`.
-
----
-
-## Principi base
-
-1. **Offline first**: tutto gira in locale, senza dipendenze cloud obbligatorie.
-2. **Privacy by design**: i dati sensibili vengono cifrati prima della persistenza.
-3. **AI locale**: i modelli girano su Ollama, senza invio dati a servizi esterni di default.
+Panoramica tecnica rapida aggiornata allo stato reale di `main`.
+Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
+Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
 
 ---
 
-## Schema generale
+## Snapshot corrente
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Browser                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │  React UI   │→ │ Encryption  │→ │  API Client (db.ts) │  │
-│  │  (Next.js)  │  │  (AES-GCM)  │  │                     │  │
-│  └─────────────┘  └─────────────┘  └──────────┬──────────┘  │
-└───────────────────────────────────────────────┼─────────────┘
-                                                │ REST
-┌───────────────────────────────────────────────┼─────────────┐
-│                      macOS                     │             │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────▼──────────┐  │
-│  │   Ollama    │  │   SQLite    │← │  Next.js Server     │  │
-│  │  :11434     │  │ medical.db  │  │      :3000          │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
-│  ┌─────────────┐                                            │
-│  │Docker: ICD  │                                            │
-│  │   :8888     │                                            │
-│  └─────────────┘                                            │
-└─────────────────────────────────────────────────────────────┘
-```
+1. **Local-first di default**: il dato resta sul computer locale e nessun cloud
+   entra nel runtime operativo per default.
+2. **Zero-knowledge a riposo**: i campi clinici e gli artifact documentali
+   persistono cifrati lato client.
+3. **Home-base opt-in**: esiste una first slice `network-home-base` read-only su
+   `/api/v1/network/*`, ma pairing, replica e sync restano governati e separati.
+4. **Document intelligence prudente**: `documentInsights` resta compat layer,
+   mentre gli allegati possono gia persistere un artifact `parse/evidence`
+   cifrato consumato in priorita da `AI Patient Insight`.
+5. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
+   congelata per rebuild e filone iPadOS/iOS ricondotto allo stesso boundary
+   `home-base + /api/v1`.
+6. **Preview profiles locali**: alcune fette UI/AI/import/SISS sono verificabili
+   come preview locali senza cambiare il checkout stabile.
 
 ---
 
-## Database
+## Componenti chiave
 
-SQLite in locale (`medical.db`). Schema gestito con Drizzle ORM.
-
-### Tabelle principali
-
-| Tabella | Cosa contiene | Campi cifrati |
+| Componente | Stato attuale | Note |
 | --- | --- | --- |
-| `users` | Profilo medico, PIN hash, chiave master cifrata | passwordHash, encryptedMasterKey |
-| `patients` | Anagrafica, diagnosi, note | address, phone, notes, aiSummary, documentInsights |
-| `entries` | Diario clinico (visite, esami, note) | content |
-| `therapies` | Piano terapeutico | motivation |
-| `checkups` | Controlli programmati | notes |
-| `ambulatories` | Sedi/reparti | — |
-| `conversations` | Chat con AI | title |
-| `messages` | Singoli messaggi AI | content, reasoning |
-| `attachments` | PDF e immagini allegati | — (blob binario) |
-
-### Cifratura
-
-I campi marcati come "cifrati" vengono processati nel browser PRIMA di essere inviati al server:
-
-```
-Dato originale → AES-256-GCM → "ENC:base64iv:base64ciphertext" → Database
-```
-
-Il server vede solo stringhe cifrate. Non ha la chiave.
+| Web app Next.js | Superficie primaria | UI, `/api/*`, `/api/v1/*`, overview `home-base`, orchestrazione AI locale |
+| SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
+| Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR locale separato |
+| ICD-11 Docker | Servizio locale opzionale | Resolver diagnostico OMS |
+| OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
+| TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
 
 ---
 
-## AI: due modelli che collaborano
+## Dati e cifratura
 
-| Modello | Porta | Ruolo |
+Tutto cio che e clinicamente sensibile viene cifrato lato client prima della
+persistenza. Questo include:
+
+- campi paziente (`address`, `phone`, `notes`, `aiSummary`, `documentInsights`)
+- contenuti del diario clinico
+- note di controlli e motivazioni terapeutiche
+- allegati e snapshot documentali (`summarySnapshot`,
+  `parseEvidenceArtifactSnapshot`)
+
+Formato at-rest:
+
+```text
+ENC:<iv_b64>:<cipher_b64>
+```
+
+Il server non possiede la chiave in chiaro; la master key vive solo nella
+sessione attiva del browser/client.
+
+---
+
+## API e boundary
+
+| Surface | Auth | Scopo |
 | --- | --- | --- |
-| **MedGemma 4B** | 11434 (Ollama) | Analisi clinica, sintesi, supporto decisionale |
-| **DeepSeek-OCR 3B** | 11434 (Ollama) | Lettura documenti, estrazione testo da PDF/immagini |
+| `/api/auth/*` | credenziali + session cookie | setup/login/logout |
+| `/api/*` | session cookie | CRUD web, proxy locali, overview shell |
+| `/api/v1/*` | bearer token locale | contratto condiviso native |
+| `/api/v1/network/*` | paired client credential + sessione operatore | `home-base` read-only first |
 
-### Flusso OCR + Sintesi
+Boundary importanti:
 
-```
-1. Utente carica PDF/immagine
-2. → DeepSeek-OCR estrae il testo (API multimodale)
-3. → MedGemma genera sintesi clinica (max 150 parole)
-4. → Salvato in patients.documentInsights (ultimi 3)
-5. → Mostrato nel pannello "Archivio Intelligente"
-```
-
-Tutto avviene in locale. Zero chiamate esterne.
+- `local-only` resta il default
+- `network-home-base` si attiva esplicitamente in Settings
+- il pairing bootstrap e PHI-safe
+- non esistono ancora write remoti, sync record-level o multi-master
 
 ---
 
-## Endpoint API
+## AI e document intelligence
 
-| Endpoint | Cosa fa |
-| --- | --- |
-| `/api/patients` | CRUD pazienti |
-| `/api/entries` | Diario clinico |
-| `/api/therapies` | Terapie |
-| `/api/checkups` | Controlli |
-| `/api/conversations` | Chat AI |
-| `/api/messages` | Messaggi singoli |
-| `/api/proxy/ai/chat` | Proxy verso Ollama |
-| `/api/icd/proxy` | Proxy verso ICD-11 Docker |
-| `/api/ocr/extract` | Estrazione OCR documenti |
-| `/api/auth/login` | Login |
-| `/api/auth/setup` | Setup iniziale |
+Pipeline corrente:
 
----
+1. upload documento
+2. normalizzazione input locale
+3. OCR locale
+4. estrazione/sintesi con runtime generativo locale
+5. persistenza di:
+   - `summarySnapshot`
+   - artifact `parse/evidence`
+   - `documentInsights` come projection compatibile
+6. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
+   flow document-driven)
 
-## Cifratura: dettagli tecnici
-
-| Parametro | Valore |
-| --- | --- |
-| Algoritmo | AES-256-GCM (Web Crypto API) |
-| Key derivation | PBKDF2-SHA256, 100k iterazioni |
-| IV | 12 byte random per operazione |
-| Storage chiave | sessionStorage (volatile, RAM only) |
-| Formato at-rest | `ENC:base64(iv):base64(ciphertext)` |
-
-La Master Key viene derivata dal PIN, usata per cifrare/decifrare, e vive SOLO nella sessione browser. Al logout o chiusura tab, sparisce.
+Nota: `Smart Import` resta reviewable e filtra il rumore da fonti senza novita
+clinica quando diagnosi/terapie sono gia presenti.
 
 ---
 
-## Docker
+## Guardrail operativi
 
-Unico container necessario: ICD-11 API (WHO ufficiale).
-
-```yaml
-services:
-  icd-api:
-    image: whoicd/icd-api
-    ports:
-      - "8888:80"
-    environment:
-      - acceptLicense=true
-      - saveAnalytics=false
-```
-
-Ollama gira nativo (non in Docker) per sfruttare GPU Metal.
+- `AppRevisionGuard` + `/api/system/revision` evitano tab stale dopo cambi di
+  branch/revision/worktree.
+- `Start_MediFlow.command` puo resettare `.next` quando cambia il fingerprint
+  della sorgente locale.
+- I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
+  restano separati dal runtime clinico.
 
 ---
 
-## File di configurazione
+## Riferimenti rapidi
 
-| File | Cosa fa |
-| --- | --- |
-| `lib/schema.ts` | Schema database (Drizzle) |
-| `lib/db.ts` | Client API + cifratura |
-| `lib/ai-service.ts` | Wrapper Ollama/MLX |
-| `lib/ocr-service.ts` | Estrazione documenti |
-| `lib/document-synthesis-service.ts` | Sintesi AI documenti |
-| `drizzle.config.ts` | Config migrazioni DB |
+- [ARCHITECTURE.md](../ARCHITECTURE.md)
+- [SECURITY.md](../SECURITY.md)
+- [docs/walkthrough.md](./walkthrough.md)
+- [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
+- [docs/adr/0034-local-only-default-and-network-home-base-opt-in.md](./adr/0034-local-only-default-and-network-home-base-opt-in.md)
+- [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md)
+- [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
 
 ---
 
-*Ultimo aggiornamento: Febbraio 2026 — MediFlow v0.3.0*
+*Ultimo aggiornamento: 2026-04-07 — main post-v0.5.0*

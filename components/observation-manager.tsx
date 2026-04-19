@@ -86,18 +86,21 @@ export default function ObservationManager({ patientId }: { patientId: string })
 
     return (
         <div className="glass-panel p-6 space-y-5">
-            <div className="flex items-center gap-2">
+            <div>
+                <p className="section-kicker">Osservazioni strutturate</p>
+                <div className="mt-1 flex items-center gap-2">
                 <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <h3 className="font-bold text-gray-800 dark:text-gray-100">Osservazioni Codificate (LOINC + UCUM)</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Osservazioni Codificate (LOINC + UCUM)</h3>
+                </div>
             </div>
 
-            <form onSubmit={saveObservation} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="space-y-1">
-                    <span className="text-[11px] font-semibold uppercase text-gray-500">Parametro (LOINC)</span>
+                    <span className="section-kicker">Parametro (LOINC)</span>
                     <select
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
-                        className="w-full p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-sm"
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5"
                     >
                         {loincOptions.map((item) => (
                             <option key={item.code} value={item.code}>
@@ -108,32 +111,32 @@ export default function ObservationManager({ patientId }: { patientId: string })
                 </label>
 
                 <label className="space-y-1">
-                    <span className="text-[11px] font-semibold uppercase text-gray-500">Data/Ora</span>
+                    <span className="section-kicker">Data/Ora</span>
                     <input
                         type="datetime-local"
                         value={observedAt}
                         onChange={(e) => setObservedAt(e.target.value)}
-                        className="w-full p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-sm dark:[color-scheme:dark]"
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
                     />
                 </label>
 
                 <label className="space-y-1">
-                    <span className="text-[11px] font-semibold uppercase text-gray-500">Valore</span>
+                    <span className="section-kicker">Valore</span>
                     <input
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         placeholder="Es. 120"
                         inputMode="decimal"
-                        className="w-full p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-sm"
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5"
                     />
                 </label>
 
                 <label className="space-y-1">
-                    <span className="text-[11px] font-semibold uppercase text-gray-500">Unità (UCUM)</span>
+                    <span className="section-kicker">Unità (UCUM)</span>
                     <select
                         value={unitCode}
                         onChange={(e) => setUnitCode(e.target.value)}
-                        className="w-full p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-sm"
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5"
                     >
                         {ucumOptions.map((item) => (
                             <option key={item.code} value={item.code}>
@@ -144,12 +147,12 @@ export default function ObservationManager({ patientId }: { patientId: string })
                 </label>
 
                 <label className="md:col-span-2 space-y-1">
-                    <span className="text-[11px] font-semibold uppercase text-gray-500">Note (opzionale)</span>
+                    <span className="section-kicker">Note (opzionale)</span>
                     <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        className="w-full p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-sm"
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5"
                         placeholder="Contesto rilevazione, paziente a riposo, ecc."
                     />
                 </label>
@@ -158,7 +161,7 @@ export default function ObservationManager({ patientId }: { patientId: string })
                     <button
                         type="submit"
                         disabled={isSaving || value.trim().length === 0}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED] disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" />
                         {isSaving ? 'Salvataggio...' : 'Aggiungi Osservazione'}
@@ -173,30 +176,30 @@ export default function ObservationManager({ patientId }: { patientId: string })
                     observations.map((item) => (
                         <div
                             key={item.id}
-                            className="rounded-xl border border-emerald-100 dark:border-emerald-700/30 bg-emerald-50/40 dark:bg-emerald-900/10 p-3"
+                            className="rounded-[22px] border border-slate-200/80 bg-white/78 p-3 dark:border-white/10 dark:bg-white/5"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
                                         {item.display}
                                     </p>
-                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 font-mono">
+                                    <p className="font-mono text-xs text-emerald-700 dark:text-emerald-300">
                                         {item.codeSystem}: {item.code}
                                     </p>
-                                    <p className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                                    <p className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
                                         <Droplets className="w-3.5 h-3.5 text-emerald-500" />
                                         {item.value} {item.unitCode}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
                                         {new Date(item.observedAt).toLocaleString('it-IT')}
                                     </p>
                                     {item.notes && (
-                                        <p className="text-xs text-gray-600 dark:text-gray-300 italic">{item.notes}</p>
+                                        <p className="text-xs italic text-slate-600 dark:text-slate-300">{item.notes}</p>
                                     )}
                                 </div>
                                 <button
                                     onClick={() => deleteObservation(item.id)}
-                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                                     title="Elimina osservazione"
                                 >
                                     <Trash2 className="w-4 h-4" />

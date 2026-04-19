@@ -2,6 +2,11 @@
 
 Per usare ICD-11 in MediFlow (e ridurre l'uso di ICD-9 legacy), avvia il container OMS in locale.
 
+Riferimenti correlati:
+- [docs/walkthrough.md](./walkthrough.md)
+- [docs/system_architecture.md](./system_architecture.md)
+- [docs/README.md](./README.md)
+
 ## Requisiti
 
 - **Docker Desktop** installato e in esecuzione.

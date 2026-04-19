@@ -9,6 +9,7 @@ struct PatientSummary: Identifiable, Decodable {
     let taxCode: String
     let isAdi: Bool?
     let isArchived: Bool?
+    let version: Int
     let updatedAt: Date?
 }
 
@@ -23,6 +24,10 @@ struct PatientDetail: Identifiable, Decodable {
     let caregiver: String?
     /* @Codex */
     let exemptions: String?
+    /* @Codex */
+    let diagnoses: String?
+    /* @Codex */
+    let monitoringProfile: String?
     let notes: String?
     /* @Codex */
     let aiSummary: String?
@@ -30,6 +35,7 @@ struct PatientDetail: Identifiable, Decodable {
     let documentInsights: String?
     let isAdi: Bool?
     let isArchived: Bool?
+    let version: Int
     let ambulatoryId: String?
     let createdAt: Date?
     let updatedAt: Date?
@@ -99,4 +105,17 @@ struct ObservationSummary: Identifiable, Decodable {
     let observedAt: Date
     let source: String?
     let createdAt: Date?
+}
+
+/* @Codex */
+struct TerminologySearchItem: Identifiable, Decodable {
+    let system: String
+    let code: String
+    let display: String
+    let version: String?
+    let source: String
+
+    var id: String {
+        "\(system):\(code)"
+    }
 }

@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { parseCheckupStatus } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 export async function PUT(
     request: Request,
@@ -18,6 +20,8 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as unknown;
+        /* @Codex */
+        const auditBody = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
         const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -78,6 +82,21 @@ export async function PUT(
             .set(updateData)
             .where(eq(checkups.id, id));
 
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'checkup.updated',
+                subjectType: 'checkup',
+                subjectRef: id,
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody),
+                },
+            },
+            '[MediFlow] Checkup audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Update Failed" }, { status: 500 });
@@ -99,6 +118,19 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
         await dbServer.delete(checkups).where(eq(checkups.id, id));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'checkup.deleted',
+                subjectType: 'checkup',
+                subjectRef: id,
+            },
+            '[MediFlow] Checkup audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });

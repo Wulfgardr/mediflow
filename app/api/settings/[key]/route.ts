@@ -4,6 +4,8 @@ import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 
 export async function GET(
     request: Request,
@@ -49,6 +51,25 @@ export async function PUT(
             .insert(settings)
             .values({ key, value })
             .onConflictDoUpdate({ target: settings.key, set: { value } });
+
+        try {
+            const context = auditContextFromRequest(request, session);
+            await writeAuditEvent({
+                eventType: 'settings.updated',
+                outcome: 'success',
+                actorType: context.actorType,
+                actorRef: context.actorRef,
+                subjectType: 'settings',
+                subjectRef: key,
+                sourceSurface: context.sourceSurface,
+                requestId: requestIdFromRequest(request),
+                redactedMetadata: withAuditContextMetadata(context, {
+                    changedFields: listChangedFields(body),
+                }),
+            });
+        } catch (error) {
+            console.error('Audit settings write failed:', error);
+        }
 
         return NextResponse.json({ success: true, key, value });
     } catch (error) {

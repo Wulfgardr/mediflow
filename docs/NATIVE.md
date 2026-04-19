@@ -2,11 +2,31 @@
 
 > Guida tecnica del client SwiftUI di MediFlow.
 
+> [!IMPORTANT]
+> Dopo `v0.4.0` il filone macOS/parity e **congelato**: la shell nativa entra in **riscrittura controllata** ("demolizione controllata").
+> Questo documento resta canonico per capire lo snapshot esistente, il contratto `/api/v1`, il trasporto TLS locale e i vincoli security da preservare nel rebuild.
+> La direzione Apple, pero, e oggi piu ampia: macOS resta il nodo di partenza, mentre iPadOS/iOS rientrano nello stesso disegno `home-base + paired client` descritto nei documenti canonici.
+
+Riferimenti correlati:
+
+- [docs/README.md](./README.md) (mappa canonica documentazione)
+- [docs/markdown-index.md](./markdown-index.md) (indice completo markdown)
+- [docs/walkthrough.md](./walkthrough.md) (flusso end-to-end)
+- [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
+- [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
+
 ---
 
 ## Stato del progetto
 
-Il client nativo non è più solo in lettura. Oggi supporta:
+Il client nativo documentato qui non e piu la base per nuova delivery incrementale. Oggi va letto cosi:
+
+* **Snapshot operativo esistente**: il vecchio client ha gia superato il read-only e contiene CRUD clinico essenziale, tooling AI locale e lock screen con PIN.
+* **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
+* **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
+* **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
+
+Lo snapshot corrente supporta comunque:
 
 * **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
 * **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
@@ -28,9 +48,9 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 ./scripts/Launch_MediFlowMac.command
 ```
 
-* avvia Next.js
-* avvia proxy TLS
-* lancia app macOS compilata (se presente)
+* configura TLS locale
+* compila il client nativo
+* apre la app macOS
 
 **Opzione B: setup sviluppatore**
 
@@ -45,8 +65,24 @@ Il client nativo non è più solo in lettura. Oggi supporta:
 2. Apri il progetto in Xcode:
 
     ```bash
-    open native/MediFlowMac.xcodeproj
+    open native/MediFlowMac/Package.swift
     ```
+
+---
+
+## Testing nativo (Xcode-first)
+
+La strategia testing ufficiale e documentata in:
+
+- [docs/native-testing.md](./native-testing.md)
+
+Comandi rapidi:
+
+```bash
+npm run test:native
+npm run test:native:xcode
+npm run test:parity:smoke
+```
 
 ---
 
@@ -64,7 +100,7 @@ L'app parte bloccata:
 
 Nel tab `Strumenti` trovi il pannello AI.
 
-* **Stato Modelli**: Vedi se MedGemma/DeepSeek sono carichi in memoria.
+* **Stato Modelli**: Vedi se Qwen/DeepSeek sono carichi in memoria.
 * **Chat tecnica**: puoi testare prompt o fare troubleshooting locale.
 * **Gestione Farmaci/ICD**: Strumenti rapidi per cercare codici senza aprire un paziente.
 

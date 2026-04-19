@@ -3,11 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
-import { extractPatientDataSmart, ExtractedPatientData } from '@/lib/pdf-service';
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { useLiveQuery } from '@/lib/live-query';
+import { db } from '@/lib/db';
+import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
+import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+/* @Codex */
+import { enrichExtractedPatientDataForReview } from '@/lib/patient-document-import-service';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    AiDocumentSynthesisDisabledError,
+    isAiDocumentSynthesisEnabledValue,
+} from '@/lib/ai-document-synthesis-kill-switch';
 
 interface PdfImporterProps {
     onDataExtracted: (data: ExtractedPatientData) => void;
@@ -26,6 +35,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
     const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
+    const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
+    const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     /* @Codex */
     useEffect(() => {
@@ -40,11 +51,11 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         if (acceptedFiles.length === 0) return;
 
         const file = acceptedFiles[0];
-        const isPdf = file.type === 'application/pdf';
-        const isImage = file.type.startsWith('image/');
+        const isPdf = isPdfDocumentInput(file);
+        const isImage = isImageDocumentInput(file);
 
         if (!isPdf && !isImage) {
-            setError('Formati supportati: PDF, JPG, PNG');
+            setError('Formati supportati: PDF e immagini comuni elaborabili localmente.');
             return;
         }
 
@@ -59,15 +70,50 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         try {
             // Use smart extraction (AI-first with regex fallback)
             const data = await extractPatientDataSmart(file);
+
+            /* @Codex */
+            if (!patientId && data.rawText && documentSynthesisEnabled) {
+                setIsSynthesizing(true);
+                /* @Codex */
+                setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                try {
+                    const analysis = await analyzeDocumentContent(data.rawText);
+                    data.diagnoses = analysis.diagnoses;
+                    data.medications = analysis.medications;
+                    data.problemStatements = analysis.problemStatements;
+                    data.therapyCandidates = analysis.therapyCandidates;
+                    data.documentQuality = analysis.quality;
+                    data.documentSummary = analysis.summary;
+                    if (!data.notes && analysis.summary) {
+                        data.notes = analysis.summary;
+                    }
+                } catch (analysisError) {
+                    if (!(analysisError instanceof AiDocumentSynthesisDisabledError)) {
+                        console.error('Document analysis error:', analysisError);
+                    }
+                } finally {
+                    setIsSynthesizing(false);
+                }
+            }
+
+            if (!patientId && documentSynthesisEnabled) {
+                try {
+                    setAiStage(`Riconciliazione ICD/AIFA (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                    Object.assign(data, await enrichExtractedPatientDataForReview(data));
+                } catch (reviewError) {
+                    console.error('Document review enrichment error:', reviewError);
+                }
+            }
+
             setExtractionSource(data.source);
             onDataExtracted(data);
             setSuccess(true);
 
             // Auto-save to archive if enabled and patientId is present
-            if (saveToArchive && patientId && data.rawText) {
+            if (saveToArchive && patientId && data.rawText && documentSynthesisEnabled) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'medgemma'})...`);
+                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                 try {
                     await synthesizeDocument(data.rawText, file.name, patientId);
                     setArchiveSaved(true);
@@ -75,10 +121,13 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     setAiStage("Aggiornamento AI Patient Summary...");
                     await regeneratePatientSummary(patientId);
                 } catch (synthErr) {
-                    console.error('Synthesis error:', synthErr);
+                    if (!(synthErr instanceof AiDocumentSynthesisDisabledError)) {
+                        console.error('Synthesis error:', synthErr);
+                    }
                     // Don't fail the whole operation, just note the archive wasn't saved
+                } finally {
+                    setIsSynthesizing(false);
                 }
-                setIsSynthesizing(false);
             }
         } catch (err) {
             console.error(err);
@@ -95,8 +144,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
         maxFiles: 1,
         accept: {
             'application/pdf': ['.pdf'],
-            'image/jpeg': ['.jpg', '.jpeg'],
-            'image/png': ['.png']
+            'image/*': []
         }
     });
 
@@ -152,6 +200,11 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                             {getSourceBadge()}
                         </div>
                         <p className="text-xs text-green-700">Controlla i campi compilati qui sotto.</p>
+                        {!patientId && (
+                            <p className="text-xs text-green-700">
+                                Diagnosi e terapie candidate vengono prima riconciliate localmente e poi proposte in review prima del salvataggio.
+                            </p>
+                        )}
 
                         {/* Archive status indicator */}
                         {patientId && (
@@ -200,6 +253,15 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     </div>
                 )}
             </div>
+
+            {!documentSynthesisEnabled && (
+                <div
+                    className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    data-testid="document-synthesis-disabled-note"
+                >
+                    La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi reviewable, terapie candidate e Archivio Intelligente non vengono generati.
+                </div>
+            )}
         </div>
     );
 }

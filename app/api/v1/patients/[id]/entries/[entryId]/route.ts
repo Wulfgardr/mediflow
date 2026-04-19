@@ -4,19 +4,17 @@ import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { normalizeEntryUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-/* @Codex */
-function parseDate(value: unknown): Date | undefined {
-    if (!value) return undefined;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
 export async function GET(
@@ -61,8 +59,14 @@ export async function PUT(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
+        const normalized = normalizeEntryUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
 
         const existing = await dbServer.select({ id: entries.id }).from(entries)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
@@ -71,21 +75,24 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const nextType = typeof body.type === 'string' ? body.type : undefined;
-        const nextDate = parseDate(body.date);
-        const nextContent = typeof body.content === 'string' ? body.content : undefined;
-
-        if (nextType === undefined && nextDate === undefined && nextContent === undefined) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-        }
-
         await dbServer.update(entries)
-            .set({
-                type: nextType,
-                date: nextDate,
-                content: nextContent
-            })
+            .set(normalized.values)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'entry.updated',
+                subjectType: 'entry',
+                subjectRef: entryId,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body),
+                },
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
 
         return NextResponse.json({ success: true });
     } catch (error) {
@@ -103,6 +110,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
         const existing = await dbServer.select({ id: entries.id }).from(entries)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
@@ -112,6 +121,19 @@ export async function DELETE(
         }
 
         await dbServer.delete(entries).where(and(eq(entries.id, entryId), eq(entries.patientId, id)));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'entry.deleted',
+                subjectType: 'entry',
+                subjectRef: entryId,
+            },
+            '[MediFlow] Entry audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/entries/[entryId] error:', error);

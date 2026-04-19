@@ -4,44 +4,56 @@ import CryptoKit
 
 actor LocalAPIClient {
     static let shared = LocalAPIClient()
+    /* @Codex */
+    private static let sourceSurfaceHeader = "X-MediFlow-Source-Surface"
+    /* @Codex */
+    private static let sourceSurfaceValue = "native"
 
     private let delegate = LocalAPISessionDelegate()
     private let session: URLSession
+    private let tokenProvider: LocalAPITokenProvider
 
-    init() {
+    init(tokenProvider: LocalAPITokenProvider = .shared, session: URLSession? = nil) {
+        self.tokenProvider = tokenProvider
         let configuration = URLSessionConfiguration.ephemeral
-        self.session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        self.session = session ?? URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+    }
+
+    /* @Codex */
+    private func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch let error as URLError {
+            throw mapTransportError(error)
+        }
     }
 
     func fetchPatients(ambulatoryId: String?) async throws -> [PatientSummary] {
         let queryItems = ambulatoryId.map { [URLQueryItem(name: "ambulatoryId", value: $0)] } ?? []
         let request = try makeRequest(path: "patients", queryItems: queryItems)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([PatientSummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([PatientSummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     func fetchPatient(id: String) async throws -> PatientDetail {
         let request = try makeRequest(path: "patients/\(id)")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(PatientDetail.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(PatientDetail.self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     func fetchAmbulatories() async throws -> [AmbulatorySummary] {
         let request = try makeRequest(path: "ambulatories")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([AmbulatorySummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([AmbulatorySummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     /* @Codex */
@@ -62,12 +74,11 @@ actor LocalAPIClient {
             path: "patients/\(patientId)/entries",
             queryItems: queryItems
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([EntrySummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([EntrySummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     /* @Codex */
@@ -88,12 +99,11 @@ actor LocalAPIClient {
             path: "patients/\(patientId)/therapies",
             queryItems: queryItems
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([TherapySummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([TherapySummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     /* @Codex */
@@ -114,12 +124,11 @@ actor LocalAPIClient {
             path: "patients/\(patientId)/checkups",
             queryItems: queryItems
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([CheckupSummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([CheckupSummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
     }
 
     /* @Codex */
@@ -140,148 +149,166 @@ actor LocalAPIClient {
             path: "patients/\(patientId)/observations",
             queryItems: queryItems
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([ObservationSummary].self, from: data) { decoder in
+            decoder.dateDecodingStrategy = .iso8601
+        }
+    }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([ObservationSummary].self, from: data)
+    /* @Codex */
+    func searchTerminology(system: String, query: String = "", limit: Int = 100) async throws -> [TerminologySearchItem] {
+        let normalizedSystem = system.trimmingCharacters(in: .whitespacesAndNewlines)
+        var queryItems = [URLQueryItem(name: "system", value: normalizedSystem)]
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedQuery.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: trimmedQuery))
+        }
+        if limit > 0 {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+
+        let request = try makeRequest(path: "terminology/search", queryItems: queryItems)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([TerminologySearchItem].self, from: data)
     }
 
     func createPatient(payload: CreatePatientPayload) async throws -> String {
         let request = try makeRequest(path: "patients", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-
-        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(CreatePatientResponse.self, from: data)
         return result.id
     }
 
     /* @Codex */
     func updatePatient(id: String, payload: UpdatePatientPayload) async throws {
         let request = try makeRequest(path: "patients/\(id)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validatePatientMutation(data: data, response: response)
     }
 
     /* @Codex */
-    func deletePatient(id: String) async throws {
-        let request = try makeRequest(path: "patients/\(id)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+    func deletePatient(id: String, expectedVersion: Int) async throws {
+        let request = try makeRequest(
+            path: "patients/\(id)",
+            method: "DELETE",
+            body: DeletePatientPayload(version: expectedVersion)
+        )
+        let (data, response) = try await data(for: request)
+        try validatePatientMutation(data: data, response: response)
     }
 
     func createEntry(patientId: String, payload: CreateEntryPayload) async throws -> String {
         let request = try makeRequest(path: "patients/\(patientId)/entries", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(CreatePatientResponse.self, from: data)
         return result.id
     }
 
     /* @Codex */
     func updateEntry(patientId: String, entryId: String, payload: UpdateEntryPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/entries/\(entryId)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func deleteEntry(patientId: String, entryId: String) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/entries/\(entryId)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func createTherapy(patientId: String, payload: CreateTherapyPayload) async throws -> String {
         let request = try makeRequest(path: "patients/\(patientId)/therapies", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(CreatePatientResponse.self, from: data)
         return result.id
     }
 
     /* @Codex */
     func updateTherapy(patientId: String, therapyId: String, payload: UpdateTherapyPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/therapies/\(therapyId)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func deleteTherapy(patientId: String, therapyId: String) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/therapies/\(therapyId)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func createCheckup(patientId: String, payload: CreateCheckupPayload) async throws -> String {
         let request = try makeRequest(path: "patients/\(patientId)/checkups", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(CreatePatientResponse.self, from: data)
         return result.id
     }
 
     /* @Codex */
     func updateCheckup(patientId: String, checkupId: String, payload: UpdateCheckupPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/checkups/\(checkupId)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func deleteCheckup(patientId: String, checkupId: String) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/checkups/\(checkupId)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func createObservation(patientId: String, payload: CreateObservationPayload) async throws -> String {
         let request = try makeRequest(path: "patients/\(patientId)/observations", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(CreatePatientResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(CreatePatientResponse.self, from: data)
         return result.id
     }
 
     /* @Codex */
     func updateObservation(patientId: String, observationId: String, payload: UpdateObservationPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "PUT", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func deleteObservation(patientId: String, observationId: String) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func testConnection() async throws {
         let request = try makeRequest(path: "ambulatories")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     /* @Codex */
     func checkAuthStatus() async throws -> AuthCheckResponse {
-        let request = try makeRootRequest(path: "auth/check")
-        let (data, response) = try await session.data(for: request)
-        guard response is HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        return try JSONDecoder().decode(AuthCheckResponse.self, from: data)
+        let request = try makeRootRequest(path: "auth/check", requiresAuth: false)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(AuthCheckResponse.self, from: data)
     }
 
     func login(pin: String) async throws -> AuthLoginResponse {
-        let payload = AuthLoginRequest(username: "admin", password: pin)
-        let request = try makeRootRequest(path: "auth/login", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        return try JSONDecoder().decode(AuthLoginResponse.self, from: data)
+        let payload = AuthLoginRequest(username: nil, password: pin)
+        let request = try makeRootRequest(path: "auth/login", method: "POST", body: payload, requiresAuth: false)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(AuthLoginResponse.self, from: data)
     }
 
     func setup(pin: String, displayName: String, ambulatoryName: String, encryptedMasterKey: String, salt: String) async throws {
@@ -293,33 +320,33 @@ actor LocalAPIClient {
             displayName: displayName,
             ambulatoryName: ambulatoryName
         )
-        let request = try makeRootRequest(path: "auth/setup", method: "POST", body: payload)
+        let request = try makeRootRequest(path: "auth/setup", method: "POST", body: payload, requiresAuth: false)
         /* @Codex */
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
+            throw LocalAPIError.unexpectedResponse
         }
         if (200...299).contains(http.statusCode) { return }
         if let errorPayload = try? JSONDecoder().decode(AuthErrorResponse.self, from: data),
            errorPayload.code == "SETUP_ALREADY_COMPLETED" {
             throw AuthFlowError.setupAlreadyCompleted
         }
-        throw AuthFlowError.httpStatus(http.statusCode)
+        throw buildHTTPError(statusCode: http.statusCode, data: data)
     }
 
     func fetchSetting(key: String) async throws -> String? {
         let request = try makeRootRequest(path: "settings/\(key)")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(SettingResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(SettingResponse.self, from: data)
         return result.value
     }
 
     func saveSetting(key: String, value: String) async throws {
         let payload = SettingUpdateRequest(key: key, value: value)
         let request = try makeRootRequest(path: "settings", method: "POST", body: payload)
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func saveSettings(_ items: [String: String]) async throws {
@@ -333,9 +360,9 @@ actor LocalAPIClient {
             path: "drugs",
             queryItems: [URLQueryItem(name: "q", value: query)]
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        return try JSONDecoder().decode([DrugSummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([DrugSummary].self, from: data)
     }
 
     /* @Codex */
@@ -347,9 +374,9 @@ actor LocalAPIClient {
                 URLQueryItem(name: "limit", value: String(limit))
             ]
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        return try JSONDecoder().decode([ExemptionSummary].self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode([ExemptionSummary].self, from: data)
     }
 
     func searchICD(query: String) async throws -> [ICDResult] {
@@ -357,14 +384,14 @@ actor LocalAPIClient {
             path: "icd/proxy",
             queryItems: [URLQueryItem(name: "q", value: query)]
         )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
         return try ICDResultParser.parse(data: data)
     }
 
     func checkICDStatus() async throws -> Bool {
         let request = try makeRootRequest(path: "icd/proxy")
-        let (_, response) = try await session.data(for: request)
+        let (_, response) = try await data(for: request)
         if let http = response as? HTTPURLResponse {
             return http.statusCode >= 200 && http.statusCode < 400
         }
@@ -374,16 +401,16 @@ actor LocalAPIClient {
     /* @Codex */
     func repairDbFromLegacy() async throws {
         let request = try makeRootRequest(path: "system/repair-db", method: "POST")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func listAIModels(baseURL: String) async throws -> [AIModelInfo] {
         let cleanedBase = normalizedAIBaseURL(baseURL)
         var request = try makeRootRequest(path: "ai/models")
         request.setValue(cleanedBase, forHTTPHeaderField: "x-target-url")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
         /* @Codex */
         // Be tolerant to provider payload changes (e.g. mixed types in model entries).
         if let object = try? JSONSerialization.jsonObject(with: data, options: []),
@@ -413,28 +440,28 @@ actor LocalAPIClient {
 
     func checkOCRStatus() async throws -> OCRModelStatus {
         let request = try makeRootRequest(path: "ocr/extract")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        return try JSONDecoder().decode(OCRModelStatus.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(OCRModelStatus.self, from: data)
     }
 
     func fetchMLXStatus() async throws -> MLXStatus {
         let request = try makeRootRequest(path: "system/mlx")
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        return try JSONDecoder().decode(MLXStatus.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(MLXStatus.self, from: data)
     }
 
     func startMLX() async throws {
         let request = try makeRootRequest(path: "system/mlx", method: "POST")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func stopMLX() async throws {
         let request = try makeRootRequest(path: "system/mlx", method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validate(response: response)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func aiChat(prompt: String, model: String, baseURL: String, maxTokens: Int = 1024, temperature: Double = 0.4) async throws -> String {
@@ -452,9 +479,9 @@ actor LocalAPIClient {
         var request = try makeRootRequest(path: "proxy/ai/chat", method: "POST", body: body)
         request.setValue(finalTarget, forHTTPHeaderField: "x-target-url")
 
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response)
-        let result = try JSONDecoder().decode(AIChatResponse.self, from: data)
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        let result = try decode(AIChatResponse.self, from: data)
         return result.choices.first?.message.content ?? ""
     }
 
@@ -476,7 +503,13 @@ actor LocalAPIClient {
         return formatter.string(from: date)
     }
 
-    private func makeRequest(path: String, method: String = "GET", body: Encodable? = nil, queryItems: [URLQueryItem] = []) throws -> URLRequest {
+    private func makeRequest(
+        path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        queryItems: [URLQueryItem] = [],
+        requiresAuth: Bool = true
+    ) throws -> URLRequest {
         let baseURL = try currentBaseURL()
         let url = baseURL.appendingPathComponent(path)
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -489,17 +522,27 @@ actor LocalAPIClient {
 
         var request = URLRequest(url: finalURL)
         request.httpMethod = method
+        /* @Codex */
+        request.setValue(Self.sourceSurfaceValue, forHTTPHeaderField: Self.sourceSurfaceHeader)
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
-        applyAuth(to: &request)
+        if requiresAuth {
+            try applyAuth(to: &request)
+        }
         return request
     }
 
-    private func makeRootRequest(path: String, method: String = "GET", body: Encodable? = nil, queryItems: [URLQueryItem] = []) throws -> URLRequest {
+    private func makeRootRequest(
+        path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        queryItems: [URLQueryItem] = [],
+        requiresAuth: Bool = true
+    ) throws -> URLRequest {
         let baseURL = try currentBaseURL()
         let rootURL = baseURL.deletingLastPathComponent()
         let url = rootURL.appendingPathComponent(path)
@@ -513,29 +556,108 @@ actor LocalAPIClient {
 
         var request = URLRequest(url: finalURL)
         request.httpMethod = method
+        /* @Codex */
+        request.setValue(Self.sourceSurfaceValue, forHTTPHeaderField: Self.sourceSurfaceHeader)
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
-        applyAuth(to: &request)
+        if requiresAuth {
+            try applyAuth(to: &request)
+        }
         return request
     }
 
-    private func applyAuth(to request: inout URLRequest) {
+    private func applyAuth(to request: inout URLRequest) throws {
         /* @Codex */
-        if let token = LocalAPITokenProvider.shared.token(), !token.isEmpty {
+        switch tokenProvider.resolveToken() {
+        case .resolved(let token, _):
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        case .failure(.notFound):
+            throw LocalAPIError.missingAPIToken
+        case .failure(let failure):
+            throw LocalAPIError.incompleteAPITokenBootstrap(failure)
         }
     }
 
-    private func validate(response: URLResponse) throws {
+    /* @Codex */
+    private func validate(data: Data, response: URLResponse) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
+            throw LocalAPIError.unexpectedResponse
         }
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw URLError(.badServerResponse)
+            throw buildHTTPError(statusCode: httpResponse.statusCode, data: data)
+        }
+    }
+
+    /* @Codex */
+    private func validatePatientMutation(data: Data, response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LocalAPIError.unexpectedResponse
+        }
+        if (200...299).contains(httpResponse.statusCode) {
+            return
+        }
+        if httpResponse.statusCode == 409,
+           let payload = try? JSONDecoder().decode(PatientVersionConflictPayload.self, from: data),
+           payload.code == "VERSION_CONFLICT" {
+            throw LocalAPIError.versionConflict(payload)
+        }
+        throw buildHTTPError(statusCode: httpResponse.statusCode, data: data)
+    }
+
+    /* @Codex */
+    private func buildHTTPError(statusCode: Int, data: Data) -> LocalAPIError {
+        let message = errorMessage(from: data)
+        switch statusCode {
+        case 400, 422:
+            return .validation(statusCode: statusCode, message: message)
+        case 401, 403:
+            return .auth(statusCode: statusCode, message: message)
+        default:
+            return .httpStatus(statusCode, message: message)
+        }
+    }
+
+    /* @Codex */
+    private func decode<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        configure: ((JSONDecoder) -> Void)? = nil
+    ) throws -> T {
+        let decoder = JSONDecoder()
+        configure?(decoder)
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw LocalAPIError.contract("Risposta API locale non valida.")
+        }
+    }
+
+    /* @Codex */
+    private func errorMessage(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+        if let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data) {
+            return payload.message ?? payload.error
+        }
+        return nil
+    }
+
+    /* @Codex */
+    private func mapTransportError(_ error: URLError) -> LocalAPIError {
+        switch error.code {
+        case .cancelled, .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot, .clientCertificateRejected, .clientCertificateRequired:
+            return .transport(.tlsHandshakeFailed)
+        case .cannotConnectToHost, .cannotFindHost, .notConnectedToInternet:
+            return .transport(.unreachable)
+        case .timedOut:
+            return .transport(.timeout)
+        case .networkConnectionLost, .dnsLookupFailed:
+            return .transport(.networkLost)
+        default:
+            return .transport(.other(error.code.rawValue))
         }
     }
 
@@ -549,13 +671,27 @@ actor LocalAPIClient {
         }
         return url
     }
+
+    private func parseAuthDate(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
 }
 
-enum LocalAPIError: LocalizedError {
+enum LocalAPIError: LocalizedError, Equatable {
     case invalidBaseURL
     case insecureTransport
+    case missingAPIToken
+    case incompleteAPITokenBootstrap(LocalAPITokenBootstrapFailure)
+    case unexpectedResponse
+    case transport(LocalAPITransportIssue)
+    case auth(statusCode: Int, message: String?)
+    case validation(statusCode: Int, message: String?)
+    case httpStatus(Int, message: String?)
+    case contract(String)
     /* @Codex */
     case invalidAIModelsPayload
+    /* @Codex */
+    case versionConflict(PatientVersionConflictPayload)
 
     var errorDescription: String? {
         switch self {
@@ -563,9 +699,53 @@ enum LocalAPIError: LocalizedError {
             return "Base URL non valida."
         case .insecureTransport:
             return "Trasporto non sicuro: HTTPS richiesto."
+        case .missingAPIToken:
+            return "Token API locale assente."
+        case .incompleteAPITokenBootstrap(let failure):
+            return failure.localizedDescription
+        case .unexpectedResponse:
+            return "Risposta non valida dal server locale."
+        case .transport(let issue):
+            return issue.localizedDescription
+        case .auth(let statusCode, let message):
+            if let message, !message.isEmpty { return message }
+            return statusCode == 403 ? "Accesso negato." : "Autenticazione fallita."
+        case .validation(_, let message):
+            return message ?? "Richiesta non valida."
+        case .httpStatus(let statusCode, let message):
+            return message ?? "Errore server (HTTP \(statusCode))."
+        case .contract(let message):
+            return message
         /* @Codex */
         case .invalidAIModelsPayload:
             return "Risposta modelli AI non valida."
+        /* @Codex */
+        case .versionConflict:
+            return "Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova."
+        }
+    }
+}
+
+/* @Codex */
+enum LocalAPITransportIssue: Equatable {
+    case tlsHandshakeFailed
+    case unreachable
+    case timeout
+    case networkLost
+    case other(Int)
+
+    var localizedDescription: String {
+        switch self {
+        case .tlsHandshakeFailed:
+            return "Handshake TLS fallito. Rigenera la configurazione locale e riprova."
+        case .unreachable:
+            return "Server locale non raggiungibile."
+        case .timeout:
+            return "Timeout verso il server locale."
+        case .networkLost:
+            return "Connessione al server locale interrotta."
+        case .other:
+            return "Errore di trasporto verso il server locale."
         }
     }
 }
@@ -573,14 +753,11 @@ enum LocalAPIError: LocalizedError {
 /* @Codex */
 enum AuthFlowError: LocalizedError {
     case setupAlreadyCompleted
-    case httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .setupAlreadyCompleted:
             return "Setup già completato."
-        case .httpStatus(let status):
-            return "Errore server (HTTP \(status))."
         }
     }
 }
@@ -642,21 +819,105 @@ struct CreatePatientPayload: Encodable {
 }
 
 /* @Codex */
+enum PatchValue<Value> {
+    case omit
+    case null
+    case value(Value)
+}
+
+/* @Codex */
 struct UpdatePatientPayload: Encodable {
+    let version: Int
     let firstName: String?
     let lastName: String?
     let taxCode: String?
-    let birthDate: Date?
-    let address: String?
-    let phone: String?
-    let caregiver: String?
-    let exemptions: String?
-    let notes: String?
-    let aiSummary: String?
-    let documentInsights: String?
+    let birthDate: PatchValue<Date>
+    let address: PatchValue<String>
+    let phone: PatchValue<String>
+    let caregiver: PatchValue<String>
+    let exemptions: PatchValue<String>
+    let notes: PatchValue<String>
+    let aiSummary: PatchValue<String>
+    let documentInsights: PatchValue<String>
     let isAdi: Bool?
     let isArchived: Bool?
-    let ambulatoryId: String?
+    let ambulatoryId: PatchValue<String>
+
+    init(
+        version: Int,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        taxCode: String? = nil,
+        birthDate: PatchValue<Date> = .omit,
+        address: PatchValue<String> = .omit,
+        phone: PatchValue<String> = .omit,
+        caregiver: PatchValue<String> = .omit,
+        exemptions: PatchValue<String> = .omit,
+        notes: PatchValue<String> = .omit,
+        aiSummary: PatchValue<String> = .omit,
+        documentInsights: PatchValue<String> = .omit,
+        isAdi: Bool? = nil,
+        isArchived: Bool? = nil,
+        ambulatoryId: PatchValue<String> = .omit
+    ) {
+        self.version = version
+        self.firstName = firstName
+        self.lastName = lastName
+        self.taxCode = taxCode
+        self.birthDate = birthDate
+        self.address = address
+        self.phone = phone
+        self.caregiver = caregiver
+        self.exemptions = exemptions
+        self.notes = notes
+        self.aiSummary = aiSummary
+        self.documentInsights = documentInsights
+        self.isAdi = isAdi
+        self.isArchived = isArchived
+        self.ambulatoryId = ambulatoryId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case firstName
+        case lastName
+        case taxCode
+        case birthDate
+        case address
+        case phone
+        case caregiver
+        case exemptions
+        case notes
+        case aiSummary
+        case documentInsights
+        case isAdi
+        case isArchived
+        case ambulatoryId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(firstName, forKey: .firstName)
+        try container.encodeIfPresent(lastName, forKey: .lastName)
+        try container.encodeIfPresent(taxCode, forKey: .taxCode)
+        try container.encodePatch(birthDate, forKey: .birthDate)
+        try container.encodePatch(address, forKey: .address)
+        try container.encodePatch(phone, forKey: .phone)
+        try container.encodePatch(caregiver, forKey: .caregiver)
+        try container.encodePatch(exemptions, forKey: .exemptions)
+        try container.encodePatch(notes, forKey: .notes)
+        try container.encodePatch(aiSummary, forKey: .aiSummary)
+        try container.encodePatch(documentInsights, forKey: .documentInsights)
+        try container.encodeIfPresent(isAdi, forKey: .isAdi)
+        try container.encodeIfPresent(isArchived, forKey: .isArchived)
+        try container.encodePatch(ambulatoryId, forKey: .ambulatoryId)
+    }
+}
+
+/* @Codex */
+struct DeletePatientPayload: Encodable {
+    let version: Int
 }
 
 struct CreateEntryPayload: Encodable {
@@ -688,13 +949,52 @@ struct CreateTherapyPayload: Encodable {
 struct UpdateTherapyPayload: Encodable {
     let drugName: String?
     /* @Codex */
-    let aic: String?
+    let aic: PatchValue<String>
     /* @Codex */
-    let atc: String?
+    let atc: PatchValue<String>
     let dosage: String?
     let status: String?
     let startDate: Date?
-    let endDate: Date?
+    let endDate: PatchValue<Date>
+
+    init(
+        drugName: String? = nil,
+        aic: PatchValue<String> = .omit,
+        atc: PatchValue<String> = .omit,
+        dosage: String? = nil,
+        status: String? = nil,
+        startDate: Date? = nil,
+        endDate: PatchValue<Date> = .omit
+    ) {
+        self.drugName = drugName
+        self.aic = aic
+        self.atc = atc
+        self.dosage = dosage
+        self.status = status
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case drugName
+        case aic
+        case atc
+        case dosage
+        case status
+        case startDate
+        case endDate
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(drugName, forKey: .drugName)
+        try container.encodePatch(aic, forKey: .aic)
+        try container.encodePatch(atc, forKey: .atc)
+        try container.encodeIfPresent(dosage, forKey: .dosage)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(startDate, forKey: .startDate)
+        try container.encodePatch(endDate, forKey: .endDate)
+    }
 }
 
 struct CreateCheckupPayload: Encodable {
@@ -750,27 +1050,64 @@ struct AuthCheckResponse: Decodable {
 }
 
 /* @Codex */
+enum AuthDbState: String, Decodable {
+    case ready
+    case missing
+    case schemaMissing = "schema-missing"
+    case unavailable
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = AuthDbState(rawValue: rawValue) ?? .unavailable
+    }
+}
+
+/* @Codex */
 struct AuthErrorResponse: Decodable {
     let error: String?
     let code: String?
     let message: String?
+    let lockedUntil: String?
+    let remainingAttempts: Int?
+    let failedLoginAttempts: Int?
+    let retryAfterSeconds: Int?
+}
+
+/* @Codex */
+struct APIErrorPayload: Decodable {
+    let error: String?
+    let message: String?
+}
+
+/* @Codex */
+struct PatientVersionConflictPayload: Decodable, Equatable {
+    let error: String
+    let code: String
+    let entity: String
+    let recordId: String
+    let expectedVersion: Int
+    let currentVersion: Int?
+    let currentUpdatedAt: String?
+    let currentState: String
+    let currentSnapshot: PatientConflictSnapshot?
+}
+
+/* @Codex */
+struct PatientConflictSnapshot: Decodable, Equatable {
+    let id: String
+    let version: Int
+    let updatedAt: String?
+    let isArchived: Bool?
 }
 
 /* @Codex */
 struct AuthDbHealth: Decodable {
-    let dataDir: String?
-    let dbPath: String?
-    let dbExists: Bool?
-    let dbReadable: Bool?
-    let dbWritable: Bool?
-    let dbSizeBytes: Int?
-    let legacyDbPath: String?
-    let legacyExists: Bool?
-    let schemaOk: Bool?
+    let state: AuthDbState?
 }
 
 struct AuthLoginRequest: Encodable {
-    let username: String
+    let username: String?
     let password: String
 }
 
@@ -925,6 +1262,20 @@ struct AIChatResponse: Decodable {
         let message: Message
     }
     let choices: [Choice]
+}
+
+/* @Codex */
+private extension KeyedEncodingContainer {
+    mutating func encodePatch<T: Encodable>(_ value: PatchValue<T>, forKey key: Key) throws {
+        switch value {
+        case .omit:
+            break
+        case .null:
+            try encodeNil(forKey: key)
+        case .value(let wrapped):
+            try encode(wrapped, forKey: key)
+        }
+    }
 }
 
 struct AnyEncodable: Encodable {

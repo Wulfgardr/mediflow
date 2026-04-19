@@ -11,6 +11,12 @@ export const users = sqliteTable('users', {
     passwordHash: text('password_hash').notNull(),
     encryptedMasterKey: text('encrypted_master_key').notNull(),
     salt: text('salt').notNull(),
+    /* @Codex */
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    /* @Codex */
+    firstFailedLoginAt: integer('first_failed_login_at', { mode: 'timestamp' }),
+    /* @Codex */
+    lockedUntil: integer('locked_until', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
@@ -49,6 +55,8 @@ export const patients = sqliteTable('patients', {
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -133,6 +141,8 @@ export const conversations = sqliteTable('conversations', {
     title: text('title').notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    /* @Codex */
+    isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
@@ -154,6 +164,23 @@ export const settings = sqliteTable('settings', {
     value: text('value').notNull(),
 });
 
+/* @Codex */
+export const auditEvents = sqliteTable('audit_events', {
+    eventId: text('event_id').primaryKey(),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    eventType: text('event_type').notNull(),
+    occurredAt: integer('occurred_at', { mode: 'timestamp' }).notNull(),
+    outcome: text('outcome').notNull(),
+    actorType: text('actor_type').notNull(),
+    actorRef: text('actor_ref').notNull(),
+    subjectType: text('subject_type').notNull(),
+    subjectRef: text('subject_ref'),
+    sourceSurface: text('source_surface').notNull(),
+    requestId: text('request_id'),
+    redactedMetadata: text('redacted_metadata'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Attachments ---
 export const attachments = sqliteTable('attachments', {
     id: text('id').primaryKey(),
@@ -165,6 +192,8 @@ export const attachments = sqliteTable('attachments', {
     data: text('data'), // Base64 content
     /* @Codex */
     summarySnapshot: text('summary_snapshot'),
+    /* @Codex */
+    parseEvidenceArtifactSnapshot: text('parse_evidence_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

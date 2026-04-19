@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-18 -->
 # ADR 0006: Terminology plugin unificato + profili documentali FSE/EDS
 
 Date: 2026-02-18  

@@ -5,7 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -90,15 +93,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
+        /* @Codex */
+        const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
         const codeSystem = typeof body.codeSystem === 'string' ? body.codeSystem.trim().toUpperCase() : '';
         const code = typeof body.code === 'string' ? body.code.trim() : '';
         const display = typeof body.display === 'string' ? body.display.trim() : '';
         const unitSystem = typeof body.unitSystem === 'string' ? body.unitSystem.trim().toUpperCase() : '';
         const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim() : '';
         const value = normalizeValue(body.value);
-        const observedAt = parseDateParam(body.observedAt ?? null);
+        const observedAt = parseDateParam(typeof body.observedAt === 'string' ? body.observedAt : null);
         const notes = typeof body.notes === 'string' ? body.notes : null;
         const source = normalizeSource(body.source);
 
@@ -124,6 +129,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             source,
             createdAt: new Date(),
         });
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            auditSession,
+            {
+                eventType: 'observation.created',
+                subjectType: 'observation',
+                subjectRef: newId,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body, ['id']),
+                },
+            },
+            '[MediFlow] Observation audit write failed:',
+        );
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

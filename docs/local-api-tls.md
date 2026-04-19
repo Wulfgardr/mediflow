@@ -1,8 +1,13 @@
-<!-- Codex: created 2026-02-01 -->
 # TLS locale per MediFlow
 
 Questa guida configura un proxy HTTPS locale davanti a `http://localhost:3000`.
 Serve al client macOS per usare HTTPS con certificate pinning.
+
+Riferimenti correlati:
+- [docs/NATIVE.md](./NATIVE.md)
+- [docs/native-setup.md](./native-setup.md)
+- [SECURITY.md](../SECURITY.md)
+- [docs/walkthrough.md](./walkthrough.md)
 
 ## 1) Genera un certificato self-signed
 

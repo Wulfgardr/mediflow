@@ -1,4 +1,3 @@
-<!-- Codex: created 2026-02-01 -->
 # ADR 0002: Native security + clinical modules
 
 Date: 2026-02-01

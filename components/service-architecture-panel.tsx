@@ -133,13 +133,14 @@ export default function ServiceArchitecturePanel() {
     };
 
     return (
-        <div className="glass-panel p-6 mb-6">
+        <div className="glass-panel p-6 md:p-7">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white">
                         <Server className="w-5 h-5" />
                     </div>
                     <div>
+                        <p className="section-kicker">Topologia locale</p>
                         <h2 className="text-lg font-bold text-gray-800 dark:text-white">Architettura Servizi</h2>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Visualizza lo stato dei componenti MediFlow</p>
                     </div>
@@ -180,7 +181,7 @@ export default function ServiceArchitecturePanel() {
                 <div className="grid grid-cols-3 gap-4 relative z-10">
 
                     {/* AI Node (Moved to First) */}
-                    <div className={`rounded-2xl border-2 p-4 transition-all ${getStatusColor(services.ai.status)}`}>
+                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.ai.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
                                 <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -226,7 +227,7 @@ export default function ServiceArchitecturePanel() {
                     </div>
 
                     {/* App Node (Moved to Center) */}
-                    <div className={`rounded-2xl border-2 p-4 transition-all ${getStatusColor(services.app.status)}`}>
+                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.app.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                                 <Server className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -249,7 +250,7 @@ export default function ServiceArchitecturePanel() {
                     </div>
 
                     {/* ICD Node (Right) */}
-                    <div className={`rounded-2xl border-2 p-4 transition-all ${getStatusColor(services.icd.status)}`}>
+                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.icd.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
                                 <Stethoscope className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />

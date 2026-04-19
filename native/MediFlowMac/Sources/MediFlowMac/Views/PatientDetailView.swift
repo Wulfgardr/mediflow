@@ -58,6 +58,13 @@ private func checkupStatusLabel(for status: String) -> String {
 }
 
 /* @Codex */
+private struct PatientDiagnosis: Decodable {
+    let code: String
+    let description: String
+    let system: String
+}
+
+/* @Codex */
 struct PatientDetailView: View {
     let patientId: String
 
@@ -68,12 +75,15 @@ struct PatientDetailView: View {
     @State private var entries: [EntrySummary] = []
     @State private var therapies: [TherapySummary] = []
     @State private var checkups: [CheckupSummary] = []
+    @State private var observations: [ObservationSummary] = []
     @State private var entriesErrorMessage: String?
     @State private var therapiesErrorMessage: String?
     @State private var checkupsErrorMessage: String?
+    @State private var observationsErrorMessage: String?
     @State private var showingNewEntry = false
     @State private var showingNewTherapy = false
     @State private var showingNewCheckup = false
+    @State private var showingNewObservation = false
     @State private var showingAIStudio = false
     @State private var aiPrompt = ""
     @State private var aiResponse = ""
@@ -93,11 +103,15 @@ struct PatientDetailView: View {
     /* @Codex */
     @State private var editingCheckup: CheckupSummary?
     /* @Codex */
+    @State private var editingObservation: ObservationSummary?
+    /* @Codex */
     @State private var pendingDeleteEntry: EntrySummary?
     /* @Codex */
     @State private var pendingDeleteTherapy: TherapySummary?
     /* @Codex */
     @State private var pendingDeleteCheckup: CheckupSummary?
+    /* @Codex */
+    @State private var pendingDeleteObservation: ObservationSummary?
 
     var body: some View {
         Group {
@@ -160,10 +174,16 @@ struct PatientDetailView: View {
                             }
                             .modifier(IslandMotion(index: 7, isRevealed: revealIslands))
 
+                            /* @Codex */
+                            ConceptIsland(title: "Osservazioni", subtitle: "Rilevazioni codificate LOINC + UCUM", icon: "waveform.path.ecg", accent: .pink) {
+                                observationsBlock
+                            }
+                            .modifier(IslandMotion(index: 8, isRevealed: revealIslands))
+
                             ConceptIsland(title: "AI Assist", subtitle: "Prompt contestuale e analisi", icon: "sparkles", accent: .purple) {
                                 aiInlineBlock
                             }
-                            .modifier(IslandMotion(index: 8, isRevealed: revealIslands))
+                            .modifier(IslandMotion(index: 9, isRevealed: revealIslands))
 
                             ConceptIsland(title: "Metadati", subtitle: "Tracciabilita record", icon: "tray.full", accent: .gray) {
                                 InfoGrid(rows: [
@@ -172,7 +192,7 @@ struct PatientDetailView: View {
                                     InfoRow(label: "Aggiornato il", value: formatted(date: detail.updatedAt))
                                 ])
                             }
-                            .modifier(IslandMotion(index: 9, isRevealed: revealIslands))
+                            .modifier(IslandMotion(index: 10, isRevealed: revealIslands))
                         }
                         .padding(24)
                     }
@@ -202,15 +222,24 @@ struct PatientDetailView: View {
             Button("Nuova voce") {
                 showingNewEntry = true
             }
+            .accessibilityIdentifier("patient-detail-new-entry-button")
             Button("Nuova terapia") {
                 showingNewTherapy = true
             }
+            .accessibilityIdentifier("patient-detail-new-therapy-button")
             Button("Nuovo appuntamento") {
                 showingNewCheckup = true
             }
+            .accessibilityIdentifier("patient-detail-new-checkup-button")
+            /* @Codex */
+            Button("Nuova osservazione") {
+                showingNewObservation = true
+            }
+            .accessibilityIdentifier("patient-detail-new-observation-button")
             Button("AI Studio") {
                 showingAIStudio = true
             }
+            .accessibilityIdentifier("patient-detail-ai-studio-button")
         }
         .sheet(isPresented: $showingNewEntry) {
             GlassPanelWindow(
@@ -245,6 +274,19 @@ struct PatientDetailView: View {
                 expandedSize: CGSize(width: 760, height: 700)
             ) {
                 NewCheckupView(patientId: patientId) {
+                    Task { await loadClinicalSections() }
+                }
+            }
+        }
+        /* @Codex */
+        .sheet(isPresented: $showingNewObservation) {
+            GlassPanelWindow(
+                title: "Nuova osservazione",
+                subtitle: "Rilevazione strutturata LOINC + UCUM",
+                minSize: CGSize(width: 620, height: 620),
+                expandedSize: CGSize(width: 860, height: 820)
+            ) {
+                NewObservationView(patientId: patientId) {
                     Task { await loadClinicalSections() }
                 }
             }
@@ -310,6 +352,22 @@ struct PatientDetailView: View {
             }
         }
         /* @Codex */
+        .sheet(item: $editingObservation) { observation in
+            GlassPanelWindow(
+                title: "Modifica osservazione",
+                subtitle: "Aggiorna coding, valore e contesto clinico",
+                minSize: CGSize(width: 620, height: 620),
+                expandedSize: CGSize(width: 860, height: 820)
+            ) {
+                EditObservationView(
+                    patientId: patientId,
+                    observation: observation
+                ) {
+                    Task { await loadClinicalSections() }
+                }
+            }
+        }
+        /* @Codex */
         .alert(
             "Eliminare questa voce clinica?",
             isPresented: Binding(
@@ -357,6 +415,22 @@ struct PatientDetailView: View {
         } message: {
             Text("L'operazione è irreversibile.")
         }
+        /* @Codex */
+        .alert(
+            "Eliminare questa osservazione?",
+            isPresented: Binding(
+                get: { pendingDeleteObservation != nil },
+                set: { if !$0 { pendingDeleteObservation = nil } }
+            )
+        ) {
+            Button("Elimina", role: .destructive) {
+                guard let observation = pendingDeleteObservation else { return }
+                Task { await deleteObservation(observation) }
+            }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            Text("L'operazione è irreversibile.")
+        }
         .task(id: patientId) {
             revealIslands = false
             await load()
@@ -389,6 +463,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-entry-filter")
                 Spacer()
             }
             if let entriesErrorMessage {
@@ -428,6 +503,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-therapy-filter")
                 Spacer()
             }
             if let therapiesErrorMessage {
@@ -466,6 +542,7 @@ struct PatientDetailView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-detail-checkup-filter")
                 Spacer()
             }
             if let checkupsErrorMessage {
@@ -491,8 +568,36 @@ struct PatientDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var aiInlineBlock: some View {
+    /* @Codex */
+    private var observationsBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let observationsErrorMessage {
+                Text(observationsErrorMessage)
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            } else if observations.isEmpty {
+                Text("Nessuna osservazione codificata.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(observations) { observation in
+                    ObservationRowView(
+                        observation: observation,
+                        onEdit: { editingObservation = observation },
+                        onDelete: { pendingDeleteObservation = observation }
+                    )
+                    if observation.id != observations.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var aiInlineBlock: some View {
+        let savedSummary = decryptOrPlain(detail?.aiSummary)
+
+        return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Contesto pronto")
                     .font(.subheadline.weight(.semibold))
@@ -518,6 +623,7 @@ struct PatientDetailView: View {
                     updateAIPromptIfNeeded(force: true)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("patient-detail-ai-refresh-context-button")
 
                 if isAILoading {
                     ProgressView()
@@ -531,12 +637,24 @@ struct PatientDetailView: View {
                 Text(aiErrorMessage)
                     .foregroundStyle(.red)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-error-message")
             }
 
-            if aiResponse.isEmpty {
+            if let savedSummary, !savedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(savedSummary)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.42))
+                    )
+                    .accessibilityIdentifier("patient-detail-ai-saved-summary")
+            } else if aiResponse.isEmpty {
                 Text("Nessuna risposta AI salvata.")
                     .foregroundStyle(.secondary)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-empty-summary")
             } else {
                 Text(aiResponse)
                     .font(.callout)
@@ -547,6 +665,7 @@ struct PatientDetailView: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white.opacity(0.42))
                     )
+                    .accessibilityIdentifier("patient-detail-ai-inline-response")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -562,6 +681,7 @@ struct PatientDetailView: View {
                     updateAIPromptIfNeeded(force: true)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("patient-detail-ai-regenerate-context-button")
             }
 
             TextEditor(text: $aiPrompt)
@@ -576,6 +696,7 @@ struct PatientDetailView: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Color.white.opacity(0.4), lineWidth: 1)
                 )
+                .accessibilityIdentifier("patient-detail-ai-prompt-editor")
 
             HStack {
                 Button(isAILoading ? "Elaborazione..." : "Genera risposta") {
@@ -583,6 +704,14 @@ struct PatientDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("patient-detail-ai-generate-button")
+
+                Button(isAILoading ? "Salvataggio..." : "Genera e salva insight") {
+                    Task { await generateAndSaveInsight() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isAILoading || aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("patient-detail-ai-save-button")
 
                 Spacer()
 
@@ -596,6 +725,7 @@ struct PatientDetailView: View {
                 Text(aiErrorMessage)
                     .foregroundStyle(.red)
                     .font(.caption)
+                    .accessibilityIdentifier("patient-detail-ai-studio-error-message")
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -605,6 +735,7 @@ struct PatientDetailView: View {
                     Text(aiResponse.isEmpty ? "Nessuna risposta" : aiResponse)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
+                        .accessibilityIdentifier("patient-detail-ai-response-output")
                 }
                 .frame(minHeight: 220)
                 .background(
@@ -639,9 +770,11 @@ struct PatientDetailView: View {
         entries = []
         therapies = []
         checkups = []
+        observations = []
         entriesErrorMessage = nil
         therapiesErrorMessage = nil
         checkupsErrorMessage = nil
+        observationsErrorMessage = nil
 
         do {
             detail = try await LocalAPIClient.shared.fetchPatient(id: patientId)
@@ -702,6 +835,17 @@ struct PatientDetailView: View {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile caricare gli appuntamenti.")
         }
 
+        do {
+            observations = try await LocalAPIClient.shared.fetchObservations(
+                patientId: patientId,
+                limit: 50
+            )
+            observationsErrorMessage = nil
+        } catch {
+            observations = []
+            observationsErrorMessage = message(for: error, fallback: "Impossibile caricare le osservazioni.")
+        }
+
         updateAIPromptIfNeeded()
     }
 
@@ -738,6 +882,18 @@ struct PatientDetailView: View {
             await loadClinicalSections()
         } catch {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'appuntamento.")
+        }
+    }
+
+    /* @Codex */
+    @MainActor
+    private func deleteObservation(_ observation: ObservationSummary) async {
+        pendingDeleteObservation = nil
+        do {
+            try await LocalAPIClient.shared.deleteObservation(patientId: patientId, observationId: observation.id)
+            await loadClinicalSections()
+        } catch {
+            observationsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'osservazione.")
         }
     }
 
@@ -782,6 +938,63 @@ struct PatientDetailView: View {
         }
     }
 
+    @MainActor
+    private func generateAndSaveInsight() async {
+        if isAILoading { return }
+        guard let detail else { return }
+
+        isAILoading = true
+        aiErrorMessage = nil
+        defer { isAILoading = false }
+
+        do {
+            let provider = await AISettingsResolver.resolveProvider(for: .clinical)
+            let config = try await AISettingsResolver.resolveClinicalConfig()
+            let prompt = buildPatientInsightPrompt(detail: detail)
+            guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                aiErrorMessage = "Contesto locale insufficiente: rigenera il prompt clinico prima di salvare un insight."
+                return
+            }
+
+            aiPrompt = prompt
+            let raw = try await LocalAPIClient.shared.aiChat(
+                prompt: """
+                Rispondi solo con output finale in italiano.
+                Non includere tag <think>, <unused94>, <unused95> o ragionamento interno.
+                Mantieni il formato markdown con sezioni e cita solo [Sx] presenti nel contesto.
+                Se il supporto diretto non basta, usa [DATI-INCOMPLETI].
+
+                \(prompt)
+                """,
+                model: config.model,
+                baseURL: config.baseURL
+            )
+            let cleaned = cleanAIResponse(raw)
+            guard !cleaned.isEmpty else {
+                aiErrorMessage = "Il modello ha restituito una risposta vuota. Prova a rigenerare il contesto clinico."
+                return
+            }
+            guard let encryptedSummary = try security.encryptString(cleaned) else {
+                aiErrorMessage = "Impossibile cifrare l'insight generato in questa sessione."
+                return
+            }
+
+            try await LocalAPIClient.shared.updatePatient(
+                id: patientId,
+                payload: UpdatePatientPayload(
+                    version: detail.version,
+                    aiSummary: .value(encryptedSummary)
+                )
+            )
+
+            self.detail = try await LocalAPIClient.shared.fetchPatient(id: patientId)
+            aiResponse = "Provider: \(provider.uppercased())\nModello: \(config.model)\nEndpoint: \(config.baseURL)\n\n" + cleaned
+            updateAIPromptIfNeeded(force: true)
+        } catch {
+            aiErrorMessage = message(for: error, fallback: "Impossibile generare o salvare l'insight AI locale.")
+        }
+    }
+
     private func cleanAIResponse(_ value: String) -> String {
         /* @Codex */
         var output = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -815,58 +1028,7 @@ struct PatientDetailView: View {
             guard aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         }
         guard let detail else { return }
-
-        var lines: [String] = []
-        let age = ageText(from: detail.birthDate)
-        lines.append("Paziente: \(detail.firstName) \(detail.lastName), \(age).")
-
-        /* @Codex */
-        if let summary = decryptOrPlain(detail.aiSummary),
-           !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            lines.append("Riassunto AI corrente:")
-            lines.append(summary.trimmingCharacters(in: .whitespacesAndNewlines))
-        } else if (detail.aiSummary ?? "").hasPrefix("ENC:") {
-            /* @Codex */
-            lines.append("Riassunto AI corrente: [contenuto cifrato non decifrabile in questa sessione]")
-        }
-
-        if let notes = decryptOrPlain(detail.notes), !notes.isEmpty {
-            lines.append("Note: \(notes)")
-        }
-
-        /* @Codex */
-        let insightSummaries = extractDocumentInsightSummaries(from: detail.documentInsights)
-        if !insightSummaries.isEmpty {
-            lines.append("Documenti analizzati:")
-            for summary in insightSummaries.prefix(3) {
-                lines.append("- \(summary)")
-            }
-        }
-
-        if !entries.isEmpty {
-            lines.append("Ultime voci cliniche:")
-            for entry in entries.prefix(3) {
-                let content = decryptOrPlain(entry.content) ?? "[cifrato]"
-                lines.append("- \(formatted(date: entry.date)): \(content)")
-            }
-        }
-
-        if !therapies.isEmpty {
-            lines.append("Terapie:")
-            for therapy in therapies.prefix(3) {
-                lines.append("- \(therapy.drugName) (\(therapy.dosage)) [\(therapy.status)]")
-            }
-        }
-
-        if !checkups.isEmpty {
-            lines.append("Appuntamenti:")
-            for checkup in checkups.prefix(3) {
-                lines.append("- \(formatted(date: checkup.date)): \(checkup.title) [\(checkup.status)]")
-            }
-        }
-
-        lines.append("Fornisci un riassunto clinico sintetico e punti di attenzione.")
-        aiPrompt = lines.joined(separator: "\n")
+        aiPrompt = buildPatientInsightPrompt(detail: detail)
     }
 
     /* @Codex */
@@ -919,6 +1081,129 @@ struct PatientDetailView: View {
         }
     }
 
+    /* @Codex */
+    private func buildPatientInsightPrompt(detail: PatientDetail) -> String {
+        var lines: [String] = []
+        var sourceIndex = 1
+        let age = ageText(from: detail.birthDate)
+
+        func pushSource(title: String, detail: String) {
+            let cleanDetail = detail
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanTitle.isEmpty, !cleanDetail.isEmpty else { return }
+            lines.append("[S\(sourceIndex)] \(cleanTitle): \(cleanDetail)")
+            sourceIndex += 1
+        }
+
+        var chartItems = ["Paziente: \(detail.firstName) \(detail.lastName), \(age)."]
+        let exemptions = parseExemptionCodes(detail.exemptions)
+        if !exemptions.isEmpty {
+            chartItems.append("Esenzioni: \(exemptions.joined(separator: ", "))")
+        }
+        if let notes = decryptOrPlain(detail.notes), !notes.isEmpty {
+            chartItems.append("Note: \(notes)")
+        }
+        if let monitoringProfile = decryptOrPlain(detail.monitoringProfile), !monitoringProfile.isEmpty {
+            chartItems.append("Profilo monitoraggio: \(monitoringProfile)")
+        }
+        pushSource(title: "Scheda paziente", detail: chartItems.joined(separator: " | "))
+
+        let diagnoses = parseDiagnoses(detail.diagnoses)
+        diagnoses.prefix(3).forEach { diagnosis in
+            pushSource(
+                title: "Diagnosi \(diagnosis.code)",
+                detail: "\(diagnosis.description) [\(diagnosis.system)]"
+            )
+        }
+
+        therapies.prefix(3).forEach { therapy in
+            pushSource(
+                title: "Terapia \(therapy.drugName)",
+                detail: "\(therapy.dosage) [\(therapyStatusLabel(for: therapy.status))]"
+            )
+        }
+
+        checkups.prefix(3).forEach { checkup in
+            pushSource(
+                title: "Appuntamento \(formatted(date: checkup.date))",
+                detail: "\(checkup.title) [\(checkupStatusLabel(for: checkup.status))]"
+            )
+        }
+
+        observations.prefix(3).forEach { observation in
+            pushSource(
+                title: "Osservazione \(observation.display)",
+                detail: "\(observation.value) \(observation.unitCode) [\(observation.codeSystem) \(observation.code)]"
+            )
+        }
+
+        entries.prefix(3).forEach { entry in
+            if let content = decryptOrPlain(entry.content), !content.isEmpty {
+                pushSource(
+                    title: "Diario clinico \(formatted(date: entry.date))",
+                    detail: content
+                )
+            }
+        }
+
+        extractDocumentInsightSummaries(from: detail.documentInsights).prefix(2).forEach { summary in
+            pushSource(title: "Documento analizzato", detail: summary)
+        }
+
+        if sourceIndex == 1 {
+            return ""
+        }
+
+        lines.append("")
+        lines.append("Produci output finale in markdown con:")
+        lines.append("**Quadro attuale:** massimo 2 frasi brevi, ognuna chiusa con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Attenzioni:** massimo 2 bullet, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Prossimi passi:** massimo 3 bullet operativi, ciascuno chiuso con [Sx] o [DATI-INCOMPLETI].")
+        lines.append("**Gap da chiarire:** massimo 2 bullet solo se davvero utili.")
+        lines.append("Usa solo i riferimenti [Sx] presenti sopra. Non inventare dati, diagnosi, esami o fonti.")
+
+        return lines.joined(separator: "\n")
+    }
+
+    /* @Codex */
+    private func parseExemptionCodes(_ raw: String?) -> [String] {
+        guard let payload = decryptOrPlain(raw) else { return [] }
+        if let data = payload.data(using: .utf8),
+           let codes = try? JSONDecoder().decode([String].self, from: data) {
+            return deduplicatedStrings(codes)
+        }
+
+        let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? [] : [trimmed]
+    }
+
+    /* @Codex */
+    private func parseDiagnoses(_ raw: String?) -> [PatientDiagnosis] {
+        guard let payload = decryptOrPlain(raw),
+              let data = payload.data(using: .utf8),
+              let diagnoses = try? JSONDecoder().decode([PatientDiagnosis].self, from: data) else {
+            return []
+        }
+        return diagnoses
+    }
+
+    /* @Codex */
+    private func deduplicatedStrings(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+
+        values.forEach { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !seen.contains(trimmed) else { return }
+            seen.insert(trimmed)
+            ordered.append(trimmed)
+        }
+
+        return ordered
+    }
+
     private func formatted(date: Date?) -> String {
         guard let date else { return "n/d" }
         return Self.dateFormatter.string(from: date)
@@ -950,7 +1235,8 @@ struct PatientDetailView: View {
     /* @Codex */
     @ViewBuilder
     private func exemptionCodesBlock(raw: String?) -> some View {
-        let codes = parseExemptionCodes(raw)
+        let decrypted = decryptOrPlain(raw)
+        let codes = decrypted == "[Dati cifrati]" ? [] : ExemptionCodesCodec.decode(decrypted)
 
         if codes.isEmpty {
             Text("Nessun codice esenzione registrato.")
@@ -974,18 +1260,6 @@ struct PatientDetailView: View {
     }
 
     /* @Codex */
-    private func parseExemptionCodes(_ raw: String?) -> [String] {
-        guard let payload = decryptOrPlain(raw),
-              let data = payload.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
-            return []
-        }
-
-        return decoded
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
-            .filter { !$0.isEmpty }
-    }
-
     private func ageText(from date: Date?) -> String {
         guard let date else { return "n/d" }
         let years = Calendar.current.dateComponents([.year], from: date, to: Date()).year
@@ -1673,13 +1947,13 @@ private struct EditTherapyView: View {
             let payload = UpdateTherapyPayload(
                 drugName: trimmedDrugName,
                 /* @Codex */
-                aic: therapy.aic,
+                aic: therapy.aic.map(PatchValue.value) ?? .omit,
                 /* @Codex */
-                atc: therapy.atc,
+                atc: therapy.atc.map(PatchValue.value) ?? .omit,
                 dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
                 status: status,
                 startDate: startDate,
-                endDate: includeEndDate ? endDate : nil
+                endDate: includeEndDate ? .value(endDate) : .null
             )
             try await LocalAPIClient.shared.updateTherapy(patientId: patientId, therapyId: therapy.id, payload: payload)
             onSaved()

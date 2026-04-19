@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { parseTherapyStatus } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 function parseDate(value: unknown): Date | undefined {
     if (value === null || value === undefined || value === '') return undefined;
@@ -22,7 +24,7 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json() as unknown;
+        const body = await request.json() as Record<string, unknown>;
         const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -48,67 +50,65 @@ export async function PUT(
             endDate?: Date | null;
         } = {};
 
-        if (body && typeof body === 'object') {
-            const payload = body as Record<string, unknown>;
-
-            if (typeof payload.drugName === 'string') updateData.drugName = payload.drugName;
+        if (typeof body === 'object') {
+            if (typeof body.drugName === 'string') updateData.drugName = body.drugName;
             /* @Codex */
-            if (payload.aic === null || payload.aic === '') {
+            if (body.aic === null || body.aic === '') {
                 updateData.aic = null;
-            } else if (typeof payload.aic === 'string') {
-                updateData.aic = payload.aic;
+            } else if (typeof body.aic === 'string') {
+                updateData.aic = body.aic;
             }
             /* @Codex */
-            if (payload.atc === null || payload.atc === '') {
+            if (body.atc === null || body.atc === '') {
                 updateData.atc = null;
-            } else if (typeof payload.atc === 'string') {
-                updateData.atc = payload.atc;
+            } else if (typeof body.atc === 'string') {
+                updateData.atc = body.atc;
             }
             /* @Codex */
-            if (payload.activePrinciple === null || payload.activePrinciple === '') {
+            if (body.activePrinciple === null || body.activePrinciple === '') {
                 updateData.activePrinciple = null;
-            } else if (typeof payload.activePrinciple === 'string') {
-                updateData.activePrinciple = payload.activePrinciple;
+            } else if (typeof body.activePrinciple === 'string') {
+                updateData.activePrinciple = body.activePrinciple;
             }
-            if (typeof payload.dosage === 'string') updateData.dosage = payload.dosage;
+            if (typeof body.dosage === 'string') updateData.dosage = body.dosage;
             /* @Codex */
-            if (payload.motivation === null || payload.motivation === '') {
+            if (body.motivation === null || body.motivation === '') {
                 updateData.motivation = null;
-            } else if (typeof payload.motivation === 'string') {
-                updateData.motivation = payload.motivation;
+            } else if (typeof body.motivation === 'string') {
+                updateData.motivation = body.motivation;
             }
             /* @Codex */
-            if (payload.diagnosisCode === null || payload.diagnosisCode === '') {
+            if (body.diagnosisCode === null || body.diagnosisCode === '') {
                 updateData.diagnosisCode = null;
-            } else if (typeof payload.diagnosisCode === 'string') {
-                updateData.diagnosisCode = payload.diagnosisCode;
+            } else if (typeof body.diagnosisCode === 'string') {
+                updateData.diagnosisCode = body.diagnosisCode;
             }
             /* @Codex */
-            if (payload.diagnosisName === null || payload.diagnosisName === '') {
+            if (body.diagnosisName === null || body.diagnosisName === '') {
                 updateData.diagnosisName = null;
-            } else if (typeof payload.diagnosisName === 'string') {
-                updateData.diagnosisName = payload.diagnosisName;
+            } else if (typeof body.diagnosisName === 'string') {
+                updateData.diagnosisName = body.diagnosisName;
             }
-            if (typeof payload.status === 'string') {
-                const parsedStatus = parseTherapyStatus(payload.status);
+            if (typeof body.status === 'string') {
+                const parsedStatus = parseTherapyStatus(body.status);
                 if (!parsedStatus) {
                     return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
                 }
                 updateData.status = parsedStatus;
             }
 
-            const hasStartDate = Object.prototype.hasOwnProperty.call(payload, 'startDate');
-            const parsedStartDate = parseDate(payload.startDate);
+            const hasStartDate = Object.prototype.hasOwnProperty.call(body, 'startDate');
+            const parsedStartDate = parseDate(body.startDate);
             if (hasStartDate && parsedStartDate === undefined) {
                 return NextResponse.json({ error: 'Invalid startDate' }, { status: 400 });
             }
             if (parsedStartDate) updateData.startDate = parsedStartDate;
 
-            if (payload.endDate === null || payload.endDate === '') {
+            if (body.endDate === null || body.endDate === '') {
                 updateData.endDate = null;
             } else {
-                const parsedEndDate = parseDate(payload.endDate);
-                if (Object.prototype.hasOwnProperty.call(payload, 'endDate') && parsedEndDate === undefined) {
+                const parsedEndDate = parseDate(body.endDate);
+                if (Object.prototype.hasOwnProperty.call(body, 'endDate') && parsedEndDate === undefined) {
                     return NextResponse.json({ error: 'Invalid endDate' }, { status: 400 });
                 }
                 if (parsedEndDate) updateData.endDate = parsedEndDate;
@@ -120,6 +120,22 @@ export async function PUT(
         }
 
         await dbServer.update(therapies).set(updateData).where(eq(therapies.id, id));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'therapy.updated',
+                subjectType: 'therapy',
+                subjectRef: id,
+                redactedMetadata: {
+                    changedFields: listChangedFields(body),
+                },
+            },
+            '[MediFlow] Therapy audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API PUT /therapies/[id] error:', error);
@@ -141,6 +157,19 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
         await dbServer.delete(therapies).where(eq(therapies.id, id));
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'therapy.deleted',
+                subjectType: 'therapy',
+                subjectRef: id,
+            },
+            '[MediFlow] Therapy audit write failed:',
+        );
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /therapies/[id] error:', error);

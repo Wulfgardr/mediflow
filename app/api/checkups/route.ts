@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
+/* @Codex */
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -43,6 +45,8 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         /* @Codex */
+        const auditBody = body as Record<string, unknown>;
+        /* @Codex */
         const normalizedStatus = body.status === undefined ? 'pending' : parseCheckupStatus(body.status);
         if (body.status !== undefined && !normalizedStatus) {
             return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
@@ -69,6 +73,21 @@ export async function POST(request: Request) {
             source: body.source ?? 'manual',
             createdAt: new Date()
         });
+
+        /* @Codex */
+        await safeWriteAuditEventFromRequest(
+            request,
+            session,
+            {
+                eventType: 'checkup.created',
+                subjectType: 'checkup',
+                subjectRef: String(newId),
+                redactedMetadata: {
+                    changedFields: listChangedFields(auditBody, ['id']),
+                },
+            },
+            '[MediFlow] Checkup audit write failed:',
+        );
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {

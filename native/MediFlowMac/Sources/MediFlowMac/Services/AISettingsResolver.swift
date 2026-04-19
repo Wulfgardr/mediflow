@@ -43,6 +43,12 @@ struct AIRuntimeSnapshot {
 
 enum AISettingsResolver {
     /* @Codex */
+    private static let staleLegacyDefaults: Set<String> = [
+        "hf.co/unsloth/medgemma-1.5-4b-it-GGUF",
+        "qwen2.5:32b"
+    ]
+
+    /* @Codex */
     static func resolveProvider() async -> String {
         return await resolveProvider(for: .clinical)
     }
@@ -110,13 +116,13 @@ enum AISettingsResolver {
             modelKey = "aiModel_clinical"
             defaultModel = provider == "mlx"
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "hf.co/unsloth/medgemma-1.5-4b-it-GGUF"
+                : "qwen3.5:35b-a3b"
         case .reasoning:
             modelKey = "aiModel_reasoning"
             /* @Codex */
             defaultModel = provider == "mlx"
                 ? "mlx-community/medgemma-1.5-4b-it-bf16"
-                : "qwen2.5:32b"
+                : "qwen3.5:35b-a3b"
         case .ocr:
             modelKey = "aiModel_ocr"
             defaultModel = "deepseek-ocr"
@@ -124,9 +130,22 @@ enum AISettingsResolver {
 
         let modelValue = try await LocalAPIClient.shared.fetchSetting(key: modelKey)
         let modelLegacy = (task == .clinical) ? try await LocalAPIClient.shared.fetchSetting(key: "aiModel") : nil
-        let model = modelValue ?? modelLegacy ?? defaultModel
+        let normalizedLegacyModel = normalizeLegacyModel(
+            modelLegacy,
+            for: task,
+            provider: provider
+        )
+        let model = modelValue ?? normalizedLegacyModel ?? defaultModel
 
         return AIConfig(baseURL: baseURL, model: model)
+    }
+
+    /* @Codex */
+    private static func normalizeLegacyModel(_ model: String?, for task: AIModelTask, provider: String) -> String? {
+        guard task == .clinical else { return model }
+        guard provider != "mlx" else { return model }
+        guard let model else { return nil }
+        return staleLegacyDefaults.contains(model) ? nil : model
     }
 
     /* @Codex */

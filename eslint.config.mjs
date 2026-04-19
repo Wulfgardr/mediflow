@@ -19,6 +19,23 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // @Codex: generated local test artifacts and local sandboxes
+    "tmp/**",
+    "tmp-*/**",
+    "playwright-report/**",
+    "test-results/**",
+    ".next-*/**",
+    ".next-ui-review/**",
+    ".codex-ui-sandbox/**",
+    ".pm2/**",
+    "tmp-e2e-data*/**",
+    "tmp-native-derived-data/**",
+    "tmp-parity-smoke/**",
+    ".texpadtmp/**",
+    ".venv*/**",
+    "scripts/__pycache__/**",
+    "native/MediFlowMac/.build/**",
+    "native/MediFlowMac/Build/**",
   ]),
 ]);
 

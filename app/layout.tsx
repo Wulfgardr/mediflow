@@ -1,9 +1,17 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
+/* @Codex */
+import PreviewProfileChrome from '@/components/preview-profile-chrome';
+import { AppRevisionGuard } from '@/components/app-revision-guard';
+import { MobileShellChrome } from '@/components/mobile-shell-chrome';
 import { Sidebar } from '@/components/sidebar';
+import { getAppFingerprint } from '@/lib/app-revision';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import { UIStyleProvider } from '@/components/ui-style-provider';
+import { UI_STYLE_STORAGE_KEY } from '@/lib/ui-style-mode';
 
 export const metadata: Metadata = {
   title: 'MediFlow - Personal Medical Record',
@@ -11,32 +19,61 @@ export const metadata: Metadata = {
 };
 
 import { SecurityProvider } from '@/components/security-provider';
-import { LockScreen } from '@/components/lock-screen';
+
+const uiStyleBootstrapScript = `
+(() => {
+  try {
+    const storageKey = '${UI_STYLE_STORAGE_KEY}';
+    const root = document.documentElement;
+    const savedStyle = localStorage.getItem(storageKey);
+    const styleMode = savedStyle === 'liquid' ? 'liquid' : 'clinical';
+    root.dataset.uiStyle = styleMode;
+  } catch (error) {
+    document.documentElement.dataset.uiStyle = 'clinical';
+  }
+})();
+`;
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  /* @Codex: expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
+  const appFingerprint = getAppFingerprint();
+
   return (
-    <html lang="it" suppressHydrationWarning>
+    <html lang="it" data-ui-style="clinical" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
+      <head>
+        <meta name="mediflow-app-fingerprint" content={appFingerprint} />
+        <Script id="ui-style-bootstrap" strategy="beforeInteractive">
+          {uiStyleBootstrapScript}
+        </Script>
+      </head>
       <body className={cn("antialiased overflow-x-hidden")} suppressHydrationWarning>
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
+          <AppRevisionGuard fingerprint={appFingerprint} />
           <SecurityProvider>
-            <LockScreen />
-            <PrivacyProvider>
-              <div className="flex">
-                <Sidebar />
-                {/* @Codex: align main offset with updated sidebar width */}
-                <main className="flex-1 ml-80 p-8 min-h-screen">
-                  {/* Main Content Area - adding a max-width container for readability */}
-                  <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    {children}
+            <UIStyleProvider>
+              {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}
+              <PrivacyProvider>
+                <div className="xl:flex">
+                  <div className="hidden xl:block">
+                    <Sidebar />
                   </div>
-                </main>
-              </div>
-            </PrivacyProvider>
+                  {/* @Codex: use dedicated mobile chrome instead of shrinking the desktop sidebar */}
+                  <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-80 xl:p-8 xl:pb-8">
+                    {/* Main Content Area - adding a max-width container for readability */}
+                    <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      <MobileShellChrome />
+                      <PreviewProfileChrome />
+                      {children}
+                    </div>
+                  </main>
+                </div>
+              </PrivacyProvider>
+            </UIStyleProvider>
           </SecurityProvider>
         </ThemeProvider>
       </body>

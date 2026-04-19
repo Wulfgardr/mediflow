@@ -5,7 +5,7 @@ import { useSecurity } from './security-provider';
 import { Lock, Unlock, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, login, setupPin } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, login, setupPin } = useSecurity();
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
@@ -22,11 +22,12 @@ export function LockScreen() {
         try {
             const success = await login(pin);
             if (!success) {
-                setError('PIN non valido');
+                setError('');
                 setPin('');
             }
         } catch (err) {
-            setError('Errore durante il login');
+            setError(err instanceof Error ? err.message : 'Errore durante il login');
+            setPin('');
         } finally {
             setLoading(false);
         }
@@ -98,10 +99,10 @@ export function LockScreen() {
                         </div>
                     )}
 
-                    {error && (
+                    {(error || authErrorMessage) && (
                         <div className="flex items-center justify-center space-x-2 text-sm text-destructive animate-pulse">
                             <AlertCircle className="w-4 h-4" />
-                            <span>{error}</span>
+                            <span>{error || authErrorMessage}</span>
                         </div>
                     )}
 
