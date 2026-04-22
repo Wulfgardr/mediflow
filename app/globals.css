@@ -21,58 +21,86 @@
 }
 
 :root {
-  --background: #f4f6fb;
-  --foreground: #1d1d1f;
-  --ui-canvas-background: linear-gradient(180deg, #fbfcff 0%, #f4f6fb 54%, #eef2fa 100%);
+  --background: #f6f0e7;
+  --foreground: #151316;
+  --ui-canvas-background: linear-gradient(180deg, #fdf9f2 0%, #f6f0e7 48%, #eee4d7 100%);
+  --mf-bg: #f6f0e7;
+  --mf-bg-elevated: #fff9f0;
+  --mf-bg-strong: #efe3d5;
+  --mf-ink: #151316;
+  --mf-muted: #706a64;
+  --mf-primary: #0f7b68;
+  --mf-accent: #b66a3c;
+  --mf-plum: #5e355f;
+  --mf-warning: #c58a2f;
+  --mf-critical: #a33a2f;
+  --mf-success: #3f7a4c;
+  --mf-flow-primary: rgba(15, 123, 104, 0.74);
+  --mf-flow-secondary: rgba(94, 53, 95, 0.62);
 
-  /* Glass Chrome (Shell) */
-  --glass-border: rgba(255, 255, 255, 0.45);
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
-  --glass-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  --glass-card-shadow: 0 10px 28px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  
-  /* Clinical Paper (Content) */
-  --paper-bg: #ffffff;
-  --paper-border: rgba(0, 0, 0, 0.06);
-  --paper-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --ui-chip-bg: rgba(15, 23, 42, 0.04);
-  --ui-chip-border: rgba(15, 23, 42, 0.06);
-  --ui-panel-radius: 28px;
+  --glass-border: rgba(255, 255, 255, 0.48);
+  --glass-bg: rgba(255, 249, 240, 0.58);
+  --glass-shadow: 0 16px 38px rgba(35, 27, 22, 0.08);
+  --glass-panel-shadow: 0 24px 60px rgba(35, 27, 22, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --glass-card-shadow: 0 14px 34px rgba(35, 27, 22, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  --paper-bg: rgba(255, 249, 240, 0.94);
+  --paper-border: rgba(80, 60, 48, 0.08);
+  --paper-shadow: 0 12px 28px rgba(35, 27, 22, 0.06);
+  --ui-chip-bg: rgba(255, 249, 240, 0.72);
+  --ui-chip-border: rgba(80, 60, 48, 0.08);
+  --ui-panel-radius: 30px;
   --ui-card-radius: 24px;
   --ui-subsection-radius: 22px;
-  --ui-orb-opacity: 0;
-  --ui-btn-primary-bg: linear-gradient(135deg, #0A84FF, #0A84FF);
-  --ui-btn-primary-shadow: 0 14px 30px rgba(10, 132, 255, 0.22);
+  --ui-orb-opacity: 0.85;
+  --ui-btn-primary-bg: linear-gradient(135deg, #b66a3c, #c07a47 58%, #8f4a30);
+  --ui-btn-primary-shadow: 0 18px 34px rgba(182, 106, 60, 0.24);
   --ui-btn-primary-radius: 18px;
 
-  /* Apple System Colors (Light) */
-  --apple-blue: #007AFF;
-  --apple-gray: #8E8E93;
-  --system-gray-6: #F2F2F7;
+  --apple-blue: #0f7b68;
+  --apple-gray: #706a64;
+  --system-gray-6: #f3ece2;
 }
 
 :root[data-ui-style='liquid'] {
-  --background: #edf4ff;
-  --ui-canvas-background:
-    radial-gradient(circle at 10% 10%, rgba(96, 165, 250, 0.24) 0, transparent 24%),
-    radial-gradient(circle at 84% 4%, rgba(244, 114, 182, 0.18) 0, transparent 22%),
-    radial-gradient(circle at 56% 18%, rgba(45, 212, 191, 0.12) 0, transparent 18%),
-    linear-gradient(180deg, #fbfdff 0%, #eef4ff 52%, #e7efff 100%);
+  --ui-canvas-background: linear-gradient(180deg, #fffaf3 0%, #f7efe3 50%, #e9ddd0 100%);
   --glass-border: rgba(255, 255, 255, 0.62);
-  --glass-bg: rgba(255, 255, 255, 0.74);
-  --glass-panel-shadow: 0 28px 64px rgba(87, 98, 182, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.58);
-  --glass-card-shadow: 0 18px 40px rgba(115, 128, 202, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.54);
-  --paper-shadow: 0 12px 30px rgba(148, 163, 184, 0.12);
-  --ui-chip-bg: rgba(255, 255, 255, 0.72);
-  --ui-chip-border: rgba(255, 255, 255, 0.55);
-  --ui-panel-radius: 32px;
+  --glass-bg: rgba(255, 249, 240, 0.72);
+  --glass-panel-shadow: 0 28px 70px rgba(78, 52, 39, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  --glass-card-shadow: 0 18px 40px rgba(78, 52, 39, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  --paper-shadow: 0 14px 34px rgba(78, 52, 39, 0.08);
+  --ui-chip-bg: rgba(255, 249, 240, 0.78);
+  --ui-chip-border: rgba(255, 255, 255, 0.56);
+  --ui-panel-radius: 34px;
   --ui-card-radius: 28px;
   --ui-subsection-radius: 24px;
   --ui-orb-opacity: 1;
-  --ui-btn-primary-bg: linear-gradient(145deg, #0A84FF, #5AC8FA 58%, #5E5CE6);
-  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.28);
+  --ui-btn-primary-bg: linear-gradient(145deg, #b66a3c, #d18952 58%, #5e355f);
+  --ui-btn-primary-shadow: 0 24px 44px rgba(105, 58, 45, 0.22);
   --ui-btn-primary-radius: 28px;
+}
+
+:root[data-ui-style='redesign'] {
+  --ui-canvas-background: linear-gradient(180deg, #f7f4ee 0%, #f2ede4 50%, #eae2d7 100%);
+  --glass-border: rgba(96, 83, 74, 0.12);
+  --glass-bg: rgba(255, 252, 247, 0.78);
+  --glass-shadow: 0 10px 24px rgba(35, 27, 22, 0.05);
+  --glass-panel-shadow: 0 14px 30px rgba(35, 27, 22, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --glass-card-shadow: 0 8px 18px rgba(35, 27, 22, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  --paper-bg: rgba(255, 252, 247, 0.96);
+  --paper-border: rgba(96, 83, 74, 0.08);
+  --paper-shadow: 0 4px 14px rgba(35, 27, 22, 0.05);
+  --ui-chip-bg: rgba(255, 252, 247, 0.92);
+  --ui-chip-border: rgba(96, 83, 74, 0.12);
+  --ui-panel-radius: 22px;
+  --ui-card-radius: 16px;
+  --ui-subsection-radius: 16px;
+  --ui-orb-opacity: 0;
+  --ui-btn-primary-bg: linear-gradient(135deg, #0f7b68, #13695d 60%, #0d5a51);
+  --ui-btn-primary-shadow: 0 12px 22px rgba(15, 123, 104, 0.18);
+  --ui-btn-primary-radius: 14px;
+  --mf-flow-primary: rgba(15, 123, 104, 0.28);
+  --mf-flow-secondary: rgba(94, 53, 95, 0.12);
 }
 
 body {
@@ -81,106 +109,103 @@ body {
   /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
   font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   background-image: var(--ui-canvas-background);
   background-size: 100% 100%;
   background-attachment: fixed;
 }
 
 body[data-preview-profile-id='liquid-glass-ui'] {
-  --glass-bg: rgba(255, 255, 255, 0.52);
-  --glass-border: rgba(255, 255, 255, 0.72);
-  background-image:
-    radial-gradient(circle at 8% 8%, rgba(90, 200, 250, 0.24) 0, transparent 26%),
-    radial-gradient(circle at 78% 2%, rgba(125, 211, 252, 0.22) 0, transparent 22%),
-    radial-gradient(circle at 92% 78%, rgba(236, 72, 153, 0.12) 0, transparent 20%),
-    linear-gradient(180deg, #fcfdff 0%, #eef4ff 52%, #e7eefb 100%);
+  --glass-bg: rgba(255, 249, 240, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.78);
+  --ui-canvas-background: linear-gradient(180deg, #fffbf5 0%, #f7efe4 48%, #eaded0 100%);
 }
 
 body[data-preview-profile-id='ai-stack-preview'] {
-  background-image:
-    radial-gradient(circle at 12% 10%, rgba(99, 102, 241, 0.18) 0, transparent 28%),
-    radial-gradient(circle at 78% 0%, rgba(56, 189, 248, 0.14) 0, transparent 24%),
-    linear-gradient(180deg, #fbfcff 0%, #f2f4ff 54%, #eaf0ff 100%);
+  --ui-canvas-background: linear-gradient(180deg, #faf6ef 0%, #f3ebdf 48%, #eadfcf 100%);
 }
 
 body[data-preview-profile-id='smart-import-review-v2'] {
-  background-image:
-    radial-gradient(circle at 10% 8%, rgba(16, 185, 129, 0.16) 0, transparent 24%),
-    radial-gradient(circle at 82% 4%, rgba(251, 191, 36, 0.12) 0, transparent 22%),
-    linear-gradient(180deg, #fcfdfb 0%, #f5f8f2 54%, #edf3ea 100%);
+  --ui-canvas-background: linear-gradient(180deg, #fdf9f2 0%, #f4ede1 48%, #ece2d3 100%);
 }
 
 /* Ensure selected text is readable in dark mode */
 ::selection {
-  background: rgba(0, 122, 255, 0.2);
+  background: rgba(15, 123, 104, 0.18);
   color: inherit;
 }
 
 /* Manually handle dark mode via class */
 :root.dark {
-  /* High contrast dark palette */
-  --background: #000000;
-  --foreground: #f5f5f7;
-  --ui-canvas-background: linear-gradient(180deg, #000000 0%, #0d0d0e 100%);
+  --background: #151316;
+  --foreground: #f7f1eb;
+  --ui-canvas-background: linear-gradient(180deg, #151316 0%, #1b171b 52%, #101214 100%);
+  --mf-bg: #151316;
+  --mf-bg-elevated: #1c171b;
+  --mf-bg-strong: #251f23;
+  --mf-ink: #f7f1eb;
+  --mf-muted: #b1a7a1;
+  --mf-flow-primary: rgba(94, 199, 177, 0.44);
+  --mf-flow-secondary: rgba(177, 114, 177, 0.34);
 
-  /* Glass Chrome (Dark Shell) */
-  --glass-bg: rgba(28, 28, 30, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --glass-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  
-  /* Clinical Paper (Dark Content) */
-  --paper-bg: #1c1c1e;
-  --paper-border: rgba(255, 255, 255, 0.08);
-  --paper-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+  --glass-bg: rgba(28, 23, 27, 0.76);
+  --glass-border: rgba(255, 247, 240, 0.1);
+  --glass-panel-shadow: 0 28px 56px rgba(6, 5, 7, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-card-shadow: 0 18px 40px rgba(6, 5, 7, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --paper-bg: rgba(30, 24, 28, 0.9);
+  --paper-border: rgba(255, 247, 240, 0.08);
+  --paper-shadow: 0 16px 32px rgba(6, 5, 7, 0.24);
   --ui-chip-bg: rgba(255, 255, 255, 0.05);
-  --ui-chip-border: rgba(255, 255, 255, 0.1);
+  --ui-chip-border: rgba(255, 247, 240, 0.08);
 
-  /* Semantic Layers */
-  --card: #1c1c1e;
-  --card-foreground: #f5f5f7;
-  --popover: #1c1c1e;
-  --popover-foreground: #f5f5f7;
+  --card: #1c171b;
+  --card-foreground: #f7f1eb;
+  --popover: #1c171b;
+  --popover-foreground: #f7f1eb;
 
-  /* Controls & Inputs */
-  --input: #2c2c2e;
-  --border: #3a3a3c;
-
-  /* Semantic Text */
-  --muted: #8e8e93;
-  --muted-foreground: #8e8e93;
-
-  /* Semantic Colors */
-  --primary: #0a84ff;
-  --apple-blue: #0a84ff;
-  --apple-gray: #8e8e93;
-  --system-gray-6: #1c1c1e;
+  --input: #251f23;
+  --border: rgba(255, 247, 240, 0.1);
+  --muted: #a89e98;
+  --muted-foreground: #a89e98;
+  --primary: #0f7b68;
+  --apple-blue: #0f7b68;
+  --apple-gray: #b1a7a1;
+  --system-gray-6: #1c171b;
 }
 
 :root.dark[data-ui-style='liquid'] {
-  --ui-canvas-background:
-    radial-gradient(circle at 12% 10%, rgba(10, 132, 255, 0.14) 0, transparent 26%),
-    radial-gradient(circle at 82% 0%, rgba(147, 51, 234, 0.11) 0, transparent 22%),
-    radial-gradient(circle at 54% 16%, rgba(45, 212, 191, 0.08) 0, transparent 18%),
-    linear-gradient(180deg, #020308 0%, #0b0f18 100%);
-  --glass-bg: rgba(23, 24, 32, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-panel-shadow: 0 28px 60px rgba(2, 6, 23, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --glass-card-shadow: 0 18px 38px rgba(2, 6, 23, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ui-canvas-background: linear-gradient(180deg, #141116 0%, #1c171e 52%, #121519 100%);
+  --glass-bg: rgba(34, 26, 31, 0.72);
+  --glass-border: rgba(255, 247, 240, 0.14);
+  --glass-panel-shadow: 0 32px 64px rgba(6, 5, 7, 0.64), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-card-shadow: 0 20px 42px rgba(6, 5, 7, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --ui-chip-bg: rgba(255, 255, 255, 0.08);
-  --ui-chip-border: rgba(255, 255, 255, 0.14);
+  --ui-chip-border: rgba(255, 247, 240, 0.12);
   --ui-orb-opacity: 1;
-  --ui-btn-primary-shadow: 0 20px 40px rgba(10, 132, 255, 0.34);
+  --ui-btn-primary-shadow: 0 24px 48px rgba(105, 58, 45, 0.32);
+}
+
+:root.dark[data-ui-style='redesign'] {
+  --ui-canvas-background: linear-gradient(180deg, #141216 0%, #1b181c 52%, #121316 100%);
+  --glass-bg: rgba(28, 24, 27, 0.84);
+  --glass-border: rgba(255, 247, 240, 0.1);
+  --glass-panel-shadow: 0 18px 36px rgba(6, 5, 7, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-card-shadow: 0 10px 24px rgba(6, 5, 7, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --paper-bg: rgba(29, 24, 27, 0.96);
+  --paper-border: rgba(255, 247, 240, 0.08);
+  --paper-shadow: 0 8px 22px rgba(6, 5, 7, 0.24);
+  --ui-chip-bg: rgba(255, 255, 255, 0.06);
+  --ui-chip-border: rgba(255, 247, 240, 0.1);
+  --ui-orb-opacity: 0;
+  --ui-btn-primary-shadow: 0 14px 28px rgba(15, 123, 104, 0.2);
+  --mf-flow-primary: rgba(94, 199, 177, 0.2);
+  --mf-flow-secondary: rgba(177, 114, 177, 0.08);
 }
 
 :root.dark body[data-preview-profile-id='liquid-glass-ui'] {
-  --glass-bg: rgba(20, 28, 40, 0.72);
-  --glass-border: rgba(125, 211, 252, 0.14);
-  background-image:
-    radial-gradient(circle at 10% 8%, rgba(56, 189, 248, 0.16) 0, transparent 24%),
-    radial-gradient(circle at 82% 4%, rgba(14, 165, 233, 0.12) 0, transparent 22%),
-    linear-gradient(180deg, #02050a 0%, #07111c 100%);
+  --glass-bg: rgba(34, 26, 31, 0.68);
+  --glass-border: rgba(255, 247, 240, 0.16);
 }
 
 /* Ensure input/card backgrounds are readable in dark mode */
@@ -196,6 +221,325 @@ body[data-preview-profile-id='smart-import-review-v2'] {
 :root.dark select option {
   background-color: #1c1c1e;
   color: #f5f5f7;
+}
+
+.mediflow-ambient-plane {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(15, 123, 104, 0.14), transparent 34%),
+    radial-gradient(circle at 86% 14%, rgba(94, 53, 95, 0.14), transparent 32%),
+    radial-gradient(circle at 72% 88%, rgba(182, 106, 60, 0.12), transparent 30%),
+    radial-gradient(circle at 18% 92%, rgba(197, 138, 47, 0.1), transparent 26%);
+}
+
+.mediflow-flow-bloom {
+  border-radius: 999px;
+  filter: blur(70px);
+  opacity: var(--ui-orb-opacity);
+}
+
+.mediflow-flow-bloom-top {
+  background: radial-gradient(circle, rgba(15, 123, 104, 0.12), transparent 72%);
+}
+
+.mediflow-flow-bloom-side {
+  background: radial-gradient(circle, rgba(94, 53, 95, 0.11), transparent 72%);
+}
+
+.mediflow-flow-bloom-bottom {
+  background: radial-gradient(circle, rgba(182, 106, 60, 0.12), transparent 72%);
+}
+
+:root[data-ui-reduce-transparency='true'] {
+  --glass-bg: rgba(255, 249, 240, 0.92);
+  --glass-border: rgba(105, 85, 72, 0.18);
+  --glass-panel-shadow: 0 16px 32px rgba(35, 27, 22, 0.08);
+  --glass-card-shadow: 0 10px 24px rgba(35, 27, 22, 0.06);
+  --ui-orb-opacity: 0;
+}
+
+:root.dark[data-ui-reduce-transparency='true'] {
+  --glass-bg: rgba(28, 23, 27, 0.94);
+  --glass-border: rgba(255, 247, 240, 0.12);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --glass-bg: rgba(255, 249, 240, 0.92);
+    --glass-border: rgba(105, 85, 72, 0.18);
+    --glass-panel-shadow: 0 16px 32px rgba(35, 27, 22, 0.08);
+    --glass-card-shadow: 0 10px 24px rgba(35, 27, 22, 0.06);
+    --ui-orb-opacity: 0;
+  }
+
+  :root.dark {
+    --glass-bg: rgba(28, 23, 27, 0.94);
+    --glass-border: rgba(255, 247, 240, 0.12);
+  }
+}
+
+:root[data-ui-reduce-transparency='true'] .mediflow-ambient-plane,
+:root[data-ui-reduce-transparency='true'] .mediflow-flow-bloom {
+  opacity: 0.28;
+  filter: blur(18px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .liquid-orb,
+  .mediflow-flow-bloom {
+    opacity: 0.18;
+    filter: blur(18px);
+  }
+}
+
+:root[data-ui-reduce-motion='true'] *,
+:root[data-ui-reduce-motion='true'] *::before,
+:root[data-ui-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-ui-reduce-motion='true'] .liquid-orb,
+:root[data-ui-reduce-motion='true'] .mediflow-flow-bloom {
+  opacity: 0.18;
+  filter: blur(18px);
+}
+
+:root[data-ui-style='redesign'] .mediflow-ambient-plane {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(15, 123, 104, 0.08), transparent 32%),
+    radial-gradient(circle at 84% 16%, rgba(94, 53, 95, 0.06), transparent 28%),
+    radial-gradient(circle at 70% 88%, rgba(182, 106, 60, 0.06), transparent 26%);
+}
+
+:root[data-ui-style='redesign'] .mediflow-flow-bloom {
+  opacity: 0;
+  filter: blur(24px);
+}
+
+:root[data-ui-style='redesign'] .mediflow-flow-contours-primary {
+  opacity: 0.22;
+}
+
+:root[data-ui-style='redesign'] .mediflow-flow-contours-secondary {
+  opacity: 0.08;
+  mix-blend-mode: normal;
+}
+
+:root[data-ui-style='redesign'] .mediflow-sidebar-shell,
+:root[data-ui-style='redesign'] .mediflow-mobile-header,
+:root[data-ui-style='redesign'] .glass-command-capsule,
+:root[data-ui-style='redesign'] .case-lens-panel,
+:root[data-ui-style='redesign'] .patient-identity-lens,
+:root[data-ui-style='redesign'] .patient-detail-section,
+:root[data-ui-style='redesign'] .patient-detail-side-section,
+:root[data-ui-style='redesign'] .patient-actions-dock,
+:root[data-ui-style='redesign'] .patient-ai-insight-panel {
+  backdrop-filter: blur(18px) saturate(1.04);
+  -webkit-backdrop-filter: blur(18px) saturate(1.04);
+}
+
+:root[data-ui-style='redesign'] .glass-card:hover,
+:root[data-ui-style='redesign'] .ui-btn-primary:hover,
+:root[data-ui-style='redesign'] .apple-list-row:hover,
+:root[data-ui-style='redesign'] .clinical-stream-row:hover {
+  transform: none;
+}
+
+:root[data-ui-style='redesign'] .apple-chip {
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+
+:root[data-ui-style='redesign'] .apple-list-row {
+  border-radius: 14px;
+  background-color: rgba(255, 252, 247, 0.88);
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .status-glyph {
+  border-radius: 12px;
+  padding: 0.2rem 0.55rem;
+}
+
+:root[data-ui-style='redesign'] .status-glyph-icon {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-ui-style='redesign'] .mediflow-sidebar-shell {
+  padding: 1rem;
+}
+
+:root[data-ui-style='redesign'] .mediflow-sidebar-link,
+:root[data-ui-style='redesign'] .mediflow-mobile-link {
+  border-radius: 14px;
+}
+
+:root[data-ui-style='redesign'] .mediflow-mobile-nav {
+  background: rgba(248, 243, 236, 0.94);
+}
+
+:root.dark[data-ui-style='redesign'] .mediflow-mobile-nav {
+  background: rgba(20, 18, 22, 0.94);
+}
+
+.mediflow-mobile-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+}
+
+:root[data-ui-style='redesign'] .preview-profile-banner {
+  border-color: rgba(96, 83, 74, 0.12);
+  background: linear-gradient(135deg, rgba(255, 252, 247, 0.88), rgba(249, 244, 236, 0.82));
+  box-shadow: 0 12px 26px rgba(35, 27, 22, 0.06);
+}
+
+:root[data-ui-style='redesign'] .preview-profile-banner-icon {
+  background: rgba(15, 123, 104, 0.08);
+  color: var(--mf-primary);
+}
+
+:root[data-ui-style='redesign'] .preview-profile-banner-reload {
+  border-radius: 14px;
+  border-color: rgba(96, 83, 74, 0.12);
+  color: var(--mf-primary);
+}
+
+:root[data-ui-style='redesign'] .glass-command-capsule {
+  border-radius: 18px;
+  padding: 0.85rem;
+  background: rgba(255, 252, 247, 0.92);
+  box-shadow: 0 10px 22px rgba(35, 27, 22, 0.05);
+}
+
+:root[data-ui-style='redesign'] .glass-command-cluster {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+:root[data-ui-style='redesign'] .glass-command-search {
+  border-radius: 14px;
+}
+
+:root[data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-style='redesign'] .patient-reader-panel,
+:root[data-ui-style='redesign'] .patient-identity-lens-reader {
+  background: rgba(255, 252, 247, 0.9);
+  box-shadow: 0 14px 30px rgba(35, 27, 22, 0.07);
+}
+
+:root[data-ui-style='redesign'] .patient-workbench-header {
+  border-color: rgba(112, 106, 100, 0.12);
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row {
+  border-radius: 18px;
+  padding: 1rem;
+  background: rgba(255, 252, 247, 0.84);
+  box-shadow: 0 8px 20px rgba(35, 27, 22, 0.05);
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row-mailbox {
+  border-radius: 16px;
+  padding: 0.8rem 0.85rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row-avatar {
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row-cell {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row-utility,
+:root[data-ui-style='redesign'] .clinical-stream-row-link {
+  border-radius: 14px;
+}
+
+:root[data-ui-style='redesign'] .case-lens-panel {
+  border-radius: 22px;
+  background: rgba(255, 252, 247, 0.84);
+  box-shadow: 0 14px 28px rgba(35, 27, 22, 0.07);
+}
+
+:root[data-ui-style='redesign'] .patient-reader-panel {
+  border-radius: 20px;
+}
+
+:root[data-ui-style='redesign'] .case-lens-section {
+  position: relative;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .case-lens-section::before {
+  content: "";
+  position: absolute;
+  left: 0.7rem;
+  top: 0.8rem;
+  bottom: 0.8rem;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--mf-primary), rgba(94, 53, 95, 0.3));
+  opacity: 0.65;
+}
+
+:root[data-ui-style='redesign'] .case-lens-footer,
+:root[data-ui-style='redesign'] .case-lens-placeholder {
+  border-radius: 16px;
+}
+
+:root[data-ui-style='redesign'] .patient-identity-lens {
+  border-radius: 24px;
+}
+
+:root[data-ui-style='redesign'] .patient-identity-lens-reader {
+  border-radius: 22px;
+}
+
+:root[data-ui-style='redesign'] .identity-lens-pane,
+:root[data-ui-style='redesign'] .patient-actions-summary,
+:root[data-ui-style='redesign'] .clinical-river-card,
+:root[data-ui-style='redesign'] .evidence-stack-tile {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: none;
+}
+
+:root[data-ui-style='redesign'] .patient-actions-dock {
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.84);
+}
+
+:root[data-ui-style='redesign'] .patient-ai-insight-panel {
+  background: rgba(255, 252, 247, 0.88);
+  box-shadow: 0 14px 28px rgba(35, 27, 22, 0.07);
+}
+
+:root[data-ui-style='redesign'] .patient-detail-section,
+:root[data-ui-style='redesign'] .patient-detail-side-section {
+  border-radius: 22px;
 }
 
 @layer utilities {
@@ -320,6 +664,13 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   .clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

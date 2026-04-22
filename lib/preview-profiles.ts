@@ -57,12 +57,12 @@ export const PREVIEW_PROFILES: readonly PreviewProfile[] = [
     },
     {
         id: 'liquid-glass-ui',
-        label: 'Liquid Glass UI',
-        description: 'Shell piu liquida e separazione piu netta tra chrome e contenuto clinico.',
+        label: 'Clinical Flow Atlas',
+        description: 'Shell cartografica, case lens contestuale e layer glass piu maturo tra contenuto e navigazione.',
         kind: 'liquid_glass',
         featureFlags: ['liquid-shell', 'frosted-sidebar'],
         sourceBranch: 'WUL-130 / current checkout',
-        notes: 'Pensato per testare la nuova direzione visiva senza cambiare branch o worktree.',
+        notes: 'Pensato per testare la nuova direzione visiva warm glass senza cambiare branch o worktree.',
     },
     {
         id: 'ai-stack-preview',

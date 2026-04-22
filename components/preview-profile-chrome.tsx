@@ -108,10 +108,10 @@ export default function PreviewProfileChrome() {
 
     return (
         <div className="mb-6">
-            <div className="rounded-[28px] border border-sky-200/70 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(255,255,255,0.74))] p-4 shadow-[0_18px_34px_rgba(14,165,233,0.1)] backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
+            <div className="preview-profile-banner rounded-[28px] border border-sky-200/70 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(255,255,255,0.74))] p-4 shadow-[0_18px_34px_rgba(14,165,233,0.1)] backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-start gap-3">
-                        <div className="rounded-[18px] bg-sky-500/10 p-2.5 text-sky-600 dark:bg-sky-500/15 dark:text-sky-200">
+                        <div className="preview-profile-banner-icon rounded-[18px] bg-sky-500/10 p-2.5 text-sky-600 dark:bg-sky-500/15 dark:text-sky-200">
                             <FlaskConical className="h-5 w-5" />
                         </div>
                         <div className="space-y-2">
@@ -133,7 +133,7 @@ export default function PreviewProfileChrome() {
                     <button
                         type="button"
                         onClick={() => window.location.reload()}
-                        className="inline-flex items-center gap-2 self-start rounded-full border border-sky-200/70 bg-white/80 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200 dark:hover:bg-white/10"
+                        className="preview-profile-banner-reload inline-flex items-center gap-2 self-start rounded-full border border-sky-200/70 bg-white/80 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200 dark:hover:bg-white/10"
                     >
                         <RefreshCw className="h-4 w-4" />
                         Ricarica shell
