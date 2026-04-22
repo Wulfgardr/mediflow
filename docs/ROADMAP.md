@@ -67,9 +67,9 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Esperienza nativa
 
-* **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
-* **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
-* **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
+* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di orchestrare il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
+* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con cache locale cifrata e nessun accesso diretto al file SQLite del Mac.
 
 ### Stile visivo e profili locali di preview
 

@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-19
+Ultimo aggiornamento: 2026-04-22
 
 ## Come usare questo indice
 
@@ -124,6 +124,7 @@ Ultimo aggiornamento: 2026-04-19
 | [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md) | Fissa il boundary ufficiale del filone `WUL-180`: oltre il `portal-handoff`, la vera integrazione nativa SISS/FSE richiede scenari approvati e un percorso coerente con `SSI` qualificata/provisioning ARIA. |
 | [docs/adr/0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md](./adr/0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md) | Fissa la decisione `WUL-181`: il primo step credibile sul prescrittivo regionale oltre l'handoff e `webapp-assisted`, non la riscrittura della UI prescrittiva dentro MediFlow. |
 | [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md) | Fissa `WUL-196`: la shell web Graphite/Clinical Workbench diventa il solo runtime UI supportato su `main`, e i preview profile restano limitati a slice funzionali. |
+| [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0026-pin-rotation-via-client-side-rewrap.md](./adr/0026-pin-rotation-via-client-side-rewrap.md) | Definisce la rotazione zero-knowledge del PIN tramite re-wrap client-side della master key, senza ricifrare i dati clinici. |
 | [docs/adr/0027-ai-task-extraction-envelope-and-local-render.md](./adr/0027-ai-task-extraction-envelope-and-local-render.md) | Introduce l'envelope condiviso `mediflow.ai.extract.v1` per insight/smart import/document synthesis, separando il render locale compatto e il benchmark contrattuale sui modelli Qwen target. |
 | [docs/adr/0028-stack-aware-ai-model-evaluation-matrix.md](./adr/0028-stack-aware-ai-model-evaluation-matrix.md) | Definisce una matrice stack-aware per i candidati AI: benchmark reale solo sui generativi `ollama` eseguibili, con stati espliciti per modelli PII/NER/encoder bloccati da integrazione, licenza o gating. |

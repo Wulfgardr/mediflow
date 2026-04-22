@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-15
+Ultimo aggiornamento: 2026-04-17
 
 ---
 
@@ -17,6 +17,7 @@ Ultimo aggiornamento: 2026-04-15
 - [ ] Fissare prima la mappa ufficiale `SSI/A2A` oltre il `portal-handoff` (`WUL-180`) prima di qualunque tentativo di prescrittivo nativo, `FSE` embedded o altri moduli SISS dentro MediFlow.
 - [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).
 - [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback senza introdurre ancora write remoti.
+- [ ] Formalizzare e avviare il rollout Apple-native condiviso (`WUL-187`): ADR architettura shared Apple client (`WUL-188`), hardening trasporto paired (`WUL-189`), boundary write remoto reviewable (`WUL-190`), target shell condivisi (`WUL-191`), macOS `home-base` packaged (`WUL-192`) e client iPhone/iPad paired con parity non-AI + cache locale (`WUL-193`, `WUL-194`).
 - [x] Portare su `main` la first slice runtime del `document evidence ledger` (`WUL-152`): artifact canonico `parse/evidence` cifrato sugli allegati, consumer iniziale in `Patient Insight`, `documentInsights` mantenuto come compat layer.
 - [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
@@ -27,6 +28,7 @@ Nota operativa:
 - `v0.4.0` resta la baseline storica taggata su `main` il `2026-03-19`
 - `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo successivo sposta il focus su uso reale, rollout governance e architettura home-base
 - `WUL-150` ha spostato `home-base` da discovery teorica a first slice eseguibile: pairing PHI-safe, Settings overview e primo read path remoto protetto
+- `WUL-187` apre il macro filone Apple-native: core Swift condiviso, Mac `home-base` packaged come runtime host autorevole e parity non-AI di iPhone/iPad solo tramite `/api/v1/network/*`, mai via accesso diretto a SQLite
 - `WUL-152` ha trasformato ADR 0040 in primo runtime concreto: `parse/evidence` cifrato sugli allegati, `documentInsights` come projection compatibile e consumer iniziale in `Patient Insight`
 - il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
 
