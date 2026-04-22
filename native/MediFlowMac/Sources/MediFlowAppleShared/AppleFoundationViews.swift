@@ -190,10 +190,12 @@ public struct AppleFoundationMobileRootView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
-    @State private var section: AppleFoundationSection = .overview
+    @State private var section: AppleFoundationSection
 
     public init(snapshot: AppleFoundationSnapshot) {
         self.snapshot = snapshot
+        let launchOverrides = AppleFoundationLaunchOverrides.load()
+        _section = State(initialValue: launchOverrides.initialSection ?? .overview)
     }
 
     public var body: some View {
@@ -223,11 +225,12 @@ public struct AppleFoundationMobileRootView: View {
                         .navigationTitle(section.title)
                 }
             } else {
-                TabView {
+                TabView(selection: $section) {
                     NavigationStack {
                         detailView(for: .overview)
                             .navigationTitle(AppleFoundationSection.overview.title)
                     }
+                    .tag(AppleFoundationSection.overview)
                     .tabItem {
                         Label(AppleFoundationSection.overview.title, systemImage: AppleFoundationSection.overview.symbolName)
                     }
@@ -236,6 +239,7 @@ public struct AppleFoundationMobileRootView: View {
                         detailView(for: .modules)
                             .navigationTitle(AppleFoundationSection.modules.title)
                     }
+                    .tag(AppleFoundationSection.modules)
                     .tabItem {
                         Label(AppleFoundationSection.modules.title, systemImage: AppleFoundationSection.modules.symbolName)
                     }
@@ -244,6 +248,7 @@ public struct AppleFoundationMobileRootView: View {
                         detailView(for: .milestones)
                             .navigationTitle(AppleFoundationSection.milestones.title)
                     }
+                    .tag(AppleFoundationSection.milestones)
                     .tabItem {
                         Label(AppleFoundationSection.milestones.title, systemImage: AppleFoundationSection.milestones.symbolName)
                     }
@@ -268,15 +273,7 @@ public struct AppleFoundationMobileRootView: View {
                 .padding(20)
                 .background(PlatformColors.groupedBackground)
         case .modules:
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(snapshot.lanes) { lane in
-                        AppleCapabilityLaneCard(lane: lane)
-                    }
-                }
-                .padding(20)
-            }
-            .background(PlatformColors.groupedBackground)
+            PairedPatientsWorkspaceView()
         case .milestones:
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -288,6 +285,452 @@ public struct AppleFoundationMobileRootView: View {
             }
             .background(PlatformColors.groupedBackground)
         }
+    }
+}
+
+private struct PairedPatientsWorkspaceView: View {
+    @StateObject private var model = PairedPatientsWorkspaceModel()
+    private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                credentialsCard
+                patientsCard
+            }
+            .padding(20)
+        }
+        .background(PlatformColors.groupedBackground)
+        .task {
+            await model.performAutomaticActionsIfNeeded()
+        }
+    }
+
+    private var credentialsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Home-base paired")
+                .font(.headline)
+            Text("Usa credenziali paired generate dal Mac e una login operatore separata.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            TextField("Server HTTPS", text: $model.serverURL)
+                .accessibilityIdentifier("homebase-server-url-field")
+            TextField("Fingerprint SHA256 (opzionale)", text: $model.tlsPin)
+                .accessibilityIdentifier("homebase-tls-pin-field")
+            Button("Scopri in LAN") {
+                Task { await model.discoverHomeBase() }
+            }
+            .accessibilityIdentifier("homebase-discover-button")
+            .disabled(model.isWorking)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            TextField("Paired client ID", text: $model.pairedClientId)
+                .accessibilityIdentifier("homebase-paired-client-id-field")
+            SecureField("Paired client token", text: $model.pairedClientToken)
+                .accessibilityIdentifier("homebase-paired-client-token-field")
+            TextField("Username (opzionale se utente unico)", text: $model.username)
+                .accessibilityIdentifier("homebase-username-field")
+            SecureField("PIN operatore", text: $model.password)
+                .accessibilityIdentifier("homebase-password-field")
+            TextField("Ambulatorio attivo (opzionale)", text: $model.ambulatoryId)
+                .accessibilityIdentifier("homebase-ambulatory-field")
+            LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
+                Button("Accedi operatore") {
+                    Task { await model.login() }
+                }
+                .accessibilityIdentifier("homebase-login-button")
+                .disabled(model.isWorking)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button("Carica pazienti") {
+                    Task { await model.loadPatients() }
+                }
+                .accessibilityIdentifier("homebase-load-patients-button")
+                .disabled(model.isWorking)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button("Salva dispositivo") {
+                    Task { await model.savePairing() }
+                }
+                .accessibilityIdentifier("homebase-save-pairing-button")
+                .disabled(model.isWorking)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button("Dissocia") {
+                    Task { await model.clearPairing() }
+                }
+                .accessibilityIdentifier("homebase-clear-pairing-button")
+                .disabled(model.isWorking)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text("PIN operatore e sessione restano locali e vengono richiesti a ogni riapertura.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let message = model.discoveryMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("homebase-discovery-message")
+            }
+            if let message = model.statusMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("homebase-status-message")
+            }
+            if let error = model.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("homebase-error-message")
+            }
+        }
+        .cardStyle()
+    }
+
+    private var patientsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Consultazione read-only")
+                .font(.headline)
+            if model.isWorking && model.patients.isEmpty {
+                ProgressView()
+            } else if model.patients.isEmpty {
+                Text("Nessun paziente caricato.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.patients) { patient in
+                    Button {
+                        Task { await model.loadPatient(patient) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(patient.lastName) \(patient.firstName)")
+                                .font(.subheadline.weight(.semibold))
+                            Text(patient.taxCode)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if let detail = model.selectedPatient {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(detail.lastName) \(detail.firstName)")
+                        .font(.subheadline.weight(.semibold))
+                    Text(detail.taxCode)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let monitoringProfile = detail.monitoringProfile, !monitoringProfile.isEmpty {
+                        Text(monitoringProfile)
+                            .font(.subheadline)
+                    }
+                    if let statusReason = detail.statusReason, !statusReason.isEmpty {
+                        Text(statusReason)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let notes = detail.notes, !notes.isEmpty {
+                        Text(notes)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .cardStyle()
+    }
+}
+
+@MainActor
+private final class PairedPatientsWorkspaceModel: ObservableObject {
+    @Published var serverURL = HomeBasePairedSettings.defaultServerURL
+    @Published var tlsPin = ""
+    @Published var pairedClientId = ""
+    @Published var pairedClientToken = ""
+    @Published var username = ""
+    @Published var password = ""
+    @Published var ambulatoryId = ""
+    @Published private(set) var patients: [HomeBasePatientSummary] = []
+    @Published private(set) var selectedPatient: HomeBasePatientDetail?
+    @Published private(set) var discoveryMessage: String?
+    @Published private(set) var statusMessage: String?
+    @Published private(set) var errorMessage: String?
+    @Published private(set) var isWorking = false
+
+    private let pairedStore: HomeBasePairedStore
+    private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
+    private var didPerformAutomaticActions = false
+    private var sessionCookie: String?
+
+    init(pairedStore: HomeBasePairedStore = .shared) {
+        self.pairedStore = pairedStore
+        let launchOverrides = AppleFoundationLaunchOverrides.load()
+        self.automaticActions = launchOverrides.automaticActions
+        do {
+            let snapshot = try pairedStore.loadSnapshot()
+            self.serverURL = snapshot.settings.serverURL
+            self.tlsPin = snapshot.settings.tlsPin
+            self.pairedClientId = snapshot.settings.pairedClientId
+            self.pairedClientToken = snapshot.pairedClientToken
+            self.username = snapshot.settings.username
+            self.ambulatoryId = snapshot.settings.ambulatoryId
+        } catch {
+            let settings = pairedStore.loadSettings()
+            self.serverURL = settings.serverURL
+            self.tlsPin = settings.tlsPin
+            self.pairedClientId = settings.pairedClientId
+            self.username = settings.username
+            self.ambulatoryId = settings.ambulatoryId
+            self.errorMessage = error.localizedDescription
+        }
+        applyLaunchOverrides(launchOverrides)
+    }
+
+    func performAutomaticActionsIfNeeded() async {
+        guard !didPerformAutomaticActions else { return }
+        didPerformAutomaticActions = true
+
+        if automaticActions.autoDiscover {
+            await discoverHomeBase()
+        }
+
+        if automaticActions.autoLogin {
+            guard errorMessage == nil else { return }
+            await login()
+        }
+
+        if automaticActions.shouldAutoLoadPatients(hasActiveSession: sessionCookie != nil) {
+            await loadPatients()
+        }
+    }
+
+    func discoverHomeBase() async {
+        await runTask {
+            let candidate = try await HomeBaseBonjourDiscovery().discoverFirst()
+            self.serverURL = candidate.serverURLString
+            if let tlsPin = candidate.tlsPin {
+                self.tlsPin = tlsPin
+            }
+            self.discoveryMessage = candidate.reviewLine
+            self.statusMessage = "Home-base trovato in LAN."
+        }
+    }
+
+    func login() async {
+        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Inserisci il PIN operatore."
+            return
+        }
+        await runTask {
+            self.sessionCookie = try await self.makeClient().login(
+                username: self.username.trimmedOrNil,
+                password: self.password
+            )
+            self.statusMessage = "Sessione operatore attiva."
+        }
+    }
+
+    func loadPatients() async {
+        guard let sessionCookie else {
+            errorMessage = "Esegui prima la login operatore."
+            return
+        }
+        guard let credentials = pairedCredentials else {
+            errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
+            return
+        }
+        await runTask {
+            self.patients = try await self.makeClient().fetchPatients(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.selectedPatient = nil
+            do {
+                try self.persistPairing()
+            } catch {
+                self.errorMessage = "Pazienti caricati, ma il salvataggio paired non e riuscito: \(error.localizedDescription)"
+            }
+            self.statusMessage = self.patients.isEmpty
+                ? "Nessun paziente nello scope corrente."
+                : "\(self.patients.count) pazienti caricati in lettura."
+        }
+    }
+
+    func loadPatient(_ patient: HomeBasePatientSummary) async {
+        guard let sessionCookie, let credentials = pairedCredentials else { return }
+        await runTask {
+            self.selectedPatient = try await self.makeClient().fetchPatient(
+                id: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
+        }
+    }
+
+    func savePairing() async {
+        guard pairedCredentials != nil else {
+            errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
+            return
+        }
+        errorMessage = nil
+        do {
+            try persistPairing()
+            statusMessage = "Credenziali paired salvate sul dispositivo."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearPairing() async {
+        errorMessage = nil
+        do {
+            try pairedStore.clear()
+            serverURL = HomeBasePairedSettings.defaultServerURL
+            tlsPin = ""
+            pairedClientId = ""
+            pairedClientToken = ""
+            username = ""
+            password = ""
+            ambulatoryId = ""
+            patients = []
+            selectedPatient = nil
+            discoveryMessage = nil
+            sessionCookie = nil
+            statusMessage = "Configurazione paired rimossa da questo dispositivo."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private var pairedCredentials: HomeBasePairedCredentials? {
+        let clientId = pairedClientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clientToken = pairedClientToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clientId.isEmpty, !clientToken.isEmpty else { return nil }
+        return HomeBasePairedCredentials(clientId: clientId, clientToken: clientToken)
+    }
+
+    private func makeClient() -> HomeBasePatientsClient {
+        HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
+    }
+
+    private func applyLaunchOverrides(_ launchOverrides: AppleFoundationLaunchOverrides) {
+        if let serverURL = launchOverrides.serverURL {
+            self.serverURL = serverURL
+        }
+        if let tlsPin = launchOverrides.tlsPin {
+            self.tlsPin = tlsPin
+        }
+        if let pairedClientId = launchOverrides.pairedClientId {
+            self.pairedClientId = pairedClientId
+        }
+        if let pairedClientToken = launchOverrides.pairedClientToken {
+            self.pairedClientToken = pairedClientToken
+        }
+        if let username = launchOverrides.username {
+            self.username = username
+        }
+        if let password = launchOverrides.password {
+            self.password = password
+        }
+        if let ambulatoryId = launchOverrides.ambulatoryId {
+            self.ambulatoryId = ambulatoryId
+        }
+    }
+
+    private func persistPairing() throws {
+        try pairedStore.save(
+            settings: HomeBasePairedSettings(
+                serverURL: serverURL,
+                tlsPin: tlsPin,
+                pairedClientId: pairedClientId,
+                username: username,
+                ambulatoryId: ambulatoryId
+            ),
+            pairedClientToken: pairedClientToken
+        )
+    }
+
+    private func runTask(_ operation: @escaping () async throws -> Void) async {
+        isWorking = true
+        errorMessage = nil
+        defer { isWorking = false }
+        do {
+            try await operation()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private extension String {
+    var trimmedOrNil: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+struct AppleFoundationLaunchOverrides: Equatable {
+    struct AutomaticActions: Equatable {
+        var autoDiscover = false
+        var autoLogin = false
+        var autoLoadPatients = false
+
+        func shouldAutoLoadPatients(hasActiveSession: Bool) -> Bool {
+            guard autoLoadPatients else { return false }
+            return !autoLogin || hasActiveSession
+        }
+    }
+
+    var initialSection: AppleFoundationSection?
+    var serverURL: String?
+    var tlsPin: String?
+    var pairedClientId: String?
+    var pairedClientToken: String?
+    var username: String?
+    var password: String?
+    var ambulatoryId: String?
+    var automaticActions = AutomaticActions()
+
+    static func load(processInfo: ProcessInfo = .processInfo) -> AppleFoundationLaunchOverrides {
+        load(environment: processInfo.environment)
+    }
+
+    static func load(environment: [String: String]) -> AppleFoundationLaunchOverrides {
+        AppleFoundationLaunchOverrides(
+            initialSection: normalizedSection(environment["MEDIFLOW_APPLE_INITIAL_SECTION"]),
+            serverURL: normalized(environment["MEDIFLOW_HOMEBASE_SERVER_URL"]),
+            tlsPin: normalized(environment["MEDIFLOW_HOMEBASE_TLS_PIN"]),
+            pairedClientId: normalized(environment["MEDIFLOW_HOMEBASE_PAIRED_CLIENT_ID"]),
+            pairedClientToken: normalized(environment["MEDIFLOW_HOMEBASE_PAIRED_CLIENT_TOKEN"]),
+            username: normalized(environment["MEDIFLOW_HOMEBASE_USERNAME"]),
+            password: normalized(environment["MEDIFLOW_HOMEBASE_OPERATOR_PIN"]),
+            ambulatoryId: normalized(environment["MEDIFLOW_HOMEBASE_AMBULATORY_ID"]),
+            automaticActions: AutomaticActions(
+                autoDiscover: normalizedFlag(environment["MEDIFLOW_HOMEBASE_AUTODISCOVER"]),
+                autoLogin: normalizedFlag(environment["MEDIFLOW_HOMEBASE_AUTOLOGIN"]),
+                autoLoadPatients: normalizedFlag(environment["MEDIFLOW_HOMEBASE_AUTOLOAD_PATIENTS"])
+            )
+        )
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func normalizedSection(_ value: String?) -> AppleFoundationSection? {
+        guard let normalized = normalized(value)?.lowercased() else { return nil }
+        return AppleFoundationSection(rawValue: normalized)
+    }
+
+    private static func normalizedFlag(_ value: String?) -> Bool {
+        guard let normalized = normalized(value)?.lowercased() else { return false }
+        return ["1", "true", "yes", "on"].contains(normalized)
     }
 }
 

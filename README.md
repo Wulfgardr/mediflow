@@ -98,6 +98,15 @@ Inizia da qui:
 > Il progetto non sta scegliendo tra web app e app Apple: sta costruendo uno stack unico.
 > La web app resta la superficie primaria di oggi; il contratto `/api/v1`, il trasporto TLS locale e il boundary `home-base` sono la base comune per il seguito.
 
+- [docs/NATIVE.md](./docs/NATIVE.md)
+- [docs/native-testing.md](./docs/native-testing.md)
+- [docs/mobile-home-base-smoke.md](./docs/mobile-home-base-smoke.md)
+- [docs/parity-smoke.md](./docs/parity-smoke.md)
+- [docs/parity-click-map-macos.md](./docs/parity-click-map-macos.md)
+- [docs/native-setup.md](./docs/native-setup.md)
+- [docs/native-launch.md](./docs/native-launch.md)
+- [docs/local-api-tls.md](./docs/local-api-tls.md)
+
 Situazione attuale:
 
 - **macOS**: esiste uno shell storico, ma non è il punto su cui stratificare le prossime feature;

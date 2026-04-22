@@ -17,6 +17,31 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Native auth tests use a synthetic PIN literal to validate typed error mapping without hitting a live backend.',
         },
         {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBasePairedStore.swift',
+            pattern: 'username\\s*=\\s*"mediflow\\.homeBase\\.username"',
+            reason: 'The paired home-base store persists the operator name under a scoped UserDefaults key; this is an internal setting identifier, not a runtime credential.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
+            pattern: 'username:\\s*" doctor "',
+            reason: 'Home-base paired-store tests trim a synthetic operator name to verify persistence normalization without using live credentials.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
+            pattern: 'username:\\s*"doctor"',
+            reason: 'Home-base paired-store tests reuse a synthetic operator fixture to verify round-trip persistence without using live credentials.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePatientsClientTests.swift',
+            pattern: 'username:\\s*"doctor"',
+            reason: 'Home-base client tests submit a synthetic operator fixture to validate native login payload encoding against a mocked local endpoint.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePatientsClientTests.swift',
+            pattern: 'password:\\s*"1992"',
+            reason: 'Home-base client tests use a synthetic password literal only inside a mocked local login exchange and never against a live backend.',
+        },
+        {
             path: 'lib/network-identity.test.ts',
             pattern: "username:\\s*'solo-user'",
             reason: 'Network identity tests use a synthetic single-user fixture to validate login-hint derivation without real credentials.',
@@ -62,6 +87,21 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'lib/siss.test.ts',
             pattern: 'https://operatorisiss.servizirl.it/',
             reason: 'SISS handoff tests validate explicit user-driven portal URLs with synthetic fixtures and no background runtime egress.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseBonjourDiscovery.swift',
+            pattern: 'https://\\\\\\(hostName\\):\\\\\\(port\\)',
+            reason: 'Bonjour discovery assembles a paired local server URL from the discovered host and port at runtime; it is not a hardcoded external endpoint.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseBonjourDiscoveryTests.swift',
+            pattern: 'https://mediflow-smoke\\.local:3443',
+            reason: 'Bonjour discovery tests use a synthetic .local host to validate candidate normalization without performing network egress.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
+            pattern: 'https://home-base\\.test',
+            reason: 'Home-base paired-store tests use a synthetic .test server URL to verify trimmed persistence without contacting a live endpoint.',
         },
         {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',

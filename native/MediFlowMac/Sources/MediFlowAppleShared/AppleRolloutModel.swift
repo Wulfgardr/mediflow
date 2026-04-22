@@ -47,7 +47,7 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
         case .overview:
             return "Panoramica"
         case .modules:
-            return "Moduli"
+            return "Pazienti"
         case .milestones:
             return "Tappe"
         }
@@ -58,7 +58,7 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
         case .overview:
             return "square.grid.2x2"
         case .modules:
-            return "list.bullet.rectangle"
+            return "person.text.rectangle"
         case .milestones:
             return "flag.pattern.checkered"
         }
@@ -151,16 +151,16 @@ public extension AppleFoundationSnapshot {
     static let live = AppleFoundationSnapshot(
         title: "Family Apple MediFlow",
         summary: "Mac come home-base autorevole, shell distinte per macOS e mobile, convergenza disciplinata tramite contratti condivisi.",
-        statusLine: "Questa build apre il package condiviso e il primo shell mobile. Pairing harden, write remoto e runtime packaged restano nei slice successivi.",
+        statusLine: "Questa build ha gia pairing harden, HTTPS LAN e smoke Bonjour sul shell mobile. Write remoto e runtime packaged restano nei slice successivi.",
         lanes: [
             AppleCapabilityLane(
                 id: "home-base",
                 title: "Home-base e trasporto",
-                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Il runtime packaged e l'harden LAN vengono dopo questa build.",
+                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Pairing, HTTPS LAN e discovery Bonjour ora hanno smoke ripetibile; il runtime packaged viene dopo.",
                 sourceOfTruth: "ADR 0034, ADR 0038, ADR 0047",
-                macOS: ApplePlatformStatus(phase: .foundation, detail: "Nuovo window condiviso e foundation build pronta"),
-                iPhone: ApplePlatformStatus(phase: .next, detail: "Shell mobile pronta; pairing dedicato in attesa"),
-                iPad: ApplePlatformStatus(phase: .next, detail: "Layout split pronto; trasporto paired in attesa"),
+                macOS: ApplePlatformStatus(phase: .foundation, detail: "HTTPS LAN e node summary PHI-safe verificati dal Mac home-base"),
+                iPhone: ApplePlatformStatus(phase: .foundation, detail: "Shell mobile paired con smoke iPhone e selection harden"),
+                iPad: ApplePlatformStatus(phase: .foundation, detail: "Layout split paired con smoke Bonjour e sessione operatore"),
                 nextIssue: "WUL-189"
             ),
             AppleCapabilityLane(
@@ -205,9 +205,9 @@ public extension AppleFoundationSnapshot {
             AppleMilestone(
                 id: "transport",
                 title: "Pairing harden su LAN fidata",
-                summary: "Discovery, trasporto e credenziali paired senza riuso del `local-api-token`.",
+                summary: "Discovery Bonjour, trasporto HTTPS e credenziali paired senza riuso del `local-api-token`.",
                 issue: "WUL-189",
-                phase: .next
+                phase: .foundation
             ),
             AppleMilestone(
                 id: "writes",

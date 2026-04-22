@@ -127,6 +127,9 @@ Nota operativa per `WUL-150`:
 
 - la slice `network` resta prudente, ma non e piu solo stub PHI-safe
 - distingue `node summary`, `session gate`, `capability discovery`, `pairing intent`, `pairing confirmation` e primo `read-only data plane`
+- sul lato Apple-native, la discovery LAN puo pubblicizzare lo stesso nodo via
+  Bonjour `_mediflow-homebase._tcp`, mantenendo fuori dal TXT record qualunque
+  dato PHI e riusando `/api/v1/network/node` come summary PHI-safe reviewable
 - la `session summary` puo includere metadata PHI-safe sul piano replica
   (`snapshot mirror`, `deferred`, `manual review`) senza implicare che esista
   gia un motore sync operativo
