@@ -102,6 +102,9 @@ Introduciamo un `AI model parliament` locale con queste regole:
   implicito nel prodotto
 - i modelli fuori registry o non benchmarkati restano in `hold`, non in
   auto-prune
+- il report puo includere uno **scorecard capability/economics advisory** per
+  confrontare qualita, latenza e copertura lane-aware, ma questo scorecard non
+  cambia da solo baseline, readiness o policy di pruning
 
 Regole di readiness:
 
@@ -124,6 +127,8 @@ Regole di protezione:
 Diventa piu semplice:
 
 - confrontare benchmark e retention nello stesso artifact
+- leggere anche il rapporto qualita/latenza e la copertura delle lane senza
+  trasformare la UI in un orchestratore di promozioni
 - capire quali modelli vale la pena tenere installati
 - evitare che i benchmark restino scollegati dalla realta del runtime locale
 

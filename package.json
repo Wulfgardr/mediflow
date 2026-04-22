@@ -59,6 +59,7 @@
     "validate:clinical-entities:openmed": "node --experimental-strip-types scripts/benchmark-clinical-entities-validate.ts --adapter-module scripts/openmed-clinical-entities-adapter.ts",
     "benchmark:model-stack": "node --experimental-strip-types scripts/benchmark-model-stack.ts",
     "benchmark:model-parliament": "node --experimental-strip-types scripts/benchmark-model-parliament.ts",
+    "test:ai-model-parliament": "node --experimental-strip-types --test scripts/benchmark-model-parliament.test.ts",
     "benchmark:mlx:runtime": "./.venv_mlx/bin/python3 scripts/mlx-chat-batch-runner.py",
     "benchmark:cloud-comparator": "node --experimental-strip-types scripts/cloud-comparator-shadow-eval.ts",
     "validate:ai-rollout-readiness": "node --experimental-strip-types scripts/benchmark-rollout-readiness.ts",
