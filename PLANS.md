@@ -22,6 +22,7 @@ Ultimo aggiornamento: 2026-04-22
 - [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti.
 - [x] Aprire il corpus documentale locale SISS/FSE 2.0 (`WUL-176`) come base per integrazioni regionali piu profonde, con manifest sorgenti, fetch pubblico ripetibile e placeholder `manual-import` per documenti autenticati/non redistribuibili.
 - [x] Portare `WUL-179` al primo stato utile: source sync engine locale con refresh policy, change detection e report di freshness sopra il corpus SISS/FSE.
+- [x] Ritirare i preview profiles funzionali da `main` (`WUL-199`) e promuovere il contesto paziente SISS come parte stabile del `Clinical Workbench`.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
@@ -253,7 +254,7 @@ Nota operativa per il filone UI web `v0.5.0` (`WUL-98`, label Linear legacy `buc
   - profondita multilayer `frosted` + `liquid` usata per gerarchia e focus, non come decorazione diffusa
   - colore giudizioso nei controlli per preservare leggibilita, contrasto e accessibilita
   - tono generale: sofisticato, leggibile, un po' giocoso, ma sempre operativo
-  - i preview profile restano ammessi solo per slice funzionali (`AI`, `Smart Import`, `SISS`), non per fork di shell
+- non esistono piu preview profile runtime su `main`: eventuali nuove sperimentazioni vivono come workstream espliciti, non come selector persistito nel prodotto
 
 ---
 

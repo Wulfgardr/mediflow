@@ -117,20 +117,6 @@ body {
   background-attachment: fixed;
 }
 
-body[data-preview-profile-id='liquid-glass-ui'] {
-  --glass-bg: rgba(255, 249, 240, 0.5);
-  --glass-border: rgba(255, 255, 255, 0.78);
-  --ui-canvas-background: linear-gradient(180deg, #fffbf5 0%, #f7efe4 48%, #eaded0 100%);
-}
-
-body[data-preview-profile-id='ai-stack-preview'] {
-  --ui-canvas-background: linear-gradient(180deg, #faf6ef 0%, #f3ebdf 48%, #eadfcf 100%);
-}
-
-body[data-preview-profile-id='smart-import-review-v2'] {
-  --ui-canvas-background: linear-gradient(180deg, #fdf9f2 0%, #f4ede1 48%, #ece2d3 100%);
-}
-
 /* Ensure selected text is readable in dark mode */
 ::selection {
   background: rgba(15, 123, 104, 0.18);
@@ -203,11 +189,6 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   --ui-btn-primary-shadow: 0 14px 28px rgba(15, 123, 104, 0.2);
   --mf-flow-primary: rgba(94, 199, 177, 0.2);
   --mf-flow-secondary: rgba(177, 114, 177, 0.08);
-}
-
-:root.dark body[data-preview-profile-id='liquid-glass-ui'] {
-  --glass-bg: rgba(34, 26, 31, 0.68);
-  --glass-border: rgba(255, 247, 240, 0.16);
 }
 
 /* Ensure input/card backgrounds are readable in dark mode */
@@ -402,23 +383,6 @@ body[data-preview-profile-id='smart-import-review-v2'] {
 
 .mediflow-mobile-nav {
   padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
-}
-
-:root[data-ui-style='redesign'] .preview-profile-banner {
-  border-color: rgba(96, 83, 74, 0.12);
-  background: linear-gradient(135deg, rgba(255, 252, 247, 0.88), rgba(249, 244, 236, 0.82));
-  box-shadow: 0 12px 26px rgba(35, 27, 22, 0.06);
-}
-
-:root[data-ui-style='redesign'] .preview-profile-banner-icon {
-  background: rgba(15, 123, 104, 0.08);
-  color: var(--mf-primary);
-}
-
-:root[data-ui-style='redesign'] .preview-profile-banner-reload {
-  border-radius: 14px;
-  border-color: rgba(96, 83, 74, 0.12);
-  color: var(--mf-primary);
 }
 
 :root[data-ui-style='redesign'] .glass-command-capsule {

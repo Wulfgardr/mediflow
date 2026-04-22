@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
-/* @Codex */
-import PreviewProfileChrome from '@/components/preview-profile-chrome';
 import { AppRevisionGuard } from '@/components/app-revision-guard';
 import { FlowFieldBackground } from '@/components/flow-field-background';
 import { MobileShellChrome } from '@/components/mobile-shell-chrome';
@@ -74,7 +72,6 @@ export default function RootLayout({
                     <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
                       <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
                         <MobileShellChrome />
-                        <PreviewProfileChrome />
                         {children}
                       </div>
                     </main>

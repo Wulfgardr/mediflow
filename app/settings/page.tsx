@@ -25,14 +25,6 @@ import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
 /* @Codex */
 import NetworkOperatingModePanel from '@/components/settings/network-operating-mode-panel';
-/* @Codex */
-import { usePreviewProfileState } from '@/components/preview-profile-chrome';
-/* @Codex */
-import {
-    getPreviewProfileById,
-    PREVIEW_PROFILE_FLAG_LABELS,
-    type PreviewProfileId,
-} from '@/lib/preview-profiles';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
 
 // --- Model Selector Component ---
@@ -433,23 +425,6 @@ export default function SettingsPage() {
     const [isDockerApp, setIsDockerApp] = useState(false);
     // @Codex
     const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    /* @Codex */
-    const {
-        isEnabled: isPreviewProfilesEnabled,
-        availableProfiles,
-        activeProfile,
-        isApplying: isApplyingPreviewProfile,
-        applyProfile,
-    } = usePreviewProfileState();
-    /* @Codex */
-    const [selectedPreviewProfileId, setSelectedPreviewProfileId] = useState(activeProfile.id);
-    /* @Codex */
-    const selectedPreviewProfile = getPreviewProfileById(selectedPreviewProfileId);
-
-    /* @Codex */
-    useEffect(() => {
-        setSelectedPreviewProfileId(activeProfile.id);
-    }, [activeProfile.id]);
     const isWorkbench = true;
     const {
         reduceMotion,
@@ -1583,93 +1558,6 @@ export default function SettingsPage() {
 
                 {/* --- System & Maintenance Section --- */}
                 <div className="space-y-6">
-                    {isPreviewProfilesEnabled ? (
-                        <div className={SETTINGS_CARD_CLASS}>
-                            <div className="mb-6 flex items-center gap-3">
-                                <div className="rounded-lg bg-sky-100 p-2 text-sky-600">
-                                    <Server className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Dev Preview Profiles</h2>
-                                    <p className="text-xs text-gray-500">
-                                        Seleziona stack sperimentali locali senza cambiare checkout dall&apos;app.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className={SETTINGS_LABEL_CLASS}>Preview Profile</label>
-                                        <select
-                                            value={selectedPreviewProfileId}
-                                            onChange={(event) => setSelectedPreviewProfileId(event.target.value as PreviewProfileId)}
-                                            className={SETTINGS_INPUT_CLASS}
-                                        >
-                                            {availableProfiles.map((profileOption) => (
-                                                <option key={profileOption.id} value={profileOption.id}>
-                                                    {profileOption.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="rounded-[22px] border border-slate-200/70 bg-white/76 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
-                                        <p className="section-kicker">Profilo selezionato</p>
-                                        <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
-                                            {selectedPreviewProfile.label}
-                                        </h3>
-                                        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                            {selectedPreviewProfile.description}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <span className="apple-chip">Origine {selectedPreviewProfile.sourceBranch}</span>
-                                            {selectedPreviewProfile.featureFlags.length > 0 ? (
-                                                selectedPreviewProfile.featureFlags.map((flag) => (
-                                                    <span key={flag} className="apple-chip">
-                                                        {PREVIEW_PROFILE_FLAG_LABELS[flag]}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="apple-chip">Nessun toggle sperimentale</span>
-                                            )}
-                                        </div>
-                                        {selectedPreviewProfile.notes ? (
-                                            <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                                {selectedPreviewProfile.notes}
-                                            </p>
-                                        ) : null}
-                                    </div>
-
-                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => applyProfile(selectedPreviewProfile.id)}
-                                            disabled={isApplyingPreviewProfile || selectedPreviewProfile.id === activeProfile.id}
-                                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
-                                        >
-                                            <RefreshCw className={cn('h-4 w-4', isApplyingPreviewProfile ? 'animate-spin' : '')} />
-                                            {selectedPreviewProfile.id === activeProfile.id ? 'Profilo attivo' : 'Applica e ricarica'}
-                                        </button>
-                                        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                            Disponibile solo in dev. La slice attuale usa il checkout corrente e lascia `targetUrl` come estensione futura.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="rounded-[24px] border border-sky-200/60 bg-sky-50/70 p-5 shadow-[0_12px_28px_rgba(14,165,233,0.08)] dark:border-sky-500/20 dark:bg-sky-900/10">
-                                    <p className="section-kicker">Profilo attivo</p>
-                                    <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
-                                        {activeProfile.label}
-                                    </h3>
-                                    <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                        {activeProfile.description}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : null}
-
                     <ServiceArchitecturePanel />
                     <DiagnosticHub />
 

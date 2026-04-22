@@ -25,7 +25,7 @@ Su `main`, oggi, ci sono già queste cose:
 - **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
 - **modalità `network home-base` read-only**: pairing esplicito, capability discovery e primo accesso remoto ai pazienti da client paired;
 - **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
-- **preview profiles locali** per provare interfaccia, stack AI, review import e contesto SISS senza cambiare checkout.
+- **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
 
 ## Cosa cambia rispetto alla `v0.3`
 
@@ -42,7 +42,7 @@ Il salto, in breve, è questo:
 - **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
 - **Apple clients**: oggi la superficie più solida è la web app sul Mac; la shell macOS storica è congelata e va verso un rebuild controllato; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
 - **SISS/FSE**: oggi MediFlow orchestra il contesto e richiama i percorsi ufficiali. Non dichiara ancora una integrazione nativa regionale certificata.
-- **Preview profiles**: sono toggle locali di prova, utili per verificare fette sperimentali, non claim di prodotto già consolidati.
+- **Shell web ufficiale**: su `main` esiste un solo `Clinical Workbench`; eventuali nuove slice sperimentali non vivono come selector runtime persistito.
 
 ---
 

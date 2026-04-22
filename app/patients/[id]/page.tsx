@@ -17,7 +17,6 @@ import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
 import Timeline from '@/components/timeline';
-import { usePreviewProfileState } from '@/components/preview-profile-chrome';
 import { db, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
@@ -27,8 +26,6 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    const { hasFeature } = usePreviewProfileState();
-    const isSissContextPreviewEnabled = hasFeature('siss-context-preview');
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
@@ -223,12 +220,10 @@ export default function PatientDetailPage() {
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.92fr)]">
                 <div className="space-y-6">
-                    {isSissContextPreviewEnabled ? (
-                        <SissPatientContextPanel
-                            patientId={id}
-                            patientTaxCode={patient.taxCode}
-                        />
-                    ) : null}
+                    <SissPatientContextPanel
+                        patientId={id}
+                        patientTaxCode={patient.taxCode}
+                    />
 
                     <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -252,10 +247,7 @@ export default function PatientDetailPage() {
                         />
                     </section>
 
-                    <TherapyManager
-                        patientId={id}
-                        showLegacySissPrescriptionPanel={!isSissContextPreviewEnabled}
-                    />
+                    <TherapyManager patientId={id} />
 
                     <ObservationManager patientId={id} />
 

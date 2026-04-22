@@ -136,7 +136,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                         Avvia il flusso dal backend locale e apri la webapp ufficiale del Modulo Prescrittivo Regionale con il codice fiscale pronto da incollare.
                     </p>
                     <p className="text-xs leading-5 text-slate-600">
-                        Questa slice resta webapp-assisted: MediFlow prepara il contesto paziente, ma l'atto prescrittivo resta nella sessione SISS ufficiale.
+                        Questa slice resta webapp-assisted: MediFlow prepara il contesto paziente, ma l&apos;atto prescrittivo resta nella sessione SISS ufficiale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">

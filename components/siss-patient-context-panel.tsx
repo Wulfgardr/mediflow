@@ -364,7 +364,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         Apri rapidamente i moduli regionali ufficiali dal gestionale con il codice fiscale del paziente pronto da incollare, dove disponibile.
                     </p>
                     <p className="text-xs leading-5 text-slate-600">
-                        Per il prescrittivo questa slice richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l'interfaccia regionale.
+                        Per il prescrittivo MediFlow richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l&apos;interfaccia regionale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">

@@ -118,39 +118,32 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
-## Shell ufficiale e preview profiles locali
+## Shell ufficiale e superfici integrate
 
 Nel checkout web esiste oggi una sola shell ufficiale del prodotto:
 
 1. `Clinical Workbench / Graphite`: runtime stabile del checkout corrente.
-2. `Preview Profiles`: registry dev-only per attivare stack o slice sperimentali
-   senza cambiare branch o worktree.
 
-I due piani non sono equivalenti: la shell Graphite e il runtime ufficiale,
-mentre i `Preview Profiles` attivano solo sperimentazioni funzionali locali.
+Le superfici AI, Smart Import e contesto paziente SISS non vivono piu dietro un
+selector locale di preview: quando sono considerate mature per `main`, vengono
+integrate direttamente nel workbench ufficiale.
 
-Su checkout non-production MediFlow espone anche una registry locale di
-`Preview Profiles`, selezionabile dalle `Impostazioni`.
+In pratica:
 
-Obiettivo: provare fette sperimentali senza cambiare branch o worktree e senza
-aprire una shell alternativa al runtime stabile.
-
-Profili attuali:
-
-- `Clinical Workbench`: nessun toggle sperimentale
-- `AI Stack Preview`: superfici locali dedicate a stack AI e diagnostica
-- `Smart Import Review v2`: percorsi review-first dell'import operatore
-- `SISS Context Preview`: pannello contestuale SISS/FSE sul paziente
+- `AI`: resta parte della shell ufficiale come stack locale governato;
+- `Smart Import`: resta reviewable dentro i flussi normali del paziente;
+- `SISS`: il pannello contestuale paziente e parte stabile della scheda
+  clinica, mantenendo il boundary `webapp-assisted` verso i moduli regionali.
 
 Implementazione principale:
 
-- `lib/preview-profiles.ts`
-- `components/preview-profile-chrome.tsx`
+- `app/patients/[id]/page.tsx`
+- `components/siss-patient-context-panel.tsx`
 - `app/settings/page.tsx`
 
-Questi profili non cambiano i boundary canonici: servono a verificare fette
-locali, non a dichiararle automaticamente come parte consolidata del prodotto o
-a introdurre shell UI concorrenti.
+Questo non cambia i boundary canonici: AI, import e contesto SISS sono integrati
+nel runtime ufficiale, ma non dichiarano scorciatoie architetturali oltre quelle
+gia formalizzate nelle ADR e nei documenti SISS.
 
 ---
 

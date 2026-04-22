@@ -4,6 +4,9 @@
 Date: 2026-04-22  
 Status: Accepted
 
+> Nota: la parte sui preview profiles funzionali su `main` e stata poi ritirata
+> da [ADR 0050](./0050-functional-preview-profiles-retired-on-mainline.md).
+
 ## Problema
 
 Dopo il redesign `WUL-196`, MediFlow ha ancora residui di una fase esplorativa:

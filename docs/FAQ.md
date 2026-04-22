@@ -44,19 +44,19 @@ Oggi questo perimetro è:
 - protetto da credenziale device + sessione operatore;
 - ancora `read-only-first`.
 
-## Cosa sono i Preview Profiles?
+## Ci sono ancora Preview Profiles?
 
-Sono profili locali di preview disponibili in ambiente non-production per provare alcune fette sperimentali senza cambiare branch o checkout.
+No, non su `main`.
 
-Non vanno confusi con il design runtime del prodotto: su `main` esiste una sola shell ufficiale, il `Clinical Workbench / Graphite`.
+Oggi esiste una sola shell ufficiale, il `Clinical Workbench / Graphite`, e le
+superfici gia mature vivono direttamente li dentro:
 
-Oggi coprono, in modo separato:
+- stack AI locale;
+- Smart Import reviewable;
+- contesto paziente SISS/FSE.
 
-- stack AI;
-- review import;
-- contesto paziente SISS.
-
-Servono a testare fette funzionali locali. Non introducono piu shell estetiche alternative e non sostituiscono il runtime ufficiale del checkout.
+Se in futuro servono nuove sperimentazioni, vanno trattate come workstream o
+branch dedicati, non come selector runtime persistito nelle `Impostazioni`.
 
 ## Cosa vuol dire integrazione SISS in MediFlow, oggi?
 

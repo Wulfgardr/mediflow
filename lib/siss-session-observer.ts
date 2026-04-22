@@ -88,9 +88,9 @@ export function buildSissSessionStatusFromHistory(
     let lastModuleAt: string | null = null;
 
     for (const row of rows) {
-        const module = resolveSissObservedModuleFromUrl(row.url);
-        if (!module || !row.visitedAt) continue;
-        lastModule = module;
+        const observedModule = resolveSissObservedModuleFromUrl(row.url);
+        if (!observedModule || !row.visitedAt) continue;
+        lastModule = observedModule;
         lastModuleAt = row.visitedAt;
         break;
     }
