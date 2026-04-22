@@ -18,7 +18,7 @@ import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
 import Timeline from '@/components/timeline';
 import { usePreviewProfileState } from '@/components/preview-profile-chrome';
-import { db, type Checkup, type ClinicalEntry } from '@/lib/db';
+import { db, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
@@ -47,12 +47,44 @@ export default function PatientDetailPage() {
         },
         [id],
     );
+    /* @Codex */
+    const exemptionCodes = Array.isArray(patient?.exemptions) ? patient.exemptions : [];
+    /* @Codex */
+    const exemptionDetails = useLiveQuery(
+        async () => {
+            const uniqueCodes = [...new Set(
+                exemptionCodes
+                    .map((code) => code.trim().toUpperCase())
+                    .filter(Boolean),
+            )];
+
+            if (!uniqueCodes.length) return [];
+
+            const response = await fetch(`/api/exemptions?codes=${encodeURIComponent(uniqueCodes.join(','))}`, {
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                return uniqueCodes.map((code) => ({ code, description: '' }));
+            }
+
+            const payload = await response.json() as ExemptionCode[];
+            const detailByCode = new Map(
+                payload.map((item) => [item.code.trim().toUpperCase(), item]),
+            );
+
+            return uniqueCodes.map((code) => ({
+                code,
+                description: detailByCode.get(code)?.description || '',
+            }));
+        },
+        [exemptionCodes.join('|')],
+    );
 
     if (!patient) {
         return <div className="p-8 text-center text-gray-500">Caricamento cartella paziente...</div>;
     }
 
-    const exemptionCodes = Array.isArray(patient.exemptions) ? patient.exemptions : [];
     const diagnosisItems = Array.isArray(patient.diagnoses) ? patient.diagnoses : [];
     const documentInsights = Array.isArray(patient.documentInsights) ? patient.documentInsights : [];
     const birthYear = patient.birthDate
@@ -183,6 +215,7 @@ export default function PatientDetailPage() {
                 birthDateLabel={birthDateLabel}
                 diagnoses={diagnosisItems}
                 exemptions={exemptionCodes}
+                exemptionDetails={exemptionDetails ?? []}
                 actions={actionsDock}
                 summary={summaryText}
                 nextStep={nextStepText}
