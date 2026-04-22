@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-17
+Ultimo aggiornamento: 2026-04-22
 
 ---
 
@@ -20,6 +20,8 @@ Ultimo aggiornamento: 2026-04-17
 - [ ] Formalizzare e avviare il rollout Apple-native condiviso (`WUL-187`): ADR architettura shared Apple client (`WUL-188`), hardening trasporto paired (`WUL-189`), boundary write remoto reviewable (`WUL-190`), target shell condivisi (`WUL-191`), macOS `home-base` packaged (`WUL-192`) e client iPhone/iPad paired con parity non-AI + cache locale (`WUL-193`, `WUL-194`).
 - [x] Portare su `main` la first slice runtime del `document evidence ledger` (`WUL-152`): artifact canonico `parse/evidence` cifrato sugli allegati, consumer iniziale in `Patient Insight`, `documentInsights` mantenuto come compat layer.
 - [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti.
+- [x] Aprire il corpus documentale locale SISS/FSE 2.0 (`WUL-176`) come base per integrazioni regionali piu profonde, con manifest sorgenti, fetch pubblico ripetibile e placeholder `manual-import` per documenti autenticati/non redistribuibili.
+- [x] Portare `WUL-179` al primo stato utile: source sync engine locale con refresh policy, change detection e report di freshness sopra il corpus SISS/FSE.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
@@ -30,6 +32,8 @@ Nota operativa:
 - `WUL-150` ha spostato `home-base` da discovery teorica a first slice eseguibile: pairing PHI-safe, Settings overview e primo read path remoto protetto
 - `WUL-187` apre il macro filone Apple-native: core Swift condiviso, Mac `home-base` packaged come runtime host autorevole e parity non-AI di iPhone/iPad solo tramite `/api/v1/network/*`, mai via accesso diretto a SQLite
 - `WUL-152` ha trasformato ADR 0040 in primo runtime concreto: `parse/evidence` cifrato sugli allegati, `documentInsights` come projection compatibile e consumer iniziale in `Patient Insight`
+- `WUL-176` ha portato su `main` il corpus documentale locale SISS/FSE: manifest versionato, fetch pubblico ripetibile fuori Git e placeholder `manual-import` per le fonti non redistribuibili
+- `WUL-179` ha completato il primo layer operativo sopra il corpus: `sync` incrementale, `changeState`, policy di refresh e report locale di freshness, senza introdurre ancora scheduling o daemon dedicati
 - il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
 
 ### Contesto storico chiuso: Release gate v0.5.0 (consolidamento AI/UI)
