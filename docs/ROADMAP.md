@@ -71,9 +71,10 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 * **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
 * **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
 
-### Profili locali di preview
+### Stile visivo e profili locali di preview
 
-* **Preview profilo interfaccia**: confronto tra baseline clinica e direzione `Liquid`.
+* **Stile visivo persistito**: il checkout corrente espone una preferenza locale `Clinico` / `Liquid` per confrontare due grammatiche della stessa UI senza cambiare branch.
+* **Preview profilo interfaccia**: `Liquid Glass UI` resta un profilo dev-only separato per provare flag visuali sperimentali sul checkout corrente, senza sostituire il selettore di stile persistito.
 * **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
 * **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
 

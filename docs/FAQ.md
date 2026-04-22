@@ -48,14 +48,19 @@ Oggi questo perimetro è:
 
 Sono profili locali di preview disponibili in ambiente non-production per provare alcune fette sperimentali senza cambiare branch o checkout.
 
+Non vanno confusi con `Stile visivo` in `Impostazioni`, che oggi e una preferenza locale persistente separata fra:
+
+- `Clinico`
+- `Liquid`
+
 Oggi coprono, in modo separato:
 
-- direzione visiva `Liquid`;
+- shell sperimentale `Liquid Glass UI`;
 - stack AI;
 - review import;
 - contesto paziente SISS.
 
-Servono a testare e confrontare. Non sostituiscono il profilo stabile.
+Servono a testare e confrontare fette locali sperimentali. Non sostituiscono il profilo stabile del checkout e non rimpiazzano il selettore di stile visivo persistito.
 
 ## Cosa vuol dire integrazione SISS in MediFlow, oggi?
 

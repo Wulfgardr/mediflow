@@ -118,7 +118,19 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
-## Preview profiles locali
+## Stile visivo e preview profiles locali
+
+Nel checkout web esistono oggi due meccanismi distinti, entrambi selezionabili da
+`Impostazioni`:
+
+1. `Stile visivo`: preferenza locale persistente del prodotto reale, oggi tra
+   `Clinico` e `Liquid`.
+2. `Preview Profiles`: registry dev-only per attivare stack o slice sperimentali
+   senza cambiare branch o worktree.
+
+I due piani non sono equivalenti: il selettore di stile cambia la grammatica UI
+persistita del checkout corrente, mentre i `Preview Profiles` attivano flag
+locali di sperimentazione.
 
 Su checkout non-production MediFlow espone anche una registry locale di
 `Preview Profiles`, selezionabile dalle `Impostazioni`.
@@ -129,7 +141,7 @@ spostare per errore il profilo stabile.
 Profili attuali:
 
 - `Base`: nessun toggle sperimentale
-- `Liquid Glass UI`: direzione visiva piu liquida e piu separata dal contenuto clinico
+- `Liquid Glass UI`: shell sperimentale piu liquida e piu separata dal contenuto clinico
 - `AI Stack Preview`: superfici locali dedicate a stack AI e diagnostica
 - `Smart Import Review v2`: percorsi review-first dell'import operatore
 - `SISS Context Preview`: pannello contestuale SISS/FSE sul paziente
@@ -142,6 +154,8 @@ Implementazione principale:
 
 Questi profili non cambiano i boundary canonici: servono a verificare fette
 locali, non a dichiararle automaticamente come parte consolidata del prodotto.
+In particolare, `Liquid Glass UI` resta una preview dev-only separata dal
+selettore persistito `Clinico` / `Liquid`.
 
 ---
 
