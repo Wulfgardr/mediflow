@@ -1,5 +1,5 @@
 /* @Codex */
-import type { SissAction, SissTransport } from './siss-adapter';
+import type { SissTransport } from './siss-adapter';
 /* @Codex */
 import {
     normalizeSissPatientTaxCode,
@@ -109,7 +109,7 @@ export async function createSissPatientContextHandoff(
         sissAdapterModule = await import('./siss-adapter');
         const result = await sissAdapterModule.executeSissAdapterRequest(
             {
-                action: input.action as SissAction,
+                action: input.action,
                 fiscalCode: fiscalCode!,
             },
             {

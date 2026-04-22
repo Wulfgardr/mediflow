@@ -49,6 +49,21 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'The SISS adapter foundation preserves the documented user-driven portal handoff as an explicit transport mode.',
         },
         {
+            path: 'lib/siss-session-observer.test.ts',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'SISS session observer tests use canonical operator URLs as synthetic Atlas history fixtures without performing runtime egress.',
+        },
+        {
+            path: 'lib/siss-session-observer.test.ts',
+            pattern: 'https://idpcrlmain.crs.lombardia.it/',
+            reason: 'SISS session observer tests use documented IdPC checkpoints only as synthetic fixtures for remote-sign detection.',
+        },
+        {
+            path: 'lib/siss.test.ts',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'SISS handoff tests validate explicit user-driven portal URLs with synthetic fixtures and no background runtime egress.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
             pattern: 'https://www.aiom.it/linee-guida-aiom/',
             reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',

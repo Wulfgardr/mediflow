@@ -1,6 +1,9 @@
 /* @Codex */
-export const SISS_PATIENT_CONTEXT_ACTIONS = ['menu.open', 'prescription.create', 'fse.lookup', 'registry.lookup'] as const;
-export type SissPatientContextAction = (typeof SISS_PATIENT_CONTEXT_ACTIONS)[number];
+import { SISS_ACTIONS, type SissAction } from './siss-actions';
+
+/* @Codex */
+export const SISS_PATIENT_CONTEXT_ACTIONS = SISS_ACTIONS;
+export type SissPatientContextAction = SissAction;
 
 /* @Codex */
 export type SissPatientContextTransportMode = 'portal-handoff' | 'certified-api';

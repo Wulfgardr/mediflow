@@ -1,4 +1,7 @@
 /* @Codex */
+import type { SissAction } from './siss-actions';
+
+/* @Codex */
 export const SISS_URLS = {
     MENU: 'https://operatorisiss.servizirl.it/menusiss/',
     PRESCRIZIONE_WEBAPP: 'https://operatorisiss.servizirl.it/prescrizione/',
@@ -7,7 +10,7 @@ export const SISS_URLS = {
 } as const;
 
 /* @Codex */
-export const SISS_ACTION_URLS = {
+export const SISS_ACTION_URLS: Record<SissAction, string> = {
     'menu.open': SISS_URLS.MENU,
     'prescription.create': SISS_URLS.PRESCRIZIONE_WEBAPP,
     'fse.lookup': SISS_URLS.FSE,
