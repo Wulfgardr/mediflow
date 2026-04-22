@@ -114,7 +114,7 @@ Situazione attuale:
 - Docker Desktop (**opzionale**, solo per ICD-11)
 - Ollama (**opzionale**, solo per AI/OCR locale)
 
-### Avvio tutto-in-uno
+### Avvio stack web locale
 
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
@@ -127,6 +127,7 @@ npm install
 Apri: `http://localhost:3000`
 
 > Lo script avvia anche Ollama e ICD-11 se presenti.
+> Non avvia i client Apple: macOS, iPadOS e iOS restano su un filone e su launcher separati.
 > Se non sono installati, MediFlow resta usabile con funzionalità ridotte.
 
 ### Verifiche rapide

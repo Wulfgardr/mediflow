@@ -53,13 +53,15 @@ cd mediflow
 npm install
 ```
 
-### Avvio (stack locale completo consigliato)
+### Avvio (stack web locale consigliato)
 
 ```bash
 ./Start_MediFlow.command
 ```
 
 Poi apri: `http://localhost:3000`
+
+`Start_MediFlow.command` avvia la web app e i servizi locali opzionali; il client macOS resta su launcher separato (`./scripts/Launch_MediFlowMac.command`).
 
 ### Avvio (solo web)
 
