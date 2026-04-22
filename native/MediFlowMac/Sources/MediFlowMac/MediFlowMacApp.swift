@@ -1,3 +1,4 @@
+import MediFlowAppleShared
 import SwiftUI
 
 @main
@@ -19,6 +20,12 @@ struct MediFlowMacApp: App {
                     store.reopenOnboarding()
                 }
             }
+        }
+
+        // @Codex
+        Window("Apple Rollout", id: "apple-rollout") {
+            AppleFoundationWindowContent(snapshot: .live)
+                .frame(minWidth: 960, minHeight: 760)
         }
 
         Settings {
