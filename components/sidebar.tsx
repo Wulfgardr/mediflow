@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, Users, Activity, Settings, PlusCircle, 
-  ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical, 
-  Plus, Building2, Eye, EyeOff 
+import {
+  LayoutDashboard, Users, Activity, Settings, PlusCircle,
+  ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical,
+  Plus, Building2, Eye, EyeOff, BarChart3, Sparkles
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -125,9 +125,20 @@ function AmbulatoryTree() {
         return (
             <div className="">
                 <div
+                    role="treeitem"
+                    tabIndex={0}
+                    aria-selected={isActive}
+                    aria-expanded={hasChildren ? isExpanded : undefined}
+                    aria-label={node.name}
                     onClick={() => activate(node.id)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            activate(node.id);
+                        }
+                    }}
                     className={cn(
-                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0",
+                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgba(15,123,104,0.4)]",
                         isActive
                             ? "bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] font-semibold border-[color:rgba(15,123,104,0.22)]"
                             : "hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400",
@@ -139,6 +150,9 @@ function AmbulatoryTree() {
 
                     <button
                         onClick={(e) => toggle(node.id, e)}
+                        aria-label={hasChildren ? (isExpanded ? 'Comprimi' : 'Espandi') : undefined}
+                        aria-hidden={!hasChildren}
+                        tabIndex={hasChildren ? 0 : -1}
                         className={cn("mt-0.5 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 transition-colors shrink-0", !hasChildren && "invisible")}
                     >
                         {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -149,7 +163,7 @@ function AmbulatoryTree() {
                     <span className="flex-1 min-w-0 clamp-2 pr-1" title={node.name}>{node.name}</span>
                 </div>
                 {isExpanded && hasChildren && (
-                    <div className="relative">
+                    <div role="group" className="relative">
                         <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200/50 dark:bg-gray-800/50" style={{ left: `${level * 12 + 18}px` }} />
                         {node.children.map((child: TreeAmbulatory) => <TreeNode key={child.id} node={child} level={level + 1} />)}
                     </div>
@@ -198,12 +212,13 @@ function AmbulatoryTree() {
                     onClick={() => setShowAddModal(true)}
                     className="p-1 text-gray-400 transition-colors hover:text-[color:var(--mf-primary)]"
                     title="Nuovo Ambulatorio"
+                    aria-label="Nuovo Ambulatorio"
                 >
                     <Plus className="w-3.5 h-3.5" />
                 </button>
             </div>
 
-            <div className="space-y-0.5 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
+            <div role="tree" aria-label="Ambulatori" className="space-y-0.5 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
                 {buildTree(ambulatories).map(root => (
                     <TreeNode key={root.id} node={root} />
                 ))}
@@ -229,10 +244,12 @@ export function Sidebar() {
     };
 
     const links = [
-        { href: '/', name: 'Pazienti', icon: Users },
-        { name: 'Diario Clinico', href: '/diary', icon: LayoutDashboard },
-        { name: 'Scale & Test', href: '/scales', icon: Activity },
-        { name: 'Impostazioni', href: '/settings', icon: Settings },
+        { href: '/', name: 'Pazienti', icon: Users, matchPrefixes: ['/patients'] as string[] },
+        { href: '/diary', name: 'Diario Clinico', icon: LayoutDashboard },
+        { href: '/scales', name: 'Scale & Test', icon: Activity },
+        { href: '/analytics', name: 'Analytics', icon: BarChart3 },
+        { href: '/assistant', name: 'Assistant', icon: Sparkles },
+        { href: '/settings', name: 'Impostazioni', icon: Settings },
     ];
 
     return (
@@ -275,12 +292,16 @@ export function Sidebar() {
                     <nav className="space-y-1 flex-1 overflow-y-auto pr-1">
                         {links.map((link) => {
                             const Icon = link.icon;
-                            const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
+                            const prefixMatch = link.matchPrefixes?.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+                            const isActive = pathname === link.href
+                                || (link.href !== '/' && pathname.startsWith(link.href))
+                                || !!prefixMatch;
 
                             return (
                                 <Link
                                     key={link.href}
                                     href={link.href}
+                                    aria-current={isActive ? 'page' : undefined}
                                     className={cn(
                                         "mediflow-sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-[border-color,background-color,color,box-shadow] duration-200 group text-[14px] font-medium",
                                         isActive

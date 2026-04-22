@@ -45,7 +45,12 @@ export function GlassCommandCapsule({
                 className,
             )}
         >
-            <div className="grid gap-2.5 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_auto] 2xl:items-center">
+            <div className={cn(
+                'grid gap-2.5 lg:grid-cols-2 2xl:items-center',
+                onDensityChange
+                    ? '2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_auto]'
+                    : '2xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]',
+            )}>
                 <label className="relative block">
                     <span className="sr-only">Cerca casi</span>
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--mf-muted)]" />
@@ -121,14 +126,14 @@ export function GlassCommandCapsule({
                     </div>
                 </div>
 
-                <div className={cn(
-                    'glass-command-cluster flex items-center gap-2 border border-[color:rgba(112,106,100,0.14)] bg-white/58 dark:bg-white/6',
-                    isWorkbench ? 'rounded-[14px] p-1.5' : 'rounded-[18px] p-1.5',
-                )}>
-                    <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                        Densita
-                    </div>
-                    {onDensityChange ? (
+                {onDensityChange && (
+                    <div className={cn(
+                        'glass-command-cluster flex items-center gap-2 border border-[color:rgba(112,106,100,0.14)] bg-white/58 dark:bg-white/6',
+                        isWorkbench ? 'rounded-[14px] p-1.5' : 'rounded-[18px] p-1.5',
+                    )}>
+                        <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            Densità
+                        </div>
                         <div className="ml-auto flex gap-1">
                             {(['compact', 'wide'] as const).map((mode) => (
                                 <button
@@ -148,10 +153,8 @@ export function GlassCommandCapsule({
                                 </button>
                             ))}
                         </div>
-                    ) : (
-                        <p className="ml-auto px-2 text-sm font-medium text-[color:var(--mf-ink)]">Vista contestuale</p>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 <Link
                     href="/patients/new"

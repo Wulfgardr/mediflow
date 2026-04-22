@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
     if (!patients) return <div className="p-10 text-center">Caricamento Analisi...</div>;
 
     return (
-        <div className="space-y-8 bg-gray-50 min-h-screen p-8">
+        <div className="space-y-8">
             {/* Header */}
             <div className="flex items-center gap-4">
                 <Link href="/" className="p-2 hover:bg-white rounded-full transition-colors">

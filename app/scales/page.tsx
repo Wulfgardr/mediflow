@@ -73,14 +73,14 @@ export default function ScalesLibraryPage() {
     return (
         <div className="max-w-5xl mx-auto space-y-8 relative">
             <div>
-                <h1 className="text-3xl font-bold text-gray-800">Libreria Scale & Valutazioni</h1>
-                <p className="text-gray-500 mt-1">Seleziona una scala per iniziare una valutazione.</p>
+                <h1 className="text-3xl font-bold text-[color:var(--mf-ink)]">Libreria Scale & Valutazioni</h1>
+                <p className="text-[color:var(--mf-muted)] mt-1">Seleziona una scala per iniziare una valutazione.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-8">
                 {scalesLibrary.map((cat) => (
                     <div key={cat.category}>
-                        <h3 className="text-xl font-bold text-gray-700 mb-4 px-1">{cat.category}</h3>
+                        <h3 className="text-xl font-bold text-[color:var(--mf-ink)] mb-4 px-1">{cat.category}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {cat.items.map((item) => {
                                 const Icon = item.icon;
@@ -93,16 +93,16 @@ export default function ScalesLibraryPage() {
                                         className={`glass-card p-6 flex flex-col gap-4 text-left transition-all hover:scale-[1.02] ${isImplemented ? 'opacity-100 hover:shadow-lg' : 'opacity-60 grayscale'}`}
                                     >
                                         <div className="flex justify-between items-start w-full">
-                                            <div className="p-3 bg-gray-100 rounded-xl text-gray-600">
+                                            <div className="p-3 bg-[color:rgba(15,123,104,0.1)] rounded-xl text-[color:var(--mf-primary)]">
                                                 <Icon className="w-6 h-6" />
                                             </div>
-                                            <span className={`px-2 py-1 rounded text-xs font-mono ${isImplemented ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                            <span className={`px-2 py-1 rounded text-xs font-mono ${isImplemented ? 'bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)]' : 'bg-[color:rgba(112,106,100,0.1)] text-[color:var(--mf-muted)]'}`}>
                                                 {isImplemented ? 'Attiva' : 'Coming Soon'}
                                             </span>
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
-                                            <p className="text-sm text-gray-500">{item.desc}</p>
+                                            <h4 className="font-bold text-lg text-[color:var(--mf-ink)]">{item.name}</h4>
+                                            <p className="text-sm text-[color:var(--mf-muted)]">{item.desc}</p>
                                         </div>
                                     </button>
                                 );
@@ -116,28 +116,28 @@ export default function ScalesLibraryPage() {
             {selectedScale && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setSelectedScale(null)} />
-                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50/50">
-                            <h3 className="font-bold text-lg text-gray-800">Seleziona Paziente</h3>
-                            <button onClick={() => setSelectedScale(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors" aria-label="Chiudi">
-                                <X className="w-5 h-5 text-gray-500" />
+                    <div className="relative bg-[color:var(--mf-bg-elevated)] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-[color:rgba(112,106,100,0.14)]">
+                        <div className="flex justify-between items-center p-4 border-b border-[color:rgba(112,106,100,0.14)] bg-[color:rgba(255,249,240,0.6)]">
+                            <h3 className="font-bold text-lg text-[color:var(--mf-ink)]">Seleziona Paziente</h3>
+                            <button onClick={() => setSelectedScale(null)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Chiudi">
+                                <X className="w-5 h-5 text-[color:var(--mf-muted)]" />
                             </button>
                         </div>
 
                         <div className="p-6 space-y-4">
-                            <p className="text-gray-600 text-sm">
-                                Stai per avviare la scala <strong>{SCALES[selectedScale].title}</strong>.
+                            <p className="text-[color:var(--mf-muted)] text-sm">
+                                Stai per avviare la scala <strong className="text-[color:var(--mf-ink)]">{SCALES[selectedScale].title}</strong>.
                                 A chi è destinata?
                             </p>
 
                             <div className="relative">
-                                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                <Search className="absolute left-3 top-3 w-5 h-5 text-[color:var(--mf-muted)]" />
                                 <input
                                     autoFocus
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder="Cerca paziente..."
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    className="w-full pl-10 pr-4 py-3 bg-white/60 dark:bg-white/6 border border-[color:rgba(112,106,100,0.16)] rounded-xl focus:border-[color:rgba(15,123,104,0.38)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)] transition-all outline-none"
                                 />
                             </div>
 
@@ -146,23 +146,23 @@ export default function ScalesLibraryPage() {
                                     <button
                                         key={patient.id}
                                         onClick={() => handleSelectPatient(patient.id)}
-                                        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-200 group text-left"
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-[color:rgba(15,123,104,0.06)] rounded-lg transition-colors border border-transparent hover:border-[color:rgba(15,123,104,0.18)] group text-left"
                                     >
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                        <div className="w-10 h-10 rounded-full bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] flex items-center justify-center font-bold text-sm">
                                             {patient.firstName[0]}{patient.lastName[0]}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-gray-800 group-hover:text-blue-600">{patient.lastName} {patient.firstName}</p>
-                                            <p className="text-xs text-gray-500">{patient.taxCode}</p>
+                                            <p className="font-bold text-[color:var(--mf-ink)] group-hover:text-[color:var(--mf-primary)]">{patient.lastName} {patient.firstName}</p>
+                                            <p className="text-xs text-[color:var(--mf-muted)]">{patient.taxCode}</p>
                                         </div>
                                     </button>
                                 ))}
                             </div>
 
-                            <div className="pt-4 border-t border-gray-100">
+                            <div className="pt-4 border-t border-[color:rgba(112,106,100,0.14)]">
                                 <button
                                     onClick={() => router.push('/patients/new')}
-                                    className="w-full py-3 bg-green-50 text-green-700 rounded-xl border border-green-200 hover:bg-green-100 transition-colors font-medium flex justify-center items-center gap-2"
+                                    className="w-full py-3 bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] rounded-xl border border-[color:rgba(15,123,104,0.22)] hover:bg-[color:rgba(15,123,104,0.16)] transition-colors font-medium flex justify-center items-center gap-2"
                                 >
                                     <Users className="w-4 h-4" />
                                     Crea Nuovo Paziente
