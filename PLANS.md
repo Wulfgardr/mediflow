@@ -236,18 +236,18 @@ Ordine di consegna consigliato (incrementale):
 Nota operativa per il filone UI web `v0.5.0` (`WUL-98`, label Linear legacy `bucket/post-0.4`):
 - la leadership autoriale di UI/UX puo essere delegata a Gemini quando il focus e strettamente di interfaccia
 - Codex mantiene i guardrail su scope, regressioni comportamentali, accessibilita, compliance repo e gestione Linear
-- direzione d'uso: intuitivita clinica, sleekness adatta al contesto medico, linguaggio `liquid glass` leggibile e credibile anche per medici digitalmente fluenti
-- tesi visiva esplicita: unire ricercatezza e immediatezza secondo principi Apple `Liquid Glass`, mantenendo un'interfaccia quotidianamente usabile e senza barriere
-- nuova esplorazione controllata `WUL-112`: affiancare alla baseline `Clinico` una modalita `Liquid` piu massimalista e playful, persistita come preferenza locale e usata come laboratorio di art direction senza compromettere la baseline operativa
+- direzione d'uso: intuitivita clinica, leggibilita alta e shell Graphite/Clinical Workbench come unica interfaccia ufficiale su `main`
+- tesi visiva esplicita: unire ricercatezza e immediatezza in una sola shell operativa, con chrome caldo, layering sobrio e orientamento rapido sul caso
+- la fase di confronto runtime `Clinico` / `Liquid` e chiusa: eventuali nuove esplorazioni visive non vivono come toggle persistiti sul prodotto reale
 - principi da rispettare nella lane UI:
-  - `Liquid Glass` come layer funzionale superiore per navigazione, controlli chiave, sheet e CTA
+  - il layering glass resta grammatica di navigazione e focus, non una modalita alternativa separata
   - uso parco del glass nei controlli custom: evitare layering e overcrowding di superfici traslucide
   - separazione chiara tra contenuto clinico e chrome di navigazione
   - corner radius morbidi e concentrici, senza durezza geometrica gratuita
   - profondita multilayer `frosted` + `liquid` usata per gerarchia e focus, non come decorazione diffusa
   - colore giudizioso nei controlli per preservare leggibilita, contrasto e accessibilita
   - tono generale: sofisticato, leggibile, un po' giocoso, ma sempre operativo
-  - se vengono mantenute due grammatiche UI, `Clinico` resta sempre la baseline affidabile e `Liquid` deve distinguersi per materialita, profondita e delight senza toccare il significato clinico dei colori o rompere scanning e affordance
+  - i preview profile restano ammessi solo per slice funzionali (`AI`, `Smart Import`, `SISS`), non per fork di shell
 
 ---
 

@@ -12,12 +12,12 @@ test('unknown preview profile ids fall back to base', () => {
     assert.equal(getPreviewProfileById('unknown-profile').id, 'base');
 });
 
-test('liquid glass preview exposes the expected shell flags', () => {
-    const profile = getPreviewProfileById('liquid-glass-ui');
+test('ai stack preview keeps only functional flags on top of the official shell', () => {
+    const profile = getPreviewProfileById('ai-stack-preview');
 
-    assert.equal(profile.kind, 'liquid_glass');
-    assert.deepEqual(profile.featureFlags, ['liquid-shell', 'frosted-sidebar']);
-    assert.equal(PREVIEW_PROFILE_FLAG_LABELS['liquid-shell'], 'Shell Liquid Glass');
+    assert.equal(profile.kind, 'ai_stack');
+    assert.deepEqual(profile.featureFlags, ['ai-preview']);
+    assert.equal(PREVIEW_PROFILE_FLAG_LABELS['ai-preview'], 'Badge AI preview');
 });
 
 test('preview profile registry ids stay unique', () => {

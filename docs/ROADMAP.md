@@ -73,10 +73,10 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Stile visivo e profili locali di preview
 
-* **Stile visivo persistito**: il checkout corrente espone una preferenza locale `Clinico` / `Liquid` per confrontare due grammatiche della stessa UI senza cambiare branch.
-* **Preview profilo interfaccia**: `Liquid Glass UI` resta un profilo dev-only separato per provare flag visuali sperimentali sul checkout corrente, senza sostituire il selettore di stile persistito.
+* **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
+* **Preview solo funzionali**: i preview profile restano disponibili per slice `AI`, `Smart Import` e `SISS`, non per confrontare shell estetiche concorrenti.
 * **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
-* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
+* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare la shell ufficiale del checkout.
 
 ### Interazione vocale
 

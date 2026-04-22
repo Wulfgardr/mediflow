@@ -48,19 +48,15 @@ Oggi questo perimetro è:
 
 Sono profili locali di preview disponibili in ambiente non-production per provare alcune fette sperimentali senza cambiare branch o checkout.
 
-Non vanno confusi con `Stile visivo` in `Impostazioni`, che oggi e una preferenza locale persistente separata fra:
-
-- `Clinico`
-- `Liquid`
+Non vanno confusi con il design runtime del prodotto: su `main` esiste una sola shell ufficiale, il `Clinical Workbench / Graphite`.
 
 Oggi coprono, in modo separato:
 
-- shell sperimentale `Liquid Glass UI`;
 - stack AI;
 - review import;
 - contesto paziente SISS.
 
-Servono a testare e confrontare fette locali sperimentali. Non sostituiscono il profilo stabile del checkout e non rimpiazzano il selettore di stile visivo persistito.
+Servono a testare fette funzionali locali. Non introducono piu shell estetiche alternative e non sostituiscono il runtime ufficiale del checkout.
 
 ## Cosa vuol dire integrazione SISS in MediFlow, oggi?
 

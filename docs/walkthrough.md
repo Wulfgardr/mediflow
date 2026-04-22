@@ -118,30 +118,26 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
-## Stile visivo e preview profiles locali
+## Shell ufficiale e preview profiles locali
 
-Nel checkout web esistono oggi due meccanismi distinti, entrambi selezionabili da
-`Impostazioni`:
+Nel checkout web esiste oggi una sola shell ufficiale del prodotto:
 
-1. `Stile visivo`: preferenza locale persistente del prodotto reale, oggi tra
-   `Clinico` e `Liquid`.
+1. `Clinical Workbench / Graphite`: runtime stabile del checkout corrente.
 2. `Preview Profiles`: registry dev-only per attivare stack o slice sperimentali
    senza cambiare branch o worktree.
 
-I due piani non sono equivalenti: il selettore di stile cambia la grammatica UI
-persistita del checkout corrente, mentre i `Preview Profiles` attivano flag
-locali di sperimentazione.
+I due piani non sono equivalenti: la shell Graphite e il runtime ufficiale,
+mentre i `Preview Profiles` attivano solo sperimentazioni funzionali locali.
 
 Su checkout non-production MediFlow espone anche una registry locale di
 `Preview Profiles`, selezionabile dalle `Impostazioni`.
 
 Obiettivo: provare fette sperimentali senza cambiare branch o worktree e senza
-spostare per errore il profilo stabile.
+aprire una shell alternativa al runtime stabile.
 
 Profili attuali:
 
-- `Base`: nessun toggle sperimentale
-- `Liquid Glass UI`: shell sperimentale piu liquida e piu separata dal contenuto clinico
+- `Clinical Workbench`: nessun toggle sperimentale
 - `AI Stack Preview`: superfici locali dedicate a stack AI e diagnostica
 - `Smart Import Review v2`: percorsi review-first dell'import operatore
 - `SISS Context Preview`: pannello contestuale SISS/FSE sul paziente
@@ -153,9 +149,8 @@ Implementazione principale:
 - `app/settings/page.tsx`
 
 Questi profili non cambiano i boundary canonici: servono a verificare fette
-locali, non a dichiararle automaticamente come parte consolidata del prodotto.
-In particolare, `Liquid Glass UI` resta una preview dev-only separata dal
-selettore persistito `Clinico` / `Liquid`.
+locali, non a dichiararle automaticamente come parte consolidata del prodotto o
+a introdurre shell UI concorrenti.
 
 ---
 

@@ -6,18 +6,15 @@ export const PREVIEW_PROFILES_ENABLED = process.env.NODE_ENV !== 'production';
 /* @Codex */
 export type PreviewProfileId =
     | 'base'
-    | 'liquid-glass-ui'
     | 'ai-stack-preview'
     | 'smart-import-review-v2'
     | 'siss-context-preview';
 
 /* @Codex */
-export type PreviewProfileKind = 'base' | 'liquid_glass' | 'ai_stack' | 'smart_import' | 'siss_context';
+export type PreviewProfileKind = 'base' | 'ai_stack' | 'smart_import' | 'siss_context';
 
 /* @Codex */
 export type PreviewProfileFlag =
-    | 'liquid-shell'
-    | 'frosted-sidebar'
     | 'ai-preview'
     | 'smart-import-review'
     | 'siss-context-preview';
@@ -37,8 +34,6 @@ export interface PreviewProfile {
 
 /* @Codex */
 export const PREVIEW_PROFILE_FLAG_LABELS: Record<PreviewProfileFlag, string> = {
-    'liquid-shell': 'Shell Liquid Glass',
-    'frosted-sidebar': 'Sidebar accentata',
     'ai-preview': 'Badge AI preview',
     'smart-import-review': 'Review import esplicita',
     'siss-context-preview': 'Contesto paziente SISS',
@@ -48,30 +43,21 @@ export const PREVIEW_PROFILE_FLAG_LABELS: Record<PreviewProfileFlag, string> = {
 export const PREVIEW_PROFILES: readonly PreviewProfile[] = [
     {
         id: 'base',
-        label: 'Base',
-        description: 'Esperienza standard del checkout corrente, senza stack sperimentali attivi.',
+        label: 'Clinical Workbench',
+        description: 'Shell ufficiale del checkout corrente, senza preview funzionali aggiuntive attive.',
         kind: 'base',
         featureFlags: [],
         sourceBranch: 'main / base',
-        notes: 'Nessun toggle aggiuntivo: la UI resta sul profilo stabile locale.',
-    },
-    {
-        id: 'liquid-glass-ui',
-        label: 'Clinical Flow Atlas',
-        description: 'Shell cartografica, case lens contestuale e layer glass piu maturo tra contenuto e navigazione.',
-        kind: 'liquid_glass',
-        featureFlags: ['liquid-shell', 'frosted-sidebar'],
-        sourceBranch: 'WUL-130 / current checkout',
-        notes: 'Pensato per testare la nuova direzione visiva warm glass senza cambiare branch o worktree.',
+        notes: 'Il redesign Graphite e la sola shell supportata su main; le preview restano solo funzionali.',
     },
     {
         id: 'ai-stack-preview',
         label: 'AI Stack Preview',
         description: 'Profilo dedicato ai workstream AI, insight e diagnostica locale.',
         kind: 'ai_stack',
-        featureFlags: ['liquid-shell', 'ai-preview'],
+        featureFlags: ['ai-preview'],
         sourceBranch: 'WUL-123 / AI stack',
-        notes: 'Prima slice compatibile con toggle runtime sul checkout corrente.',
+        notes: 'Aggiunge segnali e superfici AI senza introdurre una shell alternativa.',
     },
     {
         id: 'smart-import-review-v2',
