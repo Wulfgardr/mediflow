@@ -1,5 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @plugin "@tailwindcss/typography";
+@source "../app";
+@source "../components";
 
 .liquid-blur {
   filter: blur(5px);
