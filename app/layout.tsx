@@ -4,14 +4,19 @@ import './globals.css';
 /* @Codex */
 import PreviewProfileChrome from '@/components/preview-profile-chrome';
 import { AppRevisionGuard } from '@/components/app-revision-guard';
+import { FlowFieldBackground } from '@/components/flow-field-background';
 import { MobileShellChrome } from '@/components/mobile-shell-chrome';
 import { Sidebar } from '@/components/sidebar';
 import { getAppFingerprint } from '@/lib/app-revision';
 import { cn } from '@/lib/utils';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider';
 import { UIStyleProvider } from '@/components/ui-style-provider';
-import { UI_STYLE_STORAGE_KEY } from '@/lib/ui-style-mode';
+import {
+  UI_REDUCE_MOTION_STORAGE_KEY,
+  UI_REDUCE_TRANSPARENCY_STORAGE_KEY,
+} from '@/lib/ui-accessibility-preferences';
 
 export const metadata: Metadata = {
   title: 'MediFlow - Personal Medical Record',
@@ -23,13 +28,14 @@ import { SecurityProvider } from '@/components/security-provider';
 const uiStyleBootstrapScript = `
 (() => {
   try {
-    const storageKey = '${UI_STYLE_STORAGE_KEY}';
     const root = document.documentElement;
-    const savedStyle = localStorage.getItem(storageKey);
-    const styleMode = savedStyle === 'liquid' ? 'liquid' : 'clinical';
-    root.dataset.uiStyle = styleMode;
+    root.dataset.uiStyle = 'redesign';
+    root.dataset.uiReduceMotion = localStorage.getItem('${UI_REDUCE_MOTION_STORAGE_KEY}') === 'true' ? 'true' : 'false';
+    root.dataset.uiReduceTransparency = localStorage.getItem('${UI_REDUCE_TRANSPARENCY_STORAGE_KEY}') === 'true' ? 'true' : 'false';
   } catch (error) {
-    document.documentElement.dataset.uiStyle = 'clinical';
+    document.documentElement.dataset.uiStyle = 'redesign';
+    document.documentElement.dataset.uiReduceMotion = 'false';
+    document.documentElement.dataset.uiReduceTransparency = 'false';
   }
 })();
 `;
@@ -43,7 +49,7 @@ export default function RootLayout({
   const appFingerprint = getAppFingerprint();
 
   return (
-    <html lang="it" data-ui-style="clinical" suppressHydrationWarning>
+    <html lang="it" data-ui-style="redesign" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />
@@ -51,30 +57,32 @@ export default function RootLayout({
           {uiStyleBootstrapScript}
         </Script>
       </head>
-      <body className={cn("antialiased overflow-x-hidden")} suppressHydrationWarning>
+      <body className={cn("min-h-screen antialiased overflow-x-hidden")} suppressHydrationWarning>
+        <FlowFieldBackground />
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
           <AppRevisionGuard fingerprint={appFingerprint} />
-          <SecurityProvider>
-            <UIStyleProvider>
+          <UIAccessibilityProvider>
+            <SecurityProvider>
+              <UIStyleProvider>
               {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}
-              <PrivacyProvider>
-                <div className="xl:flex">
-                  <div className="hidden xl:block">
-                    <Sidebar />
-                  </div>
-                  {/* @Codex: use dedicated mobile chrome instead of shrinking the desktop sidebar */}
-                  <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-80 xl:p-8 xl:pb-8">
-                    {/* Main Content Area - adding a max-width container for readability */}
-                    <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                      <MobileShellChrome />
-                      <PreviewProfileChrome />
-                      {children}
+                <PrivacyProvider>
+                  <div className="relative z-10 xl:flex">
+                    <div className="hidden xl:block">
+                      <Sidebar />
                     </div>
-                  </main>
-                </div>
-              </PrivacyProvider>
-            </UIStyleProvider>
-          </SecurityProvider>
+                    {/* @Codex: use dedicated mobile chrome instead of shrinking the desktop sidebar */}
+                    <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
+                      <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <MobileShellChrome />
+                        <PreviewProfileChrome />
+                        {children}
+                      </div>
+                    </main>
+                  </div>
+                </PrivacyProvider>
+              </UIStyleProvider>
+            </SecurityProvider>
+          </UIAccessibilityProvider>
         </ThemeProvider>
       </body>
     </html>

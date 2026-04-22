@@ -1,5 +1,4 @@
 import PatientList from '@/components/patient-list';
-import DashboardInsights from '@/components/dashboard-insights';
 
 export default function Home() {
   return (
