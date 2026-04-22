@@ -2,6 +2,8 @@
 
 import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
 
+/* @Codex */
+import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
 
 interface ClinicalRiverTimelineProps {
@@ -24,7 +26,8 @@ function getEntrySummary(entry: ClinicalEntry): string {
     if (entry.type === 'hospitalization') return 'Passaggio ospedaliero rilevante per la timeline.';
     if (entry.type === 'remote') return 'Interazione remota con elementi utili al contesto.';
     if (entry.type === 'scale') return 'Valutazione strutturata inserita nel caso.';
-    return entry.content?.trim() ? entry.content.trim() : 'Voce del diario clinico pronta alla revisione.';
+    /* @Codex */
+    return compactClinicalRichText(entry.content, 220) || 'Voce del diario clinico pronta alla revisione.';
 }
 
 function buildRiverItems(

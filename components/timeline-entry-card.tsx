@@ -2,7 +2,8 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { ClinicalEntry, Attachment, db } from '@/lib/db';
 import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+/* @Codex */
+import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 
@@ -136,9 +137,10 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                 )}
 
                 {/* Main Text Content */}
-                <div className="prose prose-sm max-w-none text-gray-600 prose-p:leading-relaxed">
+                <div className="text-gray-600">
                     <PrivacyBlur>
-                        <ReactMarkdown>{entry.content}</ReactMarkdown>
+                        {/* @Codex */}
+                        <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed" />
                     </PrivacyBlur>
                 </div>
 

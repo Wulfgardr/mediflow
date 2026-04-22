@@ -16,6 +16,8 @@ import {
     parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentInsightFromArtifact,
 } from '@/lib/document-parse-evidence-artifact';
+/* @Codex */
+import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -810,7 +812,7 @@ export async function buildPatientInsightContext(
         });
 
     const diaryLines = entries
-        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(entry.content, 220)}`);
+        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(clinicalRichTextToPlainText(entry.content), 220)}`);
 
     let nextIndex = 1;
     const profileRefs = createSourceRefs('Profilo strutturato', profileLines, nextIndex);

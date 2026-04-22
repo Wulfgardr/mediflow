@@ -663,6 +663,87 @@ body[data-preview-profile-id='smart-import-review-v2'] {
   }
 
   /* @Codex */
+  .clinical-rich-text,
+  .clinical-rich-editor {
+    color: var(--mf-ink);
+    line-height: 1.75;
+  }
+
+  .clinical-rich-text :first-child,
+  .clinical-rich-editor :first-child {
+    margin-top: 0;
+  }
+
+  .clinical-rich-text p,
+  .clinical-rich-editor p,
+  .clinical-rich-text ul,
+  .clinical-rich-editor ul,
+  .clinical-rich-text ol,
+  .clinical-rich-editor ol,
+  .clinical-rich-text blockquote,
+  .clinical-rich-editor blockquote {
+    margin-top: 0.75rem;
+  }
+
+  .clinical-rich-text h1,
+  .clinical-rich-editor h1,
+  .clinical-rich-text h2,
+  .clinical-rich-editor h2,
+  .clinical-rich-text h3,
+  .clinical-rich-editor h3 {
+    margin-top: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--mf-ink);
+  }
+
+  .clinical-rich-text h1,
+  .clinical-rich-editor h1 {
+    font-size: 1.25rem;
+  }
+
+  .clinical-rich-text h2,
+  .clinical-rich-editor h2 {
+    font-size: 1.125rem;
+  }
+
+  .clinical-rich-text h3,
+  .clinical-rich-editor h3 {
+    font-size: 1rem;
+  }
+
+  .clinical-rich-text ul,
+  .clinical-rich-editor ul {
+    list-style-type: disc;
+    padding-left: 1.2rem;
+  }
+
+  .clinical-rich-text ol,
+  .clinical-rich-editor ol {
+    list-style-type: decimal;
+    padding-left: 1.2rem;
+  }
+
+  .clinical-rich-text li,
+  .clinical-rich-editor li {
+    margin-top: 0.25rem;
+  }
+
+  .clinical-rich-text blockquote,
+  .clinical-rich-editor blockquote {
+    border-left: 2px solid rgba(182, 106, 60, 0.22);
+    padding-left: 0.875rem;
+    color: var(--mf-muted);
+  }
+
+  .clinical-rich-editor[data-empty='true']::before {
+    content: attr(data-placeholder);
+    color: var(--mf-muted);
+    white-space: pre-wrap;
+    pointer-events: none;
+  }
+
+  /* @Codex */
   .clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
