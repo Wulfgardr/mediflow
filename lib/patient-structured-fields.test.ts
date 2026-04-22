@@ -27,6 +27,10 @@ test('parsePatientDatedRecords revives dates from strings and arrays', () => {
     assert.equal(fromArray[0].date.toISOString(), '2025-03-11T00:00:00.000Z');
 });
 
+test('parsePatientDatedRecords returns an empty array for malformed JSON strings', () => {
+    assert.deepEqual(parsePatientDatedRecords<{ id: string }>('{"id":"broken"'), []);
+});
+
 test('revivePatientStructuredFields only mutates parsable patient fields', () => {
     const item = {
         exemptions: '["E01","E02"]',

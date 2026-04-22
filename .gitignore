@@ -13,6 +13,7 @@
 # testing
 /coverage
 /playwright-report
+/.playwright-cli/
 /test-results
 /tmp-e2e-data
 /tmp-concurrency-data
@@ -23,10 +24,13 @@
 /tmp-patient-document-import-test
 /tmp-real-import-data
 /tmp-real-pipeline
+/tmp-manual-browser
+/tmp-network-home-base-readonly
 /tmp/
 
 # next.js
 /.next/
+/.next-manual-browser/
 /.next-real-import/
 /out/
 

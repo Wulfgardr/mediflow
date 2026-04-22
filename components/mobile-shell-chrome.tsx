@@ -22,6 +22,11 @@ const MOBILE_LINKS = [
 ];
 
 /* @Codex */
+const MOBILE_NAV_STYLE = {
+    paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)',
+} as const;
+
+/* @Codex */
 export function MobileShellChrome() {
     const pathname = usePathname();
     const { user } = useSecurity();
@@ -44,7 +49,10 @@ export function MobileShellChrome() {
                 </div>
             </header>
 
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/88 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/88 xl:hidden">
+            <nav
+                className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/88 px-3 pt-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/88 xl:hidden"
+                style={MOBILE_NAV_STYLE}
+            >
                 <div className="mx-auto grid max-w-md grid-cols-4 gap-2">
                     {MOBILE_LINKS.map((link) => {
                         const Icon = link.icon;
