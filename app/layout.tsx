@@ -25,15 +25,26 @@ import { SecurityProvider } from '@/components/security-provider';
 
 const uiStyleBootstrapScript = `
 (() => {
+  const root = document.documentElement;
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   try {
-    const root = document.documentElement;
     root.dataset.uiStyle = 'redesign';
     root.dataset.uiReduceMotion = localStorage.getItem('${UI_REDUCE_MOTION_STORAGE_KEY}') === 'true' ? 'true' : 'false';
     root.dataset.uiReduceTransparency = localStorage.getItem('${UI_REDUCE_TRANSPARENCY_STORAGE_KEY}') === 'true' ? 'true' : 'false';
+
+    const stored = localStorage.getItem('mediflow-theme');
+    const resolved = stored === 'dark' || stored === 'light' ? stored : (prefersDark ? 'dark' : 'light');
+    root.classList.remove('light', 'dark');
+    root.classList.add(resolved);
+    root.style.colorScheme = resolved;
   } catch (error) {
-    document.documentElement.dataset.uiStyle = 'redesign';
-    document.documentElement.dataset.uiReduceMotion = 'false';
-    document.documentElement.dataset.uiReduceTransparency = 'false';
+    root.dataset.uiStyle = 'redesign';
+    root.dataset.uiReduceMotion = 'false';
+    root.dataset.uiReduceTransparency = 'false';
+    const fallback = prefersDark ? 'dark' : 'light';
+    root.classList.remove('light', 'dark');
+    root.classList.add(fallback);
+    root.style.colorScheme = fallback;
   }
 })();
 `;
