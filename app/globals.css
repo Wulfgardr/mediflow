@@ -125,41 +125,41 @@ body {
 
 /* Manually handle dark mode via class */
 :root.dark {
-  --background: #151316;
-  --foreground: #f7f1eb;
-  --ui-canvas-background: linear-gradient(180deg, #151316 0%, #1b171b 52%, #101214 100%);
-  --mf-bg: #151316;
-  --mf-bg-elevated: #1c171b;
-  --mf-bg-strong: #251f23;
-  --mf-ink: #f7f1eb;
-  --mf-muted: #b1a7a1;
+  --background: #131013;
+  --foreground: #f3ece4;
+  --ui-canvas-background: linear-gradient(180deg, #141115 0%, #1a161a 52%, #0f0d10 100%);
+  --mf-bg: #131013;
+  --mf-bg-elevated: #1d181c;
+  --mf-bg-strong: #261f24;
+  --mf-ink: #f3ece4;
+  --mf-muted: #b9b0a8;
   --mf-flow-primary: rgba(94, 199, 177, 0.44);
   --mf-flow-secondary: rgba(177, 114, 177, 0.34);
 
-  --glass-bg: rgba(28, 23, 27, 0.76);
+  --glass-bg: rgba(28, 23, 27, 0.78);
   --glass-border: rgba(255, 247, 240, 0.1);
   --glass-panel-shadow: 0 28px 56px rgba(6, 5, 7, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --glass-card-shadow: 0 18px 40px rgba(6, 5, 7, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  --paper-bg: rgba(30, 24, 28, 0.9);
-  --paper-border: rgba(255, 247, 240, 0.08);
+  --paper-bg: rgba(30, 24, 28, 0.92);
+  --paper-border: rgba(255, 247, 240, 0.09);
   --paper-shadow: 0 16px 32px rgba(6, 5, 7, 0.24);
-  --ui-chip-bg: rgba(255, 255, 255, 0.05);
-  --ui-chip-border: rgba(255, 247, 240, 0.08);
+  --ui-chip-bg: rgba(255, 255, 255, 0.06);
+  --ui-chip-border: rgba(255, 247, 240, 0.1);
 
   --card: #1c171b;
-  --card-foreground: #f7f1eb;
+  --card-foreground: #f3ece4;
   --popover: #1c171b;
-  --popover-foreground: #f7f1eb;
+  --popover-foreground: #f3ece4;
 
   --input: #251f23;
   --border: rgba(255, 247, 240, 0.1);
-  --muted: #a89e98;
-  --muted-foreground: #a89e98;
+  --muted: #b9b0a8;
+  --muted-foreground: #b9b0a8;
   --primary: #0f7b68;
-  --apple-blue: #0f7b68;
-  --apple-gray: #b1a7a1;
-  --system-gray-6: #1c171b;
+  --apple-blue: #4dd1b8;
+  --apple-gray: #b9b0a8;
+  --system-gray-6: #221d21;
 }
 
 :root.dark[data-ui-style='liquid'] {
@@ -198,12 +198,6 @@ body {
   background-color: var(--input);
   color: var(--foreground);
   border-color: var(--border);
-}
-
-/* Fix native select options in dark mode */
-:root.dark select option {
-  background-color: #1c1c1e;
-  color: #f5f5f7;
 }
 
 .mediflow-ambient-plane {
@@ -506,6 +500,69 @@ body {
 :root[data-ui-style='redesign'] .patient-detail-section,
 :root[data-ui-style='redesign'] .patient-detail-side-section {
   border-radius: 22px;
+}
+
+/* Dark-mode surface restoration for the official redesign shell.
+   Component templates carry inline light tints (e.g. bg-[color:rgba(255,...)])
+   that must be neutralised in dark mode without editing every callsite. */
+:root.dark[data-ui-style='redesign'] .patient-identity-lens-reader,
+:root.dark[data-ui-style='redesign'] .patient-detail-section,
+:root.dark[data-ui-style='redesign'] .patient-detail-side-section,
+:root.dark[data-ui-style='redesign'] .patient-ai-insight-panel,
+:root.dark[data-ui-style='redesign'] .patient-reader-panel,
+:root.dark[data-ui-style='redesign'] .patient-inbox-pane,
+:root.dark[data-ui-style='redesign'] .case-lens-panel {
+  background-color: rgba(26, 22, 26, 0.88);
+  border-color: rgba(255, 247, 240, 0.08);
+  box-shadow: 0 16px 30px rgba(6, 5, 7, 0.42);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-actions-dock {
+  background-color: rgba(36, 30, 34, 0.88);
+  border-color: rgba(255, 247, 240, 0.1);
+}
+
+:root.dark[data-ui-style='redesign'] .identity-lens-pane,
+:root.dark[data-ui-style='redesign'] .patient-actions-summary,
+:root.dark[data-ui-style='redesign'] .clinical-river-card,
+:root.dark[data-ui-style='redesign'] .evidence-stack-tile,
+:root.dark[data-ui-style='redesign'] .case-lens-section {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 247, 240, 0.08);
+  box-shadow: none;
+}
+
+:root.dark[data-ui-style='redesign'] .apple-list-row {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 247, 240, 0.08);
+  color: var(--mf-ink);
+}
+
+:root.dark[data-ui-style='redesign'] .apple-list-row:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 247, 240, 0.16);
+}
+
+:root.dark[data-ui-style='redesign'] .clinical-stream-row,
+:root.dark[data-ui-style='redesign'] .clinical-stream-row-cell {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 247, 240, 0.08);
+}
+
+:root.dark[data-ui-style='redesign'] .glass-command-capsule {
+  background-color: rgba(28, 23, 27, 0.86);
+  box-shadow: 0 10px 22px rgba(6, 5, 7, 0.3);
+}
+
+:root.dark[data-ui-style='redesign'] .glass-command-cluster,
+:root.dark[data-ui-style='redesign'] .glass-command-search {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Dark inputs in the official shell: make sure dropdown/popover text remains legible */
+:root.dark select option {
+  background-color: var(--mf-bg-elevated);
+  color: var(--foreground);
 }
 
 @layer utilities {
