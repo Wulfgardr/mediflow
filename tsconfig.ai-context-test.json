@@ -10,6 +10,7 @@
     "isolatedModules": false
   },
   "include": [
+    "lib/pdfjs-worker.d.ts",
     "lib/ai-context.ts",
     "lib/ai-context.test.ts",
     "lib/ai-insight-settings.ts",

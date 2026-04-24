@@ -162,6 +162,14 @@ function isLowSignalAttachmentSummary(value: string | null | undefined): boolean
     return LOW_SIGNAL_ATTACHMENT_SUMMARIES.some((candidate) => normalized === candidate);
 }
 
+/* @Codex */
+function canAttemptAttachmentTextRecovery(attachment: Attachment): boolean {
+    const summary = typeof attachment.summarySnapshot === 'string'
+        ? attachment.summarySnapshot
+        : '';
+    return Boolean(attachment.data) && isLowSignalAttachmentSummary(summary);
+}
+
 function formatDate(value: unknown): string {
     if (!value) return '';
     const parsed = value instanceof Date ? value : new Date(value as string | number);
@@ -696,15 +704,24 @@ export async function buildPatientInsightContext(
         })
         .filter((candidate): candidate is DocumentContextCandidate => Boolean(candidate?.line));
 
+    let remainingAttachmentTextRecoveries = MAX_ATTACHMENT_TEXT_RECOVERY;
     const attachmentCandidates = await Promise.all(
         attachments
             .filter((attachment) => !archivedAttachmentIds.has(attachment.id))
-            .map((attachment, index) => buildAttachmentContextCandidate(
-                attachment,
-                runtimeSettings.maxDocumentSummaryChars,
-                recoverAttachmentText,
-                index < MAX_ATTACHMENT_TEXT_RECOVERY,
-            )),
+            .map((attachment) => {
+                const allowRecovery = canAttemptAttachmentTextRecovery(attachment)
+                    && remainingAttachmentTextRecoveries > 0;
+                if (allowRecovery) {
+                    remainingAttachmentTextRecoveries -= 1;
+                }
+
+                return buildAttachmentContextCandidate(
+                    attachment,
+                    runtimeSettings.maxDocumentSummaryChars,
+                    recoverAttachmentText,
+                    allowRecovery,
+                );
+            }),
     );
     const limitations: string[] = [];
     const recoveredAttachmentCount = attachmentCandidates.filter((candidate) => candidate.recoveredDirectText).length;
