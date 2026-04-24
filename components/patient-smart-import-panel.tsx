@@ -168,13 +168,45 @@ function formatResolverScore(score: number): string {
     return `${Math.round(score)}`;
 }
 
+// @Codex: Smart Import often renders in a narrow patient side rail, so actions must not share a cramped title row.
+function ReviewActionButtons({
+    isEditing,
+    onToggleEditor,
+    onDiscard,
+}: {
+    isEditing: boolean;
+    onToggleEditor: () => void;
+    onDiscard: () => void;
+}) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            <button
+                type="button"
+                onClick={onToggleEditor}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-sky-400/30 dark:hover:bg-sky-950/20 dark:hover:text-sky-200"
+            >
+                <Edit3 className="h-3 w-3" />
+                {isEditing ? 'Chiudi modifica' : 'Modifica'}
+            </button>
+            <button
+                type="button"
+                onClick={onDiscard}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
+            >
+                <Trash2 className="h-3 w-3" />
+                Scarta
+            </button>
+        </div>
+    );
+}
+
 function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImportSuggestion }) {
     return (
         <div className="space-y-2 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver ICD locale</p>
                 {diagnosis.resolver.queries.length > 0 && (
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                    <span className="max-w-full break-words rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
                         {diagnosis.resolver.queries.join(' · ')}
                     </span>
                 )}
@@ -194,8 +226,8 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
                             </div>
-                            <p className="mt-1 text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.description}</p>
-                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Query: {candidate.query}</p>
+                            <p className="mt-1 break-words text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.description}</p>
+                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">Query: {candidate.query}</p>
                         </div>
                     ))}
                 </div>
@@ -212,7 +244,7 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver AIFA locale</p>
                 {therapy.resolver.searchTerms.length > 0 && (
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                    <span className="max-w-full break-words rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
                         {therapy.resolver.searchTerms.join(' · ')}
                     </span>
                 )}
@@ -235,13 +267,13 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
                                     {candidate.dosageAligned ? 'dosaggio coerente' : 'dosaggio divergente'}
                                 </span>
                             </div>
-                            <p className="mt-1 text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.name}</p>
-                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 break-words text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.name}</p>
+                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">
                                 {[candidate.activePrinciple, candidate.packaging, candidate.atc ? `ATC ${candidate.atc}` : undefined]
                                     .filter(Boolean)
                                     .join(' · ')}
                             </p>
-                            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Search: {candidate.searchTerm}</p>
+                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">Search: {candidate.searchTerm}</p>
                         </div>
                     ))}
                 </div>
@@ -480,19 +512,19 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
     return (
         <div className="glass-panel overflow-hidden rounded-[28px] border-sky-100/50 bg-sky-50/10 p-0 backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
             <div className="border-b border-sky-200/30 p-5 dark:border-white/5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-sky-600 text-white shadow-lg shadow-sky-500/20">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-sky-600 text-white shadow-lg shadow-sky-500/20">
                             <Brain className="h-5 w-5" />
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">Smart Import</h3>
-                            <div className="mt-0.5 flex items-center gap-2">
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="inline-flex items-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
                                     {sourceCount} fonti
                                 </span>
                                 {analysis && (
-                                    <span className="text-[9px] font-medium uppercase tracking-tight text-slate-400">
+                                    <span className="break-all text-[9px] font-medium uppercase tracking-tight text-slate-400">
                                         {analysis.model.model}
                                     </span>
                                 )}
@@ -503,7 +535,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                     <button
                         onClick={generateSuggestions}
                         disabled={isGenerating || isApplying || !smartImportEnabled}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 transition-[background-color,opacity,transform] hover:bg-sky-700 active:scale-95 disabled:opacity-50"
+                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 transition-[background-color,opacity,transform] hover:bg-sky-700 active:scale-95 disabled:opacity-50"
                     >
                         {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         {analysis ? (smartImportEnabled ? 'Aggiorna' : 'Disabilitata') : (smartImportEnabled ? 'Analizza fonti' : 'Disabilitata')}
@@ -574,7 +606,10 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                        <div
+                            className="grid gap-5"
+                            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))' }}
+                        >
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
                                     <Stethoscope className="h-3.5 w-3.5 text-rose-500" />
@@ -610,15 +645,15 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                     </div>
 
                                                     <div className="min-w-0 flex-1 space-y-3">
-                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                        <div className="flex flex-col gap-3">
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {diagnosis.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer text-sm font-bold text-slate-900 dark:text-white">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-slate-900 dark:text-white">
                                                                             {displayLabel}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{displayLabel}</p>
+                                                                        <p className="break-words text-sm font-bold text-slate-900 dark:text-white">{displayLabel}</p>
                                                                     )}
                                                                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${reviewStateBadgeClasses(diagnosis.review.state)}`}>
                                                                         {reviewStateLabel(diagnosis.review.state)}
@@ -628,30 +663,17 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
-                                                                    <p className="font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                                                    <p className="break-words font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
                                                                         ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
                                                                     </p>
                                                                 )}
                                                             </div>
 
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => toggleDiagnosisEditor(diagnosis.id)}
-                                                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-sky-400/30 dark:hover:bg-sky-950/20 dark:hover:text-sky-200"
-                                                                >
-                                                                    <Edit3 className="h-3 w-3" />
-                                                                    {isEditing ? 'Chiudi modifica' : 'Modifica'}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => removeDiagnosisSuggestion(diagnosis.id)}
-                                                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
-                                                                >
-                                                                    <Trash2 className="h-3 w-3" />
-                                                                    Scarta
-                                                                </button>
-                                                            </div>
+                                                            <ReviewActionButtons
+                                                                isEditing={isEditing}
+                                                                onToggleEditor={() => toggleDiagnosisEditor(diagnosis.id)}
+                                                                onDiscard={() => removeDiagnosisSuggestion(diagnosis.id)}
+                                                            />
                                                         </div>
 
                                                         <div className="rounded-[20px] border border-slate-100 bg-white/80 p-3 text-[11px] text-slate-600 dark:border-white/5 dark:bg-black/10 dark:text-slate-300">
@@ -744,15 +766,15 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                     </div>
 
                                                     <div className="min-w-0 flex-1 space-y-3">
-                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                        <div className="flex flex-col gap-3">
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {therapy.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer text-sm font-bold text-slate-900 dark:text-white">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-slate-900 dark:text-white">
                                                                             {displayName}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{displayName}</p>
+                                                                        <p className="break-words text-sm font-bold text-slate-900 dark:text-white">{displayName}</p>
                                                                     )}
                                                                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${reviewStateBadgeClasses(therapy.review.state)}`}>
                                                                         {reviewStateLabel(therapy.review.state)}
@@ -764,34 +786,21 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                         {therapy.matchType}
                                                                     </span>
                                                                 </div>
-                                                                <p className="text-[10px] font-bold text-sky-700 dark:text-sky-400">
+                                                                <p className="break-words text-[10px] font-bold text-sky-700 dark:text-sky-400">
                                                                     {[displayPrinciple, displayDosage].filter(Boolean).join(' · ')}
                                                                 </p>
                                                                 {therapy.match?.aic && (
-                                                                    <p className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-300">
+                                                                    <p className="break-words font-mono text-[10px] font-bold text-slate-500 dark:text-slate-300">
                                                                         AIC {therapy.match.aic}{therapy.match.atc ? ` · ATC ${therapy.match.atc}` : ''}
                                                                     </p>
                                                                 )}
                                                             </div>
 
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => toggleTherapyEditor(therapy.id)}
-                                                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-sky-400/30 dark:hover:bg-sky-950/20 dark:hover:text-sky-200"
-                                                                >
-                                                                    <Edit3 className="h-3 w-3" />
-                                                                    {isEditing ? 'Chiudi modifica' : 'Modifica'}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => removeTherapySuggestion(therapy.id)}
-                                                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
-                                                                >
-                                                                    <Trash2 className="h-3 w-3" />
-                                                                    Scarta
-                                                                </button>
-                                                            </div>
+                                                            <ReviewActionButtons
+                                                                isEditing={isEditing}
+                                                                onToggleEditor={() => toggleTherapyEditor(therapy.id)}
+                                                                onDiscard={() => removeTherapySuggestion(therapy.id)}
+                                                            />
                                                         </div>
 
                                                         <div className="rounded-[20px] border border-slate-100 bg-white/80 p-3 text-[11px] text-slate-600 dark:border-white/5 dark:bg-black/10 dark:text-slate-300">
