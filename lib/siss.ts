@@ -10,28 +10,77 @@
 import { SISS_URLS } from './siss-urls';
 
 // --- Clipboard Utility ---
-async function copyToClipboard(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
+function isDocumentFocused(): boolean {
+    if (typeof document === 'undefined') {
+        return false;
+    }
+
+    if (typeof document.hasFocus !== 'function') {
         return true;
-    } catch (err) {
-        console.error('Failed to copy to clipboard:', err);
-        // Fallback for older browsers
-        try {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            return true;
-        } catch (fallbackErr) {
-            console.error('Fallback copy failed:', fallbackErr);
-            return false;
+    }
+
+    return document.hasFocus();
+}
+
+function describeClipboardError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.name ? `${error.name}: ${error.message}` : error.message;
+    }
+
+    return typeof error === 'string' ? error : 'unknown clipboard error';
+}
+
+function warnClipboardUnavailable(stage: string, error: unknown): void {
+    console.warn(`SISS clipboard ${stage} unavailable: ${describeClipboardError(error)}`);
+}
+
+function copyToClipboardWithTextArea(text: string): boolean {
+    if (!isDocumentFocused()) {
+        return false;
+    }
+
+    let textArea: HTMLTextAreaElement | null = null;
+
+    try {
+        textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        return document.execCommand('copy');
+    } catch (error) {
+        warnClipboardUnavailable('fallback copy', error);
+        return false;
+    } finally {
+        if (textArea) {
+            try {
+                document.body.removeChild(textArea);
+            } catch {
+                // The fallback is best-effort; cleanup must not turn it into a thrown failure.
+            }
         }
     }
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        if (!isDocumentFocused()) {
+            return false;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            warnClipboardUnavailable('write', error);
+        }
+    }
+
+    return copyToClipboardWithTextArea(text);
 }
 
 // --- Open SISS Prescrizione ---
@@ -60,6 +109,13 @@ function tryOpenSissPortalWindow(): SissPortalWindow {
         popupWindow.opener = null;
     } catch (error) {
         console.error('Failed to detach SISS popup opener:', error);
+    }
+
+    try {
+        popupWindow.blur();
+        window.focus();
+    } catch {
+        // Best-effort: some browsers ignore focus restoration after opening a tab.
     }
 
     return popupWindow;
