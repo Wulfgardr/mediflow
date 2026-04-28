@@ -159,26 +159,26 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
     let lastName: string | undefined;
 
     for (const line of lines) {
-        const nameMatch = line.match(/^nome\s*[:.]?\s*(.+)$/i);
+        const nameMatch = line.match(/^nome(?!\s*(?:e|\/|-)?\s*cognome)\s*[:.]?\s*(.+)$/i);
         if (!firstName && nameMatch) {
             firstName = sanitizePersonValue(stripPatientIdentityTail(nameMatch[1]));
             continue;
         }
 
-        const surnameMatch = line.match(/^cognome\s*[:.]?\s*(.+)$/i);
+        const surnameMatch = line.match(/^cognome(?!\s*(?:e|\/|-)?\s*nome)\s*[:.]?\s*(.+)$/i);
         if (!lastName && surnameMatch) {
             lastName = sanitizePersonValue(stripPatientIdentityTail(surnameMatch[1]));
             continue;
         }
 
-        const fullNameMatch = line.match(/^(cognome\s+e\s+nome|nome\s+e\s+cognome|paziente|assistito|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
+        const fullNameMatch = line.match(/^(cognome\s*(?:e|\/|-)?\s*nome|nome\s*(?:e|\/|-)?\s*cognome|paziente|assistito|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
         if (fullNameMatch) {
             const label = fullNameMatch[1].toLowerCase();
             const candidate = sanitizePersonValue(stripPatientIdentityTail(fullNameMatch[2]));
             if (!candidate) continue;
             const parts = candidate.split(/\s+/).filter(Boolean);
             if (parts.length >= 2) {
-                const surnameFirst = /^cognome\s+e\s+nome$/i.test(label);
+                const surnameFirst = /^cognome\b.*\bnome$/i.test(label);
                 const given = surnameFirst ? parts.slice(-1).join(' ') : parts.slice(0, -1).join(' ');
                 const family = surnameFirst ? parts.slice(0, -1).join(' ') : parts.slice(-1).join(' ');
                 firstName ||= sanitizePersonValue(given);
@@ -503,13 +503,7 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
     // If AI gave good results, validate with regex
     if (aiResult && aiResult.confidence > 0.7) {
-        // Validate taxCode format if provided
-        if (aiResult.taxCode && !isValidCodiceFiscale(aiResult.taxCode)) {
-            // Try regex extraction from PDF text
-            const regexTax = extractCodiceFiscale(combinedText || aiResult.rawText);
-            if (regexTax) aiResult.taxCode = regexTax;
-        }
-        return aiResult;
+        return mergeExtractedPatientDataWithTextFallback(aiResult, combinedText);
     }
 
     // Fallback: regex parsing (for PDF text)
@@ -518,20 +512,12 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
         // Merge AI and regex results (prefer AI where available)
         if (aiResult) {
-            return {
-                firstName: aiResult.firstName || regexResult.firstName,
-                lastName: aiResult.lastName || regexResult.lastName,
-                taxCode: aiResult.taxCode || regexResult.taxCode,
-                birthDate: aiResult.birthDate || regexResult.birthDate,
-                address: aiResult.address || regexResult.address,
-                phone: aiResult.phone,
-                diagnosis: aiResult.diagnosis,
-                medications: aiResult.medications,
-                notes: aiResult.notes || regexResult.notes,
+            return mergeExtractedPatientDataWithTextFallback({
+                ...aiResult,
                 rawText: combinedText,
                 source: 'hybrid',
                 confidence: Math.max(aiResult.confidence, 0.5)
-            };
+            }, combinedText);
         }
 
         return { ...regexResult, source: 'regex', confidence: 0.6, rawText: combinedText };
@@ -550,16 +536,48 @@ function isValidCodiceFiscale(cf: string): boolean {
     return /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(cf);
 }
 
-/**
- * Extract Codice Fiscale using regex
- */
-function extractCodiceFiscale(text: string): string | null {
-    const match = text.match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i);
-    return match ? match[0].toUpperCase() : null;
+/* @Codex */
+export function mergeExtractedPatientDataWithTextFallback(
+    aiResult: ExtractedPatientData,
+    fallbackText: string,
+): ExtractedPatientData {
+    const usableText = fallbackText.trim() || aiResult.rawText || '';
+    if (!usableText.trim()) {
+        return aiResult;
+    }
+
+    const regexResult = parsePatientData(usableText);
+    const taxCode = aiResult.taxCode && isValidCodiceFiscale(aiResult.taxCode)
+        ? aiResult.taxCode.toUpperCase()
+        : regexResult.taxCode || aiResult.taxCode;
+    const firstName = aiResult.firstName || regexResult.firstName;
+    const lastName = aiResult.lastName || regexResult.lastName;
+    const birthDate = aiResult.birthDate || regexResult.birthDate;
+    const address = aiResult.address || regexResult.address;
+    const phone = aiResult.phone || regexResult.phone;
+    const notes = aiResult.notes || regexResult.notes;
+    const fallbackContributed = firstName !== aiResult.firstName
+        || lastName !== aiResult.lastName
+        || taxCode !== aiResult.taxCode
+        || birthDate !== aiResult.birthDate
+        || address !== aiResult.address
+        || phone !== aiResult.phone
+        || notes !== aiResult.notes;
+
+    return {
+        ...aiResult,
+        firstName,
+        lastName,
+        taxCode,
+        birthDate,
+        address,
+        phone,
+        notes,
+        rawText: usableText,
+        source: aiResult.source === 'ai' && fallbackContributed ? 'hybrid' : aiResult.source,
+        confidence: Math.max(aiResult.confidence, regexResult.confidence),
+    };
 }
-
-
-
 
 export function parsePatientData(text: string): ExtractedPatientData {
     const data: ExtractedPatientData = { rawText: text, source: 'regex', confidence: 0.6 };
