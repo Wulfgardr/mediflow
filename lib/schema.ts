@@ -121,6 +121,28 @@ export const observations = sqliteTable('observations', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category').notNull().default('standard'),
+    isoCode: text('iso_code'),
+    description: text('description').notNull(),
+    measures: text('measures'),
+    clinicalReason: text('clinical_reason'),
+    regionalPrescriptionId: text('regional_prescription_id'),
+    supplier: text('supplier'),
+    collaudoAt: integer('collaudo_at', { mode: 'timestamp' }),
+    collaudoOutcome: text('collaudo_outcome'),
+    source: text('source').notNull().default('manual'),
+    documentRefs: text('document_refs'),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),

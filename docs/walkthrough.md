@@ -134,16 +134,59 @@ In pratica:
 - `Smart Import`: resta reviewable dentro i flussi normali del paziente;
 - `SISS`: il pannello contestuale paziente e parte stabile della scheda
   clinica, mantenendo il boundary `webapp-assisted` verso i moduli regionali.
+- `Protesica`: la scheda paziente include un diario locale delle prescrizioni
+  protesiche e un handoff `Protesica-RL` con codice fiscale pronto da incollare.
 
 Implementazione principale:
 
 - `app/patients/[id]/page.tsx`
 - `components/siss-patient-context-panel.tsx`
+- `components/prosthetic-prescription-manager.tsx`
 - `app/settings/page.tsx`
 
 Questo non cambia i boundary canonici: AI, import e contesto SISS sono integrati
 nel runtime ufficiale, ma non dichiarano scorciatoie architetturali oltre quelle
-gia formalizzate nelle ADR e nei documenti SISS.
+gia formalizzate nelle ADR e nei documenti SISS. Il diario protesico resta un
+registro locale document-backed: non invia prescrizioni al sistema regionale e
+non dichiara un canale certificato.
+
+### Diario protesico da documenti Assistente RL
+
+Quando l'operatore produce un pacchetto documentale `Protesica-RL`, MediFlow lo
+tratta come fonte documentale per una bozza revisionabile del diario protesico,
+non come scrittura automatica certificata verso il sistema regionale.
+
+Fonti attese:
+
+- `PRESCRIZIONE DI PROTESICA`: analisi funzionale, diagnosi/razionale, tabella
+  dei presidi ISO prescritti, significato terapeutico-riabilitativo e tempi
+  d'impiego.
+- `MODELLO 03`: numero pratica/domanda, data presentazione, diritto, area
+  fornitore/prezzi, requisito di collaudo e sezione consegna.
+- `SchedaTecnica`: conferma tecnica della fornitura, data prescrizione, codice
+  ISO, quantita, descrizione del presidio, prescrittore e struttura.
+
+Regole di import reviewable:
+
+- una voce `prosthetic_prescriptions` per ogni presidio ISO documentato;
+- `regionalPrescriptionId` da `NUMERO PRESCRIZIONE` / `NUMERO PRATICA`;
+- `prescribedAt` da `DATA PRESCRIZIONE`, conservando eventuale data domanda
+  nelle note se diversa;
+- `status=prescribed` quando esiste solo la prescrizione clinica,
+  `status=submitted` quando il modello regionale documenta la domanda
+  presentata, e stati `authorized`, `delivered`, `tested` solo con evidenza
+  esplicita;
+- `collaudoAt` solo con data di collaudo effettiva; `Prescrizione soggetta a
+  collaudo: NO` e una informazione di requisito, non un collaudo completato;
+- `measures` solo per misure, configurazioni, quantita o tempi d'impiego
+  espliciti, senza inventare dettagli tecnici dalla narrativa;
+- `clinicalReason` solo da diagnosi, analisi funzionale e significato
+  terapeutico-riabilitativo documentati.
+
+Il matching resta paziente-scoped: codice fiscale prima, poi nome/data di
+nascita come controllo secondario. Se i documenti del pacchetto divergono su
+identita, numero pratica o data, l'import deve fermarsi e lasciare una bozza da
+revisione operatore.
 
 ---
 

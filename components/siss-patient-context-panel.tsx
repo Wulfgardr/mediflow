@@ -3,7 +3,7 @@
 /* @Codex */
 import { useEffect, useState } from 'react';
 /* @Codex */
-import { ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
+import { Accessibility, ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
 /* @Codex */
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 /* @Codex */
@@ -71,6 +71,12 @@ const ACTIONS: ContextActionConfig[] = [
         label: 'Modulo prescrittivo',
         caption: 'Apri la webapp ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
         icon: ExternalLink,
+    },
+    {
+        action: 'prosthetics.open',
+        label: 'Protesica-RL',
+        caption: 'Apri Assistente RL / Protesica-RL con il CF del paziente pronto da incollare.',
+        icon: Accessibility,
     },
     {
         action: 'fse.lookup',
@@ -348,6 +354,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
     const moduleCheckpoints = sessionData?.checkpoints.filter((checkpoint): checkpoint is SissSessionCheckpoint => (
         checkpoint.key === 'menu'
         || checkpoint.key === 'prescription'
+        || checkpoint.key === 'prosthetics'
         || checkpoint.key === 'fse'
         || checkpoint.key === 'registry'
     )) ?? [];
@@ -562,7 +569,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 ) : null}
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {ACTIONS.map((item) => {
                     const Icon = item.icon;
                     const isLoading = activeAction === item.action;

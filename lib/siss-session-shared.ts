@@ -4,7 +4,7 @@ export const SISS_SESSION_HEALTH_STATES = ['recent', 'stale', 'none'] as const;
 export type SissSessionHealth = (typeof SISS_SESSION_HEALTH_STATES)[number];
 
 /* @Codex */
-export const SISS_SESSION_OBSERVED_MODULES = ['menu', 'prescription', 'fse', 'registry'] as const;
+export const SISS_SESSION_OBSERVED_MODULES = ['menu', 'prescription', 'prosthetics', 'fse', 'registry'] as const;
 /* @Codex */
 export type SissSessionObservedModule = (typeof SISS_SESSION_OBSERVED_MODULES)[number];
 
@@ -12,6 +12,7 @@ export type SissSessionObservedModule = (typeof SISS_SESSION_OBSERVED_MODULES)[n
 export const SISS_SESSION_OBSERVED_MODULE_LABELS: Record<SissSessionObservedModule, string> = {
     menu: 'Menu SISS',
     prescription: 'Modulo prescrittivo',
+    prosthetics: 'Protesica-RL',
     fse: 'FSE OpeFseIE',
     registry: 'Anagrafe Gaia',
 };

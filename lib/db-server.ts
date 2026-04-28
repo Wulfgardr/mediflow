@@ -145,6 +145,37 @@ try {
 }
 /* @Codex */
 try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS prosthetic_prescriptions (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            prescribed_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'prescribed',
+            category TEXT NOT NULL DEFAULT 'standard',
+            iso_code TEXT,
+            description TEXT NOT NULL,
+            measures TEXT,
+            clinical_reason TEXT,
+            regional_prescription_id TEXT,
+            supplier TEXT,
+            collaudo_at INTEGER,
+            collaudo_outcome TEXT,
+            source TEXT NOT NULL DEFAULT 'manual',
+            document_refs TEXT,
+            notes TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_patient_idx ON prosthetic_prescriptions(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_prescribed_idx ON prosthetic_prescriptions(prescribed_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();
+} catch (error) {
+    console.warn('[MediFlow] Prosthetic prescriptions schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureAuditSqliteSchema(sqlite);
 } catch (error) {
     console.warn('[MediFlow] Audit schema check skipped:', error);

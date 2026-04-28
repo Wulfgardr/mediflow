@@ -25,10 +25,11 @@ MediFlow non integra ancora una catena SISS certificata.
 Lo stato presente è un comportamento di servizio locale che:
 
 - espone un mediatore backend locale per l'handoff contestuale verso i portali `operatorisiss`
-- apre dal paziente i moduli `Menu SISS`, `Ricetta Elettronica`, `FSE` e `Anagrafe`
-- riallinea i launcher contestuali ai percorsi realmente osservati nella sessione operatore locale (`menusiss/#/menusiss`, `prescrizione/`, `opefseie/#/app-fascicolo`, `gaia/`)
+- apre dal paziente i moduli `Menu SISS`, `Ricetta Elettronica`, `Protesica-RL`, `FSE` e `Anagrafe`
+- riallinea i launcher contestuali ai percorsi realmente osservati nella sessione operatore locale (`menusiss/#/menusiss`, `prescrizione/`, `assistantrl/home/`, `opefseie/#/app-fascicolo`, `gaia/`)
 - mostra nel pannello contestuale un pre-check locale di prontezza FSE per terapie e osservazioni
 - mostra nel pannello contestuale un indicatore locale di stato sessione SISS / firma remota osservato dalla cronologia Atlas della macchina, senza dichiarare uno stato certificato del backend regionale
+- mantiene un diario locale delle prescrizioni protesiche con campi decodificati per codice ISO, descrizione, misure, motivazione clinico-funzionale e collaudo
 - copia il Codice Fiscale negli appunti quando il flusso lo richiede
 - scrive un audit locale PHI-safe del launch verso il `Modulo Prescrittivo Regionale`
 - delega comunque all'operatore il completamento manuale nel portale esterno
@@ -63,14 +64,35 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | --- | --- | --- |
 | `Menu SISS` | `Disponibile ora` | Apertura dal paziente via `portal-handoff` sul percorso osservato `menusiss/#/menusiss`, anche senza CF valido. |
 | `Ricetta Elettronica` | `Disponibile ora` | Richiama la webapp ufficiale del `Modulo Prescrittivo Regionale` in modalita `portal-handoff`, prepara il CF negli appunti e scrive audit locale PHI-safe del launch. |
+| `Protesica-RL` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Assistente RL / Protesica-RL`, con CF pronto da incollare e diario locale delle prescrizioni protesiche. |
 | `FSE` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `OpeFseIE` con CF pronto da incollare. |
 | `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Gaia` con CF pronto da incollare. |
 | Prontezza FSE locale | `Disponibile ora` | Il pannello paziente mostra il pre-check locale su terapie e osservazioni prima di un eventuale export/filone FSE. |
-| Stato sessione SISS / firma remota | `Disponibile ora` | Il pannello paziente legge in locale la cronologia Atlas della macchina e mostra segnali osservati di `LoginRemoteSign`, selezione ruolo e ultimo modulo SISS raggiunto. |
+| Stato sessione SISS / firma remota | `Disponibile ora` | Il pannello paziente legge in locale la cronologia Atlas della macchina e mostra segnali osservati di `LoginRemoteSign`, selezione ruolo e ultimo modulo SISS raggiunto, inclusa `Protesica-RL` quando osservata. |
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
+| Protesica nativa/certificata dentro MediFlow | `Non disponibile` | Il diario locale non sostituisce l'applicativo regionale e non invia prescrizioni verso SISS. |
 | FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, regole privacy e contratti regionali ulteriori. |
 | SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato, non come route pronta nel prototipo. |
 | Certificati di malattia contestuali | `Non disponibile` | La documentazione esiste, ma MediFlow non ha ancora un adapter/scenario dedicato. |
+
+## Documenti protesici prodotti dal portale
+
+Il pacchetto documentale `Protesica-RL` puo alimentare solo il diario locale
+reviewable. Le fonti operative sono trattate cosi:
+
+- `PRESCRIZIONE DI PROTESICA`: fonte primaria per analisi funzionale, diagnosi,
+  razionale clinico-funzionale, presidi ISO e tempi d'impiego;
+- `MODELLO 03`: fonte primaria per numero pratica/domanda, data presentazione,
+  requisito di collaudo e dati di fornitura quando compilati;
+- `SchedaTecnica`: fonte di conferma per codice ISO, quantita, descrizione del
+  presidio, data prescrizione, prescrittore e struttura.
+
+MediFlow conserva una riga locale per ciascun presidio ISO documentato e usa il
+numero pratica/prescrizione come riferimento regionale. `Collaudo: NO` o
+formulazioni equivalenti non significano `collaudato`: lo stato `tested` richiede
+una data o un esito di collaudo esplicito. In caso di divergenze tra documenti su
+identita paziente, numero pratica o data, la trasformazione resta in revisione e
+non deve essere applicata automaticamente.
 
 ## Target certificato
 

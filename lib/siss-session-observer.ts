@@ -43,6 +43,7 @@ export function resolveSissObservedModuleFromUrl(url: string): SissSessionObserv
     if (!normalized) return null;
     if (normalized.includes('/menusiss')) return 'menu';
     if (normalized.includes('/prescrizione') || normalized.includes('/prescrittivoregionale')) return 'prescription';
+    if (normalized.includes('/assistantrl')) return 'prosthetics';
     if (normalized.includes('/opefseie') || normalized.includes('/fse/')) return 'fse';
     if (normalized.includes('/gaia') || normalized.includes('/anagrafe/')) return 'registry';
     return null;

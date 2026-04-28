@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-22
+Ultimo aggiornamento: 2026-04-28
 
 ---
 
@@ -23,6 +23,7 @@ Ultimo aggiornamento: 2026-04-22
 - [x] Aprire il corpus documentale locale SISS/FSE 2.0 (`WUL-176`) come base per integrazioni regionali piu profonde, con manifest sorgenti, fetch pubblico ripetibile e placeholder `manual-import` per documenti autenticati/non redistribuibili.
 - [x] Portare `WUL-179` al primo stato utile: source sync engine locale con refresh policy, change detection e report di freshness sopra il corpus SISS/FSE.
 - [x] Ritirare i preview profiles funzionali da `main` (`WUL-199`) e promuovere il contesto paziente SISS come parte stabile del `Clinical Workbench`.
+- [ ] Stabilizzare il nuovo diario protesico (`WUL-204`) con documentazione reale allegata: mantenere `Protesica-RL` come `portal-handoff`, usare campi decodificati locali per ausili/codici ISO/misure/collaudo e aggiornare la skill di lettura semantica dopo esempi documentali reali.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 

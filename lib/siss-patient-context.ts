@@ -45,6 +45,11 @@ function describeSissAction(action: SissPatientContextAction): {
                 title: 'Modulo Prescrittivo Regionale',
                 message: 'Webapp ufficiale del Modulo Prescrittivo Regionale pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.',
             };
+        case 'prosthetics.open':
+            return {
+                title: 'Protesica-RL',
+                message: 'Modulo Protesica-RL pronto. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione regionale.',
+            };
         case 'fse.lookup':
             return {
                 title: 'FSE',
