@@ -4,12 +4,6 @@
 > v0.5.0 (release corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
-> [!NOTE]
-> Per chi arriva dalla `v0.3` pubblica, il salto da leggere oggi è `0.3 -> 0.5`.
-> `v0.4.0` resta una tappa tecnica decisiva, ma non è più la cornice narrativa giusta per il frontespizio del progetto.
-
----
-
 ## Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.
@@ -67,15 +61,15 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Esperienza nativa
 
-* **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
 * **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
 * **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
 
-### Profili locali di preview
+### Shell ufficiale e sperimentazioni controllate
 
-* **Preview profilo interfaccia**: confronto tra baseline clinica e direzione `Liquid`.
-* **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
-* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
+* **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
+* **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
+* **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
 
 ### Interazione vocale
 

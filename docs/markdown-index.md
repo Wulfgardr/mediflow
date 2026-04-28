@@ -4,16 +4,15 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-19
+Ultimo aggiornamento: 2026-04-28
 
 ## Come usare questo indice
 
 - Se devi capire **quali file sono canonici**, parti da [docs/README.md](./README.md).
 - Se devi trovare **dove sta un tema specifico**, usa le tabelle qui sotto.
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
-- Nella repo OSS alcuni file interni non sono presenti: orchestrazione agent, attribution, piano operativo a breve e workspace privati restano nel workspace privato.
 
-## Orchestrazione e governance (consultazione sempre)
+## Orientamento e governance
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -51,7 +50,7 @@ Ultimo aggiornamento: 2026-04-19
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
-| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: salto `v0.3 -> v0.5`, boundary dichiarati, preview profiles e stato Apple/SISS. | Per onboarding rapido o lettura pubblica del progetto. |
+| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
 | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | Matrice di allineamento tra baseline ufficiale GTW/FSE e stato MediFlow. | Per gap analysis ministeriale, priorità FSE e anti-drift tecnico. |
@@ -60,7 +59,7 @@ Ultimo aggiornamento: 2026-04-19
 | [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md) | Nota canonica `WUL-181` sul Modulo Prescrittivo Regionale: fissa il boundary tra richiamo della webapp ufficiale, possibile supporto WS/API e re-implementazione UI non ancora dimostrata. | Quando si lavora sul prescrittivo regionale oltre il launcher attuale. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
-## Tracciabilità agent e metadoc
+## Indici e contratti tecnici
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |

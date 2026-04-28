@@ -2,39 +2,28 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-04-19
+Ultimo aggiornamento: 2026-04-28
 
-> [!NOTE]
-> La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
+## Percorso di lettura consigliato
 
-## Policy di consultazione (agent)
-
-Documenti da consultare **sempre**:
+Per orientarti rapidamente:
 
 1. [README.md](../README.md)
-3. [docs/README.md](./README.md) (questo file)
-4. [ARCHITECTURE.md](../ARCHITECTURE.md)
-5. [SECURITY.md](../SECURITY.md)
-6. [CONTRIBUTING.md](../CONTRIBUTING.md)
+2. [docs/README.md](./README.md) (questo file)
+3. [ARCHITECTURE.md](../ARCHITECTURE.md)
+4. [SECURITY.md](../SECURITY.md)
+5. [CONTRIBUTING.md](../CONTRIBUTING.md)
+6. [docs/ROADMAP.md](./ROADMAP.md)
+7. [docs/walkthrough.md](./walkthrough.md)
 8. [docs/adr/](./adr/README.md) (partendo dai più recenti)
 
-Documenti da consultare **al bisogno**:
+Approfondimenti utili:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity web/macOS: [docs/parity-matrix.md](./parity-matrix.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md)
-
-## Ordine di lettura consigliato
-
-1. [README.md](../README.md)
-3. [ARCHITECTURE.md](../ARCHITECTURE.md)
-4. [SECURITY.md](../SECURITY.md)
-5. [CONTRIBUTING.md](../CONTRIBUTING.md)
-6. [docs/adr/](./adr/README.md) (partendo dai più recenti)
-8. [docs/walkthrough.md](./walkthrough.md)
-9. [docs/markdown-index.md](./markdown-index.md)
 
 ## Convenzione stato documenti
 
@@ -54,7 +43,7 @@ Documenti da consultare **al bisogno**:
 | Contratto API locale `/api/v1` | [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml) | `CANONICAL` | Spec OpenAPI client-facing; processo/versioning governati da ADR 0010. |
 | Runbook manutenzione OpenAPI | [docs/openapi/README.md](./openapi/README.md) | `SECONDARY` | Workflow operativo per mantenere aggiornata la spec durante lo sviluppo. |
 | Matrice parity web/macOS | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Gate capability-by-capability (funzioni/campi/flessibilita/autonomia). |
-| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per chi deve capire in poche righe cosa fa oggi MediFlow, cosa cambia tra `v0.3` e `v0.5`, quali sono i boundary dichiarati e perche alcune note restano private. |
+| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
 | Baseline SISS | [docs/siss-baseline.md](./siss-baseline.md) | `CANONICAL` | Stato attuale, fonti ufficiali, matrice del prototipo contestuale e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` -> `WUL-178` -> `WUL-180` per l'integrazione SISS. |
@@ -94,8 +83,6 @@ Documenti da consultare **al bisogno**:
 
 - [docs/product_roadmap.md](./product_roadmap.md): alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva è [docs/ROADMAP.md](./ROADMAP.md).
 - `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verità per decisioni architetturali.
-- Alcuni documenti interni restano volutamente fuori dall'export OSS: playbook di orchestrazione, attribution agent, piano operativo di breve e workspace privati locali.
-
 ## Regole rapide di mantenimento
 
 1. Una decisione duratura deve finire in ADR.
