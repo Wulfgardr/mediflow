@@ -10,9 +10,9 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## Qual è il salto tra `v0.3` e `v0.5`?
+## Che cosa è cambiato in `v0.5`?
 
-Il salto è soprattutto di maturità:
+`v0.5` rende MediFlow più maturo e più leggibile:
 
 - storage e sicurezza più solidi;
 - contratto locale `/api/v1` più chiaro;
@@ -21,7 +21,7 @@ Il salto è soprattutto di maturità:
 - direzione multi-device più leggibile;
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
-`v0.4` resta una tappa tecnica importante, ma il salto pubblico oggi si legge meglio come `0.3 -> 0.5`.
+`v0.4` resta una tappa tecnica importante; `v0.5` è la baseline più chiara per capire lo stato attuale del progetto.
 
 ## Posso usarlo su Mac, iPad o iPhone?
 
@@ -55,8 +55,7 @@ superfici gia mature vivono direttamente li dentro:
 - Smart Import reviewable;
 - contesto paziente SISS/FSE.
 
-Se in futuro servono nuove sperimentazioni, vanno trattate come workstream o
-branch dedicati, non come selector runtime persistito nelle `Impostazioni`.
+Le sperimentazioni future devono arrivare in modo esplicito e verificabile, non come selector persistiti nelle `Impostazioni`.
 
 ## Cosa vuol dire integrazione SISS in MediFlow, oggi?
 
@@ -79,9 +78,3 @@ Non vuol dire ancora:
 Non nel path di default.
 
 OCR e sintesi usano runtime locali. Se esistono lane separate di benchmark o comparazione, sono esplicitamente distinte dal runtime clinico e non vanno lette come comportamento standard del prodotto.
-
-## Perché nella repo OSS manca qualcosa che esiste nella repo privata?
-
-Per scelta.
-
-La facciata OSS deve esporre il prodotto, l'architettura e i boundary pubblicabili. I materiali interni di orchestrazione, il piano engineering attivo e la documentazione privata restano fuori.

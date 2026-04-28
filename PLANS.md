@@ -24,6 +24,7 @@ Ultimo aggiornamento: 2026-04-28
 - [x] Portare `WUL-179` al primo stato utile: source sync engine locale con refresh policy, change detection e report di freshness sopra il corpus SISS/FSE.
 - [x] Ritirare i preview profiles funzionali da `main` (`WUL-199`) e promuovere il contesto paziente SISS come parte stabile del `Clinical Workbench`.
 - [ ] Stabilizzare il nuovo diario protesico (`WUL-204`) con documentazione reale allegata: mantenere `Protesica-RL` come `portal-handoff`, usare campi decodificati locali per ausili/codici ISO/misure/collaudo e aggiornare la skill di lettura semantica dopo esempi documentali reali.
+- [x] Riallineare documentazione di riferimento/supporto allo stato corrente di `main` (`WUL-203`): Workbench unico, SISS/FSE corpus, `home-base` read-only, document intelligence artifact-first e direzione Apple condivisa.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
@@ -36,6 +37,7 @@ Nota operativa:
 - `WUL-152` ha trasformato ADR 0040 in primo runtime concreto: `parse/evidence` cifrato sugli allegati, `documentInsights` come projection compatibile e consumer iniziale in `Patient Insight`
 - `WUL-176` ha portato su `main` il corpus documentale locale SISS/FSE: manifest versionato, fetch pubblico ripetibile fuori Git e placeholder `manual-import` per le fonti non redistribuibili
 - `WUL-179` ha completato il primo layer operativo sopra il corpus: `sync` incrementale, `changeState`, policy di refresh e report locale di freshness, senza introdurre ancora scheduling o daemon dedicati
+- `WUL-203` chiude il passaggio documentale post-`WUL-199` / post-`WUL-179`: le mappe, la roadmap, la sintesi architetturale, il changelog e la facciata OSS non devono piu raccontare i preview profiles come runtime disponibile su `main`
 - il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
 
 ### Contesto storico chiuso: Release gate v0.5.0 (consolidamento AI/UI)
@@ -230,7 +232,7 @@ Ordine di consegna consigliato (incrementale):
 
 ### 7) DX / Igiene repository
 - [x] Aggiungere script `typecheck` (es. `tsc --noEmit`) e documentare il loop di verifica.
-- [ ] Garantire onboarding docs autorevoli e aggiornati (README + CONTRIBUTING + ARCHITECTURE).
+- [x] Garantire onboarding docs autorevoli e aggiornati (README + CONTRIBUTING + ARCHITECTURE). Snapshot WUL-203: 2026-04-26.
 
 ---
 

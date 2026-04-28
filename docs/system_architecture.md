@@ -22,11 +22,14 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 4. **Document intelligence prudente**: `documentInsights` resta compat layer,
    mentre gli allegati possono gia persistere un artifact `parse/evidence`
    cifrato consumato in priorita da `AI Patient Insight`.
-5. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
+5. **Clinical Workbench unico**: Graphite e la shell web ufficiale su `main`;
+   AI, Smart Import e contesto paziente SISS/FSE non dipendono piu da preview
+   profiles runtime.
+6. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
    congelata per rebuild e filone iPadOS/iOS ricondotto allo stesso boundary
    `home-base + /api/v1`.
-6. **Preview profiles locali**: alcune fette UI/AI/import/SISS sono verificabili
-   come preview locali senza cambiare il checkout stabile.
+7. **SISS/FSE documentale governato**: il corpus locale con sync/freshness
+   prepara integrazioni future senza dichiarare una catena regionale certificata.
 
 ---
 
@@ -109,6 +112,8 @@ clinica quando diagnosi/terapie sono gia presenti.
   branch/revision/worktree.
 - `Start_MediFlow.command` puo resettare `.next` quando cambia il fingerprint
   della sorgente locale.
+- Il `Clinical Workbench` e l'unico runtime UI supportato su `main`; nuove
+  sperimentazioni non vivono come selector persistito in Settings.
 - I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
   restano separati dal runtime clinico.
 
@@ -124,7 +129,10 @@ clinica quando diagnosi/terapie sono gia presenti.
 - [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [docs/adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md)
 - [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+- [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md)
+- [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
+- [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
 
 ---
 
-*Ultimo aggiornamento: 2026-04-07 — main post-v0.5.0*
+*Ultimo aggiornamento: 2026-04-26 — main corrente*

@@ -292,6 +292,8 @@ function sanitizeContributingForOss(targetDir) {
 
     const original = fs.readFileSync(contributingPath, 'utf8');
     const sanitized = original
+        .replace(/\n## Igiene workflow e tracciabilita[\s\S]*?\n---\n/m, '\n')
+        .replace(/\n## Attribution \(Codex \/ agent\)[\s\S]*?\n---\n/m, '\n')
         .replace(/\n## Export OSS \(repo pubblica\)[\s\S]*$/m, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/\s+$/g, '\n');
@@ -299,6 +301,92 @@ function sanitizeContributingForOss(targetDir) {
     if (sanitized !== original) {
         fs.writeFileSync(contributingPath, sanitized, 'utf8');
         console.log('Sanitized CONTRIBUTING.md for OSS.');
+    }
+}
+
+function sanitizePublicDocsCopyForOss(targetDir) {
+    const docsReadmePath = path.join(targetDir, 'docs', 'README.md');
+    if (fs.existsSync(docsReadmePath)) {
+        const original = fs.readFileSync(docsReadmePath, 'utf8');
+        let content = original
+            .replace(/> \[!NOTE\]\n> La repo OSS[^\n]*\n\n/m, '')
+            .replace('## Policy di consultazione (agent)', '## Percorso di lettura consigliato')
+            .replace('Documenti da consultare **sempre**:', 'Per orientarti rapidamente:')
+            .replace('Documenti da consultare **al bisogno**:', 'Approfondimenti utili:')
+            .replace(/\n- Playbook orchestrazione lavoro con Linear\/Codex:[^\n]*/g, '')
+            .replace(/\n- Tooling documentale Apple \(MCP\):[^\n]*/g, '')
+            .replace(/\| FAQ pubbliche \| \[docs\/FAQ\.md\]\(\.\/FAQ\.md\) \| `SECONDARY` \|[^\n]*/g, '| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |')
+            .replace(/\n- `docs\/private\/openhospital-alignment\/\*`:[^\n]*/g, '')
+            .replace(/\n- Alcuni documenti interni[^\n]*/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/\s+$/g, '\n');
+
+        content = content.replace(
+            /## Percorso di lettura consigliato[\s\S]*?## Convenzione stato documenti/m,
+            `## Percorso di lettura consigliato
+
+Per orientarti rapidamente:
+
+1. [README.md](../README.md)
+2. [docs/README.md](./README.md) (questo file)
+3. [ARCHITECTURE.md](../ARCHITECTURE.md)
+4. [SECURITY.md](../SECURITY.md)
+5. [CONTRIBUTING.md](../CONTRIBUTING.md)
+6. [docs/ROADMAP.md](./ROADMAP.md)
+7. [docs/walkthrough.md](./walkthrough.md)
+8. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+
+Approfondimenti utili:
+
+- Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
+- FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
+- Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
+- Parity web/macOS: [docs/parity-matrix.md](./parity-matrix.md)
+- Contratto OpenAPI \`/api/v1\`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md)
+
+## Convenzione stato documenti`
+        );
+
+        if (content !== original) {
+            fs.writeFileSync(docsReadmePath, content, 'utf8');
+            console.log('Sanitized docs/README.md public copy.');
+        }
+    }
+
+    const markdownIndexPath = path.join(targetDir, 'docs', 'markdown-index.md');
+    if (fs.existsSync(markdownIndexPath)) {
+        const original = fs.readFileSync(markdownIndexPath, 'utf8');
+        const content = original
+            .replace(/\n- Nella repo OSS[^\n]*/g, '')
+            .replace('## Orchestrazione e governance (consultazione sempre)', '## Orientamento e governance')
+            .replace('## Tracciabilità agent e metadoc', '## Indici e contratti tecnici')
+            .replace(/\| \[docs\/FAQ\.md\]\(\.\/FAQ\.md\) \| FAQ sintetiche pubbliche:[^\n]*/g, '| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |')
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/\s+$/g, '\n');
+
+        if (content !== original) {
+            fs.writeFileSync(markdownIndexPath, content, 'utf8');
+            console.log('Sanitized docs/markdown-index.md public copy.');
+        }
+    }
+}
+
+function sanitizeSecurityForOss(targetDir) {
+    const securityPath = path.join(targetDir, 'SECURITY.md');
+    if (!fs.existsSync(securityPath)) return;
+
+    const original = fs.readFileSync(securityPath, 'utf8');
+    const sanitized = original
+        .replace(/\n## Comparator cloud opt-in[\s\S]*?\n---\n\n## Logging e redazione/m, '\n## Logging e redazione')
+        .replace(/\n- case pack privati\/comparator cloud o output non minimizzati di shadow eval/g, '')
+        .replace(/canale privato/g, 'canale riservato')
+        .replace(/Preferisci canale riservato/g, 'Preferisci un canale riservato')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\s+$/g, '\n');
+
+    if (sanitized !== original) {
+        fs.writeFileSync(securityPath, sanitized, 'utf8');
+        console.log('Sanitized SECURITY.md for OSS.');
     }
 }
 
@@ -368,6 +456,8 @@ try {
     sanitizeMarkdownReferences(TARGET_DIR);
     sanitizePackageJsonForOss(TARGET_DIR);
     sanitizeContributingForOss(TARGET_DIR);
+    sanitizePublicDocsCopyForOss(TARGET_DIR);
+    sanitizeSecurityForOss(TARGET_DIR);
 
     console.log('Done! Open Source version ready at: ' + TARGET_DIR);
 } catch (e) {

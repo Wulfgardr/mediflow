@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-04-22
+Ultimo aggiornamento: 2026-04-26
 
 ## Come usare questo indice
 
@@ -35,7 +35,7 @@ Ultimo aggiornamento: 2026-04-22
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato parity web/macOS su moduli core e gap operativi. | Per steering parity e release readiness. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
-| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al main post-`v0.5.0`. | Per overview veloce in onboarding/review. |
+| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
 
 ## Native, setup e testing
 

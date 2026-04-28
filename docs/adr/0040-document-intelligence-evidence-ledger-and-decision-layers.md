@@ -2,7 +2,13 @@
 # ADR 0040: document intelligence come evidence ledger con decision layers separati
 
 Date: 2026-04-04  
-Status: Proposed
+Status: Accepted
+
+> Nota stato corrente: dopo `WUL-152`, questa decisione non e piu solo una
+> proposta. La prima slice runtime persiste `parse/evidence` sugli allegati,
+> mantiene `patients.documentInsights` come projection compatibile e porta
+> `AI Patient Insight` sul path artifact-first. Il ledger completo resta
+> incrementale e non richiede un rewrite in blocco.
 
 ## Problema
 

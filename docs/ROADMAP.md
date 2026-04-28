@@ -4,12 +4,6 @@
 > v0.5.0 (release corrente) — Marzo 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
 
-> [!NOTE]
-> Per chi arriva dalla `v0.3` pubblica, il salto da leggere oggi è `0.3 -> 0.5`.
-> `v0.4.0` resta una tappa tecnica decisiva, ma non è più la cornice narrativa giusta per il frontespizio del progetto.
-
----
-
 ## Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.
@@ -67,16 +61,22 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Esperienza nativa
 
-* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di orchestrare il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
 * **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
 * **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con cache locale cifrata e nessun accesso diretto al file SQLite del Mac.
 
-### Stile visivo e profili locali di preview
+### Shell ufficiale e sperimentazioni controllate
 
 * **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
-* **Preview solo funzionali**: i preview profile restano disponibili per slice `AI`, `Smart Import` e `SISS`, non per confrontare shell estetiche concorrenti.
-* **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
-* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare la shell ufficiale del checkout.
+* **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
+* **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
+* **Guardrail locali**: revision fingerprint, `/api/system/revision` e reset `.next` source-aware riducono il rischio di testare una shell stale.
+
+### SISS/FSE e base documentale regionale
+
+* **Boundary attuale**: MediFlow prepara il contesto e richiama percorsi ufficiali; il prescrittivo resta `webapp-assisted` e non una UI regionale custom dentro MediFlow.
+* **Corpus locale SISS/FSE**: manifest sorgenti, fetch/sync incrementale e report di freschezza sono gia su `main` come base di lavoro documentale, fuori dal runtime clinico.
+* **Integrazione piu profonda**: prima di codice runtime servono scenari approvati, qualifica/provisioning coerenti con `SSI/A2A` e documentazione scenario-specific verificabile.
 
 ### Interazione vocale
 

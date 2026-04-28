@@ -25,6 +25,7 @@ Su `main`, oggi, ci sono già queste cose:
 - **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
 - **modalità `network home-base` read-only**: pairing esplicito, capability discovery e primo accesso remoto ai pazienti da client paired;
 - **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
+- **corpus documentale SISS/FSE locale**: fonti approvate, sync incrementale e report di freschezza restano fuori dal runtime clinico ma guidano le integrazioni future;
 - **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
 
 ## Cosa cambia rispetto alla `v0.3`
