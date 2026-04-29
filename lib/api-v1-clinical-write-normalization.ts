@@ -11,16 +11,40 @@ type EntryCreateValues = {
     id: string;
     patientId: string;
     type: string;
+    /* @Codex */
+    title: string;
     date: Date;
     content: string;
+    /* @Codex */
+    setting: string | null;
+    /* @Codex */
+    metadata: string | null;
+    /* @Codex */
+    attachments: string | null;
     createdAt: Date;
+    /* @Codex */
+    updatedAt: Date;
 };
 
 /* @Codex */
 type EntryUpdateValues = {
     type?: string;
+    /* @Codex */
+    title?: string;
     date?: Date;
     content?: string;
+    /* @Codex */
+    setting?: string | null;
+    /* @Codex */
+    metadata?: string | null;
+    /* @Codex */
+    attachments?: string | null;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
+    /* @Codex */
+    updatedAt?: Date;
 };
 
 /* @Codex */
@@ -98,6 +122,98 @@ function parseNullableString(value: unknown, field: string): WriteNormalizationR
 }
 
 /* @Codex */
+function parseOptionalString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    if (typeof value !== 'string') {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+
+    return { ok: true, values: value };
+}
+
+/* @Codex */
+function parseOptionalDate(value: unknown, field: string): WriteNormalizationResult<Date | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    const parsed = parseDate(value);
+    if (!parsed) {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+
+    return { ok: true, values: parsed };
+}
+
+/* @Codex */
+function parseOptionalNullableDate(value: unknown, field: string): WriteNormalizationResult<Date | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+    if (value === null || value === '') {
+        return { ok: true, values: null };
+    }
+
+    const parsed = parseDate(value);
+    if (!parsed) {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+
+    return { ok: true, values: parsed };
+}
+
+/* @Codex */
+function normalizeJsonText(value: unknown, field: string): WriteNormalizationResult<string | null> {
+    if (value === undefined || value === null) {
+        return { ok: true, values: null };
+    }
+
+    if (typeof value === 'string') {
+        return { ok: true, values: value };
+    }
+
+    try {
+        return { ok: true, values: JSON.stringify(value) };
+    } catch {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+}
+
+/* @Codex */
+function normalizeOptionalJsonText(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    return normalizeJsonText(value, field);
+}
+
+/* @Codex */
+function normalizeEntrySetting(value: unknown): WriteNormalizationResult<string | null> {
+    if (value === undefined || value === null || value === '') {
+        return { ok: true, values: null };
+    }
+
+    if (value === 'home' || value === 'hospital' || value === 'ambulatory') {
+        return { ok: true, values: value };
+    }
+
+    return { ok: false, error: 'Invalid setting' };
+}
+
+/* @Codex */
+function normalizeOptionalEntrySetting(value: unknown): WriteNormalizationResult<string | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    return normalizeEntrySetting(value);
+}
+
+/* @Codex */
 export function normalizeEntryCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -111,15 +227,37 @@ export function normalizeEntryCreateInput(
     const content = parseRequiredString(input.content, 'content');
     if (!content.ok) return content;
 
+    const title = parseOptionalString(input.title, 'title');
+    if (!title.ok) return title;
+
+    const setting = normalizeEntrySetting(input.setting);
+    if (!setting.ok) return setting;
+
+    const metadata = normalizeJsonText(input.metadata, 'metadata');
+    if (!metadata.ok) return metadata;
+
+    const attachments = normalizeJsonText(input.attachments, 'attachments');
+    if (!attachments.ok) return attachments;
+
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const now = context.now ?? new Date();
+
     return {
         ok: true,
         values: {
             id: context.id,
             patientId: context.patientId,
             type: type.values,
+            title: title.values ?? 'Voce clinica',
             date: date.values,
             content: content.values,
-            createdAt: context.now ?? new Date(),
+            setting: setting.values,
+            metadata: metadata.values,
+            attachments: attachments.values,
+            createdAt: now,
+            updatedAt: updatedAt.values ?? now,
         },
     };
 }
@@ -128,16 +266,46 @@ export function normalizeEntryCreateInput(
 export function normalizeEntryUpdateInput(
     input: Record<string, unknown>
 ): WriteNormalizationResult<EntryUpdateValues> {
-    const hasDate = Object.prototype.hasOwnProperty.call(input, 'date');
-    const nextDate = hasDate ? parseDate(input.date) : null;
-    if (hasDate && nextDate === null) {
-        return { ok: false, error: 'Invalid date' };
-    }
+    const nextDate = parseOptionalDate(input.date, 'date');
+    if (!nextDate.ok) return nextDate;
+
+    const nextDeletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!nextDeletedAt.ok) return nextDeletedAt;
+
+    const nextUpdatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!nextUpdatedAt.ok) return nextUpdatedAt;
+
+    const nextTitle = parseOptionalString(input.title, 'title');
+    if (!nextTitle.ok) return nextTitle;
+
+    const nextSetting = normalizeOptionalEntrySetting(input.setting);
+    if (!nextSetting.ok) return nextSetting;
+
+    const nextMetadata = normalizeOptionalJsonText(input.metadata, 'metadata');
+    if (!nextMetadata.ok) return nextMetadata;
+
+    const nextAttachments = normalizeOptionalJsonText(input.attachments, 'attachments');
+    if (!nextAttachments.ok) return nextAttachments;
+
+    const nextDeletionReason = parseNullableString(input.deletionReason, 'deletionReason');
+    if (!nextDeletionReason.ok) return nextDeletionReason;
 
     const nextType = typeof input.type === 'string' ? input.type : undefined;
     const nextContent = typeof input.content === 'string' ? input.content : undefined;
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
 
-    if (nextType === undefined && nextContent === undefined && !hasDate) {
+    if (
+        nextType === undefined &&
+        nextContent === undefined &&
+        nextDate.values === undefined &&
+        nextTitle.values === undefined &&
+        nextSetting.values === undefined &&
+        nextMetadata.values === undefined &&
+        nextAttachments.values === undefined &&
+        nextDeletedAt.values === undefined &&
+        !hasDeletionReason &&
+        nextUpdatedAt.values === undefined
+    ) {
         return { ok: false, error: 'No valid fields to update' };
     }
 
@@ -145,8 +313,15 @@ export function normalizeEntryUpdateInput(
         ok: true,
         values: {
             type: nextType,
+            title: nextTitle.values,
             content: nextContent,
-            date: nextDate ?? undefined,
+            date: nextDate.values,
+            setting: nextSetting.values,
+            metadata: nextMetadata.values,
+            attachments: nextAttachments.values,
+            deletedAt: nextDeletedAt.values,
+            deletionReason: hasDeletionReason ? nextDeletionReason.values : undefined,
+            updatedAt: nextUpdatedAt.values ?? new Date(),
         },
     };
 }

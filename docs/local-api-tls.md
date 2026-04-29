@@ -1,7 +1,8 @@
 # TLS locale per MediFlow
 
 Questa guida configura un proxy HTTPS locale davanti a `http://localhost:3000`.
-Serve al client macOS per usare HTTPS con certificate pinning.
+Serve ai client Apple per usare HTTPS con certificate pinning e per mantenere
+il cookie operatore `Secure` anche quando il backend Next gira ancora in HTTP.
 
 Riferimenti correlati:
 - [docs/NATIVE.md](./NATIVE.md)
@@ -29,6 +30,24 @@ node scripts/local-api-tls-proxy.mjs
 ```
 
 Il proxy ascolta su `https://localhost:3443` e inoltra al server HTTP locale.
+Inoltre inoltra `x-forwarded-proto=https`, `x-forwarded-host` e
+`x-forwarded-port`, cosi le route auth possono emettere il cookie sessione con
+flag `Secure`.
+
+## 2b) Bind LAN solo in `network-home-base`
+
+Per test o pairing da iPhone/iPad su LAN il proxy puo ascoltare anche su un host
+non loopback, per esempio `0.0.0.0`. Questo e permesso solo quando il database
+MediFlow e gia in `network.mode = network-home-base`.
+
+Con `scripts/native-setup.sh`:
+
+```bash
+MEDIFLOW_TLS_BIND_HOST=0.0.0.0 bash scripts/native-setup.sh
+```
+
+Se `network.mode` non e ancora `network-home-base`, lo script rifiuta il bind
+LAN e termina con errore invece di esporre il proxy per sbaglio.
 
 ## 3) Calcola il fingerprint SHA256
 

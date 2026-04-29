@@ -355,6 +355,64 @@ test('buildPatientInsightContext recovers direct attachment text when the stored
     }
 });
 
+test('buildPatientInsightContext applies attachment text recovery budget to low-signal candidates only', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-good-1',
+                patientId: 'patient-1',
+                name: 'eco-cuore.pdf',
+                summarySnapshot: 'Funzione sistolica conservata.',
+                createdAt: new Date('2025-03-16T00:00:00Z'),
+            },
+            {
+                id: 'attachment-good-2',
+                patientId: 'patient-1',
+                name: 'rx-torace.pdf',
+                summarySnapshot: 'Non evidenza di addensamenti pleuroparenchimali acuti.',
+                createdAt: new Date('2025-03-15T00:00:00Z'),
+            },
+            {
+                id: 'attachment-low-signal',
+                patientId: 'patient-1',
+                name: 'dimissione-ortopedica.pdf',
+                type: 'application/pdf',
+                data: 'data:application/pdf;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+
+    try {
+        const recoveredAttachmentIds: string[] = [];
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1', {
+            recoverAttachmentText: async (attachment) => {
+                recoveredAttachmentIds.push(attachment.id);
+                return [
+                    'Indicazioni alla dimissione',
+                    'FKT domiciliare 2-3 volte alla settimana',
+                    'Controllo ortopedico con Rx anca sinistra',
+                ].join('\n');
+            },
+        });
+
+        assert.deepEqual(recoveredAttachmentIds, ['attachment-low-signal']);
+        assert.match(snapshot.prompt, /eco-cuore\.pdf \(16\/03\/2025\): Funzione sistolica conservata/i);
+        assert.match(snapshot.prompt, /rx-torace\.pdf \(15\/03\/2025\): Non evidenza di addensamenti/i);
+        assert.match(snapshot.prompt, /dimissione-ortopedica\.pdf \(14\/03\/2025\): Estratto diretto allegato:/i);
+        assert.match(snapshot.prompt, /FKT domiciliare 2-3 volte alla settimana/i);
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /Alcuni allegati senza sintesi clinica strutturata sono stati riletti direttamente dal file/i,
+        );
+    } finally {
+        restore();
+    }
+});
+
 test('buildPatientInsightContext prefers the attachment parse/evidence artifact over the legacy document projection', async () => {
     const artifact = buildDocumentParseEvidenceArtifact({
         documentInsightId: 'doc-artifact',

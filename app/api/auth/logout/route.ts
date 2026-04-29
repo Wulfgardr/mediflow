@@ -5,6 +5,8 @@ import { deleteSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/se
 /* @Codex */
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 import { requireSession } from '@/lib/server-auth';
+/* @Codex */
+import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
 
 export async function POST(request: Request) {
     const session: ServerSession | null = await requireSession();
@@ -33,10 +35,7 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({ success: true });
     response.cookies.set(SESSION_COOKIE_NAME, '', {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: false,
-        path: '/',
+        ...sessionCookieOptionsForRequest(request),
         maxAge: 0
     });
     return response;

@@ -11,6 +11,7 @@
     "isolatedModules": false
   },
   "include": [
+    "lib/pdfjs-worker.d.ts",
     "lib/pdf-service.ts",
     "lib/pdf-service.test.ts"
   ]

@@ -1,0 +1,158 @@
+[
+  {
+    "id": "siss-accesso-documentazione",
+    "title": "SISS - Accesso alla documentazione",
+    "area": "governance",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/accesso-alla-documentazione",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "catalog", "docs-entrypoint"]
+  },
+  {
+    "id": "siss-modalita-accesso",
+    "title": "SISS - Modalita di accesso",
+    "area": "auth",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/piattaforma-siss/modalita-di-accesso",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "auth", "sso", "smartcard"]
+  },
+  {
+    "id": "siss-integrazione-a2a",
+    "title": "SISS - Integrazione Application to Application",
+    "area": "integration",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/piattaforma-siss/integrazione-application-to-application",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "a2a", "soap", "integration"]
+  },
+  {
+    "id": "siss-ricetta-elettronica",
+    "title": "SISS - Ricetta elettronica",
+    "area": "prescription",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/ricetta-elettronica",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "prescription", "nre", "dematerializzazione"]
+  },
+  {
+    "id": "siss-modulo-prescrittivo-regionale",
+    "title": "SISS - Modulo Prescrittivo Regionale (manuali e specifiche)",
+    "area": "prescription",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "prescription", "manual-import"],
+    "notes": "Documento noto e indicizzato sul portale documentale SISS; acquisizione da completare via ricerca mirata o download autorizzato."
+  },
+  {
+    "id": "siss-gestione-assistiti-anagrafe",
+    "title": "SISS - Gestione assistiti / anagrafe regionale",
+    "area": "registry",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "registry", "assistiti", "manual-import"],
+    "notes": "Raccoglie manuali e specifiche di integrazione per gestione assistiti e anagrafe regionale."
+  },
+  {
+    "id": "siss-seb-fse-gestione-eventi",
+    "title": "SISS - SEB FSE Gestione Eventi",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/pubblicazioniENormativa.jsp",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "soap", "manual-import"],
+    "notes": "Interfacce SOAP FSE regionale; acquisizione da allineare alle pubblicazioni attive del portale."
+  },
+  {
+    "id": "siss-certificati-malattia",
+    "title": "SISS - Certificati di Malattia",
+    "area": "certificates",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=49997836",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "certificati", "inps", "manual-import"],
+    "notes": "Il portale pubblico conferma la presenza di documentazione di supporto; la raccolta strutturata va completata fuori da scraping fragile."
+  },
+  {
+    "id": "siss-sgdt",
+    "title": "SISS - SGDT / servizi territoriali adiacenti",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "manual-import"],
+    "notes": "Placeholder per la documentazione SGDT e servizi territoriali correlati."
+  },
+  {
+    "id": "fse-support-readme",
+    "title": "FSE 2.0 - it-fse-support README",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/blob/main/README.md",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "gateway", "baseline"]
+  },
+  {
+    "id": "fse-support-integrazione-gateway",
+    "title": "FSE 2.0 - integrazione gateway",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/integrazione-gateway",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "gateway", "rest", "auth"]
+  },
+  {
+    "id": "fse-support-provisioning",
+    "title": "FSE 2.0 - provisioning",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/provisioning",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "provisioning", "certificates"]
+  },
+  {
+    "id": "fse-support-accreditamento",
+    "title": "FSE 2.0 - accreditamento",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/accreditamento",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "accreditamento", "qualification"]
+  },
+  {
+    "id": "fse-catalogs",
+    "title": "FSE 2.0 - it-fse-catalogs",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-catalogs",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "catalogs", "schematron", "schema"]
+  },
+  {
+    "id": "fse-gestione-portal",
+    "title": "FSE - portale gestione manuali e istruzioni",
+    "area": "fse2",
+    "url": "https://gestione.fascicolosanitario.gov.it/",
+    "access": "auth-gated",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["fse2", "portal", "manual-import"],
+    "notes": "Portale autenticato: usare solo come placeholder e punto di accesso ai manuali disponibili per utenti autorizzati."
+  }
+]

@@ -8,8 +8,6 @@ echo "==================================================="
 echo ""
 
 # @Codex
-WATCHDOG_PID=""
-# @Codex
 QUIET_EXIT=""
 # @Codex
 MEDIFLOW_PORT="3000"
@@ -112,7 +110,7 @@ echo "   🪪 Sorgente: ${CURRENT_APP_SOURCE_FINGERPRINT}"
 echo ""
 
 # --- 1. Start Ollama (AI Engine) ---
-echo "🤖 [1/4] Controllo AI Engine (Ollama)..."
+echo "🤖 [1/3] Controllo AI Engine (Ollama)..."
 if ! pgrep -x "ollama" > /dev/null; then
     echo "   ⚠️  Ollama non attivo. Avvio in corso..."
     if command -v ollama &> /dev/null; then
@@ -128,7 +126,7 @@ fi
 
 # --- 2. Start ICD-11 API (Docker) ---
 echo ""
-echo "🩺 [2/4] Controllo ICD-11 API (Docker)..."
+echo "🩺 [2/3] Controllo ICD-11 API (Docker)..."
 if command -v docker &> /dev/null; then
     # Check if container is running
     if docker ps --format '{{.Names}}' | grep -q 'mediflow-icd'; then
@@ -162,33 +160,9 @@ if [ "$PORT_STATUS" = "occupied_other" ]; then
     exit 1
 fi
 
-# /* @Codex */
-# --- 3. Optional: Start Native App ---
+# --- 3. Start Next.js App ---
 echo ""
-echo "🖥️  [3/4] Avvio App Nativa (opzionale)..."
-read -r -p "   Vuoi avviare anche l'app nativa macOS? [y/N] " START_NATIVE
-if [[ "$START_NATIVE" =~ ^[Yy]$ ]]; then
-    echo "   🚧 Avvio app nativa in corso..."
-    if "$DIR/scripts/Launch_MediFlowMac.command"; then
-        echo "   ✅ App nativa avviata."
-        # @Codex
-        if [ -x "$DIR/scripts/native-watchdog.sh" ]; then
-            "$DIR/scripts/native-watchdog.sh" &
-            WATCHDOG_PID=$!
-            echo "   👀 Watchdog app nativa attivo."
-        else
-            echo "   ⚠️  Watchdog non trovato. Nessun riavvio automatico."
-        fi
-    else
-        echo "   ⚠️  Avvio app nativa fallito. Controlla gli script in /scripts."
-    fi
-else
-    echo "   ⏭️  App nativa non avviata."
-fi
-
-# --- 4. Start Next.js App ---
-echo ""
-echo "🚀 [4/4] Avvio Applicazione Next.js..."
+echo "🚀 [3/3] Avvio Applicazione Next.js..."
 echo ""
 
 # Cleanup function
@@ -198,10 +172,6 @@ cleanup() {
     fi
     echo ""
     echo "🛑 Arresto in corso..."
-    # @Codex
-    if [ -n "${WATCHDOG_PID:-}" ] && kill -0 "$WATCHDOG_PID" 2>/dev/null; then
-        kill "$WATCHDOG_PID" 2>/dev/null
-    fi
     # Optional: stop ICD container on exit to save resources
     # docker compose stop icd-api 2>/dev/null
     echo "👋 MediFlow arrestato. A presto!"

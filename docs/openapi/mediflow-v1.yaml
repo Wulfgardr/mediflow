@@ -11,6 +11,9 @@ info:
     for home-base discovery, session gating, capability discovery, explicit
     pairing bootstrap/review on trusted local networks, and the first read-only
     remote patient data plane behind a dedicated paired-client auth boundary.
+    Apple-native discovery may advertise the same PHI-safe node summary over
+    Bonjour `_mediflow-homebase._tcp`, while `/api/v1/network/node` remains the
+    reviewable HTTP summary contract for node identity and transport metadata.
     The session summary now includes PHI-safe replica planning metadata for
     snapshot mirror, deferred fallback, and manual review states. A dedicated
     identity summary distinguishes device pairing from operator login and

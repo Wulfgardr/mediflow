@@ -1,21 +1,13 @@
 'use client';
 
 /* @Codex */
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo } from 'react';
 /* @Codex */
-import { db } from '@/lib/db';
-/* @Codex */
-import {
-    normalizeUIStyleMode,
-    type UIStyleMode,
-    UI_STYLE_SETTING_KEY,
-    UI_STYLE_STORAGE_KEY,
-} from '@/lib/ui-style-mode';
+import type { UIStyleMode } from '@/lib/ui-style-mode';
 
 /* @Codex */
 interface UIStyleProviderProps {
     children: React.ReactNode;
-    defaultStyle?: UIStyleMode;
 }
 
 /* @Codex */
@@ -27,75 +19,21 @@ interface UIStyleProviderState {
 /* @Codex */
 const UIStyleContext = createContext<UIStyleProviderState | undefined>(undefined);
 
-/* @Codex */
-function applyUIStyleModeToDocument(mode: UIStyleMode) {
-    window.document.documentElement.dataset.uiStyle = mode;
-}
+/* @Codex: redesign is the only official runtime */
+const OFFICIAL_UI_STYLE_MODE: UIStyleMode = 'redesign';
 
 /* @Codex */
-function readStoredUIStyleMode(defaultStyle: UIStyleMode): UIStyleMode {
-    if (typeof window === 'undefined') return defaultStyle;
-
-    try {
-        return normalizeUIStyleMode(localStorage.getItem(UI_STYLE_STORAGE_KEY), defaultStyle);
-    } catch {
-        return defaultStyle;
-    }
-}
-
-/* @Codex */
-export function UIStyleProvider({
-    children,
-    defaultStyle = 'clinical',
-}: UIStyleProviderProps) {
-    const [uiStyleMode, setUIStyleModeState] = useState<UIStyleMode>(() => readStoredUIStyleMode(defaultStyle));
-
+export function UIStyleProvider({ children }: UIStyleProviderProps) {
     useEffect(() => {
-        applyUIStyleModeToDocument(uiStyleMode);
-        try {
-            localStorage.setItem(UI_STYLE_STORAGE_KEY, uiStyleMode);
-        } catch {
-            // No-op: local bootstrap remains best-effort only.
-        }
-    }, [uiStyleMode]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        const syncPersistedStyle = async () => {
-            try {
-                const stored = await db.settings.get(UI_STYLE_SETTING_KEY) as { value?: unknown } | undefined;
-                const resolved = normalizeUIStyleMode(stored?.value, uiStyleMode);
-
-                if (!cancelled && stored?.value && resolved !== uiStyleMode) {
-                    setUIStyleModeState(resolved);
-                    return;
-                }
-
-                if (!stored?.value) {
-                    await db.settings.put({ key: UI_STYLE_SETTING_KEY, value: uiStyleMode }, { suppressNotify: true });
-                }
-            } catch {
-                // No-op: unauthenticated or unavailable settings should not block rendering.
-            }
-        };
-
-        void syncPersistedStyle();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [uiStyleMode]);
+        window.document.documentElement.dataset.uiStyle = OFFICIAL_UI_STYLE_MODE;
+    }, []);
 
     const value = useMemo<UIStyleProviderState>(() => ({
-        uiStyleMode,
-        setUIStyleMode: (mode: UIStyleMode) => {
-            setUIStyleModeState(mode);
-            void db.settings.put({ key: UI_STYLE_SETTING_KEY, value: mode }, { suppressNotify: true }).catch(() => {
-                // No-op: localStorage keeps the style sticky even if settings sync fails.
-            });
+        uiStyleMode: OFFICIAL_UI_STYLE_MODE,
+        setUIStyleMode: () => {
+            // No-op: the redesign shell is the only runtime.
         },
-    }), [uiStyleMode]);
+    }), []);
 
     return (
         <UIStyleContext.Provider value={value}>

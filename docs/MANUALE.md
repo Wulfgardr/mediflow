@@ -26,6 +26,7 @@ Riferimenti utili:
     `http://localhost:3000`
 
 > La prima esecuzione può richiedere più tempo per il download dei modelli AI.
+> `Start_MediFlow.command` avvia la web app locale; l'eventuale client macOS segue un launcher separato.
 
 ---
 
@@ -105,7 +106,7 @@ Le diagnosi usano lo standard OMS ICD-11.
 Se lavori su Mac, puoi usare anche il client nativo.
 
 * **Vantaggi**: avvio rapido, integrazione macOS, lock screen con PIN.
-* **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale.
+* **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale, separatamente da `Start_MediFlow.command`.
 * **Nota**: il vecchio shell macOS resta uno snapshot alpha mentre il lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi usa l'interfaccia web, che resta la superficie operativa primaria.
 
 ---

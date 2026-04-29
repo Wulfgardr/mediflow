@@ -82,6 +82,20 @@ export async function POST(request: Request) {
             );
         }
 
+        if (auditPatientId) {
+            await safeWriteAuditEventFromRequest(request, session, {
+                eventType: 'patient.siss.prescription.launch',
+                outcome: 'failure',
+                subjectType: 'patient',
+                subjectRef: auditPatientId,
+                redactedMetadata: buildSissPrescriptionLaunchAuditMetadata({
+                    entrypoint: 'therapy-panel',
+                    outcome: 'failure',
+                    reasonCode: 'SISS_UPSTREAM',
+                }),
+            }, '[MediFlow] SISS prescription audit write failed:');
+        }
+
         console.error('API POST /api/siss/prescription error:', error);
         return NextResponse.json({ error: 'Failed to start SISS prescription flow' }, { status: 500 });
     }

@@ -38,6 +38,10 @@ prepare_workspace() {
     fi
   done
 
+  if [[ -d "$ROOT_DIR/node_modules" ]]; then
+    ln -s "$ROOT_DIR/node_modules" "$WORKSPACE_DIR/node_modules"
+  fi
+
   cat >"$WORKSPACE_DIR/next.config.ts" <<'EOF'
 import type { NextConfig } from "next";
 
@@ -70,13 +74,19 @@ cleanup() {
     kill "$DEV_PID" >/dev/null 2>&1 || true
     wait "$DEV_PID" >/dev/null 2>&1 || true
   fi
-  rm -rf "$WORKSPACE_DIR"
+  rm -rf "$WORKSPACE_DIR" >/dev/null 2>&1 || {
+    sleep 1
+    rm -rf "$WORKSPACE_DIR" >/dev/null 2>&1 || true
+  }
 }
 
 trap cleanup EXIT
 
 echo "Starting Next.js dev server for network home-base smoke..."
-npx next dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
+(
+  cd "$WORKSPACE_DIR"
+  npx next dev --webpack --hostname "$HOST" --port "$PORT"
+) >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
 echo "Waiting for $BASE_URL/api/v1/ambulatories ..."

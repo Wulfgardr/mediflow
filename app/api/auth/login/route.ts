@@ -22,6 +22,8 @@ import {
 } from '@/lib/auth-lockout';
 /* @Codex */
 import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+/* @Codex */
+import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
 
 /* @Codex */
 function recordFailedLoginAttempt(request: Request, username: unknown): void {
@@ -190,12 +192,7 @@ export async function POST(request: Request) {
             encryptedMasterKey: user.encryptedMasterKey,
             salt: user.salt
         });
-        response.cookies.set(SESSION_COOKIE_NAME, session.id, {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: false,
-            path: '/'
-        });
+        response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {

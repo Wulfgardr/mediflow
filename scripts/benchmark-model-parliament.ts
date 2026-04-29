@@ -40,20 +40,79 @@ type SmartImportChamberAssessment = {
     score: number;
 };
 
-type CandidateParliamentDecision = {
+type CandidateLane = Awaited<ReturnType<typeof runModelStackBenchmark>>['candidates'][number]['lane'];
+
+type CandidateCapabilityProfile = {
+    summary: string;
+    tasks: string[];
+};
+
+type CandidateEconomics = {
+    qualityScore: number;
+    avgLatencyMs: number | null;
+    p95LatencyMs: number | null;
+    relativeLatency: number | null;
+    valueScore: number | null;
+};
+
+export type CandidateParliamentDecision = {
     id: string;
     label: string;
-    lane: string;
+    lane: CandidateLane;
     origin: string;
     runtime: string;
     runtimeModel: string | null;
     executionStatus: string;
     registryStatus: string;
+    notes: string;
     verdict: ParliamentVerdict;
     reasons: string[];
     blockers: string[];
     contractChamber: ContractChamberAssessment;
     smartImportChamber: SmartImportChamberAssessment;
+    capabilities: CandidateCapabilityProfile;
+    economics: CandidateEconomics;
+};
+
+type ParliamentLaneState =
+    | 'competitive'
+    | 'hold'
+    | 'benchmark_only'
+    | 'integration_pending'
+    | 'blocked';
+
+export type ParliamentLaneScorecard = {
+    lane: CandidateLane;
+    capability: string;
+    tasks: string[];
+    state: ParliamentLaneState;
+    totalCandidates: number;
+    runnableCandidates: number;
+    benchmarkedCandidates: number;
+    focusCandidateLabel: string | null;
+    focusCandidateModel: string | null;
+    bestValueModel: string | null;
+    blockers: string[];
+    focusNote: string | null;
+};
+
+export type ParliamentScorecard = {
+    summary: {
+        bestQualityModel: string | null;
+        bestQualityLabel: string | null;
+        bestQualityScore: number | null;
+        bestValueModel: string | null;
+        bestValueLabel: string | null;
+        bestValueScore: number | null;
+        bestValueChallengerModel: string | null;
+        bestValueChallengerLabel: string | null;
+        fastestModel: string | null;
+        fastestLabel: string | null;
+        fastestAvgLatencyMs: number | null;
+        competitiveLaneCount: number;
+        advisoryLaneCount: number;
+    };
+    lanes: ParliamentLaneScorecard[];
 };
 
 type PruneResult = {
@@ -63,7 +122,7 @@ type PruneResult = {
     message: string;
 };
 
-type ParliamentReport = {
+export type ParliamentReport = {
     generatedAt: string;
     baseUrl: string;
     mlxBaseUrl: string;
@@ -100,6 +159,7 @@ type ParliamentReport = {
         pruneResults: PruneResult[];
     };
     candidates: CandidateParliamentDecision[];
+    scorecard: ParliamentScorecard;
 };
 
 type ConfiguredRuntime = ParliamentReport['configuredRuntime'];
@@ -116,6 +176,25 @@ const CONTRACT_MIN_RATE = 0.95;
 const JSON_MIN_RATE = 0.95;
 const TASK_MIN_RATE = 0.9;
 const SMART_IMPORT_MIN_RATE = 0.95;
+const PARLIAMENT_MAX_QUALITY_SCORE = 11;
+const LANE_CAPABILITY_PROFILES: Record<CandidateLane, CandidateCapabilityProfile> = {
+    generative: {
+        summary: 'Baseline locale multi-task per patient insight, smart import e document synthesis.',
+        tasks: ['patient_insight', 'smart_import', 'document_synthesis'],
+    },
+    pii: {
+        summary: 'Lane specialistica privacy-first per redaction.v1 e de-identificazione locale.',
+        tasks: ['redaction.v1', 'deidentify'],
+    },
+    clinical_entities: {
+        summary: 'Lane evidence-first per estrazione medication/problem su corpus clinico sintetico.',
+        tasks: ['clinical_entities.v1', 'problem_extraction', 'medication_extraction'],
+    },
+    embedding: {
+        summary: 'Lane encoder per retrieval, reranking e memoria di evidenze locale.',
+        tasks: ['retrieval', 'reranking', 'evidence_memory'],
+    },
+};
 
 function parseArgs(argv: string[]) {
     const args = {
@@ -278,6 +357,12 @@ function average(values: number[]) {
     return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(4));
 }
 
+function averageNullable(values: Array<number | null | undefined>) {
+    const filtered = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+    if (filtered.length === 0) return null;
+    return Number((filtered.reduce((sum, value) => sum + value, 0) / filtered.length).toFixed(1));
+}
+
 function assessContractChamber(candidate: Awaited<ReturnType<typeof runModelStackBenchmark>>['candidates'][number]): ContractChamberAssessment {
     const benchmark = candidate.benchmark;
     if (!benchmark || benchmark.status !== 'completed' || !benchmark.metrics || !benchmark.tasks) {
@@ -393,6 +478,204 @@ function combinedScore(contractChamber: ContractChamberAssessment, smartImportCh
     return Number((contractChamber.score + smartImportChamber.score).toFixed(4));
 }
 
+function buildCandidateCapabilities(lane: CandidateLane): CandidateCapabilityProfile {
+    return LANE_CAPABILITY_PROFILES[lane];
+}
+
+function buildCandidateEconomics(
+    candidate: Awaited<ReturnType<typeof runModelStackBenchmark>>['candidates'][number],
+    target: LocalChatTarget | null,
+    contractChamber: ContractChamberAssessment,
+    smartImportChamber: SmartImportChamberAssessment,
+    smartImportByModel: Map<string, Awaited<ReturnType<typeof runSmartImportBenchmark>>['models'][number]>,
+): CandidateEconomics {
+    const contractMetrics = candidate.benchmark?.status === 'completed' && candidate.benchmark.metrics
+        ? candidate.benchmark.metrics
+        : null;
+    const smartImportBenchmark = target ? smartImportByModel.get(buildLocalChatTargetKey(target)) : null;
+    const smartImportMetrics = smartImportBenchmark?.status === 'completed' && smartImportBenchmark.metrics
+        ? smartImportBenchmark.metrics
+        : null;
+    const qualityScore = Number((combinedScore(contractChamber, smartImportChamber) / PARLIAMENT_MAX_QUALITY_SCORE).toFixed(3));
+
+    return {
+        qualityScore,
+        avgLatencyMs: averageNullable([
+            contractMetrics?.avgLatencyMs ?? null,
+            smartImportMetrics?.avgLatencyMs ?? null,
+        ]),
+        p95LatencyMs: averageNullable([
+            contractMetrics?.p95LatencyMs ?? null,
+            smartImportMetrics?.p95LatencyMs ?? null,
+        ]),
+        relativeLatency: null,
+        valueScore: null,
+    };
+}
+
+export function finalizeCandidateEconomics(candidates: CandidateParliamentDecision[]) {
+    const fastestAvgLatencyMs = candidates
+        .map((candidate) => candidate.economics.avgLatencyMs)
+        .filter((value): value is number => typeof value === 'number' && value > 0)
+        .sort((left, right) => left - right)[0];
+
+    if (!fastestAvgLatencyMs) {
+        return candidates;
+    }
+
+    return candidates.map((candidate) => {
+        const avgLatencyMs = candidate.economics.avgLatencyMs;
+        if (!avgLatencyMs) {
+            return candidate;
+        }
+
+        const relativeLatency = Number((fastestAvgLatencyMs / avgLatencyMs).toFixed(3));
+        return {
+            ...candidate,
+            economics: {
+                ...candidate.economics,
+                relativeLatency,
+                valueScore: Number((candidate.economics.qualityScore * relativeLatency).toFixed(3)),
+            },
+        };
+    });
+}
+
+function pickBestCandidate(
+    candidates: CandidateParliamentDecision[],
+    selector: (candidate: CandidateParliamentDecision) => number | null,
+) {
+    return candidates.reduce<CandidateParliamentDecision | null>((best, candidate) => {
+        const score = selector(candidate);
+        if (score === null || Number.isNaN(score) || score <= 0) return best;
+        if (!best) return candidate;
+
+        const bestScore = selector(best) || 0;
+        if (score > bestScore) return candidate;
+        if (score < bestScore) return best;
+
+        const bestLatency = best.economics.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
+        const candidateLatency = candidate.economics.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
+        return candidateLatency < bestLatency ? candidate : best;
+    }, null);
+}
+
+function collectLaneBlockers(candidates: CandidateParliamentDecision[]) {
+    return Array.from(new Set(
+        candidates.flatMap((candidate) => [
+            ...candidate.blockers,
+            ...candidate.reasons.filter((reason) =>
+                !reason.includes('thresholds passed')
+                && !reason.startsWith('Retained as ')
+                && !reason.startsWith('Configured active role model')
+                && !reason.startsWith('Strong but redundant')
+            ),
+        ]),
+    )).slice(0, 4);
+}
+
+function resolveLaneState(candidates: CandidateParliamentDecision[]): ParliamentLaneState {
+    if (candidates.some((candidate) =>
+        candidate.verdict === 'baseline'
+        || candidate.verdict === 'challenger'
+        || candidate.verdict === 'prune_redundant'
+    )) {
+        return 'competitive';
+    }
+
+    if (candidates.some((candidate) =>
+        candidate.executionStatus === 'runnable'
+        || candidate.registryStatus === 'benchmarked'
+    )) {
+        return 'hold';
+    }
+
+    if (candidates.some((candidate) =>
+        candidate.blockers.includes('benchmark_only')
+        || candidate.blockers.includes('promotion_gate_failed')
+        || candidate.blockers.includes('shadow_validation_failed')
+    )) {
+        return 'benchmark_only';
+    }
+
+    if (candidates.some((candidate) => candidate.executionStatus === 'integration_required')) {
+        return 'integration_pending';
+    }
+
+    return 'blocked';
+}
+
+export function buildParliamentScorecard(candidates: CandidateParliamentDecision[]): ParliamentScorecard {
+    const bestQualityCandidate = pickBestCandidate(candidates, (candidate) => candidate.economics.qualityScore);
+    const bestValueCandidate = pickBestCandidate(candidates, (candidate) => candidate.economics.valueScore);
+    const bestValueChallenger = pickBestCandidate(
+        candidates.filter((candidate) =>
+            candidate.lane === 'generative'
+            && candidate.verdict !== 'baseline',
+        ),
+        (candidate) => candidate.economics.valueScore,
+    );
+    const fastestCandidate = pickBestCandidate(candidates, (candidate) =>
+        candidate.economics.avgLatencyMs
+            ? Number((1 / candidate.economics.avgLatencyMs).toFixed(6))
+            : null,
+    );
+
+    const lanes = Array.from(new Set(candidates.map((candidate) => candidate.lane)))
+        .map((lane) => {
+            const laneCandidates = candidates.filter((candidate) => candidate.lane === lane);
+            const focusCandidate = pickBestCandidate(laneCandidates, (candidate) => candidate.economics.valueScore)
+                || pickBestCandidate(laneCandidates, (candidate) => candidate.economics.qualityScore)
+                || laneCandidates[0]
+                || null;
+
+            return {
+                lane,
+                capability: buildCandidateCapabilities(lane).summary,
+                tasks: buildCandidateCapabilities(lane).tasks,
+                state: resolveLaneState(laneCandidates),
+                totalCandidates: laneCandidates.length,
+                runnableCandidates: laneCandidates.filter((candidate) => candidate.executionStatus === 'runnable').length,
+                benchmarkedCandidates: laneCandidates.filter((candidate) =>
+                    candidate.contractChamber.available || candidate.smartImportChamber.available,
+                ).length,
+                focusCandidateLabel: focusCandidate?.label || null,
+                focusCandidateModel: focusCandidate?.runtimeModel || null,
+                bestValueModel: pickBestCandidate(laneCandidates, (candidate) => candidate.economics.valueScore)?.runtimeModel || null,
+                blockers: collectLaneBlockers(laneCandidates),
+                focusNote: focusCandidate?.notes || null,
+            };
+        })
+        .sort((left, right) => left.lane.localeCompare(right.lane));
+
+    return {
+        summary: {
+            bestQualityModel: bestQualityCandidate?.runtimeModel || null,
+            bestQualityLabel: bestQualityCandidate?.label || null,
+            bestQualityScore: bestQualityCandidate?.economics.qualityScore ?? null,
+            bestValueModel: bestValueCandidate?.runtimeModel || null,
+            bestValueLabel: bestValueCandidate?.label || null,
+            bestValueScore: bestValueCandidate?.economics.valueScore ?? null,
+            bestValueChallengerModel: bestValueChallenger?.runtimeModel || null,
+            bestValueChallengerLabel: bestValueChallenger?.label || null,
+            fastestModel: fastestCandidate?.runtimeModel || null,
+            fastestLabel: fastestCandidate?.label || null,
+            fastestAvgLatencyMs: fastestCandidate?.economics.avgLatencyMs ?? null,
+            competitiveLaneCount: lanes.filter((lane) => lane.state === 'competitive').length,
+            advisoryLaneCount: lanes.filter((lane) => lane.state !== 'competitive').length,
+        },
+        lanes,
+    };
+}
+
+function formatScore(value: number | null) {
+    return typeof value === 'number' ? value.toFixed(3) : 'n/a';
+}
+
+function formatLatency(value: number | null) {
+    return typeof value === 'number' ? `${value.toFixed(1)} ms` : 'n/a';
+}
+
 function buildPruneCommand(model: string) {
     return `ollama rm ${JSON.stringify(model)}`;
 }
@@ -431,7 +714,7 @@ function applyPruneModels(models: string[]): PruneResult[] {
     });
 }
 
-function buildMarkdown(report: ParliamentReport) {
+export function buildMarkdown(report: ParliamentReport) {
     const lines: string[] = [];
     lines.push('# AI model parliament');
     lines.push('');
@@ -457,12 +740,27 @@ function buildMarkdown(report: ParliamentReport) {
         }
     }
     lines.push('');
+    lines.push('## Capability / economics scorecard');
+    lines.push('');
+    lines.push(`- Best quality: ${report.scorecard.summary.bestQualityModel ? `\`${report.scorecard.summary.bestQualityModel}\`` : 'none'} (${formatScore(report.scorecard.summary.bestQualityScore)})`);
+    lines.push(`- Best value: ${report.scorecard.summary.bestValueModel ? `\`${report.scorecard.summary.bestValueModel}\`` : 'none'} (${formatScore(report.scorecard.summary.bestValueScore)})`);
+    lines.push(`- Best value challenger: ${report.scorecard.summary.bestValueChallengerModel ? `\`${report.scorecard.summary.bestValueChallengerModel}\`` : 'none'}`);
+    lines.push(`- Fastest runnable: ${report.scorecard.summary.fastestModel ? `\`${report.scorecard.summary.fastestModel}\`` : 'none'} (${formatLatency(report.scorecard.summary.fastestAvgLatencyMs)})`);
+    lines.push(`- Competitive lanes: ${report.scorecard.summary.competitiveLaneCount}`);
+    lines.push(`- Advisory lanes: ${report.scorecard.summary.advisoryLaneCount}`);
+    lines.push('');
+    lines.push('| Lane | Capability | State | Focus candidate | Runnable | Benchmarked | Blockers |');
+    lines.push('| --- | --- | --- | --- | --- | --- | --- |');
+    for (const lane of report.scorecard.lanes) {
+        lines.push(`| \`${lane.lane}\` | ${lane.capability} | \`${lane.state}\` | ${lane.focusCandidateModel ? `\`${lane.focusCandidateModel}\`` : lane.focusCandidateLabel || 'n/a'} | ${lane.runnableCandidates}/${lane.totalCandidates} | ${lane.benchmarkedCandidates}/${lane.totalCandidates} | ${lane.blockers.join('; ') || 'none'} |`);
+    }
+    lines.push('');
     lines.push('## Candidate verdicts');
     lines.push('');
-    lines.push('| Candidate | Runtime | Runtime model | Verdict | Contract chamber | Smart Import chamber |');
-    lines.push('| --- | --- | --- | --- | --- | --- |');
+    lines.push('| Candidate | Runtime | Runtime model | Verdict | Quality | Value | Avg latency | Capability | Contract chamber | Smart Import chamber |');
+    lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
     for (const candidate of report.candidates) {
-        lines.push(`| ${candidate.label} | \`${candidate.runtime}\` | ${candidate.runtimeModel ? `\`${candidate.runtimeModel}\`` : 'n/a'} | \`${candidate.verdict}\` | ${candidate.contractChamber.reasons.join('; ')} | ${candidate.smartImportChamber.reasons.join('; ')} |`);
+        lines.push(`| ${candidate.label} | \`${candidate.runtime}\` | ${candidate.runtimeModel ? `\`${candidate.runtimeModel}\`` : 'n/a'} | \`${candidate.verdict}\` | ${formatScore(candidate.economics.qualityScore)} | ${formatScore(candidate.economics.valueScore)} | ${formatLatency(candidate.economics.avgLatencyMs)} | ${candidate.capabilities.summary} | ${candidate.contractChamber.reasons.join('; ')} | ${candidate.smartImportChamber.reasons.join('; ')} |`);
     }
     lines.push('');
     if (report.parliament.untrackedInstalledModels.length > 0) {
@@ -610,7 +908,7 @@ export async function runModelParliament(options: {
             .filter((value): value is string => typeof value === 'string' && value.length > 0),
     ]);
 
-    const candidates: CandidateParliamentDecision[] = generative.candidates.map((candidate) => {
+    const rawCandidates: CandidateParliamentDecision[] = generative.candidates.map((candidate) => {
         const runtimeModel = candidate.runtimeModel || null;
         const contractChamber = assessContractChamber(candidate);
         const target = runtimeModel && (candidate.runtime === 'ollama_chat' || candidate.runtime === 'mlx_chat')
@@ -618,6 +916,7 @@ export async function runModelParliament(options: {
             : null;
         const targetKey = target ? buildLocalChatTargetKey(target) : null;
         const smartImportChamber = assessSmartImportChamber(target, smartImportByModel);
+        const capabilities = buildCandidateCapabilities(candidate.lane);
         const reasons = [
             ...contractChamber.reasons,
             ...smartImportChamber.reasons,
@@ -660,13 +959,18 @@ export async function runModelParliament(options: {
             runtimeModel,
             executionStatus: candidate.executionStatus,
             registryStatus: candidate.status,
+            notes: candidate.notes,
             verdict,
             reasons,
             blockers: candidate.blockers || [],
             contractChamber,
             smartImportChamber,
+            capabilities,
+            economics: buildCandidateEconomics(candidate, target, contractChamber, smartImportChamber, smartImportByModel),
         };
     });
+    const candidates = finalizeCandidateEconomics(rawCandidates);
+    const scorecard = buildParliamentScorecard(candidates);
 
     const untrackedInstalledModels = Array.from(installedOllamaTargetKeys)
         .filter((targetKey) => !registryOllamaTargetKeys.has(targetKey))
@@ -722,6 +1026,7 @@ export async function runModelParliament(options: {
             pruneResults,
         },
         candidates,
+        scorecard,
     };
 }
 

@@ -133,20 +133,6 @@ devono rispettare queste regole aggiuntive:
 L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
 (es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
 
-## Comparator cloud opt-in
-
-non cambia il default `local-first`.
-
-Regole minime:
-
-- e ammesso solo come lane interna di engineering, mai come runtime clinico
-- usa solo case pack privati, redatti/minimizzati e fuori Git
-- richiede approvazione umana esplicita prima di qualunque export
-- non puo scrivere dati paziente, generare apply automatici o essere committato
-  nel repository
-
----
-
 ## Logging e redazione
 
 I dati sanitari non devono trapelare dai log.
@@ -169,7 +155,6 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 - `summarySnapshot` o `parseEvidenceArtifactSnapshot` grezzi
 - token, PIN, chiavi o salt
 - prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
-- case pack privati/comparator cloud o output non minimizzati di shadow eval
 
 ### Puoi loggare (preferibile)
 - conteggi (es. numero record)
@@ -228,8 +213,8 @@ Opzionali (se usati nella toolchain):
 
 Se ritieni di aver trovato una vulnerabilità:
 
-1. Preferisci canale privato (GitHub Security Advisories / Security tab), se disponibile.
-2. Se il canale privato non è disponibile, apri una issue **senza dettagli sensibili**:
+1. Preferisci un canale riservato (GitHub Security Advisories / Security tab), se disponibile.
+2. Se il canale riservato non è disponibile, apri una issue **senza dettagli sensibili**:
    - descrivi impatto e area coinvolta
    - fornisci passi minimi di riproduzione
    - evita dati reali, token o payload decifrati

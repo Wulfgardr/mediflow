@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 /* @Codex */
+import { clinicalRichTextToPlainText } from './clinical-rich-text';
+/* @Codex */
 import type { Patient, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
@@ -246,7 +248,7 @@ export const generatePatientReport = (
         const diaryData = diaryEntries.map(e => [
             new Date(e.date).toLocaleDateString('it-IT'),
             e.type.toUpperCase(),
-            e.content
+            clinicalRichTextToPlainText(e.content)
         ]);
 
         autoTable(doc, {

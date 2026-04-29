@@ -2,11 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './audit';
 /* @Codex */
-import { SISS_ACTION_URLS } from './siss-urls';
-
+import { SISS_ACTIONS, type SissAction } from './siss-actions';
 /* @Codex */
-export const SISS_ACTIONS = ['menu.open', 'prescription.create', 'fse.lookup', 'registry.lookup'] as const;
-export type SissAction = (typeof SISS_ACTIONS)[number];
+import { SISS_ACTION_URLS } from './siss-urls';
 
 /* @Codex */
 export const SISS_ERROR_CODES = [

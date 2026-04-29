@@ -62,8 +62,8 @@ export interface Patient {
     caregiver?: string;
     updatedAt: Date;
     createdAt: Date;
-    deletedAt?: Date;
-    deletionReason?: string;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
     aiSummary?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
     /* @Codex */
@@ -109,8 +109,8 @@ export interface ClinicalEntry {
     content: string;
     createdAt: Date;
     updatedAt: Date;
-    deletedAt?: Date;
-    deletionReason?: string;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
     metadata?: Record<string, unknown>;
     attachments?: string[];
     setting?: 'home' | 'hospital' | 'ambulatory';
@@ -120,11 +120,13 @@ export interface ClinicalEntry {
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
-    entries: ['content', 'deletionReason'],
+    entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
     /* @Codex */
     observations: ['notes'],
+    /* @Codex */
+    prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
     /* @Codex */
@@ -393,11 +395,17 @@ class ApiTable<T> {
         if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
         if (obj.date) obj.date = new Date(obj.date);
         /* @Codex */
+        if (obj.deletedAt) obj.deletedAt = new Date(obj.deletedAt);
+        /* @Codex */
         if (obj.startDate) obj.startDate = new Date(obj.startDate);
         /* @Codex */
         if (obj.endDate) obj.endDate = new Date(obj.endDate);
         /* @Codex */
         if (obj.observedAt) obj.observedAt = new Date(obj.observedAt);
+        /* @Codex */
+        if (obj.prescribedAt) obj.prescribedAt = new Date(obj.prescribedAt);
+        /* @Codex */
+        if (obj.collaudoAt) obj.collaudoAt = new Date(obj.collaudoAt);
         return obj;
     }
 
@@ -466,6 +474,8 @@ class MedicalApiClient {
     therapies: ApiTable<Therapy>;
     /* @Codex */
     observations: ApiTable<Observation>;
+    /* @Codex */
+    prostheticPrescriptions: ApiTable<ProstheticPrescription>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
     checkups: ApiTable<Checkup>;
@@ -486,6 +496,8 @@ class MedicalApiClient {
         this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
         /* @Codex */
         this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
+        /* @Codex */
+        this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
         this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
@@ -631,6 +643,34 @@ export interface Attachment {
     /* @Codex */
     parseEvidenceArtifactSnapshot?: string;
     createdAt: Date;
+}
+
+/* @Codex */
+export type ProstheticPrescriptionStatus = 'draft' | 'prescribed' | 'submitted' | 'authorized' | 'delivered' | 'tested' | 'cancelled';
+
+/* @Codex */
+export type ProstheticPrescriptionCategory = 'standard' | 'oxygen' | 'repair' | 'replacement' | 'trial' | 'other';
+
+/* @Codex */
+export interface ProstheticPrescription {
+    id: string;
+    patientId: string;
+    prescribedAt: Date;
+    status: ProstheticPrescriptionStatus;
+    category: ProstheticPrescriptionCategory;
+    isoCode?: string;
+    description: string;
+    measures?: string;
+    clinicalReason?: string;
+    regionalPrescriptionId?: string;
+    supplier?: string;
+    collaudoAt?: Date;
+    collaudoOutcome?: string;
+    source: 'manual' | 'document_review';
+    documentRefs?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt?: Date;
 }
 
 export interface AifaDrug {

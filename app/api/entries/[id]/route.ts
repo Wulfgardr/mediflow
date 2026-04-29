@@ -6,12 +6,8 @@ import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-
-function parseDate(value: unknown): Date | undefined {
-    if (value === null || value === undefined) return undefined;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-}
+/* @Codex */
+import { normalizeEntryUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 
 export async function PUT(
     request: Request,
@@ -23,30 +19,17 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as Record<string, unknown>;
-        const updateData: { type?: string; date?: Date; content?: string } = {};
+        const normalized = normalizeEntryUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
 
         const existing = await dbServer.select({ id: entries.id }).from(entries).where(eq(entries.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        if (typeof body === 'object') {
-            if (typeof body.type === 'string') updateData.type = body.type;
-            if (typeof body.content === 'string') updateData.content = body.content;
-
-            const hasDate = Object.prototype.hasOwnProperty.call(body, 'date');
-            const parsedDate = parseDate(body.date);
-            if (hasDate && parsedDate === undefined) {
-                return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
-            }
-            if (parsedDate) updateData.date = parsedDate;
-        }
-
-        if (Object.keys(updateData).length === 0) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-        }
-
-        await dbServer.update(entries).set(updateData).where(eq(entries.id, id));
+        await dbServer.update(entries).set(normalized.values).where(eq(entries.id, id));
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(

@@ -101,6 +101,20 @@ export async function POST(request: Request) {
             );
         }
 
+        if (shouldAuditPrescriptionLaunch && auditPatientId) {
+            await safeWriteAuditEventFromRequest(request, session, {
+                eventType: 'patient.siss.prescription.launch',
+                outcome: 'failure',
+                subjectType: 'patient',
+                subjectRef: auditPatientId,
+                redactedMetadata: buildSissPrescriptionLaunchAuditMetadata({
+                    entrypoint: 'patient-context',
+                    outcome: 'failure',
+                    reasonCode: 'SISS_UPSTREAM',
+                }),
+            }, '[MediFlow] SISS patient-context prescription audit write failed:');
+        }
+
         console.error('API POST /api/siss/context error:', error);
         return NextResponse.json({ error: 'Failed to start SISS contextual flow' }, { status: 500 });
     }
