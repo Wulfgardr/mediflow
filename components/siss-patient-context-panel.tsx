@@ -3,13 +3,20 @@
 /* @Codex */
 import { useEffect, useState } from 'react';
 /* @Codex */
-import { ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
+import { Accessibility, ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
 /* @Codex */
-import { completeSissPortalHandoff } from '@/lib/siss';
+import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 /* @Codex */
 import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
+/* @Codex */
+import {
+    SISS_SESSION_OBSERVED_MODULE_LABELS,
+    type SissSessionCheckpoint,
+    type SissSessionHealth,
+    type SissSessionStatusResponse,
+} from '@/lib/siss-session-shared';
 
 type Props = {
     patientId: string;
@@ -52,6 +59,12 @@ type FseReadinessState = {
     validation: ValidatePatientExportResponse | null;
 };
 
+type SessionStatusState = {
+    loading: boolean;
+    error: string | null;
+    status: SissSessionStatusResponse | null;
+};
+
 const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
@@ -60,15 +73,21 @@ const ACTIONS: ContextActionConfig[] = [
         icon: ExternalLink,
     },
     {
+        action: 'prosthetics.open',
+        label: 'Protesica-RL',
+        caption: 'Apri Assistente RL / Protesica-RL con il CF del paziente pronto da incollare.',
+        icon: Accessibility,
+    },
+    {
         action: 'fse.lookup',
         label: 'FSE',
-        caption: 'Apri il fascicolo con il CF del paziente pronto da incollare.',
+        caption: 'Apri OpeFseIE con il CF del paziente pronto da incollare.',
         icon: FolderOpen,
     },
     {
         action: 'registry.lookup',
         label: 'Anagrafe',
-        caption: 'Apri l\'anagrafe regionale con il CF del paziente pronto da incollare.',
+        caption: 'Apri Gaia con il CF del paziente pronto da incollare.',
         icon: Search,
     },
     {
@@ -134,6 +153,11 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         error: null,
         validation: null,
     });
+    const [sessionStatus, setSessionStatus] = useState<SessionStatusState>({
+        loading: false,
+        error: null,
+        status: null,
+    });
 
     const summary = buildSissPatientContextSummary({ patientTaxCode });
     const hasTaxCode = summary.patientFiscalCodeReady;
@@ -175,6 +199,43 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         }
     };
 
+    const refreshSessionStatus = async () => {
+        setSessionStatus((current) => ({
+            loading: true,
+            error: null,
+            status: current.status,
+        }));
+
+        try {
+            const response = await fetch('/api/siss/session-status');
+            const payload = await response.json().catch(() => null) as SissSessionStatusResponse | { error?: string } | null;
+
+            if (!response.ok) {
+                const message = payload && 'error' in payload && typeof payload.error === 'string'
+                    ? payload.error
+                    : 'Stato sessione SISS non disponibile';
+                setSessionStatus({
+                    loading: false,
+                    error: message,
+                    status: null,
+                });
+                return;
+            }
+
+            setSessionStatus({
+                loading: false,
+                error: null,
+                status: payload as SissSessionStatusResponse,
+            });
+        } catch (error) {
+            setSessionStatus({
+                loading: false,
+                error: error instanceof Error ? error.message : 'Errore inatteso nel controllo sessione SISS',
+                status: null,
+            });
+        }
+    };
+
     useEffect(() => {
         void refreshFseReadiness();
     }, [patientId]);
@@ -182,6 +243,16 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
     const startFlow = async (action: SissPatientContextAction) => {
         setActiveAction(action);
         setFeedback(null);
+
+        const popupWindow = prepareSissPortalWindow();
+        if (!popupWindow) {
+            setFeedback({
+                kind: 'error',
+                message: 'Il browser ha bloccato l\'apertura del portale SISS. Consenti i popup e riprova.',
+            });
+            setActiveAction(null);
+            return;
+        }
 
         try {
             const response = await fetch('/api/siss/context', {
@@ -204,6 +275,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 : null;
 
             if (!response.ok) {
+                popupWindow.close();
                 setFeedback({
                     kind: 'error',
                     message: errorMessage,
@@ -220,14 +292,19 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 handoffUrl: payload.handoffUrl,
                 clipboardText: payload.clipboardText ?? undefined,
                 successMessage: payload.message,
+                popupWindow,
             });
+            if (!handoffResult.opened) {
+                popupWindow.close();
+            }
 
             setFeedback({
-                kind: handoffResult.success ? 'success' : 'warning',
+                kind: handoffResult.success ? 'success' : handoffResult.opened ? 'warning' : 'error',
                 message: `${payload.title}: ${handoffResult.message}`,
                 correlationId: payload.correlationId,
             });
         } catch (error) {
+            popupWindow.close();
             setFeedback({
                 kind: 'error',
                 message: error instanceof Error ? error.message : 'Errore inatteso nel flusso SISS',
@@ -245,6 +322,41 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
             : validation
                 ? 'success'
                 : 'neutral';
+    const sessionData = sessionStatus.status;
+
+    const formatObservedAt = (value: string | null) => {
+        if (!value) return 'Non osservato';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+
+        return new Intl.DateTimeFormat('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(date);
+    };
+
+    const sessionHealthClassName = (health: SissSessionHealth) => {
+        switch (health) {
+            case 'recent':
+                return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            case 'stale':
+                return 'border-amber-200 bg-amber-50 text-amber-700';
+            default:
+                return 'border-slate-200 bg-white/70 text-slate-500';
+        }
+    };
+
+    const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
+    const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
+    const moduleCheckpoints = sessionData?.checkpoints.filter((checkpoint): checkpoint is SissSessionCheckpoint => (
+        checkpoint.key === 'menu'
+        || checkpoint.key === 'prescription'
+        || checkpoint.key === 'prosthetics'
+        || checkpoint.key === 'fse'
+        || checkpoint.key === 'registry'
+    )) ?? [];
 
     return (
         <div className="rounded-[28px] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50 p-5 shadow-sm">
@@ -258,7 +370,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         Apri rapidamente i moduli regionali ufficiali dal gestionale con il codice fiscale del paziente pronto da incollare, dove disponibile.
                     </p>
                     <p className="text-xs leading-5 text-slate-600">
-                        Per il prescrittivo questa slice richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l'interfaccia regionale.
+                        Per il prescrittivo MediFlow richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l&apos;interfaccia regionale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">
@@ -306,6 +418,101 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                     ? 'FSE locale pronta'
                                     : 'Pre-check FSE non disponibile'}
                 </span>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                        <div className="text-sm font-semibold text-slate-900">Stato sessione SISS</div>
+                        <p className="text-xs leading-5 text-slate-600">
+                            Lettura locale della cronologia Atlas su questa macchina. Mostra segnali osservati di sessione, firma remota e ultimo modulo raggiunto, senza dichiarare uno stato certificato del backend regionale.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void refreshSessionStatus()}
+                        disabled={sessionStatus.loading}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                        {sessionStatus.loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                        Aggiorna stato
+                    </button>
+                </div>
+
+                {sessionStatus.error ? (
+                    <p className="mt-3 text-xs font-medium text-rose-700">{sessionStatus.error}</p>
+                ) : sessionData ? (
+                    <>
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                            <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(sessionData.sessionHealth)}`}>
+                                {sessionData.sessionHealth === 'recent'
+                                    ? 'Sessione SISS osservata'
+                                    : sessionData.sessionHealth === 'stale'
+                                        ? 'Sessione SISS osservata in passato'
+                                        : 'Sessione SISS non osservata'}
+                            </span>
+                            {remoteSignatureCheckpoint && (
+                                <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(remoteSignatureCheckpoint.health)}`}>
+                                    {remoteSignatureCheckpoint.health === 'recent'
+                                        ? 'Firma remota osservata'
+                                        : remoteSignatureCheckpoint.health === 'stale'
+                                            ? 'Firma remota osservata in passato'
+                                            : 'Firma remota non osservata'}
+                                </span>
+                            )}
+                            {roleSelectionCheckpoint && (
+                                <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(roleSelectionCheckpoint.health)}`}>
+                                    {roleSelectionCheckpoint.health === 'recent'
+                                        ? 'Ruolo operatore osservato'
+                                        : roleSelectionCheckpoint.health === 'stale'
+                                            ? 'Ruolo operatore osservato in passato'
+                                            : 'Ruolo operatore non osservato'}
+                                </span>
+                            )}
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-500">
+                                Fonte: Atlas locale
+                            </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div className={`rounded-xl border px-3 py-3 ${sessionHealthClassName(sessionData.sessionHealth)}`}>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ultimo modulo osservato</div>
+                                <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : 'Nessuno'}
+                                </div>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    {formatObservedAt(sessionData.lastModuleAt)}
+                                </p>
+                            </div>
+                            {moduleCheckpoints.map((checkpoint) => (
+                                <div
+                                    key={checkpoint.key}
+                                    className={`rounded-xl border px-3 py-3 ${sessionHealthClassName(checkpoint.health)}`}
+                                >
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{checkpoint.label}</div>
+                                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                                        {checkpoint.health === 'recent'
+                                            ? 'Osservato di recente'
+                                            : checkpoint.health === 'stale'
+                                                ? 'Osservato in passato'
+                                                : 'Non osservato'}
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-600">
+                                        {formatObservedAt(checkpoint.observedAt)}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {sessionData.warning && (
+                            <p className="mt-3 text-xs font-medium text-amber-700">{sessionData.warning}</p>
+                        )}
+                    </>
+                ) : (
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                        La cronologia Atlas locale non viene letta automaticamente. Usa il controllo manuale quando serve verificare una sessione SISS recente.
+                    </p>
+                )}
             </div>
 
             <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">
@@ -365,7 +572,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 ) : null}
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {ACTIONS.map((item) => {
                     const Icon = item.icon;
                     const isLoading = activeAction === item.action;

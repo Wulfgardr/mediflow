@@ -75,6 +75,7 @@ Lo snapshot corrente supporta comunque:
 La strategia testing ufficiale e documentata in:
 
 - [docs/native-testing.md](./native-testing.md)
+- [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md)
 
 Comandi rapidi:
 

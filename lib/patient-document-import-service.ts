@@ -113,6 +113,7 @@ const THERAPY_SECTION_HEADING_RULES: Array<{
     pattern: RegExp;
 }> = [
     { section: 'discharge', label: 'Terapia alla dimissione', pattern: /^terapia alla dimissione\b[:\-–]?\s*(.*)$/i },
+    { section: 'discharge', label: 'Terapia alla dimissione', pattern: /^(?:terapia|trattamento)(?:\s+farmacologic[ao])?(?:\s+(?:consigliat[ao]|prescritt[ao]))?\s+(?:alla|di|in)\s+dimissione\b[:.\-–]?\s*(.*)$/i },
     { section: 'discharge', label: 'Indicazioni terapeutiche alla dimissione', pattern: /^indicazioni\s+terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b[:.\-–]?\s*(.*)$/i },
     { section: 'home', label: 'Terapia domiciliare', pattern: /^(?:abituale\s+)?terapia domiciliare\b[:\-–]?\s*(.*)$/i },
     { section: 'followup', label: 'Controlli successivi', pattern: /^controlli successivi\b[:\-–]?\s*(.*)$/i },

@@ -16,6 +16,8 @@ import {
     parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentInsightFromArtifact,
 } from '@/lib/document-parse-evidence-artifact';
+/* @Codex */
+import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -158,6 +160,14 @@ function isLowSignalAttachmentSummary(value: string | null | undefined): boolean
     const normalized = (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
     if (!normalized) return true;
     return LOW_SIGNAL_ATTACHMENT_SUMMARIES.some((candidate) => normalized === candidate);
+}
+
+/* @Codex */
+function canAttemptAttachmentTextRecovery(attachment: Attachment): boolean {
+    const summary = typeof attachment.summarySnapshot === 'string'
+        ? attachment.summarySnapshot
+        : '';
+    return Boolean(attachment.data) && isLowSignalAttachmentSummary(summary);
 }
 
 function formatDate(value: unknown): string {
@@ -694,15 +704,24 @@ export async function buildPatientInsightContext(
         })
         .filter((candidate): candidate is DocumentContextCandidate => Boolean(candidate?.line));
 
+    let remainingAttachmentTextRecoveries = MAX_ATTACHMENT_TEXT_RECOVERY;
     const attachmentCandidates = await Promise.all(
         attachments
             .filter((attachment) => !archivedAttachmentIds.has(attachment.id))
-            .map((attachment, index) => buildAttachmentContextCandidate(
-                attachment,
-                runtimeSettings.maxDocumentSummaryChars,
-                recoverAttachmentText,
-                index < MAX_ATTACHMENT_TEXT_RECOVERY,
-            )),
+            .map((attachment) => {
+                const allowRecovery = canAttemptAttachmentTextRecovery(attachment)
+                    && remainingAttachmentTextRecoveries > 0;
+                if (allowRecovery) {
+                    remainingAttachmentTextRecoveries -= 1;
+                }
+
+                return buildAttachmentContextCandidate(
+                    attachment,
+                    runtimeSettings.maxDocumentSummaryChars,
+                    recoverAttachmentText,
+                    allowRecovery,
+                );
+            }),
     );
     const limitations: string[] = [];
     const recoveredAttachmentCount = attachmentCandidates.filter((candidate) => candidate.recoveredDirectText).length;
@@ -810,7 +829,7 @@ export async function buildPatientInsightContext(
         });
 
     const diaryLines = entries
-        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(entry.content, 220)}`);
+        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(clinicalRichTextToPlainText(entry.content), 220)}`);
 
     let nextIndex = 1;
     const profileRefs = createSourceRefs('Profilo strutturato', profileLines, nextIndex);

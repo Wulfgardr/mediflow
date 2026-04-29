@@ -76,9 +76,23 @@ export const entries = sqliteTable('entries', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     type: text('type').notNull(),
+    /* @Codex */
+    title: text('title').notNull().default('Voce clinica'),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     content: text('content').notNull(),
+    /* @Codex */
+    setting: text('setting'),
+    /* @Codex */
+    metadata: text('metadata'),
+    /* @Codex */
+    attachments: text('attachments'),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
 // --- Therapies ---
@@ -119,6 +133,28 @@ export const observations = sqliteTable('observations', {
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category').notNull().default('standard'),
+    isoCode: text('iso_code'),
+    description: text('description').notNull(),
+    measures: text('measures'),
+    clinicalReason: text('clinical_reason'),
+    regionalPrescriptionId: text('regional_prescription_id'),
+    supplier: text('supplier'),
+    collaudoAt: integer('collaudo_at', { mode: 'timestamp' }),
+    collaudoOutcome: text('collaudo_outcome'),
+    source: text('source').notNull().default('manual'),
+    documentRefs: text('document_refs'),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
 // --- Checkups / Appointments ---

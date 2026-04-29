@@ -165,7 +165,7 @@ flowchart TB
 - `local-only` come default e `network-home-base` come opt-in paired/read-only-first.
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - Principio local-only: nessuna dipendenza cloud di default.
-- Boundary SISS/FSE: oggi orchestrazione locale + percorsi ufficiali; niente claim
+- Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
 
 ---

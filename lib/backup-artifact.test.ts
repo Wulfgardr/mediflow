@@ -49,6 +49,7 @@ const basePayload = {
         },
     ],
     observations: [],
+    prostheticPrescriptions: [],
     patients: [
         {
             id: 'pat-1',

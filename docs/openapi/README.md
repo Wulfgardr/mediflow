@@ -65,7 +65,6 @@ Se la risposta e `si`, la spec va aggiornata.
 4. Nella PR scrivi cosa e cambiato:
    - spec aggiornata
    - oppure `no contract impact`
-5. Se il cambio e breaking o deprecante, aggiorna prima ADR/PLANS/Linear.
 6. Esegui `npm run check:openapi:drift` per verificare coverage, drift e breaking.
 
 ## Registro eccezioni e override
@@ -74,7 +73,6 @@ Se la risposta e `si`, la spec va aggiornata.
   fuori dalla slice OpenAPI pubblicata; una nuova operation `/api/v1` deve stare
   o nella spec o in questo registro
 - `breakingOverrides` nello stesso file e il punto unico per deroghe intenzionali:
-  ogni voce deve citare il change esatto bloccato dal guard e il Linear issue che
   la giustifica
 
 ## Versioning semplice
@@ -127,6 +125,9 @@ Nota operativa per `WUL-150`:
 
 - la slice `network` resta prudente, ma non e piu solo stub PHI-safe
 - distingue `node summary`, `session gate`, `capability discovery`, `pairing intent`, `pairing confirmation` e primo `read-only data plane`
+- sul lato Apple-native, la discovery LAN puo pubblicizzare lo stesso nodo via
+  Bonjour `_mediflow-homebase._tcp`, mantenendo fuori dal TXT record qualunque
+  dato PHI e riusando `/api/v1/network/node` come summary PHI-safe reviewable
 - la `session summary` puo includere metadata PHI-safe sul piano replica
   (`snapshot mirror`, `deferred`, `manual review`) senza implicare che esista
   gia un motore sync operativo

@@ -6,8 +6,10 @@ import { users } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
 /* @Codex */
 import { clearAllSessions, SESSION_COOKIE_NAME } from '@/lib/server-session';
+/* @Codex */
+import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
 
-export async function POST() {
+export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
@@ -23,10 +25,7 @@ export async function POST() {
 
         const response = NextResponse.json({ success: true });
         response.cookies.set(SESSION_COOKIE_NAME, '', {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: false,
-            path: '/',
+            ...sessionCookieOptionsForRequest(request),
             maxAge: 0,
         });
         return response;

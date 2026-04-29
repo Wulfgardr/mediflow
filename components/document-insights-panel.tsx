@@ -6,6 +6,7 @@ import { db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
 import { regeneratePatientSummary } from '@/lib/ai-summary-service';
+import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -16,11 +17,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
 
     // Parse insights from patient
-    const insights: DocumentInsight[] = patient.documentInsights
-        ? (typeof patient.documentInsights === 'string'
-            ? JSON.parse(patient.documentInsights)
-            : patient.documentInsights)
-        : [];
+    const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
 
     if (!patient.id || insights.length === 0) {
         return null; // Don't render if no insights

@@ -50,7 +50,7 @@ const runtimeImport = new Function(
 /* @Codex */
 export async function loadPdfJsServer(): Promise<PdfJsServerModule> {
     installPdfJsNodeShims();
-    const pdfjs = await runtimeImport('pdfjs-dist/legacy/build/pdf.js');
+    const pdfjs = await runtimeImport('pdfjs-dist/legacy/build/pdf.mjs');
 
     if (pdfjs?.GlobalWorkerOptions) {
         pdfjs.GlobalWorkerOptions.workerSrc = '';

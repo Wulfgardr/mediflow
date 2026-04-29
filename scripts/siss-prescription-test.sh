@@ -10,5 +10,7 @@ npx tsc -p "$ROOT_DIR/tsconfig.siss-prescription-test.json"
 mkdir -p "$OUT_DIR/node_modules/server-only"
 printf '%s\n' "module.exports = {};" > "$OUT_DIR/node_modules/server-only/index.js"
 node --test \
+  "$OUT_DIR/siss.test.js" \
   "$OUT_DIR/siss-patient-context.test.js" \
-  "$OUT_DIR/siss-prescription.test.js"
+  "$OUT_DIR/siss-prescription.test.js" \
+  "$OUT_DIR/siss-session-observer.test.js"

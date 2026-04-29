@@ -1,28 +1,28 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { db } from '@/lib/db';
-import { ArrowLeft, Save, Video, Stethoscope, FileText, Paperclip, Calendar, Clock, Upload, X, Loader2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { v4 as uuidv4 } from 'uuid';
-import { cn } from '@/lib/utils';
+import { useParams, useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
+import { v4 as uuidv4 } from 'uuid';
+import { ArrowLeft, Calendar, Clock, FileText, Loader2, Paperclip, Save, Sparkles, Stethoscope, Upload, Video, X } from 'lucide-react';
+
 /* @Codex */
-import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
+import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
+import { db } from '@/lib/db';
 /* @Codex */
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
-/* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
-/* @Codex */
+import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
+import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { cn } from '@/lib/utils';
 
 export default function NewEntryPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
 
-    // Default to current time, formatted for datetime-local (YYYY-MM-DDTHH:mm)
     const now = new Date();
     const defaultDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
 
@@ -35,35 +35,40 @@ export default function NewEntryPage() {
     const [uploadProgress, setUploadProgress] = useState('');
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
-        setFiles(prev => [...prev, ...acceptedFiles]);
+        setFiles((prev) => [...prev, ...acceptedFiles]);
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
     const removeFile = (index: number) => {
-        setFiles(prev => prev.filter((_, i) => i !== index));
+        setFiles((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        /* @Codex */
+        const normalizedContent = sanitizeClinicalRichTextHtml(content);
+
+        if (isClinicalRichTextBlank(normalizedContent)) {
+            alert('Inserisci un resoconto clinico prima di registrare la visita.');
+            return;
+        }
+
         setIsSubmitting(true);
         setUploadProgress('Salvataggio allegati...');
 
         try {
             const attachmentIds: string[] = [];
-            /* @Codex */
             const aiModels = await getAiModelLabels();
 
-            // 1. Process and Upload Files
             for (const file of files) {
-                let summary = "Allegato alla visita";
+                let summary = 'Allegato alla visita';
                 let parseEvidenceArtifactSnapshot: string | undefined;
                 const attachmentId = uuidv4();
 
                 const isPdf = isPdfDocumentInput(file);
                 const isImage = isImageDocumentInput(file);
 
-                /* @Codex */
                 if (isPdf || isImage) {
                     try {
                         setUploadProgress(`AI OCR (${aiModels.ocr})...`);
@@ -76,20 +81,18 @@ export default function NewEntryPage() {
                         if (rawText) {
                             setUploadProgress(`Sintesi documento (${aiModels.clinical})...`);
                             const result = await synthesizeDocument(rawText, file.name, id, { attachmentId });
-                            const insight = result.insight;
-                            summary = insight.summary;
+                            summary = result.insight.summary;
                             parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
                         } else if (extracted.notes && extracted.notes.length > 5) {
                             summary = extracted.notes;
                         } else {
-                            summary = "Documento allegato (analizzato)";
+                            summary = 'Documento allegato (analizzato)';
                         }
-                    } catch (err) {
-                        console.warn("Documento OCR/Sintesi fallita", err);
+                    } catch (error) {
+                        console.warn('Documento OCR/Sintesi fallita', error);
                     }
                 }
 
-                // Convert to Base64
                 const base64Data = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result as string);
@@ -103,22 +106,21 @@ export default function NewEntryPage() {
                     name: file.name,
                     type: file.type,
                     size: file.size,
-                    path: `uploads/${file.name}`, // Placeholder path since we store in data
+                    path: `uploads/${file.name}`,
                     data: base64Data,
                     summarySnapshot: summary,
                     parseEvidenceArtifactSnapshot,
-                    createdAt: new Date()
+                    createdAt: new Date(),
                 });
                 attachmentIds.push(attachmentId);
             }
 
             setUploadProgress('Salvataggio voce diario...');
 
-            // 2. Create Entry
             const typeLabels: Record<string, string> = {
                 visit: 'Visita Ambulatoriale',
                 remote: 'Videoconsulto',
-                note: 'Nota Clinica'
+                note: 'Nota Clinica',
             };
 
             await db.entries.add({
@@ -126,22 +128,21 @@ export default function NewEntryPage() {
                 patientId: id,
                 type,
                 title: typeLabels[type] || 'Nuova Voce',
-                date: new Date(entryDate), // Authentic User-Specified Date
-                content,
+                date: new Date(entryDate),
+                content: normalizedContent,
                 setting,
                 attachments: attachmentIds,
-                createdAt: new Date(), // Audit Timestamp
+                createdAt: new Date(),
                 updatedAt: new Date(),
             });
 
-            /* @Codex */
             setUploadProgress('Aggiornamento AI Patient Summary...');
             await regeneratePatientSummary(id);
 
             router.push(`/patients/${id}`);
-        } catch (err) {
-            console.error(err);
-            alert("Errore durante il salvataggio. Riprova.");
+        } catch (error) {
+            console.error(error);
+            alert('Errore durante il salvataggio. Riprova.');
             setIsSubmitting(false);
             setUploadProgress('');
         }
@@ -154,186 +155,280 @@ export default function NewEntryPage() {
     ];
 
     return (
-        <div className="max-w-3xl mx-auto">
-            <div className="mb-6 flex items-center gap-4">
-                <Link href={`/patients/${id}`} className="p-2 hover:bg-white/50 dark:hover:bg-white/10 rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                </Link>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Nuova Voce Diario</h1>
-            </div>
-
-            <div className="glass-panel p-8">
-                <form onSubmit={handleSubmit} className="space-y-8">
-
-                    {/* Date & Type Row */}
-                    <div className="flex flex-col md:flex-row gap-6">
-                        {/* Date Picker */}
-                        <div className="w-full md:w-1/3 space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                Data e Ora
-                            </label>
-                            <div className="relative">
-                                <Clock className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                                <input
-                                    type="datetime-local"
-                                    value={entryDate}
-                                    onChange={(e) => setEntryDate(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none text-gray-700 dark:text-gray-200 font-medium dark:[color-scheme:dark]"
-                                    aria-label="Data e ora della visita"
-                                    required
-                                />
-                            </div>
-                            <p className="text-[10px] text-gray-400">
-                                Puoi retrodatare l&apos;inserimento se necessario.
+        <div className="mx-auto max-w-5xl space-y-6">
+            <section className="glass-panel overflow-hidden p-6 md:p-7">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                    <div className="flex items-start gap-4">
+                        <Link
+                            href={`/patients/${id}`}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/78 text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(182,106,60,0.22)] hover:text-[color:var(--mf-accent)] dark:bg-white/6"
+                        >
+                            <ArrowLeft className="h-5 w-5" />
+                        </Link>
+                        <div>
+                            <p className="section-kicker">Voce clinica</p>
+                            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[color:var(--mf-ink)]">
+                                Nuova visita o nota strutturata
+                            </h1>
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                                Stesso linguaggio della shell Graphite, ma con un editor abbastanza ricco da stratificare il ragionamento clinico senza trasformarlo in un word processor.
                             </p>
                         </div>
-
-                        {/* Setting Selector */}
-                        <div className="flex-1 space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Setting</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setSetting('ambulatory')}
-                                    className={cn(
-                                        "flex items-center justify-center gap-2 p-3 rounded-xl border font-medium transition-all h-[50px]",
-                                        setting === 'ambulatory'
-                                            ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-sm"
-                                            : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/10"
-                                    )}
-                                >
-                                    <span className="text-lg">🏥</span>
-                                    <span>Ambulatorio</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSetting('home')}
-                                    className={cn(
-                                        "flex items-center justify-center gap-2 p-3 rounded-xl border font-medium transition-all h-[50px]",
-                                        setting === 'home'
-                                            ? "bg-amber-50 dark:bg-amber-900/20 border-amber-500 text-amber-700 dark:text-amber-400 shadow-sm"
-                                            : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/10"
-                                    )}
-                                >
-                                    <span className="text-lg">🏠</span>
-                                    <span>Domicilio</span>
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
-                    {/* Type Selector */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tipo Attività</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {types.map((t) => {
-                                const Icon = t.icon;
-                                const isSelected = type === t.id;
-                                return (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => setType(t.id as 'visit' | 'remote' | 'note')}
-                                        className={cn(
-                                            "flex flex-col items-center justify-center gap-2 p-4 rounded-xl border text-center transition-all",
-                                            isSelected
-                                                ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                                                : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 text-gray-500 dark:text-gray-400"
-                                        )}
-                                    >
-                                        <Icon className={cn("w-6 h-6", isSelected ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-gray-500")} />
-                                        <span className="font-semibold text-sm">{t.label}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                    <div className="flex flex-wrap gap-2 md:justify-end">
+                        <span className="apple-chip">Titoli e sezioni</span>
+                        <span className="apple-chip">Bullet e rientri</span>
+                        <span className="apple-chip">Bold · Italic · Underline</span>
                     </div>
+                </div>
+            </section>
 
-                    {/* Content Area */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Resoconto Clinico (SOAP)</label>
-                        <textarea
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            className="w-full h-64 p-5 rounded-2xl bg-white/70 dark:bg-white/5 border-0 shadow-inner resize-none focus:ring-2 focus:ring-indigo-500 focus:bg-white/90 dark:focus:bg-white/10 transition-all text-gray-800 dark:text-gray-200 placeholder-gray-400"
-                            placeholder="S: Il paziente riferisce...&#10;O: PA 120/80, Sat 98%...&#10;A: Stazionarietà...&#10;P: Proseguire terapia..."
-                            required
-                        />
-                    </div>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_320px]">
+                <div className="space-y-6">
+                    <div className="glass-panel p-6 md:p-7">
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+                                <div className="space-y-2">
+                                    <label className="section-kicker flex items-center gap-2">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        Data e ora
+                                    </label>
+                                    <div className="relative">
+                                        <Clock className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[color:var(--mf-muted)]" />
+                                        <input
+                                            type="datetime-local"
+                                            value={entryDate}
+                                            onChange={(e) => setEntryDate(e.target.value)}
+                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
+                                            aria-label="Data e ora della visita"
+                                            required
+                                        />
+                                    </div>
+                                    <p className="text-xs leading-5 text-[color:var(--mf-muted)]">
+                                        Puoi retrodatare l&apos;inserimento se stai ricostruendo il diario.
+                                    </p>
+                                </div>
 
-                    {/* Attachments Section */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <Paperclip className="w-4 h-4" />
-                            Allegati & Documenti
-                        </label>
-
-                        {/* Dropzone */}
-                        <div
-                            {...getRootProps()}
-                            className={cn(
-                                "border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all",
-                                isDragActive
-                                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10"
-                                    : "border-gray-300 dark:border-white/10 hover:border-indigo-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
-                            )}
-                        >
-                            <input {...getInputProps()} />
-                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-full mb-3">
-                                <Upload className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <p className="text-gray-700 dark:text-gray-300 font-medium text-sm">Clicca o trascina qui i file</p>
-                            <p className="text-gray-400 text-xs mt-1">PDF, Immagini, Referti...</p>
-                        </div>
-
-                        {/* File List */}
-                        {files.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                {files.map((file, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 p-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg shadow-sm group">
-                                        <div className="p-2 bg-gray-100 dark:bg-white/10 rounded-md">
-                                            <FileText className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{file.name}</p>
-                                            <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(0)} KB</p>
-                                        </div>
+                                <div className="space-y-2">
+                                    <label className="section-kicker">Setting operativo</label>
+                                    <div className="grid grid-cols-2 gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => removeFile(idx)}
-                                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                            aria-label={`Rimuovi allegato ${file.name}`}
+                                            onClick={() => setSetting('ambulatory')}
+                                            className={cn(
+                                                'flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow,transform]',
+                                                setting === 'ambulatory'
+                                                    ? 'border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)] text-[color:var(--mf-primary)] shadow-[0_12px_24px_rgba(15,123,104,0.08)]'
+                                                    : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                            )}
                                         >
-                                            <X className="w-4 h-4" />
+                                            <span className="text-lg">🏥</span>
+                                            <span>Ambulatorio</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSetting('home')}
+                                            className={cn(
+                                                'flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow,transform]',
+                                                setting === 'home'
+                                                    ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--mf-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
+                                                    : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                            )}
+                                        >
+                                            <span className="text-lg">🏠</span>
+                                            <span>Domicilio</span>
                                         </button>
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-white/10">
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span>{uploadProgress || 'Salvataggio...'}</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-5 h-5" />
-                                    <span>Registra nel Diario</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
+                            <div className="space-y-2">
+                                <label className="section-kicker">Tipo attività</label>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                    {types.map((currentType) => {
+                                        const Icon = currentType.icon;
+                                        const isSelected = type === currentType.id;
 
-                </form>
+                                        return (
+                                            <button
+                                                key={currentType.id}
+                                                type="button"
+                                                onClick={() => setType(currentType.id as 'visit' | 'remote' | 'note')}
+                                                className={cn(
+                                                    'flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left transition-[border-color,background-color,color,box-shadow,transform]',
+                                                    isSelected
+                                                        ? 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.08)] text-[color:var(--mf-ink)] shadow-[0_12px_24px_rgba(94,53,95,0.08)]'
+                                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                    'flex h-11 w-11 items-center justify-center rounded-[16px] border',
+                                                    isSelected
+                                                        ? 'border-[color:rgba(94,53,95,0.18)] bg-white/82 text-[color:var(--mf-plum)]'
+                                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white/82 text-[color:var(--mf-muted)]',
+                                                )}>
+                                                    <Icon className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{currentType.label}</p>
+                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                                                        {currentType.id === 'visit'
+                                                            ? 'In presenza, con esame obiettivo e piano.'
+                                                            : currentType.id === 'remote'
+                                                                ? 'Contatto a distanza, follow-up o riallineamento.'
+                                                                : 'Nota breve, decisione o memo clinico.'}
+                                                    </p>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* @Codex */}
+                            <section className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
+                                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <p className="section-kicker">Resoconto clinico</p>
+                                        <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                            Campo visita strutturabile
+                                        </h2>
+                                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                                            Titoli, punti elenco e formattazioni leggere per separare sintomi, obiettivi, assessment e piano.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="apple-chip">SOAP-friendly</span>
+                                        <span className="apple-chip">Compatibile timeline</span>
+                                    </div>
+                                </div>
+
+                                <ClinicalRichTextEditor
+                                    value={content}
+                                    onChange={setContent}
+                                    placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
+                                />
+                            </section>
+
+                            <section className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
+                                <div className="mb-4">
+                                    <p className="section-kicker">Allegati</p>
+                                    <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                        Documenti e referti collegati
+                                    </h2>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[color:var(--mf-ink)]">
+                                        <Paperclip className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                        Allegati della visita
+                                    </label>
+
+                                    <div
+                                        {...getRootProps()}
+                                        className={cn(
+                                            'rounded-[22px] border-2 border-dashed p-6 text-center transition-[border-color,background-color,color,box-shadow]',
+                                            isDragActive
+                                                ? 'border-[color:rgba(182,106,60,0.34)] bg-[color:rgba(182,106,60,0.08)]'
+                                                : 'border-[color:rgba(112,106,100,0.18)] bg-white/68 hover:border-[color:rgba(182,106,60,0.24)] hover:bg-[color:rgba(255,252,247,0.92)]'
+                                        )}
+                                    >
+                                        <input {...getInputProps()} />
+                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 text-[color:var(--mf-accent)]">
+                                            <Upload className="h-5 w-5" />
+                                        </div>
+                                        <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Clicca o trascina qui i file</p>
+                                        <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">PDF, immagini, referti e documenti clinici.</p>
+                                    </div>
+
+                                    {files.length > 0 ? (
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                            {files.map((file, index) => (
+                                                <div key={index} className="flex items-center gap-3 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-3 shadow-[0_10px_20px_rgba(35,27,22,0.04)]">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.9)] text-[color:var(--mf-muted)]">
+                                                        <FileText className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-sm font-semibold text-[color:var(--mf-ink)]">{file.name}</p>
+                                                        <p className="text-xs text-[color:var(--mf-muted)]">{(file.size / 1024).toFixed(0)} KB</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeFile(index)}
+                                                        className="rounded-[12px] p-2 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(182,106,60,0.08)] hover:text-[color:var(--mf-accent)]"
+                                                        aria-label={`Rimuovi allegato ${file.name}`}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </section>
+
+                            <div className="flex justify-end border-t border-[color:rgba(112,106,100,0.12)] pt-4">
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="ui-btn-primary px-8 py-3 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                            <span>{uploadProgress || 'Salvataggio...'}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-5 w-5" />
+                                            <span>Registra nel diario</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <aside className="space-y-6">
+                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                        <div className="mb-4">
+                            <p className="section-kicker">Editor</p>
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
+                                <Sparkles className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                                Formattazione leggera
+                            </h3>
+                        </div>
+                        <div className="space-y-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                            <p>Usa titoli per separare i blocchi clinici e bullet point per terapie, alert o passi successivi.</p>
+                            <p>Il contenuto resta leggibile anche in timeline, report PDF e contesto AI locale.</p>
+                        </div>
+                    </section>
+
+                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                        <div className="mb-4">
+                            <p className="section-kicker">Struttura suggerita</p>
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
+                                Una visita che si lascia scansionare
+                            </h3>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">S</p>
+                                <p className="mt-1 text-sm text-[color:var(--mf-ink)]">Motivo del contatto, sintomi, contesto funzionale.</p>
+                            </div>
+                            <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">O</p>
+                                <p className="mt-1 text-sm text-[color:var(--mf-ink)]">Parametri, esame obiettivo, referti o dati oggettivi.</p>
+                            </div>
+                            <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">A / P</p>
+                                <p className="mt-1 text-sm text-[color:var(--mf-ink)]">Assessment clinico, decisione e follow-up operativo.</p>
+                            </div>
+                        </div>
+                    </section>
+                </aside>
             </div>
         </div>
     );

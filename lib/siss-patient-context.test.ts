@@ -19,6 +19,7 @@ test('resolveSissPatientContextAction accepts supported contextual actions only'
     assert.equal(resolveSissPatientContextAction('fse.lookup'), 'fse.lookup');
     assert.equal(resolveSissPatientContextAction('registry.lookup'), 'registry.lookup');
     assert.equal(resolveSissPatientContextAction('menu.open'), 'menu.open');
+    assert.equal(resolveSissPatientContextAction('prosthetics.open'), 'prosthetics.open');
     assert.equal(resolveSissPatientContextAction('unknown.action'), null);
 });
 
@@ -50,6 +51,7 @@ test('createSissPatientContextHandoff returns structured payload for FSE lookup'
     assert.equal(result.mode, 'portal-handoff');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['fse.lookup']);
     assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
+    assert.equal(result.message, 'Flusso FSE pronto. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.');
     assert.match(result.correlationId, /^siss-/);
 });
 
@@ -64,6 +66,21 @@ test('createSissPatientContextHandoff returns structured payload for registry lo
     assert.equal(result.title, 'Anagrafe');
     assert.equal(result.handoffUrl, SISS_PORTAL_URLS['registry.lookup']);
     assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
+    assert.equal(result.message, 'Flusso anagrafe SISS pronto. Il codice fiscale verra copiato in locale prima dell\'apertura del portale.');
+});
+
+test('createSissPatientContextHandoff returns structured payload for Protesica-RL', async () => {
+    const result = await createSissPatientContextHandoff({
+        patientId: 'patient-ctx-prosthetics',
+        patientTaxCode: 'RSSMRA85T10A562S',
+        action: 'prosthetics.open',
+    });
+
+    assert.equal(result.action, 'prosthetics.open');
+    assert.equal(result.title, 'Protesica-RL');
+    assert.equal(result.handoffUrl, SISS_PORTAL_URLS['prosthetics.open']);
+    assert.equal(result.clipboardText, 'RSSMRA85T10A562S');
+    assert.equal(result.message, 'Modulo Protesica-RL pronto. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione regionale.');
 });
 
 test('createSissPatientContextHandoff opens menu even without fiscal code', async () => {

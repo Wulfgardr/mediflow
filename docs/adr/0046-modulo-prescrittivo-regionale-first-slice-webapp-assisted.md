@@ -73,7 +73,7 @@ prescrittivo regionale e:
 
 Questo significa:
 
-- MediFlow puo preparare il contesto paziente e l'orchestrazione locale
+- MediFlow puo preparare il contesto paziente e l'coordinamento locale
 - l'atto prescrittivo vero resta nel `Modulo Prescrittivo Regionale`
   ufficiale
 - non trattiamo questa slice come `prescrittivo nativo MediFlow`
