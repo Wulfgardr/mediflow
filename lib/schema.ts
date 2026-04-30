@@ -143,6 +143,23 @@ export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    action: text('action').notNull(),
+    moduleLabel: text('module_label').notNull(),
+    reason: text('reason'),
+    startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+    outcome: text('outcome').notNull().default('started'),
+    nextAction: text('next_action'),
+    notes: text('notes'),
+    correlationId: text('correlation_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),

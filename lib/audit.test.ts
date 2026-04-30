@@ -298,6 +298,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         therapy: 0,
         observation: 0,
         prosthetic_prescription: 0,
+        siss_handoff: 0,
         settings: 0,
     });
     assert.deepEqual(summary.topEventTypes, [

@@ -176,6 +176,32 @@ try {
 }
 /* @Codex */
 try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS siss_handoff_events (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            module_label TEXT NOT NULL,
+            reason TEXT,
+            started_at INTEGER NOT NULL,
+            completed_at INTEGER,
+            outcome TEXT NOT NULL DEFAULT 'started',
+            next_action TEXT,
+            notes TEXT,
+            correlation_id TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_patient_idx ON siss_handoff_events(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_started_idx ON siss_handoff_events(started_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_outcome_idx ON siss_handoff_events(outcome)').run();
+} catch (error) {
+    console.warn('[MediFlow] SISS handoff events schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureAuditSqliteSchema(sqlite);
 } catch (error) {
     console.warn('[MediFlow] Audit schema check skipped:', error);

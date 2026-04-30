@@ -11,6 +11,8 @@ import { buildSissPatientContextSummary, type SissPatientContextAction } from '@
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
+import { db } from '@/lib/db';
+/* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
     type SissSessionCheckpoint,
@@ -304,6 +306,25 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 message: `${payload.title}: ${handoffResult.message}`,
                 correlationId: payload.correlationId,
             });
+
+            if (handoffResult.opened) {
+                const actionConfig = ACTIONS.find((item) => item.action === action);
+                const now = new Date();
+                void db.sissHandoffs.add({
+                    id: crypto.randomUUID(),
+                    patientId,
+                    action,
+                    moduleLabel: actionConfig?.label ?? payload.title,
+                    reason: 'Handoff avviato dal pannello contesto paziente SISS.',
+                    startedAt: now,
+                    outcome: 'started',
+                    correlationId: payload.correlationId,
+                    createdAt: now,
+                    updatedAt: now,
+                }).catch((logError) => {
+                    console.warn('[MediFlow] SISS handoff diary write failed:', logError);
+                });
+            }
         } catch (error) {
             popupWindow.close();
             setFeedback({

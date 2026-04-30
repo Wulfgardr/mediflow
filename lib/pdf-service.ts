@@ -253,13 +253,13 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
     const buffer = await file.arrayBuffer();
     try {
         if (!(globalThis as any).pdfjsWorker) {
-            await import('pdfjs-dist/legacy/build/pdf.worker.js');
+            await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
         }
     } catch {
         // Fall back to the legacy fake-worker path if the side-effect import is unavailable.
     }
 
-    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.js');
+    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
     try {
         if (pdfjsLib?.GlobalWorkerOptions) {
