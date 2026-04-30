@@ -76,9 +76,23 @@ export const entries = sqliteTable('entries', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     type: text('type').notNull(),
+    /* @Codex */
+    title: text('title').notNull().default('Voce clinica'),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     content: text('content').notNull(),
+    /* @Codex */
+    setting: text('setting'),
+    /* @Codex */
+    metadata: text('metadata'),
+    /* @Codex */
+    attachments: text('attachments'),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
 // --- Therapies ---

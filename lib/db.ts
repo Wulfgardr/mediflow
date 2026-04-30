@@ -109,8 +109,8 @@ export interface ClinicalEntry {
     content: string;
     createdAt: Date;
     updatedAt: Date;
-    deletedAt?: Date;
-    deletionReason?: string;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
     metadata?: Record<string, unknown>;
     attachments?: string[];
     setting?: 'home' | 'hospital' | 'ambulatory';
@@ -140,7 +140,7 @@ export interface SissHandoffEvent {
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
-    entries: ['content', 'deletionReason'],
+    entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
     /* @Codex */
@@ -416,6 +416,8 @@ class ApiTable<T> {
         if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt);
         if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
         if (obj.date) obj.date = new Date(obj.date);
+        /* @Codex */
+        if (obj.deletedAt) obj.deletedAt = new Date(obj.deletedAt);
         /* @Codex */
         if (obj.startDate) obj.startDate = new Date(obj.startDate);
         /* @Codex */

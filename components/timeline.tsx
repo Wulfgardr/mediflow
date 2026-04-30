@@ -34,8 +34,8 @@ export default function Timeline({ entries }: TimelineProps) {
     const handleRestore = async (entry: TimelineEntryData) => {
         if (confirm("Ripristinare questa voce?")) {
             await db.entries.update(entry.id, {
-                deletedAt: undefined,
-                deletionReason: undefined
+                deletedAt: null,
+                deletionReason: null
             });
         }
     };

@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -40,16 +42,20 @@ export async function POST(request: Request) {
         const body = await request.json();
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
-        const newId = body.id || uuidv4();
-
-        await dbServer.insert(entries).values({
+        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+        const patientId = typeof body.patientId === 'string' ? body.patientId : '';
+        const normalized = normalizeEntryCreateInput(body, {
             id: newId,
-            patientId: body.patientId,
-            type: body.type,
-            date: new Date(body.date),
-            content: body.content,
-            createdAt: new Date()
+            patientId,
         });
+        if (!patientId) {
+            return NextResponse.json({ error: 'Invalid patientId' }, { status: 400 });
+        }
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(entries).values(normalized.values);
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(

@@ -44,11 +44,56 @@ test('normalizeEntryUpdateInput fails fast on invalid date and still allows part
     assert.equal(result.ok, true);
     if (!result.ok) return;
 
-    assert.deepEqual(result.values, {
-        content: 'updated',
-        date: undefined,
-        type: undefined,
+    assert.equal(result.values.content, 'updated');
+    assert.equal(result.values.date, undefined);
+    assert.equal(result.values.type, undefined);
+    assert.ok(result.values.updatedAt instanceof Date);
+});
+
+test('normalizeEntryCreateInput preserves visit metadata and attachments', () => {
+    const now = new Date('2026-04-29T10:00:00.000Z');
+    const result = normalizeEntryCreateInput(
+        {
+            type: 'visit',
+            title: 'Visita domiciliare',
+            date: '2026-04-29T09:30:00.000Z',
+            content: 'Contenuto cifrato lato client',
+            setting: 'home',
+            metadata: { scale: 'ADL', score: 4 },
+            attachments: ['attachment-1'],
+            updatedAt: '2026-04-29T09:45:00.000Z',
+        },
+        { id: 'entry-1', patientId: 'patient-1', now },
+    );
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.values.title, 'Visita domiciliare');
+    assert.equal(result.values.setting, 'home');
+    assert.equal(result.values.metadata, '{"scale":"ADL","score":4}');
+    assert.equal(result.values.attachments, '["attachment-1"]');
+    assert.equal(result.values.createdAt, now);
+    assert.equal(result.values.updatedAt.toISOString(), '2026-04-29T09:45:00.000Z');
+});
+
+test('normalizeEntryUpdateInput allows explicit soft delete restore fields', () => {
+    const deleteResult = normalizeEntryUpdateInput({
+        deletedAt: '2026-04-29T10:00:00.000Z',
+        deletionReason: 'Errore di inserimento',
     });
+    assert.equal(deleteResult.ok, true);
+    if (!deleteResult.ok) return;
+    assert.equal(deleteResult.values.deletedAt?.toISOString(), '2026-04-29T10:00:00.000Z');
+    assert.equal(deleteResult.values.deletionReason, 'Errore di inserimento');
+
+    const restoreResult = normalizeEntryUpdateInput({
+        deletedAt: null,
+        deletionReason: null,
+    });
+    assert.equal(restoreResult.ok, true);
+    if (!restoreResult.ok) return;
+    assert.equal(restoreResult.values.deletedAt, null);
+    assert.equal(restoreResult.values.deletionReason, null);
 });
 
 test('normalizeTherapyCreateInput rejects invalid dates, status, and optional field types', () => {

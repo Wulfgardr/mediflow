@@ -62,6 +62,18 @@ try {
 }
 /* @Codex */
 try {
+    ensureColumn('entries', 'title', "title TEXT NOT NULL DEFAULT 'Voce clinica'");
+    ensureColumn('entries', 'setting', 'setting TEXT');
+    ensureColumn('entries', 'metadata', 'metadata TEXT');
+    ensureColumn('entries', 'attachments', 'attachments TEXT');
+    ensureColumn('entries', 'deleted_at', 'deleted_at INTEGER');
+    ensureColumn('entries', 'deletion_reason', 'deletion_reason TEXT');
+    ensureColumn('entries', 'updated_at', 'updated_at INTEGER');
+} catch (error) {
+    console.warn('[MediFlow] Entries schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureColumn('checkups', 'notes', 'notes TEXT');
     /* @Codex */
     ensureColumn('checkups', 'source', 'source TEXT');
