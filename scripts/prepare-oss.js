@@ -20,7 +20,8 @@ const TO_EXCLUDE_BY_NAME = [
     'oss-assets',
     'brain',
     '.gemini',
-    'Farmaci'
+    'Farmaci',
+    'medical.db'
 ];
 
 const TO_EXCLUDE_BY_PATH = [
@@ -76,6 +77,17 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/turboquant-runtime-benchmark.md'
 ];
 
+const TO_EXCLUDE_FILE_EXTENSIONS = [
+    '.db',
+    '.sqlite',
+    '.sqlite3'
+];
+
+const TO_EXCLUDE_RUNTIME_DIR_PATTERNS = [
+    /^tmp-/,
+    /^\.next$/
+];
+
 const REPLACEMENTS = [
     { from: /Leonardo Pegollo/g, to: 'Nome Medico' },
     { from: /Pegollo/g, to: 'Medico' },
@@ -106,6 +118,10 @@ const PRIVATE_MARKDOWN_LINE_PATTERNS = [
     /docs\/private\//,
     /oss-assets\/README\.md/,
     /^<!-- Codex: created .* -->$/,
+    /^<!-- @Codex created .* -->$/,
+    /Codex/,
+    /Linear/,
+    /PLANS/,
     /^Fonte canonica del protocollo operativo:$/,
     /^Questo progetto traccia il codice generato da agent\.$/,
     /^## Attribution \(Codex \/ agent\)$/,
@@ -123,6 +139,8 @@ function normalizePathForMatch(inputPath) {
 function shouldExclude(relPath, itemName) {
     const normalizedRelPath = normalizePathForMatch(relPath);
     if (TO_EXCLUDE_BY_NAME.includes(itemName)) return true;
+    if (TO_EXCLUDE_FILE_EXTENSIONS.includes(path.extname(itemName))) return true;
+    if (TO_EXCLUDE_RUNTIME_DIR_PATTERNS.some((pattern) => pattern.test(itemName))) return true;
 
     for (const excludedPath of TO_EXCLUDE_BY_PATH) {
         if (normalizedRelPath === excludedPath || normalizedRelPath.startsWith(`${excludedPath}/`)) {
@@ -220,6 +238,12 @@ function sanitizeMarkdownReferences(targetDir) {
             const visibleLabel = label || parsedTarget;
             return `${visibleLabel} (private)`;
         });
+
+        content = content
+            .replace(/orchestrazione/g, 'coordinamento')
+            .replace(/orchestratore/g, 'coordinatore')
+            .replace(/orchestrata/g, 'coordinata')
+            .replace(/orchestration/g, 'coordination');
 
         content = content.replace(INLINE_DOC_REF_PATTERN, (fullMatch, docRef, offset, fullText) => {
             if (docRef.includes('*')) return fullMatch;
