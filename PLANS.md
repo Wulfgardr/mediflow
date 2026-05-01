@@ -52,7 +52,7 @@ Nota operativa:
 
 Nota operativa:
 - la validazione manuale desktop/mobile continua nel focus post-release e non va retro-proiettata come gate bloccante ormai chiuso
-- `WUL-109`, `WUL-110` e `WUL-111` restano la coda esplicita di hardening AI sul campo, non il motivo per tenere `v0.5.0` in uno stato narrativo indefinito
+- `WUL-109`, `WUL-110` e `WUL-111` sono chiusi come coda di hardening AI minima; le lane non promosse restano tracciate dai rispettivi tracker benchmark-only, non dal gate `v0.5.0`
 
 ### Contesto storico chiuso: Release gate v0.4 (web/core only)
 - [x] Chiudere i bug web/core che bloccano davvero `0.4`: `WUL-56` (ICD header), `WUL-58` (OCR smart su immagini/input non-PDF supportabili), `WUL-60` (placeholder anagrafici in import impegnativa).
@@ -99,7 +99,8 @@ Nota operativa:
   Completato in `WUL-110`: helper condiviso di normalizzazione documentale locale (OCR/testo + CDA/CCD) integrato in `document_synthesis`, import/OCR locale, fact pack storico e contesto `Patient Insight`, senza sconfinare in NER/redaction/coding.
 - [ ] Eseguire `AI-06`: benchmarkare una lane NER clinica italiana deterministica (`HUMADEX`) solo se migliora auditabilita o coding. Stato `WUL-96`: corpus `clinical_entities.v2`, confronto reale, repeatability a 5 run e promotion gate completati; `HUMADEX` resta davanti a `OpenMed NER` (`0.6/0.7` precision/recall vs `0.5/0.6`), ma entrambi falliscono il gate (`promotionReady = false`) per leak sui case negativi e under-span su problemi composti, quindi la lane resta `benchmark-only`.
 - [ ] Eseguire `AI-07`: valutare challenger generativi solo dopo baseline e resolver stabili, senza cambiare il default per intuizione.
-- [ ] Eseguire `AI-08`: formalizzare rollout/shadow mode/stop-rules delle lane AI prima di qualunque attivazione operativa.
+- [x] Eseguire `AI-08`: formalizzare rollout/shadow mode/stop-rules delle lane AI prima di qualunque attivazione operativa.
+  Completato tramite `WUL-111` e child `WUL-133`..`WUL-144`: runbook canonico, validator locale, artifact persistiti JSON/Markdown, pannello `Settings` read-only, guard notice vicino ai model selector e kill-switch UI-driven per `patient_insight`, `smart_import` e `document_synthesis`. Nessuna lane `benchmark-only` viene promossa da questo closeout.
 
 Nota operativa:
 - la sequenza esecutiva dettagliata e in [docs/ai-stack-execution-plan.md](./docs/ai-stack-execution-plan.md)
@@ -183,6 +184,10 @@ Nota operativa:
 - `WUL-135` rende il validator reviewable anche fuori dal terminale:
   persistenza locale canonica del verdict e report Markdown lane-aware,
   senza ancora introdurre API o superfici UI dedicate
+- `WUL-136`..`WUL-144` chiudono il resto operativo di `AI-08`:
+  surface read-only in `Settings`, coverage dedicata, guard notice sui modelli
+  selezionati e kill-switch locali productized per `patient_insight`,
+  `smart_import` e `document_synthesis`
 - nuove lane o sidecar AI richiedono corpus sintetico, benchmark dedicato e, se cambiano l'architettura, ADR esplicita prima dell'implementazione
 
 ### 0) Guardrail e operabilità minima (T00 + T05)

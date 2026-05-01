@@ -324,6 +324,11 @@ Runbook canonico:
 
 - [docs/ai-rollout-governance.md](./ai-rollout-governance.md)
 
+Stato implementativo:
+
+- chiuso come governance minima in `WUL-111` tramite i child `WUL-133`..`WUL-144`
+- nessuna promozione automatica delle lane `benchmark-only`
+
 ### Scope
 
 - shadow mode
@@ -339,6 +344,8 @@ Runbook canonico:
 - runbook lane-aware scritto su disco
 - validator CLI locale di readiness/rollout
 - artifact locali persistiti (`json` + `markdown`) per ogni verdict lane-aware
+- surface read-only in `Settings`, guard notice sui model selector e kill-switch
+  UI-driven per le lane productized
 
 ### Stop-rules
 

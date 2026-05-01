@@ -6,7 +6,12 @@
 
 # Runbook governance rollout AI
 
-Ultimo aggiornamento: 2026-04-02
+Ultimo aggiornamento: 2026-05-02
+
+Closeout `WUL-111`: la governance minima `AI-08` e chiusa come runbook,
+validator, artifact locali, surface read-only e kill-switch productized per le
+lane operative. Le lane `benchmark-only` restano fuori dal runtime finche non
+superano i gate lane-specific.
 
 ## Scopo
 
