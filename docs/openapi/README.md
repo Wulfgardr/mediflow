@@ -65,7 +65,7 @@ Se la risposta e `si`, la spec va aggiornata.
 4. Nella PR scrivi cosa e cambiato:
    - spec aggiornata
    - oppure `no contract impact`
-5. Se il cambio e breaking o deprecante, aggiorna prima ADR/PLANS/Linear.
+5. Se il cambio e breaking o deprecante, aggiorna prima ADR e piano di lavoro.
 6. Esegui `npm run check:openapi:drift` per verificare coverage, drift e breaking.
 
 ## Registro eccezioni e override
@@ -74,7 +74,7 @@ Se la risposta e `si`, la spec va aggiornata.
   fuori dalla slice OpenAPI pubblicata; una nuova operation `/api/v1` deve stare
   o nella spec o in questo registro
 - `breakingOverrides` nello stesso file e il punto unico per deroghe intenzionali:
-  ogni voce deve citare il change esatto bloccato dal guard e il Linear issue che
+  ogni voce deve citare il change esatto bloccato dal guard e la motivazione che
   la giustifica
 
 ## Versioning semplice

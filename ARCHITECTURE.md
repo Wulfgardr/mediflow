@@ -5,6 +5,7 @@ Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazion
 Per il resto:
 
 - [docs/walkthrough.md](./docs/walkthrough.md) (end-to-end, web + native)
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)
 - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (topologia dati + percorsi digitali end-to-end)
 - [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md) e [docs/system_architecture.md](./docs/system_architecture.md) (deep dive)
 - [docs/adr/](./docs/adr/README.md) (decisioni architetturali)
@@ -164,8 +165,11 @@ flowchart TB
   - retrocompatibile all'interno della stessa major
 - `local-only` come default e `network-home-base` come opt-in paired/read-only-first.
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
+- `Clinical Workbench / Graphite` resta l'unica shell web ufficiale su `main`;
+  nuove sperimentazioni non diventano selector runtime persistiti senza
+  workstream e decisione espliciti.
 - Principio local-only: nessuna dipendenza cloud di default.
-- Boundary SISS/FSE: oggi orchestrazione locale + percorsi ufficiali; niente claim
+- Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
 
 ---

@@ -2,13 +2,7 @@
 
 > **Dove siamo e dove vogliamo andare.**
 > v0.5.0 (release corrente) — Marzo 2026
-> Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
-
-> [!NOTE]
-> Per chi arriva dalla `v0.3` pubblica, il salto da leggere oggi è `0.3 -> 0.5`.
-> `v0.4.0` resta una tappa tecnica decisiva, ma non è più la cornice narrativa giusta per il frontespizio del progetto.
-
----
+> Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 ## Fatto (v0.3.0)
 
@@ -54,6 +48,11 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ## In corso (post-v0.5)
 
+La lettura operativa piu completa del ciclo post-v0.5 e ora
+[docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
+roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
+boundary, document intelligence, home-base, Apple clients e split private/OSS.
+
 ### Modalita network home-base
 
 * **Nodo centrale locale**: pairing esplicito, capability discovery e primo data plane read-only sono gia entrati su `main`; restano da estendere UX, replica e write boundary.
@@ -67,15 +66,22 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Esperienza nativa
 
-* **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
-* **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
-* **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
+* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
+* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con cache locale cifrata e nessun accesso diretto al file SQLite del Mac.
 
-### Profili locali di preview
+### Shell ufficiale e sperimentazioni controllate
 
-* **Preview profilo interfaccia**: confronto tra baseline clinica e direzione `Liquid`.
-* **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
-* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
+* **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
+* **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
+* **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
+* **Guardrail locali**: revision fingerprint, `/api/system/revision` e reset `.next` source-aware riducono il rischio di testare una shell stale.
+
+### SISS/FSE e base documentale regionale
+
+* **Boundary attuale**: MediFlow prepara il contesto e richiama percorsi ufficiali; il prescrittivo resta `webapp-assisted` e non una UI regionale custom dentro MediFlow.
+* **Corpus locale SISS/FSE**: manifest sorgenti, fetch/sync incrementale e report di freschezza sono gia su `main` come base di lavoro documentale, fuori dal runtime clinico.
+* **Integrazione piu profonda**: prima di codice runtime servono scenari approvati, qualifica/provisioning coerenti con `SSI/A2A` e documentazione scenario-specific verificabile.
 
 ### Interazione vocale
 
