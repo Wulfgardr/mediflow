@@ -30,6 +30,8 @@
     "test:ai-context": "bash scripts/ai-context-test.sh",
     "test:document-insight-context": "bash scripts/document-insight-context-test.sh",
     "test:document-synthesis": "bash scripts/document-synthesis-service-test.sh",
+    "plan:document-evidence-backfill": "bash scripts/document-evidence-backfill-plan.sh",
+    "plan:document-evidence-backfill:live": "bash scripts/document-evidence-backfill-live-db.sh",
     "test:ai-task-contracts": "bash scripts/ai-task-contracts-test.sh",
     "test:report-service": "bash scripts/report-service-test.sh",
     "test:fse-validation": "bash scripts/fse-validation-test.sh",

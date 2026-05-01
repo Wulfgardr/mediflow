@@ -43,6 +43,7 @@ Documenti da consultare **al bisogno**:
 - Piano esecutivo work-package per affidabilita AI: [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md)
 - Runbook governance rollout AI: [docs/ai-rollout-governance.md](./ai-rollout-governance.md)
 - Runbook `cloud comparator shadow eval`: [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md)
+- Protocollo dialogo design-time Codex/Opus: [docs/codex-opus-dialogue.md](./codex-opus-dialogue.md)
 
 ## Ordine di lettura consigliato
 
@@ -96,6 +97,7 @@ Documenti da consultare **al bisogno**:
 | Troubleshooting documentale `AI Patient Insight` | [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md) | `SECONDARY` | Runbook locale per diagnosticare e recuperare i casi in cui allegati PDF o diario clinico non entrano correttamente nel contesto o nel render finale di `Patient Insight`. |
 | Document intelligence lab | [docs/document-intelligence-lab.md](./document-intelligence-lab.md) | `SECONDARY` | Nota operativa per strutturare corpus documentali multi-archetipo e distinguere il corpus canonico `synthetic-only` dal vault locale privato di shadow evaluation. |
 | Runbook cloud comparator shadow eval | [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md) | `SECONDARY` | Workflow opt-in per confrontare baseline locale e `gpt-5.4` su case pack privati redatti/minimizzati, con report lane-specific, tassonomia di distillazione, `localEvolutionAgenda` e review strutturato dell approccio documentale. |
+| Protocollo dialogo Codex/Opus | [docs/codex-opus-dialogue.md](./codex-opus-dialogue.md), [docs/dialogue/](./dialogue/2026-04-24-ai-intelligence-stack-optimization.md) | `SECONDARY` | Protocollo design-time per usare Opus/Claude come reviewer dello stack intelligence senza introdurre dipendenze runtime, PHI in repo o promozioni fuori benchmark. |
 | Stato affidabilita stack AI | [docs/ai-stack-reliability-review.md](./ai-stack-reliability-review.md) | `SECONDARY` | Dossier tecnico trasversale sullo stato reale delle lane AI, sui problemi incontrati, sui benchmark eseguiti e sul piano di hardening coerente con le ADR correnti. |
 | Piano esecutivo affidabilita AI | [docs/ai-stack-execution-plan.md](./ai-stack-execution-plan.md) | `SECONDARY` | Traduzione operativa del dossier AI in work package, dipendenze, exit criteria e stop-rules per portare a terra benchmarking, hardening e rollout delle lane AI. |
 | Governance rollout AI | [docs/ai-rollout-governance.md](./ai-rollout-governance.md) | `CANONICAL` | Runbook lane-aware per shadow mode, fallback, rollback e kill-switch delle lane AI locali prima di qualunque promozione prudente. |
