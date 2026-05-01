@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-04-26
+Ultimo aggiornamento: 2026-05-01
 
 ## Percorso di lettura consigliato
 
@@ -36,6 +36,7 @@ Approfondimenti utili:
 | Tema | File canonico | Stato | Note |
 | --- | --- | --- | --- |
 | Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Punto di ingresso generale. |
+| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e split private/OSS. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Confini e principi che cambiano raramente. |
 | Sicurezza e redazione dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Policy di sicurezza, threat model, logging rules. |
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |

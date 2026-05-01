@@ -3,6 +3,10 @@
 > Cartella clinica territoriale local-first.
 > Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 
+![Render reale della nuova interfaccia Clinical Workbench senza dati paziente](./screenshot.png)
+
+_Render reale dell'interfaccia attuale, catturato su un database temporaneo vuoto senza dati paziente._
+
 ## Perché MediFlow
 
 MediFlow nasce dal lavoro reale con i pazienti, non da un esercizio teorico.
@@ -75,6 +79,7 @@ Open source, in questo caso, significa soprattutto:
 ## Documentazione
 
 - [FAQ](./docs/FAQ.md)
+- [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md)
 - [Roadmap](./docs/ROADMAP.md)
 - [Compliance](./docs/COMPLIANCE.md)
 - [Document map](./docs/README.md)

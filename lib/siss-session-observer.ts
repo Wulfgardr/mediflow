@@ -130,7 +130,7 @@ export function buildSissSessionStatusFromHistory(
         status: rows.length > 0 ? 'available' : 'unavailable',
         source: 'atlas-history',
         checkedAt: now.toISOString(),
-        browserProfile: options.browserProfile ? 'local' : null,
+        browserProfile: options.browserProfile ?? null,
         warning: options.warning ?? null,
         sessionHealth: resolveSissSessionHealth(sessionObservedAt, now),
         lastModule,
@@ -247,7 +247,7 @@ function readRelevantAtlasHistoryRows(): AtlasHistorySource {
 export function readSissSessionStatusFromAtlasHistory(): SissSessionStatusResponse {
     const source = readRelevantAtlasHistoryRows();
     return buildSissSessionStatusFromHistory(source.rows, {
-        browserProfile: source.browserProfile ? 'local' : null,
+        browserProfile: source.browserProfile,
         warning: source.warning,
     });
 }

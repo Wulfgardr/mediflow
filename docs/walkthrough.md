@@ -26,6 +26,7 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 - Riassumere sicurezza, cifratura e trasporto locale.
 
 Se serve il dettaglio di singoli moduli, consulta anche:
+- [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
 - [docs/system_architecture.md](./system_architecture.md)
 - [docs/native-setup.md](./native-setup.md)

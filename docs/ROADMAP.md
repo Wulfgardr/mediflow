@@ -2,7 +2,7 @@
 
 > **Dove siamo e dove vogliamo andare.**
 > v0.5.0 (release corrente) — Marzo 2026
-> Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
+> Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 ## Fatto (v0.3.0)
 
@@ -47,6 +47,11 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 ---
 
 ## In corso (post-v0.5)
+
+La lettura operativa piu completa del ciclo post-v0.5 e ora
+[docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
+roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
+boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Modalita network home-base
 

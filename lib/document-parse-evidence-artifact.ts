@@ -9,6 +9,7 @@ import {
     type BuildDocumentEvidencePackInput,
     type DocumentEvidenceFact,
     type DocumentEvidencePack,
+    type DocumentEvidenceSourceGovernance,
 } from './document-evidence-pack';
 
 /* @Codex */
@@ -35,6 +36,7 @@ export interface DocumentParseEvidenceArtifact {
     };
     evidenceMemory: {
         facts: DocumentEvidenceFact[];
+        sourceGovernance?: DocumentEvidenceSourceGovernance;
     };
 }
 
@@ -101,6 +103,7 @@ export function buildDocumentParseEvidenceArtifact(
         },
         evidenceMemory: {
             facts: evidencePack.facts,
+            sourceGovernance: evidencePack.sourceGovernance,
         },
     };
 }
@@ -118,6 +121,7 @@ export function projectDocumentEvidencePack(
             qualityLevel: artifact.source.qualityLevel,
         },
         facts: artifact.evidenceMemory.facts,
+        sourceGovernance: artifact.evidenceMemory.sourceGovernance,
     };
 }
 
@@ -185,6 +189,12 @@ export function parseDocumentParseEvidenceArtifactSnapshot(
         || typeof parsed.parseBundle.parserDiagnostics.rawTextChars !== 'number'
         || typeof parsed.parseBundle.parserDiagnostics.lineCount !== 'number'
         || !Array.isArray(parsed.evidenceMemory.facts)
+    ) {
+        return undefined;
+    }
+    if (
+        parsed.evidenceMemory.sourceGovernance !== undefined
+        && !isRecord(parsed.evidenceMemory.sourceGovernance)
     ) {
         return undefined;
     }

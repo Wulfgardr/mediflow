@@ -35,12 +35,9 @@ function applySqlMigrations(db, projectRoot) {
 }
 
 function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath) {
-  if (fs.existsSync(dbPath)) {
-    fs.rmSync(dbPath, { force: true });
-  }
+  if (fs.existsSync(dbPath)) return;
 
-  const copyLegacyDb = process.env.MEDIFLOW_E2E_COPY_LEGACY_DB === '1';
-  if (copyLegacyDb && fs.existsSync(legacyDbPath)) {
+  if (fs.existsSync(legacyDbPath)) {
     fs.copyFileSync(legacyDbPath, dbPath);
     return;
   }

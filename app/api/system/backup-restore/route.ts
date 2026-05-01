@@ -14,6 +14,7 @@ import {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    sissHandoffEvents,
     therapies,
 } from '@/lib/schema';
 import {
@@ -38,6 +39,7 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'attachments',
     'observations',
     'prostheticPrescriptions',
+    'sissHandoffs',
     'checkups',
     'therapies',
     'entries',
@@ -59,6 +61,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'checkups',
     'observations',
     'prostheticPrescriptions',
+    'sissHandoffs',
     'attachments',
     'messages',
 ];
@@ -76,6 +79,7 @@ const TABLES = {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    sissHandoffs: sissHandoffEvents,
     therapies,
 } as const;
 
@@ -91,6 +95,7 @@ const TABLE_LOOKUP = {
     observations,
     patients,
     prostheticPrescriptions,
+    sissHandoffs: sissHandoffEvents,
     therapies,
 } as const;
 
@@ -108,6 +113,7 @@ type InsertableTable =
     | typeof patients
     | typeof patientsToAmbulatories
     | typeof prostheticPrescriptions
+    | typeof sissHandoffEvents
     | typeof therapies;
 
 type PatientAmbulatoryLinkRow = {
@@ -178,6 +184,7 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observationsRows,
         patientsRows,
         prostheticPrescriptionRows,
+        sissHandoffRows,
         checkupsRows,
         therapiesRows,
         patientAmbulatoryRows,
@@ -192,6 +199,7 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         dbServer.select().from(observations),
         dbServer.select().from(patients),
         dbServer.select().from(prostheticPrescriptions),
+        dbServer.select().from(sissHandoffEvents),
         dbServer.select().from(checkups),
         dbServer.select().from(therapies),
         dbServer.select().from(patientsToAmbulatories),
@@ -226,6 +234,7 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
         patients: sortBackupRows(enrichedPatients),
         prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
+        sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
         checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
         therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
     };
@@ -242,6 +251,8 @@ const DATE_FIELDS = new Set([
     'observedAt',
     'prescribedAt',
     'startDate',
+    'startedAt',
+    'completedAt',
     'updatedAt',
 ]);
 
@@ -399,6 +410,11 @@ export async function POST(request: Request) {
 
                 if (collection === 'prostheticPrescriptions') {
                     insertRows(tx, TABLE_LOOKUP.prostheticPrescriptions, artifact.payload.prostheticPrescriptions);
+                    continue;
+                }
+
+                if (collection === 'sissHandoffs') {
+                    insertRows(tx, TABLE_LOOKUP.sissHandoffs, artifact.payload.sissHandoffs);
                     continue;
                 }
 

@@ -63,17 +63,11 @@ try {
 /* @Codex */
 try {
     ensureColumn('entries', 'title', "title TEXT NOT NULL DEFAULT 'Voce clinica'");
-    /* @Codex */
     ensureColumn('entries', 'setting', 'setting TEXT');
-    /* @Codex */
     ensureColumn('entries', 'metadata', 'metadata TEXT');
-    /* @Codex */
     ensureColumn('entries', 'attachments', 'attachments TEXT');
-    /* @Codex */
     ensureColumn('entries', 'deleted_at', 'deleted_at INTEGER');
-    /* @Codex */
     ensureColumn('entries', 'deletion_reason', 'deletion_reason TEXT');
-    /* @Codex */
     ensureColumn('entries', 'updated_at', 'updated_at INTEGER');
 } catch (error) {
     console.warn('[MediFlow] Entries schema check skipped:', error);
@@ -191,6 +185,32 @@ try {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();
 } catch (error) {
     console.warn('[MediFlow] Prosthetic prescriptions schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS siss_handoff_events (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            module_label TEXT NOT NULL,
+            reason TEXT,
+            started_at INTEGER NOT NULL,
+            completed_at INTEGER,
+            outcome TEXT NOT NULL DEFAULT 'started',
+            next_action TEXT,
+            notes TEXT,
+            correlation_id TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_patient_idx ON siss_handoff_events(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_started_idx ON siss_handoff_events(started_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_outcome_idx ON siss_handoff_events(outcome)').run();
+} catch (error) {
+    console.warn('[MediFlow] SISS handoff events schema check skipped:', error);
 }
 /* @Codex */
 try {

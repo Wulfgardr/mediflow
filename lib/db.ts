@@ -62,8 +62,8 @@ export interface Patient {
     caregiver?: string;
     updatedAt: Date;
     createdAt: Date;
-    deletedAt?: Date | null;
-    deletionReason?: string | null;
+    deletedAt?: Date;
+    deletionReason?: string;
     aiSummary?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
     /* @Codex */
@@ -116,6 +116,26 @@ export interface ClinicalEntry {
     setting?: 'home' | 'hospital' | 'ambulatory';
 }
 
+/* @Codex */
+export type SissHandoffOutcome = 'started' | 'completed' | 'blocked' | 'cancelled';
+
+/* @Codex */
+export interface SissHandoffEvent {
+    id: string;
+    patientId: string;
+    action: string;
+    moduleLabel: string;
+    reason?: string;
+    startedAt: Date;
+    completedAt?: Date;
+    outcome: SissHandoffOutcome;
+    nextAction?: string;
+    notes?: string;
+    correlationId?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
@@ -127,6 +147,8 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     observations: ['notes'],
     /* @Codex */
     prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
+    /* @Codex */
+    siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
     /* @Codex */
@@ -406,6 +428,10 @@ class ApiTable<T> {
         if (obj.prescribedAt) obj.prescribedAt = new Date(obj.prescribedAt);
         /* @Codex */
         if (obj.collaudoAt) obj.collaudoAt = new Date(obj.collaudoAt);
+        /* @Codex */
+        if (obj.startedAt) obj.startedAt = new Date(obj.startedAt);
+        /* @Codex */
+        if (obj.completedAt) obj.completedAt = new Date(obj.completedAt);
         return obj;
     }
 
@@ -476,6 +502,8 @@ class MedicalApiClient {
     observations: ApiTable<Observation>;
     /* @Codex */
     prostheticPrescriptions: ApiTable<ProstheticPrescription>;
+    /* @Codex */
+    sissHandoffs: ApiTable<SissHandoffEvent>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
     checkups: ApiTable<Checkup>;
@@ -498,6 +526,8 @@ class MedicalApiClient {
         this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
         /* @Codex */
         this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
+        /* @Codex */
+        this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
         this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);

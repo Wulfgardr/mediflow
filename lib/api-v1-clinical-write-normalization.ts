@@ -73,9 +73,12 @@ type CheckupCreateValues = {
     title: string;
     notes: string | null;
     status: 'pending' | 'completed' | 'cancelled';
-    source: string;
+    source: CheckupSource;
     createdAt: Date;
 };
+
+/* @Codex */
+export type CheckupSource = 'manual' | 'ai_suggestion';
 
 /* @Codex */
 function isNonEmptyString(value: unknown): value is string {
@@ -211,6 +214,32 @@ function normalizeOptionalEntrySetting(value: unknown): WriteNormalizationResult
     }
 
     return normalizeEntrySetting(value);
+}
+
+/* @Codex */
+export function normalizeCheckupSource(value: unknown): WriteNormalizationResult<CheckupSource> {
+    if (value === undefined || value === null || value === '') {
+        return { ok: true, values: 'manual' };
+    }
+
+    if (value === 'manual' || value === 'ai_suggestion') {
+        return { ok: true, values: value };
+    }
+
+    return { ok: false, error: 'Invalid source' };
+}
+
+/* @Codex */
+export function normalizeOptionalCheckupSource(value: unknown): WriteNormalizationResult<CheckupSource | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    if (value === null || value === '') {
+        return { ok: true, values: null };
+    }
+
+    return normalizeCheckupSource(value);
 }
 
 /* @Codex */
@@ -409,9 +438,7 @@ export function normalizeCheckupCreateInput(
         return { ok: false, error: 'Invalid checkup status' };
     }
 
-    const source: WriteNormalizationResult<string> = input.source === undefined || input.source === null
-        ? { ok: true, values: 'manual' }
-        : parseRequiredString(input.source, 'source');
+    const source = normalizeCheckupSource(input.source);
     if (!source.ok) return source;
 
     return {

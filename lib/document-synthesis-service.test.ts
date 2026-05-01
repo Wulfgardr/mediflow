@@ -7,7 +7,9 @@ import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
+    parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentEvidencePack,
+    serializeDocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
 
 test('parses explicit medications from the model JSON payload', () => {
@@ -208,6 +210,9 @@ test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence ch
 
     const evaluation = evaluateDocumentParseEvidenceArtifact(casePack, artifact);
     const evidencePack = projectDocumentEvidencePack(artifact);
+    const parsedArtifact = parseDocumentParseEvidenceArtifactSnapshot(
+        serializeDocumentParseEvidenceArtifact(artifact),
+    );
 
     assert.deepEqual(evaluation.missingKinds, []);
     assert.deepEqual(evaluation.leakedNegativeAssertions, []);
@@ -217,9 +222,31 @@ test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence ch
     );
     assert.equal(artifact.source.attachmentId, 'attachment-1');
     assert.equal(artifact.parseBundle.parserDiagnostics.lineCount, 1);
+    assert.ok(artifact.evidenceMemory.sourceGovernance);
+    assert.equal(artifact.evidenceMemory.sourceGovernance.freshness, 'recent');
+    assert.match(
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.map((candidate) => candidate.label).join('\n'),
+        /carcinoma mammario/i,
+    );
+    assert.match(
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.map((candidate) => candidate.label).join('\n'),
+        /frattura di polso/i,
+    );
+    assert.equal(
+        parsedArtifact?.evidenceMemory.sourceGovernance?.suppressedCandidates.length,
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.length,
+    );
     assert.equal(evidencePack.facts.length, artifact.evidenceMemory.facts.length);
+    assert.equal(
+        evidencePack.sourceGovernance?.suppressedCandidates.length,
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.length,
+    );
     assert.match(
         evidencePack.facts.map((fact) => fact.label).join('\n'),
         /Frattura pertrocanterica del femore sinistro/,
+    );
+    assert.doesNotMatch(
+        evidencePack.facts.map((fact) => fact.label).join('\n'),
+        /Carcinoma mammario|frattura di polso/i,
     );
 });

@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     normalizeCheckupCreateInput,
+    normalizeOptionalCheckupSource,
     normalizeEntryCreateInput,
     normalizeEntryUpdateInput,
     normalizeTherapyCreateInput,
@@ -167,9 +168,32 @@ test('normalizeCheckupCreateInput rejects invalid required fields and invalid st
 
     assert.deepEqual(
         normalizeCheckupCreateInput(
-            { date: '2026-04-04', title: 'Controllo', source: 7 },
+            { date: '2026-04-04', title: 'Controllo', source: 'external' },
             { id: 'checkup-1', patientId: 'patient-1' },
         ),
         { ok: false, error: 'Invalid source' },
     );
+});
+
+test('normalizeCheckupCreateInput keeps checkup source in the manual or ai_suggestion domain', () => {
+    const manualResult = normalizeCheckupCreateInput(
+        { date: '2026-04-04', title: 'Controllo' },
+        { id: 'checkup-1', patientId: 'patient-1' },
+    );
+    assert.equal(manualResult.ok, true);
+    if (!manualResult.ok) return;
+    assert.equal(manualResult.values.source, 'manual');
+
+    const aiResult = normalizeCheckupCreateInput(
+        { date: '2026-04-04', title: 'Controllo', source: 'ai_suggestion' },
+        { id: 'checkup-1', patientId: 'patient-1' },
+    );
+    assert.equal(aiResult.ok, true);
+    if (!aiResult.ok) return;
+    assert.equal(aiResult.values.source, 'ai_suggestion');
+
+    assert.deepEqual(normalizeOptionalCheckupSource(undefined), { ok: true, values: undefined });
+    assert.deepEqual(normalizeOptionalCheckupSource(null), { ok: true, values: null });
+    assert.deepEqual(normalizeOptionalCheckupSource('manual'), { ok: true, values: 'manual' });
+    assert.deepEqual(normalizeOptionalCheckupSource('ai'), { ok: false, error: 'Invalid source' });
 });

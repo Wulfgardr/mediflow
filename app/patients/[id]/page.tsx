@@ -15,6 +15,7 @@ import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
+import SissHandoffDiary from '@/components/siss-handoff-diary';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
 import Timeline from '@/components/timeline';
@@ -225,6 +226,8 @@ export default function PatientDetailPage() {
                         patientId={id}
                         patientTaxCode={patient.taxCode}
                     />
+
+                    <SissHandoffDiary patientId={id} />
 
                     <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

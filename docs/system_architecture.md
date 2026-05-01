@@ -6,6 +6,7 @@
 > Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
 
 Panoramica tecnica rapida aggiornata allo stato reale di `main`.
+Per la lettura completa e trasversale usa [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
 Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
 
@@ -134,4 +135,4 @@ clinica quando diagnosi/terapie sono gia presenti.
 
 ---
 
-*Ultimo aggiornamento: 2026-04-26 — main corrente*
+*Ultimo aggiornamento: 2026-05-01 — main corrente*
