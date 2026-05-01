@@ -56,7 +56,7 @@ test('buildSissSessionStatusFromHistory summarizes remote-sign and last module w
     );
 
     assert.equal(status.status, 'available');
-    assert.equal(status.browserProfile, 'local');
+    assert.equal(status.browserProfile, 'Default');
     assert.equal(status.sessionHealth, 'recent');
     assert.equal(status.lastModule, 'fse');
     assert.equal(status.lastModuleLabel, 'FSE OpeFseIE');

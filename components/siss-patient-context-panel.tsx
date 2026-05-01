@@ -11,6 +11,8 @@ import { buildSissPatientContextSummary, type SissPatientContextAction } from '@
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
+import { db } from '@/lib/db';
+/* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
     type SissSessionCheckpoint,
@@ -154,7 +156,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         validation: null,
     });
     const [sessionStatus, setSessionStatus] = useState<SessionStatusState>({
-        loading: false,
+        loading: true,
         error: null,
         status: null,
     });
@@ -238,6 +240,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
 
     useEffect(() => {
         void refreshFseReadiness();
+        void refreshSessionStatus();
     }, [patientId]);
 
     const startFlow = async (action: SissPatientContextAction) => {
@@ -303,6 +306,25 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 message: `${payload.title}: ${handoffResult.message}`,
                 correlationId: payload.correlationId,
             });
+
+            if (handoffResult.opened) {
+                const actionConfig = ACTIONS.find((item) => item.action === action);
+                const now = new Date();
+                void db.sissHandoffs.add({
+                    id: crypto.randomUUID(),
+                    patientId,
+                    action,
+                    moduleLabel: actionConfig?.label ?? payload.title,
+                    reason: 'Handoff avviato dal pannello contesto paziente SISS.',
+                    startedAt: now,
+                    outcome: 'started',
+                    correlationId: payload.correlationId,
+                    createdAt: now,
+                    updatedAt: now,
+                }).catch((logError) => {
+                    console.warn('[MediFlow] SISS handoff diary write failed:', logError);
+                });
+            }
         } catch (error) {
             popupWindow.close();
             setFeedback({
@@ -470,7 +492,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                 </span>
                             )}
                             <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-500">
-                                Fonte: Atlas locale
+                                Fonte: {sessionData.browserProfile ? `Atlas ${sessionData.browserProfile}` : 'Atlas locale'}
                             </span>
                         </div>
 
@@ -508,11 +530,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                             <p className="mt-3 text-xs font-medium text-amber-700">{sessionData.warning}</p>
                         )}
                     </>
-                ) : (
-                    <p className="mt-3 text-xs leading-5 text-slate-500">
-                        La cronologia Atlas locale non viene letta automaticamente. Usa il controllo manuale quando serve verificare una sessione SISS recente.
-                    </p>
-                )}
+                ) : null}
             </div>
 
             <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">

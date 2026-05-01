@@ -174,3 +174,73 @@ test('buildDocumentEvidencePack extracts follow-up from CDA-like XML narrative',
     assert.match(lines, /Follow-up documentato: Controllo ortopedico tra 14 giorni/i);
     assert.match(lines, /Setting assistenziale: ADI infermieristica da proseguire/i);
 });
+
+test('buildDocumentEvidencePack records suppressed candidates without rendering them as facts', () => {
+    const pack = buildDocumentEvidencePack({
+        documentInsightId: 'doc-6',
+        fileName: 'lettera-con-rumore.pdf',
+        documentDate: '2026-03-20T00:00:00.000Z',
+        qualityLevel: 'green',
+        summary: 'Valutazione respiratoria con problema corrente e rumore anamnestico.',
+        rawMarkdown: [
+            'Diagnosi attuale: BPCO riacutizzata.',
+            'Anamnesi remota: pregressa frattura di polso destro guarita.',
+            'Familiarita: madre con carcinoma mammario.',
+            'Non evidenza di embolia polmonare.',
+        ].join('\n'),
+        diagnoses: [
+            {
+                code: 'J44.1',
+                description: 'BPCO riacutizzata',
+                system: 'ICD-10',
+                evidence: 'Diagnosi attuale: BPCO riacutizzata.',
+                confidence: 'high',
+            },
+            {
+                code: 'C50',
+                description: 'Carcinoma mammario materno',
+                system: 'ICD-10',
+                evidence: 'Familiarita: madre con carcinoma mammario.',
+                confidence: 'medium',
+            },
+            {
+                code: 'S62.1',
+                description: 'Pregressa frattura di polso destro',
+                system: 'ICD-10',
+                evidence: 'Anamnesi remota: pregressa frattura di polso destro guarita.',
+                confidence: 'medium',
+            },
+            {
+                code: 'I26',
+                description: 'Embolia polmonare',
+                system: 'ICD-10',
+                evidence: 'Non evidenza di embolia polmonare.',
+                confidence: 'medium',
+            },
+        ],
+        medications: [],
+    });
+
+    assert.ok(pack.sourceGovernance);
+    assert.equal(pack.sourceGovernance.freshness, 'recent');
+    assert.ok(pack.sourceGovernance.sourcePriority > 0);
+    const suppressedReasons = new Set(pack.sourceGovernance.suppressedCandidates.map((candidate) => candidate.reason));
+    assert.ok(suppressedReasons.has('family_history'));
+    assert.ok(suppressedReasons.has('historical_only'));
+    assert.ok(suppressedReasons.has('negated'));
+    assert.match(
+        pack.sourceGovernance.suppressedCandidates.map((candidate) => candidate.label).join('\n'),
+        /carcinoma mammario/i,
+    );
+
+    const renderedFacts = pack.facts.map((fact) => fact.label).join('\n');
+    assert.match(renderedFacts, /BPCO riacutizzata/i);
+    assert.doesNotMatch(renderedFacts, /Carcinoma mammario/i);
+    assert.doesNotMatch(renderedFacts, /frattura di polso/i);
+    assert.doesNotMatch(renderedFacts, /Embolia polmonare/i);
+
+    const context = renderDocumentEvidencePackContext(pack, 400);
+    assert.match(context, /BPCO riacutizzata/i);
+    assert.doesNotMatch(context, /Carcinoma mammario/i);
+    assert.doesNotMatch(context, /Embolia polmonare/i);
+});

@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-document-evidence-backfill-cli",
+    "rootDir": ".",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "scripts/document-evidence-backfill.ts",
+    "scripts/document-evidence-backfill-live-db.ts",
+    "lib/document-evidence-backfill.ts",
+    "lib/document-parse-evidence-artifact.ts",
+    "lib/document-evidence-pack.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next/**/*",
+    "tmp-*/**/*"
+  ]
+}

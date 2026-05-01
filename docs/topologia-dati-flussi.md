@@ -13,6 +13,7 @@ Questo documento mappa in modo operativo:
 - quali controlli di sicurezza lo proteggono
 
 Riferimenti rapidi:
+- [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - [docs/walkthrough.md](./walkthrough.md)
 - [docs/README.md](./README.md)
 - [docs/markdown-index.md](./markdown-index.md)

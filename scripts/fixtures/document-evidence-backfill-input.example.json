@@ -1,0 +1,36 @@
+[
+  {
+    "id": "synthetic-attachment-1",
+    "patientId": "synthetic-patient-alpha",
+    "fileName": "followup-letter.pdf",
+    "createdAt": "2026-03-20T00:00:00.000Z",
+    "summarySnapshot": "Indicazioni di follow-up: controllo cardiologico tra sei mesi. ADI infermieristica da proseguire.",
+    "qualityStatus": "green"
+  },
+  {
+    "id": "synthetic-attachment-2",
+    "patientId": "synthetic-patient-alpha",
+    "fileName": "rehab-report.pdf",
+    "createdAt": "2026-03-21T00:00:00.000Z",
+    "summarySnapshot": "Nessuna informazione rilevante trovata.",
+    "rawMarkdown": "Relazione fisiatrica. Deambulazione con ausilio. Proseguire FKT domiciliare.",
+    "qualityStatus": "green"
+  },
+  {
+    "id": "synthetic-attachment-3",
+    "patientId": "synthetic-patient-beta",
+    "fileName": "empty-scan.pdf",
+    "createdAt": "2026-03-22T00:00:00.000Z",
+    "summarySnapshot": "Nessuna informazione rilevante trovata.",
+    "qualityStatus": "red",
+    "qualityReason": "Synthetic unreadable scan."
+  },
+  {
+    "id": "synthetic-attachment-4",
+    "patientId": "synthetic-patient-beta",
+    "fileName": "invalid-artifact.pdf",
+    "createdAt": "2026-03-23T00:00:00.000Z",
+    "summarySnapshot": "Visita fisiatrica: proseguire FKT domiciliare e rivalutazione tra trenta giorni.",
+    "parseEvidenceArtifactSnapshot": "{invalid"
+  }
+]

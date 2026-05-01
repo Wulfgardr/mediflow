@@ -13,6 +13,7 @@ export const BACKUP_COLLECTIONS = [
     'observations',
     'patients',
     'prostheticPrescriptions',
+    'sissHandoffs',
     'checkups',
     'therapies',
 ] as const;
@@ -182,7 +183,7 @@ function assertCollectionReferences(payload: BackupDataset): void {
         }
     }
 
-    const patientDependentCollections: BackupCollectionName[] = ['attachments', 'checkups', 'entries', 'observations', 'prostheticPrescriptions', 'therapies'];
+    const patientDependentCollections: BackupCollectionName[] = ['attachments', 'checkups', 'entries', 'observations', 'prostheticPrescriptions', 'sissHandoffs', 'therapies'];
     for (const collection of patientDependentCollections) {
         for (const item of payload[collection]) {
             if (typeof item.patientId !== 'string' || !patientIds.has(item.patientId)) {

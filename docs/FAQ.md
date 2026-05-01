@@ -2,6 +2,7 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (FAQ pubblica e orientamento rapido).**
+> Per una lettura completa parti da [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 > Per i confini canonici valgono sempre [ARCHITECTURE.md](../ARCHITECTURE.md), [SECURITY.md](../SECURITY.md), [docs/ROADMAP.md](./ROADMAP.md) e [docs/walkthrough.md](./walkthrough.md).
 
 ## MediFlow è cloud?
@@ -22,6 +23,10 @@ Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se 
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
 `v0.4` resta una tappa tecnica importante; `v0.5` è la baseline più chiara per capire lo stato attuale del progetto.
+
+Per il quadro dettagliato, inclusi runtime reale, home-base, document
+intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
+[docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
 ## Posso usarlo su Mac, iPad o iPhone?
 
