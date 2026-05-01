@@ -41,6 +41,7 @@
     "test:patient-write-normalization": "bash scripts/patient-write-normalization-test.sh",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
+    "check:audit-quality-gate": "node scripts/audit-quality-gate.mjs",
     "test:audit": "bash scripts/audit-test.sh",
     "benchmark:clinical-facts:observations": "node --experimental-strip-types scripts/benchmark-observation-facts.mjs",
     "benchmark:icd-resolver": "node --experimental-strip-types scripts/benchmark-icd-resolver.ts",

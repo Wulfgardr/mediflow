@@ -11,3 +11,4 @@ cat <<'EOF' > "$OUT_DIR/node_modules/server-only/index.js"
 module.exports = {};
 EOF
 node --test "$OUT_DIR/audit.test.js"
+node "$ROOT_DIR/scripts/audit-quality-gate.mjs"
