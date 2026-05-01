@@ -10,18 +10,31 @@ const TARGET_DIR = path.resolve(process.env.MEDIFLOW_OSS_TARGET_DIR || DEFAULT_T
 // Config
 const TO_EXCLUDE_BY_NAME = [
     '.git',
+    '.build',
     'node_modules',
     '.next',
+    '.next-manual-browser',
+    '.playwright-cli',
     '.vscode',
     '.DS_Store',
     '__pycache__',
     '.env',
     '.env.local',
+    '.venv_mlx',
+    '.venv_openmed',
+    'Build',
+    'certs',
     'oss-assets',
     'brain',
     '.gemini',
     'Farmaci',
-    'medical.db'
+    'medical.db',
+    'next-env.d.ts',
+    'playwright-report',
+    'test-results',
+    'tmp',
+    'tsconfig.tsbuildinfo',
+    'tsconfig.typecheck.tsbuildinfo'
 ];
 
 const TO_EXCLUDE_BY_PATH = [
@@ -35,6 +48,8 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/clinical-entities-benchmark.md',
     'docs/clinical-facts-benchmark-observations.md',
     'docs/cloud-comparator-shadow-eval.md',
+    'docs/codex-opus-dialogue.md',
+    'docs/dialogue',
     'docs/document-intelligence-lab.md',
     'docs/e2e-smoke.md',
     'docs/adr/0027-ai-task-extraction-envelope-and-local-render.md',
@@ -85,7 +100,8 @@ const TO_EXCLUDE_FILE_EXTENSIONS = [
 
 const TO_EXCLUDE_RUNTIME_DIR_PATTERNS = [
     /^tmp-/,
-    /^\.next$/
+    /^\.next/,
+    /^\.venv/
 ];
 
 const REPLACEMENTS = [
