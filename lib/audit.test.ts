@@ -13,6 +13,7 @@ import {
     withAuditContextMetadata,
     type AuditRecord,
 } from './audit';
+import { hasValidLocalApiToken } from './local-api-auth';
 
 function buildAuditRecord(overrides: Partial<AuditRecord>): AuditRecord {
     return {
@@ -195,6 +196,55 @@ test('auditContextFromRequest marks shared routes as native only when a valid lo
         delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
     } else {
         process.env.MEDIFLOW_LOCAL_API_TOKEN = previousToken;
+    }
+});
+
+test('local API token auth accepts Bearer and legacy headers but rejects raw Authorization tokens', () => {
+    const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    process.env.MEDIFLOW_LOCAL_API_TOKEN = 'test-local-token';
+
+    try {
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'Bearer test-local-token',
+                },
+            })),
+            true,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'test-local-token',
+                },
+            })),
+            false,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    'x-mediflow-token': 'test-local-token',
+                },
+            })),
+            true,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'Bearer wrong-token',
+                },
+            })),
+            false,
+        );
+    } finally {
+        if (previousToken === undefined) {
+            delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
+        } else {
+            process.env.MEDIFLOW_LOCAL_API_TOKEN = previousToken;
+        }
     }
 });
 
