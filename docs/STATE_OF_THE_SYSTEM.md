@@ -38,7 +38,7 @@ La fotografia corrente e questa:
   `/api/v1/network/*` read-only verso client paired su rete fidata.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
-  artifact cifrati `parse/evidence`.
+  artifact cifrati `parse/evidence` con prime ancore sezionali.
 - **AI**: runtime locale per default, benchmark e shadow lane separati dal
   prodotto clinico.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -121,6 +121,8 @@ La direzione document intelligence e `artifact-first`:
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
+- i nuovi `parseEvidenceArtifactSnapshot` possono includere `sectionMap`,
+  ancore `page/section/snippet` e conflitti terapeutici reviewable;
 - `patients.documentInsights` resta una projection compatibile, non il modello
   finale ideale.
 

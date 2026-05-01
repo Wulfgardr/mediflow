@@ -27,6 +27,7 @@ Ultimo aggiornamento: 2026-05-01
 - [x] Riallineare documentazione di riferimento/supporto allo stato corrente di `main` (`WUL-203`): Workbench unico, SISS/FSE corpus, `home-base` read-only, document intelligence artifact-first e direzione Apple condivisa.
 - [x] Aggiungere una lettura canonica completa dello stato corrente (`docs/STATE_OF_THE_SYSTEM.md`) e riallineare mappe private/OSS cosi che onboarding profondo, review trasversale e export pubblico partano da un quadro unico.
 - [x] Formalizzare il primo `patient import decision` reviewable tra review documentale e persistenza prudente, per distillare il create/merge/apply in un contratto riusabile (`WUL-167`).
+- [x] Aggiungere la prima granularita section-aware al `parse/evidence` artifact (`WUL-159`): `sectionMap` opzionale con sezioni classificate, fact anchors `page/section/snippet` e conflitti terapeutici espliciti, senza migrazione DB o auto-write.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
@@ -155,6 +156,11 @@ Nota operativa:
   esplicito (`create_new_patient` / `merge_existing_patient` /
   `review_identity`, write strutturate vs note-only) invece di lasciare la
   semantica prudente implicita nel solo apply finale
+- `WUL-159` estende il `parse/evidence` artifact in modo compatibile con la
+  north star di `ADR 0040`: i nuovi snapshot includono una `sectionMap`
+  riusabile con sezioni classificate, ancore fact `page/section/snippet` e
+  conflitti/ambiguita terapeutiche da mantenere reviewable prima dei decision
+  layer
 - `WUL-152` apre la prima slice runtime del nuovo approccio `document evidence
   ledger`: introduce l'artifact canonico `parse/evidence` per documento
   singolo, lo persiste come snapshot cifrato sugli `attachments`, mantiene

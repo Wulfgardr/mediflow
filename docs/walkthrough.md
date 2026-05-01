@@ -362,7 +362,8 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 - `lib/pdf-service.ts`: estrazione testo PDF (fallback regex)
 - `lib/document-synthesis-service.ts`: sintesi clinica + salvataggio
 - `lib/document-parse-evidence-artifact.ts`: artifact canonico `parse/evidence`
-  per allegato
+  per allegato, con `sectionMap` opzionale per sezioni classificate, ancore
+  fact `page/section/snippet` e conflitti reviewable
 - `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
   locale shadow-only per la lane `redaction.v1`
 
@@ -374,7 +375,8 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 4) Analisi testuale e sintesi via Qwen (`qwen3.5:35b-a3b` di default)
 5) Costruzione di:
    - `summarySnapshot` leggibile
-   - `parse/evidence artifact` canonico per l'allegato
+   - `parse/evidence artifact` canonico per l'allegato, incluse le ancore
+     sezionali quando disponibili
    - `documentInsights` come projection/compat layer iniziale
 6) Estrazione prudente di eventuali diagnosi con codice ICD esplicito
 7) Persistenza cifrata sugli allegati + refresh di `AI Patient Insight`
@@ -544,8 +546,9 @@ sequenceDiagram
 
 - `home-base` e ancora read-only-first: niente write remoto, sync record-level o
   fallback automatico promotable.
-- `documentInsights` resta un compat layer: il `document evidence ledger` e
-  solo alla prima slice runtime.
+- `documentInsights` resta un compat layer: il `document evidence ledger` ha
+  ora una base runtime con artifact e prime ancore sezionali, ma i decision
+  layer completi restano incrementali.
 - Il vecchio shell macOS resta congelato: la parity non riparte su quello
   snapshot.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
