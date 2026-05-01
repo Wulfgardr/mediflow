@@ -7,6 +7,8 @@ import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 /* @Codex */
+import { normalizeOptionalCheckupSource } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
@@ -104,13 +106,11 @@ export async function PUT(
             nextStatus = parsedStatus;
         }
         const hasSource = Object.prototype.hasOwnProperty.call(body, 'source');
-        const nextSource = hasSource
-            ? (typeof body.source === 'string'
-                ? body.source
-                : body.source === null || body.source === ''
-                    ? null
-                    : undefined)
-            : undefined;
+        const normalizedSource = normalizeOptionalCheckupSource(body.source);
+        if (!normalizedSource.ok) {
+            return NextResponse.json({ error: normalizedSource.error }, { status: 400 });
+        }
+        const nextSource = hasSource ? normalizedSource.values : undefined;
 
         if (
             nextDate === undefined &&
