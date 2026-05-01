@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-04-26
+Ultimo aggiornamento: 2026-05-01
 
 > [!NOTE]
 > La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
@@ -14,15 +14,17 @@ Documenti da consultare **sempre**:
 1. [README.md](../README.md)
 2. [AGENTS.md](../AGENTS.md)
 3. [docs/README.md](./README.md) (questo file)
-4. [ARCHITECTURE.md](../ARCHITECTURE.md)
-5. [SECURITY.md](../SECURITY.md)
-6. [CONTRIBUTING.md](../CONTRIBUTING.md)
-7. [PLANS.md](../PLANS.md) (se presente)
-8. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+4. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
+5. [ARCHITECTURE.md](../ARCHITECTURE.md)
+6. [SECURITY.md](../SECURITY.md)
+7. [CONTRIBUTING.md](../CONTRIBUTING.md)
+8. [PLANS.md](../PLANS.md) (se presente)
+9. [docs/adr/](./adr/README.md) (partendo dai più recenti)
 
 Documenti da consultare **al bisogno**:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
+- Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Playbook orchestrazione lavoro con Linear/Codex: [docs/linear-codex-playbook.md](./linear-codex-playbook.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
@@ -49,13 +51,14 @@ Documenti da consultare **al bisogno**:
 
 1. [README.md](../README.md)
 2. [AGENTS.md](../AGENTS.md)
-3. [ARCHITECTURE.md](../ARCHITECTURE.md)
-4. [SECURITY.md](../SECURITY.md)
-5. [CONTRIBUTING.md](../CONTRIBUTING.md)
-6. [docs/adr/](./adr/README.md) (partendo dai più recenti)
-7. [PLANS.md](../PLANS.md)
-8. [docs/walkthrough.md](./walkthrough.md)
-9. [docs/markdown-index.md](./markdown-index.md)
+3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
+4. [ARCHITECTURE.md](../ARCHITECTURE.md)
+5. [SECURITY.md](../SECURITY.md)
+6. [CONTRIBUTING.md](../CONTRIBUTING.md)
+7. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+8. [PLANS.md](../PLANS.md)
+9. [docs/walkthrough.md](./walkthrough.md)
+10. [docs/markdown-index.md](./markdown-index.md)
 
 ## Convenzione stato documenti
 
@@ -69,6 +72,7 @@ Documenti da consultare **al bisogno**:
 | --- | --- | --- | --- |
 | Regole agent e vincoli | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Fonte primaria per processi e limiti operativi. |
 | Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Punto di ingresso generale. |
+| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e split private/OSS. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Confini e principi che cambiano raramente. |
 | Sicurezza e redazione dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Policy di sicurezza, threat model, logging rules. |
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |

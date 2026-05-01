@@ -9,6 +9,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 ## Riferimenti correlati
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato corrente completo e boundary operativi)
 - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dato e trust boundaries)
 - [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)

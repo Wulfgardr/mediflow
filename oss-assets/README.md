@@ -75,6 +75,7 @@ Open source, in questo caso, significa soprattutto:
 ## Documentazione
 
 - [FAQ](./docs/FAQ.md)
+- [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md)
 - [Roadmap](./docs/ROADMAP.md)
 - [Compliance](./docs/COMPLIANCE.md)
 - [Document map](./docs/README.md)

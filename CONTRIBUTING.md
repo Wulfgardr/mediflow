@@ -169,6 +169,7 @@ Usalo quando tocchi:
 - Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `Start_MediFlow.command`
 
 Documentazione tecnica:
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)
 - [docs/README.md](./docs/README.md) (mappa canonica documentazione)
 - [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
 - [docs/walkthrough.md](./docs/walkthrough.md)

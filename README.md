@@ -28,6 +28,12 @@ Su `main`, oggi, ci sono già queste cose:
 - **corpus documentale SISS/FSE locale**: fonti approvate, sync incrementale e report di freschezza restano fuori dal runtime clinico ma guidano le integrazioni future;
 - **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
 
+Per una lettura completa, aggiornata e navigabile dello stato reale del sistema,
+parti da [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md). È la
+pagina che unisce prodotto, architettura, sicurezza, runtime, boundary SISS/FSE,
+AI/document intelligence, Apple clients e split private/OSS senza dover
+ricostruire il quadro da dieci file separati.
+
 ## Cosa cambia rispetto alla `v0.3`
 
 Il salto, in breve, è questo:
@@ -59,6 +65,7 @@ Il salto, in breve, è questo:
 Inizia da qui:
 
 1. **Mappa canonica della documentazione**
+   - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md)
    - [docs/README.md](./docs/README.md)
    - [docs/markdown-index.md](./docs/markdown-index.md)
 

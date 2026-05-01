@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-04-28
+Ultimo aggiornamento: 2026-05-01
 
 ---
 
@@ -25,6 +25,7 @@ Ultimo aggiornamento: 2026-04-28
 - [x] Ritirare i preview profiles funzionali da `main` (`WUL-199`) e promuovere il contesto paziente SISS come parte stabile del `Clinical Workbench`.
 - [ ] Stabilizzare il nuovo diario protesico (`WUL-204`) con documentazione reale allegata: mantenere `Protesica-RL` come `portal-handoff`, usare campi decodificati locali per ausili/codici ISO/misure/collaudo e aggiornare la skill di lettura semantica dopo esempi documentali reali.
 - [x] Riallineare documentazione di riferimento/supporto allo stato corrente di `main` (`WUL-203`): Workbench unico, SISS/FSE corpus, `home-base` read-only, document intelligence artifact-first e direzione Apple condivisa.
+- [x] Aggiungere una lettura canonica completa dello stato corrente (`docs/STATE_OF_THE_SYSTEM.md`) e riallineare mappe private/OSS cosi che onboarding profondo, review trasversale e export pubblico partano da un quadro unico.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
