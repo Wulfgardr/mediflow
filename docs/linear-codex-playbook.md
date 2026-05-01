@@ -472,6 +472,55 @@ Se la issue cambia architettura, sicurezza, contratti `/api/v1`, cifratura o net
 2. Assegna `priority`, `labels`, `project`, `cycle`.
 3. Definisci WIP limit personale: max 2 issue `In Progress`.
 
+## Prospecting trimestrale (future feature)
+
+Obiettivo: esplorare idee future senza frammentare il backlog operativo.
+
+Regola: il prospecting produce decisioni di discovery, non lavoro di delivery
+automatico. Una proposta diventa delivery solo dopo una decisione esplicita e
+una issue piccola con acceptance criteria verificabili.
+
+### Template proposta feature
+
+```md
+## Problema
+Quale attrito clinico, tecnico o operativo risolve.
+
+## Valore
+Per chi conta e quale risultato osservabile migliora.
+
+## Rischio
+Sicurezza, dati clinici, complessita, dipendenze esterne, manutenzione.
+
+## Effort
+Taglia stimata: S / M / L, con primo slice massimo.
+
+## Evidenza
+Repo/docs/uso reale/feedback che giustifica l'esplorazione.
+
+## Decisione richiesta
+- Scartare
+- Tenere in discovery
+- Fare PoC piccolo
+- Promuovere a delivery
+```
+
+### Cadenza e gate
+
+Ogni trimestre:
+
+1. raccogli solo le proposte ancora rilevanti;
+2. chiudi o cancella le idee senza evidenza o senza owner;
+3. scegli al massimo 1-2 PoC piccoli;
+4. promuovi a delivery solo cio che ha un primo slice chiaro, testabile e
+   coerente con `PLANS.md`;
+5. lascia nel backlog operativo solo issue gia pronte per essere implementate.
+
+Distinzione pratica:
+
+- `Discovery`: chiarisce problema, valore, rischio, effort o fattibilita.
+- `Delivery`: modifica repo/prodotto con branch, PR, verifica e chiusura Linear.
+
 ## Esecuzione con Codex
 
 Per ogni issue:
