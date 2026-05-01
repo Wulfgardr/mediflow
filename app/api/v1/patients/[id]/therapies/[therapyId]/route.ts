@@ -7,7 +7,9 @@ import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
+import { normalizeTherapyUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
+import { normalizeTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
@@ -15,13 +17,6 @@ function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-/* @Codex */
-function parseDate(value: unknown): Date | undefined {
-    if (!value) return undefined;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
 export async function GET(
@@ -88,107 +83,13 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const nextStartDate = parseDate(body.startDate);
-        if (body.startDate !== undefined && nextStartDate === undefined) {
-            return NextResponse.json({ error: 'Invalid startDate' }, { status: 400 });
-        }
-
-        const hasEndDate = Object.prototype.hasOwnProperty.call(body, 'endDate');
-        const nextEndDate = body.endDate === null ? null : parseDate(body.endDate);
-        if (hasEndDate && body.endDate !== null && nextEndDate === undefined) {
-            return NextResponse.json({ error: 'Invalid endDate' }, { status: 400 });
-        }
-
-        const nextDrugName = typeof body.drugName === 'string' ? body.drugName : undefined;
-        const hasAic = Object.prototype.hasOwnProperty.call(body, 'aic');
-        const nextAic = hasAic
-            ? (typeof body.aic === 'string'
-                ? body.aic
-                : body.aic === null || body.aic === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        const hasAtc = Object.prototype.hasOwnProperty.call(body, 'atc');
-        const nextAtc = hasAtc
-            ? (typeof body.atc === 'string'
-                ? body.atc
-                : body.atc === null || body.atc === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        const hasActivePrinciple = Object.prototype.hasOwnProperty.call(body, 'activePrinciple');
-        const nextActivePrinciple = hasActivePrinciple
-            ? (typeof body.activePrinciple === 'string'
-                ? body.activePrinciple
-                : body.activePrinciple === null || body.activePrinciple === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        const nextDosage = typeof body.dosage === 'string' ? body.dosage : undefined;
-        const hasMotivation = Object.prototype.hasOwnProperty.call(body, 'motivation');
-        const nextMotivation = hasMotivation
-            ? (typeof body.motivation === 'string'
-                ? body.motivation
-                : body.motivation === null || body.motivation === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        const hasDiagnosisCode = Object.prototype.hasOwnProperty.call(body, 'diagnosisCode');
-        const nextDiagnosisCode = hasDiagnosisCode
-            ? (typeof body.diagnosisCode === 'string'
-                ? body.diagnosisCode
-                : body.diagnosisCode === null || body.diagnosisCode === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        const hasDiagnosisName = Object.prototype.hasOwnProperty.call(body, 'diagnosisName');
-        const nextDiagnosisName = hasDiagnosisName
-            ? (typeof body.diagnosisName === 'string'
-                ? body.diagnosisName
-                : body.diagnosisName === null || body.diagnosisName === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        /* @Codex */
-        let nextStatus: string | undefined;
-        if (typeof body.status === 'string') {
-            const parsedStatus = parseTherapyStatus(body.status);
-            if (!parsedStatus) {
-                return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
-            }
-            nextStatus = parsedStatus;
-        }
-
-        if (
-            nextDrugName === undefined &&
-            nextAic === undefined &&
-            nextAtc === undefined &&
-            nextActivePrinciple === undefined &&
-            nextDosage === undefined &&
-            nextMotivation === undefined &&
-            nextDiagnosisCode === undefined &&
-            nextDiagnosisName === undefined &&
-            nextStatus === undefined &&
-            nextStartDate === undefined &&
-            !hasEndDate
-        ) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        const normalized = normalizeTherapyUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
         await dbServer.update(therapies)
-            .set({
-                drugName: nextDrugName,
-                aic: nextAic,
-                atc: nextAtc,
-                activePrinciple: nextActivePrinciple,
-                dosage: nextDosage,
-                motivation: nextMotivation,
-                diagnosisCode: nextDiagnosisCode,
-                diagnosisName: nextDiagnosisName,
-                status: nextStatus,
-                startDate: nextStartDate,
-                endDate: hasEndDate ? nextEndDate : undefined
-            })
+            .set(normalized.values)
             .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)));
 
         /* @Codex */

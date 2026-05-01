@@ -66,6 +66,21 @@ type TherapyCreateValues = {
 };
 
 /* @Codex */
+type TherapyUpdateValues = {
+    drugName?: string;
+    aic?: string | null;
+    atc?: string | null;
+    activePrinciple?: string | null;
+    dosage?: string;
+    motivation?: string | null;
+    diagnosisCode?: string | null;
+    diagnosisName?: string | null;
+    status?: 'active' | 'suspended' | 'completed';
+    startDate?: Date;
+    endDate?: Date | null;
+};
+
+/* @Codex */
 type CheckupCreateValues = {
     id: string;
     patientId: string;
@@ -75,6 +90,15 @@ type CheckupCreateValues = {
     status: 'pending' | 'completed' | 'cancelled';
     source: CheckupSource;
     createdAt: Date;
+};
+
+/* @Codex */
+type CheckupUpdateValues = {
+    date?: Date;
+    title?: string;
+    notes?: string | null;
+    status?: 'pending' | 'completed' | 'cancelled';
+    source?: CheckupSource | null;
 };
 
 /* @Codex */
@@ -128,6 +152,35 @@ function parseNullableString(value: unknown, field: string): WriteNormalizationR
 function parseOptionalString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
+    }
+
+    if (typeof value !== 'string') {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+
+    return { ok: true, values: value };
+}
+
+/* @Codex */
+function parseOptionalRequiredString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    const parsed = parseRequiredString(value, field);
+    if (!parsed.ok) return parsed;
+
+    return { ok: true, values: parsed.values };
+}
+
+/* @Codex */
+function parseOptionalNullableString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    if (value === null || value === '') {
+        return { ok: true, values: null };
     }
 
     if (typeof value !== 'string') {
@@ -420,6 +473,84 @@ export function normalizeTherapyCreateInput(
 }
 
 /* @Codex */
+export function normalizeTherapyUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<TherapyUpdateValues> {
+    const drugName = parseOptionalRequiredString(input.drugName, 'drugName');
+    if (!drugName.ok) return drugName;
+
+    const dosage = parseOptionalRequiredString(input.dosage, 'dosage');
+    if (!dosage.ok) return dosage;
+
+    const startDate = parseOptionalDate(input.startDate, 'startDate');
+    if (!startDate.ok) return startDate;
+
+    const endDate = parseOptionalNullableDate(input.endDate, 'endDate');
+    if (!endDate.ok) return endDate;
+
+    const aic = parseOptionalNullableString(input.aic, 'aic');
+    if (!aic.ok) return aic;
+
+    const atc = parseOptionalNullableString(input.atc, 'atc');
+    if (!atc.ok) return atc;
+
+    const activePrinciple = parseOptionalNullableString(input.activePrinciple, 'activePrinciple');
+    if (!activePrinciple.ok) return activePrinciple;
+
+    const motivation = parseOptionalNullableString(input.motivation, 'motivation');
+    if (!motivation.ok) return motivation;
+
+    const diagnosisCode = parseOptionalNullableString(input.diagnosisCode, 'diagnosisCode');
+    if (!diagnosisCode.ok) return diagnosisCode;
+
+    const diagnosisName = parseOptionalNullableString(input.diagnosisName, 'diagnosisName');
+    if (!diagnosisName.ok) return diagnosisName;
+
+    const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
+    let status: TherapyUpdateValues['status'];
+    if (hasStatus) {
+        const parsedStatus = parseTherapyStatus(input.status);
+        if (!parsedStatus) {
+            return { ok: false, error: 'Invalid therapy status' };
+        }
+        status = parsedStatus;
+    }
+
+    if (
+        drugName.values === undefined &&
+        aic.values === undefined &&
+        atc.values === undefined &&
+        activePrinciple.values === undefined &&
+        dosage.values === undefined &&
+        motivation.values === undefined &&
+        diagnosisCode.values === undefined &&
+        diagnosisName.values === undefined &&
+        status === undefined &&
+        startDate.values === undefined &&
+        endDate.values === undefined
+    ) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            drugName: drugName.values,
+            aic: aic.values,
+            atc: atc.values,
+            activePrinciple: activePrinciple.values,
+            dosage: dosage.values,
+            motivation: motivation.values,
+            diagnosisCode: diagnosisCode.values,
+            diagnosisName: diagnosisName.values,
+            status,
+            startDate: startDate.values,
+            endDate: endDate.values,
+        },
+    };
+}
+
+/* @Codex */
 export function normalizeCheckupCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -452,6 +583,54 @@ export function normalizeCheckupCreateInput(
             status: normalizedStatus ?? 'pending',
             source: source.values,
             createdAt: context.now ?? new Date(),
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeCheckupUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<CheckupUpdateValues> {
+    const date = parseOptionalDate(input.date, 'date');
+    if (!date.ok) return date;
+
+    const title = parseOptionalRequiredString(input.title, 'title');
+    if (!title.ok) return title;
+
+    const notes = parseOptionalNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+
+    const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
+    let status: CheckupUpdateValues['status'];
+    if (hasStatus) {
+        const parsedStatus = parseCheckupStatus(input.status);
+        if (!parsedStatus) {
+            return { ok: false, error: 'Invalid checkup status' };
+        }
+        status = parsedStatus;
+    }
+
+    const source = normalizeOptionalCheckupSource(input.source);
+    if (!source.ok) return source;
+
+    if (
+        date.values === undefined &&
+        title.values === undefined &&
+        notes.values === undefined &&
+        status === undefined &&
+        source.values === undefined
+    ) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            date: date.values,
+            title: title.values,
+            notes: notes.values,
+            status,
+            source: source.values,
         },
     };
 }
