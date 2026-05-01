@@ -152,6 +152,7 @@ Ultimo aggiornamento: 2026-05-01
 | [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md) | Formalizza il create-flow `Nuova Anagrafica` da documento con review esplicita, matching locale ICD/AIFA e persistenza strutturata solo delle terapie sufficientemente confermate. |
 | [docs/adr/0043-macos-oncology-backbone-prototype.md](./adr/0043-macos-oncology-backbone-prototype.md) | Formalizza il prototipo macOS della backbone oncologica come shell SwiftUI sintetica, locale e separata da backend, schema e contratti `/api/v1` del prodotto reale. |
 | [docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md](./adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md) | Formalizza `WUL-114`: TurboQuant resta un tema di runtime/KV cache e non un semplice challenger modello; l'unica strada sensata oggi e un prototipo benchmark-only su serving isolato `Ollama`/`MLX`. |
+| [docs/adr/0051-patient-import-decision-contract-between-review-and-persistence.md](./adr/0051-patient-import-decision-contract-between-review-and-persistence.md) | Formalizza la thin slice `WUL-167`: contratto `patient import decision` tra review documentale e persistenza prudente, con target `create/merge/review` e distinzione esplicita tra write strutturate e note-only. |
 
 ## Checklist manutenzione indice
 

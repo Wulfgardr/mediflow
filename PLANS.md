@@ -26,6 +26,7 @@ Ultimo aggiornamento: 2026-05-01
 - [ ] Stabilizzare il nuovo diario protesico (`WUL-204`) con documentazione reale allegata: mantenere `Protesica-RL` come `portal-handoff`, usare campi decodificati locali per ausili/codici ISO/misure/collaudo e aggiornare la skill di lettura semantica dopo esempi documentali reali.
 - [x] Riallineare documentazione di riferimento/supporto allo stato corrente di `main` (`WUL-203`): Workbench unico, SISS/FSE corpus, `home-base` read-only, document intelligence artifact-first e direzione Apple condivisa.
 - [x] Aggiungere una lettura canonica completa dello stato corrente (`docs/STATE_OF_THE_SYSTEM.md`) e riallineare mappe private/OSS cosi che onboarding profondo, review trasversale e export pubblico partano da un quadro unico.
+- [x] Formalizzare il primo `patient import decision` reviewable tra review documentale e persistenza prudente, per distillare il create/merge/apply in un contratto riusabile (`WUL-167`).
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
 
@@ -149,6 +150,11 @@ Nota operativa:
   `document_evidence_pack.v2` come pack compatto a un approccio
   `document evidence ledger`, con separazione esplicita tra recognition,
   source governance, decision layer e render/projection
+- `WUL-167` apre una thin slice adiacente a `ADR 0040` e `ADR 0042`: il
+  create-flow document-driven inizia a produrre un `patient import decision`
+  esplicito (`create_new_patient` / `merge_existing_patient` /
+  `review_identity`, write strutturate vs note-only) invece di lasciare la
+  semantica prudente implicita nel solo apply finale
 - `WUL-152` apre la prima slice runtime del nuovo approccio `document evidence
   ledger`: introduce l'artifact canonico `parse/evidence` per documento
   singolo, lo persiste come snapshot cifrato sugli `attachments`, mantiene

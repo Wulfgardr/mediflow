@@ -19,6 +19,8 @@ import {
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/patient-document-review';
+/* @Codex */
+import { buildPatientImportDecision } from '@/lib/patient-import-decision';
 
 interface PatientDocumentImportReviewProps {
     draft: PatientDocumentReviewDraft;
@@ -101,6 +103,8 @@ export default function PatientDocumentImportReview({
         diagnoses: localDraft.diagnoses.filter((diagnosis) => diagnosis.included).length,
         medications: localDraft.medications.filter((medication) => medication.included).length,
     }), [localDraft]);
+    /* @Codex */
+    const importDecision = useMemo(() => buildPatientImportDecision(localDraft), [localDraft]);
 
     const tone = qualityTone(localDraft.quality?.level);
 
@@ -131,6 +135,9 @@ export default function PatientDocumentImportReview({
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
                                 {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie
+                            </span>
+                            <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                                {importDecision.summary.structuredDiagnosisCount} write diagnosi · {importDecision.summary.structuredTherapyCount} write terapie · {importDecision.summary.noteOnlyTherapyCount} note da riconciliare
                             </span>
                         </div>
                     </div>

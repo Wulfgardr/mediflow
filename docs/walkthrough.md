@@ -383,7 +383,9 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 
 Nel create-flow `Nuova Anagrafica`, `components/pdf-importer.tsx` usa lo stesso
 OCR locale ma aggiunge una review intermedia esplicita prima del salvataggio.
-La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+e viene ora resa esplicita dal contratto `patient import decision` di
+[ADR 0051](./adr/0051-patient-import-decision-contract-between-review-and-persistence.md).
 
 Il flusso:
 
@@ -395,9 +397,15 @@ Il flusso:
 3) riconciliazione locale reviewable:
    - match ICD-11 per i problemi candidati
    - match AIFA/ATC o fallback manuale per le terapie candidate
-4) review operatore su anagrafica, diagnosi e terapie prima di applicare i
+4) costruzione di un `patient import decision` esplicito:
+   - target dell import (`create_new_patient`, `merge_existing_patient`,
+     `review_identity`)
+   - field decisions
+   - diagnosi `apply_structured|review_only|ignore`
+   - terapie `persist_structured|append_note|ignore`
+5) review operatore su anagrafica, diagnosi e terapie prima di applicare i
    default al form
-5) alla creazione della scheda, le terapie confermate e attive con posologia
+6) alla creazione della scheda, le terapie confermate e attive con posologia
    sufficiente vengono persistite come record strutturati in `therapies`; i casi
    incompleti o non attivi possono restare come nota documentale di supporto
 
