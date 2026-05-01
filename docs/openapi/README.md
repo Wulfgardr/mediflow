@@ -68,6 +68,21 @@ Se la risposta e `si`, la spec va aggiornata.
 5. Se il cambio e breaking o deprecante, aggiorna prima ADR/PLANS/Linear.
 6. Esegui `npm run check:openapi:drift` per verificare coverage, drift e breaking.
 
+## Rehearsal di compatibilita
+
+Per una issue di migrazione o rilascio che deve dimostrare la compatibilita
+senza cambiare necessariamente il contratto, usa:
+
+```bash
+npm run rehearse:api-v1-compatibility
+```
+
+Il comando esegue lo stesso guard anti-drift e produce un ledger Markdown
+temporaneo in `tmp-api-v1-compatibility-rehearsal.md` con base/head, esito,
+conteggio delle operation documentate, operation implementation-only coperte da
+policy e file sensibili modificati rispetto alla base. Il file e pensato come
+evidenza da allegare a PR/Linear, non come artifact da committare.
+
 ## Registro eccezioni e override
 
 - `docs/openapi/contract-policy.json` elenca gli endpoint implementati ma ancora

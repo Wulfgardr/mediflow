@@ -22,6 +22,7 @@
 /tmp-audit-test
 /tmp-auth-lockout-test
 /tmp-patient-document-import-test
+/tmp-api-v1-compatibility-rehearsal.md
 /tmp-real-import-data
 /tmp-real-pipeline
 /tmp-manual-browser

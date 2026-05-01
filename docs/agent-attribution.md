@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-05-01 Codex
+- Opened `WUL-154` as an API v1 compatibility rehearsal slice: added a command that runs the existing OpenAPI drift guard and emits a temporary Markdown ledger for Linear/PR evidence without changing runtime route behavior: `scripts/api-v1-compatibility-rehearsal.mjs`, `package.json`, `docs/openapi/README.md`, `docs/agent-attribution.md`
 - Extended `WUL-203` with a complete current-state documentation pass: added `docs/STATE_OF_THE_SYSTEM.md` as the canonical full-system reading surface and aligned private/public entrypoints so README, docs maps, roadmap, FAQ, walkthrough, topology, architecture, security, contributing, plan, changelog and OSS facade all point to the same current-state contract: `docs/STATE_OF_THE_SYSTEM.md`, `README.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/system_architecture.md`, `ARCHITECTURE.md`, `SECURITY.md`, `CONTRIBUTING.md`, `docs/ROADMAP.md`, `docs/FAQ.md`, `docs/walkthrough.md`, `docs/topologia-dati-flussi.md`, `PLANS.md`, `CHANGELOG.md`, `oss-assets/README.md`, `docs/agent-attribution.md`
 
 ## 2026-04-28 Codex
