@@ -1,7 +1,7 @@
 # Playbook Operativo Linear + Codex (MediFlow)
 
 Stato documento: `CANONICAL` (workflow operativo planning -> coding -> audit trail)  
-Ultimo aggiornamento: 2026-03-03
+Ultimo aggiornamento: 2026-05-01
 
 ---
 
@@ -399,21 +399,43 @@ delivery.
 
 ## Template Issue (copia/incolla)
 
+Le issue MediFlow devono essere leggibili in due passaggi:
+
+1. **Parte alta rapida**: 5-10 righe per capire problema, risultato atteso e
+   confini senza leggere dettagli implementativi.
+2. **Parte bassa tecnica**: note operative, file probabili, test, rischi e
+   riferimenti canonici.
+
+Regole pratiche:
+
+- il titolo deve dire il risultato operativo, non solo l'area tecnica;
+- `In breve`, `Perche conta` e `Acceptance Criteria` devono stare sopra;
+- dettagli su file, test, ADR, branch o note storiche stanno sotto;
+- se una issue supera facilmente una schermata, aggiungi un sommario iniziale
+  invece di obbligare il lettore a ricostruire il punto dai dettagli;
+- non duplicare una decisione architetturale lunga nella issue: linka ADR,
+  `PLANS.md` o documento canonico e riporta solo la conseguenza pratica.
+
 ```md
-## Context
-Perche questa attivita e necessaria adesso.
+## In breve
+Risultato atteso in 2-3 frasi, scritto per capire subito cosa deve cambiare.
 
-## Problem
-Comportamento attuale vs comportamento atteso.
-
-## Scope
-- In scope:
-- Out of scope:
+## Perche conta
+Problema attuale, rischio o valore operativo.
 
 ## Acceptance Criteria
 1. ...
 2. ...
 3. ...
+
+## Scope
+- In scope:
+- Out of scope:
+
+## Dettagli tecnici
+- File probabili:
+- Note di implementazione:
+- Rischi:
 
 ## Verification
 - Manuale:
@@ -422,6 +444,11 @@ Comportamento attuale vs comportamento atteso.
 
 ## Docs/Decisioni coinvolte
 - ARCHITECTURE.md / SECURITY.md / PLANS.md / ADR ...
+
+## Delivery
+- Branch:
+- PR:
+- Stato finale:
 ```
 
 ## Regola ADR
