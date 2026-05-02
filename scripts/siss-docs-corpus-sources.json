@@ -51,15 +51,37 @@
     "notes": "Documento noto e indicizzato sul portale documentale SISS; acquisizione da completare via ricerca mirata o download autorizzato."
   },
   {
-    "id": "siss-gestione-assistiti-anagrafe",
-    "title": "SISS - Gestione assistiti / anagrafe regionale",
+    "id": "siss-anagrafe-regionale-servizio",
+    "title": "SISS - Anagrafe Regionale degli assistiti e delle strutture",
     "area": "registry",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/anagrafe-regionale-degli-assistiti-e-delle-strutture",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "registry", "nar", "assistiti", "ricettari", "prescrittori"],
+    "notes": "Pagina pubblica SISS: NAR come fonte anagrafica regionale, funzioni esenzioni/ticket, medici prescrittori e ricettari assegnati."
+  },
+  {
+    "id": "siss-gestione-assistiti-anagrafe",
+    "title": "SISS - Gestione Anagrafe / iscrizione Assistiti (Gaia/NAR)",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=21",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "registry", "assistiti", "manual-import"],
-    "notes": "Raccoglie manuali e specifiche di integrazione per gestione assistiti e anagrafe regionale."
+    "tags": ["siss", "registry", "nar", "assistiti", "gaia", "manual-import"],
+    "notes": "Catalogo pubblico SISS: manuali Gaia/Gestione Anagrafe - iscrizione Assistiti; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-anagrafe-medici-specialisti",
+    "title": "SISS - GAMS Gestione Anagrafe Medici Specialisti",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=10",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "registry", "nar", "prescrittori", "specialisti", "manual-import"],
+    "notes": "Catalogo pubblico SISS: GAMS/Gestione Anagrafe Medici Specialisti; rilevante per contesto prescrittori ma non sufficiente a runtime custom."
   },
   {
     "id": "siss-fse-documento-clinico-elettronico",

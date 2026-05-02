@@ -15,6 +15,7 @@ Riferimenti canonici:
 - [docs/markdown-index.md](./markdown-index.md)
 - [docs/siss-baseline.md](./siss-baseline.md)
 - [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
+- [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md)
 - [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 - [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 - [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md)
@@ -180,7 +181,7 @@ e `Certificati`, usando quattro esiti operativi:
 | --- | --- | --- | --- | --- |
 | `Prescrittivo` | `webapp-mediated`; `custom-ui-plausible` solo dopo onboarding | Web Application del `Modulo Prescrittivo Regionale`, con indizi di servizi WS/API SISS | `SSI` qualificata, credenziali/canale, scenario approvato, audit e gestione errori regionali | `webapp-assisted` sul modulo ufficiale, gia tracciato dalla nota prescrittivo |
 | `FSE consultazione` | `handoff-only-for-now`; feed/viewer embedded `blocked-by-docs-or-qualification` | UI ufficiale FSE, scenari FSE, consenso consultazione, SEB/eventi | consenso, ruolo operatore, provisioning, audit FSE, policy cache/retention | `official-session handoff guard`, senza ingerire documenti FSE |
-| `NAR / Anagrafe Regionale` | `handoff-only-for-now`; lookup read-only `custom-ui-plausible` ma non provato | servizio NAR/Anagrafe, `Identifica Cittadino`, `Classe di Esenzione`, handoff `Gaia` | specifiche non ancora raccolte, minimizzazione dati, ruolo/contesto operatore, source-of-truth regionale | blueprint read-only separato, senza runtime custom immediato |
+| `NAR / Anagrafe Regionale` | `handoff-only-for-now`; lookup read-only `custom-ui-plausible` ma non provato | servizio NAR/Anagrafe, `Identifica Cittadino`, `Classe di Esenzione`, handoff `Gaia` | specifiche non ancora raccolte, minimizzazione dati, ruolo/contesto operatore, source-of-truth regionale | blueprint read-only separato in [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md), senza runtime custom immediato |
 | `Certificati di malattia` | `webapp-mediated`; UI/backend custom `blocked-by-docs-or-qualification` | Web Application Certificati di Malattia e possibili interfacce applicativo medico-SISS | SISS come `SAR`, Carta Operatore, specifiche complete, responsabilita medico-legale, test ufficiale | `official-webapp handoff guard`, solo dopo verifica path ufficiale |
 
 Decisione: il primo dominio backend-first non va scelto perche "piu

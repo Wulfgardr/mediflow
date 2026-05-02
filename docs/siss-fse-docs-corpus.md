@@ -88,6 +88,15 @@ Per i Certificati di malattia il manifest mantiene separati:
 La mappa decisionale e in
 [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
 
+Per NAR / Anagrafe Regionale il manifest distingue:
+
+- pagina pubblica `Anagrafe Regionale degli assistiti e delle strutture`
+- manuali Gaia / gestione anagrafe / iscrizione assistiti
+- manuali GAMS / gestione anagrafe medici specialisti
+
+La mappa decisionale read-only e in
+[docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md).
+
 ## Comandi
 
 Validazione del manifest:

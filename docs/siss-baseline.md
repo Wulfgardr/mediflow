@@ -19,6 +19,7 @@ Riferimenti canonici:
 - [docs/COMPLIANCE.md](./COMPLIANCE.md)
 - [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
 - [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
+- [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md)
 - [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 - [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 
@@ -69,7 +70,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | `Ricetta Elettronica` | `Disponibile ora` | Richiama la webapp ufficiale del `Modulo Prescrittivo Regionale` in modalita `portal-handoff`, prepara il CF negli appunti e scrive audit locale PHI-safe del launch. |
 | `Protesica-RL` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Assistente RL / Protesica-RL`, con CF pronto da incollare e diario locale delle prescrizioni protesiche. |
 | `FSE` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `OpeFseIE` con CF pronto da incollare. |
-| `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Gaia` con CF pronto da incollare. |
+| `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Gaia` con CF pronto da incollare; il blueprint read-only e in [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md). |
 | Prontezza FSE locale | `Disponibile ora` | Il pannello paziente mostra il pre-check locale su terapie e osservazioni prima di un eventuale export/filone FSE. |
 | Stato sessione SISS / firma remota | `Disponibile ora` | Il pannello paziente legge in locale la cronologia Atlas della macchina e mostra segnali osservati di `LoginRemoteSign`, selezione ruolo e ultimo modulo SISS raggiunto, inclusa `Protesica-RL` quando osservata. |
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
@@ -149,7 +150,8 @@ La sequenza di lavoro per questo stream è:
    `webapp ufficiale`, `A2A`, `SSI qualificata` e capability realmente
    perseguibili
 6. note scenario-specific dedicate prima del runtime: Modulo Prescrittivo
-   Regionale, FSE consultazione/consenso, SGDT/PAI e Certificati di malattia
+   Regionale, FSE consultazione/consenso, NAR/Anagrafe read-only, SGDT/PAI e
+   Certificati di malattia
 7. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
    certificato`, se e solo se la documentazione tecnica disponibile e
    l'onboarding regionale lo rendono concretamente perseguibile
