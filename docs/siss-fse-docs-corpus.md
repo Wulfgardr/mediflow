@@ -63,6 +63,40 @@ Valori operativi:
 - `captureStrategy = manual-placeholder`: registra solo metadati/placeholder
 - `refreshHours = N`: cadenza suggerita di refresh per la sorgente
 
+Per FSE regionale il manifest deve mantenere separati almeno tre placeholder
+scenario-specific:
+
+- `DC-SCEN-REF#01`: gestione del Documento Clinico Elettronico presso Enti
+  Erogatori e `MMG/PLS`
+- `DC-SCEN-ACCO#03`: consenso alla consultazione FSE
+- `DC-SEBC_FSE-SIAA#02`: SEB FSE Gestione Eventi
+
+La mappa decisionale di prodotto per questi documenti e in
+[docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md).
+
+Per SGDT il manifest non mantiene un placeholder generico: il caso emerso dalle
+fonti pubbliche resta `DC-COOP-FHIR_PIC#02`, cioe cooperazione applicativa
+SGDT/PAI con Cartelle Elettroniche `MMG/PLS`, affiancato dai manuali COT/MMG
+per richieste di transizione e attivazione territoriale. La mappa decisionale e in
+[docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md).
+
+Per i Certificati di malattia il manifest mantiene separati:
+
+- FAQ SISS per integrazione applicativi medico/SISS e boundary `SAR`
+- Web Application Certificati di Malattia in sede di ricovero/dimissione
+
+La mappa decisionale e in
+[docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
+
+Per NAR / Anagrafe Regionale il manifest distingue:
+
+- pagina pubblica `Anagrafe Regionale degli assistiti e delle strutture`
+- manuali Gaia / gestione anagrafe / iscrizione assistiti
+- manuali GAMS / gestione anagrafe medici specialisti
+
+La mappa decisionale read-only e in
+[docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md).
+
 ## Comandi
 
 Validazione del manifest:
@@ -134,14 +168,14 @@ Flusso previsto:
 
 ## Relazione con il futuro MCP
 
-Il futuro MCP locale (`WUL-177`) dovra offrire solo:
+Il MCP locale (`WUL-177`) offre solo:
 
 - ricerca nel manifest/corpus locale
 - fetch di documenti gia acquisiti
 - navigazione per area/tag/fonte/versione
 
-Non dovra essere il meccanismo con cui si dipende da fetch live dei portali
-regionali.
+Non e il meccanismo con cui si dipende da fetch live dei portali regionali.
+Il runbook operativo MCP e in
 
 ## Nota operativa su WUL-179
 

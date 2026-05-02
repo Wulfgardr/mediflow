@@ -16,6 +16,10 @@ Riferimenti canonici:
 - [docs/walkthrough.md](./walkthrough.md)
 - [docs/COMPLIANCE.md](./COMPLIANCE.md)
 - [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
+- [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
+- [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md)
+- [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
+- [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 
 ## Stato attuale
 
@@ -64,14 +68,14 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | `Ricetta Elettronica` | `Disponibile ora` | Richiama la webapp ufficiale del `Modulo Prescrittivo Regionale` in modalita `portal-handoff`, prepara il CF negli appunti e scrive audit locale PHI-safe del launch. |
 | `Protesica-RL` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Assistente RL / Protesica-RL`, con CF pronto da incollare e diario locale delle prescrizioni protesiche. |
 | `FSE` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `OpeFseIE` con CF pronto da incollare. |
-| `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Gaia` con CF pronto da incollare. |
+| `Anagrafe Regionale` | `Disponibile ora` | Apertura contestuale via `portal-handoff` verso `Gaia` con CF pronto da incollare; il blueprint read-only e in [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md). |
 | Prontezza FSE locale | `Disponibile ora` | Il pannello paziente mostra il pre-check locale su terapie e osservazioni prima di un eventuale export/filone FSE. |
 | Stato sessione SISS / firma remota | `Disponibile ora` | Il pannello paziente legge in locale la cronologia Atlas della macchina e mostra segnali osservati di `LoginRemoteSign`, selezione ruolo e ultimo modulo SISS raggiunto, inclusa `Protesica-RL` quando osservata. |
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
 | Protesica nativa/certificata dentro MediFlow | `Non disponibile` | Il diario locale non sostituisce l'applicativo regionale e non invia prescrizioni verso SISS. |
-| FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, regole privacy e contratti regionali ulteriori. |
-| SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato, non come route pronta nel prototipo. |
-| Certificati di malattia contestuali | `Non disponibile` | La documentazione esiste, ma MediFlow non ha ancora un adapter/scenario dedicato. |
+| FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, consenso, ruolo operatore, audit e scenario approvato; la mappa dedicata e in [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md). |
+| SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato; i soli casi utili emersi sono SGDT/PAI con `SSI-MMG` e COT/transizioni, documentati in [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md). |
+| Certificati di malattia contestuali | `Non disponibile` | Il path piu prudente e una futura Web Application handoff guard; UI custom/backend restano bloccati come documentato in [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md). |
 
 ## Documenti protesici prodotti dal portale
 
@@ -143,7 +147,10 @@ La sequenza di lavoro per questo stream è:
 5. `WUL-180`: mappa di fattibilita ufficiale per separare `portal-handoff`,
    `webapp ufficiale`, `A2A`, `SSI qualificata` e capability realmente
    perseguibili
-6. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
+6. note scenario-specific dedicate prima del runtime: Modulo Prescrittivo
+   Regionale, FSE consultazione/consenso, NAR/Anagrafe read-only, SGDT/PAI e
+   Certificati di malattia
+7. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
    certificato`, se e solo se la documentazione tecnica disponibile e
    l'onboarding regionale lo rendono concretamente perseguibile
 

@@ -345,15 +345,16 @@ export default function PatientDetailPage() {
                             <p className="section-kicker">Pianificazione</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 <Calendar className="h-5 w-5 text-[color:var(--mf-accent)]" />
-                                Prossimi controlli
+                                Lavoro pianificato
                             </h3>
+                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">PRIAMO, valutazioni, visite, follow-up.</p>
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
                             <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
-                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun controllo programmato.</p>
+                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun lavoro pianificato.</p>
                                 <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
-                                    Aggiungi o pianifica
+                                    Aggiungi pianificazione
                                 </Link>
                             </div>
                         ) : (
@@ -372,7 +373,7 @@ export default function PatientDetailPage() {
                                     </div>
                                 ))}
                                 <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
-                                    Gestisci controlli
+                                    Gestisci pianificazione
                                 </Link>
                             </div>
                         )}

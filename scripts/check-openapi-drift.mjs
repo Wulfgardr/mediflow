@@ -60,7 +60,9 @@ function buildCurrentRoutes() {
         routeFiles.push(filePath);
         const source = fs.readFileSync(filePath, 'utf8');
         const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
-        const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(');
+        const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
+            || source.includes('requireNetworkCapabilityContext(')
+            || source.includes('requireNetworkWriteContext(');
         if (!hasLocalTokenGuard && !hasPairedClientGuard) {
             throw new Error(
                 `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`

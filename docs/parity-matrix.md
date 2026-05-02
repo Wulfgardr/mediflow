@@ -1,7 +1,7 @@
 # Matrice Parity Web <-> macOS (Core)
 
 Stato documento: CANONICAL (parity operativa web/native)  
-Ultimo aggiornamento: 2026-03-17
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -33,23 +33,28 @@ Riferimenti:
 
 ---
 
-## Baseline corrente (2026-02-20)
+## Baseline corrente (frozen native snapshot)
+
+Il run strict `WUL-21` del 2026-05-02 ha validato la lane automatizzata
+web+native (`web 2/2`, Xcode native `45/45`), ma non cambia gli stati modulo:
+la click-map manuale `P6` non e stata eseguita e nessun modulo core e ancora
+`FULL`. Le esenzioni in create/edit paziente risultano code-satisfied in
+`WUL-22`, la semantica delete del diario e stata riallineata in `WUL-24`, le
+osservazioni native LOINC/UCUM risultano code-satisfied in `WUL-23` e i
+cataloghi farmaci/esenzioni sono ora operabili da Settings macOS in `WUL-25`.
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Pazienti | FULL (GET/POST/PUT/DELETE) | FULL | PARTIAL (view/add/edit/delete/archive/search/sort + filtri stato) | PARTIAL (esenzioni in edit/create: P2) | FULL | FULL | PARTIAL |
-| Diario clinico (entries) | FULL | PARTIAL (add + soft-delete/restore) | FULL (add/edit/delete + filtri) | PARTIAL | PARTIAL | FULL | PARTIAL |
+| Pazienti | FULL (GET/POST/PUT/DELETE) | FULL | PARTIAL (view/add/edit/delete/archive/search/sort + filtri stato + esenzioni create/edit code-satisfied) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
+| Diario clinico (entries) | FULL | PARTIAL (add + soft-delete/restore) | FULL (add/edit/soft-delete/restore + filtri eliminati) | PARTIAL | PARTIAL | FULL | PARTIAL |
 | Terapie | FULL | FULL | PARTIAL (CRUD base, campi clinici ridotti) | PARTIAL | PARTIAL | FULL | PARTIAL |
 | Appuntamenti (checkups) | FULL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
-| Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | PARTIAL (search) | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
-| Esenzioni (catalogo + patient mapping) | FULL | FULL | PARTIAL (selector/search/save in create/edit; catalogo settings ancora mancante) | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
+| Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | FULL (search + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
+| Esenzioni (catalogo + patient mapping) | FULL | FULL | FULL (patient mapping create/edit + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 
 ## Gap principali da chiudere
 
-2. Esenzioni su macOS: completare il catalogo in Settings e la gestione operativa del catalogo stesso.
-3. Osservazioni su macOS: UI CRUD LOINC+UCUM gia presente a contratto.
-4. Diario clinico: allineare semantica delete (soft delete + restore + reason) tra web e macOS.
-5. Cataloghi farmaci/esenzioni: minima operabilita parity in Settings macOS, con esenzioni patient mapping gia attivo ma catalogo ancora da chiudere.
+2. Terapie e checkups/appuntamenti restano i gap modulo-specifici principali prima della chiusura parity formale.
 
 ## Regole di uscita (parity gate)
 

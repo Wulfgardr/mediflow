@@ -5,6 +5,8 @@ import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { DrugSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { parseApiV1Limit } from '@/lib/api-v1-route-helpers';
 
 type DrugPayload = {
     aic?: string;
@@ -16,13 +18,6 @@ type DrugPayload = {
     price?: number | null;
     atc?: string | null;
 };
-
-function parseLimit(value: string | null, fallback: number, max = 500): number {
-    if (!value) return fallback;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return fallback;
-    return Math.min(parsed, max);
-}
 
 function normalizeDrug(item: DrugPayload): typeof drugs.$inferInsert | null {
     const aic = (item.aic || '').trim();
@@ -66,7 +61,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const q = searchParams.get('q')?.trim();
         const countOnly = searchParams.get('count') === '1';
-        const limit = parseLimit(searchParams.get('limit'), q ? 60 : 200);
+        const limit = parseApiV1Limit(searchParams.get('limit'), q ? 60 : 200, 500);
 
         if (countOnly) {
             const row = await dbServer

@@ -21,6 +21,8 @@ type EntryCreateValues = {
     metadata: string | null;
     /* @Codex */
     attachments: string | null;
+    /* @Codex */
+    version: number;
     createdAt: Date;
     /* @Codex */
     updatedAt: Date;
@@ -62,7 +64,36 @@ type TherapyCreateValues = {
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate: Date | null;
+    /* @Codex */
+    version: number;
     createdAt: Date;
+    /* @Codex */
+    updatedAt: Date;
+    /* @Codex */
+    deletedAt: Date | null;
+    /* @Codex */
+    deletionReason: string | null;
+};
+
+/* @Codex */
+type TherapyUpdateValues = {
+    drugName?: string;
+    aic?: string | null;
+    atc?: string | null;
+    activePrinciple?: string | null;
+    dosage?: string;
+    motivation?: string | null;
+    diagnosisCode?: string | null;
+    diagnosisName?: string | null;
+    status?: 'active' | 'suspended' | 'completed';
+    startDate?: Date;
+    endDate?: Date | null;
+    /* @Codex */
+    updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 };
 
 /* @Codex */
@@ -74,11 +105,70 @@ type CheckupCreateValues = {
     notes: string | null;
     status: 'pending' | 'completed' | 'cancelled';
     source: CheckupSource;
+    /* @Codex */
+    version: number;
     createdAt: Date;
+    /* @Codex */
+    updatedAt: Date;
+    /* @Codex */
+    deletedAt: Date | null;
+    /* @Codex */
+    deletionReason: string | null;
+};
+
+/* @Codex */
+type CheckupUpdateValues = {
+    date?: Date;
+    title?: string;
+    notes?: string | null;
+    status?: 'pending' | 'completed' | 'cancelled';
+    source?: CheckupSource | null;
+    /* @Codex */
+    updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 };
 
 /* @Codex */
 export type CheckupSource = 'manual' | 'ai_suggestion';
+
+/* @Codex */
+type ObservationCreateValues = {
+    id: string;
+    patientId: string;
+    codeSystem: 'LOINC';
+    code: string;
+    display: string;
+    unitSystem: 'UCUM';
+    unitCode: string;
+    value: string;
+    notes: string | null;
+    observedAt: Date;
+    source: CheckupSource;
+    version: number;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+    deletionReason: string | null;
+};
+
+/* @Codex */
+type ObservationUpdateValues = {
+    codeSystem?: 'LOINC';
+    code?: string;
+    display?: string;
+    unitSystem?: 'UCUM';
+    unitCode?: string;
+    value?: string;
+    notes?: string | null;
+    observedAt?: Date;
+    source?: CheckupSource | null;
+    updatedAt?: Date;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
+};
 
 /* @Codex */
 function isNonEmptyString(value: unknown): value is string {
@@ -128,6 +218,35 @@ function parseNullableString(value: unknown, field: string): WriteNormalizationR
 function parseOptionalString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
+    }
+
+    if (typeof value !== 'string') {
+        return { ok: false, error: `Invalid ${field}` };
+    }
+
+    return { ok: true, values: value };
+}
+
+/* @Codex */
+function parseOptionalRequiredString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    const parsed = parseRequiredString(value, field);
+    if (!parsed.ok) return parsed;
+
+    return { ok: true, values: parsed.values };
+}
+
+/* @Codex */
+function parseOptionalNullableString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
+    if (value === undefined) {
+        return { ok: true, values: undefined };
+    }
+
+    if (value === null || value === '') {
+        return { ok: true, values: null };
     }
 
     if (typeof value !== 'string') {
@@ -243,6 +362,41 @@ export function normalizeOptionalCheckupSource(value: unknown): WriteNormalizati
 }
 
 /* @Codex */
+function normalizeObservationValue(value: unknown, allowClear = false): WriteNormalizationResult<string> {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return { ok: true, values: String(value) };
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        return { ok: true, values: value.trim() };
+    }
+    if (allowClear && (value === null || value === '')) {
+        return { ok: true, values: '' };
+    }
+
+    return { ok: false, error: 'Invalid value field' };
+}
+
+/* @Codex */
+function normalizeObservationCodeSystem(value: unknown): WriteNormalizationResult<'LOINC'> {
+    const codeSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (codeSystem !== 'LOINC') {
+        return { ok: false, error: 'Only LOINC observations are supported' };
+    }
+
+    return { ok: true, values: 'LOINC' };
+}
+
+/* @Codex */
+function normalizeObservationUnitSystem(value: unknown): WriteNormalizationResult<'UCUM'> {
+    const unitSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (unitSystem !== 'UCUM') {
+        return { ok: false, error: 'Only UCUM units are supported' };
+    }
+
+    return { ok: true, values: 'UCUM' };
+}
+
+/* @Codex */
 export function normalizeEntryCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -285,6 +439,7 @@ export function normalizeEntryCreateInput(
             setting: setting.values,
             metadata: metadata.values,
             attachments: attachments.values,
+            version: 1,
             createdAt: now,
             updatedAt: updatedAt.values ?? now,
         },
@@ -360,6 +515,7 @@ export function normalizeTherapyCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
 ): WriteNormalizationResult<TherapyCreateValues> {
+    const now = context.now ?? new Date();
     const drugName = parseRequiredString(input.drugName, 'drugName');
     if (!drugName.ok) return drugName;
 
@@ -414,7 +570,105 @@ export function normalizeTherapyCreateInput(
             status: normalizedStatus ?? 'active',
             startDate: startDate.values,
             endDate: nextEndDate,
-            createdAt: context.now ?? new Date(),
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeTherapyUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<TherapyUpdateValues> {
+    const drugName = parseOptionalRequiredString(input.drugName, 'drugName');
+    if (!drugName.ok) return drugName;
+
+    const dosage = parseOptionalRequiredString(input.dosage, 'dosage');
+    if (!dosage.ok) return dosage;
+
+    const startDate = parseOptionalDate(input.startDate, 'startDate');
+    if (!startDate.ok) return startDate;
+
+    const endDate = parseOptionalNullableDate(input.endDate, 'endDate');
+    if (!endDate.ok) return endDate;
+
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+
+    const aic = parseOptionalNullableString(input.aic, 'aic');
+    if (!aic.ok) return aic;
+
+    const atc = parseOptionalNullableString(input.atc, 'atc');
+    if (!atc.ok) return atc;
+
+    const activePrinciple = parseOptionalNullableString(input.activePrinciple, 'activePrinciple');
+    if (!activePrinciple.ok) return activePrinciple;
+
+    const motivation = parseOptionalNullableString(input.motivation, 'motivation');
+    if (!motivation.ok) return motivation;
+
+    const diagnosisCode = parseOptionalNullableString(input.diagnosisCode, 'diagnosisCode');
+    if (!diagnosisCode.ok) return diagnosisCode;
+
+    const diagnosisName = parseOptionalNullableString(input.diagnosisName, 'diagnosisName');
+    if (!diagnosisName.ok) return diagnosisName;
+
+    const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
+    let status: TherapyUpdateValues['status'];
+    if (hasStatus) {
+        const parsedStatus = parseTherapyStatus(input.status);
+        if (!parsedStatus) {
+            return { ok: false, error: 'Invalid therapy status' };
+        }
+        status = parsedStatus;
+    }
+
+    if (
+        drugName.values === undefined &&
+        aic.values === undefined &&
+        atc.values === undefined &&
+        activePrinciple.values === undefined &&
+        dosage.values === undefined &&
+        motivation.values === undefined &&
+        diagnosisCode.values === undefined &&
+        diagnosisName.values === undefined &&
+        status === undefined &&
+        startDate.values === undefined &&
+        endDate.values === undefined &&
+        updatedAt.values === undefined &&
+        deletedAt.values === undefined &&
+        !hasDeletionReason
+    ) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            drugName: drugName.values,
+            aic: aic.values,
+            atc: atc.values,
+            activePrinciple: activePrinciple.values,
+            dosage: dosage.values,
+            motivation: motivation.values,
+            diagnosisCode: diagnosisCode.values,
+            diagnosisName: diagnosisName.values,
+            status,
+            startDate: startDate.values,
+            endDate: endDate.values,
+            updatedAt: updatedAt.values ?? new Date(),
+            deletedAt: deletedAt.values,
+            deletionReason: hasDeletionReason ? deletionReason.values : undefined,
         },
     };
 }
@@ -424,6 +678,7 @@ export function normalizeCheckupCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
 ): WriteNormalizationResult<CheckupCreateValues> {
+    const now = context.now ?? new Date();
     const date = parseRequiredDate(input.date, 'date');
     if (!date.ok) return date;
 
@@ -451,7 +706,206 @@ export function normalizeCheckupCreateInput(
             notes: notes.values,
             status: normalizedStatus ?? 'pending',
             source: source.values,
-            createdAt: context.now ?? new Date(),
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeCheckupUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<CheckupUpdateValues> {
+    const date = parseOptionalDate(input.date, 'date');
+    if (!date.ok) return date;
+
+    const title = parseOptionalRequiredString(input.title, 'title');
+    if (!title.ok) return title;
+
+    const notes = parseOptionalNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+
+    const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
+    let status: CheckupUpdateValues['status'];
+    if (hasStatus) {
+        const parsedStatus = parseCheckupStatus(input.status);
+        if (!parsedStatus) {
+            return { ok: false, error: 'Invalid checkup status' };
+        }
+        status = parsedStatus;
+    }
+
+    const source = normalizeOptionalCheckupSource(input.source);
+    if (!source.ok) return source;
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
+
+    if (
+        date.values === undefined &&
+        title.values === undefined &&
+        notes.values === undefined &&
+        status === undefined &&
+        source.values === undefined &&
+        updatedAt.values === undefined &&
+        deletedAt.values === undefined &&
+        !hasDeletionReason
+    ) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            date: date.values,
+            title: title.values,
+            notes: notes.values,
+            status,
+            source: source.values,
+            updatedAt: updatedAt.values ?? new Date(),
+            deletedAt: deletedAt.values,
+            deletionReason: hasDeletionReason ? deletionReason.values : undefined,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeObservationCreateInput(
+    input: Record<string, unknown>,
+    context: { id: string; patientId: string; now?: Date }
+): WriteNormalizationResult<ObservationCreateValues> {
+    const now = context.now ?? new Date();
+    const codeSystem = normalizeObservationCodeSystem(input.codeSystem);
+    if (!codeSystem.ok) return codeSystem;
+
+    const code = parseRequiredString(input.code, 'code');
+    if (!code.ok) return code;
+
+    const display = parseRequiredString(input.display, 'display');
+    if (!display.ok) return display;
+
+    const unitSystem = normalizeObservationUnitSystem(input.unitSystem);
+    if (!unitSystem.ok) return unitSystem;
+
+    const unitCode = parseRequiredString(input.unitCode, 'unitCode');
+    if (!unitCode.ok) return unitCode;
+
+    const value = normalizeObservationValue(input.value);
+    if (!value.ok) return value;
+
+    const notes = parseNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+
+    const observedAt = parseRequiredDate(input.observedAt, 'observedAt');
+    if (!observedAt.ok) return observedAt;
+
+    const source = normalizeCheckupSource(input.source);
+    if (!source.ok) return source;
+
+    return {
+        ok: true,
+        values: {
+            id: context.id,
+            patientId: context.patientId,
+            codeSystem: codeSystem.values,
+            code: code.values.trim(),
+            display: display.values.trim(),
+            unitSystem: unitSystem.values,
+            unitCode: unitCode.values.trim(),
+            value: value.values,
+            notes: notes.values,
+            observedAt: observedAt.values,
+            source: source.values,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeObservationUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<ObservationUpdateValues> {
+    const update: ObservationUpdateValues = {};
+
+    if (Object.prototype.hasOwnProperty.call(input, 'codeSystem')) {
+        const codeSystem = normalizeObservationCodeSystem(input.codeSystem);
+        if (!codeSystem.ok) return codeSystem;
+        update.codeSystem = codeSystem.values;
+    }
+
+    const code = parseOptionalRequiredString(input.code, 'code');
+    if (!code.ok) return code;
+    if (code.values !== undefined) update.code = code.values.trim();
+
+    const display = parseOptionalRequiredString(input.display, 'display');
+    if (!display.ok) return display;
+    if (display.values !== undefined) update.display = display.values.trim();
+
+    if (Object.prototype.hasOwnProperty.call(input, 'unitSystem')) {
+        const unitSystem = normalizeObservationUnitSystem(input.unitSystem);
+        if (!unitSystem.ok) return unitSystem;
+        update.unitSystem = unitSystem.values;
+    }
+
+    const unitCode = parseOptionalRequiredString(input.unitCode, 'unitCode');
+    if (!unitCode.ok) return unitCode;
+    if (unitCode.values !== undefined) update.unitCode = unitCode.values.trim();
+
+    if (Object.prototype.hasOwnProperty.call(input, 'value')) {
+        const value = normalizeObservationValue(input.value);
+        if (!value.ok) return value;
+        update.value = value.values;
+    }
+
+    const notes = parseOptionalNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+    if (notes.values !== undefined) update.notes = notes.values;
+
+    const observedAt = parseOptionalDate(input.observedAt, 'observedAt');
+    if (!observedAt.ok) return observedAt;
+    if (observedAt.values !== undefined) update.observedAt = observedAt.values;
+
+    const source = normalizeOptionalCheckupSource(input.source);
+    if (!source.ok) return source;
+    if (source.values !== undefined) update.source = source.values;
+
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
+
+    if (updatedAt.values !== undefined) update.updatedAt = updatedAt.values;
+    if (deletedAt.values !== undefined) update.deletedAt = deletedAt.values;
+    if (hasDeletionReason) update.deletionReason = deletionReason.values;
+
+    if (Object.keys(update).length === 0) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            ...update,
+            updatedAt: update.updatedAt ?? new Date(),
         },
     };
 }

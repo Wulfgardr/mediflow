@@ -15,7 +15,7 @@ import type {
 } from './api/v1/types';
 
 /* @Codex */
-export const NETWORK_PROTOCOL_VERSION = '1.6.0';
+export const NETWORK_PROTOCOL_VERSION = '1.11.0';
 /* @Codex */
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
 /* @Codex */
@@ -248,6 +248,60 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Read-only remote patient access from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.readonly-clinical-diary',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only clinical diary access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-patient-profile',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired patient profile/status update boundary with optimistic concurrency; excludes AI, document, child clinical CRUD, and remote delete.'
+            ),
+            capability(
+                'network.replica.write-clinical-diary',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired clinical diary create/update boundary scoped to the active ambulatory; excludes hard delete, AI, and document-derived writes.'
+            ),
+            capability(
+                'network.replica.readonly-therapies',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only therapy access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-therapies',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired therapy create/update/soft-delete boundary with optimistic concurrency; excludes hard delete, AI, and document-derived writes.'
+            ),
+            capability(
+                'network.replica.readonly-checkups',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only checkup access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-checkups',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired checkup create/update/soft-delete boundary with optimistic concurrency; excludes hard delete, AI, and document-derived writes.'
+            ),
+            capability(
+                'network.replica.readonly-observations',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only observation access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-observations',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired observation create/update/soft-delete boundary with optimistic concurrency; excludes hard delete, AI, and document-derived writes.'
             ),
             capability(
                 'network.replica.sync',

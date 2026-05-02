@@ -5,34 +5,56 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-05-01
+## [Unreleased]
+
+## [0.6.0] - 2026-05-02
+
+> Nota release: `v0.6.0` formalizza il ciclo post-`v0.5.0`: MediFlow non e piu
+> soltanto web app locale + AI governata, ma un sistema local-first con Mac
+> `home-base`, primi client Apple paired, document intelligence artifact-first,
+> boundary SISS/FSE piu maturi e coda operativa MediFlow azzerata. Restano fuori
+> scope sync completo, hard delete remoto, attachment remoti, cataloghi remoti,
+> runtime AI remoto di default e integrazione regionale nativa certificata.
 
 ### ✨ Aggiunto
 
+- **Update awareness locale**: pannello Impostazioni per confrontare versione installata e versione disponibile dichiarata da runtime/manifest locale, con changelog minimo e azione `Piu tardi` senza egress automatico.
 - **Home-base read-only eseguibile**: modalita `network-home-base`, overview Settings, pairing PHI-safe e primo data plane `/api/v1/network/patients*` protetto da `paired client + sessione operatore`.
+- **Mac home-base packaged**: il bundle macOS usa la shell Apple/home-base come entrypoint, gestisce esplicitamente backend web production e proxy TLS con stop bounded/escalation, e mantiene Ollama/Docker-ICD come diagnostica read-only non app-managed.
+- **Client iPhone/iPad paired non-AI**: lista/dettaglio pazienti, cache mobile cifrata con stato offline degradato e primi workflow online versionati sui moduli core tramite `/api/v1/network/*`, senza accesso diretto a SQLite.
+- **Write paired profilo e diario**: boundary `/api/v1/network/patients/{id}` e `/api/v1/network/patients/{id}/entries*` con capability dedicate, `version`, conflitti `409` PHI-safe e soft delete del diario.
+- **Write paired terapie**: boundary `/api/v1/network/patients/{id}/therapies*` con capability dedicate, `therapies.version`, soft delete e niente prescribing SISS o campi AI/document-derived.
+- **Write paired osservazioni**: boundary `/api/v1/network/patients/{id}/observations*` con capability dedicate, `observations.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
+- **Write paired checkup**: boundary `/api/v1/network/patients/{id}/checkups*` con capability dedicate, `checkups.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
 - **Document intelligence piu esplicita**: first slice runtime del `document evidence ledger` con artifact `parse/evidence` cifrato sugli allegati e primo consumer artifact-first in `AI Patient Insight`.
+- **Parse/evidence section-aware**: artifact documentali con `sectionMap`, ancore `page/section/snippet` e conflitti terapeutici reviewable senza migrazione DB o auto-write.
 - **Nuova anagrafica document-driven reviewable**: create-flow da documento con review esplicita, riconciliazione locale ICD/AIFA e persistenza prudente delle terapie confermate.
 - **Clinical Workbench unico su `main`**: preview profiles runtime ritirati; AI, Smart Import e contesto paziente SISS/FSE vivono nella shell ufficiale.
 - **Corpus SISS/FSE locale**: manifest sorgenti, sync incrementale e report di freschezza preparano le integrazioni regionali future senza entrare nel runtime clinico.
 - **Lane AI opt-in e shadow-only piu disciplinate**: comparator cloud `gpt-5.4` per engineering interno e adapter OpenMed `redaction.v1` separato dal runtime clinico.
+- **MLX parity benchmark-visible**: MLX e visibile in benchmark, model parliament e diagnostica home-base read-only, con guard dedicato; Ollama resta runtime clinico standard e OCR resta Ollama-only.
 
 ### 🧪 Migliorato
 
 - **Smart Import piu prudente**: normalizzazione therapy-state, guard su terapie `manual-only` o senza posologia sufficiente e soppressione dei duplicati referral-only quando la fonte non introduce novita clinica.
 - **Input documentali piu robusti**: normalizzazione condivisa per PDF/CDA/CCD e riuso della stessa recovery path nei consumer documentali principali.
 - **Resolver clinici benchmarkabili**: runner dedicati WHO ICD-11 e AIFA per misurare recall, latenza e mismatch reali sul catalogo locale.
+- **Parity legacy chiusa**: i tracker web/macOS storici sono stati rolluppati, con click-map e manifest Apple-wide a distinguere evidenza coperta da gap futuri.
 
 ### 🔒 Hardening
 
 - **Shell locale piu resiliente ai drift di revisione**: fingerprint di sorgente, endpoint `/api/system/revision`, reload soft delle tab attive e reset `.next` source-aware nello start script.
+- **Boundary paired piu espliciti**: profilo, diario, terapie, checkup e osservazioni hanno capability e ADR dedicate, con hard delete remoto, sync, cataloghi e campi AI/documentali fuori scope.
+- **Standalone runtime guard**: il bundle home-base blocca artefatti locali, database, tmp e documenti privati prima di copiare il backend production nel `.app`.
 
 ### 📚 Documentazione
 
 - **Lettura completa dello stato sistema**: aggiunto `docs/STATE_OF_THE_SYSTEM.md` come punto canonico unico per prodotto, runtime, dati, sicurezza, AI/document intelligence, home-base, SISS/FSE, Apple clients e split private/OSS.
 - **Repo/GitHub riallineati al runtime reale**: README, piani, walkthrough, topologia dati, roadmap e sintesi architetturale descrivono ora `home-base` read-only, artifact `parse/evidence`, comparator/shadow lane e guard di revisione della shell locale.
-- **Narrativa `v0.5` piu chiara**: README, FAQ, roadmap, architettura e mappe documentali raccontano lo stato corrente senza confronti interni, con Clinical Workbench unico, boundary SISS attuale e direzione `macOS + iPadOS/iPhone` tramite `home-base`.
-- **Sweep WUL-203**: riferimento, supporto e overview docs riallineati allo stato corrente di `main`, con rimozione dei residui che presentavano i preview profiles come runtime disponibile.
+- **Narrativa `v0.6` piu chiara**: README, FAQ, roadmap, architettura e mappe documentali raccontano lo stato corrente senza confronti interni, con Clinical Workbench unico, boundary SISS attuale, `home-base` packaged e client Apple paired.
+- **Sweep documentale**: riferimento, supporto e overview docs riallineati allo stato corrente di `main`, con rimozione dei residui che presentavano i preview profiles come runtime disponibile.
 - **Copy pubblico piu armonico**: le superfici GitHub privilegiano prodotto, architettura e uso reale, senza rimandi a processi interni o screenshot non piu rappresentativi.
+- **Release narrative `v0.6.0`**: documentazione privata e OSS riallineata per presentare home-base, Apple paired, document intelligence artifact-first e governance chiusa come release corrente.
 
 ## [0.5.0] - 2026-03-29
 

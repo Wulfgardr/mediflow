@@ -10,7 +10,7 @@ function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): Networ
             displayName: 'MediFlow Studio',
             role: 'home-base-candidate',
             operatingMode: 'local-only',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             transport: {
                 apiBasePath: '/api/v1',
                 tlsRequired: true,
@@ -25,7 +25,7 @@ function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): Networ
             trustedSession: false,
             degradedReason: null,
             authMode: 'bearer-token',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             replica: {
                 strategy: 'encrypted-snapshot-mirror',
                 state: 'local-only',
@@ -139,7 +139,7 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
             displayName: 'MediFlow Studio',
             role: 'home-base-candidate',
             operatingMode: 'network-home-base',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             transport: {
                 apiBasePath: '/api/v1',
                 tlsRequired: true,
@@ -154,7 +154,7 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
             trustedSession: false,
             degradedReason: null,
             authMode: 'paired-client-plus-session',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             replica: {
                 strategy: 'encrypted-snapshot-mirror',
                 state: 'unpaired',
@@ -254,7 +254,7 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
             trustedSession: false,
             degradedReason: null,
             authMode: 'paired-client-plus-session',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             replica: {
                 strategy: 'encrypted-snapshot-mirror',
                 state: 'unpaired',
@@ -310,7 +310,7 @@ test('deriveNetworkOperatingModeViewModel treats paired-online as a real active 
             displayName: 'MediFlow Studio',
             role: 'home-base-candidate',
             operatingMode: 'network-home-base',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             transport: {
                 apiBasePath: '/api/v1',
                 tlsRequired: true,
@@ -325,7 +325,7 @@ test('deriveNetworkOperatingModeViewModel treats paired-online as a real active 
             trustedSession: true,
             degradedReason: null,
             authMode: 'paired-client-plus-session',
-            protocolVersion: '1.6.0',
+            protocolVersion: '1.11.0',
             replica: {
                 strategy: 'encrypted-snapshot-mirror',
                 state: 'online',
