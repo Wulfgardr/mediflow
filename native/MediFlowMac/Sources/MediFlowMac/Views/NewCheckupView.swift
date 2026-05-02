@@ -8,6 +8,7 @@ struct NewCheckupView: View {
     let onCreated: () -> Void
 
     @State private var title = ""
+    @State private var notes = ""
     @State private var date = Date()
     @State private var status = "pending"
     @State private var isSaving = false
@@ -25,6 +26,8 @@ struct NewCheckupView: View {
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 90)
                 }
             }
 
@@ -54,13 +57,22 @@ struct NewCheckupView: View {
         defer { isSaving = false }
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "Titolo richiesto"
             return
         }
 
         do {
-            let payload = CreateCheckupPayload(date: date, title: trimmedTitle, status: status)
+            let payload = CreateCheckupPayload(
+                date: date,
+                title: trimmedTitle,
+                /* @Codex */
+                notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                status: status,
+                /* @Codex */
+                source: "manual"
+            )
             _ = try await LocalAPIClient.shared.createCheckup(patientId: patientId, payload: payload)
             onCreated()
             dismiss()

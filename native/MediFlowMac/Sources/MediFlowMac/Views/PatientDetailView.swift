@@ -1880,6 +1880,12 @@ private struct CheckupRowView: View {
                 Text(dateFormatter.string(from: checkup.date))
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                if let notes = cleaned(checkup.notes) {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
 
             /* @Codex */
@@ -1908,6 +1914,12 @@ private struct CheckupRowView: View {
         case "cancelled": return .red
         default: return .secondary
         }
+    }
+
+    /* @Codex */
+    private func cleaned(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var dateFormatter: DateFormatter {
@@ -2332,6 +2344,7 @@ private struct EditCheckupView: View {
     let onSaved: () -> Void
 
     @State private var title: String
+    @State private var notes: String
     @State private var date: Date
     @State private var status: String
     @State private var isSaving = false
@@ -2342,6 +2355,7 @@ private struct EditCheckupView: View {
         self.checkup = checkup
         self.onSaved = onSaved
         _title = State(initialValue: checkup.title)
+        _notes = State(initialValue: checkup.notes ?? "")
         _date = State(initialValue: checkup.date)
         _status = State(initialValue: normalizedCheckupStatus(checkup.status))
     }
@@ -2358,6 +2372,8 @@ private struct EditCheckupView: View {
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 90)
                 }
             }
 
@@ -2387,13 +2403,20 @@ private struct EditCheckupView: View {
         defer { isSaving = false }
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "Titolo richiesto"
             return
         }
 
         do {
-            let payload = UpdateCheckupPayload(date: date, title: trimmedTitle, status: status)
+            let payload = UpdateCheckupPayload(
+                date: date,
+                title: trimmedTitle,
+                /* @Codex */
+                notes: trimmedNotes.isEmpty ? .null : .value(trimmedNotes),
+                status: status
+            )
             try await LocalAPIClient.shared.updateCheckup(patientId: patientId, checkupId: checkup.id, payload: payload)
             onSaved()
             dismiss()

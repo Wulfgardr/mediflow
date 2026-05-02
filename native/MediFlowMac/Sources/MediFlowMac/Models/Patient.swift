@@ -138,8 +138,20 @@ struct CheckupSummary: Identifiable, Decodable {
     let patientId: String
     let date: Date
     let title: String
+    /* @Codex */
+    let notes: String?
     let status: String
+    /* @Codex */
+    let source: String?
+    /* @Codex */
+    let version: Int?
     let createdAt: Date?
+    /* @Codex */
+    let updatedAt: Date?
+    /* @Codex */
+    let deletedAt: Date?
+    /* @Codex */
+    let deletionReason: String?
 }
 
 /* @Codex */

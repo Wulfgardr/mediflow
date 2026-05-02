@@ -503,6 +503,13 @@ principio attivo, posologia, motivazione, indicazione ICD o sentinelle
 per svuotare esplicitamente campi opzionali senza lasciare valori clinici
 stale.
 
+I form appuntamento/checkup nativi restano volutamente semplici ma allineati
+al contratto `/api/v1/patients/{id}/checkups*`: data, titolo, note operative,
+stato e source `manual` in creazione. Le note sono visibili nella scheda
+paziente e modificabili con clear esplicito, mentre `version`, `updatedAt` e
+tombstone metadata restano disponibili come metadata di contratto per i client
+nativi.
+
 ### Avvio rapido
 
 - Web + servizi: `./Start_MediFlow.command`

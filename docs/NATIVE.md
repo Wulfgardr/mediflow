@@ -32,6 +32,9 @@ Lo snapshot corrente supporta comunque:
   Le terapie native usano lo stesso contratto `/api/v1` della web UI per
   farmaco AIFA/manuale, AIC/ATC, principio attivo, posologia, motivazione,
   indicazione ICD/sentinella, date e stato.
+  I controlli/appuntamenti nativi mantengono parita sul contratto condiviso
+  per data, titolo, note operative, stato, source manuale e metadata di
+  versione restituita dal backend.
 * **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
 * **Sicurezza**: lock screen con PIN, cifratura in memoria e certificate pinning.
 

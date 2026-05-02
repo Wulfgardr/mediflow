@@ -1113,14 +1113,46 @@ struct UpdateTherapyPayload: Encodable {
 struct CreateCheckupPayload: Encodable {
     let date: Date
     let title: String
+    /* @Codex */
+    let notes: String?
     let status: String
+    /* @Codex */
+    let source: String?
 }
 
 /* @Codex */
 struct UpdateCheckupPayload: Encodable {
     let date: Date?
     let title: String?
+    let notes: PatchValue<String>
     let status: String?
+
+    init(
+        date: Date? = nil,
+        title: String? = nil,
+        notes: PatchValue<String> = .omit,
+        status: String? = nil
+    ) {
+        self.date = date
+        self.title = title
+        self.notes = notes
+        self.status = status
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case date
+        case title
+        case notes
+        case status
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(date, forKey: .date)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodePatch(notes, forKey: .notes)
+        try container.encodeIfPresent(status, forKey: .status)
+    }
 }
 
 /* @Codex */

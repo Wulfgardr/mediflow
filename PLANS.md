@@ -232,7 +232,7 @@ Nota operativa:
 - [x] `P3` Osservazioni native: esporre in UI macOS il CRUD `LOINC + UCUM` gia disponibile a contratto (`/api/v1/patients/:id/observations`). Evidenza `WUL-23` del 2026-05-02: UI macOS gia presente con lista/create/edit/delete, editor LOINC/UCUM, validazioni e test nativi su payload, route client ed editor; la click-map manuale completa resta nel gate `P6`.
 - [x] `P4` Diario clinico: allineare semantica delete web/native (soft delete + restore + reason) per evitare drift comportamentale. Evidenza `WUL-24` del 2026-05-02: `/api/v1/patients/{id}/entries*` locale nasconde i tombstone di default, espone `includeDeleted=true`, soft-delete/restore via `PUT`, `DELETE` locale sicuro come tombstone validato, macOS usa reason sheet + restore e non usa piu hard delete per le entry.
 - [x] `P5` Cataloghi farmaci/esenzioni: minima operabilita native in Settings senza storage duplicato. Evidenza `WUL-25` del 2026-05-02: pane macOS `Cataloghi` con status/count, import JSON e clear per farmaci via `/api/v1/drugs` ed esenzioni via `/api/exemptions`, piu test nativi sulle route client.
-- [ ] `P6` Chiusura parity: smoke test manuale capability-by-capability su web/native + aggiornamento `docs/walkthrough.md`; bloccata/deferita fino al rebuild della shell nativa e al gap residuo tracciato in `WUL-77`. `WUL-76` ha chiuso la parita campi/flex delle terapie native.
+- [ ] `P6` Chiusura parity: smoke test manuale capability-by-capability su web/native + aggiornamento `docs/walkthrough.md`; sbloccata a livello di gap modulo-specifici da `WUL-76` e `WUL-77`, ma ancora dipendente dalla click-map manuale sullo snapshot nativo.
 
 Ordine di consegna consigliato (incrementale):
 1. `P0` + `P1`

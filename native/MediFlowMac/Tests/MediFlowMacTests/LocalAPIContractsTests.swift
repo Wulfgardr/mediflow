@@ -159,6 +159,73 @@ final class LocalAPIContractsTests: XCTestCase {
         XCTAssertTrue(json["endDate"] is NSNull)
     }
 
+    /* @Codex */
+    func testCheckupSummaryDecodesApiV1ParityFields() throws {
+        let payload = """
+        {
+          "id": "checkup-1",
+          "patientId": "patient-1",
+          "date": "1970-01-01T00:00:00Z",
+          "title": "Visita programmata",
+          "notes": "Portare esami ematici",
+          "status": "pending",
+          "source": "manual",
+          "version": 2,
+          "createdAt": "1970-01-01T00:00:00Z",
+          "updatedAt": "1970-01-02T00:00:00Z",
+          "deletedAt": null,
+          "deletionReason": null
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let checkup = try decoder.decode(CheckupSummary.self, from: payload)
+
+        XCTAssertEqual(checkup.notes, "Portare esami ematici")
+        XCTAssertEqual(checkup.source, "manual")
+        XCTAssertEqual(checkup.version, 2)
+        XCTAssertEqual(checkup.updatedAt, Date(timeIntervalSince1970: 86_400))
+        XCTAssertNil(checkup.deletedAt)
+        XCTAssertNil(checkup.deletionReason)
+    }
+
+    /* @Codex */
+    func testCreateCheckupPayloadEncodesNotesAndManualSource() throws {
+        let payload = CreateCheckupPayload(
+            date: Date(timeIntervalSince1970: 0),
+            title: "Visita programmata",
+            notes: "Portare esami ematici",
+            status: "pending",
+            source: "manual"
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["date"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertEqual(json["title"] as? String, "Visita programmata")
+        XCTAssertEqual(json["notes"] as? String, "Portare esami ematici")
+        XCTAssertEqual(json["status"] as? String, "pending")
+        XCTAssertEqual(json["source"] as? String, "manual")
+    }
+
+    /* @Codex */
+    func testUpdateCheckupPayloadEncodesNullForClearedNotes() throws {
+        let payload = UpdateCheckupPayload(
+            date: Date(timeIntervalSince1970: 0),
+            title: "Visita programmata",
+            notes: .null,
+            status: "completed"
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["date"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertEqual(json["title"] as? String, "Visita programmata")
+        XCTAssertTrue(json["notes"] is NSNull)
+        XCTAssertEqual(json["status"] as? String, "completed")
+    }
+
     func testObservationSummaryDecodesLoincUcumObservationFromApiV1() throws {
         let payload = """
         {
