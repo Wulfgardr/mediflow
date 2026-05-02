@@ -10,7 +10,7 @@
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-05-01
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -37,6 +37,9 @@ La fotografia corrente e questa:
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
   verso client paired su rete fidata: lettura pazienti e primo write
   profilo/status paziente con `version`.
+- **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
+  superficie primaria e mostra readiness runtime locale read-only; il prototype
+  oncologico e separato e non definisce MediFlow prodotto.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali.
@@ -173,7 +176,8 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo; il bundle compilato corrente monta il prototipo oncologico come entrypoint | Rebuild controllato |
+| macOS Apple shell | First slice WUL-192 | Entry point del bundle macOS: shell Apple/home-base con pannello runtime read-only | Rebuild controllato, supervisione processi ancora aperta |
+| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
 | iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |

@@ -34,6 +34,7 @@ public struct AppleFoundationOverviewView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 safetyNotes
+                HomeBaseRuntimeStatusView()
                 lanes
                 milestones
             }
@@ -272,6 +273,12 @@ public struct AppleFoundationMobileRootView: View {
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)
                 .background(PlatformColors.groupedBackground)
+        case .runtime:
+            ScrollView {
+                HomeBaseRuntimeStatusView()
+                    .padding(20)
+            }
+            .background(PlatformColors.groupedBackground)
         case .modules:
             PairedPatientsWorkspaceView()
         case .milestones:
@@ -284,6 +291,105 @@ public struct AppleFoundationMobileRootView: View {
                 .padding(20)
             }
             .background(PlatformColors.groupedBackground)
+        }
+    }
+}
+
+public struct HomeBaseRuntimeStatusView: View {
+    @State private var snapshot = HomeBaseRuntimeStatusLoader.load()
+
+    public init() {}
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Runtime home-base")
+                        .font(.headline)
+                    Text(snapshot.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Button {
+                    snapshot = HomeBaseRuntimeStatusLoader.load()
+                } label: {
+                    Label("Aggiorna", systemImage: "arrow.clockwise")
+                }
+                .accessibilityIdentifier("homebase-runtime-refresh-button")
+            }
+
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+                runtimeRow("Server", value: snapshot.baseURL ?? "Non configurato")
+                runtimeRow("Modalita rete", value: snapshot.networkMode ?? "Non registrata")
+                runtimeRow("Ultimo setup", value: snapshot.generatedAt ?? "Non registrato")
+                runtimeRow("Cartella dati", value: snapshot.dataDirectory)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(snapshot.components) { component in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: symbolName(for: component.state))
+                            .foregroundStyle(tintColor(for: component.state))
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(component.title)
+                                .font(.subheadline.weight(.semibold))
+                            Text(component.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 12)
+                        Text(component.state.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(tintColor(for: component.state))
+                    }
+                }
+            }
+
+            Text("Questo pannello non avvia ancora processi: mostra solo config, token presence, proxy PID e fingerprint. La supervisione app-managed resta esplicitamente fuori da questo slice.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .cardStyle()
+        .accessibilityIdentifier("homebase-runtime-status-card")
+    }
+
+    private func runtimeRow(_ title: String, value: String) -> some View {
+        GridRow {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func symbolName(for state: HomeBaseRuntimeComponentState) -> String {
+        switch state {
+        case .ready:
+            return "checkmark.circle.fill"
+        case .missing:
+            return "xmark.circle.fill"
+        case .mismatch:
+            return "exclamationmark.triangle.fill"
+        case .unknown:
+            return "questionmark.circle.fill"
+        }
+    }
+
+    private func tintColor(for state: HomeBaseRuntimeComponentState) -> Color {
+        switch state {
+        case .ready:
+            return .green
+        case .missing:
+            return .red
+        case .mismatch:
+            return .orange
+        case .unknown:
+            return .secondary
         }
     }
 }

@@ -54,11 +54,11 @@ Il closeout `WUL-26` del 2026-05-02 ha rieseguito lo strict smoke automatizzato
 post-moduli con esito `PASS` (`web PASS`, `native xcode PASS`) in
 `tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md`.
 Questo chiude la track legacy come evidenza documentale/code-satisfied, non come
-dichiarazione di UI parity piena del bundle macOS compilato: l'entrypoint
-corrente di `MediFlowMacApp` monta il prototipo oncologico, mentre la shell
-clinica MediFlow legacy resta snapshot congelato. La prossima verifica
-capability-by-capability appartiene al filone Apple-native/home-base
-(`WUL-187`/`WUL-194`).
+dichiarazione di UI parity piena del vecchio bundle macOS. Il primo slice
+`WUL-192` sposta l'entrypoint compilato su Apple Foundation/home-base e aggiunge
+osservabilita runtime read-only; non riapre la vecchia shell clinica come UI
+ufficiale. La prossima verifica capability-by-capability appartiene al filone
+Apple-native/home-base (`WUL-187`/`WUL-194`).
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -68,6 +68,19 @@ capability-by-capability appartiene al filone Apple-native/home-base
 | Appuntamenti (checkups) | FULL | PARTIAL (form paziente con date/title/notes/status/source manuale) | FULL (CRUD + note operative, status, source manuale, metadata contratto) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 | Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | FULL (search + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 | Esenzioni (catalogo + patient mapping) | FULL | FULL | FULL (patient mapping create/edit + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
+
+### Runtime home-base Apple
+
+`WUL-192` introduce una prima superficie osservabile nel bundle macOS:
+
+- finestra primaria Apple Foundation/home-base invece del prototipo oncologico;
+- pannello runtime read-only con config nativa, presenza token, PID proxy,
+  modalita rete e fingerprint TLS;
+- nessuna supervisione automatica ancora dichiarata per backend Next.js, proxy
+  TLS, Ollama o container Docker.
+
+Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
+per la track Apple-wide successiva, non una nuova certificazione di parity UI.
 
 ## Gap principali da chiudere
 

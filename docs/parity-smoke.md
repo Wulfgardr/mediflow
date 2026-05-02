@@ -98,11 +98,12 @@ legittimi. Il test e stato stabilizzato con `data-testid` dedicati ai filtri
 pazienti e il rerun strict e passato.
 
 Questo run certifica l'harness automatizzato sullo stato corrente di `main`, ma
-non trasforma il bundle macOS compilato in prova di parity clinica: l'entrypoint
-attuale di `MediFlowMacApp` monta il prototipo oncologico, mentre la superficie
-clinica legacy resta codice/snapshot congelato. La chiusura parity UI piena
-passa quindi dal filone Apple-native corrente (`WUL-187`/`WUL-194`), non dal
-rilancio della vecchia click-map sul bundle compilato.
+non trasforma la vecchia shell macOS in prova di parity clinica. Con `WUL-192`
+l'entrypoint compilato passa al shell Apple/home-base, mentre la superficie
+clinica legacy resta codice/snapshot congelato e il prototipo oncologico resta
+separato. La chiusura parity UI piena passa quindi dal filone Apple-native
+corrente (`WUL-187`/`WUL-194`), non dal rilancio della vecchia click-map sul
+bundle compilato.
 
 ---
 

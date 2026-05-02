@@ -487,8 +487,15 @@ Flusso:
 1) Genera certificato self-signed  
 2) Avvia proxy HTTPS su `:3443`  
 3) Scrive `~/Library/Application Support/MediFlow/native-config.json`
+4) Scrive `runtime-status.json` nella stessa cartella con timestamp,
+   `baseURL`, fingerprint TLS, modalita rete e metadati proxy PHI-free
 
-La app macOS usa TLS pinning in `LocalAPIClient`.
+La app macOS usa TLS pinning in `LocalAPIClient`. La finestra primaria del
+bundle compilato e ora il shell Apple/home-base: il pannello `Runtime` legge
+`native-config.json` e `runtime-status.json` per mostrare readiness locale senza
+esporre token, certificati, chiavi o dati paziente. Questo e solo osservabilita:
+backend Next.js, proxy TLS, Ollama e Docker non sono ancora supervisionati dalla
+app.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
 operabilita amministrativa dei dataset condivisi: count/stato, import JSON e
@@ -591,12 +598,13 @@ sequenceDiagram
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
 - Il vecchio shell macOS resta congelato e non va rilanciato come base di
-  delivery: i thin slice parity legacy sono code-satisfied, ma il bundle
-  `MediFlowMac` compilato oggi monta il prototipo oncologico come entrypoint,
-  non la shell clinica MediFlow storica.
+  delivery: i thin slice parity legacy sono code-satisfied, mentre il bundle
+  `MediFlowMac` compilato ora apre il shell Apple/home-base come entrypoint.
+  Il prototipo oncologico resta separato e non va confuso con MediFlow prodotto
+  o con OncoBackboneMac.
 - `WUL-26` chiude la track parity legacy come closeout documentale: strict
   smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
-  di UI parity piena sul bundle macOS corrente. La prossima click-map
+  di UI parity piena della vecchia shell clinica. La prossima click-map
   capability-by-capability appartiene al filone Apple-native/home-base.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 

@@ -25,10 +25,11 @@ Il client nativo documentato qui non e piu la base per nuova delivery incrementa
 * **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
 * **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
 * **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
-* **Entrypoint compilato corrente**: `MediFlowMacApp` monta il prototipo
-  oncologico, non la shell clinica MediFlow legacy. Le note di parity qui sotto
-  documentano codice/contratti da preservare, non una garanzia che il bundle
-  attuale esponga quella UI come prodotto.
+* **Entrypoint compilato corrente**: `MediFlowMacApp` apre la shell
+  Apple/home-base come finestra primaria. Il prototipo oncologico resta
+  apribile come finestra separata e non va confuso con MediFlow prodotto o con
+  OncoBackboneMac, che e un'applicazione distinta usabile solo come riferimento
+  visuale esterno.
 
 Lo snapshot corrente supporta comunque:
 
@@ -61,6 +62,9 @@ Lo snapshot corrente supporta comunque:
 * configura TLS locale
 * compila il client nativo
 * apre la app macOS
+* registra `runtime-status.json` accanto a `native-config.json`, cosi il
+  pannello runtime nella app puo mostrare lo stato del bootstrap senza esporre
+  token o contenuti sensibili
 
 **Opzione B: setup sviluppatore**
 
@@ -100,6 +104,23 @@ npm run test:parity:smoke
 ---
 
 ## Funzionalità principali
+
+### 0. Shell Apple/home-base e runtime locale
+
+La finestra primaria della app macOS e il shell Apple/home-base condiviso con
+la family architecture. In questa slice il bundle **osserva** il runtime locale:
+
+* legge `~/Library/Application Support/MediFlow/native-config.json`;
+* legge `runtime-status.json` prodotto da `scripts/native-setup.sh`;
+* mostra server, modalita rete, presenza token, PID proxy e coerenza del
+  fingerprint TLS;
+* non mostra mai token, certificati, chiavi o dati paziente;
+* non avvia e non supervisiona ancora backend Next.js, proxy TLS, Ollama o
+  container Docker.
+
+La promessa completa di `home-base packaged` resta quindi progressiva: il
+prossimo slice dovra sostituire il launcher/script con supervisione
+app-managed, recovery leggibile e packaging firmabile/notarizzabile.
 
 ### 1. Lock Screen & Sicurezza
 

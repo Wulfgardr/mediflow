@@ -129,9 +129,9 @@ Closeout documentale eseguito il 2026-05-02.
 
 - Run strict automatizzato post `WUL-25`/`WUL-76`/`WUL-77`: `PASS`
   (`tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md`).
-- Probe AX read-only: non applicabile al bundle compilato corrente. Il probe
-  cerca la shell clinica legacy (`patients-ambulatory-picker` ecc.), ma
-  `MediFlowMacApp` oggi monta il prototipo oncologico come entrypoint compilato.
+- Probe AX read-only: non applicabile alla vecchia shell clinica. Il probe cerca
+  identificativi legacy (`patients-ambulatory-picker` ecc.), mentre `WUL-192`
+  sposta l'entrypoint compilato verso Apple Foundation/home-base.
 - Esito P6: non dichiarare `FULL` UI parity sul vecchio bundle macOS. I gap
   modulo-specifici legacy sono chiusi come code-satisfied; la verifica
   capability-by-capability va spostata sul nuovo filone Apple-native/home-base
