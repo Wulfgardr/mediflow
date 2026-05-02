@@ -297,6 +297,7 @@ public struct AppleFoundationMobileRootView: View {
 
 public struct HomeBaseRuntimeStatusView: View {
     @State private var snapshot = HomeBaseRuntimeStatusLoader.load()
+    @State private var optionalServices = HomeBaseOptionalServicesSnapshot.initial
     @StateObject private var supervisor = HomeBaseRuntimeSupervisor()
 
     public init() {}
@@ -314,6 +315,7 @@ public struct HomeBaseRuntimeStatusView: View {
                 Spacer(minLength: 12)
                 Button {
                     snapshot = HomeBaseRuntimeStatusLoader.load()
+                    Task { await refreshOptionalServices() }
                 } label: {
                     Label("Aggiorna", systemImage: "arrow.clockwise")
                 }
@@ -381,31 +383,28 @@ public struct HomeBaseRuntimeStatusView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(snapshot.components) { component in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: symbolName(for: component.state))
-                            .foregroundStyle(tintColor(for: component.state))
-                            .frame(width: 18)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(component.title)
-                                .font(.subheadline.weight(.semibold))
-                            Text(component.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 12)
-                        Text(component.state.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(tintColor(for: component.state))
-                    }
+                    runtimeComponentRow(
+                        title: component.title,
+                        detail: component.detail,
+                        state: component.state,
+                        accessibilityIdentifier: "homebase-runtime-component-\(component.id)"
+                    )
                 }
             }
 
-            Text("Questo pannello puo avviare o arrestare backend web production e proxy TLS locali. Ollama e Docker/ICD restano fuori da questo slice e non vengono installati o supervisionati automaticamente.")
+            Divider()
+
+            optionalServicesSection
+
+            Text("Backend web e proxy TLS sono gli unici servizi gestiti dalla app. Ollama e Docker/ICD sono mostrati a scopo diagnostico e non vengono mai installati o avviati automaticamente.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .cardStyle()
         .accessibilityIdentifier("homebase-runtime-status-card")
+        .task {
+            await refreshOptionalServices()
+        }
     }
 
     private func runtimeRow(_ title: String, value: String) -> some View {
@@ -441,6 +440,69 @@ public struct HomeBaseRuntimeStatusView: View {
         snapshot = HomeBaseRuntimeStatusLoader.load()
     }
     #endif
+
+    private var optionalServicesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Servizi opzionali")
+                    .font(.subheadline.weight(.semibold))
+                Text("Rilevati solo se gia attivi. La app non li installa, avvia o arresta.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(optionalServices.services) { service in
+                runtimeComponentRow(
+                    title: service.title,
+                    detail: service.detail,
+                    state: service.state,
+                    accessibilityIdentifier: accessibilityIdentifier(for: service)
+                )
+            }
+        }
+        .padding(.top, 4)
+        .accessibilityIdentifier("homebase-runtime-optional-section")
+    }
+
+    private func runtimeComponentRow(
+        title: String,
+        detail: String,
+        state: HomeBaseRuntimeComponentState,
+        accessibilityIdentifier: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbolName(for: state))
+                .foregroundStyle(tintColor(for: state))
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            Text(state.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tintColor(for: state))
+        }
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private func accessibilityIdentifier(for service: HomeBaseOptionalServiceStatus) -> String {
+        switch service.id {
+        case "optional-ollama":
+            return "homebase-runtime-optional-ollama"
+        case "optional-docker-icd":
+            return "homebase-runtime-optional-docker"
+        default:
+            return "homebase-runtime-\(service.id)"
+        }
+    }
+
+    private func refreshOptionalServices() async {
+        optionalServices = await HomeBaseOptionalServicesProbe.probe()
+    }
 
     private func symbolName(for state: HomeBaseRuntimeComponentState) -> String {
         switch state {

@@ -31,9 +31,9 @@ Questo script:
 
 Dentro l'app, il pannello `Runtime` puo avviare/arrestare esplicitamente il
 backend web production standalone e il proxy TLS inclusi nel bundle. I servizi
-opzionali Ollama e Docker/ICD restano fuori dalla supervisione app-managed e
-continuano a richiedere gestione separata finche un slice successivo non
-definisce policy, consenso e recovery dedicati.
+opzionali Ollama e Docker/ICD sono mostrati come health diagnostico read-only
+quando gia attivi su `127.0.0.1:11434` e `127.0.0.1:8888`, ma restano fuori
+dalla supervisione app-managed e continuano a richiedere gestione separata.
 
 Prima di impacchettare il backend standalone nel bundle, eseguire:
 

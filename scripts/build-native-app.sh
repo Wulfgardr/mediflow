@@ -11,6 +11,7 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 WEB_RUNTIME_DIR="$APP_RESOURCES/WebRuntime"
 
 echo "Building MediFlow web runtime (standalone)..."
+rm -rf "$WEB_RUNTIME_DIR"
 cd "$ROOT_DIR"
 npm run build
 npm run check:standalone-runtime-bundle

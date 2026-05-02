@@ -119,12 +119,15 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
 * puo avviare e arrestare esplicitamente il backend web production locale;
 * puo avviare e arrestare esplicitamente il solo proxy TLS locale usando lo
   script `local-api-tls-proxy.mjs` incluso nel bundle;
+* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e
+  Docker/ICD (`127.0.0.1:8888`) quando sono gia attivi;
 * non mostra mai token, certificati, chiavi o dati paziente;
-* non avvia e non supervisiona ancora Ollama o container Docker.
+* non installa, avvia, arresta o supervisiona Ollama o container Docker.
 
 La promessa completa di `home-base packaged` resta quindi progressiva: il
-prossimo slice dovra aggiungere recovery/backoff piu robusti e la policy per i
-servizi opzionali, con packaging firmabile/notarizzabile.
+prossimo slice dovra aggiungere recovery/backoff piu robusti, con packaging
+firmabile/notarizzabile. I servizi opzionali sono visibili come health
+diagnostico, non come processi app-managed.
 
 ### 1. Lock Screen & Sicurezza
 

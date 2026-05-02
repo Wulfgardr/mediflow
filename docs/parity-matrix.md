@@ -77,8 +77,8 @@ Apple-native/home-base (`WUL-187`/`WUL-194`).
 - pannello runtime con config nativa, presenza token, PID backend/proxy,
   modalita rete, fingerprint TLS e start/stop esplicito di backend web
   production + proxy TLS inclusi nel bundle;
-- nessuna supervisione automatica ancora dichiarata per Ollama o container
-  Docker.
+- health diagnostico read-only per Ollama e Docker/ICD se gia attivi, senza
+  installazione, avvio, arresto o supervisione app-managed.
 
 Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
 per la track Apple-wide successiva, non una nuova certificazione di parity UI.
