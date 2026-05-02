@@ -133,6 +133,42 @@ public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable 
 }
 
 /* @Codex */
+public struct HomeBaseCheckupSummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let date: Date
+    public let title: String
+    public let notes: String?
+    public let status: String
+    public let source: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+}
+
+/* @Codex */
+public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let codeSystem: String
+    public let code: String
+    public let display: String
+    public let unitSystem: String
+    public let unitCode: String
+    public let value: String
+    public let notes: String?
+    public let observedAt: Date
+    public let source: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+}
+
+/* @Codex */
 public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let id: String
     public let type: String
@@ -275,6 +311,122 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
         try container.encodeIfPresent(motivation, forKey: .motivation)
         try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encodeIfPresent(deletionReason, forKey: .deletionReason)
+    }
+}
+
+/* @Codex */
+public struct HomeBaseCheckupCreatePayload: Encodable, Sendable {
+    public let date: Date
+    public let title: String
+    public let status: String
+    public let notes: String?
+    public let source: String
+
+    public init(date: Date, title: String, status: String, notes: String? = nil, source: String = "manual") {
+        self.date = date
+        self.title = title
+        self.status = status
+        self.notes = notes
+        self.source = source
+    }
+}
+
+/* @Codex */
+public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let date: Date?
+    public let title: String?
+    public let status: String?
+    public let notes: String?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+
+    public init(
+        version: Int,
+        date: Date? = nil,
+        title: String? = nil,
+        status: String? = nil,
+        notes: String? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.version = version
+        self.date = date
+        self.title = title
+        self.status = status
+        self.notes = notes
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
+    }
+}
+
+/* @Codex */
+public struct HomeBaseObservationCreatePayload: Encodable, Sendable {
+    public let codeSystem: String
+    public let code: String
+    public let display: String
+    public let unitSystem: String
+    public let unitCode: String
+    public let value: String
+    public let observedAt: Date
+    public let notes: String?
+    public let source: String
+
+    public init(
+        codeSystem: String = "LOINC",
+        code: String,
+        display: String,
+        unitSystem: String = "UCUM",
+        unitCode: String,
+        value: String,
+        observedAt: Date,
+        notes: String? = nil,
+        source: String = "manual"
+    ) {
+        self.codeSystem = codeSystem
+        self.code = code
+        self.display = display
+        self.unitSystem = unitSystem
+        self.unitCode = unitCode
+        self.value = value
+        self.observedAt = observedAt
+        self.notes = notes
+        self.source = source
+    }
+}
+
+/* @Codex */
+public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let code: String?
+    public let display: String?
+    public let unitCode: String?
+    public let value: String?
+    public let observedAt: Date?
+    public let notes: String?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+
+    public init(
+        version: Int,
+        code: String? = nil,
+        display: String? = nil,
+        unitCode: String? = nil,
+        value: String? = nil,
+        observedAt: Date? = nil,
+        notes: String? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.version = version
+        self.code = code
+        self.display = display
+        self.unitCode = unitCode
+        self.value = value
+        self.observedAt = observedAt
+        self.notes = notes
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
     }
 }
 
@@ -522,6 +674,140 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent(patientId)
             .appendingPathComponent("therapies")
             .appendingPathComponent(therapyId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchCheckups(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = 20
+    ) async throws -> [HomeBaseCheckupSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("checkups")
+            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseCheckupSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createCheckup(
+        patientId: String,
+        payload: HomeBaseCheckupCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("checkups")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateCheckup(
+        patientId: String,
+        checkupId: String,
+        payload: HomeBaseCheckupUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("checkups")
+            .appendingPathComponent(checkupId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchObservations(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = 20
+    ) async throws -> [HomeBaseObservationSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("observations")
+            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseObservationSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createObservation(
+        patientId: String,
+        payload: HomeBaseObservationCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("observations")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateObservation(
+        patientId: String,
+        observationId: String,
+        payload: HomeBaseObservationUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("observations")
+            .appendingPathComponent(observationId)
         let (data, _) = try await send(
             to: url,
             method: "PUT",

@@ -141,8 +141,9 @@ Restano gap tracciati, non regressioni nascoste:
   le slice WUL-206/WUL-208 coprono il diario clinico nella scheda paziente
   mobile paired con read, create online idempotente, update e annullamento
   soft-delete versionato; WUL-209 aggiunge le terapie con list/create/update e
-  annullamento online per campi manuali non-AI essenziali. Controlli e
-  osservazioni restano gap espliciti, sempre senza coda offline;
+  annullamento online per campi manuali non-AI essenziali; WUL-210 aggiunge
+  controlli e osservazioni manuali non-AI con soft-delete versionato, sempre
+  senza coda offline;
 - cache locale cifrata e riconciliazione esplicita. La prima slice WUL-193
   persiste uno snapshot cifrato della lista pazienti, lo usa solo come
   consultazione locale `paired-offline-degraded` entro una soglia di freschezza

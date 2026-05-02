@@ -143,9 +143,8 @@
       "id": "mobile-core-crud-ui",
       "title": "Mobile core CRUD UI",
       "surfaces": ["iPhone", "iPad"],
-      "status": "gap",
+      "status": "covered",
       "acceptance": "iPhone/iPad expose usable native list/detail/create/edit flows for the non-AI core modules.",
-      "gapIssue": "WUL-206",
       "evidence": [
         {
           "type": "command",
@@ -160,6 +159,14 @@
           "value": "npm run test:network:home-base-therapy-write"
         },
         {
+          "type": "command",
+          "value": "npm run test:network:home-base-checkup-write"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-observation-write"
+        },
+        {
           "type": "issue",
           "value": "WUL-206"
         },
@@ -170,6 +177,10 @@
         {
           "type": "issue",
           "value": "WUL-209"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-210"
         }
       ]
     },
@@ -196,7 +207,7 @@
       "title": "Current Apple-wide click-map evidence",
       "surfaces": ["macOS", "iPhone", "iPad"],
       "status": "covered",
-      "acceptance": "Automated probes cover the current macOS home-base shell, paired mobile simulator bootstrap/read, and paired network write/conflict boundaries; residual checkup/observation mobile CRUD and offline reconciliation remain separate WUL-193/WUL-210 gaps.",
+      "acceptance": "Automated probes cover the current macOS home-base shell, paired mobile simulator bootstrap/read, mobile non-AI CRUD UI, and paired network write/conflict boundaries; offline reconciliation remains a separate WUL-193 gap.",
       "evidence": [
         {
           "type": "command",

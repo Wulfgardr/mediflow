@@ -543,6 +543,10 @@ private struct PairedPatientsWorkspaceView: View {
     @State private var deletionCandidateId: String?
     @State private var confirmsDeletingTherapy = false
     @State private var therapyDeletionCandidateId: String?
+    @State private var confirmsDeletingCheckup = false
+    @State private var checkupDeletionCandidateId: String?
+    @State private var confirmsDeletingObservation = false
+    @State private var observationDeletionCandidateId: String?
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -584,6 +588,34 @@ private struct PairedPatientsWorkspaceView: View {
             Button("Mantieni", role: .cancel) {}
         } message: {
             Text("La terapia resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
+        }
+        .confirmationDialog(
+            "Annullare questo controllo?",
+            isPresented: $confirmsDeletingCheckup,
+            titleVisibility: .visible
+        ) {
+            Button("Annulla controllo", role: .destructive) {
+                guard let checkupDeletionCandidateId else { return }
+                self.checkupDeletionCandidateId = nil
+                Task { await model.softDeleteCheckup(id: checkupDeletionCandidateId) }
+            }
+            Button("Mantieni", role: .cancel) {}
+        } message: {
+            Text("Il controllo resta nello storico come annullato. Nessun hard delete viene eseguito dal client mobile.")
+        }
+        .confirmationDialog(
+            "Annullare questa osservazione?",
+            isPresented: $confirmsDeletingObservation,
+            titleVisibility: .visible
+        ) {
+            Button("Annulla osservazione", role: .destructive) {
+                guard let observationDeletionCandidateId else { return }
+                self.observationDeletionCandidateId = nil
+                Task { await model.softDeleteObservation(id: observationDeletionCandidateId) }
+            }
+            Button("Mantieni", role: .cancel) {}
+        } message: {
+            Text("L'osservazione resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
         }
     }
 
@@ -725,6 +757,8 @@ private struct PairedPatientsWorkspaceView: View {
                     patientDetailSection(detail)
                     diarySection
                     therapiesSection
+                    checkupsSection
+                    observationsSection
                 }
             }
         }
@@ -1115,6 +1149,365 @@ private struct PairedPatientsWorkspaceView: View {
         }
     }
 
+    /* @Codex */
+    private var checkupsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            pairedSectionHeader(
+                title: "Controlli",
+                subtitle: "Ultimi 20 controlli",
+                systemImage: "calendar.badge.clock",
+                refreshIdentifier: "homebase-refresh-checkups-button"
+            ) {
+                Task { await model.loadSelectedPatientCheckups() }
+            }
+
+            if model.checkups.isEmpty {
+                Text("Nessun controllo caricato.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.checkups) { checkup in
+                    checkupRow(checkup)
+                }
+            }
+
+            if model.isEditingCheckup {
+                Divider()
+                checkupForm(
+                    title: "Modifica controllo online",
+                    checkupTitle: $model.editCheckupTitle,
+                    notes: $model.editCheckupNotes,
+                    status: $model.editCheckupStatus,
+                    date: $model.editCheckupDate,
+                    primaryLabel: "Salva modifiche",
+                    primaryIdentifier: "homebase-update-checkup-button",
+                    canSubmit: model.canUpdateEditingCheckup,
+                    onCancel: { model.cancelEditingCheckup() },
+                    onSubmit: { Task { await model.updateEditingCheckup() } }
+                )
+                Text("Disponibile solo online. Se la versione non coincide, ricarica i controlli prima di riprovare.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            checkupForm(
+                title: "Nuovo controllo online",
+                checkupTitle: $model.newCheckupTitle,
+                notes: $model.newCheckupNotes,
+                status: $model.newCheckupStatus,
+                date: $model.newCheckupDate,
+                primaryLabel: "Salva controllo",
+                primaryIdentifier: "homebase-create-checkup-button",
+                canSubmit: model.canCreateCheckup,
+                onCancel: nil,
+                onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
+            )
+            Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private var observationsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            pairedSectionHeader(
+                title: "Osservazioni",
+                subtitle: "Ultime 20 osservazioni",
+                systemImage: "waveform.path.ecg",
+                refreshIdentifier: "homebase-refresh-observations-button"
+            ) {
+                Task { await model.loadSelectedPatientObservations() }
+            }
+
+            if model.observations.isEmpty {
+                Text("Nessuna osservazione caricata.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.observations) { observation in
+                    observationRow(observation)
+                }
+            }
+
+            if model.isEditingObservation {
+                Divider()
+                observationForm(
+                    title: "Modifica osservazione online",
+                    display: $model.editObservationDisplay,
+                    code: $model.editObservationCode,
+                    value: $model.editObservationValue,
+                    unitCode: $model.editObservationUnitCode,
+                    notes: $model.editObservationNotes,
+                    observedAt: $model.editObservationObservedAt,
+                    primaryLabel: "Salva modifiche",
+                    primaryIdentifier: "homebase-update-observation-button",
+                    canSubmit: model.canUpdateEditingObservation,
+                    onCancel: { model.cancelEditingObservation() },
+                    onSubmit: { Task { await model.updateEditingObservation() } }
+                )
+                Text("Disponibile solo online. Se la versione non coincide, ricarica le osservazioni prima di riprovare.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            observationForm(
+                title: "Nuova osservazione online",
+                display: $model.newObservationDisplay,
+                code: $model.newObservationCode,
+                value: $model.newObservationValue,
+                unitCode: $model.newObservationUnitCode,
+                notes: $model.newObservationNotes,
+                observedAt: $model.newObservationObservedAt,
+                primaryLabel: "Salva osservazione",
+                primaryIdentifier: "homebase-create-observation-button",
+                canSubmit: model.canCreateObservation,
+                onCancel: nil,
+                onSubmit: { Task { await model.createObservationForSelectedPatient() } }
+            )
+            Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private func pairedSectionHeader(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        refreshIdentifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Label(title, systemImage: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button(action: action) {
+                Label("Aggiorna", systemImage: "arrow.clockwise")
+            }
+            .font(.caption)
+            .disabled(model.isWorking || model.selectedPatient == nil)
+            .accessibilityIdentifier(refreshIdentifier)
+        }
+    }
+
+    /* @Codex */
+    private func checkupRow(_ checkup: HomeBaseCheckupSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(checkup.title)
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                Text(PairedCheckupStatus(rawValue: checkup.status)?.title ?? checkup.status)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(checkup.deletedAt == nil ? Color.secondary : Color.orange)
+            }
+            Text(Self.entryDateFormatter.string(from: checkup.date))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if let notes = checkup.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.caption)
+                    .foregroundStyle(checkup.deletedAt == nil ? .primary : .secondary)
+                    .lineLimit(3)
+            }
+            if checkup.deletedAt != nil {
+                Text("Controllo annullato")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.orange)
+            } else if model.canMutateCheckup(checkup) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.startEditingCheckup(checkup)
+                    } label: {
+                        Label("Modifica", systemImage: "pencil")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-edit-checkup-button-\(checkup.id)")
+
+                    Button(role: .destructive) {
+                        checkupDeletionCandidateId = checkup.id
+                        confirmsDeletingCheckup = true
+                    } label: {
+                        Label("Annulla", systemImage: "xmark.circle")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-delete-checkup-button-\(checkup.id)")
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private func observationRow(_ observation: HomeBaseObservationSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(observation.display)
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                Text("\(observation.value) \(observation.unitCode)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
+            }
+            Text("\(observation.codeSystem) \(observation.code) - \(Self.entryDateFormatter.string(from: observation.observedAt))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if let notes = observation.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.caption)
+                    .foregroundStyle(observation.deletedAt == nil ? .primary : .secondary)
+                    .lineLimit(3)
+            }
+            if observation.deletedAt != nil {
+                Text("Osservazione annullata")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.orange)
+            } else if model.canMutateObservation(observation) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.startEditingObservation(observation)
+                    } label: {
+                        Label("Modifica", systemImage: "pencil")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-edit-observation-button-\(observation.id)")
+
+                    Button(role: .destructive) {
+                        observationDeletionCandidateId = observation.id
+                        confirmsDeletingObservation = true
+                    } label: {
+                        Label("Annulla", systemImage: "xmark.circle")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-delete-observation-button-\(observation.id)")
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private func checkupForm(
+        title: String,
+        checkupTitle: Binding<String>,
+        notes: Binding<String>,
+        status: Binding<PairedCheckupStatus>,
+        date: Binding<Date>,
+        primaryLabel: String,
+        primaryIdentifier: String,
+        canSubmit: Bool,
+        onCancel: (() -> Void)?,
+        onSubmit: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: "calendar.badge.clock")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Titolo", text: checkupTitle)
+                .accessibilityIdentifier("\(primaryIdentifier)-title")
+            Picker("Stato", selection: status) {
+                ForEach(PairedCheckupStatus.allCases) { status in
+                    Text(status.title).tag(status)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("\(primaryIdentifier)-status")
+            DatePicker("Data", selection: date, displayedComponents: [.date, .hourAndMinute])
+                .accessibilityIdentifier("\(primaryIdentifier)-date")
+            TextField("Note (opzionale)", text: notes)
+                .accessibilityIdentifier("\(primaryIdentifier)-notes")
+            pairedFormButtons(
+                primaryLabel: primaryLabel,
+                primaryIdentifier: primaryIdentifier,
+                canSubmit: canSubmit,
+                onCancel: onCancel,
+                onSubmit: onSubmit
+            )
+        }
+    }
+
+    /* @Codex */
+    private func observationForm(
+        title: String,
+        display: Binding<String>,
+        code: Binding<String>,
+        value: Binding<String>,
+        unitCode: Binding<String>,
+        notes: Binding<String>,
+        observedAt: Binding<Date>,
+        primaryLabel: String,
+        primaryIdentifier: String,
+        canSubmit: Bool,
+        onCancel: (() -> Void)?,
+        onSubmit: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: "waveform.path.ecg")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Parametro LOINC", text: display)
+                .accessibilityIdentifier("\(primaryIdentifier)-display")
+            TextField("Codice LOINC", text: code)
+                .accessibilityIdentifier("\(primaryIdentifier)-code")
+            HStack(spacing: 8) {
+                TextField("Valore", text: value)
+                    .accessibilityIdentifier("\(primaryIdentifier)-value")
+                TextField("Unita UCUM", text: unitCode)
+                    .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
+            }
+            DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
+                .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
+            TextField("Note (opzionale)", text: notes)
+                .accessibilityIdentifier("\(primaryIdentifier)-notes")
+            pairedFormButtons(
+                primaryLabel: primaryLabel,
+                primaryIdentifier: primaryIdentifier,
+                canSubmit: canSubmit,
+                onCancel: onCancel,
+                onSubmit: onSubmit
+            )
+        }
+    }
+
+    /* @Codex */
+    private func pairedFormButtons(
+        primaryLabel: String,
+        primaryIdentifier: String,
+        canSubmit: Bool,
+        onCancel: (() -> Void)?,
+        onSubmit: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            if let onCancel {
+                Button("Annulla") {
+                    onCancel()
+                }
+                .font(.caption)
+            }
+            Button {
+                onSubmit()
+            } label: {
+                Label(primaryLabel, systemImage: "checkmark.circle")
+            }
+            .font(.caption)
+            .disabled(!canSubmit)
+            .accessibilityIdentifier(primaryIdentifier)
+        }
+    }
+
     private static let entryDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -1151,6 +1544,8 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var selectedPatient: HomeBasePatientDetail?
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
     @Published private(set) var therapies: [HomeBaseTherapySummary] = []
+    @Published private(set) var checkups: [HomeBaseCheckupSummary] = []
+    @Published private(set) var observations: [HomeBaseObservationSummary] = []
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     @Published var newEntryContent = ""
@@ -1177,6 +1572,30 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editTherapyStartDate = Date()
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
+    @Published var newCheckupTitle = ""
+    @Published var newCheckupNotes = ""
+    @Published var newCheckupStatus: PairedCheckupStatus = .pending
+    @Published var newCheckupDate = Date()
+    @Published private(set) var editingCheckupId: String?
+    @Published private(set) var editingCheckupVersion: Int?
+    @Published var editCheckupTitle = ""
+    @Published var editCheckupNotes = ""
+    @Published var editCheckupStatus: PairedCheckupStatus = .pending
+    @Published var editCheckupDate = Date()
+    @Published var newObservationDisplay = ""
+    @Published var newObservationCode = ""
+    @Published var newObservationValue = ""
+    @Published var newObservationUnitCode = ""
+    @Published var newObservationNotes = ""
+    @Published var newObservationObservedAt = Date()
+    @Published private(set) var editingObservationId: String?
+    @Published private(set) var editingObservationVersion: Int?
+    @Published var editObservationDisplay = ""
+    @Published var editObservationCode = ""
+    @Published var editObservationValue = ""
+    @Published var editObservationUnitCode = ""
+    @Published var editObservationNotes = ""
+    @Published var editObservationObservedAt = Date()
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -1290,8 +1709,12 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             self.selectedPatient = nil
             self.entries = []
             self.therapies = []
+            self.checkups = []
+            self.observations = []
             self.cancelEditingEntry()
             self.cancelEditingTherapy()
+            self.cancelEditingCheckup()
+            self.cancelEditingObservation()
             do {
                 try self.persistPairing()
                 try self.cacheStore.savePatientList(
@@ -1331,8 +1754,22 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
             self.cancelEditingEntry()
             self.cancelEditingTherapy()
+            self.cancelEditingCheckup()
+            self.cancelEditingObservation()
             self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
         }
     }
@@ -1672,6 +2109,328 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    /* @Codex */
+    func loadSelectedPatientCheckups() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.cancelEditingCheckup()
+            self.statusMessage = "\(self.checkups.count) controlli caricati."
+        }
+    }
+
+    /* @Codex */
+    func createCheckupForSelectedPatient() async {
+        guard canCreateCheckup else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let title = newCheckupTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = newCheckupNotes.trimmedOrNil
+        await runTask {
+            _ = try await self.makeClient().createCheckup(
+                patientId: patientId,
+                payload: HomeBaseCheckupCreatePayload(
+                    date: self.newCheckupDate,
+                    title: title,
+                    status: self.newCheckupStatus.rawValue,
+                    notes: notes
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.resetNewCheckupForm()
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Controllo inviato all'home-base."
+        }
+    }
+
+    /* @Codex */
+    func startEditingCheckup(_ checkup: HomeBaseCheckupSummary) {
+        guard canMutateCheckup(checkup) else { return }
+        editingCheckupId = checkup.id
+        editingCheckupVersion = checkup.version
+        editCheckupTitle = checkup.title
+        editCheckupNotes = checkup.notes ?? ""
+        editCheckupStatus = PairedCheckupStatus(rawValue: checkup.status) ?? .pending
+        editCheckupDate = checkup.date
+        statusMessage = "Modifica controllo pronta."
+    }
+
+    /* @Codex */
+    func cancelEditingCheckup() {
+        editingCheckupId = nil
+        editingCheckupVersion = nil
+        editCheckupTitle = ""
+        editCheckupNotes = ""
+        editCheckupStatus = .pending
+        editCheckupDate = Date()
+    }
+
+    /* @Codex */
+    func updateEditingCheckup() async {
+        guard canUpdateEditingCheckup else { return }
+        guard let patientId = selectedPatient?.id,
+              let checkupId = editingCheckupId,
+              let version = editingCheckupVersion,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let title = editCheckupTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = editCheckupNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateCheckup(
+                patientId: patientId,
+                checkupId: checkupId,
+                payload: HomeBaseCheckupUpdatePayload(
+                    version: version,
+                    date: self.editCheckupDate,
+                    title: title,
+                    status: self.editCheckupStatus.rawValue,
+                    notes: notes
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.cancelEditingCheckup()
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Controllo aggiornato sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func softDeleteCheckup(id checkupId: String) async {
+        guard let checkup = checkups.first(where: { $0.id == checkupId }),
+              canMutateCheckup(checkup) else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateCheckup(
+                patientId: patientId,
+                checkupId: checkup.id,
+                payload: HomeBaseCheckupUpdatePayload(
+                    version: checkup.version,
+                    deletedAt: Date(),
+                    deletionReason: "mobile-paired-operator-cancelled"
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            if self.editingCheckupId == checkup.id {
+                self.cancelEditingCheckup()
+            }
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Controllo annullato sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func loadSelectedPatientObservations() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.cancelEditingObservation()
+            self.statusMessage = "\(self.observations.count) osservazioni caricate."
+        }
+    }
+
+    /* @Codex */
+    func createObservationForSelectedPatient() async {
+        guard canCreateObservation else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let display = newObservationDisplay.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = newObservationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = newObservationValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unitCode = newObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = newObservationNotes.trimmedOrNil
+        await runTask {
+            _ = try await self.makeClient().createObservation(
+                patientId: patientId,
+                payload: HomeBaseObservationCreatePayload(
+                    code: code,
+                    display: display,
+                    unitCode: unitCode,
+                    value: value,
+                    observedAt: self.newObservationObservedAt,
+                    notes: notes
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.resetNewObservationForm()
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Osservazione inviata all'home-base."
+        }
+    }
+
+    /* @Codex */
+    func startEditingObservation(_ observation: HomeBaseObservationSummary) {
+        guard canMutateObservation(observation) else { return }
+        editingObservationId = observation.id
+        editingObservationVersion = observation.version
+        editObservationDisplay = observation.display
+        editObservationCode = observation.code
+        editObservationValue = observation.value
+        editObservationUnitCode = observation.unitCode
+        editObservationNotes = observation.notes ?? ""
+        editObservationObservedAt = observation.observedAt
+        statusMessage = "Modifica osservazione pronta."
+    }
+
+    /* @Codex */
+    func cancelEditingObservation() {
+        editingObservationId = nil
+        editingObservationVersion = nil
+        editObservationDisplay = ""
+        editObservationCode = ""
+        editObservationValue = ""
+        editObservationUnitCode = ""
+        editObservationNotes = ""
+        editObservationObservedAt = Date()
+    }
+
+    /* @Codex */
+    func updateEditingObservation() async {
+        guard canUpdateEditingObservation else { return }
+        guard let patientId = selectedPatient?.id,
+              let observationId = editingObservationId,
+              let version = editingObservationVersion,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let display = editObservationDisplay.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = editObservationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = editObservationValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unitCode = editObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = editObservationNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateObservation(
+                patientId: patientId,
+                observationId: observationId,
+                payload: HomeBaseObservationUpdatePayload(
+                    version: version,
+                    code: code,
+                    display: display,
+                    unitCode: unitCode,
+                    value: value,
+                    observedAt: self.editObservationObservedAt,
+                    notes: notes
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.cancelEditingObservation()
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Osservazione aggiornata sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func softDeleteObservation(id observationId: String) async {
+        guard let observation = observations.first(where: { $0.id == observationId }),
+              canMutateObservation(observation) else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateObservation(
+                patientId: patientId,
+                observationId: observation.id,
+                payload: HomeBaseObservationUpdatePayload(
+                    version: observation.version,
+                    deletedAt: Date(),
+                    deletionReason: "mobile-paired-operator-cancelled"
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            if self.editingObservationId == observation.id {
+                self.cancelEditingObservation()
+            }
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Osservazione annullata sull'home-base."
+        }
+    }
+
     func savePairing() async {
         guard pairedCredentials != nil else {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
@@ -1701,6 +2460,8 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             selectedPatient = nil
             entries = []
             therapies = []
+            checkups = []
+            observations = []
             newEntryTitle = ""
             newEntryType = .note
             newEntryContent = ""
@@ -1708,6 +2469,10 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             cancelEditingEntry()
             resetNewTherapyForm()
             cancelEditingTherapy()
+            resetNewCheckupForm()
+            cancelEditingCheckup()
+            resetNewObservationForm()
+            cancelEditingObservation()
             connectionState = .notLoaded
             reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
             discoveryMessage = nil
@@ -1780,8 +2545,12 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             selectedPatient = nil
             entries = []
             therapies = []
+            checkups = []
+            observations = []
             cancelEditingEntry()
             cancelEditingTherapy()
+            cancelEditingCheckup()
+            cancelEditingObservation()
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
             statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
             reconciliationLine = markOffline
@@ -1829,6 +2598,24 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         newTherapyStartDate = Date()
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
+    }
+
+    /* @Codex */
+    private func resetNewCheckupForm() {
+        newCheckupTitle = ""
+        newCheckupNotes = ""
+        newCheckupStatus = .pending
+        newCheckupDate = Date()
+    }
+
+    /* @Codex */
+    private func resetNewObservationForm() {
+        newObservationDisplay = ""
+        newObservationCode = ""
+        newObservationValue = ""
+        newObservationUnitCode = ""
+        newObservationNotes = ""
+        newObservationObservedAt = Date()
     }
 
     /* @Codex */
@@ -1890,6 +2677,66 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
+    var isEditingCheckup: Bool {
+        editingCheckupId != nil
+    }
+
+    /* @Codex */
+    var canCreateCheckup: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newCheckupTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canUpdateEditingCheckup: Bool {
+        editingCheckupId != nil
+            && editingCheckupVersion != nil
+            && selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !editCheckupTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var isEditingObservation: Bool {
+        editingObservationId != nil
+    }
+
+    /* @Codex */
+    var canCreateObservation: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newObservationDisplay.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !newObservationCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !newObservationValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !newObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canUpdateEditingObservation: Bool {
+        editingObservationId != nil
+            && editingObservationVersion != nil
+            && selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !editObservationDisplay.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !editObservationCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !editObservationValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !editObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
     func canMutateEntry(_ entry: HomeBaseEntrySummary) -> Bool {
         entry.deletedAt == nil
             && selectedPatient?.id == entry.patientId
@@ -1903,6 +2750,26 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     func canMutateTherapy(_ therapy: HomeBaseTherapySummary) -> Bool {
         therapy.deletedAt == nil
             && selectedPatient?.id == therapy.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canMutateCheckup(_ checkup: HomeBaseCheckupSummary) -> Bool {
+        checkup.deletedAt == nil
+            && selectedPatient?.id == checkup.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canMutateObservation(_ observation: HomeBaseObservationSummary) -> Bool {
+        observation.deletedAt == nil
+            && selectedPatient?.id == observation.patientId
             && sessionCookie != nil
             && pairedCredentials != nil
             && connectionState == .pairedOnline
@@ -1949,6 +2816,26 @@ private enum PairedTherapyStatus: String, CaseIterable, Identifiable {
             return "Sospesa"
         case .completed:
             return "Conclusa"
+        }
+    }
+}
+
+/* @Codex */
+private enum PairedCheckupStatus: String, CaseIterable, Identifiable {
+    case pending
+    case completed
+    case cancelled
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pending:
+            return "Da fare"
+        case .completed:
+            return "Completato"
+        case .cancelled:
+            return "Annullato"
         }
     }
 }
