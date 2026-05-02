@@ -77,7 +77,8 @@ La mappa decisionale di prodotto per questi documenti e in
 
 Per SGDT il manifest non mantiene un placeholder generico: il caso emerso dalle
 fonti pubbliche resta `DC-COOP-FHIR_PIC#02`, cioe cooperazione applicativa
-SGDT/PAI con Cartelle Elettroniche `MMG/PLS`. La mappa decisionale e in
+SGDT/PAI con Cartelle Elettroniche `MMG/PLS`, affiancato dai manuali COT/MMG
+per richieste di transizione e attivazione territoriale. La mappa decisionale e in
 [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md).
 
 Per i Certificati di malattia il manifest mantiene separati:

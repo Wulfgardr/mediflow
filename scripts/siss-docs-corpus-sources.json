@@ -150,6 +150,28 @@
     "notes": "Catalogo pubblico SISS: DC-COOP-FHIR_PIC#02, versione 1.0, data 02/10/2024; cooperazione applicativa con Cartelle Elettroniche MMG/PLS per PAI pazienti cronici."
   },
   {
+    "id": "siss-sgdt-cot-transizioni-mmg",
+    "title": "SISS - SGDT/COT interconnessione Centrali Operative Territoriali per MMG/PLS",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "cot", "mmg", "pls", "transizioni", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORMS-MRS#899, versione 1.1, data 19/12/2025; richieste di transizione registrate dal MMG/PLS in SGDT e gestite tramite Centrali Operative Territoriali."
+  },
+  {
+    "id": "siss-sgdt-vademecum-mmg",
+    "title": "SISS - SGDT vademecum operativo MMG",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "cot", "mmg", "cure-domiciliari", "pai", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORM-MES#896, versione 2.0, data 19/12/2025; uso SGDT per attivazione Cure Domiciliari e Presa in Carico dei pazienti cronici da parte di MMG/PLS."
+  },
+  {
     "id": "fse-support-readme",
     "title": "FSE 2.0 - it-fse-support README",
     "area": "fse2",

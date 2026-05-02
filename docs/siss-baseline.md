@@ -76,7 +76,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
 | Protesica nativa/certificata dentro MediFlow | `Non disponibile` | Il diario locale non sostituisce l'applicativo regionale e non invia prescrizioni verso SISS. |
 | FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, consenso, ruolo operatore, audit e scenario approvato; la mappa dedicata e in [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md). |
-| SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato; l'unico caso utile emerso e SGDT/PAI con `SSI-MMG`, documentato in [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md). |
+| SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato; i soli casi utili emersi sono SGDT/PAI con `SSI-MMG` e COT/transizioni, documentati in [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md). |
 | Certificati di malattia contestuali | `Non disponibile` | Il path piu prudente e una futura Web Application handoff guard; UI custom/backend restano bloccati come documentato in [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md). |
 
 ## Documenti protesici prodotti dal portale
