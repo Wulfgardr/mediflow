@@ -44,6 +44,8 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/ai-rollout-governance.md',
     'docs/ai-stack-execution-plan.md',
     'docs/ai-stack-reliability-review.md',
+    'docs/apple-wide-parity-qa.md',
+    'docs/apple-wide-qa-manifest.json',
     'docs/apple-docs-mcp.md',
     'docs/siss-fse-corpus-mcp.md',
     'docs/clinical-entities-benchmark.md',
@@ -75,6 +77,7 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/linear-import-open.mf-fse-q2.linear.csv',
     'scripts/cloud-comparator-shadow-eval.test.ts',
     'scripts/cloud-comparator-shadow-eval.ts',
+    'scripts/check-apple-wide-qa-manifest.mjs',
     'scripts/codex-mcp-apple-docs-validate.sh',
     'scripts/codex-mcp-siss-fse-corpus-validate.sh',
     'scripts/linear-import-all.sh',
@@ -119,6 +122,7 @@ const MARKDOWN_LINK_PATTERN = /(!?)\[([^\]]*)\]\(([^)]+)\)/g;
 const INLINE_DOC_REF_PATTERN = /`([^`\n]*?\.md(?:#[^`\n]+)?)`/g;
 const OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS = [
     'benchmark:cloud-comparator',
+    'check:apple-wide-qa',
     'linear:import:all',
     'linear:import:api',
     'linear:prepare-import',
@@ -138,6 +142,9 @@ const PRIVATE_MARKDOWN_LINE_PATTERNS = [
         .filter((excludedPath) => excludedPath.endsWith('.md'))
         .map((excludedPath) => new RegExp(escapeRegExp(path.basename(excludedPath)))),
     /docs\/private\//,
+    /apple-wide-parity-qa/,
+    /apple-wide-qa/,
+    /check:apple-wide-qa/,
     /oss-assets\/README\.md/,
     /^<!-- Codex: created .* -->$/,
     /^<!-- @Codex created .* -->$/,

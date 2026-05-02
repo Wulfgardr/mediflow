@@ -19,6 +19,7 @@ Riferimenti:
 - [docs/adr/0005-web-native-functional-parity.md](./adr/0005-web-native-functional-parity.md)
 - [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
 - [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
+- [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
 - [PLANS.md](../PLANS.md) (sezione 5 e 5a)
 - [docs/parity-smoke.md](./parity-smoke.md)
 - [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
@@ -56,9 +57,11 @@ post-moduli con esito `PASS` (`web PASS`, `native xcode PASS`) in
 Questo chiude la track legacy come evidenza documentale/code-satisfied, non come
 dichiarazione di UI parity piena del vecchio bundle macOS. Il primo slice
 `WUL-192` sposta l'entrypoint compilato su Apple Foundation/home-base e aggiunge
-osservabilita runtime read-only; non riapre la vecchia shell clinica come UI
-ufficiale. La prossima verifica capability-by-capability appartiene al filone
-Apple-native/home-base (`WUL-187`/`WUL-194`).
+osservabilita runtime, supervisione app-managed di backend/proxy e packaging
+firmabile; non riapre la vecchia shell clinica come UI ufficiale. La verifica
+capability-by-capability Apple-wide parte da
+[docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md) e dal manifest
+`docs/apple-wide-qa-manifest.json` (`WUL-194`).
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -82,6 +85,24 @@ Apple-native/home-base (`WUL-187`/`WUL-194`).
 
 Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
 per la track Apple-wide successiva, non una nuova certificazione di parity UI.
+
+## QA Apple-wide (WUL-194)
+
+La matrice legacy sopra resta la fonte per il vecchio confronto web/macOS core.
+Dal momento in cui il bundle macOS usa il shell Apple/home-base, la promessa
+Apple-wide si verifica invece con una matrice separata:
+
+- documento canonico: [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
+- manifest machine-readable: `docs/apple-wide-qa-manifest.json`
+- guard: `npm run check:apple-wide-qa`
+
+La matrice Apple-wide distingue esplicitamente capability `covered` con
+comando/runbook ripetibile, gap `WUL-193` per CRUD UI mobile e cache/offline, e
+click-map `WUL-194` coperto sulle superfici oggi disponibili: macOS home-base
+shell, smoke mobile paired e write paired non-AI.
+
+Nessuna riga `covered` nella matrice Apple-wide equivale da sola a parity piena
+del prodotto.
 
 ## Gap principali da chiudere
 

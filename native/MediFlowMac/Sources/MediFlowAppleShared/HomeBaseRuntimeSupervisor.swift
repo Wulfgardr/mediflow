@@ -37,8 +37,10 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var isWorking = false
 
+    #if os(macOS)
     private var managedProxyProcess: Process?
     private var managedBackendProcess: Process?
+    #endif
     private let fileManager: FileManager
     private let processInfo: ProcessInfo
     private let stopGraceNanoseconds: UInt64
@@ -221,6 +223,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         throw HomeBaseRuntimeSupervisorError.missingWebRuntime
     }
 
+    #if os(macOS)
     private func launchProcess(plan: HomeBaseRuntimeLaunchPlan, terminationStatusPrefix: String) throws -> Process {
         try fileManager.createDirectory(
             at: URL(fileURLWithPath: plan.logPath).deletingLastPathComponent(),
@@ -251,7 +254,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         try "\(process.processIdentifier)\n".write(toFile: plan.pidPath, atomically: true, encoding: .utf8)
         return process
     }
-
+    #endif
 
     private func resolveNodeBinary() throws -> String {
         if let override = processInfo.environment["MEDIFLOW_NODE_BINARY"],

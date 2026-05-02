@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-02",
+  "issue": "WUL-194",
+  "capabilities": [
+    {
+      "id": "macos-packaged-home-base-runtime",
+      "title": "macOS packaged home-base runtime",
+      "surfaces": ["macOS"],
+      "status": "covered",
+      "acceptance": "The built macOS bundle opens the Apple/home-base shell, includes the web runtime, manages backend/proxy explicitly, and supports local signing.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "MEDIFLOW_CODESIGN_IDENTITY=- bash scripts/build-native-app.sh"
+        },
+        {
+          "type": "command",
+          "value": "codesign -dv native/MediFlowMac/Build/MediFlowMac.app"
+        },
+        {
+          "type": "pr",
+          "value": "https://github.com/Wulfgardr/mediflow_private/pull/129"
+        }
+      ]
+    },
+    {
+      "id": "shared-apple-core-contracts",
+      "title": "Shared Apple core contracts",
+      "surfaces": ["macOS", "iPhone", "iPad"],
+      "status": "covered",
+      "acceptance": "Shared Swift code has repeatable tests for pairing store, patients client, launch overrides, Bonjour discovery, runtime status and optional service diagnostics.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac"
+        }
+      ]
+    },
+    {
+      "id": "mobile-paired-bootstrap-read",
+      "title": "Mobile paired bootstrap and read",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "A booted iPhone/iPad simulator can receive temporary paired credentials, authenticate as operator, read network patients, launch MediFlowMobile and capture an artifact.",
+      "evidence": [
+        {
+          "type": "runbook",
+          "value": "docs/mobile-home-base-smoke.md"
+        },
+        {
+          "type": "command",
+          "value": "MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN=<PIN> bash scripts/mobile-home-base-paired-smoke.sh"
+        }
+      ]
+    },
+    {
+      "id": "paired-profile-write",
+      "title": "Paired patient profile write",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "Network paired write for patient profile/status requires paired credentials, operator session, capability and version conflict handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0052-network-patient-profile-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-diary-write",
+      "title": "Paired diary write",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "Network paired diary create/update/soft-delete requires paired credentials, operator session, capability and entry version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-diary-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0053-network-diary-entry-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-therapy-write",
+      "title": "Paired therapy write",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "Network paired therapy create/update/soft-delete requires paired credentials, operator session, capability and therapy version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-therapy-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0054-network-therapy-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-checkup-write",
+      "title": "Paired checkup write",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "Network paired checkup create/update/soft-delete requires paired credentials, operator session, capability and checkup version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-checkup-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0055-network-checkup-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-observation-write",
+      "title": "Paired observation write",
+      "surfaces": ["iPhone", "iPad", "home-base"],
+      "status": "covered",
+      "acceptance": "Network paired observation create/update/soft-delete requires paired credentials, operator session, capability and observation version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-observation-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0056-network-observation-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "mobile-core-crud-ui",
+      "title": "Mobile core CRUD UI",
+      "surfaces": ["iPhone", "iPad"],
+      "status": "gap",
+      "acceptance": "iPhone/iPad expose usable native list/detail/create/edit flows for the non-AI core modules.",
+      "gapIssue": "WUL-193",
+      "evidence": [
+        {
+          "type": "issue",
+          "value": "WUL-193"
+        }
+      ]
+    },
+    {
+      "id": "mobile-offline-cache-reconciliation",
+      "title": "Mobile offline cache and explicit reconciliation",
+      "surfaces": ["iPhone", "iPad"],
+      "status": "gap",
+      "acceptance": "Mobile clients keep encrypted derived cache, show paired-offline-degraded state and reconcile writes explicitly when the home-base returns.",
+      "gapIssue": "WUL-193",
+      "evidence": [
+        {
+          "type": "issue",
+          "value": "WUL-193"
+        }
+      ]
+    },
+    {
+      "id": "apple-wide-click-map",
+      "title": "Current Apple-wide click-map evidence",
+      "surfaces": ["macOS", "iPhone", "iPad"],
+      "status": "covered",
+      "acceptance": "Automated probes cover the current macOS home-base shell, paired mobile simulator bootstrap/read, and paired network write/conflict boundaries; full mobile CRUD UI and offline reconciliation remain separate WUL-193 gaps.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:native:clickmap:probe"
+        },
+        {
+          "type": "command",
+          "value": "MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN=<PIN> MEDIFLOW_MOBILE_SMOKE_AUTOLOAD_PATIENTS=0 bash scripts/mobile-home-base-paired-smoke.sh"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-write"
+        }
+      ]
+    }
+  ]
+}

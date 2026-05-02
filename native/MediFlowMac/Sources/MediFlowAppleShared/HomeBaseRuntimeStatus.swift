@@ -102,7 +102,13 @@ public enum HomeBaseRuntimeStatusLoader {
     public static let defaultDataDirectory = "Library/Application Support/MediFlow"
 
     public static func defaultDataDirectoryURL(fileManager: FileManager = .default) -> URL {
+        #if os(macOS)
         fileManager.homeDirectoryForCurrentUser.appendingPathComponent(defaultDataDirectory)
+        #else
+        (fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory)
+            .appendingPathComponent("MediFlow")
+        #endif
     }
 
     public static func load(

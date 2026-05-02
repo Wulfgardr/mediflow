@@ -16,6 +16,8 @@ Eseguire un check rapido parity con un comando unico che copre:
 
 Script:
 - `scripts/parity-smoke.sh`
+- manifest Apple-wide: `docs/apple-wide-qa-manifest.json`
+- guard manifest: `npm run check:apple-wide-qa`
 
 ---
 
@@ -126,3 +128,7 @@ bundle compilato.
 - La lane native usa `scripts/native-test.sh`; per dettagli vedi:
   - `docs/native-testing.md`
 - Il probe AX `scripts/native-click-map-probe.swift` non sostituisce la checklist manuale e non esegue scritture: verifica solo presenza controlli chiave e apertura delle sheet parity principali.
+- Il run parity generico non certifica Apple-wide parity. Per `WUL-194`, usa
+  anche [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md) e
+  `npm run check:apple-wide-qa` per verificare che ogni capability sia coperta
+  da evidenza o gap esplicito.

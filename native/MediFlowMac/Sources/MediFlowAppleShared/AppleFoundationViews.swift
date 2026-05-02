@@ -218,6 +218,7 @@ public struct AppleFoundationMobileRootView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("apple-foundation-section-\(item.rawValue)-button")
                         }
                     }
                     .navigationTitle("MediFlow")
@@ -273,14 +274,17 @@ public struct AppleFoundationMobileRootView: View {
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)
                 .background(PlatformColors.groupedBackground)
+                .accessibilityIdentifier("apple-foundation-overview-view")
         case .runtime:
             ScrollView {
                 HomeBaseRuntimeStatusView()
                     .padding(20)
             }
             .background(PlatformColors.groupedBackground)
+            .accessibilityIdentifier("apple-foundation-runtime-view")
         case .modules:
             PairedPatientsWorkspaceView()
+                .accessibilityIdentifier("apple-foundation-modules-view")
         case .milestones:
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -291,6 +295,7 @@ public struct AppleFoundationMobileRootView: View {
                 .padding(20)
             }
             .background(PlatformColors.groupedBackground)
+            .accessibilityIdentifier("apple-foundation-milestones-view")
         }
     }
 }

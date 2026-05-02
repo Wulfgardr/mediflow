@@ -17,6 +17,7 @@ Riferimenti:
 - [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
 - [PLANS.md](../PLANS.md) (sezione `P0b`)
 - [docs/parity-matrix.md](./parity-matrix.md)
+- [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
 
 ---
 
@@ -107,6 +108,7 @@ Per debugging test:
    - compila checklist `docs/parity-click-map-macos.md`
 4. Smoke mobile paired (quando tocchi `home-base` iPhone/iPad):
    - esegui `bash scripts/mobile-home-base-paired-smoke.sh`
+   - verifica la mappa capability in `docs/apple-wide-qa-manifest.json` con `npm run check:apple-wide-qa`
    - per modifiche al boundary `/api/v1/network/*`, esegui anche `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write` e, se tocchi il diario paired, `npm run test:network:home-base-diary-write`
    - per prerequisiti, safety notes e artifact consulta `docs/mobile-home-base-smoke.md`
 5. Aggiorna esito in PR/notes:

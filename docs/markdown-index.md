@@ -36,6 +36,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Stato canonico complessivo del sistema, pensato come lettura unica per onboarding profondo e review trasversale. | Quando devi capire cosa esiste davvero oggi, cosa e direzione e quali confini non vanno superati. |
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato parity web/macOS su moduli core e gap operativi. | Per steering parity e release readiness. |
+| [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md) | Matrice QA Apple-wide WUL-194 con manifest verificabile capability-by-capability. | Quando si lavora su macOS home-base, iPhone/iPad paired, smoke simulator/device o claim di parity Apple-wide. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
 | [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
 
@@ -48,6 +49,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/native-launch.md](./native-launch.md) | Avvio rapido app macOS via script/launcher. | Per esecuzione operativa locale. |
 | [docs/local-api-tls.md](./local-api-tls.md) | TLS proxy locale e trasporto sicuro per native API. | Per debug networking/certificate pinning. |
 | [docs/native-testing.md](./native-testing.md) | Strategia canonica test macOS (SwiftPM/XCTest/Xcode). | Per piani test e parity sweep. |
+| [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) | Manifest machine-readable della QA Apple-wide. | Validato da `npm run check:apple-wide-qa`; ogni capability deve avere evidenza o gap esplicito. |
 | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | Runbook smoke iPhone/iPad contro `home-base` reale con pairing temporaneo e sessione operatore. | Per verifiche mobili `home-base` paired su simulatori Apple. |
 | [docs/e2e-smoke.md](./e2e-smoke.md) | Harness smoke test web Playwright in ambiente isolato. | Per verifica rapida web in CI/VM. |
 | [docs/patient-concurrency-tests.md](./patient-concurrency-tests.md) | Suite smoke isolata per conflitti di scrittura pazienti tra lane web e `/api/v1`. | Quando tocchi `patients.version`, compare-on-write o payload `409 VERSION_CONFLICT`. |

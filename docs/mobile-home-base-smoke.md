@@ -10,7 +10,7 @@ Ultimo aggiornamento: 2026-04-18
 
 Eseguire uno smoke rapido del client Apple mobile contro un `home-base` reale
 MediFlow, verificando il boundary paired definito da
-[docs/adr/0047-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0047-apple-shared-client-architecture-and-home-base-runtime.md)
+[docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md)
 e i vincoli di sicurezza di [SECURITY.md](../SECURITY.md).
 
 Script:
@@ -32,6 +32,7 @@ temporanee piu sessione operatore.
 - `MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN` valorizzato
 
 Riferimenti correlati:
+- [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
 - [docs/native-testing.md](./native-testing.md)
 - [docs/native-setup.md](./native-setup.md)
 - [docs/local-api-tls.md](./local-api-tls.md)
