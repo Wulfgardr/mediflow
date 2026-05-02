@@ -62,9 +62,30 @@ try {
 }
 /* @Codex */
 try {
+    ensureColumn('entries', 'title', "title TEXT NOT NULL DEFAULT 'Voce clinica'");
+    ensureColumn('entries', 'setting', 'setting TEXT');
+    ensureColumn('entries', 'metadata', 'metadata TEXT');
+    ensureColumn('entries', 'attachments', 'attachments TEXT');
+    ensureColumn('entries', 'deleted_at', 'deleted_at INTEGER');
+    ensureColumn('entries', 'deletion_reason', 'deletion_reason TEXT');
+    ensureColumn('entries', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    ensureColumn('entries', 'updated_at', 'updated_at INTEGER');
+} catch (error) {
+    console.warn('[MediFlow] Entries schema check skipped:', error);
+}
+/* @Codex */
+try {
     ensureColumn('checkups', 'notes', 'notes TEXT');
     /* @Codex */
     ensureColumn('checkups', 'source', 'source TEXT');
+    /* @Codex */
+    ensureColumn('checkups', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    /* @Codex */
+    ensureColumn('checkups', 'updated_at', 'updated_at INTEGER');
+    /* @Codex */
+    ensureColumn('checkups', 'deleted_at', 'deleted_at INTEGER');
+    /* @Codex */
+    ensureColumn('checkups', 'deletion_reason', 'deletion_reason TEXT');
 } catch (error) {
     console.warn('[MediFlow] Checkups schema check skipped:', error);
 }
@@ -77,6 +98,14 @@ try {
     ensureColumn('therapies', 'diagnosis_code', 'diagnosis_code TEXT');
     /* @Codex */
     ensureColumn('therapies', 'diagnosis_name', 'diagnosis_name TEXT');
+    /* @Codex */
+    ensureColumn('therapies', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    /* @Codex */
+    ensureColumn('therapies', 'updated_at', 'updated_at INTEGER');
+    /* @Codex */
+    ensureColumn('therapies', 'deleted_at', 'deleted_at INTEGER');
+    /* @Codex */
+    ensureColumn('therapies', 'deletion_reason', 'deletion_reason TEXT');
 } catch (error) {
     console.warn('[MediFlow] Therapies schema check skipped:', error);
 }
@@ -134,14 +163,79 @@ try {
             notes TEXT,
             observed_at INTEGER NOT NULL,
             source TEXT DEFAULT 'manual',
+            version INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            deleted_at INTEGER,
+            deletion_reason TEXT,
             FOREIGN KEY (patient_id) REFERENCES patients(id)
         )
     `).run();
+    ensureColumn('observations', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    ensureColumn('observations', 'updated_at', 'updated_at INTEGER');
+    ensureColumn('observations', 'deleted_at', 'deleted_at INTEGER');
+    ensureColumn('observations', 'deletion_reason', 'deletion_reason TEXT');
     sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
     sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
 } catch (error) {
     console.warn('[MediFlow] Observations schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS prosthetic_prescriptions (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            prescribed_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'prescribed',
+            category TEXT NOT NULL DEFAULT 'standard',
+            iso_code TEXT,
+            description TEXT NOT NULL,
+            measures TEXT,
+            clinical_reason TEXT,
+            regional_prescription_id TEXT,
+            supplier TEXT,
+            collaudo_at INTEGER,
+            collaudo_outcome TEXT,
+            source TEXT NOT NULL DEFAULT 'manual',
+            document_refs TEXT,
+            notes TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_patient_idx ON prosthetic_prescriptions(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_prescribed_idx ON prosthetic_prescriptions(prescribed_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();
+} catch (error) {
+    console.warn('[MediFlow] Prosthetic prescriptions schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS siss_handoff_events (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            module_label TEXT NOT NULL,
+            reason TEXT,
+            started_at INTEGER NOT NULL,
+            completed_at INTEGER,
+            outcome TEXT NOT NULL DEFAULT 'started',
+            next_action TEXT,
+            notes TEXT,
+            correlation_id TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_patient_idx ON siss_handoff_events(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_started_idx ON siss_handoff_events(started_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_outcome_idx ON siss_handoff_events(outcome)').run();
+} catch (error) {
+    console.warn('[MediFlow] SISS handoff events schema check skipped:', error);
 }
 /* @Codex */
 try {

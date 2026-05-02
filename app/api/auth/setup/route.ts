@@ -7,6 +7,8 @@ import bcrypt from 'bcryptjs';
 import { auditSourceSurfaceFromRequest } from '@/lib/audit';
 /* @Codex */
 import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+/* @Codex */
+import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
 
 export async function POST(request: Request) {
     try {
@@ -54,12 +56,7 @@ export async function POST(request: Request) {
             sourceSurface === 'native' ? 'native' : 'web',
         );
         const response = NextResponse.json({ success: true });
-        response.cookies.set(SESSION_COOKIE_NAME, session.id, {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: false,
-            path: '/'
-        });
+        response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
         return response;
     } catch (error) {
         console.error("Setup error:", error);

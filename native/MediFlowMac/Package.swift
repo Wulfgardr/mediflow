@@ -5,18 +5,33 @@ import PackageDescription
 let package = Package(
     name: "MediFlowMac",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
+        .iOS(.v17)
     ],
     products: [
-        .executable(name: "MediFlowMac", targets: ["MediFlowMac"])
+        .library(name: "MediFlowAppleShared", targets: ["MediFlowAppleShared"]),
+        .executable(name: "MediFlowMac", targets: ["MediFlowMac"]),
+        .executable(name: "MediFlowMobile", targets: ["MediFlowMobile"])
     ],
     targets: [
+        .target(
+            name: "MediFlowAppleShared"
+        ),
         .executableTarget(
-            name: "MediFlowMac"
+            name: "MediFlowMac",
+            dependencies: ["MediFlowAppleShared"]
+        ),
+        .executableTarget(
+            name: "MediFlowMobile",
+            dependencies: ["MediFlowAppleShared"]
         ),
         .testTarget(
             name: "MediFlowMacTests",
             dependencies: ["MediFlowMac"]
+        ),
+        .testTarget(
+            name: "MediFlowAppleSharedTests",
+            dependencies: ["MediFlowAppleShared"]
         )
     ]
 )

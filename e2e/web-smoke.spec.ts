@@ -23,9 +23,8 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText('Impostazioni').first()).toBeVisible();
   await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
-  await expect(page.getByTestId('ui-style-clinical')).toBeVisible();
-  await expect(page.getByTestId('ui-style-liquid')).toBeVisible();
-  await expect(page.getByTestId('ui-style-current-state')).toBeVisible();
+  await expect(page.getByTestId('ui-style-runtime-notice')).toBeVisible();
+  await expect(page.getByTestId('ui-accessibility-controls')).toBeVisible();
 
   await page.getByRole('link', { name: 'Pazienti' }).click();
   await expect(page).toHaveURL(/\/$/);

@@ -76,9 +76,25 @@ export const entries = sqliteTable('entries', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     type: text('type').notNull(),
+    /* @Codex */
+    title: text('title').notNull().default('Voce clinica'),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     content: text('content').notNull(),
+    /* @Codex */
+    setting: text('setting'),
+    /* @Codex */
+    metadata: text('metadata'),
+    /* @Codex */
+    attachments: text('attachments'),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
 // --- Therapies ---
@@ -102,7 +118,15 @@ export const therapies = sqliteTable('therapies', {
     status: text('status').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
 });
 
 /* @Codex */
@@ -118,7 +142,54 @@ export const observations = sqliteTable('observations', {
     notes: text('notes'),
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
+});
+
+/* @Codex */
+export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category').notNull().default('standard'),
+    isoCode: text('iso_code'),
+    description: text('description').notNull(),
+    measures: text('measures'),
+    clinicalReason: text('clinical_reason'),
+    regionalPrescriptionId: text('regional_prescription_id'),
+    supplier: text('supplier'),
+    collaudoAt: integer('collaudo_at', { mode: 'timestamp' }),
+    collaudoOutcome: text('collaudo_outcome'),
+    source: text('source').notNull().default('manual'),
+    documentRefs: text('document_refs'),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    action: text('action').notNull(),
+    moduleLabel: text('module_label').notNull(),
+    reason: text('reason'),
+    startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+    outcome: text('outcome').notNull().default('started'),
+    nextAction: text('next_action'),
+    notes: text('notes'),
+    correlationId: text('correlation_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
 // --- Checkups / Appointments ---
@@ -132,7 +203,15 @@ export const checkups = sqliteTable('checkups', {
     status: text('status').default('pending'),
     /* @Codex */
     source: text('source'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
 });
 
 // --- Conversations (AI Chat) ---

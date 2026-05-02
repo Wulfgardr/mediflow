@@ -15,7 +15,7 @@ export function ThemeToggle() {
     }, []);
 
     if (!mounted) {
-        return <div className="w-[88px] h-8 bg-gray-200/50 rounded-full animate-pulse mx-auto" />;
+        return <div className="w-[88px] h-8 bg-gray-200/50 dark:bg-white/5 rounded-full animate-pulse mx-auto" />;
     }
 
     const tabs = [

@@ -101,7 +101,11 @@ Per debugging test:
    - apri app con `./scripts/Launch_MediFlowMac.command`
    - opzionale: esegui il probe AX read-only `npm run test:native:clickmap:probe`
    - verifica punti chiave parity da `docs/parity-matrix.md`
-4. Aggiorna esito in PR/notes:
+4. Smoke mobile paired (quando tocchi `home-base` iPhone/iPad):
+   - esegui `bash scripts/mobile-home-base-paired-smoke.sh`
+   - per modifiche al boundary `/api/v1/network/*`, esegui anche `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write` e, se tocchi il diario paired, `npm run test:network:home-base-diary-write`
+   - per prerequisiti, safety notes e artifact consulta `docs/mobile-home-base-smoke.md`
+5. Aggiorna esito in PR/notes:
    - cosa e stato verificato
    - cosa non e stato verificato e perche
 

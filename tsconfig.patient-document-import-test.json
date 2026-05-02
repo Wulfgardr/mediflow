@@ -14,11 +14,14 @@
     "lib/db.ts",
     "lib/document-excerpt.ts",
     "lib/icd-service.ts",
+    "lib/patient-import-decision.ts",
+    "lib/patient-import-decision.test.ts",
     "lib/patient-document-import-service.ts",
     "lib/patient-document-import-service.test.ts",
     "lib/patient-document-review.ts",
     "lib/patient-document-review.test.ts",
     "lib/patient-smart-import-matching.ts",
+    "lib/pdfjs-worker.d.ts",
     "lib/pdf-service.ts"
   ]
 }

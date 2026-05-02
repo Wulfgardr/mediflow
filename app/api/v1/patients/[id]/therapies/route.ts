@@ -78,7 +78,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             status: normalizeTherapyStatus(therapy.status),
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
-            createdAt: toIsoString(therapy.createdAt)
+            version: therapy.version,
+            createdAt: toIsoString(therapy.createdAt),
+            updatedAt: toIsoString(therapy.updatedAt),
+            deletedAt: toIsoString(therapy.deletedAt),
+            deletionReason: therapy.deletionReason ?? null,
         }));
 
         return NextResponse.json(result);
@@ -120,12 +124,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 subjectRef: normalized.values.id,
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
         );
 
-        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
+        return NextResponse.json({ id: normalized.values.id, version: 1 }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/therapies error:', error);
         return NextResponse.json({ error: 'Failed to create therapy' }, { status: 500 });

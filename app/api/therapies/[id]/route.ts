@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { parseTherapyStatus } from '@/lib/status-normalization';
@@ -119,7 +119,18 @@ export async function PUT(
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        await dbServer.update(therapies).set(updateData).where(eq(therapies.id, id));
+        await dbServer.update(therapies)
+            .set({
+                ...updateData,
+                version: sql`${therapies.version} + 1`,
+                updatedAt: new Date(),
+            })
+            .where(eq(therapies.id, id));
+        const current = await dbServer
+            .select({ version: therapies.version })
+            .from(therapies)
+            .where(eq(therapies.id, id))
+            .get();
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -131,6 +142,7 @@ export async function PUT(
                 subjectRef: id,
                 redactedMetadata: {
                     changedFields: listChangedFields(body),
+                    resourceVersion: current?.version ?? undefined,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
@@ -152,7 +164,7 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
+        const existing = await dbServer.select({ id: therapies.id, version: therapies.version }).from(therapies).where(eq(therapies.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -166,6 +178,10 @@ export async function DELETE(
                 eventType: 'therapy.deleted',
                 subjectType: 'therapy',
                 subjectRef: id,
+                redactedMetadata: {
+                    changedFields: ['deleted'],
+                    resourceVersion: existing.version,
+                },
             },
             '[MediFlow] Therapy audit write failed:',
         );

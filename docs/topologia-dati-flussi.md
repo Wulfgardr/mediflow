@@ -13,6 +13,7 @@ Questo documento mappa in modo operativo:
 - quali controlli di sicurezza lo proteggono
 
 Riferimenti rapidi:
+- [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - [docs/walkthrough.md](./walkthrough.md)
 - [docs/README.md](./README.md)
 - [docs/markdown-index.md](./markdown-index.md)
@@ -79,7 +80,9 @@ flowchart TB
 
 Nota operativa: i client paired non accedono direttamente al database. Il nodo
 autorevole resta il Mac `home-base`, che espone solo superfici documentate e
-oggi ancora `read-only-first`.
+oggi ancora `read-only-first` nel disegno generale, con write online limitati e
+versionati su profilo/status paziente, diario clinico, terapie, checkup e
+osservazioni.
 
 ---
 
@@ -333,7 +336,7 @@ Nota aggiuntiva: se una fonte e solo referral/follow-up senza novita clinica e
 una diagnosi o terapia e gia presente, il suggerimento viene soppresso per
 ridurre rumore operativo.
 
-### 4.7 Modalita `network-home-base` -> paired client read-only
+### 4.7 Modalita `network-home-base` -> paired client read/write limitato
 
 ```mermaid
 sequenceDiagram
@@ -342,6 +345,10 @@ sequenceDiagram
     participant Node as Nodo home-base
     participant Session as Sessione operatore
     participant Data as /api/v1/network/patients*
+    participant Diary as /api/v1/network/patients/{id}/entries*
+    participant Therapy as /api/v1/network/patients/{id}/therapies*
+    participant Checkup as /api/v1/network/patients/{id}/checkups*
+    participant Observation as /api/v1/network/patients/{id}/observations*
     Client->>Pair: POST pairing intent (bootstrap PHI-safe)
     Node-->>Client: pairing secret + intent pending
     Client->>Node: POST confirm intent
@@ -349,6 +356,16 @@ sequenceDiagram
     Client->>Session: Login operatore sul nodo
     Client->>Data: GET patients / patient detail
     Data-->>Client: payload read-only se paired client + sessione sono validi
+    Client->>Data: PUT patient profile/status con version + write capability
+    Data-->>Client: success oppure 409 VERSION_CONFLICT
+    Client->>Diary: POST/PUT diario con entries.version + diary capability
+    Diary-->>Client: success oppure 409 VERSION_CONFLICT
+    Client->>Therapy: POST/PUT terapie con therapies.version + therapy capability
+    Therapy-->>Client: success oppure 409 VERSION_CONFLICT
+    Client->>Checkup: POST/PUT checkup con checkups.version + checkup capability
+    Checkup-->>Client: success oppure 409 VERSION_CONFLICT
+    Client->>Observation: POST/PUT osservazione con observations.version + observation capability
+    Observation-->>Client: success oppure 409 VERSION_CONFLICT
 ```
 
 ---
@@ -360,7 +377,7 @@ sequenceDiagram
 | `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
-| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only first |
+| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + primi write limitati paziente/diario/terapie/checkup/osservazioni versionati |
 | `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
@@ -385,7 +402,7 @@ sequenceDiagram
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
 - `/api/v1/*` resta versionata e compatibile per client native.
-- `network-home-base` resta opt-in, paired e read-only-first.
+- `network-home-base` resta opt-in, paired e read-only-first, con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
 - Token locale e sessione devono restare separati (web cookie vs native bearer).
 - Proxy verso servizi locali sempre allowlist localhost.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici

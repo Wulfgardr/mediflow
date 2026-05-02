@@ -75,6 +75,7 @@ Lo snapshot corrente supporta comunque:
 La strategia testing ufficiale e documentata in:
 
 - [docs/native-testing.md](./native-testing.md)
+- [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md)
 
 Comandi rapidi:
 
@@ -103,6 +104,9 @@ Nel tab `Strumenti` trovi il pannello AI.
 * **Stato Modelli**: Vedi se Qwen/DeepSeek sono carichi in memoria.
 * **Chat tecnica**: puoi testare prompt o fare troubleshooting locale.
 * **Gestione Farmaci/ICD**: Strumenti rapidi per cercare codici senza aprire un paziente.
+* **Cataloghi in Settings**: il pannello `Cataloghi` espone stato/count,
+  import JSON e svuotamento controllato per farmaci ed esenzioni usando il
+  backend condiviso, senza storage nativo duplicato.
 
 ### 3. Editor Full-Feature
 

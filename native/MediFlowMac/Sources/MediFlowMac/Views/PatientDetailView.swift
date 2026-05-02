@@ -104,8 +104,9 @@ struct PatientDetailView: View {
     @State private var editingCheckup: CheckupSummary?
     /* @Codex */
     @State private var editingObservation: ObservationSummary?
-    /* @Codex */
-    @State private var pendingDeleteEntry: EntrySummary?
+    @State private var pendingSoftDeleteEntry: EntrySummary?
+    @State private var pendingRestoreEntry: EntrySummary?
+    @State private var showDeletedDiaryEntries = false
     /* @Codex */
     @State private var pendingDeleteTherapy: TherapySummary?
     /* @Codex */
@@ -367,21 +368,33 @@ struct PatientDetailView: View {
                 }
             }
         }
-        /* @Codex */
+        .sheet(item: $pendingSoftDeleteEntry) { entry in
+            GlassPanelWindow(
+                title: "Archivia voce clinica",
+                subtitle: "Conserva audit trail e consenti il ripristino",
+                minSize: CGSize(width: 540, height: 360),
+                expandedSize: CGSize(width: 700, height: 460)
+            ) {
+                SoftDeleteEntrySheet(entry: entry) { reason in
+                    Task { await softDeleteEntry(entry, reason: reason) }
+                }
+            }
+        }
         .alert(
-            "Eliminare questa voce clinica?",
+            "Ripristinare la voce clinica?",
             isPresented: Binding(
-                get: { pendingDeleteEntry != nil },
-                set: { if !$0 { pendingDeleteEntry = nil } }
+                get: { pendingRestoreEntry != nil },
+                set: { if !$0 { pendingRestoreEntry = nil } }
             )
         ) {
-            Button("Elimina", role: .destructive) {
-                guard let entry = pendingDeleteEntry else { return }
-                Task { await deleteEntry(entry) }
+            Button("Ripristina") {
+                guard let entry = pendingRestoreEntry else { return }
+                Task { await restoreEntry(entry) }
             }
+            .accessibilityIdentifier("patient-detail-entry-restore-confirm-button")
             Button("Annulla", role: .cancel) {}
         } message: {
-            Text("L'operazione è irreversibile.")
+            Text("La voce tornerà visibile nel diario clinico attivo.")
         }
         /* @Codex */
         .alert(
@@ -440,6 +453,9 @@ struct PatientDetailView: View {
         .onChange(of: entryTypeFilter) { _ in
             Task { await loadClinicalSections() }
         }
+        .onChange(of: showDeletedDiaryEntries) { _ in
+            Task { await loadClinicalSections() }
+        }
         /* @Codex */
         .onChange(of: therapyStatusFilter) { _ in
             Task { await loadClinicalSections() }
@@ -465,21 +481,27 @@ struct PatientDetailView: View {
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("patient-detail-entry-filter")
                 Spacer()
+                Toggle("Mostra eliminate", isOn: $showDeletedDiaryEntries)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.caption)
+                    .accessibilityIdentifier("patient-detail-entry-show-deleted-toggle")
             }
             if let entriesErrorMessage {
                 Text(entriesErrorMessage)
                     .foregroundStyle(.red)
                     .font(.caption)
             } else if entries.isEmpty {
-                Text("Nessuna voce registrata.")
+                Text(showDeletedDiaryEntries ? "Nessuna voce, attiva o eliminata." : "Nessuna voce registrata.")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(entries) { entry in
                     EntryRowView(
                         entry: entry,
                         content: displayValue(entry.content),
-                        onEdit: { editingEntry = entry },
-                        onDelete: { pendingDeleteEntry = entry }
+                        onEdit: entry.isDeleted ? nil : { editingEntry = entry },
+                        onSoftDelete: entry.isDeleted ? nil : { pendingSoftDeleteEntry = entry },
+                        onRestore: entry.isDeleted ? { pendingRestoreEntry = entry } : nil
                     )
                     if entry.id != entries.last?.id {
                         Divider()
@@ -803,7 +825,8 @@ struct PatientDetailView: View {
             entries = try await LocalAPIClient.shared.fetchEntries(
                 patientId: patientId,
                 limit: 50,
-                type: entryType
+                type: entryType,
+                includeDeleted: showDeletedDiaryEntries
             )
             entriesErrorMessage = nil
         } catch {
@@ -849,15 +872,35 @@ struct PatientDetailView: View {
         updateAIPromptIfNeeded()
     }
 
-    /* @Codex */
     @MainActor
-    private func deleteEntry(_ entry: EntrySummary) async {
-        pendingDeleteEntry = nil
+    private func softDeleteEntry(_ entry: EntrySummary, reason: String) async {
+        pendingSoftDeleteEntry = nil
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            entriesErrorMessage = "Indica il motivo dell'archiviazione."
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteEntry(patientId: patientId, entryId: entry.id)
+            try await LocalAPIClient.shared.softDeleteEntry(
+                patientId: patientId,
+                entryId: entry.id,
+                deletedAt: Date(),
+                reason: trimmed
+            )
             await loadClinicalSections()
         } catch {
-            entriesErrorMessage = message(for: error, fallback: "Impossibile eliminare la voce clinica.")
+            entriesErrorMessage = message(for: error, fallback: "Impossibile archiviare la voce clinica.")
+        }
+    }
+
+    @MainActor
+    private func restoreEntry(_ entry: EntrySummary) async {
+        pendingRestoreEntry = nil
+        do {
+            try await LocalAPIClient.shared.restoreEntry(patientId: patientId, entryId: entry.id)
+            await loadClinicalSections()
+        } catch {
+            entriesErrorMessage = message(for: error, fallback: "Impossibile ripristinare la voce clinica.")
         }
     }
 
@@ -1521,12 +1564,19 @@ private struct InfoGrid: View {
 private struct EntryRowView: View {
     let entry: EntrySummary
     let content: String
-    /* @Codex */
     let onEdit: (() -> Void)?
-    /* @Codex */
-    let onDelete: (() -> Void)?
+    let onSoftDelete: (() -> Void)?
+    let onRestore: (() -> Void)?
 
     var body: some View {
+        if entry.isDeleted {
+            deletedBody
+        } else {
+            activeBody
+        }
+    }
+
+    private var activeBody: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: iconName(for: entry.type))
                 .font(.title3)
@@ -1535,7 +1585,7 @@ private struct EntryRowView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(label(for: entry.type))
+                    Text(headlineText)
                         .font(.headline)
                     Spacer()
                     Text(dateFormatter.string(from: entry.date))
@@ -1548,14 +1598,13 @@ private struct EntryRowView: View {
                     .lineLimit(3)
             }
 
-            /* @Codex */
-            if onEdit != nil || onDelete != nil {
+            if onEdit != nil || onSoftDelete != nil {
                 Menu {
                     if let onEdit {
                         Button("Modifica", action: onEdit)
                     }
-                    if let onDelete {
-                        Button("Elimina", role: .destructive, action: onDelete)
+                    if let onSoftDelete {
+                        Button("Elimina", role: .destructive, action: onSoftDelete)
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -1563,8 +1612,85 @@ private struct EntryRowView: View {
                         .foregroundStyle(.secondary)
                 }
                 .menuStyle(.borderlessButton)
+                .accessibilityIdentifier("patient-detail-entry-row-menu")
             }
         }
+    }
+
+    private var deletedBody: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "trash.slash")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(headlineText)
+                        .font(.headline)
+                        .strikethrough(true, color: .secondary)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    TagView(text: "Eliminata", tone: .gray)
+                }
+
+                Text(dateFormatter.string(from: entry.date))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let reason = trimmedReason, !reason.isEmpty {
+                    Text("Motivo: \(reason)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.secondary.opacity(0.08))
+                        )
+                        .accessibilityIdentifier("patient-detail-entry-deletion-reason")
+                }
+
+                if let deletedAt = entry.deletedAt {
+                    Text("Eliminata il \(dateFormatter.string(from: deletedAt))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let onRestore {
+                Button(action: onRestore) {
+                    Label("Ripristina", systemImage: "arrow.uturn.backward.circle")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("patient-detail-entry-restore-action")
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    Color.secondary.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                )
+        )
+        .accessibilityIdentifier("patient-detail-entry-tombstone-row")
+    }
+
+    private var headlineText: String {
+        let trimmedTitle = entry.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmedTitle.isEmpty { return trimmedTitle }
+        return label(for: entry.type)
+    }
+
+    private var trimmedReason: String? {
+        entry.deletionReason?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func label(for type: String) -> String {
@@ -1735,6 +1861,75 @@ private struct CheckupRowView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter
+    }
+}
+
+private struct SoftDeleteEntrySheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let entry: EntrySummary
+    let onConfirm: (String) -> Void
+
+    @State private var reason: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("La voce resterà nello storico clinico per tracciabilità e potrà essere ripristinata in qualsiasi momento.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(entrySummaryLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Motivo dell'archiviazione")
+                    .font(.subheadline.weight(.semibold))
+                TextEditor(text: $reason)
+                    .font(.body)
+                    .frame(minHeight: 120)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.5))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                    )
+                    .accessibilityIdentifier("patient-detail-entry-soft-delete-reason-field")
+                Text("Esempi: errore di trascrizione, voce duplicata, contenuto attribuito al paziente sbagliato.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Button("Annulla") { dismiss() }
+                    .accessibilityIdentifier("patient-detail-entry-soft-delete-cancel-button")
+                Spacer()
+                Button("Archivia voce") {
+                    let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                    onConfirm(trimmed)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("patient-detail-entry-soft-delete-confirm-button")
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 480, minHeight: 320)
+    }
+
+    private var entrySummaryLine: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        let trimmedTitle = entry.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let label = trimmedTitle.isEmpty ? entry.type.capitalized : trimmedTitle
+        return "\(formatter.string(from: entry.date)) · \(label)"
     }
 }
 

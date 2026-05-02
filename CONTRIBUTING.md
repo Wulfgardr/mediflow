@@ -17,22 +17,6 @@ Se vuoi cambiare confini di sicurezza, scrivi prima un ADR (vedi sotto).
 
 ---
 
-## Igiene workflow e tracciabilita
-
-Per i lavori non banali, il default operativo e questo:
-
-- una issue Linear per ogni unita di delivery
-- un branch dedicato per ogni issue attiva
-- commit piccoli, leggibili e con issue ID
-- push su checkpoint stabili, non solo a fine lavoro
-- PR `Draft` appena il workstream supera una singola sessione o un solo commit utile
-- verifica esplicita di cosa e stato testato e cosa no
-
-Se durante il lavoro lo scope cambia davvero, non allargare il branch in modo
-silenzioso: apri un nuovo capitolo con nuova issue / nuovo branch / nuova PR.
-
----
-
 ## Prerequisiti
 
 - Node.js **v20+** consigliato
@@ -50,13 +34,15 @@ cd mediflow
 npm install
 ```
 
-### Avvio (stack locale completo consigliato)
+### Avvio (stack web locale consigliato)
 
 ```bash
 ./Start_MediFlow.command
 ```
 
 Poi apri: `http://localhost:3000`
+
+`Start_MediFlow.command` avvia la web app e i servizi locali opzionali; il client macOS resta su launcher separato (`./scripts/Launch_MediFlowMac.command`).
 
 ### Avvio (solo web)
 
@@ -162,6 +148,7 @@ Usalo quando tocchi:
 - Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `Start_MediFlow.command`
 
 Documentazione tecnica:
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)
 - [docs/README.md](./docs/README.md) (mappa canonica documentazione)
 - [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
 - [docs/walkthrough.md](./docs/walkthrough.md)
@@ -221,6 +208,8 @@ home-base, esegui anche:
 
 ```bash
 npm run test:network:home-base-readonly
+npm run test:network:home-base-write
+npm run test:network:home-base-diary-write
 ```
 
 ---

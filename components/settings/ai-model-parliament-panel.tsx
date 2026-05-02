@@ -5,6 +5,45 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type ParliamentLaneState =
+    | 'competitive'
+    | 'hold'
+    | 'benchmark_only'
+    | 'integration_pending'
+    | 'blocked';
+
+type ParliamentScorecard = {
+    summary?: {
+        bestQualityModel?: string | null;
+        bestQualityLabel?: string | null;
+        bestQualityScore?: number | null;
+        bestValueModel?: string | null;
+        bestValueLabel?: string | null;
+        bestValueScore?: number | null;
+        bestValueChallengerModel?: string | null;
+        bestValueChallengerLabel?: string | null;
+        fastestModel?: string | null;
+        fastestLabel?: string | null;
+        fastestAvgLatencyMs?: number | null;
+        competitiveLaneCount?: number;
+        advisoryLaneCount?: number;
+    };
+    lanes?: Array<{
+        lane: string;
+        capability: string;
+        tasks: string[];
+        state: ParliamentLaneState;
+        totalCandidates: number;
+        runnableCandidates: number;
+        benchmarkedCandidates: number;
+        focusCandidateLabel?: string | null;
+        focusCandidateModel?: string | null;
+        bestValueModel?: string | null;
+        blockers: string[];
+        focusNote?: string | null;
+    }>;
+};
+
 type ParliamentPayload = {
     updatedAt: string;
     jsonPath: string;
@@ -18,6 +57,7 @@ type ParliamentPayload = {
             protectedModels?: string[];
             recommendedPruneModels?: string[];
         };
+        scorecard?: ParliamentScorecard;
     };
 };
 
@@ -68,6 +108,7 @@ export default function AiModelParliamentPanel() {
     }, []);
 
     const parliament = state.payload?.report.parliament;
+    const scorecard = state.payload?.report.scorecard;
     const readiness = parliament?.readiness || 'hold';
 
     return (
@@ -146,6 +187,40 @@ export default function AiModelParliamentPanel() {
                         <MetricCard label="Prune candidate" value={String((parliament.recommendedPruneModels || []).length)} />
                     </div>
 
+                    {scorecard?.summary ? (
+                        <div className="space-y-3">
+                            <div>
+                                <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Scorecard capability / economics</h4>
+                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                                    Advisory only: aiuta a leggere valore, latenza e copertura delle lane senza cambiare baseline o pruning dalla UI.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <MetricCard
+                                    label="Miglior qualità"
+                                    value={scorecard.summary.bestQualityLabel || scorecard.summary.bestQualityModel || 'n/d'}
+                                    meta={typeof scorecard.summary.bestQualityScore === 'number' ? `score ${scorecard.summary.bestQualityScore.toFixed(3)}` : null}
+                                />
+                                <MetricCard
+                                    label="Miglior valore"
+                                    value={scorecard.summary.bestValueLabel || scorecard.summary.bestValueModel || 'n/d'}
+                                    meta={typeof scorecard.summary.bestValueScore === 'number' ? `score ${scorecard.summary.bestValueScore.toFixed(3)}` : null}
+                                />
+                                <MetricCard
+                                    label="Challenger economico"
+                                    value={scorecard.summary.bestValueChallengerLabel || scorecard.summary.bestValueChallengerModel || 'n/d'}
+                                    meta={typeof scorecard.summary.fastestAvgLatencyMs === 'number' ? `fastest ${scorecard.summary.fastestAvgLatencyMs.toFixed(1)} ms` : null}
+                                />
+                                <MetricCard
+                                    label="Lane"
+                                    value={`${scorecard.summary.competitiveLaneCount || 0} competitive`}
+                                    meta={`${scorecard.summary.advisoryLaneCount || 0} advisory`}
+                                />
+                            </div>
+                        </div>
+                    ) : null}
+
                     <ListCard
                         title="Modelli protetti"
                         emptyLabel="Nessun modello protetto."
@@ -156,6 +231,62 @@ export default function AiModelParliamentPanel() {
                         emptyLabel="Nessun prune candidate."
                         values={parliament.recommendedPruneModels || []}
                     />
+
+                    {scorecard?.lanes && scorecard.lanes.length > 0 ? (
+                        <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5">
+                            <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Lane capabilities</h4>
+                            <div className="mt-3 space-y-3">
+                                {scorecard.lanes.map((lane) => (
+                                    <div
+                                        key={lane.lane}
+                                        className="rounded-[16px] border border-slate-200/70 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/5"
+                                    >
+                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                            <div>
+                                                <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                                                    {laneLabel(lane.lane)}
+                                                </p>
+                                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                                                    {lane.capability}
+                                                </p>
+                                            </div>
+                                            <span className={cn(
+                                                'rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]',
+                                                laneStateClassName(lane.state),
+                                            )}>
+                                                {laneStateLabel(lane.state)}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                                            <InlineMetric label="Focus" value={lane.focusCandidateLabel || lane.focusCandidateModel || 'n/d'} />
+                                            <InlineMetric label="Runnable" value={`${lane.runnableCandidates}/${lane.totalCandidates}`} />
+                                            <InlineMetric label="Benchmarked" value={`${lane.benchmarkedCandidates}/${lane.totalCandidates}`} />
+                                        </div>
+
+                                        {lane.focusNote ? (
+                                            <p className="mt-3 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                {lane.focusNote}
+                                            </p>
+                                        ) : null}
+
+                                        {lane.blockers.length > 0 ? (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {lane.blockers.map((blocker) => (
+                                                    <span
+                                                        key={`${lane.lane}-${blocker}`}
+                                                        className="rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                                                    >
+                                                        {blocker}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
 
                     <div className="rounded-[18px] border border-slate-200/70 bg-white/72 p-3 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                         <p>Aggiornato: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.updatedAt || 'n/d'}</span></p>
@@ -168,11 +299,14 @@ export default function AiModelParliamentPanel() {
     );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MetricCard({ label, value, meta }: { label: string; value: string; meta?: string | null }) {
     return (
         <div className="rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/5">
             <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{label}</span>
             <span className="mt-2 block text-xs font-semibold text-slate-900 dark:text-white">{value}</span>
+            {meta ? (
+                <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{meta}</span>
+            ) : null}
         </div>
     );
 }
@@ -195,4 +329,56 @@ function ListCard({ title, values, emptyLabel }: { title: string; values: string
             </div>
         </div>
     );
+}
+
+function InlineMetric({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-[12px] border border-slate-200/70 bg-white/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/5">
+            <span className="block text-[10px] uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">{label}</span>
+            <span className="mt-1 block text-[11px] font-medium text-slate-700 dark:text-slate-200">{value}</span>
+        </div>
+    );
+}
+
+function laneLabel(lane: string) {
+    switch (lane) {
+        case 'generative':
+            return 'Generative';
+        case 'pii':
+            return 'PII / Redaction';
+        case 'clinical_entities':
+            return 'Clinical entities';
+        case 'embedding':
+            return 'Embedding';
+        default:
+            return lane;
+    }
+}
+
+function laneStateLabel(state: ParliamentLaneState) {
+    switch (state) {
+        case 'competitive':
+            return 'competitive';
+        case 'benchmark_only':
+            return 'benchmark-only';
+        case 'integration_pending':
+            return 'integration';
+        default:
+            return state;
+    }
+}
+
+function laneStateClassName(state: ParliamentLaneState) {
+    switch (state) {
+        case 'competitive':
+            return 'border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200';
+        case 'benchmark_only':
+            return 'border-sky-200/70 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200';
+        case 'integration_pending':
+            return 'border-violet-200/70 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200';
+        case 'blocked':
+            return 'border-red-200/70 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200';
+        default:
+            return 'border-amber-200/70 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200';
+    }
 }

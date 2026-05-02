@@ -16,9 +16,28 @@ const BACKUP_COLLECTIONS = [
   'messages',
   'observations',
   'patients',
+  'prostheticPrescriptions',
+  'sissHandoffs',
   'checkups',
   'therapies',
 ];
+
+/* @Codex */
+const BACKUP_TABLES = {
+  ambulatories: 'ambulatories',
+  attachments: 'attachments',
+  conversations: 'conversations',
+  drugs: 'drugs',
+  entries: 'entries',
+  exemptions: 'exemptions',
+  messages: 'messages',
+  observations: 'observations',
+  patients: 'patients',
+  prostheticPrescriptions: 'prosthetic_prescriptions',
+  sissHandoffs: 'siss_handoff_events',
+  checkups: 'checkups',
+  therapies: 'therapies',
+};
 
 function getDefaultDataDir() {
   return process.env.MEDIFLOW_DATA_DIR
@@ -111,8 +130,8 @@ function buildDataset(db) {
   const dataset = Object.fromEntries(
     BACKUP_COLLECTIONS.map((collection) => [
       collection,
-      hasTable(db, collection)
-        ? db.prepare(`SELECT * FROM ${collection}`).all().map(normalizeRowKeys)
+      hasTable(db, BACKUP_TABLES[collection])
+        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map(normalizeRowKeys)
         : [],
     ]),
   );
@@ -125,6 +144,8 @@ function buildDataset(db) {
   dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
   dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
   dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
+  dataset.prostheticPrescriptions = filterRowsByReference(dataset.prostheticPrescriptions, 'patientId', patientIds);
+  dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
   dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
 
   return dataset;

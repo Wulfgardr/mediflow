@@ -3,7 +3,7 @@
 /* @Codex */
 import { useState } from 'react';
 import { ExternalLink, LoaderCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { completeSissPortalHandoff } from '@/lib/siss';
+import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 
 type Props = {
     patientId: string;
@@ -54,6 +54,16 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
         setIsSubmitting(true);
         setFeedback(null);
 
+        const popupWindow = prepareSissPortalWindow();
+        if (!popupWindow) {
+            setFeedback({
+                kind: 'error',
+                message: 'Il browser ha bloccato l\'apertura del portale SISS. Consenti i popup e riprova.',
+            });
+            setIsSubmitting(false);
+            return;
+        }
+
         try {
             const response = await fetch('/api/siss/prescription', {
                 method: 'POST',
@@ -75,6 +85,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                 : null;
 
             if (!response.ok) {
+                popupWindow.close();
                 setFeedback({
                     kind: 'error',
                     message: errorMessage,
@@ -91,14 +102,19 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                 handoffUrl: payload.handoffUrl,
                 clipboardText: payload.clipboardText ?? undefined,
                 successMessage: payload.message,
+                popupWindow,
             });
+            if (!handoffResult.opened) {
+                popupWindow.close();
+            }
 
             setFeedback({
-                kind: handoffResult.success ? 'success' : 'warning',
+                kind: handoffResult.success ? 'success' : handoffResult.opened ? 'warning' : 'error',
                 message: handoffResult.message,
                 correlationId: payload.correlationId,
             });
         } catch (error) {
+            popupWindow.close();
             setFeedback({
                 kind: 'error',
                 message: error instanceof Error ? error.message : 'Errore inatteso nel flusso SISS',
@@ -120,7 +136,7 @@ export default function SissPrescriptionPanel({ patientId, patientTaxCode }: Pro
                         Avvia il flusso dal backend locale e apri la webapp ufficiale del Modulo Prescrittivo Regionale con il codice fiscale pronto da incollare.
                     </p>
                     <p className="text-xs leading-5 text-slate-600">
-                        Questa slice resta webapp-assisted: MediFlow prepara il contesto paziente, ma l'atto prescrittivo resta nella sessione SISS ufficiale.
+                        Questa slice resta webapp-assisted: MediFlow prepara il contesto paziente, ma l&apos;atto prescrittivo resta nella sessione SISS ufficiale.
                     </p>
                     {!hasTaxCode && (
                         <p className="text-xs font-medium text-amber-700">

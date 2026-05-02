@@ -62,13 +62,15 @@ actor LocalAPIClient {
         limit: Int? = nil,
         type: String? = nil,
         dateFrom: Date? = nil,
-        dateTo: Date? = nil
+        dateTo: Date? = nil,
+        includeDeleted: Bool = false
     ) async throws -> [EntrySummary] {
         var queryItems: [URLQueryItem] = []
         if let limit { queryItems.append(URLQueryItem(name: "limit", value: String(limit))) }
         if let type, !type.isEmpty { queryItems.append(URLQueryItem(name: "type", value: type)) }
         if let dateFrom { queryItems.append(URLQueryItem(name: "dateFrom", value: iso8601String(from: dateFrom))) }
         if let dateTo { queryItems.append(URLQueryItem(name: "dateTo", value: iso8601String(from: dateTo))) }
+        if includeDeleted { queryItems.append(URLQueryItem(name: "includeDeleted", value: "true")) }
 
         let request = try makeRequest(
             path: "patients/\(patientId)/entries",
@@ -215,9 +217,28 @@ actor LocalAPIClient {
         try validate(data: data, response: response)
     }
 
-    /* @Codex */
-    func deleteEntry(patientId: String, entryId: String) async throws {
-        let request = try makeRequest(path: "patients/\(patientId)/entries/\(entryId)", method: "DELETE")
+    func softDeleteEntry(
+        patientId: String,
+        entryId: String,
+        deletedAt: Date,
+        reason: String
+    ) async throws {
+        let payload = SoftDeleteEntryPayload(deletedAt: deletedAt, deletionReason: reason)
+        let request = try makeRequest(
+            path: "patients/\(patientId)/entries/\(entryId)",
+            method: "PUT",
+            body: payload
+        )
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+    }
+
+    func restoreEntry(patientId: String, entryId: String) async throws {
+        let request = try makeRequest(
+            path: "patients/\(patientId)/entries/\(entryId)",
+            method: "PUT",
+            body: RestoreEntryPayload()
+        )
         let (data, response) = try await data(for: request)
         try validate(data: data, response: response)
     }
@@ -377,6 +398,34 @@ actor LocalAPIClient {
         let (data, response) = try await data(for: request)
         try validate(data: data, response: response)
         return try decode([ExemptionSummary].self, from: data)
+    }
+
+    /* @Codex */
+    func catalogCount(_ kind: CatalogKind) async throws -> Int {
+        let request = try makeCatalogRequest(
+            kind,
+            queryItems: [URLQueryItem(name: "count", value: "1")]
+        )
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(CatalogCountResponse.self, from: data).count
+    }
+
+    /* @Codex */
+    func importCatalog(_ kind: CatalogKind, jsonData: Data) async throws -> Int? {
+        var request = try makeCatalogRequest(kind, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try? decode(CatalogImportResponse.self, from: data).count
+    }
+
+    /* @Codex */
+    func clearCatalog(_ kind: CatalogKind) async throws {
+        let request = try makeCatalogRequest(kind, method: "DELETE")
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
     }
 
     func searchICD(query: String) async throws -> [ICDResult] {
@@ -568,6 +617,20 @@ actor LocalAPIClient {
             try applyAuth(to: &request)
         }
         return request
+    }
+
+    /* @Codex */
+    private func makeCatalogRequest(
+        _ kind: CatalogKind,
+        method: String = "GET",
+        queryItems: [URLQueryItem] = []
+    ) throws -> URLRequest {
+        switch kind.routeScope {
+        case .apiV1:
+            return try makeRequest(path: kind.path, method: method, queryItems: queryItems)
+        case .rootApi:
+            return try makeRootRequest(path: kind.path, method: method, queryItems: queryItems)
+        }
     }
 
     private func applyAuth(to request: inout URLRequest) throws {
@@ -933,6 +996,24 @@ struct UpdateEntryPayload: Encodable {
     let content: String?
 }
 
+struct SoftDeleteEntryPayload: Encodable {
+    let deletedAt: Date
+    let deletionReason: String
+}
+
+struct RestoreEntryPayload: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case deletedAt
+        case deletionReason
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeNil(forKey: .deletedAt)
+        try container.encodeNil(forKey: .deletionReason)
+    }
+}
+
 struct CreateTherapyPayload: Encodable {
     let drugName: String
     /* @Codex */
@@ -1146,6 +1227,51 @@ struct DrugSummary: Identifiable, Decodable, Equatable {
     let atc: String?
 
     var id: String { aic }
+}
+
+/* @Codex */
+enum CatalogKind: String, CaseIterable, Identifiable, Equatable {
+    case drugs
+    case exemptions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .drugs: return "Farmaci"
+        case .exemptions: return "Esenzioni"
+        }
+    }
+
+    var path: String {
+        switch self {
+        case .drugs: return "drugs"
+        case .exemptions: return "exemptions"
+        }
+    }
+
+    fileprivate var routeScope: CatalogRouteScope {
+        switch self {
+        case .drugs: return .apiV1
+        case .exemptions: return .rootApi
+        }
+    }
+}
+
+/* @Codex */
+private enum CatalogRouteScope {
+    case apiV1
+    case rootApi
+}
+
+/* @Codex */
+private struct CatalogCountResponse: Decodable {
+    let count: Int
+}
+
+/* @Codex */
+private struct CatalogImportResponse: Decodable {
+    let count: Int?
 }
 
 /* @Codex */
