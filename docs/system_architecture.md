@@ -19,9 +19,9 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 2. **Zero-knowledge a riposo**: i campi clinici e gli artifact documentali
    persistono cifrati lato client.
 3. **Home-base opt-in**: esiste una slice `network-home-base` su
-   `/api/v1/network/*` con read pazienti e primo `PUT` profilo/status
-   paziente, mentre pairing, replica, child CRUD e sync restano governati e
-   separati.
+   `/api/v1/network/*` con read pazienti, primo `PUT` profilo/status paziente
+   e diario clinico versionato, mentre pairing, replica, altri child CRUD e
+   sync restano governati e separati.
 4. **Document intelligence prudente**: `documentInsights` resta compat layer,
    mentre gli allegati possono gia persistere un artifact `parse/evidence`
    cifrato consumato in priorita da `AI Patient Insight`.
@@ -78,7 +78,7 @@ sessione attiva del browser/client.
 | `/api/auth/*` | credenziali + session cookie | setup/login/logout |
 | `/api/*` | session cookie | CRUD web, proxy locali, overview shell |
 | `/api/v1/*` | bearer token locale | contratto condiviso native |
-| `/api/v1/network/*` | paired client credential + sessione operatore | `home-base` read-only-first + primo write paziente limitato |
+| `/api/v1/network/*` | paired client credential + sessione operatore | `home-base` read-only-first + primi write limitati paziente/diario versionato |
 
 Boundary importanti:
 

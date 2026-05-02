@@ -223,10 +223,12 @@ Documenti/ADR principali:
    - device paired valido;
    - sessione operatore valida sul nodo;
    - scope clinico risolto dal nodo.
-6. `GET` resta read-only; `PUT /api/v1/network/patients/{id}` e limitato a
-   profilo/status paziente, richiede `network.replica.write-patient-profile`
-   e `version`, e blocca delete remoto, child CRUD, sync e campi
-   AI/documentali.
+6. `GET` pazienti resta read-only; `PUT /api/v1/network/patients/{id}` e
+   limitato a profilo/status paziente, richiede
+   `network.replica.write-patient-profile` e `version`.
+7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
+   del diario con capability diary dedicate e `entries.version`, bloccando hard
+   delete, attachment remoti, sync e campi AI/documentali.
 
 ---
 
@@ -479,7 +481,7 @@ In piu:
 
 - `/api/v1`: `npm run check:openapi:drift`
 - pazienti/versioning: `npm run test:concurrency:patients`
-- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`
+- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`, `npm run test:network:home-base-diary-write`
 - document intelligence: `npm run test:document-synthesis`, `npm run
   test:ai-context`, `npm run test:pdf-service`
 - nuova anagrafica da documento: `npm run test:patient-document-import`

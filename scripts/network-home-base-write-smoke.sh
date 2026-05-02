@@ -10,6 +10,7 @@ LOG_DIR="$DATA_DIR/logs"
 DEV_LOG="$LOG_DIR/next-dev.log"
 BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:3400}"
 REPORT_PATH="$DATA_DIR/reports/network-home-base-write-report.json"
+TEST_SCRIPT="${MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT:-scripts/network-home-base-write.test.mjs}"
 HOST="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3400'); console.log(u.hostname)")"
 PORT="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3400'); console.log(u.port || (u.protocol === 'https:' ? '443' : '80'))")"
 WORKSPACE_DIR="$DATA_DIR/next-workspace"
@@ -94,8 +95,8 @@ if ! curl -fsS -H "Authorization: Bearer $MEDIFLOW_LOCAL_API_TOKEN" "$BASE_URL/a
   exit 1
 fi
 
-echo "Running network home-base write smoke..."
-node --test --test-concurrency=1 scripts/network-home-base-write.test.mjs
+echo "Running network home-base write smoke via $TEST_SCRIPT..."
+node --test --test-concurrency=1 "$TEST_SCRIPT"
 
 echo "Network home-base write smoke completed."
 echo "Data dir: $DATA_DIR"

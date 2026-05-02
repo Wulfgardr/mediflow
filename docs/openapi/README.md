@@ -2,7 +2,7 @@
 
 Stato documento: `SECONDARY`  
 Fonte canonica del contratto: [docs/openapi/mediflow-v1.yaml](./mediflow-v1.yaml)  
-Decisioni di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](../adr/0052-network-patient-profile-write-boundary.md)
+Decisioni di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](../adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](../adr/0053-network-diary-entry-write-boundary.md)
 
 ## A cosa serve
 
@@ -159,6 +159,11 @@ Nota operativa per `WUL-150`:
   richiede capability `network.replica.write-patient-profile`, `version`,
   sessione operatore e scope ambulatoriale del nodo; blocca campi
   AI/document-derived e non abilita delete remoto, child CRUD, sync o coda offline
+- `/api/v1/network/patients/{id}/entries*` pubblica la slice diario paired:
+  capability `network.replica.readonly-clinical-diary` /
+  `network.replica.write-clinical-diary`, `entries.version`, `409`
+  PHI-safe e soft delete via `deletedAt`; hard delete, attachment e campi
+  AI/document-derived restano fuori boundary
 - `network/ai-runtime` esplicita che `AI plane` e `data plane` restano separati
   e dichiara solo `AI locale` vs `AI centralizzata disponibile/non disponibile`
   piu fallback e rollout gate, senza introdurre ancora remote execution reale

@@ -314,8 +314,11 @@ Boundary attuale:
 
 - `POST /api/v1/network/pairing-intents` e bootstrap PHI-safe
 - read e write remoto richiedono `paired client` + sessione operatore valida
-- il write richiede capability `network.replica.write-patient-profile` e `version`
-- delete remoto, child CRUD, sync record-level e fallback automatico restano fuori scope
+- il write paziente richiede capability `network.replica.write-patient-profile` e `version`
+- il diario paired usa capability `network.replica.readonly-clinical-diary` /
+  `network.replica.write-clinical-diary` e `entries.version`
+- hard delete remoto, attachment remoti, altri child CRUD, sync record-level e
+  fallback automatico restano fuori scope
 
 ### Backup e restore artifact v1
 
@@ -547,9 +550,10 @@ sequenceDiagram
 
 ## Limitazioni attuali
 
-- `home-base` e ancora read-only-first: esiste solo il primo `PUT` profilo/status
-  paziente; child CRUD, delete remoto, sync record-level e fallback automatico
-  promotable restano fuori.
+- `home-base` e ancora read-only-first: esistono solo i primi write versionati
+  per profilo/status paziente e diario clinico; hard delete remoto, attachment
+  remoti, altri child CRUD, sync record-level e fallback automatico promotable
+  restano fuori.
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
@@ -567,4 +571,4 @@ sequenceDiagram
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
-   e con il write paziente limitato/versionato
+   e con i write paziente/diario limitati e versionati

@@ -119,7 +119,7 @@ Situazione attuale:
 
 - **macOS**: esiste uno shell storico, ma non è il punto su cui stratificare le prossime feature;
 - **iPadOS / iOS**: rientrano nel filone paired-client sul nodo `home-base`, ancora in definizione operativa;
-- **multi-device**: la first slice già disponibile è `read-only-first`, con primo write profilo/status paziente esplicito e senza child CRUD, delete remoto o sync automatico.
+- **multi-device**: la first slice già disponibile è `read-only-first`, con write espliciti e versionati per profilo/status paziente e diario clinico, senza hard delete remoto, attachment remoti, altri child CRUD o sync automatico.
 
 ---
 

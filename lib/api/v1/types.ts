@@ -57,9 +57,25 @@ export type EntrySummary = {
     id: string;
     patientId: string;
     type: string;
+    /* @Codex */
+    title: string;
     date: string;
     content: string;
+    /* @Codex */
+    setting: string | null;
+    /* @Codex */
+    metadata: string | null;
+    /* @Codex */
+    attachments: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
 };
 
 export type TherapySummary = {
@@ -279,7 +295,11 @@ export type NetworkCapabilityKey =
     | 'network.pairing.bootstrap'
     | 'network.replica.readonly-patients'
     /* @Codex */
+    | 'network.replica.readonly-clinical-diary'
+    /* @Codex */
     | 'network.replica.write-patient-profile'
+    /* @Codex */
+    | 'network.replica.write-clinical-diary'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

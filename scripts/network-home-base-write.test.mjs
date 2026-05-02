@@ -299,6 +299,10 @@ async function request(method, pathname, { headers = {}, body } = {}) {
 }
 
 function resolveReportPath() {
+    if (process.env.MEDIFLOW_NETWORK_WRITE_REPORT_PATH) {
+        return process.env.MEDIFLOW_NETWORK_WRITE_REPORT_PATH;
+    }
+
     const dataDir = process.env.MEDIFLOW_DATA_DIR || process.env.MEDIFLOW_NETWORK_WRITE_DATA_DIR;
     if (dataDir) {
         return path.join(dataDir, 'reports', 'network-home-base-write-report.json');

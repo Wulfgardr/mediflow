@@ -22,7 +22,7 @@ test('buildNetworkNodeSummary falls back to clinic or host name and keeps local-
     assert.equal(summary.displayName, 'MediFlow Studio');
     assert.equal(summary.operatingMode, 'local-only');
     assert.equal(summary.transport.localTlsPort, 3443);
-    assert.equal(summary.protocolVersion, '1.7.0');
+    assert.equal(summary.protocolVersion, '1.8.0');
 });
 
 test('buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled', () => {
@@ -99,6 +99,16 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.ok(patientWrite);
     assert.equal(patientWrite.status, 'available');
     assert.equal(patientWrite.requiresPairing, true);
+
+    const diaryRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-clinical-diary');
+    assert.ok(diaryRead);
+    assert.equal(diaryRead.status, 'available');
+    assert.equal(diaryRead.requiresPairing, true);
+
+    const diaryWrite = response.capabilities.find((item) => item.key === 'network.replica.write-clinical-diary');
+    assert.ok(diaryWrite);
+    assert.equal(diaryWrite.status, 'available');
+    assert.equal(diaryWrite.requiresPairing, true);
 });
 
 test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states', () => {

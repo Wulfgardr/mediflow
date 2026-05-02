@@ -21,6 +21,8 @@ type EntryCreateValues = {
     metadata: string | null;
     /* @Codex */
     attachments: string | null;
+    /* @Codex */
+    version: number;
     createdAt: Date;
     /* @Codex */
     updatedAt: Date;
@@ -338,6 +340,7 @@ export function normalizeEntryCreateInput(
             setting: setting.values,
             metadata: metadata.values,
             attachments: attachments.values,
+            version: 1,
             createdAt: now,
             updatedAt: updatedAt.values ?? now,
         },

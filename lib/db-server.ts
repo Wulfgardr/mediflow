@@ -68,6 +68,7 @@ try {
     ensureColumn('entries', 'attachments', 'attachments TEXT');
     ensureColumn('entries', 'deleted_at', 'deleted_at INTEGER');
     ensureColumn('entries', 'deletion_reason', 'deletion_reason TEXT');
+    ensureColumn('entries', 'version', 'version INTEGER NOT NULL DEFAULT 1');
     ensureColumn('entries', 'updated_at', 'updated_at INTEGER');
 } catch (error) {
     console.warn('[MediFlow] Entries schema check skipped:', error);

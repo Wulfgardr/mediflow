@@ -96,8 +96,11 @@ Quando il nodo passa a `network-home-base`:
   device paired + sessione operatore
 - `PUT /api/v1/network/patients/{id}` richiede inoltre capability
   `network.replica.write-patient-profile` e `version`
-- delete remoto, child CRUD, sync record-level, campi AI/documentali e fallback
-  automatico restano fuori scope
+- `/api/v1/network/patients/{id}/entries*` richiede capability diary dedicate,
+  sessione operatore e `entries.version`; abilita solo create/update/soft-delete
+  del diario clinico
+- delete remoto hard, attachment/document write remoti, altri child CRUD, sync
+  record-level, campi AI/documentali e fallback automatico restano fuori scope
 
 ### Lockout autenticazione PIN
 

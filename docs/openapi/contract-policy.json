@@ -101,7 +101,7 @@
     {
       "change": "GET /api/v1/network/capabilities response 200 changed",
       "trackingIssue": "WUL-190",
-      "reason": "OpenAPI guard treats the capability-key enum extension as response shape drift; adding network.replica.write-patient-profile is an additive capability advertisement for paired clients, not a removal or stricter client requirement."
+      "reason": "OpenAPI guard treats capability-key enum extensions as response shape drift; adding network.replica.write-patient-profile plus paired clinical diary read/write capabilities is additive capability advertisement for paired clients, not a removal or stricter client requirement."
     }
   ]
 }

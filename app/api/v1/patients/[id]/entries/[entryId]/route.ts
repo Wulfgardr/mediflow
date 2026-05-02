@@ -38,9 +38,17 @@ export async function GET(
             id: entry.id,
             patientId: entry.patientId,
             type: entry.type,
+            title: entry.title,
             date: toIsoString(entry.date) ?? new Date(0).toISOString(),
             content: entry.content,
+            setting: entry.setting ?? null,
+            metadata: entry.metadata ?? null,
+            attachments: entry.attachments ?? null,
+            deletedAt: toIsoString(entry.deletedAt),
+            deletionReason: entry.deletionReason ?? null,
+            version: entry.version,
             createdAt: toIsoString(entry.createdAt),
+            updatedAt: toIsoString(entry.updatedAt),
         };
 
         return NextResponse.json(result);

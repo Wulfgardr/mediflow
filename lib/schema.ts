@@ -90,6 +90,8 @@ export const entries = sqliteTable('entries', {
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     /* @Codex */
     deletionReason: text('deletion_reason'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
