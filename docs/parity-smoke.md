@@ -77,6 +77,33 @@ create/edit paziente, la semantica delete del diario e stata chiusa in
 `WUL-24` e `WUL-23` e code-satisfied per le osservazioni native LOINC/UCUM. I
 gap modulo residui restano in `WUL-25`, `WUL-76` e `WUL-77`.
 
+## Evidenza WUL-26 post modulo closeout
+
+Run locale del 2026-05-02 dopo la chiusura code-satisfied di `WUL-25`,
+`WUL-76` e `WUL-77`:
+
+```bash
+MEDIFLOW_PARITY_REQUIRE_WEB=1 MEDIFLOW_PARITY_REQUIRE_NATIVE=1 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode MEDIFLOW_PARITY_ARTIFACT_DIR=tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun bash scripts/parity-smoke.sh
+```
+
+Esito:
+
+- web lane: `PASS`
+- native lane: `PASS` (`xcodebuild test`, 53 test)
+- summary locale: `tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md`
+
+Nota: il primo tentativo `tmp-parity-smoke/wul-26-20260502-post-module-closeout`
+ha fallito solo per un locator Playwright ambiguo su due bottoni `Attivi`
+legittimi. Il test e stato stabilizzato con `data-testid` dedicati ai filtri
+pazienti e il rerun strict e passato.
+
+Questo run certifica l'harness automatizzato sullo stato corrente di `main`, ma
+non trasforma il bundle macOS compilato in prova di parity clinica: l'entrypoint
+attuale di `MediFlowMacApp` monta il prototipo oncologico, mentre la superficie
+clinica legacy resta codice/snapshot congelato. La chiusura parity UI piena
+passa quindi dal filone Apple-native corrente (`WUL-187`/`WUL-194`), non dal
+rilancio della vecchia click-map sul bundle compilato.
+
 ---
 
 ## VM workflow consigliato

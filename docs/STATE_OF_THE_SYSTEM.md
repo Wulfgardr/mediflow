@@ -173,7 +173,7 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Rebuild controllato |
+| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo; il bundle compilato corrente monta il prototipo oncologico come entrypoint | Rebuild controllato |
 | iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |

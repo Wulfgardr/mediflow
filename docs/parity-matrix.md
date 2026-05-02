@@ -48,7 +48,17 @@ osservazioni native LOINC/UCUM risultano code-satisfied in `WUL-23` e i
 cataloghi farmaci/esenzioni sono ora operabili da Settings macOS in `WUL-25`.
 La parita campi/flex delle terapie native e code-satisfied in `WUL-76`.
 La parita campi/flex dei checkups/appuntamenti nativi e code-satisfied in
-`WUL-77`. Il residuo operativo e il gate manuale `P6`.
+`WUL-77`.
+
+Il closeout `WUL-26` del 2026-05-02 ha rieseguito lo strict smoke automatizzato
+post-moduli con esito `PASS` (`web PASS`, `native xcode PASS`) in
+`tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md`.
+Questo chiude la track legacy come evidenza documentale/code-satisfied, non come
+dichiarazione di UI parity piena del bundle macOS compilato: l'entrypoint
+corrente di `MediFlowMacApp` monta il prototipo oncologico, mentre la shell
+clinica MediFlow legacy resta snapshot congelato. La prossima verifica
+capability-by-capability appartiene al filone Apple-native/home-base
+(`WUL-187`/`WUL-194`).
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -61,8 +71,8 @@ La parita campi/flex dei checkups/appuntamenti nativi e code-satisfied in
 
 ## Gap principali da chiudere
 
-1. Pazienti su macOS: consolidare smoke VM sulle nuove azioni `edit/delete/archive` e toolbar/context-menu (checklist: `docs/parity-click-map-macos.md`).
-2. Terapie e checkups/appuntamenti attendono solo la click-map `P6` prima della chiusura parity formale.
+1. Nessun gap modulo-specifico legacy resta aperto nella track `WUL-75`: pazienti, esenzioni, osservazioni, diario, cataloghi, terapie e checkups sono code-satisfied sui rispettivi thin slice.
+2. La parity UI piena non va dichiarata sul bundle macOS corrente finche l'entrypoint compilato non torna a una shell clinica MediFlow. Questo lavoro passa alla track Apple-native/home-base (`WUL-187`/`WUL-194`).
 
 ## Regole di uscita (parity gate)
 

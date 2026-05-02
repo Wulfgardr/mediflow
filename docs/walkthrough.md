@@ -590,11 +590,14 @@ sequenceDiagram
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
-- Il vecchio shell macOS resta congelato: la parity non riparte su quello
-  snapshot.
-- `WUL-26` non puo chiudere la parity come Done finche la shell nativa
-  ricostruita non supera una click-map capability-by-capability; `WUL-24`
-  chiude solo il drift delete/restore del diario.
+- Il vecchio shell macOS resta congelato e non va rilanciato come base di
+  delivery: i thin slice parity legacy sono code-satisfied, ma il bundle
+  `MediFlowMac` compilato oggi monta il prototipo oncologico come entrypoint,
+  non la shell clinica MediFlow storica.
+- `WUL-26` chiude la track parity legacy come closeout documentale: strict
+  smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
+  di UI parity piena sul bundle macOS corrente. La prossima click-map
+  capability-by-capability appartiene al filone Apple-native/home-base.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 
 ---
@@ -605,6 +608,8 @@ sequenceDiagram
    dichiarato senza rompere il local-first
 2) Portare altri consumer sul `parse/evidence artifact` prima di cambiare i
    contratti persistiti piu ampi
-3) Riavviare il filone native sul nuovo shell, non su quello storico
+3) Riavviare il filone native sul nuovo shell, non su quello storico; quando
+   serve un riferimento visuale esterno, confrontarlo esplicitamente con
+   OncoBackboneMac senza confonderlo con MediFlow
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
    e con i write paziente/diario/terapie/checkup/osservazioni limitati e versionati

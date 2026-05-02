@@ -9,8 +9,8 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await bootstrapUnlockedSession(page, pin);
 
   await expect(patientsSearch).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: 'Archiviati' }).click();
-  await page.getByRole('button', { name: 'Attivi' }).click();
+  await page.getByTestId('patients-view-mode-archived').click();
+  await page.getByTestId('patients-view-mode-active').click();
   await patientsSearch.fill('smoke');
   await patientsSearch.clear();
 

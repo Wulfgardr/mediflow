@@ -25,6 +25,10 @@ Il client nativo documentato qui non e piu la base per nuova delivery incrementa
 * **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
 * **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
 * **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
+* **Entrypoint compilato corrente**: `MediFlowMacApp` monta il prototipo
+  oncologico, non la shell clinica MediFlow legacy. Le note di parity qui sotto
+  documentano codice/contratti da preservare, non una garanzia che il bundle
+  attuale esponga quella UI come prodotto.
 
 Lo snapshot corrente supporta comunque:
 

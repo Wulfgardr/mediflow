@@ -125,7 +125,14 @@ rieseguire sul nuovo shell nativo prima della chiusura parity completa.
 
 ## Esito WUL-26
 
-Non eseguito. Il run strict `WUL-21` del 2026-05-02 copre la sola lane
-automatizzata web+native; la click-map capability-by-capability resta il gate
-manuale `P6` e va rieseguita sul nuovo shell nativo, non sullo snapshot macOS
-congelato.
+Closeout documentale eseguito il 2026-05-02.
+
+- Run strict automatizzato post `WUL-25`/`WUL-76`/`WUL-77`: `PASS`
+  (`tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md`).
+- Probe AX read-only: non applicabile al bundle compilato corrente. Il probe
+  cerca la shell clinica legacy (`patients-ambulatory-picker` ecc.), ma
+  `MediFlowMacApp` oggi monta il prototipo oncologico come entrypoint compilato.
+- Esito P6: non dichiarare `FULL` UI parity sul vecchio bundle macOS. I gap
+  modulo-specifici legacy sono chiusi come code-satisfied; la verifica
+  capability-by-capability va spostata sul nuovo filone Apple-native/home-base
+  (`WUL-187`/`WUL-194`) invece di riaprire lo snapshot macOS congelato.
