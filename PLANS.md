@@ -67,8 +67,8 @@ Nota operativa:
 - il filone parity/macOS resta congelato fino al rebuild controllato della shell nativa
 - i punti `P0b` e `P2`-`P6` sotto non bloccano il push `0.4`
 - le issue native/miste restano tracciate in Linear ma fuori dal release gate corrente
-- il residuo aperto in Linear e composto solo da backlog intenzionale `bucket/post-0.4`, macro/tracker e `bucket/frozen-native`, quindi non rientra nel gate `0.4`
-- i tracker macro (`WUL-35`, `WUL-37`, `WUL-39`, `WUL-41`, `WUL-42`, `WUL-74`, `WUL-75`) restano aperti come contenitori, non come delivery queue attiva
+- il residuo aperto in Linear era composto da backlog intenzionale `bucket/post-0.4`, macro/tracker e `bucket/frozen-native`, quindi non rientrava nel gate `0.4`
+- follow-up `2026-05-02`: i tracker macro storici (`WUL-37`, `WUL-39`, `WUL-40`, `WUL-41`, `WUL-42`, `WUL-74`, `WUL-75`, `WUL-187`) sono stati rolluppati e chiusi quando tutti i figli erano gia consegnati; `WUL-85` e stato chiuso come funzionalita nativa gia soddisfatta/superata dalla direzione artifact-first; `WUL-33` e stato cancellato come PoC toolchain stale. `WUL-35` chiude il residuo di governance/toolchain invece di restare come delivery queue attiva.
 
 ### 0b) Terminologie cliniche e compliance FSE 2.0 (ADR 0006)
 - [x] Portare `ATC` a first-class nei flussi terapia (`AIC + ATC` coerenti su web/native API).
