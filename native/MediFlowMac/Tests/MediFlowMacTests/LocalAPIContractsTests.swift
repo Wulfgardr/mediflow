@@ -99,12 +99,47 @@ final class LocalAPIContractsTests: XCTestCase {
         XCTAssertNil(json["documentInsights"])
     }
 
-    func testUpdateTherapyPayloadEncodesNullForClearedEndDate() throws {
+    /* @Codex */
+    func testCreateTherapyPayloadEncodesClinicalParityFields() throws {
+        let payload = CreateTherapyPayload(
+            drugName: "Aspirina",
+            aic: "012345678",
+            atc: "B01AC06",
+            activePrinciple: "Acido acetilsalicilico",
+            dosage: "1 cp",
+            motivation: "Prevenzione secondaria",
+            diagnosisCode: "PREV",
+            diagnosisName: "Prevenzione",
+            status: "active",
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: nil
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["drugName"] as? String, "Aspirina")
+        XCTAssertEqual(json["aic"] as? String, "012345678")
+        XCTAssertEqual(json["atc"] as? String, "B01AC06")
+        XCTAssertEqual(json["activePrinciple"] as? String, "Acido acetilsalicilico")
+        XCTAssertEqual(json["dosage"] as? String, "1 cp")
+        XCTAssertEqual(json["motivation"] as? String, "Prevenzione secondaria")
+        XCTAssertEqual(json["diagnosisCode"] as? String, "PREV")
+        XCTAssertEqual(json["diagnosisName"] as? String, "Prevenzione")
+        XCTAssertEqual(json["status"] as? String, "active")
+        XCTAssertEqual(json["startDate"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertNil(json["endDate"])
+    }
+
+    func testUpdateTherapyPayloadEncodesNullForClearedOptionalFields() throws {
         let payload = UpdateTherapyPayload(
             drugName: "Aspirina",
-            aic: .omit,
+            aic: .null,
             atc: .value("B01AC06"),
+            activePrinciple: .value("Acido acetilsalicilico"),
             dosage: "1 cp",
+            motivation: .null,
+            diagnosisCode: .null,
+            diagnosisName: .null,
             status: "active",
             startDate: Date(timeIntervalSince1970: 0),
             endDate: .null
@@ -114,10 +149,14 @@ final class LocalAPIContractsTests: XCTestCase {
 
         XCTAssertEqual(json["drugName"] as? String, "Aspirina")
         XCTAssertEqual(json["atc"] as? String, "B01AC06")
+        XCTAssertEqual(json["activePrinciple"] as? String, "Acido acetilsalicilico")
         XCTAssertEqual(json["dosage"] as? String, "1 cp")
         XCTAssertEqual(json["status"] as? String, "active")
+        XCTAssertTrue(json["aic"] is NSNull)
+        XCTAssertTrue(json["motivation"] is NSNull)
+        XCTAssertTrue(json["diagnosisCode"] is NSNull)
+        XCTAssertTrue(json["diagnosisName"] is NSNull)
         XCTAssertTrue(json["endDate"] is NSNull)
-        XCTAssertNil(json["aic"])
     }
 
     func testObservationSummaryDecodesLoincUcumObservationFromApiV1() throws {

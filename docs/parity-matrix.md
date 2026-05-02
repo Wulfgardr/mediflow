@@ -46,13 +46,14 @@ la click-map manuale `P6` non e stata eseguita e nessun modulo core e ancora
 `WUL-22`, la semantica delete del diario e stata riallineata in `WUL-24`, le
 osservazioni native LOINC/UCUM risultano code-satisfied in `WUL-23` e i
 cataloghi farmaci/esenzioni sono ora operabili da Settings macOS in `WUL-25`.
-I residui restano tracciati in Linear sotto `WUL-76` e `WUL-77`.
+La parita campi/flex delle terapie native e code-satisfied in `WUL-76`.
+I residui restano tracciati in Linear sotto `WUL-77` e nel gate manuale `P6`.
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Pazienti | FULL (GET/POST/PUT/DELETE) | FULL | PARTIAL (view/add/edit/delete/archive/search/sort + filtri stato + esenzioni create/edit code-satisfied) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 | Diario clinico (entries) | FULL | PARTIAL (add + soft-delete/restore) | FULL (add/edit/soft-delete/restore + filtri eliminati) | PARTIAL | PARTIAL | FULL | PARTIAL |
-| Terapie | FULL | FULL | PARTIAL (CRUD base, campi clinici ridotti) | PARTIAL | PARTIAL | FULL | PARTIAL |
+| Terapie | FULL | FULL | FULL (CRUD + AIFA/manuale, principio attivo, motivazione, indicazione, date/stato) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 | Appuntamenti (checkups) | FULL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL |
 | Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | FULL (search + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
 | Esenzioni (catalogo + patient mapping) | FULL | FULL | FULL (patient mapping create/edit + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
@@ -60,7 +61,7 @@ I residui restano tracciati in Linear sotto `WUL-76` e `WUL-77`.
 ## Gap principali da chiudere
 
 1. Pazienti su macOS: consolidare smoke VM sulle nuove azioni `edit/delete/archive` e toolbar/context-menu (checklist: `docs/parity-click-map-macos.md`).
-2. Terapie e checkups/appuntamenti restano i gap modulo-specifici principali prima della chiusura parity formale.
+2. Checkups/appuntamenti resta il gap modulo-specifico principale prima della chiusura parity formale; le terapie attendono solo la click-map `P6`.
 
 ## Regole di uscita (parity gate)
 

@@ -1020,7 +1020,15 @@ struct CreateTherapyPayload: Encodable {
     let aic: String?
     /* @Codex */
     let atc: String?
+    /* @Codex */
+    let activePrinciple: String?
     let dosage: String
+    /* @Codex */
+    let motivation: String?
+    /* @Codex */
+    let diagnosisCode: String?
+    /* @Codex */
+    let diagnosisName: String?
     let status: String
     let startDate: Date
     let endDate: Date?
@@ -1033,7 +1041,15 @@ struct UpdateTherapyPayload: Encodable {
     let aic: PatchValue<String>
     /* @Codex */
     let atc: PatchValue<String>
+    /* @Codex */
+    let activePrinciple: PatchValue<String>
     let dosage: String?
+    /* @Codex */
+    let motivation: PatchValue<String>
+    /* @Codex */
+    let diagnosisCode: PatchValue<String>
+    /* @Codex */
+    let diagnosisName: PatchValue<String>
     let status: String?
     let startDate: Date?
     let endDate: PatchValue<Date>
@@ -1042,7 +1058,11 @@ struct UpdateTherapyPayload: Encodable {
         drugName: String? = nil,
         aic: PatchValue<String> = .omit,
         atc: PatchValue<String> = .omit,
+        activePrinciple: PatchValue<String> = .omit,
         dosage: String? = nil,
+        motivation: PatchValue<String> = .omit,
+        diagnosisCode: PatchValue<String> = .omit,
+        diagnosisName: PatchValue<String> = .omit,
         status: String? = nil,
         startDate: Date? = nil,
         endDate: PatchValue<Date> = .omit
@@ -1050,7 +1070,11 @@ struct UpdateTherapyPayload: Encodable {
         self.drugName = drugName
         self.aic = aic
         self.atc = atc
+        self.activePrinciple = activePrinciple
         self.dosage = dosage
+        self.motivation = motivation
+        self.diagnosisCode = diagnosisCode
+        self.diagnosisName = diagnosisName
         self.status = status
         self.startDate = startDate
         self.endDate = endDate
@@ -1060,7 +1084,11 @@ struct UpdateTherapyPayload: Encodable {
         case drugName
         case aic
         case atc
+        case activePrinciple
         case dosage
+        case motivation
+        case diagnosisCode
+        case diagnosisName
         case status
         case startDate
         case endDate
@@ -1071,7 +1099,11 @@ struct UpdateTherapyPayload: Encodable {
         try container.encodeIfPresent(drugName, forKey: .drugName)
         try container.encodePatch(aic, forKey: .aic)
         try container.encodePatch(atc, forKey: .atc)
+        try container.encodePatch(activePrinciple, forKey: .activePrinciple)
         try container.encodeIfPresent(dosage, forKey: .dosage)
+        try container.encodePatch(motivation, forKey: .motivation)
+        try container.encodePatch(diagnosisCode, forKey: .diagnosisCode)
+        try container.encodePatch(diagnosisName, forKey: .diagnosisName)
         try container.encodeIfPresent(status, forKey: .status)
         try container.encodeIfPresent(startDate, forKey: .startDate)
         try container.encodePatch(endDate, forKey: .endDate)

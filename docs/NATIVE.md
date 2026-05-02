@@ -29,6 +29,9 @@ Il client nativo documentato qui non e piu la base per nuova delivery incrementa
 Lo snapshot corrente supporta comunque:
 
 * **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
+  Le terapie native usano lo stesso contratto `/api/v1` della web UI per
+  farmaco AIFA/manuale, AIC/ATC, principio attivo, posologia, motivazione,
+  indicazione ICD/sentinella, date e stato.
 * **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
 * **Sicurezza**: lock screen con PIN, cifratura in memoria e certificate pinning.
 

@@ -496,6 +496,13 @@ clear per farmaci ed esenzioni. Le operazioni passano dal backend locale
 (`drugs` via `/api/v1`, esenzioni via route locale token-aware) e non creano
 storage cataloghi parallelo nell'app nativa.
 
+I form terapia nativi usano lo stesso contratto `/api/v1/patients/{id}/therapies*`
+della web UI: farmaco AIFA o manuale/galenico, AIC/ATC quando disponibili,
+principio attivo, posologia, motivazione, indicazione ICD o sentinelle
+`PREV`/`NONE`, stato e date. La modifica mantiene la semantica patch nullable
+per svuotare esplicitamente campi opzionali senza lasciare valori clinici
+stale.
+
 ### Avvio rapido
 
 - Web + servizi: `./Start_MediFlow.command`
