@@ -17,7 +17,8 @@ MediFlow oggi va letto così:
 - **web app locale** come superficie primaria;
 - **SQLite cifrato** come storage autorevole;
 - **`/api/v1`** come contratto condiviso per i client Apple;
-- **`home-base` read-only-first** come prima thin slice multi-device;
+- **`home-base` read-only-first** con write online limitati/versionati su
+  profilo/status paziente, diario clinico, terapie, checkup e osservazioni;
 - **document intelligence reviewable** con artifact `parse/evidence`;
 - **stack AI locale governato** e separato dalle lane `benchmark-only`;
 - **SISS/FSE** dentro un boundary esplicito di handoff e `webapp-assisted`.
@@ -84,14 +85,15 @@ Le superfici principali sono tre:
 | --- | --- | --- |
 | `/api/*` | sessione web | CRUD web e overview locale |
 | `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
-| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, oggi read-only-first |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario/terapie/checkup/osservazioni versionati |
 
 Punti da non perdere:
 
 - `local-only` resta il default;
 - `home-base` è opt-in;
 - il pairing è esplicito;
-- non esistono ancora write remoti o sync automatici;
+- esistono solo write remoti limitati/versionati sui moduli gia documentati;
+  sync automatico e multi-master restano fuori scope;
 - i client iPadOS/iOS rientrano in questo stesso disegno, non in una scorciatoia tipo “DB remoto”.
 
 ---
@@ -129,7 +131,7 @@ La direzione Apple oggi è più chiara di prima:
   tela infinita per tutto il seguito;
 - il lavoro nuovo ruota attorno a **`/api/v1` + TLS locale + home-base**;
 - **iPadOS / iOS** sono previsti dentro questo stesso modello paired,
-  read-only-first.
+  read-only-first con write online espliciti e limitati sui moduli core.
 
 Questa distinzione conta: evita sia il finto “solo web”, sia il finto
 “app universale già pronta”.

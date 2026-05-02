@@ -25,6 +25,8 @@ import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
 /* @Codex */
 import NetworkOperatingModePanel from '@/components/settings/network-operating-mode-panel';
+/* @Codex */
+import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
 
 // --- Model Selector Component ---
@@ -1561,6 +1563,9 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* @Codex: local-only update awareness surface for WUL-32 */}
+                        <UpdateAwarenessPanel />
                     </div>
 
                     {/* Danger Zone */}

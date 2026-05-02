@@ -5,6 +5,8 @@ import { dbServer } from '@/lib/db-server';
 import { exemptions } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import type { ExemptionSummary } from '@/lib/api/v1/types';
+/* @Codex */
+import { parseApiV1Limit, parseApiV1NullableDate, toApiV1IsoString } from '@/lib/api-v1-route-helpers';
 
 type ExemptionPayload = {
     code?: string;
@@ -17,20 +19,6 @@ type ExemptionPayload = {
     isSpecialist?: boolean | null;
     isNational?: boolean | null;
 };
-
-function parseLimit(value: string | null, fallback: number, max = 200): number {
-    if (!value) return fallback;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return fallback;
-    return Math.min(parsed, max);
-}
-
-function parseDate(value: ExemptionPayload['startDate']): Date | null {
-    if (!value) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
 
 function normalizeBoolean(value: unknown): boolean | null {
     if (value === true || value === false) return value;
@@ -56,19 +44,13 @@ function normalizePayload(item: ExemptionPayload): typeof exemptions.$inferInser
         description,
         type: item.type?.trim() || null,
         source: item.source?.trim() || null,
-        startDate: parseDate(item.startDate),
-        endDate: parseDate(item.endDate),
+        startDate: parseApiV1NullableDate(item.startDate),
+        endDate: parseApiV1NullableDate(item.endDate),
         isPharma: normalizeBoolean(item.isPharma),
         isSpecialist: normalizeBoolean(item.isSpecialist),
         isNational: normalizeBoolean(item.isNational),
         updatedAt: new Date()
     };
-}
-
-function toIsoString(value: unknown): string | null {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function toSummary(item: typeof exemptions.$inferSelect): ExemptionSummary {
@@ -77,12 +59,12 @@ function toSummary(item: typeof exemptions.$inferSelect): ExemptionSummary {
         description: item.description,
         type: item.type ?? null,
         source: item.source ?? null,
-        startDate: toIsoString(item.startDate),
-        endDate: toIsoString(item.endDate),
+        startDate: toApiV1IsoString(item.startDate),
+        endDate: toApiV1IsoString(item.endDate),
         isPharma: item.isPharma ?? null,
         isSpecialist: item.isSpecialist ?? null,
         isNational: item.isNational ?? null,
-        updatedAt: toIsoString(item.updatedAt)
+        updatedAt: toApiV1IsoString(item.updatedAt)
     };
 }
 
@@ -95,7 +77,7 @@ export async function GET(request: Request) {
         const q = searchParams.get('q')?.trim();
         const countOnly = searchParams.get('count') === '1';
         const codesQuery = searchParams.get('codes');
-        const limit = parseLimit(searchParams.get('limit'), q ? 60 : 100);
+        const limit = parseApiV1Limit(searchParams.get('limit'), q ? 60 : 100, 200);
 
         if (countOnly) {
             const row = await dbServer

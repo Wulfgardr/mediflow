@@ -12,6 +12,10 @@ Riferimenti canonici:
 - [docs/README.md](./README.md)
 - [docs/markdown-index.md](./markdown-index.md)
 - [docs/siss-baseline.md](./siss-baseline.md)
+- [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
+- [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md)
+- [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
+- [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 - [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md)
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 
@@ -116,9 +120,10 @@ titolo, almeno questi segnali utili:
 | --- | --- |
 | `Credenziali API SISS` (`v5.8`, `11/11/2024`) | esiste un percorso documentato per ottenere credenziali `API Manager` per l'accesso ai WS SISS |
 | `Specifiche di integrazione Modulo Prescrittivo Regionale` (`ARIA-PRREG-SIAA@01`, `02/12/2025`) | esiste documentazione per richiamare la web application del modulo prescrittivo regionale |
-| `I documenti clinici sul Fascicolo Sanitario Elettronico` (`DC-SCEN-REF#01`, `03/12/2024`) | esistono regole di integrazione dedicate ai documenti FSE |
-| `Consenso alla consultazione FSE` (`DC-SCEN-ACCO#03`, `23/09/2025`) | la consultazione FSE ha uno scenario dedicato di consenso/accesso e non e un semplice fetch libero |
-| `SEB FSE Gestione Eventi` (`DC-SEBC_FSE-SIAA#02`) | il perimetro FSE include interfacce SOAP specifiche |
+| `Gestione del Documento Clinico Elettronico presso gli Enti Erogatori e i MMG/PLS` (`DC-SCEN-REF#01`, versione `10.11`, `01/12/2025`) | esistono regole di integrazione dedicate a pubblicazione e consultazione di documenti FSE |
+| `Consenso alla consultazione FSE` (`DC-SCEN-ACCO#03`, versione `2.2`, `23/09/2025`) | la consultazione FSE ha uno scenario dedicato di consenso/accesso e non e un semplice fetch libero |
+| `SEB FSE Gestione Eventi` (`DC-SEBC_FSE-SIAA#02`, versione `08`, `10/02/2025`) | il perimetro FSE include interfacce SOAP specifiche |
+| `Anagrafe Regionale degli assistiti e delle strutture` | la NAR e descritta come fonte delle basi dati anagrafiche locali e include funzioni amministrative connesse a esenzioni e ticket |
 | `DC-COOP-FHIR_PIC#02` (`02/10/2024`) | esiste almeno un caso SGDT/PAI dove i servizi cooperativi permettono accesso integrato con le `SSI-MMG` |
 
 Conseguenza per MediFlow:
@@ -154,8 +159,34 @@ Questa e un'inferenza utile, non una prova contrattuale completa:
 | `Prescrittivo` con UI totalmente custom MediFlow su backend SISS | `Non dimostrato con sole fonti pubbliche raccolte` | abbiamo prove di webapp e WS, non ancora di un contratto pubblico sufficiente a ricostruire in proprio tutto il workflow prescrittivo |
 | `FSE` contestuale/embedded nel gestionale | `Fattibile con onboarding regionale e scenari dedicati` | esistono scenari FSE, gestione consenso e interfacce dedicate, ma non un via libera pubblico a un feed embedded arbitrario |
 | `Anagrafe Regionale`/esenzioni in UI MediFlow | `Probabile con onboarding regionale, non ancora provato end-to-end` | le FAQ e il modello SISS indicano servizi applicativi; mancano ancora le specifiche raccolte nel corpus corrente |
-| `SGDT` contestuale dal paziente | `Parzialmente documentato` | esiste un caso cooperativo specifico per PAI integrato con `SSI-MMG`, non ancora una prova di shell paziente generica SGDT |
-| `Certificati di malattia` contestuali | `Non ancora sufficientemente documentato` | il filone esiste a catalogo e in FAQ/manualistica, ma non abbiamo ancora ricostruito il contratto tecnico utile per MediFlow |
+| `SGDT` contestuale dal paziente | `Non disponibile come launcher generico` | esiste un caso cooperativo specifico per PAI integrato con `SSI-MMG`, ma non una prova di shell paziente generica SGDT |
+| `Certificati di malattia` contestuali | `Webapp-mediated, backend custom bloccato` | FAQ e catalogo confermano Web Application e possibili interfacce software, ma non un contratto pubblico sufficiente per UI custom MediFlow |
+
+### Matrice backend-first per UI custom
+
+Questa matrice chiude il confronto richiesto per `Prescrittivo`, `FSE`, `NAR`
+e `Certificati`, usando quattro esiti operativi:
+
+- `custom-ui-plausible`: tecnicamente ipotizzabile, ma solo dopo scenario,
+  specifiche, qualifica/provisioning e test ufficiali
+- `webapp-mediated`: percorso ufficiale utilizzabile tramite UI regionale o
+  Web Application governata
+- `handoff-only-for-now`: MediFlow puo solo preparare contesto e audit locale
+- `blocked-by-docs-or-qualification`: mancano documenti, qualifica o canale
+  autorizzato per implementare runtime custom
+
+| Dominio | Esito | Canale ufficiale noto | Vincoli principali | Prima slice realistica |
+| --- | --- | --- | --- | --- |
+| `Prescrittivo` | `webapp-mediated`; `custom-ui-plausible` solo dopo onboarding | Web Application del `Modulo Prescrittivo Regionale`, con indizi di servizi WS/API SISS | `SSI` qualificata, credenziali/canale, scenario approvato, audit e gestione errori regionali | `webapp-assisted` sul modulo ufficiale, gia tracciato dalla nota prescrittivo |
+| `FSE consultazione` | `handoff-only-for-now`; feed/viewer embedded `blocked-by-docs-or-qualification` | UI ufficiale FSE, scenari FSE, consenso consultazione, SEB/eventi | consenso, ruolo operatore, provisioning, audit FSE, policy cache/retention | `official-session handoff guard`, senza ingerire documenti FSE |
+| `NAR / Anagrafe Regionale` | `handoff-only-for-now`; lookup read-only `custom-ui-plausible` ma non provato | servizio NAR/Anagrafe, `Identifica Cittadino`, `Classe di Esenzione`, handoff `Gaia` | specifiche non ancora raccolte, minimizzazione dati, ruolo/contesto operatore, source-of-truth regionale | blueprint read-only separato in [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md), senza runtime custom immediato |
+| `Certificati di malattia` | `webapp-mediated`; UI/backend custom `blocked-by-docs-or-qualification` | Web Application Certificati di Malattia e possibili interfacce applicativo medico-SISS | SISS come `SAR`, Carta Operatore, specifiche complete, responsabilita medico-legale, test ufficiale | `official-webapp handoff guard`, solo dopo verifica path ufficiale |
+
+Decisione: il primo dominio backend-first non va scelto perche "piu
+customizzabile", ma per valore clinico e maturita del boundary. Oggi la priorita
+resta il `Modulo Prescrittivo Regionale` in forma `webapp-assisted`; `FSE` e
+`Certificati` restano governati da handoff ufficiale, mentre `NAR` richiede il
+blueprint read-only dedicato prima di qualunque runtime.
 
 ## Cosa possiamo implementare adesso senza oltrepassare il perimetro
 
@@ -200,15 +231,20 @@ Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
    `FSE consultazione e consenso`
    - richiede un boundary piu delicato su consenso, ruoli e audit
    - va affrontato solo dopo aver chiarito meglio il prescrittivo
+   - nota canonica dedicata:
+     [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 3. [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile):
    `SGDT/PAI`
    - resta un filone piu verticale e specifico
    - oggi non e il candidato migliore per la prima integrazione ampia dentro
      MediFlow
+   - nota canonica dedicata:
+     [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 
 `Certificati di malattia` restano per ora fuori da questa priorita, non perche
-irrilevanti, ma perche il materiale pubblico raccolto fin qui non basta ancora a
-tagliare una first slice seria come per prescrittivo/FSE/SGDT.
+irrilevanti, ma perche il materiale pubblico raccolto supporta al massimo una
+futura slice `official-webapp handoff guard`; la nota dedicata e in
+[docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
 
 ## Sequenza consigliata dopo `WUL-178`
 
@@ -231,5 +267,6 @@ tagliare una first slice seria come per prescrittivo/FSE/SGDT.
 - [Linee Guida Regionali](https://www.siss.regione.lombardia.it/wps/portal/site/siss/servizi-per-il-territorio/linee-guida-regionali)
 - [Procedura di Qualificazione Scheda Sanitaria Informatica (SSI)](https://www.siss.regione.lombardia.it/wps/portal/site/siss/servizi-per-il-territorio/procedure-di-verifica-e-qualificazione/procedura-di-qualificazione-scheda-sanitaria-informatica-ssi)
 - [Service Provider di MMG/PDF](https://www.siss.regione.lombardia.it/wps/portal/site/siss/DettaglioRedazionale/servizi-per-il-territorio/service-provider/di-mmg-pdf/red-mmg-pdf/red-mmg-pdf/%21ut/p/z0/fYyxDoIwFAC_hQ94eQhIcGxYFEOMupQuprEFX4S2eTYd_HpZ3Izj5S6HCiUqpxNNOpJ3el55UPXtJLb1vqg2XdPtyvx8LS9tfzg2lcixQ_U_WA8F920_oQo6PoDc6FG-LCd6EwTLQDNEy0zRM33V3UJgn8hYRmkIlmWCYEaUbM1vCE81CJFlH35Jatw%21/)
+- [Anagrafe Regionale degli assistiti e delle strutture](https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/anagrafe-regionale-degli-assistiti-e-delle-strutture)
 - [Portale pubblico documentazione SISS](https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.jsp)
 - [FAQ SISS](https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.jsp)

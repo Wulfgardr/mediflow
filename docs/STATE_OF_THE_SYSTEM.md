@@ -8,9 +8,9 @@
 > Per i principi stabili prevalgono sempre [ARCHITECTURE.md](../ARCHITECTURE.md)
 > e [SECURITY.md](../SECURITY.md). Per il flusso operativo end-to-end prevale
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
-> nel piano engineering del workspace sorgente.
+> in documenti interni non necessari alla repo pubblica.
 
-Ultimo aggiornamento: 2026-05-01
+Ultimo aggiornamento: 2026-05-02 (`v0.6.0`)
 
 ---
 
@@ -34,11 +34,17 @@ La fotografia corrente e questa:
   telemetry default-on.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
-- **Home-base**: modalita opt-in in cui il Mac espone una first slice
-  `/api/v1/network/*` read-only verso client paired su rete fidata.
+- **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
+  verso client paired su rete fidata: lettura pazienti e write versionati
+  limitati a profilo/status, diario, terapie, checkup e osservazioni.
+- **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
+  superficie primaria, mostra readiness runtime locale e puo gestire
+  esplicitamente backend web production e proxy TLS con stop bounded/escalation.
+  Ollama e Docker/ICD sono solo health diagnostico read-only quando gia attivi;
+  il prototype oncologico e separato e non definisce MediFlow prodotto.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
-  artifact cifrati `parse/evidence`.
+  artifact cifrati `parse/evidence` con prime ancore sezionali.
 - **AI**: runtime locale per default, benchmark e shadow lane separati dal
   prodotto clinico.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -102,8 +108,10 @@ Il disegno Apple non e "tre app con tre store dati". E una family architecture:
 - client mobili paired, con cache derivata e riconciliazione esplicita quando
   quella parte verra implementata.
 
-Oggi la first slice disponibile e read-only. Write remoti, sync record-level,
-replica automatica e multi-master sono fuori scope corrente.
+Oggi la slice resta read-only-first nel disegno generale: il read pazienti e
+stabile e i write remoti sono limitati/versionati a profilo/status paziente,
+diario clinico, terapie, checkup e osservazioni. Hard delete remoto, cataloghi, sync
+record-level, replica automatica e multi-master sono fuori scope corrente.
 
 Documenti/ADR principali:
 
@@ -121,6 +129,8 @@ La direzione document intelligence e `artifact-first`:
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
+- i nuovi `parseEvidenceArtifactSnapshot` possono includere `sectionMap`,
+  ancore `page/section/snippet` e conflitti terapeutici reviewable;
 - `patients.documentInsights` resta una projection compatibile, non il modello
   finale ideale.
 
@@ -130,8 +140,9 @@ certezza documentate.
 
 Documenti/ADR principali:
 
-- ADR 0040 (private)
+- [ADR 0040](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md)
 - [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+- [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md)
 
 ### 2.5 Le integrazioni regionali restano dentro canali ufficiali
 
@@ -166,9 +177,10 @@ Documenti/ADR principali:
 | Web app locale | Primaria | Lavoro clinico quotidiano sul Mac | HTTP localhost, sessione web |
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
-| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti read-only da device paired | Credenziale device + sessione operatore |
-| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Rebuild controllato |
-| iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
+| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
+| macOS Apple shell | `v0.6.0` | Entry point del bundle macOS: shell Apple/home-base con pannello runtime, start/stop esplicito di backend web production e proxy TLS, stop bounded/escalation, health diagnostico read-only per Ollama e Docker/ICD | Rebuild controllato, firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
+| iPhone/iPad | Slice `v0.6.0` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
@@ -209,7 +221,7 @@ Documenti/ADR principali:
    - nuova anagrafica da documento;
    - troubleshooting documentale.
 
-### 4.4 Home-base read-only
+### 4.4 Home-base paired patient data plane
 
 1. Operatore abilita `network-home-base`.
 2. Device remoto apre un pairing intent PHI-safe.
@@ -219,7 +231,22 @@ Documenti/ADR principali:
    - device paired valido;
    - sessione operatore valida sul nodo;
    - scope clinico risolto dal nodo.
-6. Il data plane resta read-only.
+6. `GET` pazienti resta read-only; `PUT /api/v1/network/patients/{id}` e
+   limitato a profilo/status paziente, richiede
+   `network.replica.write-patient-profile` e `version`.
+7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
+   del diario con capability diary dedicate e `entries.version`, bloccando hard
+   delete, attachment remoti, sync e campi AI/documentali.
+8. Il diario locale condiviso `/api/v1/patients/{id}/entries*` mantiene la
+   stessa semantica reversibile per web/native: lista attiva di default,
+   `includeDeleted=true` per i tombstone, motivo di eliminazione e restore via
+   `PUT`.
+9. `/api/v1/network/patients/{id}/therapies*`,
+   `/api/v1/network/patients/{id}/checkups*` e
+   `/api/v1/network/patients/{id}/observations*` seguono lo stesso boundary
+   paired: capability dedicate, `therapies.version`/`checkups.version`/
+   `observations.version`, `409` PHI-safe e soft delete, senza hard delete
+   remoto o campi AI/documentali.
 
 ---
 
@@ -247,6 +274,10 @@ sono documentate o benchmarkate:
 - challenger generativi non promossi;
 - TurboQuant / MLX runtime experiments;
 - comparator cloud opt-in.
+
+La release `v0.6.0` rende MLX benchmark-visible e diagnosticabile in read-only nella
+home-base, ma non lo promuove a runtime clinico: Ollama resta il default
+operativo e l'OCR resta Ollama-only.
 
 Per promuovere una lane servono:
 
@@ -280,12 +311,12 @@ non scrive dati paziente e non cambia il default local-first.
 7. [docs/README.md](./README.md): mappa canonica e fonti autorevoli per tema.
 8. [docs/markdown-index.md](./markdown-index.md): inventario completo.
 9. [docs/adr/README.md](./adr/README.md): decisioni architetturali.
-10. Piano engineering privato: priorita operative a breve, disponibile solo nel
-    workspace sorgente quando presente.
+10. Roadmap pubblica: direzione prodotto; eventuali priorita operative interne
+    non sono necessarie per usare o valutare la repo OSS.
 
 ### 6.2 Documenti pubblici vs documenti privati
 
-Il workspace sorgente puo contenere:
+Il workspace privato puo contenere:
 
 - piani operativi a breve;
 - attribution agentica;
@@ -324,7 +355,7 @@ Disponibile:
 - diario clinico;
 - terapie;
 - osservazioni;
-- appuntamenti/checkup;
+- appuntamenti/checkup e agenda operativa sui casi visibili;
 - allegati;
 - archiviazione paziente;
 - campi strutturati e projection documentale;
@@ -423,7 +454,8 @@ Quando cambia una feature runtime:
 - aggiorna [docs/README.md](./README.md) se cambia la fonte autorevole;
 - aggiorna [docs/markdown-index.md](./markdown-index.md) se aggiungi, rimuovi o
   rinomini Markdown;
-- aggiorna il piano engineering privato se cambia priorita operativa.
+- aggiorna la roadmap pubblica se cambia direzione prodotto; eventuali piani
+  operativi interni restano fuori dalla repo OSS.
 
 Quando cambia un boundary:
 
@@ -438,6 +470,7 @@ Quando esporti OSS:
   destinazione di prova;
 - verifica che non compaiano DB, runtime artifacts o documenti interni;
 - cerca termini interni e riferimenti privati;
+- aggiorna `oss-assets/README.md` se cambia la facciata pubblica.
 
 ---
 
@@ -471,7 +504,7 @@ In piu:
 
 - `/api/v1`: `npm run check:openapi:drift`
 - pazienti/versioning: `npm run test:concurrency:patients`
-- home-base network: `npm run test:network:home-base-readonly`
+- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`, `npm run test:network:home-base-diary-write`, `npm run test:network:home-base-therapy-write`, `npm run test:network:home-base-checkup-write`, `npm run test:network:home-base-observation-write`
 - document intelligence: `npm run test:document-synthesis`, `npm run
   test:ai-context`, `npm run test:pdf-service`
 - nuova anagrafica da documento: `npm run test:patient-document-import`

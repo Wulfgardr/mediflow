@@ -73,7 +73,11 @@ export async function POST(request: Request) {
             status: normalizedStatus ?? 'active',
             startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,
-            createdAt: new Date()
+            version: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            deletedAt: null,
+            deletionReason: null,
         });
 
         /* @Codex */
@@ -86,12 +90,13 @@ export async function POST(request: Request) {
                 subjectRef: String(newId),
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
         );
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
     } catch (error) {
         console.error("API POST /therapies error:", error);
         return NextResponse.json({ error: `Create Failed: ${error instanceof Error ? error.message : String(error)}` }, { status: 500 });

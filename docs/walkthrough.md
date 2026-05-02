@@ -8,12 +8,16 @@ Questo documento offre la vista end-to-end del progetto: web app Next.js, backen
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
 > [!IMPORTANT]
-> Dopo `v0.4.0` la delivery macOS e congelata per un rebuild controllato della shell nativa.
-> Le sezioni native qui sotto descrivono lo snapshot corrente e i confini da preservare (`/api/v1`, TLS locale, security/sessione), non una roadmap di estensione del client storico.
+> Dopo `v0.6.0` il client macOS da estendere e il bundle Apple/home-base.
+> La vecchia shell clinica resta snapshot/parity; le sezioni native qui sotto
+> descrivono il contratto da preservare (`/api/v1`, TLS locale,
+> security/sessione) e la direzione home-base packaged.
 
 > [!IMPORTANT]
-> Su `main` esistono gia due slice post-`v0.5.0` che cambiano il quadro operativo:
-> `network home-base` read-only su `/api/v1/network/*` e il primo artifact
+> Su `main` esistono gia slice `v0.6.0` che cambiano il quadro operativo:
+> `network home-base` paired su `/api/v1/network/*` con read pazienti e write
+> limitati su profilo/status, diario, terapie, checkup e osservazioni, il bundle
+> macOS home-base packaged, client iPhone/iPad paired non-AI, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
 
 ---
@@ -297,7 +301,7 @@ Endpoint principali:
 Tipi condivisi:
 - `lib/api/v1/types.ts`
 
-### API v1/network per `home-base` read-only
+### API v1/network per `home-base` paired
 
 La first thin slice `network home-base` si attiva solo in modalita
 `network-home-base` dal pannello Settings.
@@ -307,12 +311,30 @@ Surface attuale:
 - summary PHI-safe di nodo, sessione, capability, identita e AI runtime
 - pairing bootstrap/confirm
 - primo data plane remoto read-only su pazienti (`/api/v1/network/patients*`)
+- primo write remoto limitato a `PUT /api/v1/network/patients/{id}` per profilo/status paziente
+- diario clinico paired su `/api/v1/network/patients/{id}/entries*`
+- terapie paired su `/api/v1/network/patients/{id}/therapies*`
+- checkup paired su `/api/v1/network/patients/{id}/checkups*`
+- osservazioni paired su `/api/v1/network/patients/{id}/observations*`
 
 Boundary attuale:
 
 - `POST /api/v1/network/pairing-intents` e bootstrap PHI-safe
-- il read path remoto richiede `paired client` + sessione operatore valida
-- write remoto, sync record-level e fallback automatico restano fuori scope
+- read e write remoto richiedono `paired client` + sessione operatore valida
+- il write paziente richiede capability `network.replica.write-patient-profile` e `version`
+- il diario paired usa capability `network.replica.readonly-clinical-diary` /
+  `network.replica.write-clinical-diary` e `entries.version`
+- il diario locale condiviso `/api/v1/patients/{id}/entries*` usa soft-delete
+  reversibile per i client native: lista attiva di default, `includeDeleted=true`
+  per i tombstone, motivo di eliminazione e restore esplicito
+- le terapie paired usano capability `network.replica.readonly-therapies` /
+  `network.replica.write-therapies` e `therapies.version`
+- i checkup paired usano capability `network.replica.readonly-checkups` /
+  `network.replica.write-checkups` e `checkups.version`
+- le osservazioni paired usano capability `network.replica.readonly-observations` /
+  `network.replica.write-observations` e `observations.version`
+- hard delete remoto, attachment remoti, cataloghi, sync record-level,
+  campi AI/document-derived e fallback automatico restano fuori scope
 
 ### Backup e restore artifact v1
 
@@ -362,7 +384,8 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 - `lib/pdf-service.ts`: estrazione testo PDF (fallback regex)
 - `lib/document-synthesis-service.ts`: sintesi clinica + salvataggio
 - `lib/document-parse-evidence-artifact.ts`: artifact canonico `parse/evidence`
-  per allegato
+  per allegato, con `sectionMap` opzionale per sezioni classificate, ancore
+  fact `page/section/snippet` e conflitti reviewable
 - `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
   locale shadow-only per la lane `redaction.v1`
 
@@ -374,7 +397,8 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 4) Analisi testuale e sintesi via Qwen (`qwen3.5:35b-a3b` di default)
 5) Costruzione di:
    - `summarySnapshot` leggibile
-   - `parse/evidence artifact` canonico per l'allegato
+   - `parse/evidence artifact` canonico per l'allegato, incluse le ancore
+     sezionali quando disponibili
    - `documentInsights` come projection/compat layer iniziale
 6) Estrazione prudente di eventuali diagnosi con codice ICD esplicito
 7) Persistenza cifrata sugli allegati + refresh di `AI Patient Insight`
@@ -383,7 +407,9 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 
 Nel create-flow `Nuova Anagrafica`, `components/pdf-importer.tsx` usa lo stesso
 OCR locale ma aggiunge una review intermedia esplicita prima del salvataggio.
-La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+e viene ora resa esplicita dal contratto `patient import decision` di
+[ADR 0051](./adr/0051-patient-import-decision-contract-between-review-and-persistence.md).
 
 Il flusso:
 
@@ -395,9 +421,15 @@ Il flusso:
 3) riconciliazione locale reviewable:
    - match ICD-11 per i problemi candidati
    - match AIFA/ATC o fallback manuale per le terapie candidate
-4) review operatore su anagrafica, diagnosi e terapie prima di applicare i
+4) costruzione di un `patient import decision` esplicito:
+   - target dell import (`create_new_patient`, `merge_existing_patient`,
+     `review_identity`)
+   - field decisions
+   - diagnosi `apply_structured|review_only|ignore`
+   - terapie `persist_structured|append_note|ignore`
+5) review operatore su anagrafica, diagnosi e terapie prima di applicare i
    default al form
-5) alla creazione della scheda, le terapie confermate e attive con posologia
+6) alla creazione della scheda, le terapie confermate e attive con posologia
    sufficiente vengono persistite come record strutturati in `therapies`; i casi
    incompleti o non attivi possono restare come nota documentale di supporto
 
@@ -458,8 +490,37 @@ Flusso:
 1) Genera certificato self-signed  
 2) Avvia proxy HTTPS su `:3443`  
 3) Scrive `~/Library/Application Support/MediFlow/native-config.json`
+4) Scrive `runtime-status.json` nella stessa cartella con timestamp,
+   `baseURL`, fingerprint TLS, modalita rete e metadati proxy PHI-free
 
-La app macOS usa TLS pinning in `LocalAPIClient`.
+La app macOS usa TLS pinning in `LocalAPIClient`. La finestra primaria del
+bundle compilato e ora il shell Apple/home-base: il pannello `Runtime` legge
+`native-config.json` e `runtime-status.json` per mostrare readiness locale senza
+esporre token, certificati, chiavi o dati paziente. Il pannello puo avviare e
+arrestare esplicitamente il backend web production standalone e il proxy TLS
+inclusi nel bundle con stop bounded/escalation locale. Ollama e Docker/ICD
+compaiono solo come health diagnostico read-only se gia attivi su localhost; non
+vengono installati, avviati o arrestati dalla app.
+
+La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
+operabilita amministrativa dei dataset condivisi: count/stato, import JSON e
+clear per farmaci ed esenzioni. Le operazioni passano dal backend locale
+(`drugs` via `/api/v1`, esenzioni via route locale token-aware) e non creano
+storage cataloghi parallelo nell'app nativa.
+
+I form terapia nativi usano lo stesso contratto `/api/v1/patients/{id}/therapies*`
+della web UI: farmaco AIFA o manuale/galenico, AIC/ATC quando disponibili,
+principio attivo, posologia, motivazione, indicazione ICD o sentinelle
+`PREV`/`NONE`, stato e date. La modifica mantiene la semantica patch nullable
+per svuotare esplicitamente campi opzionali senza lasciare valori clinici
+stale.
+
+I form appuntamento/checkup nativi restano volutamente semplici ma allineati
+al contratto `/api/v1/patients/{id}/checkups*`: data, titolo, note operative,
+stato e source `manual` in creazione. Le note sono visibili nella scheda
+paziente e modificabili con clear esplicito, mentre `version`, `updatedAt` e
+tombstone metadata restano disponibili come metadata di contratto per i client
+nativi.
 
 ### Avvio rapido
 
@@ -534,12 +595,22 @@ sequenceDiagram
 
 ## Limitazioni attuali
 
-- `home-base` e ancora read-only-first: niente write remoto, sync record-level o
-  fallback automatico promotable.
-- `documentInsights` resta un compat layer: il `document evidence ledger` e
-  solo alla prima slice runtime.
-- Il vecchio shell macOS resta congelato: la parity non riparte su quello
-  snapshot.
+- `home-base` e ancora read-only-first: esistono solo i primi write versionati
+  per profilo/status paziente, diario clinico, terapie, checkup e osservazioni; hard delete
+  remoto, attachment remoti, cataloghi, sync record-level e
+  fallback automatico promotable restano fuori.
+- `documentInsights` resta un compat layer: il `document evidence ledger` ha
+  ora una base runtime con artifact e prime ancore sezionali, ma i decision
+  layer completi restano incrementali.
+- Il vecchio shell macOS resta congelato e non va rilanciato come base di
+  delivery: i thin slice parity legacy sono code-satisfied, mentre il bundle
+  `MediFlowMac` compilato ora apre il shell Apple/home-base come entrypoint.
+  Il prototipo oncologico resta separato e non va confuso con MediFlow prodotto
+  o con OncoBackboneMac.
+- Il closeout parity legacy documenta: strict
+  smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
+  di UI parity piena della vecchia shell clinica. La prossima click-map
+  capability-by-capability appartiene al filone Apple-native/home-base.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 
 ---
@@ -550,5 +621,8 @@ sequenceDiagram
    dichiarato senza rompere il local-first
 2) Portare altri consumer sul `parse/evidence artifact` prima di cambiare i
    contratti persistiti piu ampi
-3) Riavviare il filone native sul nuovo shell, non su quello storico
+3) Riavviare il filone native sul nuovo shell, non su quello storico; quando
+   serve un riferimento visuale esterno, confrontarlo esplicitamente con
+   OncoBackboneMac senza confonderlo con MediFlow
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
+   e con i write paziente/diario/terapie/checkup/osservazioni limitati e versionati

@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-DATA_DIR="${MEDIFLOW_NETWORK_SMOKE_DATA_DIR:-$ROOT_DIR/tmp-network-home-base-readonly}"
+DATA_DIR="${MEDIFLOW_NETWORK_SMOKE_DATA_DIR:-$ROOT_DIR/tmp-network-home-base-readonly/$(date +%Y%m%d-%H%M%S)}"
 LOG_DIR="$DATA_DIR/logs"
 DEV_LOG="$LOG_DIR/next-dev.log"
 BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:3200}"

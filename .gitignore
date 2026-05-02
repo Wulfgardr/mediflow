@@ -27,12 +27,14 @@
 /tmp-real-pipeline
 /tmp-manual-browser
 /tmp-network-home-base-readonly
+/tmp-api-v1-put-negative-routes
 /tmp/
 
 # next.js
 /.next/
 /.next-manual-browser/
 /.next-real-import/
+/.next-api-v1-put-negative/
 /out/
 
 # production

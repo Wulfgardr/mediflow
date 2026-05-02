@@ -51,48 +51,125 @@
     "notes": "Documento noto e indicizzato sul portale documentale SISS; acquisizione da completare via ricerca mirata o download autorizzato."
   },
   {
-    "id": "siss-gestione-assistiti-anagrafe",
-    "title": "SISS - Gestione assistiti / anagrafe regionale",
+    "id": "siss-anagrafe-regionale-servizio",
+    "title": "SISS - Anagrafe Regionale degli assistiti e delle strutture",
     "area": "registry",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/anagrafe-regionale-degli-assistiti-e-delle-strutture",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "registry", "nar", "assistiti", "ricettari", "prescrittori"],
+    "notes": "Pagina pubblica SISS: NAR come fonte anagrafica regionale, funzioni esenzioni/ticket, medici prescrittori e ricettari assegnati."
+  },
+  {
+    "id": "siss-gestione-assistiti-anagrafe",
+    "title": "SISS - Gestione Anagrafe / iscrizione Assistiti (Gaia/NAR)",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=21",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "registry", "assistiti", "manual-import"],
-    "notes": "Raccoglie manuali e specifiche di integrazione per gestione assistiti e anagrafe regionale."
+    "tags": ["siss", "registry", "nar", "assistiti", "gaia", "manual-import"],
+    "notes": "Catalogo pubblico SISS: manuali Gaia/Gestione Anagrafe - iscrizione Assistiti; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-anagrafe-medici-specialisti",
+    "title": "SISS - GAMS Gestione Anagrafe Medici Specialisti",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=10",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "registry", "nar", "prescrittori", "specialisti", "manual-import"],
+    "notes": "Catalogo pubblico SISS: GAMS/Gestione Anagrafe Medici Specialisti; rilevante per contesto prescrittori ma non sufficiente a runtime custom."
+  },
+  {
+    "id": "siss-fse-documento-clinico-elettronico",
+    "title": "SISS - Gestione del Documento Clinico Elettronico presso Enti Erogatori e MMG/PLS",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323489&tipologia=46193753",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "documento-clinico", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-REF#01, versione 10.11, data 01/12/2025; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-fse-consenso-consultazione",
+    "title": "SISS - Consenso alla consultazione FSE",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=6",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "consenso", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-ACCO#03, versione 2.2, data 23/09/2025; governa consenso/accesso semplificato FSE."
   },
   {
     "id": "siss-seb-fse-gestione-eventi",
     "title": "SISS - SEB FSE Gestione Eventi",
     "area": "fse-regionale",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/pubblicazioniENormativa.jsp",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323237&tipologia=46193594",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
     "tags": ["siss", "fse", "soap", "manual-import"],
-    "notes": "Interfacce SOAP FSE regionale; acquisizione da allineare alle pubblicazioni attive del portale."
+    "notes": "Catalogo pubblico SISS: DC-SEBC_FSE-SIAA#02, versione 08, data 10/02/2025; interfacce SOAP per servizi esposti dal SEB FSE."
   },
   {
-    "id": "siss-certificati-malattia",
-    "title": "SISS - Certificati di Malattia",
+    "id": "siss-certificati-malattia-faq",
+    "title": "SISS - Certificati di malattia FAQ",
     "area": "certificates",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=49997836",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=23041045",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "certificati", "inps", "manual-import"],
-    "notes": "Il portale pubblico conferma la presenza di documentazione di supporto; la raccolta strutturata va completata fuori da scraping fragile."
+    "tags": ["siss", "certificati", "malattia", "inps", "sar", "manual-import"],
+    "notes": "FAQ pubblica SISS: dichiara interfacce software per integrazione applicativi medico/SISS e chiarisce il boundary SISS qualificato SAR con Carta Operatore."
   },
   {
-    "id": "siss-sgdt",
-    "title": "SISS - SGDT / servizi territoriali adiacenti",
+    "id": "siss-certificati-malattia-webapp-ricovero",
+    "title": "SISS - Web Application Certificati di Malattia in sede di ricovero",
+    "area": "certificates",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=38",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "certificati", "malattia", "inps", "webapp", "manual-import"],
+    "notes": "Catalogo pubblico SISS: Web Application Certificati di Malattia (INPS), video/manualistica per comunicazione inizio ricovero e certificato in dimissione."
+  },
+  {
+    "id": "siss-sgdt-pai-cooperazione-mmg",
+    "title": "SISS - SGDT/PAI cooperazione applicativa CE-MMG",
+    "area": "sgdt",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=35",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "pai", "ce-mmg", "fhir", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-COOP-FHIR_PIC#02, versione 1.0, data 02/10/2024; cooperazione applicativa con Cartelle Elettroniche MMG/PLS per PAI pazienti cronici."
+  },
+  {
+    "id": "siss-sgdt-cot-transizioni-mmg",
+    "title": "SISS - SGDT/COT interconnessione Centrali Operative Territoriali per MMG/PLS",
     "area": "sgdt",
     "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "sgdt", "manual-import"],
-    "notes": "Placeholder per la documentazione SGDT e servizi territoriali correlati."
+    "tags": ["siss", "sgdt", "cot", "mmg", "pls", "transizioni", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORMS-MRS#899, versione 1.1, data 19/12/2025; richieste di transizione registrate dal MMG/PLS in SGDT e gestite tramite Centrali Operative Territoriali."
+  },
+  {
+    "id": "siss-sgdt-vademecum-mmg",
+    "title": "SISS - SGDT vademecum operativo MMG",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "cot", "mmg", "cure-domiciliari", "pai", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORM-MES#896, versione 2.0, data 19/12/2025; uso SGDT per attivazione Cure Domiciliari e Presa in Carico dei pazienti cronici da parte di MMG/PLS."
   },
   {
     "id": "fse-support-readme",

@@ -140,7 +140,8 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
             {fields.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 px-6 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/2">
                     <Calendar className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="text-sm text-slate-400 font-medium">Nessun controllo programmato.</p>
+                    <p className="text-sm text-slate-400 font-medium">Nessun lavoro pianificato.</p>
+                    <p className="mt-1 text-xs text-slate-400">Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
                 </div>
             )}
 
@@ -152,37 +153,46 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                             type="button"
                             onClick={() => removeField(index)}
                             className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all rounded-full bg-white dark:bg-slate-800 p-2 shadow-lg border border-slate-100 dark:border-white/10 text-slate-400 hover:text-red-500 hover:scale-110 z-10"
-                            aria-label="Rimuovi controllo"
+                            aria-label="Rimuovi pianificazione"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
 
                         <div className="flex flex-col md:flex-row gap-5 items-end">
                             <div className="w-full md:w-40 shrink-0">
-                                <label className="section-kicker mb-1.5 block">Data Controllo</label>
+                                <label className="section-kicker mb-1.5 block">Data prevista</label>
                                 <input
                                     type="date"
                                     {...register(`checkups.${index}.date`)}
                                     className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white dark:[color-scheme:dark] ${
-                                        errors.checkups?.[index]?.date 
-                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
+                                        errors.checkups?.[index]?.date
+                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40'
                                             : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
                                     }`}
                                 />
                             </div>
 
                             <div className="flex-1 w-full">
-                                <label className="section-kicker mb-1.5 block">Motivazione / Esame</label>
+                                <label className="section-kicker mb-1.5 block">Lavoro pianificato</label>
                                 <input
                                     {...register(`checkups.${index}.title`)}
-                                    placeholder="Es. Controllo pressione, ECG, Emocromo..."
+                                    placeholder="Es. PRIAMO, valutazione ADL, visita programmata, ECG..."
                                     className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white ${
-                                        errors.checkups?.[index]?.title 
-                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
+                                        errors.checkups?.[index]?.title
+                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40'
                                             : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
                                     }`}
                                 />
                             </div>
+                        </div>
+                        <div className="mt-4">
+                            <label className="section-kicker mb-1.5 block">Note operative</label>
+                            <textarea
+                                {...register(`checkups.${index}.notes`)}
+                                placeholder="Materiali, scale da somministrare, contesto utile per il prossimo passaggio..."
+                                rows={2}
+                                className="w-full resize-y rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                            />
                         </div>
                         <input type="hidden" {...register(`checkups.${index}.status`)} />
                         <input type="hidden" {...register(`checkups.${index}.source`)} />
@@ -192,11 +202,11 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 
             <button
                 type="button"
-                onClick={() => append({ date: new Date(), title: '', status: 'pending', source: 'manual' })}
+                onClick={() => append({ date: new Date(), title: '', notes: '', status: 'pending', source: 'manual' })}
                 className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all hover:bg-slate-50 dark:hover:bg-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95 shadow-sm"
             >
                 <Plus className="w-4 h-4" />
-                Pianifica Controllo
+                Aggiungi pianificazione
             </button>
         </div>
     );
@@ -372,7 +382,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 <DiagnosesFieldArray register={register} control={control} errors={errors} setValue={setValue} watch={watch} />
             </div>
 
-            {/* Prossimi Controlli */}
+            {/* Pianificazione operativa */}
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
@@ -380,7 +390,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="section-kicker">Agenda clinica</p>
-                        <h3 className={FORM_TITLE_CLASS}>Prossimi Controlli</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Lavoro pianificato</h3>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">PRIAMO, valutazioni, visite programmate, follow-up.</p>
                     </div>
                 </div>
                 <CheckupsFieldArray register={register} control={control} errors={errors} />

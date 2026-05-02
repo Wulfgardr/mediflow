@@ -642,7 +642,13 @@ export interface Checkup {
     /* @Codex */
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
+    /* @Codex */
+    version?: number;
     updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 }
 
 /* @Codex */

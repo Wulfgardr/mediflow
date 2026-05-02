@@ -22,7 +22,7 @@ test('buildNetworkNodeSummary falls back to clinic or host name and keeps local-
     assert.equal(summary.displayName, 'MediFlow Studio');
     assert.equal(summary.operatingMode, 'local-only');
     assert.equal(summary.transport.localTlsPort, 3443);
-    assert.equal(summary.protocolVersion, '1.6.0');
+    assert.equal(summary.protocolVersion, '1.11.0');
 });
 
 test('buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled', () => {
@@ -94,6 +94,51 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     const readonlyPatients = response.capabilities.find((item) => item.key === 'network.replica.readonly-patients');
     assert.ok(readonlyPatients);
     assert.equal(readonlyPatients.status, 'available');
+
+    const patientWrite = response.capabilities.find((item) => item.key === 'network.replica.write-patient-profile');
+    assert.ok(patientWrite);
+    assert.equal(patientWrite.status, 'available');
+    assert.equal(patientWrite.requiresPairing, true);
+
+    const diaryRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-clinical-diary');
+    assert.ok(diaryRead);
+    assert.equal(diaryRead.status, 'available');
+    assert.equal(diaryRead.requiresPairing, true);
+
+    const diaryWrite = response.capabilities.find((item) => item.key === 'network.replica.write-clinical-diary');
+    assert.ok(diaryWrite);
+    assert.equal(diaryWrite.status, 'available');
+    assert.equal(diaryWrite.requiresPairing, true);
+
+    const therapyRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-therapies');
+    assert.ok(therapyRead);
+    assert.equal(therapyRead.status, 'available');
+    assert.equal(therapyRead.requiresPairing, true);
+
+    const therapyWrite = response.capabilities.find((item) => item.key === 'network.replica.write-therapies');
+    assert.ok(therapyWrite);
+    assert.equal(therapyWrite.status, 'available');
+    assert.equal(therapyWrite.requiresPairing, true);
+
+    const checkupRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-checkups');
+    assert.ok(checkupRead);
+    assert.equal(checkupRead.status, 'available');
+    assert.equal(checkupRead.requiresPairing, true);
+
+    const checkupWrite = response.capabilities.find((item) => item.key === 'network.replica.write-checkups');
+    assert.ok(checkupWrite);
+    assert.equal(checkupWrite.status, 'available');
+    assert.equal(checkupWrite.requiresPairing, true);
+
+    const observationRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-observations');
+    assert.ok(observationRead);
+    assert.equal(observationRead.status, 'available');
+    assert.equal(observationRead.requiresPairing, true);
+
+    const observationWrite = response.capabilities.find((item) => item.key === 'network.replica.write-observations');
+    assert.ok(observationWrite);
+    assert.equal(observationWrite.status, 'available');
+    assert.equal(observationWrite.requiresPairing, true);
 });
 
 test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states', () => {

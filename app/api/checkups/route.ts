@@ -71,7 +71,11 @@ export async function POST(request: Request) {
             status: normalizedStatus ?? 'pending',
             /* @Codex */
             source: body.source ?? 'manual',
-            createdAt: new Date()
+            version: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            deletedAt: null,
+            deletionReason: null,
         });
 
         /* @Codex */
@@ -84,12 +88,13 @@ export async function POST(request: Request) {
                 subjectRef: String(newId),
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
         );
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
     } catch (error) {
         console.error("Checkup create error", error);
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });

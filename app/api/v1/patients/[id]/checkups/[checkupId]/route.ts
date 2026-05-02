@@ -2,14 +2,14 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { normalizeOptionalCheckupSource } from '@/lib/api-v1-clinical-write-normalization';
+import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
-import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
+import { normalizeCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
@@ -17,13 +17,6 @@ function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-/* @Codex */
-function parseDate(value: unknown): Date | undefined {
-    if (!value) return undefined;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
 export async function GET(
@@ -52,6 +45,10 @@ export async function GET(
             status: normalizeCheckupStatus(checkup.status),
             source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt),
+            version: checkup.version,
+            updatedAt: toIsoString(checkup.updatedAt),
+            deletedAt: toIsoString(checkup.deletedAt),
+            deletionReason: checkup.deletionReason ?? null,
         };
 
         return NextResponse.json(result);
@@ -73,7 +70,7 @@ export async function PUT(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
-        const body = await request.json();
+        const body = await request.json() as Record<string, unknown>;
 
         const existing = await dbServer.select({ id: checkups.id }).from(checkups)
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
@@ -82,55 +79,22 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const nextDate = parseDate(body.date);
-        if (body.date !== undefined && nextDate === undefined) {
-            return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
-        }
-
-        const nextTitle = typeof body.title === 'string' ? body.title : undefined;
-        const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
-        const nextNotes = hasNotes
-            ? (typeof body.notes === 'string'
-                ? body.notes
-                : body.notes === null || body.notes === ''
-                    ? null
-                    : undefined)
-            : undefined;
-        /* @Codex */
-        let nextStatus: string | undefined;
-        if (typeof body.status === 'string') {
-            const parsedStatus = parseCheckupStatus(body.status);
-            if (!parsedStatus) {
-                return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
-            }
-            nextStatus = parsedStatus;
-        }
-        const hasSource = Object.prototype.hasOwnProperty.call(body, 'source');
-        const normalizedSource = normalizeOptionalCheckupSource(body.source);
-        if (!normalizedSource.ok) {
-            return NextResponse.json({ error: normalizedSource.error }, { status: 400 });
-        }
-        const nextSource = hasSource ? normalizedSource.values : undefined;
-
-        if (
-            nextDate === undefined &&
-            nextTitle === undefined &&
-            nextNotes === undefined &&
-            nextStatus === undefined &&
-            nextSource === undefined
-        ) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        const normalized = normalizeCheckupUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
         await dbServer.update(checkups)
             .set({
-                date: nextDate,
-                title: nextTitle,
-                notes: nextNotes,
-                status: nextStatus,
-                source: nextSource,
+                ...normalized.values,
+                version: sql`${checkups.version} + 1`,
             })
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)));
+        const current = await dbServer
+            .select({ version: checkups.version })
+            .from(checkups)
+            .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
+            .get();
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -141,7 +105,8 @@ export async function PUT(
                 subjectType: 'checkup',
                 subjectRef: checkupId,
                 redactedMetadata: {
-                    changedFields: listChangedFields(body as Record<string, unknown>),
+                    changedFields: listChangedFields(body, ['version']),
+                    resourceVersion: current?.version ?? undefined,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
@@ -166,7 +131,7 @@ export async function DELETE(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
-        const existing = await dbServer.select({ id: checkups.id }).from(checkups)
+        const existing = await dbServer.select({ id: checkups.id, version: checkups.version }).from(checkups)
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
             .get();
         if (!existing) {
@@ -183,6 +148,10 @@ export async function DELETE(
                 eventType: 'checkup.deleted',
                 subjectType: 'checkup',
                 subjectRef: checkupId,
+                redactedMetadata: {
+                    changedFields: ['deleted'],
+                    resourceVersion: existing.version,
+                },
             },
             '[MediFlow] Checkup audit write failed:',
         );
