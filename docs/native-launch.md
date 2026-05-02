@@ -29,10 +29,11 @@ Questo script:
 - compila il client nativo
 - apre l'app macOS
 
-Dentro l'app, il pannello `Runtime` puo anche avviare/arrestare esplicitamente
-il solo proxy TLS incluso nel bundle. Il backend web e i servizi opzionali
-restano ancora fuori dalla supervisione app-managed e vanno avviati con il
-launcher esistente finche il prossimo slice WUL-192 non li integra.
+Dentro l'app, il pannello `Runtime` puo avviare/arrestare esplicitamente il
+backend web production standalone e il proxy TLS inclusi nel bundle. I servizi
+opzionali Ollama e Docker/ICD restano fuori dalla supervisione app-managed e
+continuano a richiedere gestione separata finche un slice successivo non
+definisce policy, consenso e recovery dedicati.
 
 Prima di impacchettare il backend standalone nel bundle, eseguire:
 

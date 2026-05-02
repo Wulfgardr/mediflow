@@ -114,15 +114,17 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
 * legge `runtime-status.json` prodotto da `scripts/native-setup.sh`;
 * mostra server, modalita rete, presenza token, PID proxy e coerenza del
   fingerprint TLS;
+* include nel bundle il runtime Next standalone validato da
+  `check:standalone-runtime-bundle`;
+* puo avviare e arrestare esplicitamente il backend web production locale;
 * puo avviare e arrestare esplicitamente il solo proxy TLS locale usando lo
   script `local-api-tls-proxy.mjs` incluso nel bundle;
 * non mostra mai token, certificati, chiavi o dati paziente;
-* non avvia e non supervisiona ancora backend Next.js, Ollama o container
-  Docker.
+* non avvia e non supervisiona ancora Ollama o container Docker.
 
 La promessa completa di `home-base packaged` resta quindi progressiva: il
-prossimo slice dovra estendere la supervisione al backend web production e poi
-ai servizi opzionali, con recovery leggibile e packaging firmabile/notarizzabile.
+prossimo slice dovra aggiungere recovery/backoff piu robusti e la policy per i
+servizi opzionali, con packaging firmabile/notarizzabile.
 
 ### 1. Lock Screen & Sicurezza
 

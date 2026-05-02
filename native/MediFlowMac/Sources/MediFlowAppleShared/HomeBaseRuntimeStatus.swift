@@ -48,6 +48,7 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
     public let certPath: String?
     public let keyPath: String?
     public let proxyPidPath: String?
+    public let webBackendPidPath: String
     public let tokenPresent: Bool
     public let statusFilePresent: Bool
     public let tlsPinMatches: Bool?
@@ -72,6 +73,7 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
         certPath: String?,
         keyPath: String?,
         proxyPidPath: String?,
+        webBackendPidPath: String,
         tokenPresent: Bool,
         statusFilePresent: Bool,
         tlsPinMatches: Bool?,
@@ -88,6 +90,7 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
         self.certPath = certPath
         self.keyPath = keyPath
         self.proxyPidPath = proxyPidPath
+        self.webBackendPidPath = webBackendPidPath
         self.tokenPresent = tokenPresent
         self.statusFilePresent = statusFilePresent
         self.tlsPinMatches = tlsPinMatches
@@ -113,6 +116,7 @@ public enum HomeBaseRuntimeStatusLoader {
         let config = decode(NativeRuntimeConfig.self, from: configURL)
         let status = decode(RuntimeStatus.self, from: statusURL)
         let pidURL = URL(fileURLWithPath: status?.proxyPidPath ?? dataDirectory.appendingPathComponent("local-api-tls-proxy.pid").path)
+        let webBackendPidURL = dataDirectory.appendingPathComponent("local-web-backend.pid")
         let configPin = normalizedPin(config?.tlsPin)
         let statusPin = normalizedPin(status?.tlsPin)
         let tlsPinMatches: Bool?
@@ -128,6 +132,7 @@ public enum HomeBaseRuntimeStatusLoader {
         let configPresent = fileManager.fileExists(atPath: configURL.path)
         let statusPresent = fileManager.fileExists(atPath: statusURL.path)
         let pidPresent = fileManager.fileExists(atPath: pidURL.path)
+        let webBackendPidPresent = fileManager.fileExists(atPath: webBackendPidURL.path)
         let networkMode = status?.networkMode
 
         let components = [
@@ -148,6 +153,12 @@ public enum HomeBaseRuntimeStatusLoader {
                 title: "Proxy TLS",
                 detail: pidPresent ? "PID proxy registrato" : "PID proxy non registrato",
                 state: pidPresent ? .ready : .unknown
+            ),
+            HomeBaseRuntimeComponent(
+                id: "web-backend",
+                title: "Backend web",
+                detail: webBackendPidPresent ? "PID backend production registrato" : "PID backend production non registrato",
+                state: webBackendPidPresent ? .ready : .unknown
             ),
             HomeBaseRuntimeComponent(
                 id: "tls-pin",
@@ -175,6 +186,7 @@ public enum HomeBaseRuntimeStatusLoader {
             certPath: status?.certPath,
             keyPath: status?.keyPath,
             proxyPidPath: pidURL.path,
+            webBackendPidPath: webBackendPidURL.path,
             tokenPresent: tokenPresent,
             statusFilePresent: statusPresent,
             tlsPinMatches: tlsPinMatches,

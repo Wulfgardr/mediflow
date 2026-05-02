@@ -330,6 +330,24 @@ public struct HomeBaseRuntimeStatusView: View {
             #if os(macOS)
             HStack(spacing: 10) {
                 Button {
+                    Task { await startBackend() }
+                } label: {
+                    Label("Avvia backend", systemImage: "play.rectangle")
+                }
+                .disabled(supervisor.isWorking)
+                .accessibilityIdentifier("homebase-runtime-start-backend-button")
+
+                Button {
+                    Task { await stopBackend() }
+                } label: {
+                    Label("Arresta backend", systemImage: "stop.rectangle")
+                }
+                .disabled(supervisor.isWorking)
+                .accessibilityIdentifier("homebase-runtime-stop-backend-button")
+            }
+
+            HStack(spacing: 10) {
+                Button {
                     Task { await startProxy() }
                 } label: {
                     Label("Avvia proxy TLS", systemImage: "play.circle")
@@ -382,7 +400,7 @@ public struct HomeBaseRuntimeStatusView: View {
                 }
             }
 
-            Text("Questo pannello puo avviare o arrestare solo il proxy TLS locale. Backend Next.js, Ollama e Docker/ICD restano fuori da questo slice e non vengono installati o supervisionati automaticamente.")
+            Text("Questo pannello puo avviare o arrestare backend web production e proxy TLS locali. Ollama e Docker/ICD restano fuori da questo slice e non vengono installati o supervisionati automaticamente.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -410,6 +428,16 @@ public struct HomeBaseRuntimeStatusView: View {
 
     private func stopProxy() async {
         await supervisor.stopProxy(snapshot: snapshot)
+        snapshot = HomeBaseRuntimeStatusLoader.load()
+    }
+
+    private func startBackend() async {
+        await supervisor.startBackend(snapshot: snapshot)
+        snapshot = HomeBaseRuntimeStatusLoader.load()
+    }
+
+    private func stopBackend() async {
+        await supervisor.stopBackend(snapshot: snapshot)
         snapshot = HomeBaseRuntimeStatusLoader.load()
     }
     #endif

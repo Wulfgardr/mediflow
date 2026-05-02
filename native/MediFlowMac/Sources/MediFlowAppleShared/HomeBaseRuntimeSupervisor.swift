@@ -9,6 +9,7 @@ import Darwin
 public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
     public let nodeBinaryPath: String
     public let scriptPath: String
+    public let workingDirectory: String?
     public let pidPath: String
     public let logPath: String
     public let environment: [String: String]
@@ -16,12 +17,14 @@ public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
     public init(
         nodeBinaryPath: String,
         scriptPath: String,
+        workingDirectory: String? = nil,
         pidPath: String,
         logPath: String,
         environment: [String: String]
     ) {
         self.nodeBinaryPath = nodeBinaryPath
         self.scriptPath = scriptPath
+        self.workingDirectory = workingDirectory
         self.pidPath = pidPath
         self.logPath = logPath
         self.environment = environment
@@ -34,7 +37,8 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var isWorking = false
 
-    private var managedProcess: Process?
+    private var managedProxyProcess: Process?
+    private var managedBackendProcess: Process?
     private let fileManager: FileManager
     private let processInfo: ProcessInfo
 
@@ -52,34 +56,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 return
             }
 
-            try fileManager.createDirectory(
-                at: URL(fileURLWithPath: plan.logPath).deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            fileManager.createFile(atPath: plan.logPath, contents: nil)
-            let logHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: plan.logPath))
-            try logHandle.seekToEnd()
-
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: plan.nodeBinaryPath)
-            process.arguments = [plan.scriptPath]
-            process.environment = plan.environment
-            process.standardOutput = logHandle
-            process.standardError = logHandle
-            process.terminationHandler = { [weak self] process in
-                Task { @MainActor in
-                    guard let self else { return }
-                    if self.managedProcess === process {
-                        self.managedProcess = nil
-                        self.statusMessage = "Proxy TLS terminato con codice \(process.terminationStatus)."
-                    }
-                    try? logHandle.close()
-                }
-            }
-
-            try process.run()
-            managedProcess = process
-            try "\(process.processIdentifier)\n".write(toFile: plan.pidPath, atomically: true, encoding: .utf8)
+            managedProxyProcess = try launchProcess(plan: plan, terminationStatusPrefix: "Proxy TLS")
             statusMessage = "Proxy TLS avviato dalla app."
         }
         #else
@@ -95,9 +72,9 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 .appendingPathComponent("local-api-tls-proxy.pid")
                 .path
 
-            if let managedProcess, managedProcess.isRunning {
-                managedProcess.terminate()
-                self.managedProcess = nil
+            if let managedProxyProcess, managedProxyProcess.isRunning {
+                managedProxyProcess.terminate()
+                self.managedProxyProcess = nil
                 try? fileManager.removeItem(atPath: pidPath)
                 statusMessage = "Stop proxy TLS richiesto."
                 return
@@ -112,6 +89,51 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
             _ = kill(pid, SIGTERM)
             try? fileManager.removeItem(atPath: pidPath)
             statusMessage = "Stop proxy TLS richiesto."
+        }
+        #else
+        errorMessage = "La supervisione runtime e disponibile solo su macOS."
+        #endif
+    }
+
+    public func startBackend(snapshot: HomeBaseRuntimeSnapshot) async {
+        #if os(macOS)
+        await runSupervisorAction {
+            let plan = try makeBackendLaunchPlan(snapshot: snapshot)
+            if Self.isProcessRunning(pidPath: plan.pidPath) {
+                statusMessage = "Backend web gia attivo."
+                return
+            }
+
+            managedBackendProcess = try launchProcess(plan: plan, terminationStatusPrefix: "Backend web")
+            statusMessage = "Backend web production avviato dalla app."
+        }
+        #else
+        errorMessage = "La supervisione runtime e disponibile solo su macOS."
+        #endif
+    }
+
+    public func stopBackend(snapshot: HomeBaseRuntimeSnapshot) async {
+        #if os(macOS)
+        await runSupervisorAction {
+            let pidPath = snapshot.webBackendPidPath
+
+            if let managedBackendProcess, managedBackendProcess.isRunning {
+                managedBackendProcess.terminate()
+                self.managedBackendProcess = nil
+                try? fileManager.removeItem(atPath: pidPath)
+                statusMessage = "Stop backend web richiesto."
+                return
+            }
+
+            guard let pid = Self.readPid(pidPath: pidPath), Self.isProcessRunning(pid: pid) else {
+                try? fileManager.removeItem(atPath: pidPath)
+                statusMessage = "Nessun backend web attivo registrato."
+                return
+            }
+
+            _ = kill(pid, SIGTERM)
+            try? fileManager.removeItem(atPath: pidPath)
+            statusMessage = "Stop backend web richiesto."
         }
         #else
         errorMessage = "La supervisione runtime e disponibile solo su macOS."
@@ -151,12 +173,79 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         )
     }
 
+    func makeBackendLaunchPlan(snapshot: HomeBaseRuntimeSnapshot) throws -> HomeBaseRuntimeLaunchPlan {
+        let dataDirectory = URL(fileURLWithPath: snapshot.dataDirectory)
+        let webRuntimeURL = try webRuntimeURL()
+        let serverURL = webRuntimeURL.appendingPathComponent("server.js")
+        let nodeBinary = try resolveNodeBinary()
+        let pidPath = snapshot.webBackendPidPath
+        let logPath = dataDirectory.appendingPathComponent("logs/local-web-backend.log").path
+
+        guard fileManager.fileExists(atPath: serverURL.path) else {
+            throw HomeBaseRuntimeSupervisorError.missingWebRuntime
+        }
+
+        return HomeBaseRuntimeLaunchPlan(
+            nodeBinaryPath: nodeBinary,
+            scriptPath: serverURL.path,
+            workingDirectory: webRuntimeURL.path,
+            pidPath: pidPath,
+            logPath: logPath,
+            environment: [
+                "HOSTNAME": "127.0.0.1",
+                "NODE_ENV": "production",
+                "PORT": "3000",
+                "MEDIFLOW_DATA_DIR": snapshot.dataDirectory
+            ]
+        )
+    }
+
     private func proxyScriptURL() throws -> URL {
         if let resourceURL = Bundle.main.url(forResource: "local-api-tls-proxy", withExtension: "mjs") {
             return resourceURL
         }
         throw HomeBaseRuntimeSupervisorError.missingProxyScript
     }
+
+    private func webRuntimeURL() throws -> URL {
+        if let resourceURL = Bundle.main.resourceURL?.appendingPathComponent("WebRuntime"),
+           fileManager.fileExists(atPath: resourceURL.path) {
+            return resourceURL
+        }
+        throw HomeBaseRuntimeSupervisorError.missingWebRuntime
+    }
+
+    private func launchProcess(plan: HomeBaseRuntimeLaunchPlan, terminationStatusPrefix: String) throws -> Process {
+        try fileManager.createDirectory(
+            at: URL(fileURLWithPath: plan.logPath).deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fileManager.createFile(atPath: plan.logPath, contents: nil)
+        let logHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: plan.logPath))
+        try logHandle.seekToEnd()
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: plan.nodeBinaryPath)
+        process.arguments = [plan.scriptPath]
+        if let workingDirectory = plan.workingDirectory {
+            process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
+        }
+        process.environment = processInfo.environment.merging(plan.environment) { _, new in new }
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+        process.terminationHandler = { [weak self] process in
+            Task { @MainActor in
+                guard let self else { return }
+                self.statusMessage = "\(terminationStatusPrefix) terminato con codice \(process.terminationStatus)."
+                try? logHandle.close()
+            }
+        }
+
+        try process.run()
+        try "\(process.processIdentifier)\n".write(toFile: plan.pidPath, atomically: true, encoding: .utf8)
+        return process
+    }
+
 
     private func resolveNodeBinary() throws -> String {
         if let override = processInfo.environment["MEDIFLOW_NODE_BINARY"],
@@ -209,6 +298,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
 public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
     case missingTLSMaterial
     case missingProxyScript
+    case missingWebRuntime
     case missingNode
 
     public var errorDescription: String? {
@@ -217,6 +307,8 @@ public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
             return "Certificato o chiave TLS mancanti. Esegui prima il setup nativo."
         case .missingProxyScript:
             return "Script proxy TLS non incluso nel bundle."
+        case .missingWebRuntime:
+            return "Runtime web standalone non incluso nel bundle. Ricompila la app con lo script nativo."
         case .missingNode:
             return "Node.js non trovato. Configura MEDIFLOW_NODE_BINARY o installa Node in un percorso standard."
         }

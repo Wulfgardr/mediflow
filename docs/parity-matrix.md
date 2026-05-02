@@ -74,10 +74,11 @@ Apple-native/home-base (`WUL-187`/`WUL-194`).
 `WUL-192` introduce una prima superficie osservabile nel bundle macOS:
 
 - finestra primaria Apple Foundation/home-base invece del prototipo oncologico;
-- pannello runtime con config nativa, presenza token, PID proxy, modalita rete,
-  fingerprint TLS e start/stop esplicito del proxy TLS incluso nel bundle;
-- nessuna supervisione automatica ancora dichiarata per backend Next.js, Ollama
-  o container Docker.
+- pannello runtime con config nativa, presenza token, PID backend/proxy,
+  modalita rete, fingerprint TLS e start/stop esplicito di backend web
+  production + proxy TLS inclusi nel bundle;
+- nessuna supervisione automatica ancora dichiarata per Ollama o container
+  Docker.
 
 Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
 per la track Apple-wide successiva, non una nuova certificazione di parity UI.

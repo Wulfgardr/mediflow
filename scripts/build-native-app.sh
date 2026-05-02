@@ -8,6 +8,12 @@ APP_DIR="$BUILD_DIR/MediFlowMac.app"
 APP_CONTENTS="$APP_DIR/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+WEB_RUNTIME_DIR="$APP_RESOURCES/WebRuntime"
+
+echo "Building MediFlow web runtime (standalone)..."
+cd "$ROOT_DIR"
+npm run build
+npm run check:standalone-runtime-bundle
 
 cd "$PACKAGE_DIR"
 
@@ -56,5 +62,14 @@ PKG
 cp "$BIN_PATH" "$APP_MACOS/MediFlowMac"
 chmod +x "$APP_MACOS/MediFlowMac"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$APP_RESOURCES/local-api-tls-proxy.mjs"
+rm -rf "$WEB_RUNTIME_DIR"
+mkdir -p "$WEB_RUNTIME_DIR"
+cp -R "$ROOT_DIR/.next/standalone/." "$WEB_RUNTIME_DIR/"
+mkdir -p "$WEB_RUNTIME_DIR/.next"
+cp -R "$ROOT_DIR/.next/static" "$WEB_RUNTIME_DIR/.next/static"
+if [[ -d "$ROOT_DIR/public" ]]; then
+  cp -R "$ROOT_DIR/public" "$WEB_RUNTIME_DIR/public"
+fi
 
 echo "App bundle created at $APP_DIR"
+echo "Web runtime copied to $WEB_RUNTIME_DIR"
