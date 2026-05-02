@@ -34,6 +34,16 @@ il solo proxy TLS incluso nel bundle. Il backend web e i servizi opzionali
 restano ancora fuori dalla supervisione app-managed e vanno avviati con il
 launcher esistente finche il prossimo slice WUL-192 non li integra.
 
+Prima di impacchettare il backend standalone nel bundle, eseguire:
+
+```bash
+npm run build
+npm run check:standalone-runtime-bundle
+```
+
+Il guard fallisce se `.next/standalone` contiene database locali, directory
+temporanee o documentazione privata/non-runtime.
+
 ## Avvio manuale
 
 ```bash
