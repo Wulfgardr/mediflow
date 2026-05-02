@@ -1,4 +1,4 @@
-# MediFlow v0.5.0
+# MediFlow v0.6.0
 
 > Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
 > Dati locali, flusso rapido, cloud solo se scelto e documentato.
@@ -14,8 +14,10 @@ Qui l'idea è l'opposto: lavorare bene, in locale, con controllo pieno dei dati 
 
 ## Dove siamo adesso
 
-`v0.5` è il punto che mette in ordine il salto vero rispetto alla `v0.3` esposta pubblicamente.
-`v0.4` resta una tappa tecnica importante, ma non è più il frontespizio giusto per raccontare lo stato del progetto.
+`v0.6` è la prima release che racconta MediFlow come sistema locale ibrido e non
+solo come web app clinica con AI. `v0.5` resta il consolidamento AI/UI; `v0.6`
+formalizza il salto su home-base, client Apple paired, document intelligence
+artifact-first e governance operativa ripulita.
 
 Su `main`, oggi, ci sono già queste cose:
 
@@ -24,6 +26,8 @@ Su `main`, oggi, ci sono già queste cose:
 - **document intelligence reviewable**: smart import, nuova anagrafica da documento e primo artifact `parse/evidence`;
 - **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
 - **modalità `network home-base` paired**: pairing esplicito, capability discovery, accesso remoto ai pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni da client paired;
+- **Mac packaged come home-base**: il bundle macOS usa la shell Apple/home-base come entrypoint, può gestire backend web production e proxy TLS, e mostra diagnostica read-only dei servizi locali opzionali;
+- **client iPhone/iPad paired non-AI**: consultazione, cache cifrata degradabile e primi CRUD online versionati sui moduli core, senza accesso diretto a SQLite e senza coda offline automatica;
 - **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
 - **corpus documentale SISS/FSE locale**: fonti approvate, sync incrementale e report di freschezza restano fuori dal runtime clinico ma guidano le integrazioni future;
 - **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
@@ -42,12 +46,13 @@ Il salto, in breve, è questo:
 2. **Più prudenza sui flussi AI**: niente automatismi opachi; import, insight e sintesi restano reviewable e separati dalle lane sperimentali.
 3. **Più chiarezza sui boundary**: home-base, FSE/SISS, runtime AI, rebuild native e multi-device sono raccontati per quello che sono davvero.
 4. **Più continuità operativa**: la web app resta la base forte, mentre il lavoro Apple-native rientra in un disegno coerente invece di restare un ramo laterale.
+5. **Più concretezza multi-device**: il Mac diventa davvero nodo `home-base`, con client paired e write limitati/versionati già tracciati, pur senza dichiarare sync completo.
 
 ## Confini dichiarati, senza ambiguità
 
 - **Local-first di default**: nessuna dipendenza cloud obbligatoria.
 - **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
-- **Apple clients**: oggi la superficie più solida è la web app sul Mac; la shell macOS storica è congelata e va verso un rebuild controllato; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
+- **Apple clients**: la web app resta la superficie più solida sul Mac; il bundle macOS home-base è la nuova base runtime packaged; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
 - **SISS/FSE**: oggi MediFlow orchestra il contesto e richiama i percorsi ufficiali. Non dichiara ancora una integrazione nativa regionale certificata.
 - **Shell web ufficiale**: su `main` esiste un solo `Clinical Workbench`; eventuali nuove slice sperimentali non vivono come selector runtime persistito.
 
@@ -117,8 +122,8 @@ Inizia da qui:
 
 Situazione attuale:
 
-- **macOS**: esiste uno shell storico, ma non è il punto su cui stratificare le prossime feature;
-- **iPadOS / iOS**: rientrano nel filone paired-client sul nodo `home-base`, ancora in definizione operativa;
+- **macOS**: il bundle home-base è il nuovo entrypoint packaged; la vecchia shell clinica resta snapshot storico/parity;
+- **iPadOS / iOS**: rientrano nel filone paired-client sul nodo `home-base`, con primi workflow non-AI online e cache cifrata degradabile;
 - **multi-device**: la first slice già disponibile è `read-only-first`, con write espliciti e versionati per profilo/status paziente, diario clinico, terapie, checkup e osservazioni, senza hard delete remoto, attachment remoti, cataloghi o sync automatico.
 
 ---

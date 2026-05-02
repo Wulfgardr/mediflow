@@ -11,18 +11,20 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## Che cosa è cambiato in `v0.5`?
+## Che cosa è cambiato in `v0.6`?
 
-`v0.5` rende MediFlow più maturo e più leggibile:
+`v0.6` rende MediFlow più concreto come sistema locale multi-superficie:
 
 - storage e sicurezza più solidi;
 - contratto locale `/api/v1` più chiaro;
 - backup, audit e guardrail più espliciti;
 - import documentale e AI più reviewable;
-- direzione multi-device più leggibile;
+- Mac `home-base` packaged e primi client Apple paired;
+- document intelligence `artifact-first` con fonti e conflitti più espliciti;
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
-`v0.4` resta una tappa tecnica importante; `v0.5` è la baseline più chiara per capire lo stato attuale del progetto.
+`v0.4` resta una tappa tecnica importante e `v0.5` il consolidamento AI/UI;
+`v0.6` è la baseline più chiara per capire lo stato attuale del progetto.
 
 Per il quadro dettagliato, inclusi runtime reale, home-base, document
 intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
@@ -30,14 +32,16 @@ intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
 
 ## Posso usarlo su Mac, iPad o iPhone?
 
-Oggi la superficie primaria è la web app sul Mac.
+Oggi la superficie primaria resta la web app sul Mac.
 
-La shell macOS storica esiste ancora come snapshot, ma non è il ramo su cui continuare a stratificare feature. La direzione attiva è:
+Il bundle macOS home-base è la nuova base packaged del nodo locale. La shell
+macOS clinica storica esiste ancora come snapshot/parity, ma non è il ramo su
+cui continuare a stratificare feature. La direzione attiva è:
 
 - **Mac** come nodo `home-base`;
 - **iPadOS / iOS** come client paired sullo stesso boundary locale;
-- perimetro **read-only-first**, con write remoti solo dove sono espliciti,
-  versionati e documentati; non c'e ancora sync automatico.
+- perimetro **read-only-first** nel disegno generale, con write remoti solo
+  dove sono espliciti, versionati e documentati; non c'e ancora sync automatico.
 
 ## Che cos'è `home-base`?
 

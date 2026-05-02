@@ -10,7 +10,7 @@
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-05-02
+Ultimo aggiornamento: 2026-05-02 (`v0.6.0`)
 
 ---
 
@@ -35,8 +35,8 @@ La fotografia corrente e questa:
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
-  verso client paired su rete fidata: lettura pazienti e primo write
-  profilo/status paziente con `version`.
+  verso client paired su rete fidata: lettura pazienti e write versionati
+  limitati a profilo/status, diario, terapie, checkup e osservazioni.
 - **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
   superficie primaria, mostra readiness runtime locale e puo gestire
   esplicitamente backend web production e proxy TLS con stop bounded/escalation.
@@ -108,9 +108,9 @@ Il disegno Apple non e "tre app con tre store dati". E una family architecture:
 - client mobili paired, con cache derivata e riconciliazione esplicita quando
   quella parte verra implementata.
 
-Oggi la slice resta read-only-first: il read pazienti e stabile e i write
-remoti sono limitati/versionati a profilo/status paziente, diario clinico,
-terapie, checkup e osservazioni. Hard delete remoto, cataloghi, sync
+Oggi la slice resta read-only-first nel disegno generale: il read pazienti e
+stabile e i write remoti sono limitati/versionati a profilo/status paziente,
+diario clinico, terapie, checkup e osservazioni. Hard delete remoto, cataloghi, sync
 record-level, replica automatica e multi-master sono fuori scope corrente.
 
 Documenti/ADR principali:
@@ -180,7 +180,7 @@ Documenti/ADR principali:
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
 | macOS Apple shell | WUL-192 | Entry point del bundle macOS: shell Apple/home-base con pannello runtime, start/stop esplicito di backend web production e proxy TLS, stop bounded/escalation, health diagnostico read-only per Ollama e Docker/ICD | Rebuild controllato, firma/notarizzazione esplicite, Ollama/Docker non app-managed |
 | macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
-| iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
+| iPhone/iPad | Slice `v0.6.0` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |

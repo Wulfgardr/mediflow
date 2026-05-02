@@ -80,7 +80,9 @@ flowchart TB
 
 Nota operativa: i client paired non accedono direttamente al database. Il nodo
 autorevole resta il Mac `home-base`, che espone solo superfici documentate e
-oggi ancora `read-only-first` con primo write limitato a profilo/status paziente.
+oggi ancora `read-only-first` nel disegno generale, con write online limitati e
+versionati su profilo/status paziente, diario clinico, terapie, checkup e
+osservazioni.
 
 ---
 

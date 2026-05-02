@@ -64,7 +64,7 @@ Ultimo aggiornamento: 2026-05-02
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
-| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: salto `v0.3 -> v0.5`, boundary dichiarati, shell ufficiale unica e stato Apple/SISS. | Per onboarding rapido o lettura pubblica del progetto. |
+| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: salto `v0.3 -> v0.6`, boundary dichiarati, shell ufficiale unica e stato Apple/SISS. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
 | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | Benchmark v1 per facts osservazionali `LOINC/UCUM`, corpus sintetico e decisione `hybrid` default / `rules` fallback. | Quando si toccano osservazioni, import documentale codificato o decisioni di interoperabilità sui clinical facts. |
