@@ -59,6 +59,128 @@ test('clinical PUT routes keep not-found precedence over payload validation', as
     });
 });
 
+test('clinical entry PUT soft-delete hides by default and restore clears tombstone fields', async () => {
+    await assertServerReady();
+
+    const patientId = await createSeedPatient();
+    const entry = await createResource(`/api/v1/patients/${patientId}/entries`, {
+        type: 'note',
+        title: 'Nota soft delete',
+        date: '2026-05-02T09:00:00.000Z',
+        content: 'Voce da cancellare in modo reversibile',
+    });
+
+    const beforeList = await request('GET', `/api/v1/patients/${patientId}/entries`);
+    assert.equal(beforeList.status, 200);
+    assert.ok(beforeList.json.some((item) => item.id === entry.id), 'entry should be visible before soft delete');
+    const beforeDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
+    assert.equal(beforeDetail.status, 200);
+
+    const softDeleteAt = '2026-05-02T10:00:00.000Z';
+    const softDelete = await request('PUT', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
+        deletedAt: softDeleteAt,
+        deletionReason: 'api-v1-soft-delete-smoke',
+    });
+    assert.equal(softDelete.status, 200);
+
+    const deletedDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
+    assert.equal(deletedDetail.status, 200);
+    assert.equal(deletedDetail.json?.deletedAt, softDeleteAt);
+    assert.equal(deletedDetail.json?.deletionReason, 'api-v1-soft-delete-smoke');
+    assert.equal(deletedDetail.json?.version, beforeDetail.json.version + 1);
+
+    const hiddenList = await request('GET', `/api/v1/patients/${patientId}/entries`);
+    assert.equal(hiddenList.status, 200);
+    assert.ok(!hiddenList.json.some((item) => item.id === entry.id), 'soft-deleted entry should be hidden by default');
+
+    const includedList = await request('GET', `/api/v1/patients/${patientId}/entries?includeDeleted=true`);
+    assert.equal(includedList.status, 200);
+    assert.ok(includedList.json.some((item) => item.id === entry.id), 'includeDeleted should expose tombstoned entries');
+
+    const restore = await request('PUT', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
+        deletedAt: null,
+        deletionReason: null,
+    });
+    assert.equal(restore.status, 200);
+
+    const restoredDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
+    assert.equal(restoredDetail.status, 200);
+    assert.equal(restoredDetail.json?.deletedAt, null);
+    assert.equal(restoredDetail.json?.deletionReason, null);
+    assert.equal(restoredDetail.json?.version, deletedDetail.json.version + 1);
+
+    const restoredList = await request('GET', `/api/v1/patients/${patientId}/entries`);
+    assert.equal(restoredList.status, 200);
+    assert.ok(restoredList.json.some((item) => item.id === entry.id), 'restored entry should be visible again');
+
+    scenarioResults.push({
+        name: 'entries soft delete restore',
+        patientId,
+        entryId: entry.id,
+        softDeleteStatus: softDelete.status,
+        restoreStatus: restore.status,
+    });
+});
+
+test('clinical entry DELETE writes a validated soft-delete tombstone instead of hard-deleting', async () => {
+    await assertServerReady();
+
+    const patientId = await createSeedPatient();
+    const entry = await createResource(`/api/v1/patients/${patientId}/entries`, {
+        type: 'note',
+        title: 'Nota DELETE soft',
+        date: '2026-05-02T11:00:00.000Z',
+        content: 'Voce da cancellare tramite DELETE sicuro',
+    });
+
+    const invalidDelete = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
+        deletionReason: 1234,
+    });
+    assert.equal(invalidDelete.status, 400);
+    assert.deepEqual(invalidDelete.json, { error: 'Invalid deletionReason' });
+
+    const invalidDeleteDate = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
+        deletedAt: 'not-a-date',
+        deletionReason: 'invalid-date-smoke',
+    });
+    assert.equal(invalidDeleteDate.status, 400);
+    assert.deepEqual(invalidDeleteDate.json, { error: 'Invalid deletedAt' });
+
+    const detailBeforeDelete = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
+    assert.equal(detailBeforeDelete.status, 200);
+    assert.equal(detailBeforeDelete.json?.deletedAt, null);
+
+    const deletedAt = '2026-05-02T12:00:00.000Z';
+    const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
+        deletedAt,
+        deletionReason: 'api-v1-delete-soft-smoke',
+    });
+    assert.equal(deletion.status, 200);
+
+    const deletedDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
+    assert.equal(deletedDetail.status, 200);
+    assert.equal(deletedDetail.json?.deletedAt, deletedAt);
+    assert.equal(deletedDetail.json?.deletionReason, 'api-v1-delete-soft-smoke');
+    assert.equal(deletedDetail.json?.version, detailBeforeDelete.json.version + 1);
+
+    const hiddenList = await request('GET', `/api/v1/patients/${patientId}/entries`);
+    assert.equal(hiddenList.status, 200);
+    assert.ok(!hiddenList.json.some((item) => item.id === entry.id), 'DELETE tombstone should be hidden by default');
+
+    const includedList = await request('GET', `/api/v1/patients/${patientId}/entries?includeDeleted=true`);
+    assert.equal(includedList.status, 200);
+    assert.ok(includedList.json.some((item) => item.id === entry.id), 'includeDeleted should include DELETE tombstones');
+
+    scenarioResults.push({
+        name: 'entries delete soft tombstone',
+        patientId,
+        entryId: entry.id,
+        invalidDeleteStatus: invalidDelete.status,
+        invalidDeleteDateStatus: invalidDeleteDate.status,
+        deleteStatus: deletion.status,
+    });
+});
+
 async function assertServerReady() {
     const response = await request('GET', '/api/v1/patients');
     assert.equal(response.status, 200, `Expected ${BASE_URL}/api/v1/patients to be reachable`);

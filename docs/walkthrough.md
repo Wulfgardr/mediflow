@@ -321,6 +321,9 @@ Boundary attuale:
 - il write paziente richiede capability `network.replica.write-patient-profile` e `version`
 - il diario paired usa capability `network.replica.readonly-clinical-diary` /
   `network.replica.write-clinical-diary` e `entries.version`
+- il diario locale condiviso `/api/v1/patients/{id}/entries*` usa soft-delete
+  reversibile per i client native: lista attiva di default, `includeDeleted=true`
+  per i tombstone, motivo di eliminazione e restore esplicito
 - le terapie paired usano capability `network.replica.readonly-therapies` /
   `network.replica.write-therapies` e `therapies.version`
 - i checkup paired usano capability `network.replica.readonly-checkups` /
@@ -570,7 +573,8 @@ sequenceDiagram
 - Il vecchio shell macOS resta congelato: la parity non riparte su quello
   snapshot.
 - `WUL-26` non puo chiudere la parity come Done finche la shell nativa
-  ricostruita non supera una click-map capability-by-capability.
+  ricostruita non supera una click-map capability-by-capability; `WUL-24`
+  chiude solo il drift delete/restore del diario.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 
 ---

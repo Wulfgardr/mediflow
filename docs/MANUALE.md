@@ -60,7 +60,7 @@ Puoi creare più ambulatori (es. "Studio Roma", "Guardia Medica").
 È tutto in una pagina.
 
 * **Anagrafica**: A sinistra.
-* **Diario Clinico**: Al centro. Scrivi le note visita per visita.
+* **Diario Clinico**: Al centro. Scrivi le note visita per visita. Le voci eliminate restano recuperabili con motivo tracciato e possono essere ripristinate.
 * **Storia**: A destra vedi i riassunti dei vecchi documenti.
 
 La lista pazienti mostra anche una piccola **agenda operativa** sui casi visibili:

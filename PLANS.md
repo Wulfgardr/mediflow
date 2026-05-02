@@ -230,9 +230,9 @@ Nota operativa:
 - [x] `P1` Pazienti native: completare `edit/delete/archive/search/sort` e filtri stato (`attivi/archiviati`) in UI macOS.
 - [ ] `P2` Esenzioni native: aggiungere selector/search su `/api/v1/exemptions` e salvataggio in create/update paziente.
 - [ ] `P3` Osservazioni native: esporre in UI macOS il CRUD `LOINC + UCUM` già disponibile a contratto (`/api/v1/patients/:id/observations`).
-- [ ] `P4` Diario clinico: allineare semantica delete web/native (soft delete + restore + reason) per evitare drift comportamentale.
+- [x] `P4` Diario clinico: allineare semantica delete web/native (soft delete + restore + reason) per evitare drift comportamentale. Evidenza `WUL-24` del 2026-05-02: `/api/v1/patients/{id}/entries*` locale nasconde i tombstone di default, espone `includeDeleted=true`, soft-delete/restore via `PUT`, `DELETE` locale sicuro come tombstone validato, macOS usa reason sheet + restore e non usa piu hard delete per le entry.
 - [ ] `P5` Cataloghi farmaci/esenzioni: definire la minima operabilità native in Settings (import/clear/stato) senza storage duplicato.
-- [ ] `P6` Chiusura parity: smoke test manuale capability-by-capability su web/native + aggiornamento `docs/walkthrough.md`; bloccata/deferita fino al rebuild della shell nativa e ai gap residui tracciati in `WUL-23`, `WUL-24`, `WUL-25`, `WUL-76` e `WUL-77`.
+- [ ] `P6` Chiusura parity: smoke test manuale capability-by-capability su web/native + aggiornamento `docs/walkthrough.md`; bloccata/deferita fino al rebuild della shell nativa e ai gap residui tracciati in `WUL-23`, `WUL-25`, `WUL-76` e `WUL-77`.
 
 Ordine di consegna consigliato (incrementale):
 1. `P0` + `P1`

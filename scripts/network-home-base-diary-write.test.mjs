@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -326,18 +327,20 @@ async function createSeedPatient(ambulatoryId) {
 }
 
 async function cleanupPatient(patientId) {
-    const entries = await request('GET', `/api/v1/patients/${patientId}/entries`, {
+    const entries = await request('GET', `/api/v1/patients/${patientId}/entries?includeDeleted=true`, {
         headers: localApiHeaders(),
     });
     if (entries.response.status === 200 && Array.isArray(entries.json)) {
         for (const entry of entries.json) {
-            if (!entry?.id) continue;
+            if (!entry?.id || entry.deletedAt) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
                 headers: localApiHeaders(),
+                body: { deletionReason: 'network-home-base-diary-write-cleanup' },
             });
             assert.equal(deletion.response.status, 200);
         }
     }
+    purgePatientEntriesFromTestDb(patientId);
 
     const detail = await request('GET', `/api/v1/patients/${patientId}`, {
         headers: localApiHeaders(),
@@ -349,6 +352,21 @@ async function cleanupPatient(patientId) {
         body: { version: detail.json?.version },
     });
     assert.equal(deletion.response.status, 200);
+}
+
+/* @Codex */
+function purgePatientEntriesFromTestDb(patientId) {
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    if (!dataDir) return;
+    const dbPath = path.join(dataDir, 'medical.db');
+    if (!fs.existsSync(dbPath)) return;
+
+    const db = new Database(dbPath);
+    try {
+        db.prepare('DELETE FROM entries WHERE patient_id = ?').run(patientId);
+    } finally {
+        db.close();
+    }
 }
 
 function localApiHeaders() {

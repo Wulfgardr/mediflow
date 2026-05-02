@@ -60,6 +60,10 @@ Riferimenti:
 - [ ] `patient-detail-new-checkup-button`: apertura nuovo appuntamento.
 - [ ] `patient-detail-ai-studio-button`: apertura AI Studio.
 - [ ] `patient-detail-entry-filter`: filtro diario funziona.
+- [ ] `patient-detail-entry-show-deleted-toggle`: mostra/nasconde le voci diario eliminate.
+- [ ] `patient-detail-entry-soft-delete-reason-field`: richiede motivo non vuoto per archiviazione voce diario.
+- [ ] `patient-detail-entry-soft-delete-confirm-button`: archivia la voce diario senza hard delete.
+- [ ] `patient-detail-entry-restore-action`: ripristina una voce diario tombstoned.
 - [ ] `patient-detail-therapy-filter`: filtro terapie funziona.
 - [ ] `patient-detail-checkup-filter`: filtro appuntamenti funziona.
 

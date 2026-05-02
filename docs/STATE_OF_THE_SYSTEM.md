@@ -231,7 +231,11 @@ Documenti/ADR principali:
 7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
    del diario con capability diary dedicate e `entries.version`, bloccando hard
    delete, attachment remoti, sync e campi AI/documentali.
-8. `/api/v1/network/patients/{id}/therapies*`,
+8. Il diario locale condiviso `/api/v1/patients/{id}/entries*` mantiene la
+   stessa semantica reversibile per web/native: lista attiva di default,
+   `includeDeleted=true` per i tombstone, motivo di eliminazione e restore via
+   `PUT`.
+9. `/api/v1/network/patients/{id}/therapies*`,
    `/api/v1/network/patients/{id}/checkups*` e
    `/api/v1/network/patients/{id}/observations*` seguono lo stesso boundary
    paired: capability dedicate, `therapies.version`/`checkups.version`/

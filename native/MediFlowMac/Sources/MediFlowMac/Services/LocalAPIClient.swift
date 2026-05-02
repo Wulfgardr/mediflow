@@ -62,13 +62,15 @@ actor LocalAPIClient {
         limit: Int? = nil,
         type: String? = nil,
         dateFrom: Date? = nil,
-        dateTo: Date? = nil
+        dateTo: Date? = nil,
+        includeDeleted: Bool = false
     ) async throws -> [EntrySummary] {
         var queryItems: [URLQueryItem] = []
         if let limit { queryItems.append(URLQueryItem(name: "limit", value: String(limit))) }
         if let type, !type.isEmpty { queryItems.append(URLQueryItem(name: "type", value: type)) }
         if let dateFrom { queryItems.append(URLQueryItem(name: "dateFrom", value: iso8601String(from: dateFrom))) }
         if let dateTo { queryItems.append(URLQueryItem(name: "dateTo", value: iso8601String(from: dateTo))) }
+        if includeDeleted { queryItems.append(URLQueryItem(name: "includeDeleted", value: "true")) }
 
         let request = try makeRequest(
             path: "patients/\(patientId)/entries",
@@ -215,9 +217,28 @@ actor LocalAPIClient {
         try validate(data: data, response: response)
     }
 
-    /* @Codex */
-    func deleteEntry(patientId: String, entryId: String) async throws {
-        let request = try makeRequest(path: "patients/\(patientId)/entries/\(entryId)", method: "DELETE")
+    func softDeleteEntry(
+        patientId: String,
+        entryId: String,
+        deletedAt: Date,
+        reason: String
+    ) async throws {
+        let payload = SoftDeleteEntryPayload(deletedAt: deletedAt, deletionReason: reason)
+        let request = try makeRequest(
+            path: "patients/\(patientId)/entries/\(entryId)",
+            method: "PUT",
+            body: payload
+        )
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+    }
+
+    func restoreEntry(patientId: String, entryId: String) async throws {
+        let request = try makeRequest(
+            path: "patients/\(patientId)/entries/\(entryId)",
+            method: "PUT",
+            body: RestoreEntryPayload()
+        )
         let (data, response) = try await data(for: request)
         try validate(data: data, response: response)
     }
@@ -931,6 +952,24 @@ struct UpdateEntryPayload: Encodable {
     let type: String?
     let date: Date?
     let content: String?
+}
+
+struct SoftDeleteEntryPayload: Encodable {
+    let deletedAt: Date
+    let deletionReason: String
+}
+
+struct RestoreEntryPayload: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case deletedAt
+        case deletionReason
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeNil(forKey: .deletedAt)
+        try container.encodeNil(forKey: .deletionReason)
+    }
 }
 
 struct CreateTherapyPayload: Encodable {
