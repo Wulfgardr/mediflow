@@ -25,6 +25,7 @@ public struct HomeBaseOptionalServicesSnapshot: Equatable, Sendable {
 
     public static let initial = HomeBaseOptionalServicesProbe.buildSnapshot(
         ollamaReachable: nil,
+        mlxReachable: nil,
         icdReachable: nil
     )
 }
@@ -43,6 +44,11 @@ public enum HomeBaseOptionalServicesProbe {
             session: session,
             acceptedStatusCodes: 200..<300
         )
+        async let mlxReachable = isReachable(
+            URL(string: "http://127.0.0.1:8080/v1/models"),
+            session: session,
+            acceptedStatusCodes: 200..<300
+        )
         async let icdReachable = isReachable(
             URL(string: "http://127.0.0.1:8888"),
             session: session,
@@ -52,11 +58,12 @@ public enum HomeBaseOptionalServicesProbe {
 
         return await buildSnapshot(
             ollamaReachable: ollamaReachable,
+            mlxReachable: mlxReachable,
             icdReachable: icdReachable
         )
     }
 
-    static func buildSnapshot(ollamaReachable: Bool?, icdReachable: Bool?) -> HomeBaseOptionalServicesSnapshot {
+    static func buildSnapshot(ollamaReachable: Bool?, mlxReachable: Bool?, icdReachable: Bool?) -> HomeBaseOptionalServicesSnapshot {
         HomeBaseOptionalServicesSnapshot(services: [
             HomeBaseOptionalServiceStatus(
                 id: "optional-ollama",
@@ -68,6 +75,17 @@ public enum HomeBaseOptionalServicesProbe {
                     unknown: "Endpoint 127.0.0.1:11434 non ancora verificato"
                 ),
                 state: state(for: ollamaReachable)
+            ),
+            HomeBaseOptionalServiceStatus(
+                id: "optional-mlx",
+                title: "MLX (AI benchmark locale)",
+                detail: detail(
+                    reachable: mlxReachable,
+                    ready: "Endpoint 127.0.0.1:8080/v1/models raggiungibile",
+                    notReady: "Endpoint 127.0.0.1:8080 non rilevato",
+                    unknown: "Endpoint 127.0.0.1:8080 non ancora verificato"
+                ),
+                state: state(for: mlxReachable)
             ),
             HomeBaseOptionalServiceStatus(
                 id: "optional-docker-icd",

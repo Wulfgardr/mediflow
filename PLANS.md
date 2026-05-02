@@ -29,7 +29,7 @@ Ultimo aggiornamento: 2026-05-02
 - [x] Formalizzare il primo `patient import decision` reviewable tra review documentale e persistenza prudente, per distillare il create/merge/apply in un contratto riusabile (`WUL-167`).
 - [x] Aggiungere la prima granularita section-aware al `parse/evidence` artifact (`WUL-159`): `sectionMap` opzionale con sezioni classificate, fact anchors `page/section/snippet` e conflitti terapeutici espliciti, senza migrazione DB o auto-write.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
-- [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115`, salvo promozione esplicita sostenuta da benchmark e stop-rules.
+- [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115` e `WUL-165`, salvo promozione esplicita sostenuta da benchmark, ADR e stop-rules. Slice `WUL-165` acquisita: MLX diventa benchmark-visible e diagnosticabile in read-only nella home-base, con guard `check:mlx-operational-parity`, ma `Ollama` resta runtime clinico standard e `OCR` resta Ollama-only.
 
 Nota operativa:
 - `v0.5.0` e la release corrente formalizzata su `main` il `2026-03-29`
@@ -132,6 +132,11 @@ Nota operativa:
   sintetico dedicato; smoke tecnico `2026-04-08` riuscito su
   `mlx-community/Llama-3.2-3B-Instruct-4bit`, ma resta solo prova di
   percorribilita del path `MLX` e non una decisione di promozione runtime
+- `WUL-165` chiarisce il significato operativo minimo della parity MLX:
+  il path `MLX` e visibile in benchmark, model parliament e diagnostica
+  home-base read-only, ma resta fuori dal runtime clinico; il guard
+  `check:mlx-operational-parity` blocca drift su default Ollama, fallback
+  espliciti, OCR Ollama-only e confine benchmark-visible/non-promoted
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`

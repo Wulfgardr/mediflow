@@ -275,6 +275,10 @@ sono documentate o benchmarkate:
 - TurboQuant / MLX runtime experiments;
 - comparator cloud opt-in.
 
+`WUL-165` rende MLX benchmark-visible e diagnosticabile in read-only nella
+home-base, ma non lo promuove a runtime clinico: Ollama resta il default
+operativo e l'OCR resta Ollama-only.
+
 Per promuovere una lane servono:
 
 - corpus sintetico o case pack governato;
