@@ -135,14 +135,15 @@ Flusso previsto:
 
 ## Relazione con il futuro MCP
 
-Il futuro MCP locale (`WUL-177`) dovra offrire solo:
+Il MCP locale (`WUL-177`) offre solo:
 
 - ricerca nel manifest/corpus locale
 - fetch di documenti gia acquisiti
 - navigazione per area/tag/fonte/versione
 
-Non dovra essere il meccanismo con cui si dipende da fetch live dei portali
-regionali.
+Non e il meccanismo con cui si dipende da fetch live dei portali regionali.
+Il runbook operativo MCP e in
+[docs/siss-fse-corpus-mcp.md](./siss-fse-corpus-mcp.md).
 
 ## Nota operativa su WUL-179
 

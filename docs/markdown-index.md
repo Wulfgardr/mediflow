@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-05-01
+Ultimo aggiornamento: 2026-05-02
 
 ## Come usare questo indice
 
@@ -71,6 +71,7 @@ Ultimo aggiornamento: 2026-05-01
 | [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md) | Mappa canonica di fattibilità ufficiale oltre il `portal-handoff`: separa ciò che il SISS rende tecnicamente possibile da ciò che MediFlow può fare davvero solo dopo `SSI`, scenari approvati e onboarding regionale. | Quando si lavora su `WUL-180` o si valuta prescrittivo/FSE/SGDT/Anagrafe oltre l'handoff attuale. |
 | [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md) | Nota canonica `WUL-181` sul Modulo Prescrittivo Regionale: fissa il boundary tra richiamo della webapp ufficiale, possibile supporto WS/API e re-implementazione UI non ancora dimostrata. | Quando si lavora sul prescrittivo regionale oltre il launcher attuale. |
 | [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md) | Runbook canonico del corpus documentale locale SISS/FSE: manifest sorgenti, fetch/sync fuori Git, placeholder `manual-import` e report di freshness. | Quando si lavora su `WUL-176`, `WUL-179` o sulla base documentale delle integrazioni regionali. |
+| [docs/siss-fse-corpus-mcp.md](./siss-fse-corpus-mcp.md) | Guida operativa del server MCP read-only sul corpus SISS/FSE locale gia sincronizzato. | Quando strumenti o agent compatibili MCP devono cercare/leggere fonti SISS/FSE senza fetch live e senza dati paziente. |
 | [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md) | Valutazione comparativa tra OpenMed e lo stack AI locale MediFlow, con raccomandazione di fit per lane (`PII`, `NER`, runtime generativo). | Quando si esplorano toolkit AI esterni o si decide se introdurre sidecar locali specialistici. |
 | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
 | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |

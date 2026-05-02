@@ -11,6 +11,8 @@
     "docs:siss-corpus:fetch": "node scripts/siss-docs-corpus.mjs fetch",
     "docs:siss-corpus:sync": "node scripts/siss-docs-corpus.mjs sync",
     "docs:siss-corpus:report": "node scripts/siss-docs-corpus.mjs report",
+    "mcp:siss-fse-corpus:validate": "bash scripts/codex-mcp-siss-fse-corpus-validate.sh",
+    "mcp:siss-fse-corpus:test": "node scripts/siss-fse-corpus-mcp-smoke.mjs",
     "mcp:apple-docs:validate": "bash scripts/codex-mcp-apple-docs-validate.sh",
     "mcp:apple-docs:test": "node scripts/mcp-apple-docs-smoke.mjs",
     "lint": "eslint --quiet",
