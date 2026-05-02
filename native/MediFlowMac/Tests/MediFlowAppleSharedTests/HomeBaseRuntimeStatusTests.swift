@@ -37,7 +37,13 @@ final class HomeBaseRuntimeStatusTests: XCTestCase {
               "generatedAt": "2026-05-02T11:20:00Z",
               "baseURL": "https://localhost:3443/api/v1",
               "tlsPin": "abcd",
-              "networkMode": "network-home-base"
+              "networkMode": "network-home-base",
+              "port": 3443,
+              "bindHost": "127.0.0.1",
+              "httpTarget": "http://127.0.0.1:3000",
+              "certPath": "/tmp/local-api.crt",
+              "keyPath": "/tmp/local-api.key",
+              "proxyPidPath": "\(temporaryDirectory.appendingPathComponent("local-api-tls-proxy.pid").path)"
             }
             """
         )
@@ -48,10 +54,26 @@ final class HomeBaseRuntimeStatusTests: XCTestCase {
         XCTAssertEqual(snapshot.baseURL, "https://localhost:3443/api/v1")
         XCTAssertEqual(snapshot.networkMode, "network-home-base")
         XCTAssertEqual(snapshot.generatedAt, "2026-05-02T11:20:00Z")
+        XCTAssertEqual(snapshot.port, 3443)
+        XCTAssertEqual(snapshot.bindHost, "127.0.0.1")
+        XCTAssertEqual(snapshot.httpTarget, "http://127.0.0.1:3000")
+        XCTAssertEqual(snapshot.certPath, "/tmp/local-api.crt")
+        XCTAssertEqual(snapshot.keyPath, "/tmp/local-api.key")
+        XCTAssertEqual(snapshot.proxyPidPath, temporaryDirectory.appendingPathComponent("local-api-tls-proxy.pid").path)
         XCTAssertTrue(snapshot.tokenPresent)
         XCTAssertTrue(snapshot.statusFilePresent)
         XCTAssertEqual(snapshot.tlsPinMatches, true)
         XCTAssertTrue(snapshot.components.contains { $0.id == "local-token" && $0.state == .ready })
+    }
+
+    func testSupervisorStopHandlesMissingPidAsNoActiveProxy() async throws {
+        let snapshot = HomeBaseRuntimeStatusLoader.load(dataDirectory: temporaryDirectory)
+        let supervisor = await HomeBaseRuntimeSupervisor()
+
+        await supervisor.stopProxy(snapshot: snapshot)
+
+        let statusMessage = await supervisor.statusMessage
+        XCTAssertEqual(statusMessage, "Nessun proxy TLS attivo registrato.")
     }
 
     func testLoadReportsMissingRuntimeStatusAsObservableGap() throws {

@@ -42,6 +42,12 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
     public let tlsPin: String?
     public let networkMode: String?
     public let generatedAt: String?
+    public let port: Int?
+    public let bindHost: String?
+    public let httpTarget: String?
+    public let certPath: String?
+    public let keyPath: String?
+    public let proxyPidPath: String?
     public let tokenPresent: Bool
     public let statusFilePresent: Bool
     public let tlsPinMatches: Bool?
@@ -60,6 +66,12 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
         tlsPin: String?,
         networkMode: String?,
         generatedAt: String?,
+        port: Int?,
+        bindHost: String?,
+        httpTarget: String?,
+        certPath: String?,
+        keyPath: String?,
+        proxyPidPath: String?,
         tokenPresent: Bool,
         statusFilePresent: Bool,
         tlsPinMatches: Bool?,
@@ -70,6 +82,12 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
         self.tlsPin = tlsPin
         self.networkMode = networkMode
         self.generatedAt = generatedAt
+        self.port = port
+        self.bindHost = bindHost
+        self.httpTarget = httpTarget
+        self.certPath = certPath
+        self.keyPath = keyPath
+        self.proxyPidPath = proxyPidPath
         self.tokenPresent = tokenPresent
         self.statusFilePresent = statusFilePresent
         self.tlsPinMatches = tlsPinMatches
@@ -91,10 +109,10 @@ public enum HomeBaseRuntimeStatusLoader {
         let configURL = dataDirectory.appendingPathComponent("native-config.json")
         let statusURL = dataDirectory.appendingPathComponent("runtime-status.json")
         let tokenURL = dataDirectory.appendingPathComponent("local-api-token")
-        let pidURL = dataDirectory.appendingPathComponent("local-api-tls-proxy.pid")
 
         let config = decode(NativeRuntimeConfig.self, from: configURL)
         let status = decode(RuntimeStatus.self, from: statusURL)
+        let pidURL = URL(fileURLWithPath: status?.proxyPidPath ?? dataDirectory.appendingPathComponent("local-api-tls-proxy.pid").path)
         let configPin = normalizedPin(config?.tlsPin)
         let statusPin = normalizedPin(status?.tlsPin)
         let tlsPinMatches: Bool?
@@ -151,6 +169,12 @@ public enum HomeBaseRuntimeStatusLoader {
             tlsPin: config?.tlsPin ?? status?.tlsPin,
             networkMode: networkMode,
             generatedAt: status?.generatedAt,
+            port: status?.port,
+            bindHost: status?.bindHost,
+            httpTarget: status?.httpTarget,
+            certPath: status?.certPath,
+            keyPath: status?.keyPath,
+            proxyPidPath: pidURL.path,
             tokenPresent: tokenPresent,
             statusFilePresent: statusPresent,
             tlsPinMatches: tlsPinMatches,
@@ -204,4 +228,10 @@ private struct RuntimeStatus: Decodable {
     let baseURL: String?
     let tlsPin: String
     let networkMode: String
+    let port: Int?
+    let bindHost: String?
+    let httpTarget: String?
+    let certPath: String?
+    let keyPath: String?
+    let proxyPidPath: String?
 }

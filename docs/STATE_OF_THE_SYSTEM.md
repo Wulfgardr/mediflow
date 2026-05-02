@@ -38,8 +38,9 @@ La fotografia corrente e questa:
   verso client paired su rete fidata: lettura pazienti e primo write
   profilo/status paziente con `version`.
 - **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
-  superficie primaria e mostra readiness runtime locale read-only; il prototype
-  oncologico e separato e non definisce MediFlow prodotto.
+  superficie primaria, mostra readiness runtime locale e puo gestire
+  esplicitamente il proxy TLS; il prototype oncologico e separato e non
+  definisce MediFlow prodotto.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali.
@@ -176,7 +177,7 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | First slice WUL-192 | Entry point del bundle macOS: shell Apple/home-base con pannello runtime read-only | Rebuild controllato, supervisione processi ancora aperta |
+| macOS Apple shell | WUL-192 progressivo | Entry point del bundle macOS: shell Apple/home-base con pannello runtime e start/stop esplicito del proxy TLS | Rebuild controllato, backend/Ollama/Docker ancora fuori supervisione |
 | macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
 | iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |

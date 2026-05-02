@@ -493,9 +493,9 @@ Flusso:
 La app macOS usa TLS pinning in `LocalAPIClient`. La finestra primaria del
 bundle compilato e ora il shell Apple/home-base: il pannello `Runtime` legge
 `native-config.json` e `runtime-status.json` per mostrare readiness locale senza
-esporre token, certificati, chiavi o dati paziente. Questo e solo osservabilita:
-backend Next.js, proxy TLS, Ollama e Docker non sono ancora supervisionati dalla
-app.
+esporre token, certificati, chiavi o dati paziente. Il pannello puo avviare e
+arrestare esplicitamente il solo proxy TLS incluso nel bundle; backend Next.js,
+Ollama e Docker non sono ancora supervisionati dalla app.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
 operabilita amministrativa dei dataset condivisi: count/stato, import JSON e

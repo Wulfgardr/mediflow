@@ -1,0 +1,224 @@
+// Codex: created 2026-05-02
+// @Codex
+import Combine
+import Foundation
+#if os(macOS)
+import Darwin
+#endif
+
+public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
+    public let nodeBinaryPath: String
+    public let scriptPath: String
+    public let pidPath: String
+    public let logPath: String
+    public let environment: [String: String]
+
+    public init(
+        nodeBinaryPath: String,
+        scriptPath: String,
+        pidPath: String,
+        logPath: String,
+        environment: [String: String]
+    ) {
+        self.nodeBinaryPath = nodeBinaryPath
+        self.scriptPath = scriptPath
+        self.pidPath = pidPath
+        self.logPath = logPath
+        self.environment = environment
+    }
+}
+
+@MainActor
+public final class HomeBaseRuntimeSupervisor: ObservableObject {
+    @Published public private(set) var statusMessage: String?
+    @Published public private(set) var errorMessage: String?
+    @Published public private(set) var isWorking = false
+
+    private var managedProcess: Process?
+    private let fileManager: FileManager
+    private let processInfo: ProcessInfo
+
+    public init(fileManager: FileManager = .default, processInfo: ProcessInfo = .processInfo) {
+        self.fileManager = fileManager
+        self.processInfo = processInfo
+    }
+
+    public func startProxy(snapshot: HomeBaseRuntimeSnapshot) async {
+        #if os(macOS)
+        await runSupervisorAction {
+            let plan = try makeLaunchPlan(snapshot: snapshot)
+            if Self.isProcessRunning(pidPath: plan.pidPath) {
+                statusMessage = "Proxy TLS gia attivo."
+                return
+            }
+
+            try fileManager.createDirectory(
+                at: URL(fileURLWithPath: plan.logPath).deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            fileManager.createFile(atPath: plan.logPath, contents: nil)
+            let logHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: plan.logPath))
+            try logHandle.seekToEnd()
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: plan.nodeBinaryPath)
+            process.arguments = [plan.scriptPath]
+            process.environment = plan.environment
+            process.standardOutput = logHandle
+            process.standardError = logHandle
+            process.terminationHandler = { [weak self] process in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if self.managedProcess === process {
+                        self.managedProcess = nil
+                        self.statusMessage = "Proxy TLS terminato con codice \(process.terminationStatus)."
+                    }
+                    try? logHandle.close()
+                }
+            }
+
+            try process.run()
+            managedProcess = process
+            try "\(process.processIdentifier)\n".write(toFile: plan.pidPath, atomically: true, encoding: .utf8)
+            statusMessage = "Proxy TLS avviato dalla app."
+        }
+        #else
+        errorMessage = "La supervisione runtime e disponibile solo su macOS."
+        #endif
+    }
+
+    public func stopProxy(snapshot: HomeBaseRuntimeSnapshot) async {
+        #if os(macOS)
+        await runSupervisorAction {
+            let pidPath = snapshot.proxyPidPath ?? HomeBaseRuntimeStatusLoader
+                .defaultDataDirectoryURL(fileManager: fileManager)
+                .appendingPathComponent("local-api-tls-proxy.pid")
+                .path
+
+            if let managedProcess, managedProcess.isRunning {
+                managedProcess.terminate()
+                self.managedProcess = nil
+                try? fileManager.removeItem(atPath: pidPath)
+                statusMessage = "Stop proxy TLS richiesto."
+                return
+            }
+
+            guard let pid = Self.readPid(pidPath: pidPath), Self.isProcessRunning(pid: pid) else {
+                try? fileManager.removeItem(atPath: pidPath)
+                statusMessage = "Nessun proxy TLS attivo registrato."
+                return
+            }
+
+            _ = kill(pid, SIGTERM)
+            try? fileManager.removeItem(atPath: pidPath)
+            statusMessage = "Stop proxy TLS richiesto."
+        }
+        #else
+        errorMessage = "La supervisione runtime e disponibile solo su macOS."
+        #endif
+    }
+
+    func makeLaunchPlan(snapshot: HomeBaseRuntimeSnapshot) throws -> HomeBaseRuntimeLaunchPlan {
+        let dataDirectory = URL(fileURLWithPath: snapshot.dataDirectory)
+        let scriptURL = try proxyScriptURL()
+        let nodeBinary = try resolveNodeBinary()
+        let port = snapshot.port ?? 3443
+        let bindHost = snapshot.bindHost ?? "127.0.0.1"
+        let httpTarget = snapshot.httpTarget ?? "http://127.0.0.1:3000"
+        let networkMode = snapshot.networkMode ?? "local-only"
+        let certPath = snapshot.certPath ?? dataDirectory.appendingPathComponent("certs/local-api.crt").path
+        let keyPath = snapshot.keyPath ?? dataDirectory.appendingPathComponent("certs/local-api.key").path
+        let pidPath = snapshot.proxyPidPath ?? dataDirectory.appendingPathComponent("local-api-tls-proxy.pid").path
+        let logPath = dataDirectory.appendingPathComponent("logs/local-api-tls-proxy.log").path
+
+        guard fileManager.fileExists(atPath: certPath), fileManager.fileExists(atPath: keyPath) else {
+            throw HomeBaseRuntimeSupervisorError.missingTLSMaterial
+        }
+
+        return HomeBaseRuntimeLaunchPlan(
+            nodeBinaryPath: nodeBinary,
+            scriptPath: scriptURL.path,
+            pidPath: pidPath,
+            logPath: logPath,
+            environment: [
+                "MEDIFLOW_TLS_CERT_PATH": certPath,
+                "MEDIFLOW_TLS_KEY_PATH": keyPath,
+                "MEDIFLOW_TLS_PORT": String(port),
+                "MEDIFLOW_HTTP_TARGET": httpTarget,
+                "MEDIFLOW_TLS_BIND_HOST": bindHost,
+                "MEDIFLOW_TLS_NETWORK_MODE": networkMode
+            ]
+        )
+    }
+
+    private func proxyScriptURL() throws -> URL {
+        if let resourceURL = Bundle.main.url(forResource: "local-api-tls-proxy", withExtension: "mjs") {
+            return resourceURL
+        }
+        throw HomeBaseRuntimeSupervisorError.missingProxyScript
+    }
+
+    private func resolveNodeBinary() throws -> String {
+        if let override = processInfo.environment["MEDIFLOW_NODE_BINARY"],
+           fileManager.isExecutableFile(atPath: override) {
+            return override
+        }
+
+        for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"] {
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+
+        throw HomeBaseRuntimeSupervisorError.missingNode
+    }
+
+    private func runSupervisorAction(_ action: () throws -> Void) async {
+        isWorking = true
+        errorMessage = nil
+        defer { isWorking = false }
+        do {
+            try action()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private static func readPid(pidPath: String) -> pid_t? {
+        guard let raw = try? String(contentsOfFile: pidPath, encoding: .utf8),
+              let value = Int32(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+        return value
+    }
+
+    private static func isProcessRunning(pidPath: String) -> Bool {
+        guard let pid = readPid(pidPath: pidPath) else { return false }
+        return isProcessRunning(pid: pid)
+    }
+
+    private static func isProcessRunning(pid: pid_t) -> Bool {
+        #if os(macOS)
+        return kill(pid, 0) == 0
+        #else
+        return false
+        #endif
+    }
+}
+
+public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
+    case missingTLSMaterial
+    case missingProxyScript
+    case missingNode
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingTLSMaterial:
+            return "Certificato o chiave TLS mancanti. Esegui prima il setup nativo."
+        case .missingProxyScript:
+            return "Script proxy TLS non incluso nel bundle."
+        case .missingNode:
+            return "Node.js non trovato. Configura MEDIFLOW_NODE_BINARY o installa Node in un percorso standard."
+        }
+    }
+}

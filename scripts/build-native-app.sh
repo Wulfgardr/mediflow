@@ -55,5 +55,6 @@ PKG
 
 cp "$BIN_PATH" "$APP_MACOS/MediFlowMac"
 chmod +x "$APP_MACOS/MediFlowMac"
+cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$APP_RESOURCES/local-api-tls-proxy.mjs"
 
 echo "App bundle created at $APP_DIR"

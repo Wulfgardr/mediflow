@@ -297,6 +297,7 @@ public struct AppleFoundationMobileRootView: View {
 
 public struct HomeBaseRuntimeStatusView: View {
     @State private var snapshot = HomeBaseRuntimeStatusLoader.load()
+    @StateObject private var supervisor = HomeBaseRuntimeSupervisor()
 
     public init() {}
 
@@ -326,6 +327,40 @@ public struct HomeBaseRuntimeStatusView: View {
                 runtimeRow("Cartella dati", value: snapshot.dataDirectory)
             }
 
+            #if os(macOS)
+            HStack(spacing: 10) {
+                Button {
+                    Task { await startProxy() }
+                } label: {
+                    Label("Avvia proxy TLS", systemImage: "play.circle")
+                }
+                .disabled(supervisor.isWorking)
+                .accessibilityIdentifier("homebase-runtime-start-proxy-button")
+
+                Button {
+                    Task { await stopProxy() }
+                } label: {
+                    Label("Arresta proxy TLS", systemImage: "stop.circle")
+                }
+                .disabled(supervisor.isWorking)
+                .accessibilityIdentifier("homebase-runtime-stop-proxy-button")
+            }
+
+            if let statusMessage = supervisor.statusMessage {
+                Text(statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("homebase-runtime-supervisor-status")
+            }
+
+            if let errorMessage = supervisor.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("homebase-runtime-supervisor-error")
+            }
+            #endif
+
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(snapshot.components) { component in
                     HStack(alignment: .top, spacing: 10) {
@@ -347,7 +382,7 @@ public struct HomeBaseRuntimeStatusView: View {
                 }
             }
 
-            Text("Questo pannello non avvia ancora processi: mostra solo config, token presence, proxy PID e fingerprint. La supervisione app-managed resta esplicitamente fuori da questo slice.")
+            Text("Questo pannello puo avviare o arrestare solo il proxy TLS locale. Backend Next.js, Ollama e Docker/ICD restano fuori da questo slice e non vengono installati o supervisionati automaticamente.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -366,6 +401,18 @@ public struct HomeBaseRuntimeStatusView: View {
                 .textSelection(.enabled)
         }
     }
+
+    #if os(macOS)
+    private func startProxy() async {
+        await supervisor.startProxy(snapshot: snapshot)
+        snapshot = HomeBaseRuntimeStatusLoader.load()
+    }
+
+    private func stopProxy() async {
+        await supervisor.stopProxy(snapshot: snapshot)
+        snapshot = HomeBaseRuntimeStatusLoader.load()
+    }
+    #endif
 
     private func symbolName(for state: HomeBaseRuntimeComponentState) -> String {
         switch state {

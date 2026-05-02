@@ -78,6 +78,8 @@ write_runtime_status() {
   MEDIFLOW_RUNTIME_PORT="$PORT" \
   MEDIFLOW_RUNTIME_BIND_HOST="$BIND_HOST" \
   MEDIFLOW_RUNTIME_HTTP_TARGET="$HTTP_TARGET" \
+  MEDIFLOW_RUNTIME_CERT_PATH="$CERT_PATH" \
+  MEDIFLOW_RUNTIME_KEY_PATH="$KEY_PATH" \
   MEDIFLOW_RUNTIME_PROXY_PID_PATH="$CONFIG_DIR/local-api-tls-proxy.pid" \
   node <<'NODE'
 const fs = require('fs');
@@ -90,6 +92,8 @@ const status = {
   port: Number(process.env.MEDIFLOW_RUNTIME_PORT),
   bindHost: process.env.MEDIFLOW_RUNTIME_BIND_HOST,
   httpTarget: process.env.MEDIFLOW_RUNTIME_HTTP_TARGET,
+  certPath: process.env.MEDIFLOW_RUNTIME_CERT_PATH,
+  keyPath: process.env.MEDIFLOW_RUNTIME_KEY_PATH,
   proxyPidPath: process.env.MEDIFLOW_RUNTIME_PROXY_PID_PATH
 };
 

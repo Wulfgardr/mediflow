@@ -26,6 +26,17 @@ Il file di configurazione viene scritto in:
 
 Il client macOS lo legge automaticamente al primo avvio.
 
+Lo script scrive anche:
+
+```
+~/Library/Application Support/MediFlow/runtime-status.json
+```
+
+Il file contiene solo metadati PHI-free del runtime locale (`baseURL`, porta,
+modalita rete, fingerprint TLS e percorsi runtime). Il pannello `Runtime`
+dell'app lo usa per mostrare readiness e per avviare/arrestare il proxy TLS
+locale in modo esplicito.
+
 ## Variabili opzionali
 
 - `MEDIFLOW_LOCAL_API_TOKEN` (token per API locale)
