@@ -108,14 +108,17 @@ soglia breve. Quando il Mac non e raggiungibile, l'app mobile puo mostrare lo
 stato `offline degradato` in sola consultazione; non esistono ancora scritture
 offline o coda di merge mobile.
 
-La prima scrittura mobile paired esposta nella shell condivisa e il diario
-clinico: dalla scheda paziente iPhone/iPad si possono leggere le ultime voci,
-inviare una nuova voce online all'home-base, modificare una voce non annullata e
-annullarla con soft-delete reviewable. Ogni create usa un identificativo
-client-side stabile per evitare duplicati se la rete cade dopo il commit; update
-e annullamento usano la `version` della voce e mostrano il conflitto come
-richiesta di ricarica/confronto. Terapie, controlli e osservazioni restano da
-estendere nello stesso boundary `/api/v1/network/*`.
+Le prime scritture mobile paired esposte nella shell condivisa coprono diario
+clinico e terapie. Dalla scheda paziente iPhone/iPad si possono leggere le
+ultime voci diario, inviare una nuova voce online all'home-base, modificarla e
+annullarla con soft-delete reviewable. Le terapie espongono list/create/update e
+annullamento online per campi manuali non-AI essenziali: farmaco, principio
+attivo opzionale, posologia, stato, date e motivazione. Ogni create diario usa
+un identificativo client-side stabile per evitare duplicati se la rete cade dopo
+il commit; update e annullamento usano la `version` del record e mostrano il
+conflitto come richiesta di ricarica/confronto. Non esistono prescrizione SISS
+nativa, catalogo farmaci mobile, scritture offline o coda di merge. Controlli e
+osservazioni restano da estendere nello stesso boundary `/api/v1/network/*`.
 
 ---
 

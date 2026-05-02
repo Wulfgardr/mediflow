@@ -111,6 +111,28 @@ public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
 }
 
 /* @Codex */
+public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let drugName: String
+    public let aic: String?
+    public let atc: String?
+    public let activePrinciple: String?
+    public let dosage: String
+    public let motivation: String?
+    public let diagnosisCode: String?
+    public let diagnosisName: String?
+    public let status: String
+    public let startDate: Date
+    public let endDate: Date?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+}
+
+/* @Codex */
 public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let id: String
     public let type: String
@@ -150,6 +172,109 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         self.content = content
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
+    }
+}
+
+/* @Codex */
+public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
+    public let drugName: String
+    public let activePrinciple: String?
+    public let dosage: String
+    public let status: String
+    public let startDate: Date
+    public let endDate: Date?
+    public let motivation: String?
+
+    public init(
+        drugName: String,
+        activePrinciple: String? = nil,
+        dosage: String,
+        status: String,
+        startDate: Date,
+        endDate: Date? = nil,
+        motivation: String? = nil
+    ) {
+        self.drugName = drugName
+        self.activePrinciple = activePrinciple
+        self.dosage = dosage
+        self.status = status
+        self.startDate = startDate
+        self.endDate = endDate
+        self.motivation = motivation
+    }
+}
+
+/* @Codex */
+public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let drugName: String?
+    public let activePrinciple: String?
+    public let dosage: String?
+    public let status: String?
+    public let startDate: Date?
+    public let endDate: Date?
+    public let motivation: String?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+    private let shouldEncodeEndDate: Bool
+
+    public init(
+        version: Int,
+        drugName: String? = nil,
+        activePrinciple: String? = nil,
+        dosage: String? = nil,
+        status: String? = nil,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        shouldEncodeEndDate: Bool = false,
+        motivation: String? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.version = version
+        self.drugName = drugName
+        self.activePrinciple = activePrinciple
+        self.dosage = dosage
+        self.status = status
+        self.startDate = startDate
+        self.endDate = endDate
+        self.shouldEncodeEndDate = shouldEncodeEndDate
+        self.motivation = motivation
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case drugName
+        case activePrinciple
+        case dosage
+        case status
+        case startDate
+        case endDate
+        case motivation
+        case deletedAt
+        case deletionReason
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(drugName, forKey: .drugName)
+        try container.encodeIfPresent(activePrinciple, forKey: .activePrinciple)
+        try container.encodeIfPresent(dosage, forKey: .dosage)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(startDate, forKey: .startDate)
+        if shouldEncodeEndDate {
+            if let endDate {
+                try container.encode(endDate, forKey: .endDate)
+            } else {
+                try container.encodeNil(forKey: .endDate)
+            }
+        }
+        try container.encodeIfPresent(motivation, forKey: .motivation)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
+        try container.encodeIfPresent(deletionReason, forKey: .deletionReason)
     }
 }
 
@@ -330,6 +455,73 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent(patientId)
             .appendingPathComponent("entries")
             .appendingPathComponent(entryId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchTherapies(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = 20
+    ) async throws -> [HomeBaseTherapySummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("therapies")
+            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseTherapySummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createTherapy(
+        patientId: String,
+        payload: HomeBaseTherapyCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("therapies")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateTherapy(
+        patientId: String,
+        therapyId: String,
+        payload: HomeBaseTherapyUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("therapies")
+            .appendingPathComponent(therapyId)
         let (data, _) = try await send(
             to: url,
             method: "PUT",

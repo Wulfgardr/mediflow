@@ -541,6 +541,8 @@ private struct PairedPatientsWorkspaceView: View {
     @State private var confirmsClearingPairing = false
     @State private var confirmsDeletingEntry = false
     @State private var deletionCandidateId: String?
+    @State private var confirmsDeletingTherapy = false
+    @State private var therapyDeletionCandidateId: String?
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -568,6 +570,20 @@ private struct PairedPatientsWorkspaceView: View {
             Button("Mantieni", role: .cancel) {}
         } message: {
             Text("La voce resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
+        }
+        .confirmationDialog(
+            "Annullare questa terapia?",
+            isPresented: $confirmsDeletingTherapy,
+            titleVisibility: .visible
+        ) {
+            Button("Annulla terapia", role: .destructive) {
+                guard let therapyDeletionCandidateId else { return }
+                self.therapyDeletionCandidateId = nil
+                Task { await model.softDeleteTherapy(id: therapyDeletionCandidateId) }
+            }
+            Button("Mantieni", role: .cancel) {}
+        } message: {
+            Text("La terapia resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
         }
     }
 
@@ -708,6 +724,7 @@ private struct PairedPatientsWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     patientDetailSection(detail)
                     diarySection
+                    therapiesSection
                 }
             }
         }
@@ -897,12 +914,228 @@ private struct PairedPatientsWorkspaceView: View {
         }
     }
 
+    /* @Codex */
+    private var therapiesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Terapie", systemImage: "pills")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Ultime 20 terapie")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    Task { await model.loadSelectedPatientTherapies() }
+                } label: {
+                    Label("Aggiorna", systemImage: "arrow.clockwise")
+                }
+                .font(.caption)
+                .disabled(model.isWorking || model.selectedPatient == nil)
+                .accessibilityIdentifier("homebase-refresh-therapies-button")
+            }
+
+            if model.therapies.isEmpty {
+                Text("Nessuna terapia caricata.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(model.therapies), id: \.id) { therapy in
+                    therapyRow(therapy)
+                }
+            }
+
+            if model.isEditingTherapy {
+                Divider()
+                therapyForm(
+                    title: "Modifica terapia online",
+                    drugName: $model.editTherapyDrugName,
+                    activePrinciple: $model.editTherapyActivePrinciple,
+                    dosage: $model.editTherapyDosage,
+                    motivation: $model.editTherapyMotivation,
+                    status: $model.editTherapyStatus,
+                    startDate: $model.editTherapyStartDate,
+                    hasEndDate: $model.editTherapyHasEndDate,
+                    endDate: $model.editTherapyEndDate,
+                    primaryLabel: "Salva modifiche",
+                    primaryIdentifier: "homebase-update-therapy-button",
+                    canSubmit: model.canUpdateEditingTherapy,
+                    onCancel: { model.cancelEditingTherapy() },
+                    onSubmit: { Task { await model.updateEditingTherapy() } }
+                )
+                Text("Disponibile solo online. Se la versione non coincide, ricarica le terapie prima di riprovare.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            therapyForm(
+                title: "Nuova terapia online",
+                drugName: $model.newTherapyDrugName,
+                activePrinciple: $model.newTherapyActivePrinciple,
+                dosage: $model.newTherapyDosage,
+                motivation: $model.newTherapyMotivation,
+                status: $model.newTherapyStatus,
+                startDate: $model.newTherapyStartDate,
+                hasEndDate: $model.newTherapyHasEndDate,
+                endDate: $model.newTherapyEndDate,
+                primaryLabel: "Salva terapia",
+                primaryIdentifier: "homebase-create-therapy-button",
+                canSubmit: model.canCreateTherapy,
+                onCancel: nil,
+                onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
+            )
+            Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private func therapyRow(_ therapy: HomeBaseTherapySummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(therapy.drugName)
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                Text(PairedTherapyStatus(rawValue: therapy.status)?.title ?? therapy.status)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(therapy.deletedAt == nil ? Color.secondary : Color.orange)
+            }
+            Text(therapy.dosage)
+                .font(.caption)
+                .foregroundStyle(therapy.deletedAt == nil ? .primary : .secondary)
+                .lineLimit(2)
+            if let activePrinciple = therapy.activePrinciple, !activePrinciple.isEmpty {
+                Text(activePrinciple)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            if let motivation = therapy.motivation, !motivation.isEmpty {
+                Text(motivation)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Text(Self.therapyDateLine(for: therapy))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if therapy.deletedAt != nil {
+                Text("Terapia annullata")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.orange)
+            } else if model.canMutateTherapy(therapy) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.startEditingTherapy(therapy)
+                    } label: {
+                        Label("Modifica", systemImage: "pencil")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-edit-therapy-button-\(therapy.id)")
+
+                    Button(role: .destructive) {
+                        therapyDeletionCandidateId = therapy.id
+                        confirmsDeletingTherapy = true
+                    } label: {
+                        Label("Annulla", systemImage: "xmark.circle")
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("homebase-delete-therapy-button-\(therapy.id)")
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private func therapyForm(
+        title: String,
+        drugName: Binding<String>,
+        activePrinciple: Binding<String>,
+        dosage: Binding<String>,
+        motivation: Binding<String>,
+        status: Binding<PairedTherapyStatus>,
+        startDate: Binding<Date>,
+        hasEndDate: Binding<Bool>,
+        endDate: Binding<Date>,
+        primaryLabel: String,
+        primaryIdentifier: String,
+        canSubmit: Bool,
+        onCancel: (() -> Void)?,
+        onSubmit: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: "pills")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Farmaco", text: drugName)
+                .accessibilityIdentifier("\(primaryIdentifier)-drug-name")
+            TextField("Principio attivo (opzionale)", text: activePrinciple)
+                .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
+            TextField("Posologia", text: dosage)
+                .accessibilityIdentifier("\(primaryIdentifier)-dosage")
+            TextField("Motivazione (opzionale)", text: motivation)
+                .accessibilityIdentifier("\(primaryIdentifier)-motivation")
+            Picker("Stato", selection: status) {
+                ForEach(PairedTherapyStatus.allCases) { status in
+                    Text(status.title).tag(status)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("\(primaryIdentifier)-status")
+            DatePicker("Inizio", selection: startDate, displayedComponents: .date)
+                .accessibilityIdentifier("\(primaryIdentifier)-start-date")
+            Toggle("Fine terapia", isOn: hasEndDate)
+                .accessibilityIdentifier("\(primaryIdentifier)-has-end-date")
+            if hasEndDate.wrappedValue {
+                DatePicker("Fine", selection: endDate, displayedComponents: .date)
+                    .accessibilityIdentifier("\(primaryIdentifier)-end-date")
+            }
+            HStack(spacing: 8) {
+                if let onCancel {
+                    Button("Annulla") {
+                        onCancel()
+                    }
+                    .font(.caption)
+                }
+                Button {
+                    onSubmit()
+                } label: {
+                    Label(primaryLabel, systemImage: "checkmark.circle")
+                }
+                .font(.caption)
+                .disabled(!canSubmit)
+                .accessibilityIdentifier(primaryIdentifier)
+            }
+        }
+    }
+
     private static let entryDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         formatter.timeStyle = .short
         return formatter
     }()
+
+    /* @Codex */
+    private static let therapyDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    /* @Codex */
+    private static func therapyDateLine(for therapy: HomeBaseTherapySummary) -> String {
+        let start = therapyDayFormatter.string(from: therapy.startDate)
+        guard let endDate = therapy.endDate else { return "Dal \(start)" }
+        return "Dal \(start) al \(therapyDayFormatter.string(from: endDate))"
+    }
 }
 
 @MainActor
@@ -917,6 +1150,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     @Published private(set) var selectedPatient: HomeBasePatientDetail?
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
+    @Published private(set) var therapies: [HomeBaseTherapySummary] = []
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     @Published var newEntryContent = ""
@@ -925,6 +1159,24 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
     @Published var editEntryContent = ""
+    @Published var newTherapyDrugName = ""
+    @Published var newTherapyActivePrinciple = ""
+    @Published var newTherapyDosage = ""
+    @Published var newTherapyMotivation = ""
+    @Published var newTherapyStatus: PairedTherapyStatus = .active
+    @Published var newTherapyStartDate = Date()
+    @Published var newTherapyHasEndDate = false
+    @Published var newTherapyEndDate = Date()
+    @Published private(set) var editingTherapyId: String?
+    @Published private(set) var editingTherapyVersion: Int?
+    @Published var editTherapyDrugName = ""
+    @Published var editTherapyActivePrinciple = ""
+    @Published var editTherapyDosage = ""
+    @Published var editTherapyMotivation = ""
+    @Published var editTherapyStatus: PairedTherapyStatus = .active
+    @Published var editTherapyStartDate = Date()
+    @Published var editTherapyHasEndDate = false
+    @Published var editTherapyEndDate = Date()
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -1037,7 +1289,9 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             self.selectedPatient = nil
             self.entries = []
+            self.therapies = []
             self.cancelEditingEntry()
+            self.cancelEditingTherapy()
             do {
                 try self.persistPairing()
                 try self.cacheStore.savePatientList(
@@ -1071,7 +1325,14 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
             self.cancelEditingEntry()
+            self.cancelEditingTherapy()
             self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
         }
     }
@@ -1237,6 +1498,180 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    /* @Codex */
+    func loadSelectedPatientTherapies() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.cancelEditingTherapy()
+            self.statusMessage = "\(self.therapies.count) terapie caricate."
+        }
+    }
+
+    /* @Codex */
+    func createTherapyForSelectedPatient() async {
+        guard canCreateTherapy else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let drugName = newTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activePrinciple = newTherapyActivePrinciple.trimmedOrNil
+        let dosage = newTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let motivation = newTherapyMotivation.trimmedOrNil
+        let endDate = newTherapyHasEndDate ? newTherapyEndDate : nil
+        await runTask {
+            _ = try await self.makeClient().createTherapy(
+                patientId: patientId,
+                payload: HomeBaseTherapyCreatePayload(
+                    drugName: drugName,
+                    activePrinciple: activePrinciple,
+                    dosage: dosage,
+                    status: self.newTherapyStatus.rawValue,
+                    startDate: self.newTherapyStartDate,
+                    endDate: endDate,
+                    motivation: motivation
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.resetNewTherapyForm()
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Terapia inviata all'home-base."
+        }
+    }
+
+    /* @Codex */
+    func startEditingTherapy(_ therapy: HomeBaseTherapySummary) {
+        guard canMutateTherapy(therapy) else { return }
+        editingTherapyId = therapy.id
+        editingTherapyVersion = therapy.version
+        editTherapyDrugName = therapy.drugName
+        editTherapyActivePrinciple = therapy.activePrinciple ?? ""
+        editTherapyDosage = therapy.dosage
+        editTherapyMotivation = therapy.motivation ?? ""
+        editTherapyStatus = PairedTherapyStatus(rawValue: therapy.status) ?? .active
+        editTherapyStartDate = therapy.startDate
+        editTherapyHasEndDate = therapy.endDate != nil
+        editTherapyEndDate = therapy.endDate ?? Date()
+        statusMessage = "Modifica terapia pronta."
+    }
+
+    /* @Codex */
+    func cancelEditingTherapy() {
+        editingTherapyId = nil
+        editingTherapyVersion = nil
+        editTherapyDrugName = ""
+        editTherapyActivePrinciple = ""
+        editTherapyDosage = ""
+        editTherapyMotivation = ""
+        editTherapyStatus = .active
+        editTherapyStartDate = Date()
+        editTherapyHasEndDate = false
+        editTherapyEndDate = Date()
+    }
+
+    /* @Codex */
+    func updateEditingTherapy() async {
+        guard canUpdateEditingTherapy else { return }
+        guard let patientId = selectedPatient?.id,
+              let therapyId = editingTherapyId,
+              let version = editingTherapyVersion,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let drugName = editTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activePrinciple = editTherapyActivePrinciple.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dosage = editTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let motivation = editTherapyMotivation.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateTherapy(
+                patientId: patientId,
+                therapyId: therapyId,
+                payload: HomeBaseTherapyUpdatePayload(
+                    version: version,
+                    drugName: drugName,
+                    activePrinciple: activePrinciple,
+                    dosage: dosage,
+                    status: self.editTherapyStatus.rawValue,
+                    startDate: self.editTherapyStartDate,
+                    endDate: self.editTherapyHasEndDate ? self.editTherapyEndDate : nil,
+                    shouldEncodeEndDate: true,
+                    motivation: motivation
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.cancelEditingTherapy()
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Terapia aggiornata sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func softDeleteTherapy(id therapyId: String) async {
+        guard let therapy = therapies.first(where: { $0.id == therapyId }),
+              canMutateTherapy(therapy) else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateTherapy(
+                patientId: patientId,
+                therapyId: therapy.id,
+                payload: HomeBaseTherapyUpdatePayload(
+                    version: therapy.version,
+                    deletedAt: Date(),
+                    deletionReason: "mobile-paired-operator-cancelled"
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            if self.editingTherapyId == therapy.id {
+                self.cancelEditingTherapy()
+            }
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Terapia annullata sull'home-base."
+        }
+    }
+
     func savePairing() async {
         guard pairedCredentials != nil else {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
@@ -1265,11 +1700,14 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             patients = []
             selectedPatient = nil
             entries = []
+            therapies = []
             newEntryTitle = ""
             newEntryType = .note
             newEntryContent = ""
             newEntryDraftId = UUID().uuidString
             cancelEditingEntry()
+            resetNewTherapyForm()
+            cancelEditingTherapy()
             connectionState = .notLoaded
             reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
             discoveryMessage = nil
@@ -1341,6 +1779,9 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             patients = snapshot.patients
             selectedPatient = nil
             entries = []
+            therapies = []
+            cancelEditingEntry()
+            cancelEditingTherapy()
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
             statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
             reconciliationLine = markOffline
@@ -1370,12 +1811,24 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 409 {
-                statusMessage = "Conflitto versione: ricarica il diario e confronta la voce prima di salvare."
+                statusMessage = "Conflitto versione: ricarica il modulo e confronta la voce prima di salvare."
                 errorMessage = nil
                 return
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    /* @Codex */
+    private func resetNewTherapyForm() {
+        newTherapyDrugName = ""
+        newTherapyActivePrinciple = ""
+        newTherapyDosage = ""
+        newTherapyMotivation = ""
+        newTherapyStatus = .active
+        newTherapyStartDate = Date()
+        newTherapyHasEndDate = false
+        newTherapyEndDate = Date()
     }
 
     /* @Codex */
@@ -1390,6 +1843,35 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && newEntryContent.count <= 2000
+            && !isWorking
+    }
+
+    /* @Codex */
+    var isEditingTherapy: Bool {
+        editingTherapyId != nil
+    }
+
+    /* @Codex */
+    var canCreateTherapy: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !newTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canUpdateEditingTherapy: Bool {
+        editingTherapyId != nil
+            && editingTherapyVersion != nil
+            && selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !editTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !editTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !isWorking
     }
 
@@ -1416,6 +1898,16 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !isWorking
     }
+
+    /* @Codex */
+    func canMutateTherapy(_ therapy: HomeBaseTherapySummary) -> Bool {
+        therapy.deletedAt == nil
+            && selectedPatient?.id == therapy.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
 }
 
 /* @Codex */
@@ -1437,6 +1929,26 @@ private enum PairedDiaryEntryType: String, CaseIterable, Identifiable {
             return "Telefono"
         case .other:
             return "Altro"
+        }
+    }
+}
+
+/* @Codex */
+private enum PairedTherapyStatus: String, CaseIterable, Identifiable {
+    case active
+    case suspended
+    case completed
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .active:
+            return "Attiva"
+        case .suspended:
+            return "Sospesa"
+        case .completed:
+            return "Conclusa"
         }
     }
 }

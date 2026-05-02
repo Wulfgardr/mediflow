@@ -156,12 +156,20 @@
           "value": "npm run test:network:home-base-diary-write"
         },
         {
+          "type": "command",
+          "value": "npm run test:network:home-base-therapy-write"
+        },
+        {
           "type": "issue",
           "value": "WUL-206"
         },
         {
           "type": "issue",
           "value": "WUL-208"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-209"
         }
       ]
     },
@@ -188,7 +196,7 @@
       "title": "Current Apple-wide click-map evidence",
       "surfaces": ["macOS", "iPhone", "iPad"],
       "status": "covered",
-      "acceptance": "Automated probes cover the current macOS home-base shell, paired mobile simulator bootstrap/read, and paired network write/conflict boundaries; full mobile CRUD UI and offline reconciliation remain separate WUL-193 gaps.",
+      "acceptance": "Automated probes cover the current macOS home-base shell, paired mobile simulator bootstrap/read, and paired network write/conflict boundaries; residual checkup/observation mobile CRUD and offline reconciliation remain separate WUL-193/WUL-210 gaps.",
       "evidence": [
         {
           "type": "command",
