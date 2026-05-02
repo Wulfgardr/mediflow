@@ -11,9 +11,9 @@ Ultimo aggiornamento: 2026-05-02
 
 ## Focus corrente (prossime 2-6 settimane)
 
-### Post-v0.5.0 (stabilizzazione sul campo + home-base/document intelligence)
-- [ ] Eseguire validazione sul campo delle superfici UI/AI rilasciate in `v0.5.0` e riversare bug/regressioni in Linear con priorita esplicite.
-- [ ] Mantenere affidabile il verify loop per le patch `0.5.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` / `test:network:home-base-write` / `test:network:home-base-diary-write` / `test:network:home-base-therapy-write` / `test:network:home-base-checkup-write` / `test:network:home-base-observation-write` quando si tocca il boundary paired.
+### Post-v0.6.0 (validazione sul campo + hardening bounded)
+- [ ] Eseguire validazione sul campo delle superfici UI/AI/home-base rilasciate in `v0.6.0` e riversare bug/regressioni in Linear con priorita esplicite.
+- [ ] Mantenere affidabile il verify loop per le patch `0.6.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` / `test:network:home-base-write` / `test:network:home-base-diary-write` / `test:network:home-base-therapy-write` / `test:network:home-base-checkup-write` / `test:network:home-base-observation-write` quando si tocca il boundary paired.
 - [ ] Fissare prima la mappa ufficiale `SSI/A2A` oltre il `portal-handoff` (`WUL-180`) prima di qualunque tentativo di prescrittivo nativo, `FSE` embedded o altri moduli SISS dentro MediFlow.
 - [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).
 - [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback; primi write remoti limitati a profilo/status paziente, diario, terapie, checkup e osservazioni versionati sotto `WUL-190`, senza hard delete remoto, attachment remoti, cataloghi o sync.
@@ -32,7 +32,8 @@ Ultimo aggiornamento: 2026-05-02
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115` e `WUL-165`, salvo promozione esplicita sostenuta da benchmark, ADR e stop-rules. Slice `WUL-165` acquisita: MLX diventa benchmark-visible e diagnosticabile in read-only nella home-base, con guard `check:mlx-operational-parity`, ma `Ollama` resta runtime clinico standard e `OCR` resta Ollama-only.
 
 Nota operativa:
-- `v0.5.0` e la release corrente formalizzata su `main` il `2026-03-29`
+- `v0.6.0` e la release corrente formalizzata su `main` il `2026-05-02`
+- `v0.5.0` resta la release storica di consolidamento AI/UI formalizzata su `main` il `2026-03-29`
 - `v0.4.0` resta la baseline storica taggata su `main` il `2026-03-19`
 - `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo successivo sposta il focus su uso reale, rollout governance e architettura home-base
 - `WUL-150` ha spostato `home-base` da discovery teorica a first slice eseguibile: pairing PHI-safe, Settings overview e primo read path remoto protetto
@@ -43,7 +44,7 @@ Nota operativa:
 - `WUL-176` ha portato su `main` il corpus documentale locale SISS/FSE: manifest versionato, fetch pubblico ripetibile fuori Git e placeholder `manual-import` per le fonti non redistribuibili
 - `WUL-179` ha completato il primo layer operativo sopra il corpus: `sync` incrementale, `changeState`, policy di refresh e report locale di freshness, senza introdurre ancora scheduling o daemon dedicati
 - `WUL-203` chiude il passaggio documentale post-`WUL-199` / post-`WUL-179`: le mappe, la roadmap, la sintesi architetturale, il changelog e la facciata OSS non devono piu raccontare i preview profiles come runtime disponibile su `main`
-- il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog `post-v0.5` e residui storici
+- il label Linear `bucket/post-0.4` resta etichetta legacy da separare progressivamente tra backlog post-release e residui storici
 
 ### Contesto storico chiuso: Release gate v0.5.0 (consolidamento AI/UI)
 - [x] Chiudere il pacchetto UI web orientato alla leggibilita clinica e al first fold operativo: `WUL-94`, `WUL-98`, `WUL-106`, `WUL-107`, `WUL-108`.
@@ -264,7 +265,7 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
-- [ ] Estendere il ciclo `post-v0.5`: pairing UX/home-base, replica/fallback offline, runtime AI centralizzabile e rebuild controllato della shell macOS.
+- [ ] Estendere il ciclo `post-v0.6`: pairing UX/home-base, replica/fallback offline, runtime AI centralizzabile e hardening controllato del bundle Apple/home-base.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 

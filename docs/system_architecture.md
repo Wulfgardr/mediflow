@@ -20,8 +20,8 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
    persistono cifrati lato client.
 3. **Home-base opt-in**: esiste una slice `network-home-base` su
    `/api/v1/network/*` con read pazienti, primo `PUT` profilo/status paziente
-   e diario clinico/terapie/checkup/osservazioni versionati, mentre pairing,
-   replica, cataloghi e sync restano governati e separati.
+   e diario clinico/terapie/checkup/osservazioni versionati, mentre hard delete
+   remoto, replica, cataloghi remoti e sync restano governati e separati.
 4. **Document intelligence prudente**: `documentInsights` resta compat layer,
    mentre gli allegati possono gia persistere un artifact `parse/evidence`
    cifrato consumato in priorita da `AI Patient Insight`.
@@ -85,7 +85,8 @@ Boundary importanti:
 - `local-only` resta il default
 - `network-home-base` si attiva esplicitamente in Settings
 - il pairing bootstrap e PHI-safe
-- non esistono ancora write remoti, sync record-level o multi-master
+- esistono solo write remoti limitati/versionati sui moduli gia documentati;
+  sync record-level, multi-master e hard delete remoto restano fuori scope
 
 ---
 
@@ -138,4 +139,4 @@ clinica quando diagnosi/terapie sono gia presenti.
 
 ---
 
-*Ultimo aggiornamento: 2026-05-01 — main corrente*
+*Ultimo aggiornamento: 2026-05-02 — v0.6.0 / main corrente*

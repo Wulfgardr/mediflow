@@ -1,7 +1,7 @@
 # Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.5.0 (release corrente) — Marzo 2026
+> v0.6.0 (release corrente) — Maggio 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 ## Fatto (v0.3.0)
@@ -46,16 +46,49 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ---
 
-## In corso (post-v0.5)
+## Fatto (v0.6.0)
 
-La lettura operativa piu completa del ciclo post-v0.5 e ora
+`v0.6.0` chiude il ciclo post-`v0.5`: il prodotto assume una forma piu
+completa come sistema local-first con Mac `home-base`, client Apple paired,
+document intelligence artifact-first e integrazioni regionali governate da
+boundary espliciti.
+
+* **Mac come home-base concreto**: pairing esplicito, capability discovery,
+  data plane pazienti e primi write versionati sono su `main`; il bundle macOS
+  puo avviare/fermare backend production e proxy TLS e mostra health read-only
+  dei servizi locali opzionali.
+* **Family Apple paired non-AI**: iPhone/iPad entrano nel disegno con core
+  condiviso, cache mobile cifrata degradabile e primi workflow online
+  versionati su profilo/status, diario, terapie, checkup e osservazioni.
+* **Document intelligence artifact-first**: `parse/evidence` cifrato sugli
+  allegati, `sectionMap`, ancore fonte e conflitti reviewable diventano la base
+  runtime prudente per `Patient Insight` e create-flow documentale.
+* **SISS/FSE piu maturo ma onesto**: corpus locale con sync/freshness,
+  scenario notes per prescrittivo, FSE, NAR, SGDT/PAI/COT e certificati, e
+  boundary `webapp-assisted` finche non esiste una qualifica `SSI/A2A`.
+* **AI governance piu netta**: MLX e benchmark-visible e diagnosticabile, ma
+  non runtime clinico; le lane OpenMed/NER/TurboQuant/comparator restano
+  benchmark-only o shadow.
+* **Governance operativa chiusa**: la coda Linear MediFlow e stata azzerata;
+  tracker macro e backlog storico sono stati rolluppati, chiusi o cancellati
+  quando obsoleti.
+
+> Nota: `v0.6.0` non dichiara sync completo, multi-master, attachment remoti,
+> cataloghi remoti, prescribing SISS nativo o AI cloud di default. Questi restano
+> esplicitamente fuori dal claim di release.
+
+---
+
+## In corso (post-v0.6)
+
+La lettura operativa piu completa del ciclo post-v0.6 e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
 boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Modalita network home-base
 
-* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie, checkup e osservazioni sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici.
+* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie, checkup e osservazioni sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici senza rompere il boundary.
 * **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita ancora da promuovere oltre il mirror/snapshot governato.
 * **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud e ancora separata dal data plane clinico.
 
@@ -68,7 +101,7 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 * **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
 * **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
-* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie, checkup e osservazioni, cache locale cifrata futura e nessun accesso diretto al file SQLite del Mac.
+* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie, checkup e osservazioni, cache locale cifrata degradabile e nessun accesso diretto al file SQLite del Mac.
 
 ### Shell ufficiale e sperimentazioni controllate
 

@@ -8,13 +8,16 @@ Questo documento offre la vista end-to-end del progetto: web app Next.js, backen
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
 > [!IMPORTANT]
-> Dopo `v0.4.0` la delivery macOS e congelata per un rebuild controllato della shell nativa.
-> Le sezioni native qui sotto descrivono lo snapshot corrente e i confini da preservare (`/api/v1`, TLS locale, security/sessione), non una roadmap di estensione del client storico.
+> Dopo `v0.6.0` il client macOS da estendere e il bundle Apple/home-base.
+> La vecchia shell clinica resta snapshot/parity; le sezioni native qui sotto
+> descrivono il contratto da preservare (`/api/v1`, TLS locale,
+> security/sessione) e la direzione home-base packaged.
 
 > [!IMPORTANT]
-> Su `main` esistono gia slice post-`v0.5.0` che cambiano il quadro operativo:
+> Su `main` esistono gia slice `v0.6.0` che cambiano il quadro operativo:
 > `network home-base` paired su `/api/v1/network/*` con read pazienti e write
-> limitati su profilo/status, diario, terapie, checkup e osservazioni, e il primo artifact
+> limitati su profilo/status, diario, terapie, checkup e osservazioni, il bundle
+> macOS home-base packaged, client iPhone/iPad paired non-AI, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
 
 ---
