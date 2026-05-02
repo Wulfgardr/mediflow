@@ -138,6 +138,9 @@ capability + version`. Non coprono cache offline o UI mobile completa.
 Restano gap WUL-193, non regressioni nascoste:
 
 - mobile CRUD UI completa per moduli core;
+  la prima slice WUL-206 aggiunge read + create online del diario clinico nella
+  scheda paziente mobile paired, con ID client-side idempotente e senza coda
+  offline;
 - cache locale cifrata e riconciliazione esplicita. La prima slice WUL-193
   persiste uno snapshot cifrato della lista pazienti, lo usa solo come
   consultazione locale `paired-offline-degraded` entro una soglia di freschezza

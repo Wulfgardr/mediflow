@@ -115,6 +115,106 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
+    /* @Codex */
+    func testFetchEntriesUsesNetworkDiaryRouteAndDecodesVersion() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+            XCTAssertEqual(
+                request.value(forHTTPHeaderField: "Cookie"),
+                "mediflow_session=session-123; ambulatory_id=amb-42"
+            )
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1/entries?limit=12"
+            )
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = """
+            [
+              {
+                "id": "entry-1",
+                "patientId": "patient-1",
+                "type": "note",
+                "title": "Controllo telefonico",
+                "date": "2026-05-02T12:00:00Z",
+                "content": "Rivalutazione clinica stabile.",
+                "setting": null,
+                "metadata": null,
+                "attachments": null,
+                "deletedAt": null,
+                "deletionReason": null,
+                "version": 4,
+                "createdAt": "2026-05-02T12:00:00Z",
+                "updatedAt": "2026-05-02T12:05:00Z"
+              }
+            ]
+            """.data(using: .utf8)!
+            return (response, data)
+        }
+
+        let entries = try await client.fetchEntries(
+            patientId: "patient-1",
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: "amb-42",
+            limit: 12
+        )
+
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.id, "entry-1")
+        XCTAssertEqual(entries.first?.version, 4)
+    }
+
+    /* @Codex */
+    func testCreateEntryPostsNetworkDiaryPayload() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/v1/network/patients/patient-1/entries")
+
+            let body = try self.readRequestBody(from: request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["id"] as? String, "entry-draft-1")
+            XCTAssertEqual(payload["type"] as? String, "note")
+            XCTAssertEqual(payload["title"] as? String, "Telefonata caregiver")
+            XCTAssertEqual(payload["content"] as? String, "Riferita stabilita clinica.")
+            XCTAssertEqual(payload["date"] as? String, "2026-05-02T12:00:00Z")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 201,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"id":"entry-2","version":1}"#.utf8))
+        }
+
+        let result = try await client.createEntry(
+            patientId: "patient-1",
+            payload: HomeBaseEntryCreatePayload(
+                id: "entry-draft-1",
+                type: "note",
+                title: "Telefonata caregiver",
+                date: Date(timeIntervalSince1970: 1_777_723_200),
+                content: "Riferita stabilita clinica."
+            ),
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: nil
+        )
+
+        XCTAssertEqual(result, HomeBaseCreatedResource(id: "entry-2", version: 1))
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {

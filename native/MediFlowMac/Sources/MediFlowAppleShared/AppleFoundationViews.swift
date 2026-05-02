@@ -689,34 +689,138 @@ private struct PairedPatientsWorkspaceView: View {
             }
             if let detail = model.selectedPatient {
                 Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Sola lettura", systemImage: "lock")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text("\(detail.lastName) \(detail.firstName)")
-                        .font(.subheadline.weight(.semibold))
-                    Text(detail.taxCode)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let monitoringProfile = detail.monitoringProfile, !monitoringProfile.isEmpty {
-                        Text(monitoringProfile)
-                            .font(.subheadline)
-                    }
-                    if let statusReason = detail.statusReason, !statusReason.isEmpty {
-                        Text(statusReason)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if let notes = detail.notes, !notes.isEmpty {
-                        Text(notes)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                VStack(alignment: .leading, spacing: 10) {
+                    patientDetailSection(detail)
+                    diarySection
                 }
             }
         }
         .cardStyle()
     }
+
+    private func patientDetailSection(_ detail: HomeBasePatientDetail) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Anagrafica in sola lettura", systemImage: "lock")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("\(detail.lastName) \(detail.firstName)")
+                .font(.subheadline.weight(.semibold))
+            Text(detail.taxCode)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let monitoringProfile = detail.monitoringProfile, !monitoringProfile.isEmpty {
+                Text(monitoringProfile)
+                    .font(.subheadline)
+            }
+            if let statusReason = detail.statusReason, !statusReason.isEmpty {
+                Text(statusReason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let notes = detail.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var diarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Diario clinico", systemImage: "list.bullet.clipboard")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Ultime 20 voci")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    Task { await model.loadSelectedPatientEntries() }
+                } label: {
+                    Label("Aggiorna", systemImage: "arrow.clockwise")
+                }
+                .font(.caption)
+                .disabled(model.isWorking || model.selectedPatient == nil)
+                .accessibilityIdentifier("homebase-refresh-entries-button")
+            }
+
+            if model.entries.isEmpty {
+                Text("Nessuna voce diario caricata.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.entries) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(entry.title)
+                                .font(.caption.weight(.semibold))
+                            Spacer(minLength: 8)
+                            Text(Self.entryDateFormatter.string(from: entry.date))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(entry.content)
+                            .font(.caption)
+                            .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
+                            .lineLimit(4)
+                        if entry.deletedAt != nil {
+                            Text("Voce annullata")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Nuova voce online", systemImage: "square.and.pencil")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Titolo (opzionale)", text: $model.newEntryTitle)
+                    .accessibilityIdentifier("homebase-new-entry-title-field")
+                Picker("Tipo", selection: $model.newEntryType) {
+                    ForEach(PairedDiaryEntryType.allCases) { type in
+                        Text(type.title).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("homebase-new-entry-type-picker")
+                TextEditor(text: $model.newEntryContent)
+                    .frame(minHeight: 90)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(PlatformColors.separator, lineWidth: 1)
+                    )
+                    .accessibilityIdentifier("homebase-new-entry-content-field")
+                Text("\(model.newEntryContent.count)/2000")
+                    .font(.caption2)
+                    .foregroundStyle(model.newEntryContent.count <= 2000 ? Color.secondary : Color.red)
+                Button {
+                    Task { await model.createEntryForSelectedPatient() }
+                } label: {
+                    Label("Salva voce", systemImage: "checkmark.circle")
+                }
+                .disabled(!model.canCreateEntry)
+                .accessibilityIdentifier("homebase-create-entry-button")
+                Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static let entryDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 @MainActor
@@ -730,6 +834,10 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var ambulatoryId = ""
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     @Published private(set) var selectedPatient: HomeBasePatientDetail?
+    @Published private(set) var entries: [HomeBaseEntrySummary] = []
+    @Published var newEntryTitle = ""
+    @Published var newEntryType: PairedDiaryEntryType = .note
+    @Published var newEntryContent = ""
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -742,6 +850,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
     private var sessionCookie: String?
+    private var newEntryDraftId = UUID().uuidString
 
     init(
         pairedStore: HomeBasePairedStore = .shared,
@@ -840,6 +949,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 throw error
             }
             self.selectedPatient = nil
+            self.entries = []
             do {
                 try self.persistPairing()
                 try self.cacheStore.savePatientList(
@@ -867,7 +977,76 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.entries = try await self.makeClient().fetchEntries(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
             self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
+        }
+    }
+
+    /* @Codex */
+    func loadSelectedPatientEntries() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.entries = try await self.makeClient().fetchEntries(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "\(self.entries.count) voci diario caricate."
+        }
+    }
+
+    /* @Codex */
+    func createEntryForSelectedPatient() async {
+        guard canCreateEntry else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let title = newEntryTitle.trimmedOrNil
+        let type = newEntryType.rawValue
+        let content = newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            _ = try await self.makeClient().createEntry(
+                patientId: patientId,
+                payload: HomeBaseEntryCreatePayload(
+                    id: self.newEntryDraftId,
+                    type: type,
+                    title: title,
+                    date: Date(),
+                    content: content
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.newEntryTitle = ""
+            self.newEntryType = .note
+            self.newEntryContent = ""
+            self.newEntryDraftId = UUID().uuidString
+            self.statusMessage = "Voce diario inviata all'home-base."
+            do {
+                self.entries = try await self.makeClient().fetchEntries(
+                    patientId: patientId,
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                )
+            } catch {
+                self.errorMessage = "Voce inviata, ma aggiornamento diario non riuscito: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -898,6 +1077,11 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             ambulatoryId = ""
             patients = []
             selectedPatient = nil
+            entries = []
+            newEntryTitle = ""
+            newEntryType = .note
+            newEntryContent = ""
+            newEntryDraftId = UUID().uuidString
             connectionState = .notLoaded
             reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
             discoveryMessage = nil
@@ -968,6 +1152,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             patients = snapshot.patients
             selectedPatient = nil
+            entries = []
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
             statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
             reconciliationLine = markOffline
@@ -987,7 +1172,49 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         do {
             try await operation()
         } catch {
+            if case HomeBaseClientError.httpStatus(let status, _) = error,
+               status == 401 {
+                connectionState = .sessionExpired
+                sessionCookie = nil
+                statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+            } else if case HomeBaseClientError.httpStatus(let status, _) = error,
+                      status == 403 {
+                statusMessage = "Operazione non autorizzata nello scope paired corrente."
+            }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    var canCreateEntry: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && newEntryContent.count <= 2000
+            && !isWorking
+    }
+}
+
+/* @Codex */
+private enum PairedDiaryEntryType: String, CaseIterable, Identifiable {
+    case note
+    case visit
+    case phone
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .note:
+            return "Nota"
+        case .visit:
+            return "Visita"
+        case .phone:
+            return "Telefono"
+        case .other:
+            return "Altro"
         }
     }
 }
@@ -997,6 +1224,7 @@ private enum PairedPatientsConnectionState {
     case cached
     case pairedOnline
     case pairedOfflineDegraded
+    case sessionExpired
 
     var title: String {
         switch self {
@@ -1008,6 +1236,8 @@ private enum PairedPatientsConnectionState {
             return "Paired online"
         case .pairedOfflineDegraded:
             return "Offline degradato"
+        case .sessionExpired:
+            return "Sessione scaduta"
         }
     }
 
@@ -1021,6 +1251,8 @@ private enum PairedPatientsConnectionState {
             return "checkmark.circle.fill"
         case .pairedOfflineDegraded:
             return "exclamationmark.triangle.fill"
+        case .sessionExpired:
+            return "person.crop.circle.badge.exclamationmark"
         }
     }
 
@@ -1033,6 +1265,8 @@ private enum PairedPatientsConnectionState {
         case .pairedOnline:
             return .green
         case .pairedOfflineDegraded:
+            return .orange
+        case .sessionExpired:
             return .orange
         }
     }
@@ -1168,6 +1402,14 @@ private enum PlatformColors {
         return Color(nsColor: .controlBackgroundColor)
         #else
         return Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+
+    static var separator: Color {
+        #if os(macOS)
+        return Color(nsColor: .separatorColor)
+        #else
+        return Color(uiColor: .separator)
         #endif
     }
 }
