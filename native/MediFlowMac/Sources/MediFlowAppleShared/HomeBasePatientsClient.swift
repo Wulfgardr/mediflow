@@ -92,6 +92,41 @@ public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
     public let updatedAt: Date?
 }
 
+/* @Codex */
+public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let type: String
+    public let title: String
+    public let date: Date
+    public let content: String
+    public let setting: String?
+    public let metadata: String?
+    public let attachments: String?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+}
+
+/* @Codex */
+public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
+    public let id: String
+    public let type: String
+    public let title: String?
+    public let date: Date
+    public let content: String
+
+    public init(id: String, type: String, title: String? = nil, date: Date, content: String) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.date = date
+        self.content = content
+    }
+}
+
 public enum HomeBaseClientError: LocalizedError, Equatable {
     case invalidServerURL
     case insecureTransport
@@ -206,10 +241,65 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBasePatientDetail.self, from: data)
     }
 
+    /* @Codex */
+    public func fetchEntries(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = 20
+    ) async throws -> [HomeBaseEntrySummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("entries")
+            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseEntrySummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createEntry(
+        patientId: String,
+        payload: HomeBaseEntryCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("entries")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
     static func cookieHeader(sessionCookie: String, ambulatoryId: String?) -> String {
         let trimmedAmbulatory = ambulatoryId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !trimmedAmbulatory.isEmpty else { return sessionCookie }
         return "\(sessionCookie); ambulatory_id=\(trimmedAmbulatory)"
+    }
+
+    private func pairedHeaders(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) -> [String: String] {
+        [
+            "x-mediflow-paired-client-id": credentials.clientId,
+            "x-mediflow-paired-client-token": credentials.clientToken,
+            "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+        ]
     }
 
     private func send(
@@ -251,6 +341,12 @@ public actor HomeBasePatientsClient {
         } catch {
             throw HomeBaseClientError.contract
         }
+    }
+
+    private func encode<T: Encodable>(_ payload: T) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(payload)
     }
 
     private static func extractSessionCookie(from response: HTTPURLResponse, url: URL) throws -> String {
@@ -332,4 +428,10 @@ private struct AuthLoginRequest: Encodable {
 private struct APIErrorPayload: Decodable {
     let error: String?
     let message: String?
+}
+
+/* @Codex */
+public struct HomeBaseCreatedResource: Decodable, Equatable, Sendable {
+    public let id: String
+    public let version: Int?
 }

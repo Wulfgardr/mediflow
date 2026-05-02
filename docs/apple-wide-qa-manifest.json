@@ -145,11 +145,19 @@
       "surfaces": ["iPhone", "iPad"],
       "status": "gap",
       "acceptance": "iPhone/iPad expose usable native list/detail/create/edit flows for the non-AI core modules.",
-      "gapIssue": "WUL-193",
+      "gapIssue": "WUL-206",
       "evidence": [
         {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac --filter HomeBasePatientsClientTests"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-diary-write"
+        },
+        {
           "type": "issue",
-          "value": "WUL-193"
+          "value": "WUL-206"
         }
       ]
     },
