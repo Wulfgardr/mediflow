@@ -71,6 +71,10 @@ Riferimenti:
 
 ## Scenario mirato WUL-23 - Osservazioni LOINC/UCUM
 
+Stato codice: chiuso in `WUL-23` come CRUD nativo LOINC/UCUM gia esposto e
+coperto da test nativi. Questa checklist resta evidenza manuale `P6` da
+rieseguire sul nuovo shell nativo prima della chiusura parity completa.
+
 - [ ] `patient-detail-new-observation-button`: apre la sheet nuova osservazione.
 - [ ] `observation-editor-loinc-picker`: selezione parametro LOINC coerente.
 - [ ] `observation-editor-ucum-picker`: selezione unità UCUM coerente.
