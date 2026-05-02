@@ -229,6 +229,7 @@ home-base, esegui anche:
 
 ```bash
 npm run test:network:home-base-readonly
+npm run test:network:home-base-write
 ```
 
 ---

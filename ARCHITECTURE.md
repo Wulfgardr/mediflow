@@ -37,7 +37,7 @@ MediFlow è un **sistema ibrido locale**:
   - route API locali
   - overview/stato operativo del nodo locale
   - accesso al database SQLite locale
-  - contratto versionato `/api/v1/*`, inclusa la first slice `network` read-only
+  - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti e primo write profilo/status
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
   - ICD-11 Docker API per ricerca diagnosi (localhost)
@@ -52,7 +52,8 @@ MediFlow è un **sistema ibrido locale**:
 
 Il default resta **local-only sul singolo computer**. Se l'operatore attiva la
 modalita `network-home-base`, lo stesso nodo espone anche `/api/v1/network/*`
-con pairing esplicito e primo data plane read-only per client trusted su LAN.
+con pairing esplicito, data plane pazienti read-only-first e primo `PUT`
+profilo/status paziente per client trusted su LAN.
 
 ### Porte locali (default)
 
@@ -94,7 +95,8 @@ MediFlow espone due superfici API:
   - protetta da **token locale** (trasporto su HTTPS locale via TLS proxy)
 - **Network API** (`/api/v1/network/*`):
   - si attiva solo in modalita `network-home-base`
-  - resta read-only nella first thin slice
+  - resta read-only-first, con primo write limitato a `PUT /patients/{id}` su profilo/status paziente
+  - esclude delete remoto, child CRUD, sync, cache offline e campi AI/documentali
   - richiede pairing esplicito del device + sessione operatore valida
 
 > Obiettivo: i client native non devono dipendere da scraping HTML o dettagli interni React/Next.
@@ -163,7 +165,7 @@ flowchart TB
   - versionato
   - documentato
   - retrocompatibile all'interno della stessa major
-- `local-only` come default e `network-home-base` come opt-in paired/read-only-first.
+- `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente limitato e versionato.
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - `Clinical Workbench / Graphite` resta l'unica shell web ufficiale su `main`;
   nuove sperimentazioni non diventano selector runtime persistiti senza

@@ -13,7 +13,8 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 
 > [!IMPORTANT]
 > Su `main` esistono gia due slice post-`v0.5.0` che cambiano il quadro operativo:
-> `network home-base` read-only su `/api/v1/network/*` e il primo artifact
+> `network home-base` paired su `/api/v1/network/*` con read pazienti e primo
+> `PUT` profilo/status paziente, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
 
 ---
@@ -297,7 +298,7 @@ Endpoint principali:
 Tipi condivisi:
 - `lib/api/v1/types.ts`
 
-### API v1/network per `home-base` read-only
+### API v1/network per `home-base` paired
 
 La first thin slice `network home-base` si attiva solo in modalita
 `network-home-base` dal pannello Settings.
@@ -307,12 +308,14 @@ Surface attuale:
 - summary PHI-safe di nodo, sessione, capability, identita e AI runtime
 - pairing bootstrap/confirm
 - primo data plane remoto read-only su pazienti (`/api/v1/network/patients*`)
+- primo write remoto limitato a `PUT /api/v1/network/patients/{id}` per profilo/status paziente
 
 Boundary attuale:
 
 - `POST /api/v1/network/pairing-intents` e bootstrap PHI-safe
-- il read path remoto richiede `paired client` + sessione operatore valida
-- write remoto, sync record-level e fallback automatico restano fuori scope
+- read e write remoto richiedono `paired client` + sessione operatore valida
+- il write richiede capability `network.replica.write-patient-profile` e `version`
+- delete remoto, child CRUD, sync record-level e fallback automatico restano fuori scope
 
 ### Backup e restore artifact v1
 
@@ -544,8 +547,9 @@ sequenceDiagram
 
 ## Limitazioni attuali
 
-- `home-base` e ancora read-only-first: niente write remoto, sync record-level o
-  fallback automatico promotable.
+- `home-base` e ancora read-only-first: esiste solo il primo `PUT` profilo/status
+  paziente; child CRUD, delete remoto, sync record-level e fallback automatico
+  promotable restano fuori.
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
@@ -563,3 +567,4 @@ sequenceDiagram
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
+   e con il write paziente limitato/versionato

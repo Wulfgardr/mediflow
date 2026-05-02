@@ -87,6 +87,7 @@
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:network:home-base-readonly": "bash scripts/network-home-base-readonly-smoke.sh",
+    "test:network:home-base-write": "bash scripts/network-home-base-write-smoke.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",

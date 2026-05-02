@@ -5,20 +5,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-DATA_DIR="${MEDIFLOW_NETWORK_SMOKE_DATA_DIR:-$ROOT_DIR/tmp-network-home-base-readonly/$(date +%Y%m%d-%H%M%S)}"
+DATA_DIR="${MEDIFLOW_NETWORK_WRITE_DATA_DIR:-$ROOT_DIR/tmp-network-home-base-write/$(date +%Y%m%d-%H%M%S)}"
 LOG_DIR="$DATA_DIR/logs"
 DEV_LOG="$LOG_DIR/next-dev.log"
-BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:3200}"
-REPORT_PATH="$DATA_DIR/reports/network-home-base-readonly-report.json"
-HOST="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3200'); console.log(u.hostname)")"
-PORT="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3200'); console.log(u.port || (u.protocol === 'https:' ? '443' : '80'))")"
+BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:3400}"
+REPORT_PATH="$DATA_DIR/reports/network-home-base-write-report.json"
+HOST="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3400'); console.log(u.hostname)")"
+PORT="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3400'); console.log(u.port || (u.protocol === 'https:' ? '443' : '80'))")"
 WORKSPACE_DIR="$DATA_DIR/next-workspace"
 
 mkdir -p "$DATA_DIR" "$LOG_DIR"
 
 export MEDIFLOW_DATA_DIR="$DATA_DIR"
 export E2E_BASE_URL="$BASE_URL"
-export MEDIFLOW_LOCAL_API_TOKEN="${MEDIFLOW_LOCAL_API_TOKEN:-mediflow-network-smoke-local-token}"
+export MEDIFLOW_LOCAL_API_TOKEN="${MEDIFLOW_LOCAL_API_TOKEN:-mediflow-network-write-smoke-local-token}"
 export E2E_PIN="${E2E_PIN:-1234}"
 export E2E_USERNAME="${E2E_USERNAME:-admin}"
 
@@ -43,7 +43,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  distDir: ".next-network-smoke",
+  distDir: ".next-network-write-smoke",
   turbopack: {},
   serverExternalPackages: ['pdfjs-dist', 'pm2'],
   webpack: (config) => {
@@ -75,7 +75,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "Starting Next.js dev server for network home-base smoke..."
+echo "Starting Next.js dev server for network home-base write smoke..."
 npx next dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
@@ -94,9 +94,9 @@ if ! curl -fsS -H "Authorization: Bearer $MEDIFLOW_LOCAL_API_TOKEN" "$BASE_URL/a
   exit 1
 fi
 
-echo "Running network home-base read-only smoke..."
-node --test --test-concurrency=1 scripts/network-home-base-readonly.test.mjs
+echo "Running network home-base write smoke..."
+node --test --test-concurrency=1 scripts/network-home-base-write.test.mjs
 
-echo "Network home-base read-only smoke completed."
+echo "Network home-base write smoke completed."
 echo "Data dir: $DATA_DIR"
 echo "Report: $REPORT_PATH"

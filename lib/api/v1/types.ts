@@ -278,6 +278,8 @@ export type NetworkCapabilityStatus = 'available' | 'disabled' | 'planned' | 'un
 export type NetworkCapabilityKey =
     | 'network.pairing.bootstrap'
     | 'network.replica.readonly-patients'
+    /* @Codex */
+    | 'network.replica.write-patient-profile'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

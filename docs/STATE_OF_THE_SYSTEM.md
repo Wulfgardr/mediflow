@@ -34,8 +34,9 @@ La fotografia corrente e questa:
   telemetry default-on.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
-- **Home-base**: modalita opt-in in cui il Mac espone una first slice
-  `/api/v1/network/*` read-only verso client paired su rete fidata.
+- **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
+  verso client paired su rete fidata: lettura pazienti e primo write
+  profilo/status paziente con `version`.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali.
@@ -169,7 +170,7 @@ Documenti/ADR principali:
 | Web app locale | Primaria | Lavoro clinico quotidiano sul Mac | HTTP localhost, sessione web |
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
-| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti read-only da device paired | Credenziale device + sessione operatore |
+| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e primo `PUT` profilo/status da device paired | Credenziale device + sessione operatore |
 | macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Rebuild controllato |
 | iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
@@ -212,7 +213,7 @@ Documenti/ADR principali:
    - nuova anagrafica da documento;
    - troubleshooting documentale.
 
-### 4.4 Home-base read-only
+### 4.4 Home-base paired patient data plane
 
 1. Operatore abilita `network-home-base`.
 2. Device remoto apre un pairing intent PHI-safe.
@@ -222,7 +223,10 @@ Documenti/ADR principali:
    - device paired valido;
    - sessione operatore valida sul nodo;
    - scope clinico risolto dal nodo.
-6. Il data plane resta read-only.
+6. `GET` resta read-only; `PUT /api/v1/network/patients/{id}` e limitato a
+   profilo/status paziente, richiede `network.replica.write-patient-profile`
+   e `version`, e blocca delete remoto, child CRUD, sync e campi
+   AI/documentali.
 
 ---
 
@@ -475,7 +479,7 @@ In piu:
 
 - `/api/v1`: `npm run check:openapi:drift`
 - pazienti/versioning: `npm run test:concurrency:patients`
-- home-base network: `npm run test:network:home-base-readonly`
+- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`
 - document intelligence: `npm run test:document-synthesis`, `npm run
   test:ai-context`, `npm run test:pdf-service`
 - nuova anagrafica da documento: `npm run test:patient-document-import`

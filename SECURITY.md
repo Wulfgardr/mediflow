@@ -72,8 +72,9 @@ MediFlow espone due superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
-- `/api/v1/network/*` (home-base opt-in): paired/read-only-first, protetta da
-  credenziale device + sessione operatore
+- `/api/v1/network/*` (home-base opt-in): paired/read-only-first con primo
+  write profilo/status paziente, protetta da credenziale device + sessione
+  operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -91,9 +92,12 @@ Quando il nodo passa a `network-home-base`:
 - il default locale non cambia: la modalita rete resta un opt-in esplicito
 - `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
   paired
-- il primo data plane remoto (`/api/v1/network/patients*`) resta read-only e
-  richiede sempre device paired + sessione operatore
-- write remoto, sync record-level e fallback automatico restano fuori scope
+- il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre
+  device paired + sessione operatore
+- `PUT /api/v1/network/patients/{id}` richiede inoltre capability
+  `network.replica.write-patient-profile` e `version`
+- delete remoto, child CRUD, sync record-level, campi AI/documentali e fallback
+  automatico restano fuori scope
 
 ### Lockout autenticazione PIN
 

@@ -15,7 +15,7 @@ import type {
 } from './api/v1/types';
 
 /* @Codex */
-export const NETWORK_PROTOCOL_VERSION = '1.6.0';
+export const NETWORK_PROTOCOL_VERSION = '1.7.0';
 /* @Codex */
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
 /* @Codex */
@@ -248,6 +248,12 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Read-only remote patient access from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-patient-profile',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired patient profile/status update boundary with optimistic concurrency; excludes AI, document, child clinical CRUD, and remote delete.'
             ),
             capability(
                 'network.replica.sync',

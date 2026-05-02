@@ -1,16 +1,17 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.6.0
-  summary: Stable patient contract plus first executable home-base network slice with explicit pairing review, paired-client auth boundary, read-only remote patient access, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.7.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, scoped remote patient read/profile-write access, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
     mutations on `PUT /api/v1/patients/{id}` and `DELETE /api/v1/patients/{id}`.
     It also introduces the first documented `/api/v1/network/*` contract slice
     for home-base discovery, session gating, capability discovery, explicit
-    pairing bootstrap/review on trusted local networks, and the first read-only
-    remote patient data plane behind a dedicated paired-client auth boundary.
+    pairing bootstrap/review on trusted local networks, the first read-only
+    remote patient data plane, and the first paired patient profile/status write
+    boundary behind a dedicated paired-client auth boundary.
     Apple-native discovery may advertise the same PHI-safe node summary over
     Bonjour `_mediflow-homebase._tcp`, while `/api/v1/network/node` remains the
     reviewable HTTP summary contract for node identity and transport metadata.
@@ -19,6 +20,7 @@ info:
     identity summary distinguishes device pairing from operator login and
     declares the effective ambulatory scope. A dedicated AI runtime summary now
     separates `AI plane` and `data plane`, while real replication, sync, remote
+    child clinical remote writes, remote delete, real replication, sync, remote
     inference routing, and advanced identity scoping remain follow-up
     workstreams.
 servers:
@@ -478,6 +480,64 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatient
+      summary: Update patient profile/status through the paired home-base data plane
+      description: |
+        Updates a patient profile/status subset from a paired client using the
+        same optimistic concurrency shape as the local patient mutation
+        contract. The route requires a paired client with
+        `network.replica.write-patient-profile`, an active operator session,
+        and the effective ambulatory scope resolved by the home-base node.
+        AI/document-derived fields, child clinical CRUD, remote delete, and
+        sync queues remain outside this first write boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMutationRequest'
+            examples:
+              updateNetworkPhone:
+                value:
+                  version: 7
+                  phone: "+39 333 1234567"
+              archiveNetworkPatient:
+                value:
+                  version: 7
+                  isArchived: true
+      responses:
+        '200':
+          description: Patient updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
@@ -499,7 +559,7 @@ components:
       type: apiKey
       in: cookie
       name: mediflow_session
-      description: Operator session cookie required for the remote read-only network data plane.
+      description: Operator session cookie required for the remote network data plane.
   responses:
     BadRequest:
       description: Request payload is invalid or missing required mutation metadata.
@@ -1078,6 +1138,7 @@ components:
           enum:
             - network.pairing.bootstrap
             - network.replica.readonly-patients
+            - network.replica.write-patient-profile
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync

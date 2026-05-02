@@ -2,7 +2,7 @@
 
 Stato documento: `SECONDARY`  
 Fonte canonica del contratto: [docs/openapi/mediflow-v1.yaml](./mediflow-v1.yaml)  
-Decisione di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md)
+Decisioni di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](../adr/0052-network-patient-profile-write-boundary.md)
 
 ## A cosa serve
 
@@ -134,6 +134,7 @@ La baseline pubblicata oggi copre:
 - `POST /api/v1/network/pairing-intents/{intentId}/confirm`
 - `GET /api/v1/network/patients`
 - `GET /api/v1/network/patients/{id}`
+- `PUT /api/v1/network/patients/{id}`
 
 L'estensione agli altri endpoint `v1` va fatta per moduli stabili, senza
 gonfiare la spec in un unico passaggio.
@@ -154,9 +155,14 @@ Nota operativa per `WUL-150`:
   - paired client id
   - paired client token
   - sessione operatore `mediflow_session`
+- `PUT /api/v1/network/patients/{id}` e la prima write slice paired:
+  richiede capability `network.replica.write-patient-profile`, `version`,
+  sessione operatore e scope ambulatoriale del nodo; blocca campi
+  AI/document-derived e non abilita delete remoto, child CRUD, sync o coda offline
 - `network/ai-runtime` esplicita che `AI plane` e `data plane` restano separati
   e dichiara solo `AI locale` vs `AI centralizzata disponibile/non disponibile`
   piu fallback e rollout gate, senza introdurre ancora remote execution reale
-- non introduce ancora write remoto, sync record-level, cache offline o identity model completo
-  o routing remoto operativo del runtime AI centralizzato
+- non introduce ancora child-resource write remoto, sync record-level, cache
+  offline, identity model completo o routing remoto operativo del runtime AI
+  centralizzato
 - puo ancora esporre stati `disabled` o `planned` per capability che restano follow-up

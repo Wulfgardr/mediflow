@@ -38,7 +38,9 @@ Senza questa decisione, il rischio e aprire tre derive pericolose:
 - [SECURITY.md](../../SECURITY.md) separa chiaramente:
   - `/api/v1/*` locale con token tecnico
   - `/api/v1/network/*` paired/read-only-first
-  - write remoto, sync record-level e fallback automatico ancora fuori scope
+  - primo write paziente limitato disciplinato da
+    [ADR 0052](./0052-network-patient-profile-write-boundary.md)
+  - child CRUD remoto, delete, sync record-level e fallback automatico ancora fuori scope
 - [docs/NATIVE.md](../NATIVE.md) dichiara congelata la shell macOS storica e
   la colloca in rebuild controllato.
 - [ADR 0005](./0005-web-native-functional-parity.md) impone la parity tramite
@@ -156,9 +158,10 @@ Negativo:
    distinti per macOS, iPhone e iPad senza ancora estendere il vecchio shell.
 3. `WUL-189`: harden del trasporto `home-base` su LAN fidata
    (discovery/pairing/HTTPS) senza riusare il `local-api-token`.
-4. `WUL-190`: estendere `/api/v1/network/*` con i primi write path paired
-   reviewable, mantenendo la stessa semantica di conflitto e audit delle route
-   core.
+4. Estendere `/api/v1/network/*` con i primi write path paired
+   reviewable. La prima slice e `PUT /api/v1/network/patients/{id}` secondo
+   [ADR 0052](./0052-network-patient-profile-write-boundary.md), mantenendo la
+   stessa semantica di conflitto e audit delle route core.
 5. `WUL-192`: rendere la app macOS packaged il bootstrapper nativo del runtime
    locale e dei servizi necessari.
 6. `WUL-193` e `WUL-194`: attivare i shell iPhone/iPad con cache locale
