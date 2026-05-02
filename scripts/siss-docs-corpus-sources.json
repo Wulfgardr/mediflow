@@ -62,15 +62,37 @@
     "notes": "Raccoglie manuali e specifiche di integrazione per gestione assistiti e anagrafe regionale."
   },
   {
+    "id": "siss-fse-documento-clinico-elettronico",
+    "title": "SISS - Gestione del Documento Clinico Elettronico presso Enti Erogatori e MMG/PLS",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323489&tipologia=46193753",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "documento-clinico", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-REF#01, versione 10.11, data 01/12/2025; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-fse-consenso-consultazione",
+    "title": "SISS - Consenso alla consultazione FSE",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=6",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "consenso", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-ACCO#03, versione 2.2, data 23/09/2025; governa consenso/accesso semplificato FSE."
+  },
+  {
     "id": "siss-seb-fse-gestione-eventi",
     "title": "SISS - SEB FSE Gestione Eventi",
     "area": "fse-regionale",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/pubblicazioniENormativa.jsp",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323237&tipologia=46193594",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
     "tags": ["siss", "fse", "soap", "manual-import"],
-    "notes": "Interfacce SOAP FSE regionale; acquisizione da allineare alle pubblicazioni attive del portale."
+    "notes": "Catalogo pubblico SISS: DC-SEBC_FSE-SIAA#02, versione 08, data 10/02/2025; interfacce SOAP per servizi esposti dal SEB FSE."
   },
   {
     "id": "siss-certificati-malattia",

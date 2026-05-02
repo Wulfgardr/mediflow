@@ -14,6 +14,7 @@ Riferimenti canonici:
 - [docs/README.md](./README.md)
 - [docs/markdown-index.md](./markdown-index.md)
 - [docs/siss-baseline.md](./siss-baseline.md)
+- [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 - [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md)
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 
@@ -118,9 +119,9 @@ titolo, almeno questi segnali utili:
 | --- | --- |
 | `Credenziali API SISS` (`v5.8`, `11/11/2024`) | esiste un percorso documentato per ottenere credenziali `API Manager` per l'accesso ai WS SISS |
 | `Specifiche di integrazione Modulo Prescrittivo Regionale` (`ARIA-PRREG-SIAA@01`, `02/12/2025`) | esiste documentazione per richiamare la web application del modulo prescrittivo regionale |
-| `I documenti clinici sul Fascicolo Sanitario Elettronico` (`DC-SCEN-REF#01`, `03/12/2024`) | esistono regole di integrazione dedicate ai documenti FSE |
-| `Consenso alla consultazione FSE` (`DC-SCEN-ACCO#03`, `23/09/2025`) | la consultazione FSE ha uno scenario dedicato di consenso/accesso e non e un semplice fetch libero |
-| `SEB FSE Gestione Eventi` (`DC-SEBC_FSE-SIAA#02`) | il perimetro FSE include interfacce SOAP specifiche |
+| `Gestione del Documento Clinico Elettronico presso gli Enti Erogatori e i MMG/PLS` (`DC-SCEN-REF#01`, versione `10.11`, `01/12/2025`) | esistono regole di integrazione dedicate a pubblicazione e consultazione di documenti FSE |
+| `Consenso alla consultazione FSE` (`DC-SCEN-ACCO#03`, versione `2.2`, `23/09/2025`) | la consultazione FSE ha uno scenario dedicato di consenso/accesso e non e un semplice fetch libero |
+| `SEB FSE Gestione Eventi` (`DC-SEBC_FSE-SIAA#02`, versione `08`, `10/02/2025`) | il perimetro FSE include interfacce SOAP specifiche |
 | `DC-COOP-FHIR_PIC#02` (`02/10/2024`) | esiste almeno un caso SGDT/PAI dove i servizi cooperativi permettono accesso integrato con le `SSI-MMG` |
 
 Conseguenza per MediFlow:
@@ -202,6 +203,8 @@ Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
    `FSE consultazione e consenso`
    - richiede un boundary piu delicato su consenso, ruoli e audit
    - va affrontato solo dopo aver chiarito meglio il prescrittivo
+   - nota canonica dedicata:
+     [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 3. [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile):
    `SGDT/PAI`
    - resta un filone piu verticale e specifico

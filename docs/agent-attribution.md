@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-05-02 Codex
+- Opened `WUL-182` as the scenario-specific FSE consultation/consent map by adding the canonical boundary note for official-session handoff vs embedded viewer/feed, updating the SISS feasibility/baseline docs, extending the SISS/FSE corpus manifest with dedicated `DC-SCEN-REF#01` and `DC-SCEN-ACCO#03` placeholders, and tightening the SEB FSE source metadata: `docs/siss-fse-consultation-consent.md`, `docs/siss-ssi-a2a-feasibility.md`, `docs/siss-baseline.md`, `docs/siss-fse-docs-corpus.md`, `scripts/siss-docs-corpus-sources.json`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 - Opened `WUL-177` as the read-only MCP layer above the synchronized SISS/FSE corpus by adding a local stdio MCP-compatible server, search/list/fetch/source tools, resource URIs for sources/index/source/body, a fixture-based smoke test, npm wiring, optional Codex MCP config validation, and documentation that keeps the server limited to local snapshots and `manual-import` placeholders: `scripts/siss-fse-corpus-mcp.mjs`, `scripts/siss-fse-corpus-mcp-smoke.mjs`, `scripts/codex-mcp-siss-fse-corpus-validate.sh`, `package.json`, `docs/siss-fse-corpus-mcp.md`, `docs/siss-fse-docs-corpus.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 
 ## 2026-05-01 Codex

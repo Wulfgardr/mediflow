@@ -18,6 +18,7 @@ Riferimenti canonici:
 - [docs/walkthrough.md](./walkthrough.md)
 - [docs/COMPLIANCE.md](./COMPLIANCE.md)
 - [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
+- [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 
 ## Stato attuale
 
@@ -71,7 +72,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | Stato sessione SISS / firma remota | `Disponibile ora` | Il pannello paziente legge in locale la cronologia Atlas della macchina e mostra segnali osservati di `LoginRemoteSign`, selezione ruolo e ultimo modulo SISS raggiunto, inclusa `Protesica-RL` quando osservata. |
 | Prescrittivo nativo dentro MediFlow | `Non disponibile` | Richiede un filone dedicato `SSI qualificata + A2A/canale certificato`. |
 | Protesica nativa/certificata dentro MediFlow | `Non disponibile` | Il diario locale non sostituisce l'applicativo regionale e non invia prescrizioni verso SISS. |
-| FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, regole privacy e contratti regionali ulteriori. |
+| FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, consenso, ruolo operatore, audit e scenario approvato; la mappa dedicata e in [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md). |
 | SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato, non come route pronta nel prototipo. |
 | Certificati di malattia contestuali | `Non disponibile` | La documentazione esiste, ma MediFlow non ha ancora un adapter/scenario dedicato. |
 
@@ -145,7 +146,9 @@ La sequenza di lavoro per questo stream è:
 5. `WUL-180`: mappa di fattibilita ufficiale per separare `portal-handoff`,
    `webapp ufficiale`, `A2A`, `SSI qualificata` e capability realmente
    perseguibili
-6. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
+6. note scenario-specific dedicate prima del runtime: Modulo Prescrittivo
+   Regionale e FSE consultazione/consenso
+7. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
    certificato`, se e solo se la documentazione tecnica disponibile e
    l'onboarding regionale lo rendono concretamente perseguibile
 

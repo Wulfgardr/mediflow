@@ -64,6 +64,17 @@ Valori operativi:
 - `captureStrategy = manual-placeholder`: registra solo metadati/placeholder
 - `refreshHours = N`: cadenza suggerita di refresh per la sorgente
 
+Per FSE regionale il manifest deve mantenere separati almeno tre placeholder
+scenario-specific:
+
+- `DC-SCEN-REF#01`: gestione del Documento Clinico Elettronico presso Enti
+  Erogatori e `MMG/PLS`
+- `DC-SCEN-ACCO#03`: consenso alla consultazione FSE
+- `DC-SEBC_FSE-SIAA#02`: SEB FSE Gestione Eventi
+
+La mappa decisionale di prodotto per questi documenti e in
+[docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md).
+
 ## Comandi
 
 Validazione del manifest:
