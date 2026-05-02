@@ -1,5 +1,6 @@
 // Codex: created 2026-02-01
 import SwiftUI
+import UniformTypeIdentifiers
 
 /* @Codex */
 struct SettingsView: View {
@@ -26,6 +27,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     case app
     case ai
     case tools
+    case catalogs
     case diagnostics
 
     var id: String { rawValue }
@@ -35,6 +37,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .app: return "App"
         case .ai: return "AI Stack"
         case .tools: return "Strumenti"
+        case .catalogs: return "Cataloghi"
         case .diagnostics: return "Diagnostica"
         }
     }
@@ -44,6 +47,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .app: return "gearshape"
         case .ai: return "brain"
         case .tools: return "hammer"
+        case .catalogs: return "tray.full"
         case .diagnostics: return "waveform.path.ecg"
         }
     }
@@ -62,6 +66,8 @@ private struct SettingsDetailView: View {
             AISettingsPane()
         case .tools:
             ToolsSettingsPane()
+        case .catalogs:
+            CatalogsSettingsPane()
         case .diagnostics:
             DiagnosticsSettingsPane(settings: settings)
         }
@@ -214,6 +220,249 @@ private struct ToolsSettingsPane: View {
             }
             .padding(24)
         }
+    }
+}
+
+/* @Codex */
+private struct CatalogsSettingsPane: View {
+    @State private var states: [CatalogKind: CatalogOperationState] = [
+        .drugs: .idle,
+        .exemptions: .idle
+    ]
+    @State private var counts: [CatalogKind: Int] = [:]
+    @State private var isImporting = false
+    @State private var importTarget: CatalogKind?
+    @State private var clearTarget: CatalogKind?
+    @State private var showDrugs = true
+    @State private var showExemptions = true
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                SettingsHeader(title: "Cataloghi", subtitle: "Farmaci ed esenzioni condivisi con il backend locale")
+
+                catalogSection(
+                    kind: .drugs,
+                    subtitle: "Dataset AIFA usato da ricerca e terapie",
+                    isExpanded: $showDrugs
+                )
+
+                catalogSection(
+                    kind: .exemptions,
+                    subtitle: "Codici esenzione usati da anagrafica e mapping paziente",
+                    isExpanded: $showExemptions
+                )
+            }
+            .padding(24)
+        }
+        .task {
+            await refreshAll()
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportSelection(result)
+        }
+        .alert(
+            "Svuotare il catalogo?",
+            isPresented: Binding(
+                get: { clearTarget != nil },
+                set: { if !$0 { clearTarget = nil } }
+            )
+        ) {
+            Button("Svuota", role: .destructive) {
+                guard let target = clearTarget else { return }
+                Task { await clear(target) }
+            }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            if let target = clearTarget {
+                Text("Il catalogo \(target.title.lowercased()) sara svuotato. Le ricerche torneranno disponibili dopo una nuova importazione.")
+            }
+        }
+    }
+
+    private func catalogSection(
+        kind: CatalogKind,
+        subtitle: String,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        SettingsGlassSection(title: kind.title, subtitle: subtitle, isExpanded: isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                statusRow(kind: kind)
+
+                HStack(spacing: 10) {
+                    Button("Aggiorna stato") {
+                        Task { await refresh(kind) }
+                    }
+                    .disabled(state(for: kind).isRunning)
+
+                    Button("Importa JSON...") {
+                        importTarget = kind
+                        isImporting = true
+                    }
+                    .disabled(state(for: kind).isRunning)
+
+                    Button("Svuota catalogo", role: .destructive) {
+                        clearTarget = kind
+                    }
+                    .disabled(state(for: kind).isRunning)
+
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func statusRow(kind: CatalogKind) -> some View {
+        let state = state(for: kind)
+
+        return HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(state.color)
+                .frame(width: 10, height: 10)
+                .padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(statusTitle(for: kind, state: state))
+                    .font(.caption.weight(.semibold))
+                Text(state.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if state.isRunning {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @MainActor
+    private func refreshAll() async {
+        await refresh(.drugs)
+        await refresh(.exemptions)
+    }
+
+    @MainActor
+    private func refresh(_ kind: CatalogKind) async {
+        states[kind] = .running("Verifica in corso...")
+
+        do {
+            let count = try await LocalAPIClient.shared.catalogCount(kind)
+            counts[kind] = count
+            states[kind] = count == 0
+                ? .ok("Nessuna voce caricata.")
+                : .ok("\(count.formatted()) voci disponibili.")
+        } catch {
+            states[kind] = .error(message(for: error, fallback: "Impossibile leggere lo stato catalogo."))
+        }
+    }
+
+    private func handleImportSelection(_ result: Result<[URL], Error>) {
+        guard let target = importTarget else { return }
+        importTarget = nil
+
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            Task { await importCatalog(target, from: url) }
+        case .failure(let error):
+            states[target] = .error(error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func importCatalog(_ kind: CatalogKind, from url: URL) async {
+        states[kind] = .running("Importazione in corso...")
+
+        do {
+            let canAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if canAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let data = try Data(contentsOf: url)
+            let imported = try await LocalAPIClient.shared.importCatalog(kind, jsonData: data)
+            let count = try await LocalAPIClient.shared.catalogCount(kind)
+            counts[kind] = count
+
+            if let imported {
+                states[kind] = .ok("\(imported.formatted()) voci importate. Totale: \(count.formatted()).")
+            } else {
+                states[kind] = .ok("Importazione completata. Totale: \(count.formatted()).")
+            }
+        } catch {
+            states[kind] = .error(message(for: error, fallback: "Importazione interrotta. Verificare lo stato del catalogo."))
+        }
+    }
+
+    @MainActor
+    private func clear(_ kind: CatalogKind) async {
+        clearTarget = nil
+        states[kind] = .running("Svuotamento in corso...")
+
+        do {
+            try await LocalAPIClient.shared.clearCatalog(kind)
+            counts[kind] = 0
+            states[kind] = .ok("Nessuna voce caricata.")
+        } catch {
+            states[kind] = .error(message(for: error, fallback: "Impossibile svuotare il catalogo."))
+        }
+    }
+
+    private func state(for kind: CatalogKind) -> CatalogOperationState {
+        states[kind] ?? .idle
+    }
+
+    private func statusTitle(for kind: CatalogKind, state: CatalogOperationState) -> String {
+        if let count = counts[kind] {
+            return "\(kind.title): \(count.formatted()) voci"
+        }
+        return "\(kind.title): stato non verificato"
+    }
+
+    private func message(for error: Error, fallback: String) -> String {
+        if let localError = error as? LocalAPIError {
+            return localError.localizedDescription
+        }
+        return fallback
+    }
+}
+
+/* @Codex */
+private enum CatalogOperationState: Equatable {
+    case idle
+    case running(String)
+    case ok(String)
+    case error(String)
+
+    var message: String {
+        switch self {
+        case .idle: return "Non verificato."
+        case .running(let message), .ok(let message), .error(let message): return message
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .idle: return .gray
+        case .running: return .orange
+        case .ok: return .green
+        case .error: return .red
+        }
+    }
+
+    var isRunning: Bool {
+        if case .running = self { return true }
+        return false
     }
 }
 

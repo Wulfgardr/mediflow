@@ -70,7 +70,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             notes: checkup.notes ?? null,
             status: normalizeCheckupStatus(checkup.status),
             source: checkup.source ?? null,
-            createdAt: toIsoString(checkup.createdAt)
+            version: checkup.version,
+            createdAt: toIsoString(checkup.createdAt),
+            updatedAt: toIsoString(checkup.updatedAt),
+            deletedAt: toIsoString(checkup.deletedAt),
+            deletionReason: checkup.deletionReason ?? null,
         }));
 
         return NextResponse.json(result);
@@ -112,12 +116,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 subjectRef: normalized.values.id,
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
         );
 
-        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
+        return NextResponse.json({ id: normalized.values.id, version: 1 }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/checkups error:', error);
         return NextResponse.json({ error: 'Failed to create checkup' }, { status: 500 });

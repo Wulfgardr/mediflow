@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
@@ -32,6 +32,7 @@ export async function PUT(
             notes?: string | null;
             status?: string;
             source?: string | null;
+            updatedAt?: Date;
         } = {};
 
         if (body && typeof body === 'object') {
@@ -79,8 +80,17 @@ export async function PUT(
         }
 
         await dbServer.update(checkups)
-            .set(updateData)
+            .set({
+                ...updateData,
+                version: sql`${checkups.version} + 1`,
+                updatedAt: new Date(),
+            })
             .where(eq(checkups.id, id));
+        const current = await dbServer
+            .select({ version: checkups.version })
+            .from(checkups)
+            .where(eq(checkups.id, id))
+            .get();
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -92,6 +102,7 @@ export async function PUT(
                 subjectRef: id,
                 redactedMetadata: {
                     changedFields: listChangedFields(auditBody),
+                    resourceVersion: current?.version ?? undefined,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
@@ -113,7 +124,7 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
+        const existing = await dbServer.select({ id: checkups.id, version: checkups.version }).from(checkups).where(eq(checkups.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -127,6 +138,10 @@ export async function DELETE(
                 eventType: 'checkup.deleted',
                 subjectType: 'checkup',
                 subjectRef: id,
+                redactedMetadata: {
+                    changedFields: ['deleted'],
+                    resourceVersion: existing.version,
+                },
             },
             '[MediFlow] Checkup audit write failed:',
         );

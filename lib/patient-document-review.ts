@@ -10,6 +10,8 @@ import type {
 import type { TherapySuggestionState } from './ai-task-contracts';
 /* @Codex */
 import { splitDocumentIntoLines } from './document-excerpt';
+/* @Codex */
+import { applyPatientImportDecision, buildPatientImportDecision } from './patient-import-decision';
 
 /* @Codex */
 export type PatientDocumentReviewFieldKey =
@@ -209,23 +211,6 @@ function buildSuggestedPatientNotes(data: ExtractedPatientData): string | undefi
         return undefined;
     }
     return text.length <= 220 ? text : `${text.slice(0, 219).trimEnd()}...`;
-}
-
-/* @Codex */
-function buildMedicationNoteBlock(medications: PatientDocumentReviewMedication[]): string | undefined {
-    if (medications.length === 0) return undefined;
-
-    return [
-        'Terapie documentali da riconciliare manualmente:',
-        ...medications.map((medication) => {
-            const details = [
-                medication.drugName,
-                medication.dosage ? `(${medication.dosage})` : undefined,
-                medication.blockedReason ? `- ${medication.blockedReason}` : undefined,
-            ].filter(Boolean);
-            return `- ${details.join(' ')}`;
-        }),
-    ].join('\n');
 }
 
 /* @Codex */
@@ -469,68 +454,5 @@ export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): Pat
 
 /* @Codex */
 export function applyPatientDocumentReview(draft: PatientDocumentReviewDraft): ReviewedPatientImportDefaults {
-    const nextDefaults: ReviewedPatientImportDefaults = {};
-    const notesParts: string[] = [];
-
-    for (const field of draft.fields) {
-        if (!field.included) continue;
-
-        const value = field.value.trim();
-        if (!value) continue;
-
-        if (field.key === 'notes') {
-            notesParts.push(value);
-            continue;
-        }
-
-        if (field.key === 'birthDate') {
-            const date = new Date(value);
-            if (!Number.isNaN(date.getTime())) {
-                nextDefaults.birthDate = date;
-            }
-            continue;
-        }
-
-        nextDefaults[field.key] = value;
-    }
-
-    const selectedDiagnoses = draft.diagnoses
-        .filter((diagnosis) => diagnosis.included && diagnosis.code.trim() && diagnosis.description.trim())
-        .map((diagnosis) => ({
-            code: diagnosis.code.trim(),
-            description: diagnosis.description.trim(),
-            system: diagnosis.system,
-            date: new Date(),
-        }));
-
-    if (selectedDiagnoses.length > 0) {
-        nextDefaults.diagnoses = selectedDiagnoses;
-    }
-
-    const selectedMedications = draft.medications.filter((medication) => medication.included && medication.drugName.trim());
-    const structuredTherapies = selectedMedications
-        .filter(canPersistStructuredTherapy)
-        .map((medication) => ({
-            drugName: medication.drugName.trim(),
-            dosage: medication.dosage!.trim(),
-            activePrinciple: medication.activePrinciple?.trim() || undefined,
-            motivation: medication.motivation?.trim() || undefined,
-            aic: medication.aic?.trim() || undefined,
-            atc: medication.atc?.trim() || undefined,
-        }));
-    const unresolvedTherapies = selectedMedications.filter((medication) => !canPersistStructuredTherapy(medication));
-    if (structuredTherapies.length > 0) {
-        nextDefaults.therapies = structuredTherapies;
-    }
-
-    const medicationsBlock = buildMedicationNoteBlock(unresolvedTherapies);
-    if (medicationsBlock) {
-        notesParts.push(medicationsBlock);
-    }
-
-    if (notesParts.length > 0) {
-        nextDefaults.notes = notesParts.join('\n\n');
-    }
-
-    return nextDefaults;
+    return applyPatientImportDecision(buildPatientImportDecision(draft));
 }

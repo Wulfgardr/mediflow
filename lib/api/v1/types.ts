@@ -57,9 +57,25 @@ export type EntrySummary = {
     id: string;
     patientId: string;
     type: string;
+    /* @Codex */
+    title: string;
     date: string;
     content: string;
+    /* @Codex */
+    setting: string | null;
+    /* @Codex */
+    metadata: string | null;
+    /* @Codex */
+    attachments: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
 };
 
 export type TherapySummary = {
@@ -78,7 +94,15 @@ export type TherapySummary = {
     status: string;
     startDate: string;
     endDate: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 export type CheckupSummary = {
@@ -89,7 +113,15 @@ export type CheckupSummary = {
     notes: string | null;
     status: string;
     source: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -105,7 +137,15 @@ export type ObservationSummary = {
     notes: string | null;
     observedAt: string;
     source: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -278,6 +318,24 @@ export type NetworkCapabilityStatus = 'available' | 'disabled' | 'planned' | 'un
 export type NetworkCapabilityKey =
     | 'network.pairing.bootstrap'
     | 'network.replica.readonly-patients'
+    /* @Codex */
+    | 'network.replica.readonly-clinical-diary'
+    /* @Codex */
+    | 'network.replica.write-patient-profile'
+    /* @Codex */
+    | 'network.replica.write-clinical-diary'
+    /* @Codex */
+    | 'network.replica.readonly-therapies'
+    /* @Codex */
+    | 'network.replica.write-therapies'
+    /* @Codex */
+    | 'network.replica.readonly-checkups'
+    /* @Codex */
+    | 'network.replica.write-checkups'
+    /* @Codex */
+    | 'network.replica.readonly-observations'
+    /* @Codex */
+    | 'network.replica.write-observations'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

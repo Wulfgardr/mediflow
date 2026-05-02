@@ -12,9 +12,14 @@
   "include": [
     "lib/siss-adapter.ts",
     "lib/siss-adapter.test.ts",
+    "lib/siss.ts",
+    "lib/siss.test.ts",
     "lib/siss-patient-context.ts",
     "lib/siss-patient-context.test.ts",
     "lib/siss-prescription.ts",
-    "lib/siss-prescription.test.ts"
+    "lib/siss-prescription.test.ts",
+    "lib/siss-session-shared.ts",
+    "lib/siss-session-observer.ts",
+    "lib/siss-session-observer.test.ts"
   ]
 }

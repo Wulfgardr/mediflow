@@ -2,6 +2,7 @@
 
 > [!NOTE]
 > **Stato documento: SECONDARY (FAQ pubblica e orientamento rapido).**
+> Per una lettura completa parti da [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 > Per i confini canonici valgono sempre [ARCHITECTURE.md](../ARCHITECTURE.md), [SECURITY.md](../SECURITY.md), [docs/ROADMAP.md](./ROADMAP.md) e [docs/walkthrough.md](./walkthrough.md).
 
 ## MediFlow è cloud?
@@ -10,28 +11,37 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## Qual è il salto tra `v0.3` e `v0.5`?
+## Che cosa è cambiato in `v0.6`?
 
-Il salto è soprattutto di maturità:
+`v0.6` rende MediFlow più concreto come sistema locale multi-superficie:
 
 - storage e sicurezza più solidi;
 - contratto locale `/api/v1` più chiaro;
 - backup, audit e guardrail più espliciti;
 - import documentale e AI più reviewable;
-- direzione multi-device più leggibile;
+- Mac `home-base` packaged e primi client Apple paired;
+- document intelligence `artifact-first` con fonti e conflitti più espliciti;
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
-`v0.4` resta una tappa tecnica importante, ma il salto pubblico oggi si legge meglio come `0.3 -> 0.5`.
+`v0.4` resta una tappa tecnica importante e `v0.5` il consolidamento AI/UI;
+`v0.6` è la baseline più chiara per capire lo stato attuale del progetto.
+
+Per il quadro dettagliato, inclusi runtime reale, home-base, document
+intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
+[docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
 ## Posso usarlo su Mac, iPad o iPhone?
 
-Oggi la superficie primaria è la web app sul Mac.
+Oggi la superficie primaria resta la web app sul Mac.
 
-La shell macOS storica esiste ancora come snapshot, ma non è il ramo su cui continuare a stratificare feature. La direzione attiva è:
+Il bundle macOS home-base è la nuova base packaged del nodo locale. La shell
+macOS clinica storica esiste ancora come snapshot/parity, ma non è il ramo su
+cui continuare a stratificare feature. La direzione attiva è:
 
 - **Mac** come nodo `home-base`;
 - **iPadOS / iOS** come client paired sullo stesso boundary locale;
-- primo perimetro **read-only-first**, senza scrittura remota o sync automatico.
+- perimetro **read-only-first** nel disegno generale, con write remoti solo
+  dove sono espliciti, versionati e documentati; non c'e ancora sync automatico.
 
 ## Che cos'è `home-base`?
 
@@ -42,20 +52,21 @@ Oggi questo perimetro è:
 - opt-in;
 - paired;
 - protetto da credenziale device + sessione operatore;
-- ancora `read-only-first`.
+- ancora `read-only-first`, con write limitati a profilo/status paziente,
+  diario clinico, terapie, checkup e osservazioni versionati.
 
-## Cosa sono i Preview Profiles?
+## Ci sono ancora Preview Profiles?
 
-Sono profili locali di preview disponibili in ambiente non-production per provare alcune fette sperimentali senza cambiare branch o checkout.
+No, non su `main`.
 
-Oggi coprono, in modo separato:
+Oggi esiste una sola shell ufficiale, il `Clinical Workbench / Graphite`, e le
+superfici gia mature vivono direttamente li dentro:
 
-- direzione visiva `Liquid`;
-- stack AI;
-- review import;
-- contesto paziente SISS.
+- stack AI locale;
+- Smart Import reviewable;
+- contesto paziente SISS/FSE.
 
-Servono a testare e confrontare. Non sostituiscono il profilo stabile.
+Le sperimentazioni future devono arrivare in modo esplicito e verificabile, non come selector persistiti nelle `Impostazioni`.
 
 ## Cosa vuol dire integrazione SISS in MediFlow, oggi?
 
@@ -78,9 +89,3 @@ Non vuol dire ancora:
 Non nel path di default.
 
 OCR e sintesi usano runtime locali. Se esistono lane separate di benchmark o comparazione, sono esplicitamente distinte dal runtime clinico e non vanno lette come comportamento standard del prodotto.
-
-## Perché nella repo OSS manca qualcosa che esiste nella repo privata?
-
-Per scelta.
-
-La facciata OSS deve esporre il prodotto, l'architettura e i boundary pubblicabili. I materiali interni di orchestrazione, il piano engineering attivo e la documentazione privata restano fuori.

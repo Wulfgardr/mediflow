@@ -44,7 +44,11 @@
     ".next-e2e-wul127/types/**/*.ts",
     ".next-e2e-wul127/dev/types/**/*.ts",
     ".next-real-import/types/**/*.ts",
-    ".next-real-import/dev/types/**/*.ts"
+    ".next-real-import/dev/types/**/*.ts",
+    ".next-manual-browser/types/**/*.ts",
+    ".next-manual-browser/dev/types/**/*.ts",
+    ".next-api-v1-put-negative/types/**/*.ts",
+    ".next-api-v1-put-negative/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

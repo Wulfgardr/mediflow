@@ -1,0 +1,31 @@
+name: MediFlowAppleApp
+options:
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+packages:
+  MediFlowMacPackage:
+    path: ../MediFlowMac
+targets:
+  MediFlowMobileApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/MediFlowMobileApp
+    dependencies:
+      - package: MediFlowMacPackage
+        product: MediFlowAppleShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile
+        PRODUCT_NAME: MediFlow
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MediFlow
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.medical
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        SUPPORTS_MACCATALYST: NO

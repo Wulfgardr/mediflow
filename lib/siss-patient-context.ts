@@ -1,5 +1,5 @@
 /* @Codex */
-import type { SissAction, SissTransport } from './siss-adapter';
+import type { SissTransport } from './siss-adapter';
 /* @Codex */
 import {
     normalizeSissPatientTaxCode,
@@ -44,6 +44,11 @@ function describeSissAction(action: SissPatientContextAction): {
             return {
                 title: 'Modulo Prescrittivo Regionale',
                 message: 'Webapp ufficiale del Modulo Prescrittivo Regionale pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.',
+            };
+        case 'prosthetics.open':
+            return {
+                title: 'Protesica-RL',
+                message: 'Modulo Protesica-RL pronto. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione regionale.',
             };
         case 'fse.lookup':
             return {
@@ -109,7 +114,7 @@ export async function createSissPatientContextHandoff(
         sissAdapterModule = await import('./siss-adapter');
         const result = await sissAdapterModule.executeSissAdapterRequest(
             {
-                action: input.action as SissAction,
+                action: input.action,
                 fiscalCode: fiscalCode!,
             },
             {

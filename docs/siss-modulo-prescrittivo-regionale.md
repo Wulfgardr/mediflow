@@ -169,7 +169,7 @@ La prossima slice runtime, se e quando verra aperta, dovrebbe essere:
 
 Forma:
 
-- MediFlow resta orchestratore locale del contesto paziente
+- MediFlow resta coordinatore locale del contesto paziente
 - l'atto prescrittivo vero avviene nel `Modulo Prescrittivo Regionale`
   ufficiale
 - l'operatore continua a usare credenziale/sessione SISS ufficiale
@@ -210,7 +210,7 @@ Una futura implementazione runtime dovra dimostrare almeno questo:
 3. non assume prefill di dati non esplicitamente supportato dalla
    documentazione/scenario raccolti
 4. preserva il boundary della credenziale operatore e del contesto funzionale
-5. mantiene audit locale PHI-safe del solo handoff/orchestrazione MediFlow
+5. mantiene audit locale PHI-safe del solo handoff/coordinamento MediFlow
 6. non dichiara `prescrittivo nativo MediFlow` se l'atto prescrittivo resta
    dentro la webapp regionale
 

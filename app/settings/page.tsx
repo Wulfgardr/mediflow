@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Building2, Download, Check, Shield, Sparkles } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Download, Check, Shield, Sparkles } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -26,14 +26,8 @@ import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice'
 /* @Codex */
 import NetworkOperatingModePanel from '@/components/settings/network-operating-mode-panel';
 /* @Codex */
-import { usePreviewProfileState } from '@/components/preview-profile-chrome';
-/* @Codex */
-import {
-    getPreviewProfileById,
-    PREVIEW_PROFILE_FLAG_LABELS,
-    type PreviewProfileId,
-} from '@/lib/preview-profiles';
-import { useUIStyle } from '@/components/ui-style-provider';
+import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
+import { useUIAccessibility } from '@/components/ui-accessibility-provider';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -433,24 +427,13 @@ export default function SettingsPage() {
     const [isDockerApp, setIsDockerApp] = useState(false);
     // @Codex
     const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    /* @Codex */
+    const isWorkbench = true;
     const {
-        isEnabled: isPreviewProfilesEnabled,
-        availableProfiles,
-        activeProfile,
-        isApplying: isApplyingPreviewProfile,
-        applyProfile,
-    } = usePreviewProfileState();
-    /* @Codex */
-    const [selectedPreviewProfileId, setSelectedPreviewProfileId] = useState(activeProfile.id);
-    /* @Codex */
-    const selectedPreviewProfile = getPreviewProfileById(selectedPreviewProfileId);
-
-    /* @Codex */
-    useEffect(() => {
-        setSelectedPreviewProfileId(activeProfile.id);
-    }, [activeProfile.id]);
-    const { uiStyleMode, setUIStyleMode } = useUIStyle();
+        reduceMotion,
+        reduceTransparency,
+        setReduceMotion,
+        setReduceTransparency,
+    } = useUIAccessibility();
 
     // Load initial data
     useEffect(() => {
@@ -587,49 +570,41 @@ export default function SettingsPage() {
 
     /* @Codex */
     const railItems = [
-        { href: '#appearance', label: 'Interfaccia', description: 'Stile clinico o liquid', icon: <Sparkles className="h-4 w-4" /> },
-        { href: '#account', label: 'Account', description: 'Profilo e accesso', icon: <User className="h-4 w-4" /> },
-        { href: '#ai', label: 'AI', description: 'Modelli, budget e runtime', icon: <Bot className="h-4 w-4" /> },
-        { href: '#data', label: 'Dati locali', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
-        { href: '#operations', label: 'Operatività', description: 'Diagnostica e strumenti', icon: <Server className="h-4 w-4" /> },
+        { href: '#account', label: 'Account', description: 'Profilo, PIN, accesso', icon: <User className="h-4 w-4" /> },
+        { href: '#ai', label: 'AI locale', description: 'Modelli, budget, runtime', icon: <Bot className="h-4 w-4" /> },
+        { href: '#data', label: 'Cataloghi', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
+        { href: '#operations', label: 'Sistema', description: 'Diagnostica e manutenzione', icon: <Server className="h-4 w-4" /> },
         { href: '#backups', label: 'Backup', description: 'Schedulazione e restore', icon: <Download className="h-4 w-4" /> },
+        { href: '#appearance', label: 'Aspetto', description: 'Trasparenza e movimento', icon: <Sparkles className="h-4 w-4" /> },
     ];
 
     return (
         <div className="space-y-8 pb-10">
-            <div className="glass-panel liquid-hero p-6 md:p-8">
-                <div className="liquid-orb -left-10 top-0 h-32 w-32 bg-sky-300/35" />
-                <div className="liquid-orb right-4 top-6 h-28 w-28 bg-violet-300/28" />
-                <div className="liquid-orb bottom-4 left-1/3 h-24 w-24 bg-emerald-200/20" />
+            <div
+                className={cn(
+                    isWorkbench
+                        ? 'rounded-[28px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.86)] p-6 shadow-[0_18px_36px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-8'
+                        : 'glass-panel liquid-hero p-6 md:p-8',
+                )}
+            >
+                {!isWorkbench ? (
+                    <>
+                        <div className="liquid-orb -left-10 top-0 h-32 w-32 bg-sky-300/35" />
+                        <div className="liquid-orb right-4 top-6 h-28 w-28 bg-violet-300/28" />
+                        <div className="liquid-orb bottom-4 left-1/3 h-24 w-24 bg-emerald-200/20" />
+                    </>
+                ) : null}
 
                 <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-4">
-                        <div className="section-kicker">Centro di controllo</div>
+                    <div className="space-y-3">
+                        <div className="section-kicker">Impostazioni locali</div>
                         <div>
                             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
                                 Impostazioni
                             </h1>
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                Un’unica shell per configurazione locale, AI, cataloghi, backup e manutenzione. La logica resta invariata; qui stiamo rendendo piu chiari ritmo, priorita e disposizione delle isole.
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                                Configurazione di questo workstation: account, AI, cataloghi, backup e manutenzione. Usa la navigazione per saltare alla famiglia che ti serve.
                             </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2.5">
-                            <span className="apple-chip">
-                                <Shield className="h-3.5 w-3.5 text-amber-500" />
-                                Sicurezza locale
-                            </span>
-                            <span className="apple-chip">
-                                <Bot className="h-3.5 w-3.5 text-indigo-500" />
-                                Runtime AI
-                            </span>
-                            <span className="apple-chip">
-                                <Database className="h-3.5 w-3.5 text-emerald-500" />
-                                Cataloghi offline
-                            </span>
-                            <span className="apple-chip">
-                                <Download className="h-3.5 w-3.5 text-sky-500" />
-                                Backup & restore
-                            </span>
                         </div>
                     </div>
 
@@ -645,13 +620,19 @@ export default function SettingsPage() {
             </div>
 
             <div className="xl:hidden">
-                <div className="glass-panel p-3">
+                <div
+                    className={cn(
+                        isWorkbench
+                            ? 'rounded-[24px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.84)] p-3 shadow-[0_16px_32px_rgba(35,27,22,0.05)] backdrop-blur-xl'
+                            : 'glass-panel p-3',
+                    )}
+                >
                     <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
-                            <p className="section-kicker">Famiglie</p>
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Salti rapidi</h2>
+                            <p className="section-kicker">Navigazione</p>
+                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Vai a sezione</h2>
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Scorri orizzontalmente</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Scorri &rarr;</p>
                     </div>
                     <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                         {railItems.map((item) => (
@@ -663,10 +644,16 @@ export default function SettingsPage() {
 
             <div className="grid gap-6 xl:grid-cols-[230px_minmax(0,1fr)]">
                 <aside className="hidden xl:block">
-                    <div className="glass-panel sticky top-6 p-4">
+                    <div
+                        className={cn(
+                            isWorkbench
+                                ? 'sticky top-6 rounded-[24px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.84)] p-4 shadow-[0_16px_32px_rgba(35,27,22,0.05)] backdrop-blur-xl'
+                                : 'glass-panel sticky top-6 p-4',
+                        )}
+                    >
                         <div className="mb-4">
                             <p className="section-kicker">Navigazione</p>
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Famiglie impostazioni</h2>
+                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Sezioni</h2>
                         </div>
                         <div className="space-y-3">
                             {railItems.map((item) => (
@@ -679,87 +666,70 @@ export default function SettingsPage() {
                 <div className="space-y-10">
                     <section id="appearance" data-testid="settings-appearance-section" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
-                            kicker="Interfaccia"
-                            title="Stile visivo"
-                            description="Scegli se usare una UI piu clinica e istituzionale oppure una variante piu massimalista, piu liquid e piu playful. La preferenza resta locale e persistente."
+                            kicker="Aspetto"
+                            title="Lettura e accessibilità"
+                            description="Controlli di lettura per chi preferisce meno trasparenza o meno movimento. La shell Clinical Workbench è l'unico runtime ufficiale."
                         />
 
-                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                            <div className={SETTINGS_CARD_CLASS}>
-                                <div className="mb-6 flex items-center gap-3">
-                                    <div className="rounded-lg bg-sky-100 p-2 text-sky-600">
-                                        <Sparkles className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Modalita interfaccia</h2>
-                                        <p className="text-xs text-gray-500">Due grammatiche diverse, stesso prodotto.</p>
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setUIStyleMode('clinical')}
-                                        data-testid="ui-style-clinical"
-                                        className={cn(
-                                            "rounded-[24px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
-                                            uiStyleMode === 'clinical'
-                                                ? "border-sky-300/80 bg-white shadow-[0_14px_28px_rgba(10,132,255,0.12)] dark:border-sky-500/20 dark:bg-white/10"
-                                                : "border-white/70 bg-white/76 hover:border-slate-200 hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                        )}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Clinico</p>
-                                                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Piu paper-first, piu denso, piu istituzionale. Ottimizzato per scansione rapida e calma operativa.</p>
-                                            </div>
-                                            {uiStyleMode === 'clinical' ? <CheckCircle className="mt-0.5 h-4 w-4 text-sky-600 dark:text-sky-300" /> : null}
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setUIStyleMode('liquid')}
-                                        data-testid="ui-style-liquid"
-                                        className={cn(
-                                            "rounded-[28px] border px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform]",
-                                            uiStyleMode === 'liquid'
-                                                ? "border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.86),rgba(255,255,255,0.62))] shadow-[0_24px_48px_rgba(10,132,255,0.14)] backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
-                                                : "border-white/70 bg-white/76 hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                        )}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="bg-[linear-gradient(135deg,#0A84FF,#5AC8FA_55%,#5E5CE6)] bg-clip-text text-sm font-semibold text-transparent">Liquid</p>
-                                                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Piu massimalista, piu materica, piu vicina a Play, Sleeve e Craft. Tiene il delight nel chrome, non nel dato clinico.</p>
-                                            </div>
-                                            {uiStyleMode === 'liquid' ? <CheckCircle className="mt-0.5 h-4 w-4 text-sky-500 dark:text-sky-300" /> : null}
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="apple-subsection" data-testid="ui-style-current-state">
-                                <p className="section-kicker">Stato corrente</p>
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+                            <div className="apple-subsection" data-testid="ui-accessibility-controls">
+                                <p className="section-kicker">Controlli di lettura</p>
                                 <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                                    {uiStyleMode === 'liquid' ? 'Liquid attivo' : 'Clinico attivo'}
+                                    Trasparenza e movimento
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                    {uiStyleMode === 'liquid'
-                                        ? 'Shell, hero e superfici principali spingono di piu su glass, profondita, curvature morbide e presence.'
-                                        : "L'interfaccia resta piu sobria, piu densa e piu focalizzata sul dato operativo."}
+                                    Disattiva vetro e animazioni quando serve più contrasto o meno stimolo visivo.
                                 </p>
-                                <div className="mt-5 flex flex-wrap gap-2.5">
-                                    <span className="apple-chip">
-                                        <Sparkles className="h-3.5 w-3.5 text-sky-500" />
-                                        {uiStyleMode === 'liquid' ? 'Massimalismo controllato' : 'Sobrieta operativa'}
-                                    </span>
-                                    <span className="apple-chip">
-                                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
-                                        Preferenza locale persistente
-                                    </span>
+
+                                <div className="mt-5 space-y-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setReduceTransparency(!reduceTransparency)}
+                                        className={cn(
+                                            "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
+                                            reduceTransparency
+                                                ? "border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)]"
+                                                : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
+                                        )}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Riduci trasparenza</p>
+                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Rende piu opachi vetro, blur e pannelli contestuali.</p>
+                                        </div>
+                                        <span className="apple-chip">{reduceTransparency ? 'Attivo' : 'Disattivo'}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setReduceMotion(!reduceMotion)}
+                                        className={cn(
+                                            "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
+                                            reduceMotion
+                                                ? "border-[color:rgba(94,53,95,0.22)] bg-[color:rgba(94,53,95,0.08)]"
+                                                : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
+                                        )}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Riduci movimento</p>
+                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Riduce transizioni, effetti atmosferici e micro-animazioni del flow field.</p>
+                                        </div>
+                                        <span className="apple-chip">{reduceMotion ? 'Attivo' : 'Disattivo'}</span>
+                                    </button>
                                 </div>
                             </div>
+
+                            <aside
+                                data-testid="ui-style-runtime-notice"
+                                className="apple-subsection self-start text-sm leading-6 text-slate-500 dark:text-slate-400"
+                            >
+                                <p className="section-kicker">Runtime</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                                    Clinical Workbench
+                                </p>
+                                <p className="mt-2 text-xs leading-5">
+                                    Inbox pazienti a sinistra, reader del caso a destra. Nessuna modalità alternativa da scegliere.
+                                </p>
+                            </aside>
                         </div>
                     </section>
 
@@ -767,20 +737,16 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="Account"
                             title="Profilo e accesso"
-                            description="Dati personali e controllo del PIN raccolti in un’unica area, cosi le impostazioni identitarie non competono con la diagnostica o con gli strumenti di sistema."
+                            description="Nome medico, ambulatorio e rotazione del PIN."
                         />
 
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* --- Profile Section --- */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
-                            <User className="w-6 h-6" /> {/* reusing Bot icon or maybe User, let's use check-circle or similar if available, or just reuse consistent styling */}
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Profilo Medico</h2>
-                            <p className="text-xs text-gray-500">Personalizza le informazioni visualizzate.</p>
-                        </div>
+                    <div className="mb-5">
+                        <p className="section-kicker">Profilo</p>
+                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Nome medico e ambulatorio</h2>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Etichette mostrate nell&apos;intestazione della shell e nei documenti generati.</p>
                     </div>
 
                     <div className="space-y-4">
@@ -831,14 +797,10 @@ export default function SettingsPage() {
 
                 {/* --- Security Section --- */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                            <Shield className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Sicurezza</h2>
-                            <p className="text-xs text-gray-500">Ruota il PIN senza rigenerare i dati clinici.</p>
-                        </div>
+                    <div className="mb-5">
+                        <p className="section-kicker">Sicurezza</p>
+                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Cambio PIN</h2>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
                     </div>
 
                     <div className="space-y-4">
@@ -928,21 +890,17 @@ export default function SettingsPage() {
 
                     <section id="ai" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
-                            kicker="AI"
-                            title="Modelli, ruoli e runtime locale"
-                            description="Qui la pagina smette di essere un mosaico di box uguali e diventa una sequenza: profilo hardware, ruoli clinici, budget insight, runtime e diagnostica."
+                            kicker="AI locale"
+                            title="Modelli, ruoli e runtime"
+                            description="Profilo hardware, modelli assegnati ai ruoli clinici, budget insight e connessione al provider locale."
                         />
 
                 {/* --- AI Config Section --- */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
-                            <Bot className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Configurazione AI</h2>
-                            <p className="text-xs text-gray-500">Gestisci i modelli del &ldquo;Team Clinico Virtuale&rdquo;.</p>
-                        </div>
+                    <div className="mb-6">
+                        <p className="section-kicker">Configurazione AI</p>
+                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Team clinico virtuale</h2>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Profilo hardware, modelli per ogni ruolo, budget insight e provider locale.</p>
                     </div>
 
                         <div className="space-y-6">
@@ -1456,32 +1414,28 @@ export default function SettingsPage() {
 
                     <section id="data" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
-                            kicker="Dati locali"
-                            title="Cataloghi offline"
-                            description="Farmaci ed esenzioni vivono nello stesso dominio visivo, invece di apparire come strumenti scollegati. Qui il focus e sulla manutenzione del dato locale."
+                            kicker="Cataloghi"
+                            title="Farmaci ed esenzioni"
+                            description="Database locali usati dal prescrittore. Importa, aggiorna e svuota i cataloghi offline."
                         />
 
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {/* --- AIFA Database Section --- */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                            <Database className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Database Farmaci (AIFA)</h2>
-                            <div className="flex flex-col">
-                                <p className="text-xs text-gray-500">Gestisci l&apos;elenco farmaci offline</p>
-                                <a
-                                    href="https://www.aifa.gov.it/web/guest/liste-dei-farmaci"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] text-blue-500 hover:underline mt-0.5"
-                                >
-                                    Fonte Dati: AIFA Open Data (Liste di Trasparenza)
-                                </a>
-                            </div>
-                        </div>
+                    <div className="mb-5">
+                        <p className="section-kicker">Farmaci</p>
+                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Database AIFA offline</h2>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Elenco farmaci rimborsabili usato dal prescrittore.{' '}
+                            <a
+                                href="https://www.aifa.gov.it/web/guest/liste-dei-farmaci"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline dark:text-blue-400"
+                            >
+                                Fonte: AIFA Open Data
+                            </a>
+                        </p>
                     </div>
 
                     <div className="space-y-6">
@@ -1549,132 +1503,37 @@ export default function SettingsPage() {
 
                     <section id="operations" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
-                            kicker="Operatività"
-                            title="Sistema e manutenzione"
-                            description="Diagnostica, architettura servizi e strumenti secondari stanno insieme, cosi non invadono le aree di configurazione clinica e account."
+                            kicker="Sistema"
+                            title="Diagnostica e manutenzione"
+                            description="Architettura servizi, strumenti di sviluppo, gestione ambulatori e azioni irreversibili."
                         />
 
                 {/* --- System & Maintenance Section --- */}
                 <div className="space-y-6">
-                    {isPreviewProfilesEnabled ? (
-                        <div className={SETTINGS_CARD_CLASS}>
-                            <div className="mb-6 flex items-center gap-3">
-                                <div className="rounded-lg bg-sky-100 p-2 text-sky-600">
-                                    <Server className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Dev Preview Profiles</h2>
-                                    <p className="text-xs text-gray-500">
-                                        Seleziona stack sperimentali locali senza cambiare checkout dall&apos;app.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className={SETTINGS_LABEL_CLASS}>Preview Profile</label>
-                                        <select
-                                            value={selectedPreviewProfileId}
-                                            onChange={(event) => setSelectedPreviewProfileId(event.target.value as PreviewProfileId)}
-                                            className={SETTINGS_INPUT_CLASS}
-                                        >
-                                            {availableProfiles.map((profileOption) => (
-                                                <option key={profileOption.id} value={profileOption.id}>
-                                                    {profileOption.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="rounded-[22px] border border-slate-200/70 bg-white/76 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
-                                        <p className="section-kicker">Profilo selezionato</p>
-                                        <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
-                                            {selectedPreviewProfile.label}
-                                        </h3>
-                                        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                            {selectedPreviewProfile.description}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <span className="apple-chip">Origine {selectedPreviewProfile.sourceBranch}</span>
-                                            {selectedPreviewProfile.featureFlags.length > 0 ? (
-                                                selectedPreviewProfile.featureFlags.map((flag) => (
-                                                    <span key={flag} className="apple-chip">
-                                                        {PREVIEW_PROFILE_FLAG_LABELS[flag]}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="apple-chip">Nessun toggle sperimentale</span>
-                                            )}
-                                        </div>
-                                        {selectedPreviewProfile.notes ? (
-                                            <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                                {selectedPreviewProfile.notes}
-                                            </p>
-                                        ) : null}
-                                    </div>
-
-                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => applyProfile(selectedPreviewProfile.id)}
-                                            disabled={isApplyingPreviewProfile || selectedPreviewProfile.id === activeProfile.id}
-                                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
-                                        >
-                                            <RefreshCw className={cn('h-4 w-4', isApplyingPreviewProfile ? 'animate-spin' : '')} />
-                                            {selectedPreviewProfile.id === activeProfile.id ? 'Profilo attivo' : 'Applica e ricarica'}
-                                        </button>
-                                        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                            Disponibile solo in dev. La slice attuale usa il checkout corrente e lascia `targetUrl` come estensione futura.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="rounded-[24px] border border-sky-200/60 bg-sky-50/70 p-5 shadow-[0_12px_28px_rgba(14,165,233,0.08)] dark:border-sky-500/20 dark:bg-sky-900/10">
-                                    <p className="section-kicker">Profilo attivo</p>
-                                    <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
-                                        {activeProfile.label}
-                                    </h3>
-                                    <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                        {activeProfile.description}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : null}
-
                     <ServiceArchitecturePanel />
                     <DiagnosticHub />
 
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                         {/* Ambulatory Management */}
                         <div className="apple-subsection flex flex-col justify-between">
-                            <div className="flex items-start gap-4 mb-4">
-                                <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
-                                    <Building2 className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">Ambulatori</h3>
-                                    <p className="text-xs text-gray-500 mt-1">Gestisci sedi e cambi contesto.</p>
-                                </div>
+                            <div className="mb-4">
+                                <p className="section-kicker">Ambulatori</p>
+                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Sedi e contesti</h3>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Gestisci più sedi e cambia rapidamente contesto operativo.</p>
                             </div>
                             <div className="flex items-center justify-end">
                                 <a href="/settings/ambulatories" className="inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20">
-                                    Apri Gestione &rarr;
+                                    Apri gestione &rarr;
                                 </a>
                             </div>
                         </div>
 
                         {/* Developer Tools */}
                         <div className="apple-subsection flex flex-col justify-between">
-                            <div className="flex items-start gap-4 mb-4">
-                                <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
-                                    <Server className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">Strumenti di Sviluppo</h3>
-                                    <p className="text-xs text-gray-500 mt-1">Genera dati fittizi per testare l&apos;applicazione.</p>
-                                </div>
+                            <div className="mb-4">
+                                <p className="section-kicker">Sviluppo</p>
+                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati di test</h3>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Genera pazienti e documenti fittizi per collaudare l&apos;applicazione.</p>
                             </div>
                             <div className="flex items-center justify-end">
                                 <DataSeeder />
@@ -1683,14 +1542,10 @@ export default function SettingsPage() {
 
                         {/* @Codex: Native app launcher */}
                         <div className="apple-subsection flex flex-col justify-between">
-                            <div className="flex items-start gap-4 mb-4">
-                                <div className="p-2.5 bg-slate-100 text-slate-600 rounded-xl shrink-0">
-                                    <Cpu className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800 dark:text-gray-100">App nativa</h3>
-                                    <p className="text-xs text-gray-500 mt-1">Apri rapidamente MediFlow su macOS.</p>
-                                </div>
+                            <div className="mb-4">
+                                <p className="section-kicker">Desktop</p>
+                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">App nativa macOS</h3>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Avvia la shell nativa quando disponibile sul sistema.</p>
                             </div>
                             <div className="flex items-center justify-between gap-4">
                                 <button
@@ -1708,39 +1563,27 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* @Codex: local-only update awareness surface for WUL-32 */}
+                        <UpdateAwarenessPanel />
                     </div>
 
                     {/* Danger Zone */}
-                    <div className="rounded-[28px] border border-red-200/60 bg-[linear-gradient(135deg,rgba(254,242,242,0.94),rgba(255,255,255,0.82))] p-6 shadow-[0_16px_32px_rgba(185,28,28,0.08)] dark:border-red-500/20 dark:bg-red-900/10">
-                        <div className="mb-6 flex items-start gap-4">
-                            <div className="rounded-2xl bg-red-100 p-2.5 text-red-600 dark:bg-red-500/15 dark:text-red-200">
-                                <AlertTriangle className="w-6 h-6" />
+                    <div className="rounded-[24px] border border-red-200/60 bg-red-50/60 p-5 md:p-6 dark:border-red-500/20 dark:bg-red-900/10">
+                        <div className="mb-5 flex items-start gap-3">
+                            <div className="rounded-xl bg-red-100 p-2 text-red-600 dark:bg-red-500/15 dark:text-red-200">
+                                <AlertTriangle className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="section-kicker">Zona Pericolo</p>
+                                <p className="section-kicker">Zona pericolo</p>
                                 <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
-                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Separata dal resto delle isole operative per non competere visivamente con diagnostica e strumenti quotidiani.</p>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    Provider AI consigliato: Ollama su <code className="font-mono">{aiConfig.url || "localhost:11434"}</code>. Modificare queste azioni può richiedere una nuova configurazione.
+                                </p>
                             </div>
                         </div>
 
-                        <div className="mb-6 rounded-[22px] border border-yellow-200/70 bg-yellow-50/80 p-4 dark:border-yellow-500/20 dark:bg-yellow-900/10">
-                            <div className="flex gap-3">
-                                <div className="flex-shrink-0">
-                                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                        Provider locale consigliato: Ollama.
-                                    </p>
-                                    <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-200">
-                                        Modificando queste impostazioni potresti interrompere il collegamento con l&apos;AI.
-                                        Assicurati che il server Ollama sia attivo su <code>{aiConfig.url || "localhost:11434"}</code>.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-4 rounded-[22px] border border-red-100 bg-white/78 p-4 shadow-[0_10px_22px_rgba(185,28,28,0.06)] dark:border-red-900/50 dark:bg-red-950/20 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-col gap-4 rounded-[20px] border border-red-100 bg-white/78 p-4 dark:border-red-900/50 dark:bg-red-950/20 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="text-sm font-semibold text-slate-900 dark:text-red-100">Reset Onboarding</p>
                                 <p className="text-xs text-slate-500 dark:text-red-200/70">Cancella profilo utente e chiavi. I pazienti restano invariati.</p>
@@ -1774,7 +1617,7 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="Backup"
                             title="Continuità e ripristino"
-                            description="Schedulazione e restore diventano una famiglia dedicata: importante, ma non concorrente con account, AI o manutenzione quotidiana."
+                            description="Schedulazione automatica e ripristino manuale degli archivi cifrati locali."
                         />
                         <div className="space-y-6">
                             <BackupSchedulerUI />

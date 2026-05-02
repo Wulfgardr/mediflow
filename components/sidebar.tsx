@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, Users, Activity, Settings, PlusCircle, 
-  ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical, 
-  Plus, Building2, Eye, EyeOff 
+import {
+  LayoutDashboard, Users, Activity, Settings, PlusCircle,
+  ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical,
+  Plus, Building2, Eye, EyeOff, BarChart3, Sparkles
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -19,7 +19,6 @@ import SystemStatus from '@/components/system-status';
 import { usePrivacy } from '@/components/privacy-provider';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useSecurity } from '@/components/security-provider';
-import { useUIStyle } from '@/components/ui-style-provider';
 
 // Helper to read cookie
 function useCookie(name: string) {
@@ -126,31 +125,45 @@ function AmbulatoryTree() {
         return (
             <div className="">
                 <div
+                    role="treeitem"
+                    tabIndex={0}
+                    aria-selected={isActive}
+                    aria-expanded={hasChildren ? isExpanded : undefined}
+                    aria-label={node.name}
                     onClick={() => activate(node.id)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            activate(node.id);
+                        }
+                    }}
                     className={cn(
-                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0",
+                        "flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-[13px] leading-snug transition-[border-color,background-color,color] select-none group relative border border-transparent min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgba(15,123,104,0.4)]",
                         isActive
-                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold border-blue-500/20"
+                            ? "bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] font-semibold border-[color:rgba(15,123,104,0.22)]"
                             : "hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400",
                         isTest && !isActive && "text-amber-600/80 dark:text-amber-500/80"
                     )}
                     style={{ paddingLeft: `${level * 12 + 12}px` }}
                 >
-                    {isActive && <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-full" />}
+                    {isActive && <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-[linear-gradient(180deg,var(--mf-primary),var(--mf-accent),var(--mf-plum))]" />}
 
                     <button
                         onClick={(e) => toggle(node.id, e)}
+                        aria-label={hasChildren ? (isExpanded ? 'Comprimi' : 'Espandi') : undefined}
+                        aria-hidden={!hasChildren}
+                        tabIndex={hasChildren ? 0 : -1}
                         className={cn("mt-0.5 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 transition-colors shrink-0", !hasChildren && "invisible")}
                     >
                         {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </button>
 
-                    {isTest ? <FlaskConical className="w-4 h-4 shrink-0 mt-0.5 opacity-70" /> : (isExpanded ? <FolderOpen className="w-4 h-4 text-blue-500/70 shrink-0 mt-0.5" /> : <Folder className="w-4 h-4 text-blue-500/70 shrink-0 mt-0.5" />)}
+                    {isTest ? <FlaskConical className="w-4 h-4 shrink-0 mt-0.5 opacity-70" /> : (isExpanded ? <FolderOpen className="w-4 h-4 shrink-0 mt-0.5 text-[color:rgba(15,123,104,0.72)]" /> : <Folder className="w-4 h-4 shrink-0 mt-0.5 text-[color:rgba(15,123,104,0.72)]" />)}
 
                     <span className="flex-1 min-w-0 clamp-2 pr-1" title={node.name}>{node.name}</span>
                 </div>
                 {isExpanded && hasChildren && (
-                    <div className="relative">
+                    <div role="group" className="relative">
                         <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200/50 dark:bg-gray-800/50" style={{ left: `${level * 12 + 18}px` }} />
                         {node.children.map((child: TreeAmbulatory) => <TreeNode key={child.id} node={child} level={level + 1} />)}
                     </div>
@@ -197,14 +210,15 @@ function AmbulatoryTree() {
                 </p>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                    className="p-1 text-gray-400 transition-colors hover:text-[color:var(--mf-primary)]"
                     title="Nuovo Ambulatorio"
+                    aria-label="Nuovo Ambulatorio"
                 >
                     <Plus className="w-3.5 h-3.5" />
                 </button>
             </div>
 
-            <div className="space-y-0.5 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
+            <div role="tree" aria-label="Ambulatori" className="space-y-0.5 overflow-y-auto flex-1 scrollbar-thin px-1 pb-4">
                 {buildTree(ambulatories).map(root => (
                     <TreeNode key={root.id} node={root} />
                 ))}
@@ -224,42 +238,27 @@ export function Sidebar() {
     const [showNewVisitModal, setShowNewVisitModal] = useState(false);
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
     const { user } = useSecurity();
-    const { uiStyleMode } = useUIStyle();
-    const isLiquid = uiStyleMode === 'liquid';
 
     const profile = {
         doctor: user?.displayName || 'Medico',
     };
 
     const links = [
-        { href: '/', name: 'Pazienti', icon: Users },
-        { name: 'Diario Clinico', href: '/diary', icon: LayoutDashboard },
-        { name: 'Scale & Test', href: '/scales', icon: Activity },
-        { name: 'Impostazioni', href: '/settings', icon: Settings },
+        { href: '/', name: 'Pazienti', icon: Users, matchPrefixes: ['/patients'] as string[] },
+        { href: '/diary', name: 'Diario Clinico', icon: LayoutDashboard },
+        { href: '/scales', name: 'Scale & Test', icon: Activity },
+        { href: '/analytics', name: 'Analytics', icon: BarChart3 },
+        { href: '/assistant', name: 'Assistant', icon: Sparkles },
+        { href: '/settings', name: 'Impostazioni', icon: Settings },
     ];
 
     return (
         <>
             <aside className="w-80 h-screen fixed left-0 top-0 p-4 z-50">
-                <div className={cn(
-                    "relative h-full glass-panel flex flex-col overflow-hidden p-4",
-                    isLiquid ? "rounded-[34px]" : "rounded-[28px]"
-                )}>
-                    {isLiquid && (
-                        <>
-                            <div className="liquid-orb -left-10 top-0 h-28 w-28 bg-sky-300/30" />
-                            <div className="liquid-orb right-2 top-8 h-24 w-24 bg-violet-300/22" />
-                            <div className="liquid-orb bottom-20 left-12 h-24 w-24 bg-emerald-200/18" />
-                        </>
-                    )}
+                <div className="mediflow-sidebar-shell relative h-full glass-panel flex flex-col overflow-hidden p-4 rounded-[28px]">
                     <div className="mb-6 px-2 pt-2">
                         <div className="flex justify-between items-center mb-1">
-                            <h1 className={cn(
-                                "text-lg font-black tracking-tight",
-                                isLiquid
-                                    ? "bg-[linear-gradient(135deg,#0A84FF,#5AC8FA_55%,#5E5CE6)] bg-clip-text text-transparent"
-                                    : "text-gray-900 dark:text-white"
-                            )}>
+                            <h1 className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
                                 MediFlow
                             </h1>
                             <button
@@ -267,15 +266,15 @@ export function Sidebar() {
                                 title={isPrivacyMode ? "Disattiva Privacy Mode" : "Attiva Privacy Mode"}
                                 className={cn(
                                     "p-1.5 rounded-lg transition-colors",
-                                    isPrivacyMode ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5"
+                                    isPrivacyMode ? "bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] dark:bg-[color:rgba(15,123,104,0.16)]" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5"
                                 )}
                             >
                                 {isPrivacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
                         <div className="flex items-center gap-2 mt-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{profile.doctor.charAt(0)}</span>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:rgba(15,123,104,0.16)] bg-[color:rgba(15,123,104,0.1)]">
+                                <span className="text-xs font-bold text-[color:var(--mf-primary)]">{profile.doctor.charAt(0)}</span>
                             </div>
                             <div className="min-w-0">
                                 <span className="block text-[13px] text-gray-900 dark:text-gray-100 font-bold truncate">
@@ -293,27 +292,27 @@ export function Sidebar() {
                     <nav className="space-y-1 flex-1 overflow-y-auto pr-1">
                         {links.map((link) => {
                             const Icon = link.icon;
-                            const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
+                            const prefixMatch = link.matchPrefixes?.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+                            const isActive = pathname === link.href
+                                || (link.href !== '/' && pathname.startsWith(link.href))
+                                || !!prefixMatch;
 
                             return (
                                 <Link
                                     key={link.href}
                                     href={link.href}
+                                    aria-current={isActive ? 'page' : undefined}
                                     className={cn(
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-[border-color,background-color,color,box-shadow] duration-200 group text-[14px] font-medium",
+                                        "mediflow-sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-[border-color,background-color,color,box-shadow] duration-200 group text-[14px] font-medium",
                                         isActive
-                                            ? isLiquid
-                                                ? "border border-white/60 bg-white/70 text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-white/10 dark:text-white font-semibold"
-                                                : "bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold"
+                                            ? "bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] font-semibold"
                                             : "text-gray-500 hover:bg-black/5 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
                                     )}
                                 >
                                     <Icon className={cn(
                                         "w-4.5 h-4.5",
                                         isActive
-                                            ? isLiquid
-                                                ? "text-sky-500 dark:text-sky-300"
-                                                : "text-blue-600 dark:text-blue-400"
+                                            ? "text-[color:var(--mf-primary)]"
                                             : "text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"
                                     )} />
                                     <span>{link.name}</span>
@@ -332,12 +331,7 @@ export function Sidebar() {
                         <SystemStatus />
                         <button
                             onClick={() => setShowNewVisitModal(true)}
-                            className={cn(
-                                "w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold",
-                                isLiquid
-                                    ? "ui-btn-primary"
-                                    : "rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
-                            )}
+                            className="w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
                         >
                             <PlusCircle className="w-4 h-4" />
                             <span>Nuova Visita</span>

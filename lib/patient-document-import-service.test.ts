@@ -12,6 +12,8 @@ import {
     shouldRetainReviewTherapy,
 } from './patient-document-import-service';
 /* @Codex */
+import { mergeExtractedPatientDataWithTextFallback, parsePatientData } from './pdf-service';
+/* @Codex */
 import type { ExtractedPatientReviewTherapy } from './pdf-service';
 /* @Codex */
 import type { SmartImportTherapyExtraction } from './ai-task-contracts';
@@ -301,6 +303,31 @@ test('document import keeps discharge therapies under the gestionali heading and
     assert.equal(candidates.some((candidate) => /^(?:prima|dopo|dal|schema)\b/i.test(candidate.drugMention)), false);
 });
 
+test('document import recognizes qualified discharge therapy headings and keeps follow-up out of therapies', () => {
+    const candidates = fallbackTherapyCandidates({
+        rawText: [
+            'Cognome/Nome: ROSSI MARIA nata il 17/02/1958',
+            'Terapia consigliata alla dimissione:',
+            '- Bisoprololo 1,25 mg cp: 1 cp al mattino + 1 cp alla sera',
+            '- Pantoprazolo 40 mg cp: 1 cp prima di colazione',
+            'Indicazioni alla dimissione',
+            '- Controllo cardiologico tra 30 giorni',
+        ].join('\n'),
+        source: 'hybrid',
+        confidence: 0.82,
+        medications: [],
+    });
+
+    const bisoprololo = candidates.find((candidate) => /Bisoprololo/i.test(candidate.drugMention));
+    const pantoprazolo = candidates.find((candidate) => /Pantoprazolo/i.test(candidate.drugMention));
+
+    assert.ok(bisoprololo);
+    assert.match(bisoprololo?.evidence || '', /Terapia alla dimissione/i);
+    assert.ok(pantoprazolo);
+    assert.match(pantoprazolo?.evidence || '', /Terapia alla dimissione/i);
+    assert.equal(candidates.some((candidate) => /controllo cardiologico/i.test(candidate.drugMention)), false);
+});
+
 test('document import grounds therapies inside the gestionali discharge heading as active discharge therapy', () => {
     const reconciled = reconcileTherapyCandidatesWithDocumentContext(COLUMBUS_DIMISSIONE_DOCUMENT, [
         {
@@ -318,6 +345,40 @@ test('document import grounds therapies inside the gestionali discharge heading 
     assert.equal(reconciled[0]?.therapyState, 'active');
     assert.match(reconciled[0]?.evidence || '', /Indicazioni terapeutiche alla dimissione/i);
     assert.match(reconciled[0]?.evidence || '', /Pantorc/i);
+});
+
+test('pdf import parses explicit surname-first hospital identity labels', () => {
+    const parsed = parsePatientData([
+        'Cognome/Nome: ROSSI MARIA nata il 17/02/1958',
+        'Codice fiscale RSSMRA58B57F205X',
+        'Diagnosi: fibrillazione atriale persistente',
+    ].join('\n'));
+
+    assert.equal(parsed.firstName, 'MARIA');
+    assert.equal(parsed.lastName, 'ROSSI');
+    assert.equal(parsed.taxCode, 'RSSMRA58B57F205X');
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1958-02-17');
+});
+
+test('pdf import merges high-confidence OCR patient data with server text fallback fields', () => {
+    const merged = mergeExtractedPatientDataWithTextFallback({
+        rawText: 'Paziente: MARIA ROSSI',
+        source: 'ai',
+        confidence: 0.92,
+        firstName: 'MARIA',
+        lastName: 'ROSSI',
+    }, [
+        'Cognome/Nome: ROSSI MARIA nata il 17/02/1958',
+        'Codice fiscale RSSMRA58B57F205X',
+        'Diagnosi: fibrillazione atriale persistente',
+    ].join('\n'));
+
+    assert.equal(merged.firstName, 'MARIA');
+    assert.equal(merged.lastName, 'ROSSI');
+    assert.equal(merged.taxCode, 'RSSMRA58B57F205X');
+    assert.equal(merged.birthDate?.toISOString().slice(0, 10), '1958-02-17');
+    assert.equal(merged.source, 'hybrid');
+    assert.match(merged.rawText, /Codice fiscale/i);
 });
 
 test('document import merges contextual manual therapy with catalog match for the same drug', () => {

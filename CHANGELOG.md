@@ -5,30 +5,56 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-04-19
+## [Unreleased]
+
+## [0.6.0] - 2026-05-02
+
+> Nota release: `v0.6.0` formalizza il ciclo post-`v0.5.0`: MediFlow non e piu
+> soltanto web app locale + AI governata, ma un sistema local-first con Mac
+> `home-base`, primi client Apple paired, document intelligence artifact-first,
+> boundary SISS/FSE piu maturi e coda operativa MediFlow azzerata. Restano fuori
+> scope sync completo, hard delete remoto, attachment remoti, cataloghi remoti,
+> runtime AI remoto di default e integrazione regionale nativa certificata.
 
 ### ✨ Aggiunto
 
+- **Update awareness locale**: pannello Impostazioni per confrontare versione installata e versione disponibile dichiarata da runtime/manifest locale, con changelog minimo e azione `Piu tardi` senza egress automatico.
 - **Home-base read-only eseguibile**: modalita `network-home-base`, overview Settings, pairing PHI-safe e primo data plane `/api/v1/network/patients*` protetto da `paired client + sessione operatore`.
+- **Mac home-base packaged**: il bundle macOS usa la shell Apple/home-base come entrypoint, gestisce esplicitamente backend web production e proxy TLS con stop bounded/escalation, e mantiene Ollama/Docker-ICD come diagnostica read-only non app-managed.
+- **Client iPhone/iPad paired non-AI**: lista/dettaglio pazienti, cache mobile cifrata con stato offline degradato e primi workflow online versionati sui moduli core tramite `/api/v1/network/*`, senza accesso diretto a SQLite.
+- **Write paired profilo e diario**: boundary `/api/v1/network/patients/{id}` e `/api/v1/network/patients/{id}/entries*` con capability dedicate, `version`, conflitti `409` PHI-safe e soft delete del diario.
+- **Write paired terapie**: boundary `/api/v1/network/patients/{id}/therapies*` con capability dedicate, `therapies.version`, soft delete e niente prescribing SISS o campi AI/document-derived.
+- **Write paired osservazioni**: boundary `/api/v1/network/patients/{id}/observations*` con capability dedicate, `observations.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
+- **Write paired checkup**: boundary `/api/v1/network/patients/{id}/checkups*` con capability dedicate, `checkups.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
 - **Document intelligence piu esplicita**: first slice runtime del `document evidence ledger` con artifact `parse/evidence` cifrato sugli allegati e primo consumer artifact-first in `AI Patient Insight`.
+- **Parse/evidence section-aware**: artifact documentali con `sectionMap`, ancore `page/section/snippet` e conflitti terapeutici reviewable senza migrazione DB o auto-write.
 - **Nuova anagrafica document-driven reviewable**: create-flow da documento con review esplicita, riconciliazione locale ICD/AIFA e persistenza prudente delle terapie confermate.
+- **Clinical Workbench unico su `main`**: preview profiles runtime ritirati; AI, Smart Import e contesto paziente SISS/FSE vivono nella shell ufficiale.
+- **Corpus SISS/FSE locale**: manifest sorgenti, sync incrementale e report di freschezza preparano le integrazioni regionali future senza entrare nel runtime clinico.
 - **Lane AI opt-in e shadow-only piu disciplinate**: comparator cloud `gpt-5.4` per engineering interno e adapter OpenMed `redaction.v1` separato dal runtime clinico.
+- **MLX parity benchmark-visible**: MLX e visibile in benchmark, model parliament e diagnostica home-base read-only, con guard dedicato; Ollama resta runtime clinico standard e OCR resta Ollama-only.
 
 ### 🧪 Migliorato
 
 - **Smart Import piu prudente**: normalizzazione therapy-state, guard su terapie `manual-only` o senza posologia sufficiente e soppressione dei duplicati referral-only quando la fonte non introduce novita clinica.
 - **Input documentali piu robusti**: normalizzazione condivisa per PDF/CDA/CCD e riuso della stessa recovery path nei consumer documentali principali.
 - **Resolver clinici benchmarkabili**: runner dedicati WHO ICD-11 e AIFA per misurare recall, latenza e mismatch reali sul catalogo locale.
+- **Parity legacy chiusa**: i tracker web/macOS storici sono stati rolluppati, con click-map e manifest Apple-wide a distinguere evidenza coperta da gap futuri.
 
 ### 🔒 Hardening
 
 - **Shell locale piu resiliente ai drift di revisione**: fingerprint di sorgente, endpoint `/api/system/revision`, reload soft delle tab attive e reset `.next` source-aware nello start script.
+- **Boundary paired piu espliciti**: profilo, diario, terapie, checkup e osservazioni hanno capability e ADR dedicate, con hard delete remoto, sync, cataloghi e campi AI/documentali fuori scope.
+- **Standalone runtime guard**: il bundle home-base blocca artefatti locali, database, tmp e documenti privati prima di copiare il backend production nel `.app`.
 
 ### 📚 Documentazione
 
+- **Lettura completa dello stato sistema**: aggiunto `docs/STATE_OF_THE_SYSTEM.md` come punto canonico unico per prodotto, runtime, dati, sicurezza, AI/document intelligence, home-base, SISS/FSE, Apple clients e split private/OSS.
 - **Repo/GitHub riallineati al runtime reale**: README, piani, walkthrough, topologia dati, roadmap e sintesi architetturale descrivono ora `home-base` read-only, artifact `parse/evidence`, comparator/shadow lane e guard di revisione della shell locale.
-- **Narrativa `v0.5` riallineata tra private e OSS**: README, FAQ, roadmap, architettura e mappe documentali chiariscono che il salto pubblico rilevante e `v0.3 -> v0.5`, esplicitano preview profiles locali, boundary SISS attuale e direzione `macOS + iPadOS/iPhone` tramite `home-base`.
-- **Export OSS piu netto**: la preparazione della repo pubblica omette anche il piano operativo di breve e ripulisce i riferimenti ai documenti interni di orchestrazione/attribution, lasciando in pubblico solo materiale di prodotto, architettura e uso reale.
+- **Narrativa `v0.6` piu chiara**: README, FAQ, roadmap, architettura e mappe documentali raccontano lo stato corrente senza confronti interni, con Clinical Workbench unico, boundary SISS attuale, `home-base` packaged e client Apple paired.
+- **Sweep documentale**: riferimento, supporto e overview docs riallineati allo stato corrente di `main`, con rimozione dei residui che presentavano i preview profiles come runtime disponibile.
+- **Copy pubblico piu armonico**: le superfici GitHub privilegiano prodotto, architettura e uso reale, senza rimandi a processi interni o screenshot non piu rappresentativi.
+- **Release narrative `v0.6.0`**: documentazione privata e OSS riallineata per presentare home-base, Apple paired, document intelligence artifact-first e governance chiusa come release corrente.
 
 ## [0.5.0] - 2026-03-29
 
@@ -76,7 +102,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Patient PDF report**: report esteso con sezioni cliniche più complete e copertura automatica sulle sezioni generate.
 - **Clinical facts benchmark**: introdotto il corpus sintetico per osservazioni `LOINC/UCUM`, con decisione `hybrid` di default e fallback `rules` tracciato.
 - **Stabilizzazione web/core pre-version-bump**: normalizzazione condivisa dei payload paziente, parsing condiviso dei campi strutturati, gate `typecheck` stabile e scomposizione incrementale dei file più densi (`SecurityProvider`, `SettingsPage`).
-- **Tooling di progetto**: playbook operativo interno, import backlog automatizzato e controllo piu esplicito del flusso OSS/private.
+- **Tooling di progetto**: strumenti di manutenzione piu ordinati, import backlog automatizzato e controllo piu esplicito della pubblicazione.
 
 ### 🐛 Risolto
 
@@ -99,7 +125,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Walkthrough e mappe canoniche aggiornate** per flusso OCR-first, smart import reviewable, backup scheduler/retention, parity sweep e governance OpenAPI.
 - **Baseline e matrici canoniche** aggiunte per GTW/FSE, SISS certificato, benchmark clinical facts e stabilizzazione web/core pre-release.
 - **Freeze esplicito del filone macOS**: patch notes, roadmap e guide native chiariscono che la parity macOS entra in rebuild controllato dopo `v0.4.0`, senza bloccare l'evoluzione web/core.
-- **Indice markdown e playbook operativi** estesi per rendere ricostruibile il lavoro tra Git, Linear, docs e repo OSS.
+- **Indice markdown e playbook operativi** estesi per rendere ricostruibile il lavoro tra repository, documentazione e verifiche.
 
 ## [0.3.1] - 2026-02-18
 
@@ -126,12 +152,12 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - **Mappa canonica documentazione** (`docs/README.md`) con ordine fonti e responsabilità per tema.
 - **Classificazione documenti** con stato `CANONICAL`, `SECONDARY`, `LEGACY`.
-- **Allineamento release docs**: intestazioni versione, roadmap e metadati `PLANS`.
+- **Allineamento release docs**: intestazioni versione, roadmap e metadati documentali.
 
 ### 🙏 Tributo OpenHospital
 
 - Questo rilascio è anche un tributo a OpenHospital: non una copia 1:1, ma un percorso di apprendimento e adattamento di pratiche mature (guardrail, integrità dati, contratti API espliciti, auditabilità) al modello local-first/zero-knowledge di MediFlow.
-- La traiettoria di allineamento resta esplicita e incrementale, con evidenza operativa mantenuta nel workspace privato di lavoro.
+- La traiettoria di allineamento resta esplicita e incrementale, con evidenza operativa mantenuta separata dal racconto di prodotto.
 
 ### 🗓 Timeline (ieri e oggi)
 
@@ -165,5 +191,5 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### 📦 Infrastruttura
 
-- **Docker All-in-One**: Nuovo `docker-compose.yml` che orchestra App (Next.js), ICD-API e Ollama.
+- **Docker All-in-One**: Nuovo `docker-compose.yml` che avvia App (Next.js), ICD-API e Ollama.
 - **Script di Avvio**: `Start_MediFlow.command` semplificato per macOS ("Click & Run").

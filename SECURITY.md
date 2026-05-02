@@ -9,6 +9,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 ## Riferimenti correlati
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato corrente completo e boundary operativi)
 - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dato e trust boundaries)
 - [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
@@ -71,7 +72,8 @@ MediFlow espone due superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
-- `/api/v1/network/*` (home-base opt-in): paired/read-only-first, protetta da
+- `/api/v1/network/*` (home-base opt-in): paired/read-only-first con write
+  limitati a profilo/status paziente, diario, terapie, checkup e osservazioni, protetta da
   credenziale device + sessione operatore
 
 Regole minime:
@@ -90,9 +92,24 @@ Quando il nodo passa a `network-home-base`:
 - il default locale non cambia: la modalita rete resta un opt-in esplicito
 - `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
   paired
-- il primo data plane remoto (`/api/v1/network/patients*`) resta read-only e
-  richiede sempre device paired + sessione operatore
-- write remoto, sync record-level e fallback automatico restano fuori scope
+- il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre
+  device paired + sessione operatore
+- `PUT /api/v1/network/patients/{id}` richiede inoltre capability
+  `network.replica.write-patient-profile` e `version`
+- `/api/v1/network/patients/{id}/entries*` richiede capability diary dedicate,
+  sessione operatore e `entries.version`; abilita solo create/update/soft-delete
+  del diario clinico
+- `/api/v1/network/patients/{id}/therapies*` richiede capability terapia
+  dedicate, sessione operatore e `therapies.version`; abilita solo
+  create/update/soft-delete delle terapie
+- `/api/v1/network/patients/{id}/checkups*` richiede capability checkup
+  dedicate, sessione operatore e `checkups.version`; abilita solo
+  create/update/soft-delete dei checkup
+- `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
+  dedicate, sessione operatore e `observations.version`; abilita solo
+  create/update/soft-delete delle osservazioni LOINC/UCUM
+- delete remoto hard, attachment/document write remoti, cataloghi, sync
+  record-level, campi AI/documentali e fallback automatico restano fuori scope
 
 ### Lockout autenticazione PIN
 
@@ -133,20 +150,6 @@ devono rispettare queste regole aggiuntive:
 L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
 (es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
 
-## Comparator cloud opt-in
-
-non cambia il default `local-first`.
-
-Regole minime:
-
-- e ammesso solo come lane interna di engineering, mai come runtime clinico
-- usa solo case pack privati, redatti/minimizzati e fuori Git
-- richiede approvazione umana esplicita prima di qualunque export
-- non puo scrivere dati paziente, generare apply automatici o essere committato
-  nel repository
-
----
-
 ## Logging e redazione
 
 I dati sanitari non devono trapelare dai log.
@@ -169,7 +172,6 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 - `summarySnapshot` o `parseEvidenceArtifactSnapshot` grezzi
 - token, PIN, chiavi o salt
 - prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
-- case pack privati/comparator cloud o output non minimizzati di shadow eval
 
 ### Puoi loggare (preferibile)
 - conteggi (es. numero record)
@@ -228,8 +230,8 @@ Opzionali (se usati nella toolchain):
 
 Se ritieni di aver trovato una vulnerabilità:
 
-1. Preferisci canale privato (GitHub Security Advisories / Security tab), se disponibile.
-2. Se il canale privato non è disponibile, apri una issue **senza dettagli sensibili**:
+1. Preferisci un canale riservato (GitHub Security Advisories / Security tab), se disponibile.
+2. Se il canale riservato non è disponibile, apri una issue **senza dettagli sensibili**:
    - descrivi impatto e area coinvolta
    - fornisci passi minimi di riproduzione
    - evita dati reali, token o payload decifrati

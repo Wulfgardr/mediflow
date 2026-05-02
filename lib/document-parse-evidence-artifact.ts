@@ -9,7 +9,10 @@ import {
     type BuildDocumentEvidencePackInput,
     type DocumentEvidenceFact,
     type DocumentEvidencePack,
+    type DocumentEvidenceSourceGovernance,
 } from './document-evidence-pack';
+/* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
 
 /* @Codex */
 export const DOCUMENT_PARSE_EVIDENCE_ARTIFACT_SCHEMA_VERSION = 'mediflow.document_parse_evidence_artifact.v1';
@@ -27,6 +30,7 @@ export interface DocumentParseEvidenceArtifact {
     parseBundle: {
         summary: string;
         rawMarkdownExcerpt: string;
+        sectionMap?: DocumentParseEvidenceSectionMap;
         parserDiagnostics: {
             rawTextChars: number;
             lineCount: number;
@@ -35,6 +39,7 @@ export interface DocumentParseEvidenceArtifact {
     };
     evidenceMemory: {
         facts: DocumentEvidenceFact[];
+        sourceGovernance?: DocumentEvidenceSourceGovernance;
     };
 }
 
@@ -43,6 +48,50 @@ export interface BuildDocumentParseEvidenceArtifactInput extends BuildDocumentEv
     attachmentId?: string;
     qualityReason?: string;
 }
+
+/* @Codex */
+export type DocumentParseEvidenceSectionKind =
+    | 'diagnosis'
+    | 'discharge_medication'
+    | 'current_or_ward_medication'
+    | 'recommendations'
+    | 'followup'
+    | 'functional_status'
+    | 'care_setting'
+    | 'other'
+    | 'ambiguous';
+
+/* @Codex */
+export interface DocumentParseEvidenceSectionMap {
+    sections: Array<{ id: string; order: number; page: number; title: string; kind: DocumentParseEvidenceSectionKind; snippet: string }>;
+    factAnchors: Array<{
+        factId: string;
+        factKind: DocumentEvidenceFact['kind'];
+        page: number;
+        sectionId: string;
+        sectionTitle: string;
+        sectionKind: DocumentParseEvidenceSectionKind;
+        snippet: string;
+        confidence: 'exact' | 'section' | 'fallback';
+    }>;
+    conflicts: Array<{
+        id: string;
+        type: 'medication_context_overlap';
+        factIds: string[];
+        sectionIds: string[];
+        message: string;
+        snippets: string[];
+    }>;
+    diagnostics: {
+        sectionCount: number;
+        anchoredFactCount: number;
+        unanchoredFactCount: number;
+        conflictCount: number;
+    };
+}
+
+type DocumentParseEvidenceSection = DocumentParseEvidenceSectionMap['sections'][number];
+type DocumentParseEvidenceFactAnchor = DocumentParseEvidenceSectionMap['factAnchors'][number];
 
 /* @Codex */
 export interface DocumentParseEvidenceArtifactEvaluation {
@@ -75,11 +124,209 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+const MAX_SECTION_SNIPPET_CHARS = 260;
+const MAX_ANCHOR_SNIPPET_CHARS = 220;
+
+const MEDICATION_TOKEN_STOPWORDS = new Set('alla allo con del della delle dello degli dei di il la le lo nel nella nelle per terapia dimissione reparto corrente domiciliare sospendere sospesa sospeso proseguire assumere compressa compresse cp cps ore mattino sera pranzo cena die'.split(' '));
+
+function compactForSection(value: string | null | undefined, maxChars: number): string {
+    const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    return normalized.length <= maxChars
+        ? normalized
+        : `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}...`;
+}
+
+function classifySection(title: string, content = ''): DocumentParseEvidenceSectionKind {
+    const normalized = normalizeComparableText(`${title} ${content.slice(0, 140)}`);
+    if (!normalized) return 'other';
+    if (/\bdiagnos\w*\b/.test(normalized)) return 'diagnosis';
+    if (/\b(stato funzionale|deambul|cammino|autonomia|mobilit|ausilio)\b/.test(normalized)) return 'functional_status';
+    if (/\b(adi|assistenza domiciliare|setting assistenziale|caregiver|rsa)\b/.test(normalized)) return 'care_setting';
+    if (/\b(indicazion\w*|raccomandazion\w*|prescrizion\w*)\b/.test(normalized)) return 'recommendations';
+    if (/\b(follow up|followup|controll\w*|visita|rivalut\w*)\b/.test(normalized)) return 'followup';
+    if (/\bterapia\b/.test(normalized)) {
+        if (/\b(dimission\w*|consigliata)\b/.test(normalized)) return 'discharge_medication';
+        if (/\b(reparto|corrente|in atto|ingresso|domiciliare)\b/.test(normalized)) return 'current_or_ward_medication';
+        return 'ambiguous';
+    }
+    return 'other';
+}
+
+function slugifySectionId(title: string, index: number): string {
+    const slug = normalizeComparableText(title)
+        .split(/\s+/)
+        .slice(0, 6)
+        .join('-');
+    return `section:${index + 1}:${slug || 'untitled'}`;
+}
+
+function buildRawSections(rawMarkdown: string): Array<{ title: string; content: string }> {
+    const normalized = normalizeDocumentInput(rawMarkdown);
+    if (normalized.sections.length > 0) {
+        return normalized.sections.map((section) => ({
+            title: section.heading,
+            content: section.content,
+        }));
+    }
+
+    const fallback = normalized.normalizedText.trim() || rawMarkdown.trim();
+    return fallback ? [{ title: 'Narrative', content: fallback }] : [];
+}
+
+function derivePageNumber(rawMarkdown: string, sectionText: string): number {
+    const pages = rawMarkdown.split(/\f+/);
+    if (pages.length <= 1) return 1;
+    const sectionProbe = normalizeComparableText(sectionText).slice(0, 120);
+    if (!sectionProbe) return 1;
+
+    const index = pages.findIndex((page) => normalizeComparableText(page).includes(sectionProbe));
+    return index >= 0 ? index + 1 : 1;
+}
+
+function buildSections(rawMarkdown: string): DocumentParseEvidenceSection[] {
+    return buildRawSections(rawMarkdown).map((section, index) => ({
+        id: slugifySectionId(section.title, index),
+        order: index + 1,
+        page: derivePageNumber(rawMarkdown, `${section.title} ${section.content}`),
+        title: section.title,
+        kind: classifySection(section.title, section.content),
+        snippet: compactForSection(section.content, MAX_SECTION_SNIPPET_CHARS),
+    }));
+}
+
+function sectionSearchText(section: DocumentParseEvidenceSection): string {
+    return normalizeComparableText(`${section.title} ${section.snippet}`);
+}
+
+function bestSectionForFact(
+    fact: DocumentEvidenceFact,
+    sections: DocumentParseEvidenceSection[],
+): { section: DocumentParseEvidenceSection; confidence: DocumentParseEvidenceFactAnchor['confidence'] } | undefined {
+    if (sections.length === 0) return undefined;
+
+    const label = normalizeComparableText(fact.label);
+    const excerpt = normalizeComparableText(fact.excerpt);
+    const exact = sections.find((section) => {
+        const sectionText = sectionSearchText(section);
+        return Boolean(label && sectionText.includes(label)) || Boolean(excerpt && sectionText.includes(excerpt));
+    });
+    if (exact) return { section: exact, confidence: 'exact' };
+
+    const kindPreferred = sections.find((section) => {
+        if (fact.kind === 'problem') return section.kind === 'diagnosis';
+        if (fact.kind === 'followup') return section.kind === 'followup' || section.kind === 'recommendations';
+        if (fact.kind === 'care_setting') return section.kind === 'care_setting' || section.kind === 'recommendations';
+        if (fact.kind === 'functional_status') return section.kind === 'functional_status' || section.kind === 'recommendations';
+        if (fact.kind === 'medication') {
+            return section.kind === 'discharge_medication'
+                || section.kind === 'current_or_ward_medication'
+                || section.kind === 'ambiguous';
+        }
+        return false;
+    });
+    if (kindPreferred) return { section: kindPreferred, confidence: 'section' };
+
+    return { section: sections[0], confidence: 'fallback' };
+}
+
+function buildFactAnchors(
+    facts: DocumentEvidenceFact[],
+    sections: DocumentParseEvidenceSection[],
+): DocumentParseEvidenceFactAnchor[] {
+    return facts
+        .map((fact): DocumentParseEvidenceFactAnchor | undefined => {
+            const match = bestSectionForFact(fact, sections);
+            if (!match) return undefined;
+
+            return {
+                factId: fact.id,
+                factKind: fact.kind,
+                page: match.section.page,
+                sectionId: match.section.id,
+                sectionTitle: match.section.title,
+                sectionKind: match.section.kind,
+                snippet: compactForSection(fact.excerpt || match.section.snippet, MAX_ANCHOR_SNIPPET_CHARS),
+                confidence: match.confidence,
+            };
+        })
+        .filter((anchor): anchor is DocumentParseEvidenceFactAnchor => Boolean(anchor));
+}
+
+function medicationContextKey(label: string): string {
+    const tokens = normalizeComparableText(label)
+        .split(/\s+/)
+        .filter((token) => token.length >= 4 && !/^\d/.test(token) && !MEDICATION_TOKEN_STOPWORDS.has(token));
+    return tokens[0] || '';
+}
+
+function buildConflicts(
+    facts: DocumentEvidenceFact[],
+    anchors: DocumentParseEvidenceFactAnchor[],
+): DocumentParseEvidenceSectionMap['conflicts'] {
+    const conflicts: DocumentParseEvidenceSectionMap['conflicts'] = [];
+    const medicationFactsById = new Map(facts.filter((fact) => fact.kind === 'medication').map((fact) => [fact.id, fact]));
+    const medicationAnchors = anchors.filter((anchor) => medicationFactsById.has(anchor.factId));
+
+    const byMedication = new Map<string, DocumentParseEvidenceFactAnchor[]>();
+    for (const anchor of medicationAnchors) {
+        const fact = medicationFactsById.get(anchor.factId);
+        const key = fact ? medicationContextKey(fact.label) : '';
+        if (!key) continue;
+        const bucket = byMedication.get(key) || [];
+        bucket.push(anchor);
+        byMedication.set(key, bucket);
+    }
+
+    for (const [, bucket] of byMedication) {
+        const contextualKinds = Array.from(new Set(bucket.map((anchor) => anchor.sectionKind).filter((kind) => (
+            kind === 'discharge_medication' || kind === 'current_or_ward_medication'
+        ))));
+        if (contextualKinds.length < 2) continue;
+
+        const factIds = Array.from(new Set(bucket.map((anchor) => anchor.factId)));
+        const sectionIds = Array.from(new Set(bucket.map((anchor) => anchor.sectionId)));
+        conflicts.push({
+            id: `conflict:medication-context:${conflicts.length + 1}`,
+            type: 'medication_context_overlap',
+            factIds,
+            sectionIds,
+            message: 'Stesso farmaco riconosciuto in contesti terapeutici diversi: mantenere separati terapia corrente/reparto e terapia alla dimissione.',
+            snippets: bucket.map((anchor) => anchor.snippet).slice(0, 4),
+        });
+    }
+
+    return conflicts;
+}
+
+/* @Codex */
+export function buildDocumentParseEvidenceSectionMap(
+    rawMarkdown: string,
+    facts: DocumentEvidenceFact[],
+): DocumentParseEvidenceSectionMap {
+    const sections = buildSections(rawMarkdown);
+    const factAnchors = buildFactAnchors(facts, sections);
+    const conflicts = buildConflicts(facts, factAnchors);
+
+    return {
+        sections,
+        factAnchors,
+        conflicts,
+        diagnostics: {
+            sectionCount: sections.length,
+            anchoredFactCount: factAnchors.length,
+            unanchoredFactCount: Math.max(0, facts.length - factAnchors.length),
+            conflictCount: conflicts.length,
+        },
+    };
+}
+
 /* @Codex */
 export function buildDocumentParseEvidenceArtifact(
     input: BuildDocumentParseEvidenceArtifactInput,
 ): DocumentParseEvidenceArtifact {
     const evidencePack = buildDocumentEvidencePack(input);
+    const sectionMap = buildDocumentParseEvidenceSectionMap(input.rawMarkdown, evidencePack.facts);
 
     return {
         schemaVersion: DOCUMENT_PARSE_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
@@ -93,6 +340,7 @@ export function buildDocumentParseEvidenceArtifact(
         parseBundle: {
             summary: input.summary,
             rawMarkdownExcerpt: input.rawMarkdown,
+            sectionMap,
             parserDiagnostics: {
                 rawTextChars: input.rawMarkdown.length,
                 lineCount: countNonEmptyLines(input.rawMarkdown),
@@ -101,6 +349,7 @@ export function buildDocumentParseEvidenceArtifact(
         },
         evidenceMemory: {
             facts: evidencePack.facts,
+            sourceGovernance: evidencePack.sourceGovernance,
         },
     };
 }
@@ -118,6 +367,7 @@ export function projectDocumentEvidencePack(
             qualityLevel: artifact.source.qualityLevel,
         },
         facts: artifact.evidenceMemory.facts,
+        sourceGovernance: artifact.evidenceMemory.sourceGovernance,
     };
 }
 
@@ -188,7 +438,12 @@ export function parseDocumentParseEvidenceArtifactSnapshot(
     ) {
         return undefined;
     }
-
+    if (
+        parsed.evidenceMemory.sourceGovernance !== undefined
+        && !isRecord(parsed.evidenceMemory.sourceGovernance)
+    ) {
+        return undefined;
+    }
     return parsed as unknown as DocumentParseEvidenceArtifact;
 }
 

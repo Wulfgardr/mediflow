@@ -54,9 +54,60 @@ struct EntrySummary: Identifiable, Decodable {
     let id: String
     let patientId: String
     let type: String
+    let title: String?
     let date: Date
     let content: String
+    let setting: String?
+    let metadata: EntryJSONValue?
+    let attachments: EntryJSONValue?
+    let version: Int?
     let createdAt: Date?
+    let updatedAt: Date?
+    let deletedAt: Date?
+    let deletionReason: String?
+
+    var isDeleted: Bool { deletedAt != nil }
+}
+
+enum EntryJSONValue: Decodable {
+    case null
+    case bool(Bool)
+    case number(Double)
+    case string(String)
+    case array([EntryJSONValue])
+    case object([String: EntryJSONValue])
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+            return
+        }
+        if let value = try? container.decode(Double.self) {
+            self = .number(value)
+            return
+        }
+        if let value = try? container.decode(String.self) {
+            self = .string(value)
+            return
+        }
+        if let value = try? container.decode([EntryJSONValue].self) {
+            self = .array(value)
+            return
+        }
+        if let value = try? container.decode([String: EntryJSONValue].self) {
+            self = .object(value)
+            return
+        }
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Unsupported JSON value for EntrySummary."
+        )
+    }
 }
 
 struct TherapySummary: Identifiable, Decodable {
@@ -104,7 +155,52 @@ struct ObservationSummary: Identifiable, Decodable {
     let notes: String?
     let observedAt: Date
     let source: String?
+    /* @Codex */
+    let version: Int?
     let createdAt: Date?
+    /* @Codex */
+    let updatedAt: Date?
+    /* @Codex */
+    let deletedAt: Date?
+    /* @Codex */
+    let deletionReason: String?
+
+    /* @Codex */
+    init(
+        id: String,
+        patientId: String,
+        codeSystem: String,
+        code: String,
+        display: String,
+        unitSystem: String,
+        unitCode: String,
+        value: String,
+        notes: String?,
+        observedAt: Date,
+        source: String?,
+        version: Int? = nil,
+        createdAt: Date?,
+        updatedAt: Date? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.id = id
+        self.patientId = patientId
+        self.codeSystem = codeSystem
+        self.code = code
+        self.display = display
+        self.unitSystem = unitSystem
+        self.unitCode = unitCode
+        self.value = value
+        self.notes = notes
+        self.observedAt = observedAt
+        self.source = source
+        self.version = version
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
+    }
 }
 
 /* @Codex */

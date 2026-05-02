@@ -13,6 +13,7 @@
 # testing
 /coverage
 /playwright-report
+/.playwright-cli/
 /test-results
 /tmp-e2e-data
 /tmp-concurrency-data
@@ -21,13 +22,19 @@
 /tmp-audit-test
 /tmp-auth-lockout-test
 /tmp-patient-document-import-test
+/tmp-api-v1-compatibility-rehearsal.md
 /tmp-real-import-data
 /tmp-real-pipeline
+/tmp-manual-browser
+/tmp-network-home-base-readonly
+/tmp-api-v1-put-negative-routes
 /tmp/
 
 # next.js
 /.next/
+/.next-manual-browser/
 /.next-real-import/
+/.next-api-v1-put-negative/
 /out/
 
 # production
@@ -38,6 +45,7 @@ native/**/Build/
 # misc
 .DS_Store
 AGENTS.md
+/.texpadtmp/
 *.pem
 certs/
 *.key

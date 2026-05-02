@@ -1,23 +1,32 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.6.0
-  summary: Stable patient contract plus first executable home-base network slice with explicit pairing review, paired-client auth boundary, read-only remote patient access, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.11.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
     mutations on `PUT /api/v1/patients/{id}` and `DELETE /api/v1/patients/{id}`.
     It also introduces the first documented `/api/v1/network/*` contract slice
     for home-base discovery, session gating, capability discovery, explicit
-    pairing bootstrap/review on trusted local networks, and the first read-only
-    remote patient data plane behind a dedicated paired-client auth boundary.
+    pairing bootstrap/review on trusted local networks, the first read-only
+    remote patient data plane, the first paired patient profile/status write
+    boundary, the first paired clinical diary read/create/update boundary, the
+    first paired therapy read/create/update/soft-delete boundary, the first
+    paired checkup read/create/update/soft-delete boundary, and the first
+    paired observation read/create/update/soft-delete boundary behind dedicated
+    paired-client auth capabilities.
+    Apple-native discovery may advertise the same PHI-safe node summary over
+    Bonjour `_mediflow-homebase._tcp`, while `/api/v1/network/node` remains the
+    reviewable HTTP summary contract for node identity and transport metadata.
     The session summary now includes PHI-safe replica planning metadata for
     snapshot mirror, deferred fallback, and manual review states. A dedicated
     identity summary distinguishes device pairing from operator login and
     declares the effective ambulatory scope. A dedicated AI runtime summary now
-    separates `AI plane` and `data plane`, while real replication, sync, remote
-    inference routing, and advanced identity scoping remain follow-up
-    workstreams.
+    separates `AI plane` and `data plane`, while real replication, offline sync,
+    remote hard delete, remote attachment/document writes, remote inference
+    routing, remote therapy/checkup/observation hard delete, and advanced
+    identity scoping remain follow-up workstreams.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -475,6 +484,947 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatient
+      summary: Update patient profile/status through the paired home-base data plane
+      description: |
+        Updates a patient profile/status subset from a paired client using the
+        same optimistic concurrency shape as the local patient mutation
+        contract. The route requires a paired client with
+        `network.replica.write-patient-profile`, an active operator session,
+        and the effective ambulatory scope resolved by the home-base node.
+        AI/document-derived fields, child clinical CRUD, remote delete, and
+        sync queues remain outside this first write boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMutationRequest'
+            examples:
+              updateNetworkPhone:
+                value:
+                  version: 7
+                  phone: "+39 333 1234567"
+              archiveNetworkPatient:
+                value:
+                  version: 7
+                  isArchived: true
+      responses:
+        '200':
+          description: Patient updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/entries:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientEntries
+      summary: List clinical diary entries through the paired home-base data plane
+      description: |
+        Returns clinical diary entries for one patient, limited to the effective
+        ambulatory scope resolved by the home-base. This route requires a valid
+        paired client with `network.replica.readonly-clinical-diary` and an
+        operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Scoped clinical diary entries from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EntryDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientEntry
+      summary: Create a clinical diary entry through the paired home-base data plane
+      description: |
+        Creates a clinical diary entry for one scoped patient. The route requires
+        a paired client with `network.replica.write-clinical-diary`, an active
+        operator session, and the effective ambulatory scope resolved by the
+        home-base node. Remote attachment/document-derived writes and AI fields
+        are excluded from this boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryCreateRequest'
+            examples:
+              createNetworkEntry:
+                value:
+                  type: note
+                  title: Diario clinico
+                  date: '2026-05-02T09:00:00.000Z'
+                  content: Nota preparata dal client paired
+                  setting: ambulatory
+      responses:
+        '201':
+          description: Entry created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/entries/{entryId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientEntry
+      summary: Get a clinical diary entry through the paired home-base data plane
+      description: |
+        Returns one clinical diary entry for a scoped patient. This route
+        requires a paired client with `network.replica.readonly-clinical-diary`
+        and an operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: entryId
+          in: path
+          required: true
+          description: Clinical diary entry identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped clinical diary entry from the paired node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatientEntry
+      summary: Update or soft-delete a clinical diary entry through the paired home-base data plane
+      description: |
+        Updates a clinical diary entry using entry-level optimistic concurrency.
+        The route requires a paired client with
+        `network.replica.write-clinical-diary`, an active operator session, and
+        the effective ambulatory scope resolved by the home-base node. Hard
+        delete, remote attachment/document writes, and AI/document-derived
+        fields are excluded; soft delete and restore use `deletedAt` and
+        `deletionReason`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: entryId
+          in: path
+          required: true
+          description: Clinical diary entry identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryMutationRequest'
+            examples:
+              updateNetworkEntry:
+                value:
+                  version: 2
+                  content: Nota aggiornata dal client paired
+              softDeleteNetworkEntry:
+                value:
+                  version: 2
+                  deletedAt: '2026-05-02T10:00:00.000Z'
+                  deletionReason: duplicate-entry
+      responses:
+        '200':
+          description: Entry updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/EntryVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/therapies:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientTherapies
+      summary: List therapies through the paired home-base data plane
+      description: |
+        Returns therapies for one patient, limited to the effective ambulatory
+        scope resolved by the home-base. This route requires a valid paired
+        client with `network.replica.readonly-therapies` and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Scoped therapies from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TherapyDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientTherapy
+      summary: Create a therapy through the paired home-base data plane
+      description: |
+        Creates a therapy for one scoped patient. The route requires a paired
+        client with `network.replica.write-therapies`, an active operator
+        session, and the effective ambulatory scope resolved by the home-base
+        node. AI/document-derived fields and client-controlled lifecycle fields
+        are excluded from this boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TherapyCreateRequest'
+            examples:
+              createNetworkTherapy:
+                value:
+                  drugName: Metformina
+                  dosage: 500 mg x 2
+                  status: active
+                  startDate: '2026-05-02T09:00:00.000Z'
+      responses:
+        '201':
+          description: Therapy created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TherapyCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/therapies/{therapyId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientTherapy
+      summary: Get a therapy through the paired home-base data plane
+      description: |
+        Returns one therapy for a scoped patient. This route requires a paired
+        client with `network.replica.readonly-therapies` and an operator
+        session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: therapyId
+          in: path
+          required: true
+          description: Therapy identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped therapy from the paired node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TherapyDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatientTherapy
+      summary: Update or soft-delete a therapy through the paired home-base data plane
+      description: |
+        Updates a therapy using therapy-level optimistic concurrency. The route
+        requires a paired client with `network.replica.write-therapies`, an
+        active operator session, and the effective ambulatory scope resolved by
+        the home-base node. Remote hard delete, AI fields, and
+        document-derived writes are excluded; soft delete and restore use
+        `deletedAt` and `deletionReason`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: therapyId
+          in: path
+          required: true
+          description: Therapy identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TherapyMutationRequest'
+            examples:
+              updateNetworkTherapy:
+                value:
+                  version: 2
+                  dosage: 850 mg x 2
+              softDeleteNetworkTherapy:
+                value:
+                  version: 2
+                  deletedAt: '2026-05-02T10:00:00.000Z'
+                  deletionReason: duplicate-therapy
+      responses:
+        '200':
+          description: Therapy updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/TherapyVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/checkups:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientCheckups
+      summary: List checkups through the paired home-base data plane
+      description: |
+        Returns checkups for one patient, limited to the effective ambulatory
+        scope resolved by the home-base. This route requires a valid paired
+        client with `network.replica.readonly-checkups` and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Scoped checkups from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CheckupDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientCheckup
+      summary: Create a checkup through the paired home-base data plane
+      description: |
+        Creates a checkup for one scoped patient. The route requires a paired
+        client with `network.replica.write-checkups`, an active operator
+        session, and the effective ambulatory scope resolved by the home-base
+        node. AI/document-derived fields and client-controlled lifecycle fields
+        are excluded from this boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckupCreateRequest'
+            examples:
+              createNetworkCheckup:
+                value:
+                  date: '2026-05-02T09:00:00.000Z'
+                  title: Controllo rete
+                  status: pending
+                  source: manual
+      responses:
+        '201':
+          description: Checkup created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckupCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/checkups/{checkupId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientCheckup
+      summary: Get a checkup through the paired home-base data plane
+      description: |
+        Returns one checkup for a scoped patient. This route requires a paired
+        client with `network.replica.readonly-checkups` and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: checkupId
+          in: path
+          required: true
+          description: Checkup identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped checkup from the paired node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckupDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatientCheckup
+      summary: Update or soft-delete a checkup through the paired home-base data plane
+      description: |
+        Updates a checkup using row-level optimistic concurrency. The route
+        requires a paired client with `network.replica.write-checkups`, an
+        active operator session, and the effective ambulatory scope resolved by
+        the home-base node. Remote hard delete, AI fields, and
+        document-derived writes are excluded; soft delete and restore use
+        `deletedAt` and `deletionReason`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: checkupId
+          in: path
+          required: true
+          description: Checkup identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckupMutationRequest'
+            examples:
+              updateNetworkCheckup:
+                value:
+                  version: 2
+                  status: completed
+              softDeleteNetworkCheckup:
+                value:
+                  version: 2
+                  deletedAt: '2026-05-02T10:00:00.000Z'
+                  deletionReason: duplicate-checkup
+      responses:
+        '200':
+          description: Checkup updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CheckupVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/observations:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientObservations
+      summary: List observations through the paired home-base data plane
+      description: |
+        Returns observations for one patient, limited to the effective
+        ambulatory scope resolved by the home-base. This route requires a valid
+        paired client with `network.replica.readonly-observations` and an
+        operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Scoped observations from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObservationDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientObservation
+      summary: Create an observation through the paired home-base data plane
+      description: |
+        Creates an observation for one scoped patient. The route requires a
+        paired client with `network.replica.write-observations`, an active
+        operator session, and the effective ambulatory scope resolved by the
+        home-base node. AI/document-derived fields and client-controlled
+        lifecycle fields are excluded from this boundary.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationCreateRequest'
+            examples:
+              createNetworkObservation:
+                value:
+                  codeSystem: 'LOINC'
+                  code: '8480-6'
+                  display: 'Systolic blood pressure'
+                  unitSystem: 'UCUM'
+                  unitCode: 'mm[Hg]'
+                  value: 128
+                  observedAt: '2026-05-02T09:00:00.000Z'
+                  notes: 'smoke-test'
+                  source: 'manual'
+      responses:
+        '201':
+          description: Observation created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/observations/{observationId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientObservation
+      summary: Get an observation through the paired home-base data plane
+      description: |
+        Returns one observation for a scoped patient. This route requires a
+        paired client with `network.replica.readonly-observations` and an
+        operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: observationId
+          in: path
+          required: true
+          description: Observation identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped observation from the paired node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkPatientObservation
+      summary: Update or soft-delete an observation through the paired home-base data plane
+      description: |
+        Updates an observation using row-level optimistic concurrency. The
+        route requires a paired client with
+        `network.replica.write-observations`, an active operator session, and
+        the effective ambulatory scope resolved by the home-base node. Remote
+        hard delete, AI fields, and document-derived writes are excluded; soft
+        delete and restore use `deletedAt` and `deletionReason`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: observationId
+          in: path
+          required: true
+          description: Observation identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationMutationRequest'
+            examples:
+              updateNetworkObservation:
+                value:
+                  version: 2
+                  value: 132
+              softDeleteNetworkObservation:
+                value:
+                  version: 2
+                  deletedAt: '2026-05-02T10:00:00.000Z'
+                  deletionReason: duplicate-observation
+      responses:
+        '200':
+          description: Observation updated through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ObservationVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
@@ -496,7 +1446,7 @@ components:
       type: apiKey
       in: cookie
       name: mediflow_session
-      description: Operator session cookie required for the remote read-only network data plane.
+      description: Operator session cookie required for the remote network data plane.
   responses:
     BadRequest:
       description: Request payload is invalid or missing required mutation metadata.
@@ -620,6 +1570,150 @@ components:
                 entity: patient
                 recordId: patient_123
                 expectedVersion: 7
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
+    EntryVersionConflict:
+      description: |
+        Entry compare-on-write conflict. The payload exposes only PHI-safe
+        metadata so clients can refresh and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EntryVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: entry
+                recordId: entry_123
+                expectedVersion: 2
+                currentVersion: 3
+                currentUpdatedAt: '2026-05-02T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: entry_123
+                  patientId: patient_123
+                  version: 3
+                  updatedAt: '2026-05-02T10:15:00.000Z'
+                  deletedAt: null
+            missingEntry:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: entry
+                recordId: entry_123
+                expectedVersion: 2
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
+    TherapyVersionConflict:
+      description: |
+        Therapy compare-on-write conflict. The payload exposes only PHI-safe
+        metadata so clients can refresh and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TherapyVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: therapy
+                recordId: therapy_123
+                expectedVersion: 2
+                currentVersion: 3
+                currentUpdatedAt: '2026-05-02T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: therapy_123
+                  patientId: patient_123
+                  version: 3
+                  updatedAt: '2026-05-02T10:15:00.000Z'
+                  deletedAt: null
+            missingTherapy:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: therapy
+                recordId: therapy_123
+                expectedVersion: 2
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
+    CheckupVersionConflict:
+      description: |
+        Checkup compare-on-write conflict. The payload exposes only PHI-safe
+        metadata so clients can refresh and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CheckupVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: checkup
+                recordId: checkup_123
+                expectedVersion: 2
+                currentVersion: 3
+                currentUpdatedAt: '2026-05-02T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: checkup_123
+                  patientId: patient_123
+                  version: 3
+                  updatedAt: '2026-05-02T10:15:00.000Z'
+                  deletedAt: null
+            missingCheckup:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: checkup
+                recordId: checkup_123
+                expectedVersion: 2
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
+    ObservationVersionConflict:
+      description: |
+        Observation compare-on-write conflict. The payload exposes only PHI-safe
+        metadata so clients can refresh and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservationVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: observation
+                recordId: observation_123
+                expectedVersion: 2
+                currentVersion: 3
+                currentUpdatedAt: '2026-05-02T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: observation_123
+                  patientId: patient_123
+                  version: 3
+                  updatedAt: '2026-05-02T10:15:00.000Z'
+                  deletedAt: null
+            missingObservation:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: observation
+                recordId: observation_123
+                expectedVersion: 2
                 currentVersion: null
                 currentUpdatedAt: null
                 currentState: missing
@@ -1075,6 +2169,15 @@ components:
           enum:
             - network.pairing.bootstrap
             - network.replica.readonly-patients
+            - network.replica.readonly-clinical-diary
+            - network.replica.write-patient-profile
+            - network.replica.write-clinical-diary
+            - network.replica.readonly-therapies
+            - network.replica.write-therapies
+            - network.replica.readonly-checkups
+            - network.replica.write-checkups
+            - network.replica.readonly-observations
+            - network.replica.write-observations
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync
@@ -1412,6 +2515,721 @@ components:
             - string
             - 'null'
           format: date-time
+    EntryDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - type
+        - title
+        - date
+        - content
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        content:
+          type: string
+        setting:
+          type:
+            - string
+            - 'null'
+          enum:
+            - home
+            - hospital
+            - ambulatory
+            - null
+        metadata:
+          type:
+            - string
+            - 'null'
+        attachments:
+          type:
+            - string
+            - 'null'
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    EntryCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - date
+        - content
+      description: |
+        Clinical diary creation payload for paired clients. Server-controlled
+        `patientId`, `createdAt`, `updatedAt`, and `version` are rejected, and
+        remote attachment/document-derived writes remain outside this boundary.
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        content:
+          type: string
+        setting:
+          type:
+            - string
+            - 'null'
+          enum:
+            - home
+            - hospital
+            - ambulatory
+            - null
+        metadata:
+          description: Opaque client-prepared metadata stored as JSON text.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+            - type: 'null'
+    EntryMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial clinical diary update payload. At least one field other than
+        `version` must be provided. Attachment/document-derived writes are
+        rejected by the paired boundary.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        type:
+          type: string
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        content:
+          type: string
+        setting:
+          type:
+            - string
+            - 'null'
+          enum:
+            - home
+            - hospital
+            - ambulatory
+            - null
+        metadata:
+          description: Opaque client-prepared metadata stored as JSON text.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+            - type: 'null'
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+    EntryCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    TherapyDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - drugName
+        - dosage
+        - status
+        - startDate
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        drugName:
+          type: string
+        aic:
+          type:
+            - string
+            - 'null'
+        atc:
+          type:
+            - string
+            - 'null'
+        activePrinciple:
+          type:
+            - string
+            - 'null'
+        dosage:
+          type: string
+        motivation:
+          type:
+            - string
+            - 'null'
+        diagnosisCode:
+          type:
+            - string
+            - 'null'
+        diagnosisName:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+            - completed
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    TherapyCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - drugName
+        - dosage
+        - startDate
+      description: |
+        Therapy creation payload for paired clients. Server-controlled
+        `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
+        `deletionReason` are rejected. AI/document-derived writes remain outside
+        this boundary.
+      properties:
+        id:
+          type: string
+        drugName:
+          type: string
+        aic:
+          type:
+            - string
+            - 'null'
+        atc:
+          type:
+            - string
+            - 'null'
+        activePrinciple:
+          type:
+            - string
+            - 'null'
+        dosage:
+          type: string
+        motivation:
+          type:
+            - string
+            - 'null'
+        diagnosisCode:
+          type:
+            - string
+            - 'null'
+        diagnosisName:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+            - completed
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    TherapyMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial therapy update payload. At least one field other than `version`
+        must be provided. AI/document-derived writes and remote hard delete are
+        rejected by the paired boundary.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        drugName:
+          type: string
+        aic:
+          type:
+            - string
+            - 'null'
+        atc:
+          type:
+            - string
+            - 'null'
+        activePrinciple:
+          type:
+            - string
+            - 'null'
+        dosage:
+          type: string
+        motivation:
+          type:
+            - string
+            - 'null'
+        diagnosisCode:
+          type:
+            - string
+            - 'null'
+        diagnosisName:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+            - completed
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+    TherapyCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    CheckupDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - date
+        - title
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        date:
+          type: string
+          format: date-time
+        title:
+          type: string
+        notes:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+            - cancelled
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    CheckupCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - date
+        - title
+      description: |
+        Checkup creation payload for paired clients. Server-controlled
+        `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
+        `deletionReason` are rejected. AI/document-derived writes remain outside
+        this boundary.
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date-time
+        title:
+          type: string
+        notes:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+            - cancelled
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+    CheckupMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial checkup update payload. At least one field other than `version`
+        must be provided. AI/document-derived writes and remote hard delete are
+        rejected by the paired boundary.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        date:
+          type: string
+          format: date-time
+        title:
+          type: string
+        notes:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+            - cancelled
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+    CheckupCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    ObservationDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - codeSystem
+        - code
+        - display
+        - unitSystem
+        - unitCode
+        - value
+        - observedAt
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        codeSystem:
+          type: string
+          const: LOINC
+        code:
+          type: string
+        display:
+          type: string
+        unitSystem:
+          type: string
+          const: UCUM
+        unitCode:
+          type: string
+        value:
+          type: string
+        notes:
+          type:
+            - string
+            - 'null'
+        observedAt:
+          type: string
+          format: date-time
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ObservationCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - codeSystem
+        - code
+        - display
+        - unitSystem
+        - unitCode
+        - value
+        - observedAt
+      description: |
+        Observation creation payload for paired clients. Server-controlled
+        `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
+        `deletionReason` are rejected. AI/document-derived writes remain outside
+        this boundary. Observation codes are limited to LOINC and units to UCUM
+        for this first paired slice.
+      properties:
+        id:
+          type: string
+        codeSystem:
+          type: string
+          const: LOINC
+        code:
+          type: string
+        display:
+          type: string
+        unitSystem:
+          type: string
+          const: UCUM
+        unitCode:
+          type: string
+        value:
+          oneOf:
+            - type: string
+            - type: number
+        notes:
+          type:
+            - string
+            - 'null'
+        observedAt:
+          type: string
+          format: date-time
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+    ObservationMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      description: |
+        Partial observation update payload. At least one field other than
+        `version` must be provided. AI/document-derived writes and remote hard
+        delete are rejected by the paired boundary.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        codeSystem:
+          type: string
+          const: LOINC
+        code:
+          type: string
+        display:
+          type: string
+        unitSystem:
+          type: string
+          const: UCUM
+        unitCode:
+          type: string
+        value:
+          oneOf:
+            - type: string
+            - type: number
+        notes:
+          type:
+            - string
+            - 'null'
+        observedAt:
+          type: string
+          format: date-time
+        source:
+          type:
+            - string
+            - 'null'
+          enum:
+            - manual
+            - ai_suggestion
+            - null
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
+    ObservationCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
     PatientMutationRequest:
       type: object
       additionalProperties: false
@@ -1570,4 +3388,300 @@ components:
         currentSnapshot:
           oneOf:
             - $ref: '#/components/schemas/PatientConflictSnapshot'
+            - type: 'null'
+    EntryConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - version
+        - updatedAt
+        - deletedAt
+      description: PHI-safe server snapshot for the currently stored diary entry row.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    EntryVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: entry
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/EntryConflictSnapshot'
+            - type: 'null'
+    TherapyConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - version
+        - updatedAt
+        - deletedAt
+      description: PHI-safe server snapshot for the currently stored therapy row.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    TherapyVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: therapy
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/TherapyConflictSnapshot'
+            - type: 'null'
+    CheckupConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - version
+        - updatedAt
+        - deletedAt
+      description: PHI-safe server snapshot for the currently stored checkup row.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    CheckupVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: checkup
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/CheckupConflictSnapshot'
+            - type: 'null'
+    ObservationConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - version
+        - updatedAt
+        - deletedAt
+      description: PHI-safe server snapshot for the currently stored observation row.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ObservationVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: observation
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/ObservationConflictSnapshot'
             - type: 'null'

@@ -174,8 +174,9 @@ test('document import reconciles diagnoses and therapies before patient creation
   await expect(page).toHaveURL(/\/$/);
   const search = page.getByTestId('patients-search-input');
   await search.fill(lastName);
-  const patientLink = page.getByRole('link', { name: new RegExp(`${lastName} ${firstName}`) }).first();
-  await expect(patientLink).toBeVisible();
+  const patientCard = page.getByRole('article').filter({ hasText: `${lastName} ${firstName}` }).first();
+  await expect(patientCard).toBeVisible();
+  const patientLink = patientCard.getByRole('link', { name: /Apri/ }).first();
   await waitForUnlockedInteractiveShell(page);
   await Promise.all([
     page.waitForURL(/\/patients\/.+/, { timeout: 20_000 }),
@@ -183,8 +184,8 @@ test('document import reconciles diagnoses and therapies before patient creation
   ]);
 
   await expect(page.getByText('Caricamento cartella paziente...')).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByText(/5A11/)).toBeVisible();
-  await expect(page.getByText(diagnosisLabel)).toBeVisible();
-  await expect(page.getByText('Humalog KwikPen')).toBeVisible();
-  await expect(page.getByText('4 U ai pasti principali')).toBeVisible();
+  await expect(page.getByText('5A11', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(diagnosisLabel).first()).toBeVisible();
+  await expect(page.getByText('Humalog KwikPen').first()).toBeVisible();
+  await expect(page.getByText('4 U ai pasti principali').first()).toBeVisible();
 });

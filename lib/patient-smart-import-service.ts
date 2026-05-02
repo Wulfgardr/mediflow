@@ -11,6 +11,8 @@ import {
 } from './ai-task-contracts';
 import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from './db';
 /* @Codex */
+import { clinicalRichTextToPlainText } from './clinical-rich-text';
+/* @Codex */
 import { dedupeDocumentInsightsForContext } from './document-insight-context';
 /* @Codex */
 import { renderDocumentEvidencePackContext } from './document-evidence-pack';
@@ -360,7 +362,7 @@ function buildSourceRecords(
         .slice(0, 6)
         .forEach((entry) => {
             /* @Codex */
-            splitPromptSourceSegments(entry.content, 4).forEach((segment, index) => {
+            splitPromptSourceSegments(clinicalRichTextToPlainText(entry.content), 4).forEach((segment, index) => {
                 records.push({
                     id: `entry:${entry.id}:${index + 1}`,
                     kind: 'clinical-entry',

@@ -8,13 +8,15 @@ Riferimenti correlati:
 
 ## Avvio con doppio click (consigliato)
 
-1) Avvia la web app, se non è già attiva:
+1) Avvia la web app locale, se non è già attiva:
 
 ```bash
 ./Start_MediFlow.command
 ```
 
-2) Fai doppio click su:
+`Start_MediFlow.command` resta il launcher della superficie web e dei servizi locali opzionali; non apre il client Apple.
+
+2) Avvia separatamente il client nativo:
 
 ```
 ./scripts/Launch_MediFlowMac.command

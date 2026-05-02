@@ -7,7 +7,9 @@ import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
+    parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentEvidencePack,
+    serializeDocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
 
 test('parses explicit medications from the model JSON payload', () => {
@@ -208,6 +210,9 @@ test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence ch
 
     const evaluation = evaluateDocumentParseEvidenceArtifact(casePack, artifact);
     const evidencePack = projectDocumentEvidencePack(artifact);
+    const parsedArtifact = parseDocumentParseEvidenceArtifactSnapshot(
+        serializeDocumentParseEvidenceArtifact(artifact),
+    );
 
     assert.deepEqual(evaluation.missingKinds, []);
     assert.deepEqual(evaluation.leakedNegativeAssertions, []);
@@ -217,9 +222,76 @@ test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence ch
     );
     assert.equal(artifact.source.attachmentId, 'attachment-1');
     assert.equal(artifact.parseBundle.parserDiagnostics.lineCount, 1);
+    assert.ok(artifact.evidenceMemory.sourceGovernance);
+    assert.equal(artifact.evidenceMemory.sourceGovernance.freshness, 'recent');
+    assert.match(
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.map((candidate) => candidate.label).join('\n'),
+        /carcinoma mammario/i,
+    );
+    assert.match(
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.map((candidate) => candidate.label).join('\n'),
+        /frattura di polso/i,
+    );
+    assert.equal(
+        parsedArtifact?.evidenceMemory.sourceGovernance?.suppressedCandidates.length,
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.length,
+    );
     assert.equal(evidencePack.facts.length, artifact.evidenceMemory.facts.length);
+    assert.equal(
+        evidencePack.sourceGovernance?.suppressedCandidates.length,
+        artifact.evidenceMemory.sourceGovernance.suppressedCandidates.length,
+    );
     assert.match(
         evidencePack.facts.map((fact) => fact.label).join('\n'),
         /Frattura pertrocanterica del femore sinistro/,
     );
+    assert.doesNotMatch(
+        evidencePack.facts.map((fact) => fact.label).join('\n'),
+        /Carcinoma mammario|frattura di polso/i,
+    );
+});
+
+test('buildDocumentParseEvidenceArtifact maps sections, anchors facts, and keeps therapy context conflicts explicit', () => {
+    const rawMarkdown = [
+        'Diagnosi: Scompenso cardiaco riacutizzato.',
+        'Terapia corrente: Furosemide 25 mg 1 cp ore 8.',
+        'Terapia alla dimissione: Furosemide 50 mg 1 cp ore 8.',
+        'Indicazioni: dieta iposodica e controllo peso quotidiano.',
+        'Follow-up: controllo cardiologico tra 7 giorni.',
+    ].join('\n');
+
+    const artifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: 'doc-section-aware-1',
+        attachmentId: 'attachment-section-aware-1',
+        fileName: 'dimissione-section-aware.pdf',
+        documentDate: '2026-04-10T00:00:00.000Z',
+        qualityLevel: 'green',
+        summary: 'Dimissione con terapia corrente, terapia alla dimissione e follow-up separati.',
+        rawMarkdown,
+        diagnoses: [{
+            code: 'I50.9',
+            description: 'Scompenso cardiaco riacutizzato',
+            system: 'ICD-10',
+            evidence: 'Diagnosi: Scompenso cardiaco riacutizzato.',
+            confidence: 'high',
+        }],
+        medications: ['Furosemide 25 mg 1 cp ore 8', 'Furosemide 50 mg 1 cp ore 8'],
+    });
+
+    const sectionMap = artifact.parseBundle.sectionMap;
+    assert.ok(sectionMap);
+    assert.equal(sectionMap.diagnostics.unanchoredFactCount, 0);
+    const sectionKinds = Array.from(new Set(sectionMap.sections.map((section) => section.kind))).sort();
+    assert.deepEqual(sectionKinds, ['current_or_ward_medication', 'diagnosis', 'discharge_medication', 'followup', 'recommendations'].sort());
+
+    const currentTherapyAnchor = sectionMap.factAnchors.find((anchor) => anchor.factKind === 'medication' && /25 mg/.test(anchor.snippet));
+    const dischargeTherapyAnchor = sectionMap.factAnchors.find((anchor) => anchor.factKind === 'medication' && /50 mg/.test(anchor.snippet));
+
+    assert.equal(currentTherapyAnchor?.sectionKind, 'current_or_ward_medication');
+    assert.equal(dischargeTherapyAnchor?.sectionKind, 'discharge_medication');
+    assert.ok(sectionMap.factAnchors.every((anchor) => anchor.page >= 1));
+    assert.match(sectionMap.conflicts.map((conflict) => conflict.type).join('\n'), /medication_context_overlap/);
+
+    const parsedArtifact = parseDocumentParseEvidenceArtifactSnapshot(serializeDocumentParseEvidenceArtifact(artifact));
+    assert.equal(parsedArtifact?.parseBundle.sectionMap?.diagnostics.conflictCount, 1);
 });

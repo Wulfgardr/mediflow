@@ -14,14 +14,8 @@ import {
     searchStaticTerminology,
     type TerminologyItem,
 } from '@/lib/terminology';
-
 /* @Codex */
-function parseLimit(value: string | null, fallback = 50, max = 200): number {
-    if (!value) return fallback;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return fallback;
-    return Math.min(parsed, max);
-}
+import { parseApiV1Limit } from '@/lib/api-v1-route-helpers';
 
 /* @Codex */
 async function searchAtc(query: string, limit: number): Promise<TerminologyItem[]> {
@@ -79,7 +73,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const system = normalizeTerminologySystem(searchParams.get('system'));
         const q = searchParams.get('q')?.trim() || '';
-        const limit = parseLimit(searchParams.get('limit'), q ? 60 : 100);
+        const limit = parseApiV1Limit(searchParams.get('limit'), q ? 60 : 100, 200);
 
         if (!system) {
             return NextResponse.json({ error: 'Invalid terminology system' }, { status: 400 });

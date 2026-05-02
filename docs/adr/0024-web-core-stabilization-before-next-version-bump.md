@@ -94,7 +94,6 @@ riusabile e verificabile.
 Questa ADR non include:
 
 - rebuild o parity del client macOS
-- merge automatico della review queue Linear gia aperta
 - UI refresh ampio, redesign accessibilita o theme work
 - nuove dipendenze JS/TS
 - unificazione delle semantics `GET` web vs `/api/v1` sui pazienti

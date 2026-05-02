@@ -1,0 +1,235 @@
+[
+  {
+    "id": "siss-accesso-documentazione",
+    "title": "SISS - Accesso alla documentazione",
+    "area": "governance",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/accesso-alla-documentazione",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "catalog", "docs-entrypoint"]
+  },
+  {
+    "id": "siss-modalita-accesso",
+    "title": "SISS - Modalita di accesso",
+    "area": "auth",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/piattaforma-siss/modalita-di-accesso",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "auth", "sso", "smartcard"]
+  },
+  {
+    "id": "siss-integrazione-a2a",
+    "title": "SISS - Integrazione Application to Application",
+    "area": "integration",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/piattaforma-siss/integrazione-application-to-application",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "a2a", "soap", "integration"]
+  },
+  {
+    "id": "siss-ricetta-elettronica",
+    "title": "SISS - Ricetta elettronica",
+    "area": "prescription",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/ricetta-elettronica",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "prescription", "nre", "dematerializzazione"]
+  },
+  {
+    "id": "siss-modulo-prescrittivo-regionale",
+    "title": "SISS - Modulo Prescrittivo Regionale (manuali e specifiche)",
+    "area": "prescription",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "prescription", "manual-import"],
+    "notes": "Documento noto e indicizzato sul portale documentale SISS; acquisizione da completare via ricerca mirata o download autorizzato."
+  },
+  {
+    "id": "siss-anagrafe-regionale-servizio",
+    "title": "SISS - Anagrafe Regionale degli assistiti e delle strutture",
+    "area": "registry",
+    "url": "https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/principali-servizi-offerti/anagrafe-regionale-degli-assistiti-e-delle-strutture",
+    "access": "public",
+    "captureStrategy": "snapshot-html",
+    "refreshHours": 24,
+    "tags": ["siss", "registry", "nar", "assistiti", "ricettari", "prescrittori"],
+    "notes": "Pagina pubblica SISS: NAR come fonte anagrafica regionale, funzioni esenzioni/ticket, medici prescrittori e ricettari assegnati."
+  },
+  {
+    "id": "siss-gestione-assistiti-anagrafe",
+    "title": "SISS - Gestione Anagrafe / iscrizione Assistiti (Gaia/NAR)",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=21",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "registry", "nar", "assistiti", "gaia", "manual-import"],
+    "notes": "Catalogo pubblico SISS: manuali Gaia/Gestione Anagrafe - iscrizione Assistiti; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-anagrafe-medici-specialisti",
+    "title": "SISS - GAMS Gestione Anagrafe Medici Specialisti",
+    "area": "registry",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=10",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "registry", "nar", "prescrittori", "specialisti", "manual-import"],
+    "notes": "Catalogo pubblico SISS: GAMS/Gestione Anagrafe Medici Specialisti; rilevante per contesto prescrittori ma non sufficiente a runtime custom."
+  },
+  {
+    "id": "siss-fse-documento-clinico-elettronico",
+    "title": "SISS - Gestione del Documento Clinico Elettronico presso Enti Erogatori e MMG/PLS",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323489&tipologia=46193753",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "documento-clinico", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-REF#01, versione 10.11, data 01/12/2025; acquisizione completa da eseguire via download autorizzato."
+  },
+  {
+    "id": "siss-fse-consenso-consultazione",
+    "title": "SISS - Consenso alla consultazione FSE",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=6",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "consenso", "consultazione", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SCEN-ACCO#03, versione 2.2, data 23/09/2025; governa consenso/accesso semplificato FSE."
+  },
+  {
+    "id": "siss-seb-fse-gestione-eventi",
+    "title": "SISS - SEB FSE Gestione Eventi",
+    "area": "fse-regionale",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?categoria=15323237&tipologia=46193594",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "fse", "soap", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-SEBC_FSE-SIAA#02, versione 08, data 10/02/2025; interfacce SOAP per servizi esposti dal SEB FSE."
+  },
+  {
+    "id": "siss-certificati-malattia-faq",
+    "title": "SISS - Certificati di malattia FAQ",
+    "area": "certificates",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=23041045",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "certificati", "malattia", "inps", "sar", "manual-import"],
+    "notes": "FAQ pubblica SISS: dichiara interfacce software per integrazione applicativi medico/SISS e chiarisce il boundary SISS qualificato SAR con Carta Operatore."
+  },
+  {
+    "id": "siss-certificati-malattia-webapp-ricovero",
+    "title": "SISS - Web Application Certificati di Malattia in sede di ricovero",
+    "area": "certificates",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=38",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "certificati", "malattia", "inps", "webapp", "manual-import"],
+    "notes": "Catalogo pubblico SISS: Web Application Certificati di Malattia (INPS), video/manualistica per comunicazione inizio ricovero e certificato in dimissione."
+  },
+  {
+    "id": "siss-sgdt-pai-cooperazione-mmg",
+    "title": "SISS - SGDT/PAI cooperazione applicativa CE-MMG",
+    "area": "sgdt",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=35",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "pai", "ce-mmg", "fhir", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-COOP-FHIR_PIC#02, versione 1.0, data 02/10/2024; cooperazione applicativa con Cartelle Elettroniche MMG/PLS per PAI pazienti cronici."
+  },
+  {
+    "id": "siss-sgdt-cot-transizioni-mmg",
+    "title": "SISS - SGDT/COT interconnessione Centrali Operative Territoriali per MMG/PLS",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "cot", "mmg", "pls", "transizioni", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORMS-MRS#899, versione 1.1, data 19/12/2025; richieste di transizione registrate dal MMG/PLS in SGDT e gestite tramite Centrali Operative Territoriali."
+  },
+  {
+    "id": "siss-sgdt-vademecum-mmg",
+    "title": "SISS - SGDT vademecum operativo MMG",
+    "area": "sgdt",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "sgdt", "cot", "mmg", "cure-domiciliari", "pai", "manual-import"],
+    "notes": "Catalogo pubblico SISS: CRS-FORM-MES#896, versione 2.0, data 19/12/2025; uso SGDT per attivazione Cure Domiciliari e Presa in Carico dei pazienti cronici da parte di MMG/PLS."
+  },
+  {
+    "id": "fse-support-readme",
+    "title": "FSE 2.0 - it-fse-support README",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/blob/main/README.md",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "gateway", "baseline"]
+  },
+  {
+    "id": "fse-support-integrazione-gateway",
+    "title": "FSE 2.0 - integrazione gateway",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/integrazione-gateway",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "gateway", "rest", "auth"]
+  },
+  {
+    "id": "fse-support-provisioning",
+    "title": "FSE 2.0 - provisioning",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/provisioning",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "provisioning", "certificates"]
+  },
+  {
+    "id": "fse-support-accreditamento",
+    "title": "FSE 2.0 - accreditamento",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-support/tree/main/doc/accreditamento",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "accreditamento", "qualification"]
+  },
+  {
+    "id": "fse-catalogs",
+    "title": "FSE 2.0 - it-fse-catalogs",
+    "area": "fse2",
+    "url": "https://github.com/ministero-salute/it-fse-catalogs",
+    "access": "public",
+    "captureStrategy": "snapshot-github-html",
+    "refreshHours": 24,
+    "tags": ["fse2", "catalogs", "schematron", "schema"]
+  },
+  {
+    "id": "fse-gestione-portal",
+    "title": "FSE - portale gestione manuali e istruzioni",
+    "area": "fse2",
+    "url": "https://gestione.fascicolosanitario.gov.it/",
+    "access": "auth-gated",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["fse2", "portal", "manual-import"],
+    "notes": "Portale autenticato: usare solo come placeholder e punto di accesso ai manuali disponibili per utenti autorizzati."
+  }
+]

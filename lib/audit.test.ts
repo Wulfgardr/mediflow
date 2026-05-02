@@ -13,6 +13,7 @@ import {
     withAuditContextMetadata,
     type AuditRecord,
 } from './audit';
+import { hasValidLocalApiToken } from './local-api-auth';
 
 function buildAuditRecord(overrides: Partial<AuditRecord>): AuditRecord {
     return {
@@ -198,6 +199,55 @@ test('auditContextFromRequest marks shared routes as native only when a valid lo
     }
 });
 
+test('local API token auth accepts Bearer and legacy headers but rejects raw Authorization tokens', () => {
+    const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    process.env.MEDIFLOW_LOCAL_API_TOKEN = 'test-local-token';
+
+    try {
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'Bearer test-local-token',
+                },
+            })),
+            true,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'test-local-token',
+                },
+            })),
+            false,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    'x-mediflow-token': 'test-local-token',
+                },
+            })),
+            true,
+        );
+
+        assert.equal(
+            hasValidLocalApiToken(new Request('https://127.0.0.1/api/v1/patients', {
+                headers: {
+                    Authorization: 'Bearer wrong-token',
+                },
+            })),
+            false,
+        );
+    } finally {
+        if (previousToken === undefined) {
+            delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
+        } else {
+            process.env.MEDIFLOW_LOCAL_API_TOKEN = previousToken;
+        }
+    }
+});
+
 test('buildAuditWriteInputFromRequest derives actor, request id, and PHI-safe metadata from the request context', () => {
     const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
     process.env.MEDIFLOW_LOCAL_API_TOKEN = 'test-local-token';
@@ -297,6 +347,8 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         entry: 0,
         therapy: 0,
         observation: 0,
+        prosthetic_prescription: 0,
+        siss_handoff: 0,
         settings: 0,
     });
     assert.deepEqual(summary.topEventTypes, [

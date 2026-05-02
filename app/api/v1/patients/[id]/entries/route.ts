@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
@@ -26,6 +26,11 @@ function parseLimit(value: string | null): number | null {
 }
 
 /* @Codex */
+function parseIncludeDeleted(value: string | null): boolean {
+    return value === 'true' || value === '1';
+}
+
+/* @Codex */
 function parseDateParam(value: string | null): Date | null {
     if (!value) return null;
     const parsed = new Date(value);
@@ -43,8 +48,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const type = searchParams.get('type')?.trim();
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
+        const includeDeleted = parseIncludeDeleted(searchParams.get('includeDeleted'));
 
         const filters = [eq(entries.patientId, id)];
+        if (!includeDeleted) filters.push(isNull(entries.deletedAt));
         if (type) filters.push(eq(entries.type, type));
         if (dateFrom) filters.push(gte(entries.date, dateFrom));
         if (dateTo) filters.push(lte(entries.date, dateTo));
@@ -58,9 +65,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             id: entry.id,
             patientId: entry.patientId,
             type: entry.type,
+            title: entry.title,
             date: toIsoString(entry.date) ?? new Date(0).toISOString(),
             content: entry.content,
-            createdAt: toIsoString(entry.createdAt)
+            setting: entry.setting ?? null,
+            metadata: entry.metadata ?? null,
+            attachments: entry.attachments ?? null,
+            deletedAt: toIsoString(entry.deletedAt),
+            deletionReason: entry.deletionReason ?? null,
+            version: entry.version,
+            createdAt: toIsoString(entry.createdAt),
+            updatedAt: toIsoString(entry.updatedAt),
         }));
 
         return NextResponse.json(result);

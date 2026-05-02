@@ -18,6 +18,8 @@ const basePayload = {
     exemptions: [],
     messages: [],
     observations: [],
+    prostheticPrescriptions: [],
+    sissHandoffs: [],
     patients: [],
     checkups: [],
     therapies: [],

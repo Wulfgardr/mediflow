@@ -1,14 +1,8 @@
 # Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.5.0 (release corrente) — Marzo 2026
-> Fonte roadmap prodotto canonica (vedi anche [docs/README.md](./README.md) per mappa completa documenti).
-
-> [!NOTE]
-> Per chi arriva dalla `v0.3` pubblica, il salto da leggere oggi è `0.3 -> 0.5`.
-> `v0.4.0` resta una tappa tecnica decisiva, ma non è più la cornice narrativa giusta per il frontespizio del progetto.
-
----
+> v0.6.0 (release corrente) — Maggio 2026
+> Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 ## Fatto (v0.3.0)
 
@@ -52,11 +46,49 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ---
 
-## In corso (post-v0.5)
+## Fatto (v0.6.0)
+
+`v0.6.0` chiude il ciclo post-`v0.5`: il prodotto assume una forma piu
+completa come sistema local-first con Mac `home-base`, client Apple paired,
+document intelligence artifact-first e integrazioni regionali governate da
+boundary espliciti.
+
+* **Mac come home-base concreto**: pairing esplicito, capability discovery,
+  data plane pazienti e primi write versionati sono su `main`; il bundle macOS
+  puo avviare/fermare backend production e proxy TLS e mostra health read-only
+  dei servizi locali opzionali.
+* **Family Apple paired non-AI**: iPhone/iPad entrano nel disegno con core
+  condiviso, cache mobile cifrata degradabile e primi workflow online
+  versionati su profilo/status, diario, terapie, checkup e osservazioni.
+* **Document intelligence artifact-first**: `parse/evidence` cifrato sugli
+  allegati, `sectionMap`, ancore fonte e conflitti reviewable diventano la base
+  runtime prudente per `Patient Insight` e create-flow documentale.
+* **SISS/FSE piu maturo ma onesto**: corpus locale con sync/freshness,
+  scenario notes per prescrittivo, FSE, NAR, SGDT/PAI/COT e certificati, e
+  boundary `webapp-assisted` finche non esiste una qualifica `SSI/A2A`.
+* **AI governance piu netta**: MLX e benchmark-visible e diagnosticabile, ma
+  non runtime clinico; le lane OpenMed/NER/TurboQuant/comparator restano
+  benchmark-only o shadow.
+* **Governance operativa chiusa**: la coda di lavoro MediFlow e stata azzerata;
+  i contenitori storici sono stati rolluppati, chiusi o cancellati quando
+  obsoleti.
+
+> Nota: `v0.6.0` non dichiara sync completo, multi-master, attachment remoti,
+> cataloghi remoti, prescribing SISS nativo o AI cloud di default. Questi restano
+> esplicitamente fuori dal claim di release.
+
+---
+
+## In corso (post-v0.6)
+
+La lettura operativa piu completa del ciclo post-v0.6 e ora
+[docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
+roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
+boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Modalita network home-base
 
-* **Nodo centrale locale**: pairing esplicito, capability discovery e primo data plane read-only sono gia entrati su `main`; restano da estendere UX, replica e write boundary.
+* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie, checkup e osservazioni sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici senza rompere il boundary.
 * **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita ancora da promuovere oltre il mirror/snapshot governato.
 * **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud e ancora separata dal data plane clinico.
 
@@ -67,15 +99,22 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 
 ### Esperienza nativa
 
-* **Nuova shell macOS**: rebuild controllato dell'app nativa, preservando `/api/v1`, TLS locale e semantica security/sessione.
-* **Parita futura per sweep**: riaprire il filone parity solo dopo il nuovo shell, non sul client storico.
-* **App iPadOS/iOS**: consultazione rapida in mobilita coerente con il modello `home-base`, paired e read-only-first.
+* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
+* **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
+* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie, checkup e osservazioni, cache locale cifrata degradabile e nessun accesso diretto al file SQLite del Mac.
 
-### Profili locali di preview
+### Shell ufficiale e sperimentazioni controllate
 
-* **Preview profilo interfaccia**: confronto tra baseline clinica e direzione `Liquid`.
-* **Preview stack AI**: verifica locale di fette AI senza promuoverle in automatico nel runtime.
-* **Preview smart import e SISS context**: sperimentazione controllata su percorsi review-first e pannello contestuale, senza cambiare il profilo stabile del checkout.
+* **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
+* **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
+* **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
+* **Guardrail locali**: revision fingerprint, `/api/system/revision` e reset `.next` source-aware riducono il rischio di testare una shell stale.
+
+### SISS/FSE e base documentale regionale
+
+* **Boundary attuale**: MediFlow prepara il contesto e richiama percorsi ufficiali; il prescrittivo resta `webapp-assisted` e non una UI regionale custom dentro MediFlow.
+* **Corpus locale SISS/FSE**: manifest sorgenti, fetch/sync incrementale e report di freschezza sono gia su `main` come base di lavoro documentale, fuori dal runtime clinico.
+* **Integrazione piu profonda**: prima di codice runtime servono scenari approvati, qualifica/provisioning coerenti con `SSI/A2A` e documentazione scenario-specific verificabile.
 
 ### Interazione vocale
 
