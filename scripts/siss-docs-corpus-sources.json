@@ -106,15 +106,15 @@
     "notes": "Il portale pubblico conferma la presenza di documentazione di supporto; la raccolta strutturata va completata fuori da scraping fragile."
   },
   {
-    "id": "siss-sgdt",
-    "title": "SISS - SGDT / servizi territoriali adiacenti",
+    "id": "siss-sgdt-pai-cooperazione-mmg",
+    "title": "SISS - SGDT/PAI cooperazione applicativa CE-MMG",
     "area": "sgdt",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do",
+    "url": "https://siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=35",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "sgdt", "manual-import"],
-    "notes": "Placeholder per la documentazione SGDT e servizi territoriali correlati."
+    "tags": ["siss", "sgdt", "pai", "ce-mmg", "fhir", "manual-import"],
+    "notes": "Catalogo pubblico SISS: DC-COOP-FHIR_PIC#02, versione 1.0, data 02/10/2024; cooperazione applicativa con Cartelle Elettroniche MMG/PLS per PAI pazienti cronici."
   },
   {
     "id": "fse-support-readme",

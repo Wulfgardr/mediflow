@@ -15,6 +15,7 @@ Riferimenti canonici:
 - [docs/markdown-index.md](./markdown-index.md)
 - [docs/siss-baseline.md](./siss-baseline.md)
 - [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
+- [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 - [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md)
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 
@@ -157,7 +158,7 @@ Questa e un'inferenza utile, non una prova contrattuale completa:
 | `Prescrittivo` con UI totalmente custom MediFlow su backend SISS | `Non dimostrato con sole fonti pubbliche raccolte` | abbiamo prove di webapp e WS, non ancora di un contratto pubblico sufficiente a ricostruire in proprio tutto il workflow prescrittivo |
 | `FSE` contestuale/embedded nel gestionale | `Fattibile con onboarding regionale e scenari dedicati` | esistono scenari FSE, gestione consenso e interfacce dedicate, ma non un via libera pubblico a un feed embedded arbitrario |
 | `Anagrafe Regionale`/esenzioni in UI MediFlow | `Probabile con onboarding regionale, non ancora provato end-to-end` | le FAQ e il modello SISS indicano servizi applicativi; mancano ancora le specifiche raccolte nel corpus corrente |
-| `SGDT` contestuale dal paziente | `Parzialmente documentato` | esiste un caso cooperativo specifico per PAI integrato con `SSI-MMG`, non ancora una prova di shell paziente generica SGDT |
+| `SGDT` contestuale dal paziente | `Non disponibile come launcher generico` | esiste un caso cooperativo specifico per PAI integrato con `SSI-MMG`, ma non una prova di shell paziente generica SGDT |
 | `Certificati di malattia` contestuali | `Non ancora sufficientemente documentato` | il filone esiste a catalogo e in FAQ/manualistica, ma non abbiamo ancora ricostruito il contratto tecnico utile per MediFlow |
 
 ## Cosa possiamo implementare adesso senza oltrepassare il perimetro
@@ -210,6 +211,8 @@ Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
    - resta un filone piu verticale e specifico
    - oggi non e il candidato migliore per la prima integrazione ampia dentro
      MediFlow
+   - nota canonica dedicata:
+     [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 
 `Certificati di malattia` restano per ora fuori da questa priorita, non perche
 irrilevanti, ma perche il materiale pubblico raccolto fin qui non basta ancora a

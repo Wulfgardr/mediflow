@@ -75,6 +75,11 @@ scenario-specific:
 La mappa decisionale di prodotto per questi documenti e in
 [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md).
 
+Per SGDT il manifest non mantiene un placeholder generico: il caso emerso dalle
+fonti pubbliche resta `DC-COOP-FHIR_PIC#02`, cioe cooperazione applicativa
+SGDT/PAI con Cartelle Elettroniche `MMG/PLS`. La mappa decisionale e in
+[docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md).
+
 ## Comandi
 
 Validazione del manifest:
