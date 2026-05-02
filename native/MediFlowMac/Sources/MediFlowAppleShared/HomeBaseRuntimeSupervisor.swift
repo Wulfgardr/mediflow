@@ -41,10 +41,16 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     private var managedBackendProcess: Process?
     private let fileManager: FileManager
     private let processInfo: ProcessInfo
+    private let stopGraceNanoseconds: UInt64
 
-    public init(fileManager: FileManager = .default, processInfo: ProcessInfo = .processInfo) {
+    public init(
+        fileManager: FileManager = .default,
+        processInfo: ProcessInfo = .processInfo,
+        stopGraceNanoseconds: UInt64 = 1_500_000_000
+    ) {
         self.fileManager = fileManager
         self.processInfo = processInfo
+        self.stopGraceNanoseconds = stopGraceNanoseconds
     }
 
     public func startProxy(snapshot: HomeBaseRuntimeSnapshot) async {
@@ -73,10 +79,10 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 .path
 
             if let managedProxyProcess, managedProxyProcess.isRunning {
-                managedProxyProcess.terminate()
+                let didStop = await stop(process: managedProxyProcess)
                 self.managedProxyProcess = nil
                 try? fileManager.removeItem(atPath: pidPath)
-                statusMessage = "Stop proxy TLS richiesto."
+                statusMessage = didStop ? "Stop proxy TLS completato." : "Proxy TLS forzato dopo timeout."
                 return
             }
 
@@ -86,9 +92,9 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 return
             }
 
-            _ = kill(pid, SIGTERM)
+            let didStop = await stop(pid: pid)
             try? fileManager.removeItem(atPath: pidPath)
-            statusMessage = "Stop proxy TLS richiesto."
+            statusMessage = didStop ? "Stop proxy TLS completato." : "Proxy TLS forzato dopo timeout."
         }
         #else
         errorMessage = "La supervisione runtime e disponibile solo su macOS."
@@ -118,10 +124,10 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
             let pidPath = snapshot.webBackendPidPath
 
             if let managedBackendProcess, managedBackendProcess.isRunning {
-                managedBackendProcess.terminate()
+                let didStop = await stop(process: managedBackendProcess)
                 self.managedBackendProcess = nil
                 try? fileManager.removeItem(atPath: pidPath)
-                statusMessage = "Stop backend web richiesto."
+                statusMessage = didStop ? "Stop backend web completato." : "Backend web forzato dopo timeout."
                 return
             }
 
@@ -131,9 +137,9 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 return
             }
 
-            _ = kill(pid, SIGTERM)
+            let didStop = await stop(pid: pid)
             try? fileManager.removeItem(atPath: pidPath)
-            statusMessage = "Stop backend web richiesto."
+            statusMessage = didStop ? "Stop backend web completato." : "Backend web forzato dopo timeout."
         }
         #else
         errorMessage = "La supervisione runtime e disponibile solo su macOS."
@@ -262,16 +268,54 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         throw HomeBaseRuntimeSupervisorError.missingNode
     }
 
-    private func runSupervisorAction(_ action: () throws -> Void) async {
+    private func runSupervisorAction(_ action: () async throws -> Void) async {
         isWorking = true
         errorMessage = nil
         defer { isWorking = false }
         do {
-            try action()
+            try await action()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
+
+    #if os(macOS)
+    private func stop(process: Process) async -> Bool {
+        process.terminate()
+        let didStop = await Self.waitUntilExited(process: process, timeoutNanoseconds: stopGraceNanoseconds)
+        if !didStop {
+            _ = kill(process.processIdentifier, SIGKILL)
+            return await Self.waitUntilExited(process: process, timeoutNanoseconds: 500_000_000)
+        }
+        return true
+    }
+
+    private func stop(pid: pid_t) async -> Bool {
+        _ = kill(pid, SIGTERM)
+        let didStop = await Self.waitUntilExited(pid: pid, timeoutNanoseconds: stopGraceNanoseconds)
+        if !didStop {
+            _ = kill(pid, SIGKILL)
+            return await Self.waitUntilExited(pid: pid, timeoutNanoseconds: 500_000_000)
+        }
+        return true
+    }
+
+    private static func waitUntilExited(process: Process, timeoutNanoseconds: UInt64) async -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while process.isRunning && DispatchTime.now().uptimeNanoseconds < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return !process.isRunning
+    }
+
+    private static func waitUntilExited(pid: pid_t, timeoutNanoseconds: UInt64) async -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while isProcessRunning(pid: pid) && DispatchTime.now().uptimeNanoseconds < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return !isProcessRunning(pid: pid)
+    }
+    #endif
 
     private static func readPid(pidPath: String) -> pid_t? {
         guard let raw = try? String(contentsOfFile: pidPath, encoding: .utf8),

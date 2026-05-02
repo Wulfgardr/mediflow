@@ -495,9 +495,9 @@ bundle compilato e ora il shell Apple/home-base: il pannello `Runtime` legge
 `native-config.json` e `runtime-status.json` per mostrare readiness locale senza
 esporre token, certificati, chiavi o dati paziente. Il pannello puo avviare e
 arrestare esplicitamente il backend web production standalone e il proxy TLS
-inclusi nel bundle. Ollama e Docker/ICD compaiono solo come health diagnostico
-read-only se gia attivi su localhost; non vengono installati, avviati o
-arrestati dalla app.
+inclusi nel bundle con stop bounded/escalation locale. Ollama e Docker/ICD
+compaiono solo come health diagnostico read-only se gia attivi su localhost; non
+vengono installati, avviati o arrestati dalla app.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
 operabilita amministrativa dei dataset condivisi: count/stato, import JSON e

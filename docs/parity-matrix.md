@@ -76,7 +76,7 @@ Apple-native/home-base (`WUL-187`/`WUL-194`).
 - finestra primaria Apple Foundation/home-base invece del prototipo oncologico;
 - pannello runtime con config nativa, presenza token, PID backend/proxy,
   modalita rete, fingerprint TLS e start/stop esplicito di backend web
-  production + proxy TLS inclusi nel bundle;
+  production + proxy TLS inclusi nel bundle, con stop bounded/escalation;
 - health diagnostico read-only per Ollama e Docker/ICD se gia attivi, senza
   installazione, avvio, arresto o supervisione app-managed.
 

@@ -72,5 +72,29 @@ if [[ -d "$ROOT_DIR/public" ]]; then
   cp -R "$ROOT_DIR/public" "$WEB_RUNTIME_DIR/public"
 fi
 
+if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
+  echo "Signing app bundle with MEDIFLOW_CODESIGN_IDENTITY..."
+  if [[ "$MEDIFLOW_CODESIGN_IDENTITY" == "-" ]]; then
+    codesign --force --deep --sign - "$APP_DIR"
+  else
+    codesign --force --deep --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY" "$APP_DIR"
+  fi
+fi
+
+if [[ -n "${MEDIFLOW_NOTARY_PROFILE:-}" ]]; then
+  if [[ -z "${MEDIFLOW_CODESIGN_IDENTITY:-}" || "${MEDIFLOW_CODESIGN_IDENTITY:-}" == "-" ]]; then
+    echo "Notarization requires a Developer ID MEDIFLOW_CODESIGN_IDENTITY, not ad-hoc signing."
+    exit 1
+  fi
+  NOTARY_ZIP="$BUILD_DIR/MediFlowMac-notary.zip"
+  rm -f "$NOTARY_ZIP"
+  ditto -c -k --keepParent "$APP_DIR" "$NOTARY_ZIP"
+  xcrun notarytool submit "$NOTARY_ZIP" --keychain-profile "$MEDIFLOW_NOTARY_PROFILE" --wait || {
+    echo "Notarization failed."
+    exit 1
+  }
+  xcrun stapler staple "$APP_DIR"
+fi
+
 echo "App bundle created at $APP_DIR"
 echo "Web runtime copied to $WEB_RUNTIME_DIR"
