@@ -56,7 +56,7 @@ public struct HomeBasePairedCredentials: Hashable, Sendable {
     }
 }
 
-public struct HomeBasePatientSummary: Identifiable, Decodable, Hashable, Sendable {
+public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let firstName: String
     public let lastName: String
@@ -68,7 +68,7 @@ public struct HomeBasePatientSummary: Identifiable, Decodable, Hashable, Sendabl
     public let updatedAt: Date?
 }
 
-public struct HomeBasePatientDetail: Identifiable, Decodable, Hashable, Sendable {
+public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let firstName: String
     public let lastName: String

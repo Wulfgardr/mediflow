@@ -138,7 +138,10 @@ capability + version`. Non coprono cache offline o UI mobile completa.
 Restano gap WUL-193, non regressioni nascoste:
 
 - mobile CRUD UI completa per moduli core;
-- cache locale cifrata e riconciliazione esplicita;
+- cache locale cifrata e riconciliazione esplicita. La prima slice WUL-193
+  persiste uno snapshot cifrato della lista pazienti, lo usa solo come
+  consultazione locale `paired-offline-degraded` entro una soglia di freschezza
+  e non abilita ancora scritture offline o coda di merge;
 - parity UI clinica completa macOS generalista oltre il runtime shell.
 
 Questi gap non devono essere convertiti in `covered` finche non esiste evidenza
