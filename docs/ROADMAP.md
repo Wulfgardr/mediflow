@@ -55,7 +55,7 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Modalita network home-base
 
-* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie e checkup sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici.
+* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie, checkup e osservazioni sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici.
 * **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita ancora da promuovere oltre il mirror/snapshot governato.
 * **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud e ancora separata dal data plane clinico.
 
@@ -68,7 +68,7 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 * **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
 * **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
-* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie e checkup, cache locale cifrata futura e nessun accesso diretto al file SQLite del Mac.
+* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie, checkup e osservazioni, cache locale cifrata futura e nessun accesso diretto al file SQLite del Mac.
 
 ### Shell ufficiale e sperimentazioni controllate
 

@@ -91,6 +91,7 @@
     "test:network:home-base-diary-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-diary-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-therapy-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-therapy-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-checkup-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-checkup-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
+    "test:network:home-base-observation-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-observation-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:native": "bash scripts/native-test.sh",
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",

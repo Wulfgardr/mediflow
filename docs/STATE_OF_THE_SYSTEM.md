@@ -105,7 +105,7 @@ Il disegno Apple non e "tre app con tre store dati". E una family architecture:
 
 Oggi la slice resta read-only-first: il read pazienti e stabile e i write
 remoti sono limitati/versionati a profilo/status paziente, diario clinico,
-terapie e checkup. Hard delete remoto, osservazioni/cataloghi, sync
+terapie, checkup e osservazioni. Hard delete remoto, cataloghi, sync
 record-level, replica automatica e multi-master sono fuori scope corrente.
 
 Documenti/ADR principali:
@@ -172,7 +172,7 @@ Documenti/ADR principali:
 | Web app locale | Primaria | Lavoro clinico quotidiano sul Mac | HTTP localhost, sessione web |
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
-| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie e checkup da device paired | Credenziale device + sessione operatore |
+| `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
 | macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Rebuild controllato |
 | iPhone/iPad | Direzione post-v0.5 | Client paired non-AI, cache derivata futura | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
@@ -231,10 +231,12 @@ Documenti/ADR principali:
 7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
    del diario con capability diary dedicate e `entries.version`, bloccando hard
    delete, attachment remoti, sync e campi AI/documentali.
-8. `/api/v1/network/patients/{id}/therapies*` e
-   `/api/v1/network/patients/{id}/checkups*` seguono lo stesso boundary paired:
-   capability dedicate, `therapies.version`/`checkups.version`, `409` PHI-safe
-   e soft delete, senza hard delete remoto o campi AI/documentali.
+8. `/api/v1/network/patients/{id}/therapies*`,
+   `/api/v1/network/patients/{id}/checkups*` e
+   `/api/v1/network/patients/{id}/observations*` seguono lo stesso boundary
+   paired: capability dedicate, `therapies.version`/`checkups.version`/
+   `observations.version`, `409` PHI-safe e soft delete, senza hard delete
+   remoto o campi AI/documentali.
 
 ---
 
@@ -487,7 +489,7 @@ In piu:
 
 - `/api/v1`: `npm run check:openapi:drift`
 - pazienti/versioning: `npm run test:concurrency:patients`
-- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`, `npm run test:network:home-base-diary-write`, `npm run test:network:home-base-therapy-write`, `npm run test:network:home-base-checkup-write`
+- home-base network: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write`, `npm run test:network:home-base-diary-write`, `npm run test:network:home-base-therapy-write`, `npm run test:network:home-base-checkup-write`, `npm run test:network:home-base-observation-write`
 - document intelligence: `npm run test:document-synthesis`, `npm run
   test:ai-context`, `npm run test:pdf-service`
 - nuova anagrafica da documento: `npm run test:patient-document-import`

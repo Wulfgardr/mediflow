@@ -104,7 +104,52 @@ struct ObservationSummary: Identifiable, Decodable {
     let notes: String?
     let observedAt: Date
     let source: String?
+    /* @Codex */
+    let version: Int?
     let createdAt: Date?
+    /* @Codex */
+    let updatedAt: Date?
+    /* @Codex */
+    let deletedAt: Date?
+    /* @Codex */
+    let deletionReason: String?
+
+    /* @Codex */
+    init(
+        id: String,
+        patientId: String,
+        codeSystem: String,
+        code: String,
+        display: String,
+        unitSystem: String,
+        unitCode: String,
+        value: String,
+        notes: String?,
+        observedAt: Date,
+        source: String?,
+        version: Int? = nil,
+        createdAt: Date?,
+        updatedAt: Date? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.id = id
+        self.patientId = patientId
+        self.codeSystem = codeSystem
+        self.code = code
+        self.display = display
+        self.unitSystem = unitSystem
+        self.unitCode = unitCode
+        self.value = value
+        self.notes = notes
+        self.observedAt = observedAt
+        self.source = source
+        self.version = version
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
+    }
 }
 
 /* @Codex */

@@ -23,7 +23,7 @@ Su `main`, oggi, ci sono già queste cose:
 - **contratto locale `/api/v1`** più esplicito, stabile e riusabile per i client Apple;
 - **document intelligence reviewable**: smart import, nuova anagrafica da documento e primo artifact `parse/evidence`;
 - **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
-- **modalità `network home-base` paired**: pairing esplicito, capability discovery, accesso remoto ai pazienti e write versionati per profilo/status, diario clinico, terapie e checkup da client paired;
+- **modalità `network home-base` paired**: pairing esplicito, capability discovery, accesso remoto ai pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni da client paired;
 - **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
 - **corpus documentale SISS/FSE locale**: fonti approvate, sync incrementale e report di freschezza restano fuori dal runtime clinico ma guidano le integrazioni future;
 - **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
@@ -119,7 +119,7 @@ Situazione attuale:
 
 - **macOS**: esiste uno shell storico, ma non è il punto su cui stratificare le prossime feature;
 - **iPadOS / iOS**: rientrano nel filone paired-client sul nodo `home-base`, ancora in definizione operativa;
-- **multi-device**: la first slice già disponibile è `read-only-first`, con write espliciti e versionati per profilo/status paziente, diario clinico, terapie e checkup, senza hard delete remoto, attachment remoti, osservazioni/cataloghi o sync automatico.
+- **multi-device**: la first slice già disponibile è `read-only-first`, con write espliciti e versionati per profilo/status paziente, diario clinico, terapie, checkup e osservazioni, senza hard delete remoto, attachment remoti, cataloghi o sync automatico.
 
 ---
 

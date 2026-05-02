@@ -37,7 +37,7 @@ MediFlow è un **sistema ibrido locale**:
   - route API locali
   - overview/stato operativo del nodo locale
   - accesso al database SQLite locale
-  - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti, write profilo/status e primi read/write diario clinico, terapie e checkup
+  - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti, write profilo/status e primi read/write diario clinico, terapie, checkup e osservazioni
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
   - ICD-11 Docker API per ricerca diagnosi (localhost)
@@ -53,7 +53,7 @@ MediFlow è un **sistema ibrido locale**:
 Il default resta **local-only sul singolo computer**. Se l'operatore attiva la
 modalita `network-home-base`, lo stesso nodo espone anche `/api/v1/network/*`
 con pairing esplicito, data plane pazienti read-only-first e write limitati a
-profilo/status paziente, diario clinico, terapie e checkup per client trusted su LAN.
+profilo/status paziente, diario clinico, terapie, checkup e osservazioni per client trusted su LAN.
 
 ### Porte locali (default)
 
@@ -95,8 +95,8 @@ MediFlow espone due superfici API:
   - protetta da **token locale** (trasporto su HTTPS locale via TLS proxy)
 - **Network API** (`/api/v1/network/*`):
   - si attiva solo in modalita `network-home-base`
-  - resta read-only-first, con write limitati a profilo/status paziente, diario clinico, terapie e checkup versionati
-  - esclude hard delete remoto, attachment remoti, osservazioni/cataloghi, sync, cache offline e campi AI/documentali
+  - resta read-only-first, con write limitati a profilo/status paziente, diario clinico, terapie, checkup e osservazioni versionati
+  - esclude hard delete remoto, attachment remoti, cataloghi, sync, cache offline e campi AI/documentali
   - richiede pairing esplicito del device + sessione operatore valida
 
 > Obiettivo: i client native non devono dipendere da scraping HTML o dettagli interni React/Next.
@@ -165,7 +165,7 @@ flowchart TB
   - versionato
   - documentato
   - retrocompatibile all'interno della stessa major
-- `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente, diario, terapie e checkup limitati/versionati.
+- `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - `Clinical Workbench / Graphite` resta l'unica shell web ufficiale su `main`;
   nuove sperimentazioni non diventano selector runtime persistiti senza

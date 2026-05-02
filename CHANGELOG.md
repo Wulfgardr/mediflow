@@ -11,6 +11,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - **Update awareness locale**: pannello Impostazioni per confrontare versione installata e versione disponibile dichiarata da runtime/manifest locale, con changelog minimo e azione `Piu tardi` senza egress automatico.
 - **Home-base read-only eseguibile**: modalita `network-home-base`, overview Settings, pairing PHI-safe e primo data plane `/api/v1/network/patients*` protetto da `paired client + sessione operatore`.
+- **Write paired osservazioni**: boundary `/api/v1/network/patients/{id}/observations*` con capability dedicate, `observations.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
 - **Write paired checkup**: boundary `/api/v1/network/patients/{id}/checkups*` con capability dedicate, `checkups.version`, soft delete, `409` PHI-safe e audit, senza hard delete remoto o campi AI/document-derived.
 - **Document intelligence piu esplicita**: first slice runtime del `document evidence ledger` con artifact `parse/evidence` cifrato sugli allegati e primo consumer artifact-first in `AI Patient Insight`.
 - **Nuova anagrafica document-driven reviewable**: create-flow da documento con review esplicita, riconciliazione locale ICD/AIFA e persistenza prudente delle terapie confermate.

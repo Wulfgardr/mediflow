@@ -9,6 +9,8 @@ import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -30,18 +32,6 @@ function parseLimit(value: string | null): number | null {
     const parsed = Number.parseInt(value, 10);
     if (Number.isNaN(parsed) || parsed <= 0) return null;
     return Math.min(parsed, 200);
-}
-
-/* @Codex */
-function normalizeValue(value: unknown): string | null {
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
-    return null;
-}
-
-/* @Codex */
-function normalizeSource(value: unknown): 'manual' | 'ai_suggestion' {
-    return value === 'ai_suggestion' ? 'ai_suggestion' : 'manual';
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -78,7 +68,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             notes: item.notes ?? null,
             observedAt: toIsoString(item.observedAt) ?? new Date(0).toISOString(),
             source: item.source ?? null,
+            version: item.version,
             createdAt: toIsoString(item.createdAt),
+            updatedAt: toIsoString(item.updatedAt),
+            deletedAt: toIsoString(item.deletedAt),
+            deletionReason: item.deletionReason ?? null,
         }));
 
         return NextResponse.json(result);
@@ -97,38 +91,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
         const body = await request.json() as Record<string, unknown>;
-        const codeSystem = typeof body.codeSystem === 'string' ? body.codeSystem.trim().toUpperCase() : '';
-        const code = typeof body.code === 'string' ? body.code.trim() : '';
-        const display = typeof body.display === 'string' ? body.display.trim() : '';
-        const unitSystem = typeof body.unitSystem === 'string' ? body.unitSystem.trim().toUpperCase() : '';
-        const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim() : '';
-        const value = normalizeValue(body.value);
-        const observedAt = parseDateParam(typeof body.observedAt === 'string' ? body.observedAt : null);
-        const notes = typeof body.notes === 'string' ? body.notes : null;
-        const source = normalizeSource(body.source);
-
-        if (!codeSystem || !code || !display || !unitSystem || !unitCode || !value || !observedAt) {
-            return NextResponse.json({ error: 'Missing required observation fields' }, { status: 400 });
-        }
-        if (codeSystem !== 'LOINC' || unitSystem !== 'UCUM') {
-            return NextResponse.json({ error: 'Only LOINC + UCUM observations are supported in this slice' }, { status: 400 });
-        }
 
         const newId = typeof body.id === 'string' ? body.id : uuidv4();
-        await dbServer.insert(observations).values({
+        const normalized = normalizeObservationCreateInput(body, {
             id: newId,
             patientId: id,
-            codeSystem,
-            code,
-            display,
-            unitSystem,
-            unitCode,
-            value,
-            notes,
-            observedAt,
-            source,
-            createdAt: new Date(),
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(observations).values(normalized.values);
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -140,12 +113,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 subjectRef: newId,
                 redactedMetadata: {
                     changedFields: listChangedFields(body, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Observation audit write failed:',
         );
 
-        return NextResponse.json({ id: newId }, { status: 201 });
+        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });

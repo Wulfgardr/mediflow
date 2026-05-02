@@ -142,7 +142,15 @@ export const observations = sqliteTable('observations', {
     notes: text('notes'),
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
 });
 
 /* @Codex */

@@ -49,7 +49,7 @@ Oggi questo perimetro è:
 - paired;
 - protetto da credenziale device + sessione operatore;
 - ancora `read-only-first`, con write limitati a profilo/status paziente,
-  diario clinico, terapie e checkup versionati.
+  diario clinico, terapie, checkup e osservazioni versionati.
 
 ## Ci sono ancora Preview Profiles?
 

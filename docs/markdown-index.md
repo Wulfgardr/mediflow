@@ -162,6 +162,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md) | Formalizza la slice write paired del diario: read/create/update/soft-delete su `/api/v1/network/patients/{id}/entries*` con `entries.version`, capability dedicate, audit PHI-safe e hard delete/attachment/AI fuori scope. |
 | [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md) | Formalizza la slice write paired delle terapie: read/create/update/soft-delete su `/api/v1/network/patients/{id}/therapies*` con `therapies.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | Formalizza la slice write paired dei checkup: read/create/update/soft-delete su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
+| [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | Formalizza la slice write paired delle osservazioni: read/create/update/soft-delete su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 
 ## Checklist manutenzione indice
 

@@ -7,20 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-
 /* @Codex */
-function parseDate(value: unknown): Date | null {
-    if (!value) return null;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-/* @Codex */
-function normalizeValue(value: unknown): string | null {
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
-    return null;
-}
+import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 
 export async function GET(request: Request) {
     const session = await requireSession();
@@ -51,40 +39,20 @@ export async function POST(request: Request) {
         const body = await request.json() as Record<string, unknown>;
 
         const patientId = typeof body.patientId === 'string' ? body.patientId : null;
-        const codeSystem = typeof body.codeSystem === 'string' ? body.codeSystem.trim().toUpperCase() : null;
-        const code = typeof body.code === 'string' ? body.code.trim() : null;
-        const display = typeof body.display === 'string' ? body.display.trim() : null;
-        const unitSystem = typeof body.unitSystem === 'string' ? body.unitSystem.trim().toUpperCase() : null;
-        const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim() : null;
-        const value = normalizeValue(body.value);
-        const observedAt = parseDate(body.observedAt);
-        const notes = typeof body.notes === 'string' ? body.notes : null;
-        const source = body.source === 'ai_suggestion' ? 'ai_suggestion' : 'manual';
-
-        if (!patientId || !codeSystem || !code || !display || !unitSystem || !unitCode || !value || !observedAt) {
+        if (!patientId) {
             return NextResponse.json({ error: 'Missing required observation fields' }, { status: 400 });
         }
 
-        if (codeSystem !== 'LOINC' || unitSystem !== 'UCUM') {
-            return NextResponse.json({ error: 'Only LOINC + UCUM observations are supported in this slice' }, { status: 400 });
-        }
-
         const id = typeof body.id === 'string' ? body.id : uuidv4();
-
-        await dbServer.insert(observations).values({
+        const normalized = normalizeObservationCreateInput(body, {
             id,
             patientId,
-            codeSystem,
-            code,
-            display,
-            unitSystem,
-            unitCode,
-            value,
-            notes,
-            observedAt,
-            source,
-            createdAt: new Date(),
         });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        await dbServer.insert(observations).values(normalized.values);
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -96,12 +64,13 @@ export async function POST(request: Request) {
                 subjectRef: id,
                 redactedMetadata: {
                     changedFields: listChangedFields(body, ['id']),
+                    resourceVersion: 1,
                 },
             },
             '[MediFlow] Observation audit write failed:',
         );
 
-        return NextResponse.json({ id }, { status: 201 });
+        return NextResponse.json({ id, version: 1 }, { status: 201 });
     } catch (error) {
         console.error('API POST /observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });

@@ -135,6 +135,42 @@ type CheckupUpdateValues = {
 export type CheckupSource = 'manual' | 'ai_suggestion';
 
 /* @Codex */
+type ObservationCreateValues = {
+    id: string;
+    patientId: string;
+    codeSystem: 'LOINC';
+    code: string;
+    display: string;
+    unitSystem: 'UCUM';
+    unitCode: string;
+    value: string;
+    notes: string | null;
+    observedAt: Date;
+    source: CheckupSource;
+    version: number;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+    deletionReason: string | null;
+};
+
+/* @Codex */
+type ObservationUpdateValues = {
+    codeSystem?: 'LOINC';
+    code?: string;
+    display?: string;
+    unitSystem?: 'UCUM';
+    unitCode?: string;
+    value?: string;
+    notes?: string | null;
+    observedAt?: Date;
+    source?: CheckupSource | null;
+    updatedAt?: Date;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
+};
+
+/* @Codex */
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }
@@ -323,6 +359,41 @@ export function normalizeOptionalCheckupSource(value: unknown): WriteNormalizati
     }
 
     return normalizeCheckupSource(value);
+}
+
+/* @Codex */
+function normalizeObservationValue(value: unknown, allowClear = false): WriteNormalizationResult<string> {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return { ok: true, values: String(value) };
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        return { ok: true, values: value.trim() };
+    }
+    if (allowClear && (value === null || value === '')) {
+        return { ok: true, values: '' };
+    }
+
+    return { ok: false, error: 'Invalid value field' };
+}
+
+/* @Codex */
+function normalizeObservationCodeSystem(value: unknown): WriteNormalizationResult<'LOINC'> {
+    const codeSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (codeSystem !== 'LOINC') {
+        return { ok: false, error: 'Only LOINC observations are supported' };
+    }
+
+    return { ok: true, values: 'LOINC' };
+}
+
+/* @Codex */
+function normalizeObservationUnitSystem(value: unknown): WriteNormalizationResult<'UCUM'> {
+    const unitSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (unitSystem !== 'UCUM') {
+        return { ok: false, error: 'Only UCUM units are supported' };
+    }
+
+    return { ok: true, values: 'UCUM' };
 }
 
 /* @Codex */
@@ -704,6 +775,137 @@ export function normalizeCheckupUpdateInput(
             updatedAt: updatedAt.values ?? new Date(),
             deletedAt: deletedAt.values,
             deletionReason: hasDeletionReason ? deletionReason.values : undefined,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeObservationCreateInput(
+    input: Record<string, unknown>,
+    context: { id: string; patientId: string; now?: Date }
+): WriteNormalizationResult<ObservationCreateValues> {
+    const now = context.now ?? new Date();
+    const codeSystem = normalizeObservationCodeSystem(input.codeSystem);
+    if (!codeSystem.ok) return codeSystem;
+
+    const code = parseRequiredString(input.code, 'code');
+    if (!code.ok) return code;
+
+    const display = parseRequiredString(input.display, 'display');
+    if (!display.ok) return display;
+
+    const unitSystem = normalizeObservationUnitSystem(input.unitSystem);
+    if (!unitSystem.ok) return unitSystem;
+
+    const unitCode = parseRequiredString(input.unitCode, 'unitCode');
+    if (!unitCode.ok) return unitCode;
+
+    const value = normalizeObservationValue(input.value);
+    if (!value.ok) return value;
+
+    const notes = parseNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+
+    const observedAt = parseRequiredDate(input.observedAt, 'observedAt');
+    if (!observedAt.ok) return observedAt;
+
+    const source = normalizeCheckupSource(input.source);
+    if (!source.ok) return source;
+
+    return {
+        ok: true,
+        values: {
+            id: context.id,
+            patientId: context.patientId,
+            codeSystem: codeSystem.values,
+            code: code.values.trim(),
+            display: display.values.trim(),
+            unitSystem: unitSystem.values,
+            unitCode: unitCode.values.trim(),
+            value: value.values,
+            notes: notes.values,
+            observedAt: observedAt.values,
+            source: source.values,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
+        },
+    };
+}
+
+/* @Codex */
+export function normalizeObservationUpdateInput(
+    input: Record<string, unknown>
+): WriteNormalizationResult<ObservationUpdateValues> {
+    const update: ObservationUpdateValues = {};
+
+    if (Object.prototype.hasOwnProperty.call(input, 'codeSystem')) {
+        const codeSystem = normalizeObservationCodeSystem(input.codeSystem);
+        if (!codeSystem.ok) return codeSystem;
+        update.codeSystem = codeSystem.values;
+    }
+
+    const code = parseOptionalRequiredString(input.code, 'code');
+    if (!code.ok) return code;
+    if (code.values !== undefined) update.code = code.values.trim();
+
+    const display = parseOptionalRequiredString(input.display, 'display');
+    if (!display.ok) return display;
+    if (display.values !== undefined) update.display = display.values.trim();
+
+    if (Object.prototype.hasOwnProperty.call(input, 'unitSystem')) {
+        const unitSystem = normalizeObservationUnitSystem(input.unitSystem);
+        if (!unitSystem.ok) return unitSystem;
+        update.unitSystem = unitSystem.values;
+    }
+
+    const unitCode = parseOptionalRequiredString(input.unitCode, 'unitCode');
+    if (!unitCode.ok) return unitCode;
+    if (unitCode.values !== undefined) update.unitCode = unitCode.values.trim();
+
+    if (Object.prototype.hasOwnProperty.call(input, 'value')) {
+        const value = normalizeObservationValue(input.value);
+        if (!value.ok) return value;
+        update.value = value.values;
+    }
+
+    const notes = parseOptionalNullableString(input.notes, 'notes');
+    if (!notes.ok) return notes;
+    if (notes.values !== undefined) update.notes = notes.values;
+
+    const observedAt = parseOptionalDate(input.observedAt, 'observedAt');
+    if (!observedAt.ok) return observedAt;
+    if (observedAt.values !== undefined) update.observedAt = observedAt.values;
+
+    const source = normalizeOptionalCheckupSource(input.source);
+    if (!source.ok) return source;
+    if (source.values !== undefined) update.source = source.values;
+
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
+
+    if (updatedAt.values !== undefined) update.updatedAt = updatedAt.values;
+    if (deletedAt.values !== undefined) update.deletedAt = deletedAt.values;
+    if (hasDeletionReason) update.deletionReason = deletionReason.values;
+
+    if (Object.keys(update).length === 0) {
+        return { ok: false, error: 'No valid fields to update' };
+    }
+
+    return {
+        ok: true,
+        values: {
+            ...update,
+            updatedAt: update.updatedAt ?? new Date(),
         },
     };
 }

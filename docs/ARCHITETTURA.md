@@ -18,7 +18,7 @@ MediFlow oggi va letto così:
 - **SQLite cifrato** come storage autorevole;
 - **`/api/v1`** come contratto condiviso per i client Apple;
 - **`home-base` read-only-first** con write limitati/versionati su
-  profilo/status paziente, diario clinico, terapie e checkup;
+  profilo/status paziente, diario clinico, terapie, checkup e osservazioni;
 - **document intelligence reviewable** con artifact `parse/evidence`;
 - **stack AI locale governato** e separato dalle lane `benchmark-only`;
 - **SISS/FSE** dentro un boundary esplicito di handoff e `webapp-assisted`.
@@ -85,7 +85,7 @@ Le superfici principali sono tre:
 | --- | --- | --- |
 | `/api/*` | sessione web | CRUD web e overview locale |
 | `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
-| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario/terapie/checkup versionati |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario/terapie/checkup/osservazioni versionati |
 
 Punti da non perdere:
 

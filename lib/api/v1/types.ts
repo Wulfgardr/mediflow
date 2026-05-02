@@ -137,7 +137,15 @@ export type ObservationSummary = {
     notes: string | null;
     observedAt: string;
     source: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -324,6 +332,10 @@ export type NetworkCapabilityKey =
     | 'network.replica.readonly-checkups'
     /* @Codex */
     | 'network.replica.write-checkups'
+    /* @Codex */
+    | 'network.replica.readonly-observations'
+    /* @Codex */
+    | 'network.replica.write-observations'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'
