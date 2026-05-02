@@ -72,8 +72,9 @@ Esito:
 Il run strict valida l'harness web+native required e chiude la sola lane
 automatizzata `P0b.c`. Non e sufficiente per dichiarare `WUL-26` Done come
 chiusura parity completa: la click-map manuale capability-by-capability resta
-separata nel gate `P6`. La semantica delete del diario e stata chiusa in
-`WUL-24`; `WUL-23` e code-satisfied per le osservazioni native LOINC/UCUM. I
+separata nel gate `P6`. `WUL-22` e code-satisfied per le esenzioni in
+create/edit paziente, la semantica delete del diario e stata chiusa in
+`WUL-24` e `WUL-23` e code-satisfied per le osservazioni native LOINC/UCUM. I
 gap modulo residui restano in `WUL-25`, `WUL-76` e `WUL-77`.
 
 ---
