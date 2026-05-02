@@ -14,7 +14,7 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 > [!IMPORTANT]
 > Su `main` esistono gia slice post-`v0.5.0` che cambiano il quadro operativo:
 > `network home-base` paired su `/api/v1/network/*` con read pazienti e write
-> limitati su profilo/status, diario e terapie, e il primo artifact
+> limitati su profilo/status, diario, terapie e checkup, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
 
 ---
@@ -311,6 +311,7 @@ Surface attuale:
 - primo write remoto limitato a `PUT /api/v1/network/patients/{id}` per profilo/status paziente
 - diario clinico paired su `/api/v1/network/patients/{id}/entries*`
 - terapie paired su `/api/v1/network/patients/{id}/therapies*`
+- checkup paired su `/api/v1/network/patients/{id}/checkups*`
 
 Boundary attuale:
 
@@ -321,7 +322,9 @@ Boundary attuale:
   `network.replica.write-clinical-diary` e `entries.version`
 - le terapie paired usano capability `network.replica.readonly-therapies` /
   `network.replica.write-therapies` e `therapies.version`
-- hard delete remoto, attachment remoti, altri child CRUD, sync record-level,
+- i checkup paired usano capability `network.replica.readonly-checkups` /
+  `network.replica.write-checkups` e `checkups.version`
+- hard delete remoto, attachment remoti, osservazioni/cataloghi, sync record-level,
   campi AI/document-derived e fallback automatico restano fuori scope
 
 ### Backup e restore artifact v1
@@ -555,9 +558,9 @@ sequenceDiagram
 ## Limitazioni attuali
 
 - `home-base` e ancora read-only-first: esistono solo i primi write versionati
-  per profilo/status paziente, diario clinico e terapie; hard delete remoto, attachment
-  remoti, altri child CRUD, sync record-level e fallback automatico promotable
-  restano fuori.
+  per profilo/status paziente, diario clinico, terapie e checkup; hard delete
+  remoto, attachment remoti, osservazioni/cataloghi, sync record-level e
+  fallback automatico promotable restano fuori.
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
@@ -575,4 +578,4 @@ sequenceDiagram
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
-   e con i write paziente/diario/terapie limitati e versionati
+   e con i write paziente/diario/terapie/checkup limitati e versionati

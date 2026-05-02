@@ -105,7 +105,15 @@ type CheckupCreateValues = {
     notes: string | null;
     status: 'pending' | 'completed' | 'cancelled';
     source: CheckupSource;
+    /* @Codex */
+    version: number;
     createdAt: Date;
+    /* @Codex */
+    updatedAt: Date;
+    /* @Codex */
+    deletedAt: Date | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -115,6 +123,12 @@ type CheckupUpdateValues = {
     notes?: string | null;
     status?: 'pending' | 'completed' | 'cancelled';
     source?: CheckupSource | null;
+    /* @Codex */
+    updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 };
 
 /* @Codex */
@@ -593,6 +607,7 @@ export function normalizeCheckupCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
 ): WriteNormalizationResult<CheckupCreateValues> {
+    const now = context.now ?? new Date();
     const date = parseRequiredDate(input.date, 'date');
     if (!date.ok) return date;
 
@@ -620,7 +635,11 @@ export function normalizeCheckupCreateInput(
             notes: notes.values,
             status: normalizedStatus ?? 'pending',
             source: source.values,
-            createdAt: context.now ?? new Date(),
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
         },
     };
 }
@@ -638,6 +657,15 @@ export function normalizeCheckupUpdateInput(
     const notes = parseOptionalNullableString(input.notes, 'notes');
     if (!notes.ok) return notes;
 
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+
     const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
     let status: CheckupUpdateValues['status'];
     if (hasStatus) {
@@ -650,13 +678,17 @@ export function normalizeCheckupUpdateInput(
 
     const source = normalizeOptionalCheckupSource(input.source);
     if (!source.ok) return source;
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
 
     if (
         date.values === undefined &&
         title.values === undefined &&
         notes.values === undefined &&
         status === undefined &&
-        source.values === undefined
+        source.values === undefined &&
+        updatedAt.values === undefined &&
+        deletedAt.values === undefined &&
+        !hasDeletionReason
     ) {
         return { ok: false, error: 'No valid fields to update' };
     }
@@ -669,6 +701,9 @@ export function normalizeCheckupUpdateInput(
             notes: notes.values,
             status,
             source: source.values,
+            updatedAt: updatedAt.values ?? new Date(),
+            deletedAt: deletedAt.values,
+            deletionReason: hasDeletionReason ? deletionReason.values : undefined,
         },
     };
 }

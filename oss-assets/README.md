@@ -42,7 +42,8 @@ In questa versione MediFlow include:
 - **backup, audit e contratto `/api/v1`** resi più chiari ed espliciti;
 - **AI locale** per insight e OCR, senza egress di default;
 - **import documentale reviewable**, con smart import prudente;
-- **modalità `home-base` read-only** per client Apple paired;
+- **modalità `home-base` read-only-first** per client Apple paired, con primi
+  write versionati e documentati;
 - **boundary SISS/FSE realistico**: handoff contestuale e percorso prescrittivo `webapp-assisted`, non integrazione regionale nativa già risolta;
 - **Clinical Workbench unico** come superficie stabile su `main`.
 
@@ -60,7 +61,7 @@ La traiettoria di MediFlow è semplice da leggere:
 MediFlow non vuole raccontare più di quanto possa dimostrare.
 
 - **Nessun cloud obbligatorio**: il default resta locale.
-- **Nessuna app iPad/iPhone dichiarata come già completa**: la direzione multi-device esiste, ma il perimetro operativo attuale è `home-base + paired client`, con approccio read-only-first.
+- **Nessuna app iPad/iPhone dichiarata come già completa**: la direzione multi-device esiste, ma il perimetro operativo attuale è `home-base + paired client`, con approccio read-only-first e write limitati a profilo/status, diario, terapie e checkup.
 - **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali.
 - **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
 

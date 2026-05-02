@@ -32,6 +32,7 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'checkup update/delete are sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'], reason: 'native/shared checkup creation is sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'native/shared checkup update/delete are sensitive CRUD' },
+    { route: 'lib/network-checkup-write.ts', events: ['checkup.created', 'checkup.updated', 'checkup.deleted'], reason: 'paired checkup writes must stay PHI-safe auditable' },
     { route: 'app/api/observations/route.ts', events: ['observation.created'], reason: 'observation creation is sensitive CRUD' },
     { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'observation update/delete are sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'], reason: 'native/shared observation creation is sensitive CRUD' },

@@ -36,7 +36,8 @@ La shell macOS storica esiste ancora come snapshot, ma non è il ramo su cui con
 
 - **Mac** come nodo `home-base`;
 - **iPadOS / iOS** come client paired sullo stesso boundary locale;
-- primo perimetro **read-only-first**, senza scrittura remota o sync automatico.
+- perimetro **read-only-first**, con write remoti solo dove sono espliciti,
+  versionati e documentati; non c'e ancora sync automatico.
 
 ## Che cos'è `home-base`?
 
@@ -47,7 +48,8 @@ Oggi questo perimetro è:
 - opt-in;
 - paired;
 - protetto da credenziale device + sessione operatore;
-- ancora `read-only-first`.
+- ancora `read-only-first`, con write limitati a profilo/status paziente,
+  diario clinico, terapie e checkup versionati.
 
 ## Ci sono ancora Preview Profiles?
 

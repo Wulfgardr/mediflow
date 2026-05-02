@@ -113,7 +113,15 @@ export type CheckupSummary = {
     notes: string | null;
     status: string;
     source: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -312,6 +320,10 @@ export type NetworkCapabilityKey =
     | 'network.replica.readonly-therapies'
     /* @Codex */
     | 'network.replica.write-therapies'
+    /* @Codex */
+    | 'network.replica.readonly-checkups'
+    /* @Codex */
+    | 'network.replica.write-checkups'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

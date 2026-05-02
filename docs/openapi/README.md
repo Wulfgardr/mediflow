@@ -2,7 +2,7 @@
 
 Stato documento: `SECONDARY`  
 Fonte canonica del contratto: [docs/openapi/mediflow-v1.yaml](./mediflow-v1.yaml)  
-Decisioni di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](../adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](../adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](../adr/0054-network-therapy-write-boundary.md)
+Decisioni di riferimento: [docs/adr/0010-openapi-spec-first-for-api-v1.md](../adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](../adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](../adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](../adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](../adr/0055-network-checkup-write-boundary.md)
 
 ## A cosa serve
 
@@ -143,6 +143,10 @@ La baseline pubblicata oggi copre:
 - `POST /api/v1/network/patients/{id}/therapies`
 - `GET /api/v1/network/patients/{id}/therapies/{therapyId}`
 - `PUT /api/v1/network/patients/{id}/therapies/{therapyId}`
+- `GET /api/v1/network/patients/{id}/checkups`
+- `POST /api/v1/network/patients/{id}/checkups`
+- `GET /api/v1/network/patients/{id}/checkups/{checkupId}`
+- `PUT /api/v1/network/patients/{id}/checkups/{checkupId}`
 
 L'estensione agli altri endpoint `v1` va fatta per moduli stabili, senza
 gonfiare la spec in un unico passaggio.
@@ -177,10 +181,15 @@ Nota operativa per `WUL-150`:
   `network.replica.write-therapies`, `therapies.version`, `409` PHI-safe e
   soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
   restano fuori boundary
+- `/api/v1/network/patients/{id}/checkups*` pubblica la slice checkup paired:
+  capability `network.replica.readonly-checkups` /
+  `network.replica.write-checkups`, `checkups.version`, `409` PHI-safe e
+  soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
+  restano fuori boundary
 - `network/ai-runtime` esplicita che `AI plane` e `data plane` restano separati
   e dichiara solo `AI locale` vs `AI centralizzata disponibile/non disponibile`
   piu fallback e rollout gate, senza introdurre ancora remote execution reale
-- non introduce ancora checkup/observations/catalog write remoto, sync
-  record-level, cache offline, identity model completo o routing remoto
-  operativo del runtime AI centralizzato
+- non introduce ancora observations/catalog write remoto, sync record-level,
+  cache offline, identity model completo o routing remoto operativo del runtime
+  AI centralizzato
 - puo ancora esporre stati `disabled` o `planned` per capability che restano follow-up

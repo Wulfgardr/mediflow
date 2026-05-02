@@ -161,6 +161,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md) | Formalizza la prima slice write paired: `PUT /api/v1/network/patients/{id}` con paired client, sessione operatore, scope ambulatoriale e `version`, lasciando fuori delete remoto, child CRUD, sync e campi AI/documentali. |
 | [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md) | Formalizza la slice write paired del diario: read/create/update/soft-delete su `/api/v1/network/patients/{id}/entries*` con `entries.version`, capability dedicate, audit PHI-safe e hard delete/attachment/AI fuori scope. |
 | [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md) | Formalizza la slice write paired delle terapie: read/create/update/soft-delete su `/api/v1/network/patients/{id}/therapies*` con `therapies.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
+| [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | Formalizza la slice write paired dei checkup: read/create/update/soft-delete su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 
 ## Checklist manutenzione indice
 

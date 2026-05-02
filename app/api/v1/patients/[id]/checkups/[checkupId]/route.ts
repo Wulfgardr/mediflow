@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
@@ -45,6 +45,10 @@ export async function GET(
             status: normalizeCheckupStatus(checkup.status),
             source: checkup.source ?? null,
             createdAt: toIsoString(checkup.createdAt),
+            version: checkup.version,
+            updatedAt: toIsoString(checkup.updatedAt),
+            deletedAt: toIsoString(checkup.deletedAt),
+            deletionReason: checkup.deletionReason ?? null,
         };
 
         return NextResponse.json(result);
@@ -81,8 +85,16 @@ export async function PUT(
         }
 
         await dbServer.update(checkups)
-            .set(normalized.values)
+            .set({
+                ...normalized.values,
+                version: sql`${checkups.version} + 1`,
+            })
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)));
+        const current = await dbServer
+            .select({ version: checkups.version })
+            .from(checkups)
+            .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
+            .get();
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -93,7 +105,8 @@ export async function PUT(
                 subjectType: 'checkup',
                 subjectRef: checkupId,
                 redactedMetadata: {
-                    changedFields: listChangedFields(body),
+                    changedFields: listChangedFields(body, ['version']),
+                    resourceVersion: current?.version ?? undefined,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
@@ -118,7 +131,7 @@ export async function DELETE(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
-        const existing = await dbServer.select({ id: checkups.id }).from(checkups)
+        const existing = await dbServer.select({ id: checkups.id, version: checkups.version }).from(checkups)
             .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, id)))
             .get();
         if (!existing) {
@@ -135,6 +148,10 @@ export async function DELETE(
                 eventType: 'checkup.deleted',
                 subjectType: 'checkup',
                 subjectRef: checkupId,
+                redactedMetadata: {
+                    changedFields: ['deleted'],
+                    resourceVersion: existing.version,
+                },
             },
             '[MediFlow] Checkup audit write failed:',
         );

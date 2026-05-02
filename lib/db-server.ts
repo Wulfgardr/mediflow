@@ -78,6 +78,14 @@ try {
     ensureColumn('checkups', 'notes', 'notes TEXT');
     /* @Codex */
     ensureColumn('checkups', 'source', 'source TEXT');
+    /* @Codex */
+    ensureColumn('checkups', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    /* @Codex */
+    ensureColumn('checkups', 'updated_at', 'updated_at INTEGER');
+    /* @Codex */
+    ensureColumn('checkups', 'deleted_at', 'deleted_at INTEGER');
+    /* @Codex */
+    ensureColumn('checkups', 'deletion_reason', 'deletion_reason TEXT');
 } catch (error) {
     console.warn('[MediFlow] Checkups schema check skipped:', error);
 }

@@ -73,8 +73,8 @@ MediFlow espone due superfici API:
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
 - `/api/v1/network/*` (home-base opt-in): paired/read-only-first con write
-  limitati a profilo/status paziente, diario e terapie, protetta da credenziale
-  device + sessione operatore
+  limitati a profilo/status paziente, diario, terapie e checkup, protetta da
+  credenziale device + sessione operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -102,8 +102,11 @@ Quando il nodo passa a `network-home-base`:
 - `/api/v1/network/patients/{id}/therapies*` richiede capability terapia
   dedicate, sessione operatore e `therapies.version`; abilita solo
   create/update/soft-delete delle terapie
-- delete remoto hard, attachment/document write remoti, altri child CRUD, sync
-  record-level, campi AI/documentali e fallback automatico restano fuori scope
+- `/api/v1/network/patients/{id}/checkups*` richiede capability checkup
+  dedicate, sessione operatore e `checkups.version`; abilita solo
+  create/update/soft-delete dei checkup
+- delete remoto hard, attachment/document write remoti, osservazioni/cataloghi,
+  sync record-level, campi AI/documentali e fallback automatico restano fuori scope
 
 ### Lockout autenticazione PIN
 
