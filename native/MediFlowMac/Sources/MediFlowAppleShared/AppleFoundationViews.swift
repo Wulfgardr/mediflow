@@ -538,6 +538,7 @@ public struct HomeBaseRuntimeStatusView: View {
 
 private struct PairedPatientsWorkspaceView: View {
     @StateObject private var model = PairedPatientsWorkspaceModel()
+    @State private var confirmsClearingPairing = false
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -604,8 +605,9 @@ private struct PairedPatientsWorkspaceView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button("Dissocia") {
-                    Task { await model.clearPairing() }
+                    confirmsClearingPairing = true
                 }
+                .tint(.red)
                 .accessibilityIdentifier("homebase-clear-pairing-button")
                 .disabled(model.isWorking)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -633,12 +635,35 @@ private struct PairedPatientsWorkspaceView: View {
             }
         }
         .cardStyle()
+        .confirmationDialog(
+            "Dissociare questo dispositivo?",
+            isPresented: $confirmsClearingPairing,
+            titleVisibility: .visible
+        ) {
+            Button("Dissocia dispositivo", role: .destructive) {
+                Task { await model.clearPairing() }
+            }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            Text("Rimuove credenziali paired e snapshot locale da questo dispositivo.")
+        }
     }
 
     private var patientsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Consultazione read-only")
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Consultazione mobile")
+                    .font(.headline)
+                Spacer(minLength: 8)
+                Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(model.connectionState.tintColor)
+                    .accessibilityIdentifier("homebase-connection-state")
+            }
+            Text(model.reconciliationLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("homebase-reconciliation-state")
             if model.isWorking && model.patients.isEmpty {
                 ProgressView()
             } else if model.patients.isEmpty {
@@ -665,6 +690,9 @@ private struct PairedPatientsWorkspaceView: View {
             if let detail = model.selectedPatient {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
+                    Label("Sola lettura", systemImage: "lock")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     Text("\(detail.lastName) \(detail.firstName)")
                         .font(.subheadline.weight(.semibold))
                     Text(detail.taxCode)
@@ -705,15 +733,22 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
+    @Published private(set) var connectionState: PairedPatientsConnectionState = .notLoaded
+    @Published private(set) var reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
     @Published private(set) var isWorking = false
 
     private let pairedStore: HomeBasePairedStore
+    private let cacheStore: HomeBasePatientCacheStore
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
     private var sessionCookie: String?
 
-    init(pairedStore: HomeBasePairedStore = .shared) {
+    init(
+        pairedStore: HomeBasePairedStore = .shared,
+        cacheStore: HomeBasePatientCacheStore = .shared
+    ) {
         self.pairedStore = pairedStore
+        self.cacheStore = cacheStore
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
         do {
@@ -734,6 +769,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             self.errorMessage = error.localizedDescription
         }
         applyLaunchOverrides(launchOverrides)
+        restoreCachedPatientList()
     }
 
     func performAutomaticActionsIfNeeded() async {
@@ -790,17 +826,32 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.patients = try await self.makeClient().fetchPatients(
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
+            do {
+                self.patients = try await self.makeClient().fetchPatients(
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                )
+            } catch {
+                if self.restoreCachedPatientList(markOffline: true) {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+                throw error
+            }
             self.selectedPatient = nil
             do {
                 try self.persistPairing()
+                try self.cacheStore.savePatientList(
+                    self.patients,
+                    serverURL: self.serverURL,
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                )
             } catch {
-                self.errorMessage = "Pazienti caricati, ma il salvataggio paired non e riuscito: \(error.localizedDescription)"
+                self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
+            self.connectionState = .pairedOnline
+            self.reconciliationLine = "Snapshot locale aggiornato. Sola lettura mobile."
             self.statusMessage = self.patients.isEmpty
                 ? "Nessun paziente nello scope corrente."
                 : "\(self.patients.count) pazienti caricati in lettura."
@@ -847,8 +898,11 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             ambulatoryId = ""
             patients = []
             selectedPatient = nil
+            connectionState = .notLoaded
+            reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
             discoveryMessage = nil
             sessionCookie = nil
+            try cacheStore.clear()
             statusMessage = "Configurazione paired rimossa da questo dispositivo."
         } catch {
             errorMessage = error.localizedDescription
@@ -903,6 +957,29 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         )
     }
 
+    @discardableResult
+    private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+        do {
+            guard let snapshot = try cacheStore.loadPatientList(
+                serverURL: serverURL,
+                ambulatoryId: ambulatoryId.trimmedOrNil
+            ) else {
+                return false
+            }
+            patients = snapshot.patients
+            selectedPatient = nil
+            connectionState = markOffline ? .pairedOfflineDegraded : .cached
+            statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
+            reconciliationLine = markOffline
+                ? "Offline degradato: sola consultazione locale. Nessuna scrittura mobile disponibile."
+                : "Snapshot locale pronto. Sola lettura mobile."
+            return true
+        } catch {
+            errorMessage = "Cache locale non leggibile: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     private func runTask(_ operation: @escaping () async throws -> Void) async {
         isWorking = true
         errorMessage = nil
@@ -911,6 +988,52 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             try await operation()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private enum PairedPatientsConnectionState {
+    case notLoaded
+    case cached
+    case pairedOnline
+    case pairedOfflineDegraded
+
+    var title: String {
+        switch self {
+        case .notLoaded:
+            return "Non caricato"
+        case .cached:
+            return "Cache locale"
+        case .pairedOnline:
+            return "Paired online"
+        case .pairedOfflineDegraded:
+            return "Offline degradato"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .notLoaded:
+            return "circle"
+        case .cached:
+            return "clock.arrow.circlepath"
+        case .pairedOnline:
+            return "checkmark.circle.fill"
+        case .pairedOfflineDegraded:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    var tintColor: Color {
+        switch self {
+        case .notLoaded:
+            return .secondary
+        case .cached:
+            return .secondary
+        case .pairedOnline:
+            return .green
+        case .pairedOfflineDegraded:
+            return .orange
         }
     }
 }

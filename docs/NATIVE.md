@@ -101,6 +101,13 @@ npm run test:native:xcode
 npm run test:parity:smoke
 ```
 
+Nel percorso mobile paired corrente, il target condiviso include anche una cache
+locale derivata della lista pazienti: lo snapshot e cifrato con chiave locale da
+Portachiavi, e valido solo per il medesimo `home-base` / ambulatorio entro una
+soglia breve. Quando il Mac non e raggiungibile, l'app mobile puo mostrare lo
+stato `offline degradato` in sola consultazione; non esistono ancora scritture
+offline o coda di merge mobile.
+
 ---
 
 ## Funzionalità principali
