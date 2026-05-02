@@ -20,6 +20,7 @@ Riferimenti canonici:
 - [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
 - [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 - [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
+- [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 
 ## Stato attuale
 
@@ -75,7 +76,7 @@ Al 15 aprile 2026 le fonti ufficiali disponibili confermano che:
 | Protesica nativa/certificata dentro MediFlow | `Non disponibile` | Il diario locale non sostituisce l'applicativo regionale e non invia prescrizioni verso SISS. |
 | FSE embedded / feed nel gestionale | `Non disponibile` | Richiede stack certificato, consenso, ruolo operatore, audit e scenario approvato; la mappa dedicata e in [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md). |
 | SGDT contestuale dal paziente | `Non disponibile` | Oggi SGDT è trattato come applicativo regionale centralizzato; l'unico caso utile emerso e SGDT/PAI con `SSI-MMG`, documentato in [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md). |
-| Certificati di malattia contestuali | `Non disponibile` | La documentazione esiste, ma MediFlow non ha ancora un adapter/scenario dedicato. |
+| Certificati di malattia contestuali | `Non disponibile` | Il path piu prudente e una futura Web Application handoff guard; UI custom/backend restano bloccati come documentato in [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md). |
 
 ## Documenti protesici prodotti dal portale
 
@@ -148,7 +149,7 @@ La sequenza di lavoro per questo stream è:
    `webapp ufficiale`, `A2A`, `SSI qualificata` e capability realmente
    perseguibili
 6. note scenario-specific dedicate prima del runtime: Modulo Prescrittivo
-   Regionale, FSE consultazione/consenso e SGDT/PAI
+   Regionale, FSE consultazione/consenso, SGDT/PAI e Certificati di malattia
 7. filone runtime successivo dedicato a `SSI qualificata / A2A / canale
    certificato`, se e solo se la documentazione tecnica disponibile e
    l'onboarding regionale lo rendono concretamente perseguibile

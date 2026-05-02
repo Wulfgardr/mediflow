@@ -80,6 +80,14 @@ fonti pubbliche resta `DC-COOP-FHIR_PIC#02`, cioe cooperazione applicativa
 SGDT/PAI con Cartelle Elettroniche `MMG/PLS`. La mappa decisionale e in
 [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md).
 
+Per i Certificati di malattia il manifest mantiene separati:
+
+- FAQ SISS per integrazione applicativi medico/SISS e boundary `SAR`
+- Web Application Certificati di Malattia in sede di ricovero/dimissione
+
+La mappa decisionale e in
+[docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
+
 ## Comandi
 
 Validazione del manifest:

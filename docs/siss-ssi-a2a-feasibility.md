@@ -16,6 +16,7 @@ Riferimenti canonici:
 - [docs/siss-baseline.md](./siss-baseline.md)
 - [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
 - [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
+- [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 - [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md)
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 
@@ -159,7 +160,7 @@ Questa e un'inferenza utile, non una prova contrattuale completa:
 | `FSE` contestuale/embedded nel gestionale | `Fattibile con onboarding regionale e scenari dedicati` | esistono scenari FSE, gestione consenso e interfacce dedicate, ma non un via libera pubblico a un feed embedded arbitrario |
 | `Anagrafe Regionale`/esenzioni in UI MediFlow | `Probabile con onboarding regionale, non ancora provato end-to-end` | le FAQ e il modello SISS indicano servizi applicativi; mancano ancora le specifiche raccolte nel corpus corrente |
 | `SGDT` contestuale dal paziente | `Non disponibile come launcher generico` | esiste un caso cooperativo specifico per PAI integrato con `SSI-MMG`, ma non una prova di shell paziente generica SGDT |
-| `Certificati di malattia` contestuali | `Non ancora sufficientemente documentato` | il filone esiste a catalogo e in FAQ/manualistica, ma non abbiamo ancora ricostruito il contratto tecnico utile per MediFlow |
+| `Certificati di malattia` contestuali | `Webapp-mediated, backend custom bloccato` | FAQ e catalogo confermano Web Application e possibili interfacce software, ma non un contratto pubblico sufficiente per UI custom MediFlow |
 
 ## Cosa possiamo implementare adesso senza oltrepassare il perimetro
 
@@ -215,8 +216,9 @@ Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
      [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md)
 
 `Certificati di malattia` restano per ora fuori da questa priorita, non perche
-irrilevanti, ma perche il materiale pubblico raccolto fin qui non basta ancora a
-tagliare una first slice seria come per prescrittivo/FSE/SGDT.
+irrilevanti, ma perche il materiale pubblico raccolto supporta al massimo una
+futura slice `official-webapp handoff guard`; la nota dedicata e in
+[docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
 
 ## Sequenza consigliata dopo `WUL-178`
 

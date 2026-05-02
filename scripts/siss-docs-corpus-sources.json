@@ -95,15 +95,26 @@
     "notes": "Catalogo pubblico SISS: DC-SEBC_FSE-SIAA#02, versione 08, data 10/02/2025; interfacce SOAP per servizi esposti dal SEB FSE."
   },
   {
-    "id": "siss-certificati-malattia",
-    "title": "SISS - Certificati di Malattia",
+    "id": "siss-certificati-malattia-faq",
+    "title": "SISS - Certificati di malattia FAQ",
     "area": "certificates",
-    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=49997836",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/faq.do?voce=23041045",
     "access": "manual-import",
     "captureStrategy": "manual-placeholder",
     "refreshHours": 168,
-    "tags": ["siss", "certificati", "inps", "manual-import"],
-    "notes": "Il portale pubblico conferma la presenza di documentazione di supporto; la raccolta strutturata va completata fuori da scraping fragile."
+    "tags": ["siss", "certificati", "malattia", "inps", "sar", "manual-import"],
+    "notes": "FAQ pubblica SISS: dichiara interfacce software per integrazione applicativi medico/SISS e chiarisce il boundary SISS qualificato SAR con Carta Operatore."
+  },
+  {
+    "id": "siss-certificati-malattia-webapp-ricovero",
+    "title": "SISS - Web Application Certificati di Malattia in sede di ricovero",
+    "area": "certificates",
+    "url": "https://www.siss.regione.lombardia.it/EdmaSissPortaleSitoWebPublic/documentoDiProgetto.do?ACT=1&PR=38",
+    "access": "manual-import",
+    "captureStrategy": "manual-placeholder",
+    "refreshHours": 168,
+    "tags": ["siss", "certificati", "malattia", "inps", "webapp", "manual-import"],
+    "notes": "Catalogo pubblico SISS: Web Application Certificati di Malattia (INPS), video/manualistica per comunicazione inizio ricovero e certificato in dimissione."
   },
   {
     "id": "siss-sgdt-pai-cooperazione-mmg",
