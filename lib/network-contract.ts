@@ -15,7 +15,7 @@ import type {
 } from './api/v1/types';
 
 /* @Codex */
-export const NETWORK_PROTOCOL_VERSION = '1.8.0';
+export const NETWORK_PROTOCOL_VERSION = '1.9.0';
 /* @Codex */
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
 /* @Codex */
@@ -266,6 +266,18 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Paired clinical diary create/update boundary scoped to the active ambulatory; excludes hard delete, AI, and document-derived writes.'
+            ),
+            capability(
+                'network.replica.readonly-therapies',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only therapy access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-therapies',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired therapy create/update/soft-delete boundary with optimistic concurrency; excludes hard delete, AI, and document-derived writes.'
             ),
             capability(
                 'network.replica.sync',

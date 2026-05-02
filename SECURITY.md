@@ -72,9 +72,9 @@ MediFlow espone due superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
-- `/api/v1/network/*` (home-base opt-in): paired/read-only-first con primo
-  write profilo/status paziente, protetta da credenziale device + sessione
-  operatore
+- `/api/v1/network/*` (home-base opt-in): paired/read-only-first con write
+  limitati a profilo/status paziente, diario e terapie, protetta da credenziale
+  device + sessione operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -99,6 +99,9 @@ Quando il nodo passa a `network-home-base`:
 - `/api/v1/network/patients/{id}/entries*` richiede capability diary dedicate,
   sessione operatore e `entries.version`; abilita solo create/update/soft-delete
   del diario clinico
+- `/api/v1/network/patients/{id}/therapies*` richiede capability terapia
+  dedicate, sessione operatore e `therapies.version`; abilita solo
+  create/update/soft-delete delle terapie
 - delete remoto hard, attachment/document write remoti, altri child CRUD, sync
   record-level, campi AI/documentali e fallback automatico restano fuori scope
 

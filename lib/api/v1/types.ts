@@ -94,7 +94,15 @@ export type TherapySummary = {
     status: string;
     startDate: string;
     endDate: string | null;
+    /* @Codex */
+    version: number;
     createdAt: string | null;
+    /* @Codex */
+    updatedAt: string | null;
+    /* @Codex */
+    deletedAt: string | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 export type CheckupSummary = {
@@ -300,6 +308,10 @@ export type NetworkCapabilityKey =
     | 'network.replica.write-patient-profile'
     /* @Codex */
     | 'network.replica.write-clinical-diary'
+    /* @Codex */
+    | 'network.replica.readonly-therapies'
+    /* @Codex */
+    | 'network.replica.write-therapies'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

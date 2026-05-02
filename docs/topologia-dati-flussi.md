@@ -344,6 +344,7 @@ sequenceDiagram
     participant Session as Sessione operatore
     participant Data as /api/v1/network/patients*
     participant Diary as /api/v1/network/patients/{id}/entries*
+    participant Therapy as /api/v1/network/patients/{id}/therapies*
     Client->>Pair: POST pairing intent (bootstrap PHI-safe)
     Node-->>Client: pairing secret + intent pending
     Client->>Node: POST confirm intent
@@ -355,6 +356,8 @@ sequenceDiagram
     Data-->>Client: success oppure 409 VERSION_CONFLICT
     Client->>Diary: POST/PUT diario con entries.version + diary capability
     Diary-->>Client: success oppure 409 VERSION_CONFLICT
+    Client->>Therapy: POST/PUT terapie con therapies.version + therapy capability
+    Therapy-->>Client: success oppure 409 VERSION_CONFLICT
 ```
 
 ---
@@ -366,7 +369,7 @@ sequenceDiagram
 | `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
-| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + primi write limitati paziente/diario versionato |
+| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + primi write limitati paziente/diario/terapie versionati |
 | `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
@@ -391,7 +394,7 @@ sequenceDiagram
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
 - `/api/v1/*` resta versionata e compatibile per client native.
-- `network-home-base` resta opt-in, paired e read-only-first, con write paziente e diario limitati/versionati.
+- `network-home-base` resta opt-in, paired e read-only-first, con write paziente, diario e terapie limitati/versionati.
 - Token locale e sessione devono restare separati (web cookie vs native bearer).
 - Proxy verso servizi locali sempre allowlist localhost.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici

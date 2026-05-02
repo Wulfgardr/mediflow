@@ -12,9 +12,9 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 > Le sezioni native qui sotto descrivono lo snapshot corrente e i confini da preservare (`/api/v1`, TLS locale, security/sessione), non una roadmap di estensione del client storico.
 
 > [!IMPORTANT]
-> Su `main` esistono gia due slice post-`v0.5.0` che cambiano il quadro operativo:
-> `network home-base` paired su `/api/v1/network/*` con read pazienti e primo
-> `PUT` profilo/status paziente, e il primo artifact
+> Su `main` esistono gia slice post-`v0.5.0` che cambiano il quadro operativo:
+> `network home-base` paired su `/api/v1/network/*` con read pazienti e write
+> limitati su profilo/status, diario e terapie, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
 
 ---
@@ -309,6 +309,8 @@ Surface attuale:
 - pairing bootstrap/confirm
 - primo data plane remoto read-only su pazienti (`/api/v1/network/patients*`)
 - primo write remoto limitato a `PUT /api/v1/network/patients/{id}` per profilo/status paziente
+- diario clinico paired su `/api/v1/network/patients/{id}/entries*`
+- terapie paired su `/api/v1/network/patients/{id}/therapies*`
 
 Boundary attuale:
 
@@ -317,8 +319,10 @@ Boundary attuale:
 - il write paziente richiede capability `network.replica.write-patient-profile` e `version`
 - il diario paired usa capability `network.replica.readonly-clinical-diary` /
   `network.replica.write-clinical-diary` e `entries.version`
-- hard delete remoto, attachment remoti, altri child CRUD, sync record-level e
-  fallback automatico restano fuori scope
+- le terapie paired usano capability `network.replica.readonly-therapies` /
+  `network.replica.write-therapies` e `therapies.version`
+- hard delete remoto, attachment remoti, altri child CRUD, sync record-level,
+  campi AI/document-derived e fallback automatico restano fuori scope
 
 ### Backup e restore artifact v1
 
@@ -551,7 +555,7 @@ sequenceDiagram
 ## Limitazioni attuali
 
 - `home-base` e ancora read-only-first: esistono solo i primi write versionati
-  per profilo/status paziente e diario clinico; hard delete remoto, attachment
+  per profilo/status paziente, diario clinico e terapie; hard delete remoto, attachment
   remoti, altri child CRUD, sync record-level e fallback automatico promotable
   restano fuori.
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
@@ -571,4 +575,4 @@ sequenceDiagram
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico
 4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
-   e con i write paziente/diario limitati e versionati
+   e con i write paziente/diario/terapie limitati e versionati

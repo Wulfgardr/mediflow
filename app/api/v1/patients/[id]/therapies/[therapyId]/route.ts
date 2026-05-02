@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
@@ -52,7 +52,11 @@ export async function GET(
             status: normalizeTherapyStatus(therapy.status),
             startDate: toIsoString(therapy.startDate) ?? new Date(0).toISOString(),
             endDate: toIsoString(therapy.endDate),
+            version: therapy.version,
             createdAt: toIsoString(therapy.createdAt),
+            updatedAt: toIsoString(therapy.updatedAt),
+            deletedAt: toIsoString(therapy.deletedAt),
+            deletionReason: therapy.deletionReason ?? null,
         };
 
         return NextResponse.json(result);
@@ -88,9 +92,24 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.update(therapies)
-            .set(normalized.values)
-            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)));
+        const updateResult = await dbServer.update(therapies)
+            .set({
+                ...normalized.values,
+                version: sql`${therapies.version} + 1`,
+            })
+            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
+            .run();
+
+        if (updateResult.changes === 0) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+
+        const current = await dbServer
+            .select({ version: therapies.version })
+            .from(therapies)
+            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
+            .get();
+        const resourceVersion = current?.version ?? undefined;
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -101,7 +120,8 @@ export async function PUT(
                 subjectType: 'therapy',
                 subjectRef: therapyId,
                 redactedMetadata: {
-                    changedFields: listChangedFields(body),
+                    changedFields: listChangedFields(body, ['version']),
+                    resourceVersion,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
@@ -126,14 +146,20 @@ export async function DELETE(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, therapyId } = await params;
-        const existing = await dbServer.select({ id: therapies.id }).from(therapies)
+        const existing = await dbServer.select({ id: therapies.id, version: therapies.version }).from(therapies)
             .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
             .get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        await dbServer.delete(therapies).where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)));
+        const deleteResult = await dbServer.delete(therapies)
+            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
+            .run();
+
+        if (deleteResult.changes === 0) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -143,6 +169,10 @@ export async function DELETE(
                 eventType: 'therapy.deleted',
                 subjectType: 'therapy',
                 subjectRef: therapyId,
+                redactedMetadata: {
+                    changedFields: ['deleted'],
+                    resourceVersion: existing.version,
+                },
             },
             '[MediFlow] Therapy audit write failed:',
         );

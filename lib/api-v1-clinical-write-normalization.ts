@@ -64,7 +64,15 @@ type TherapyCreateValues = {
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate: Date | null;
+    /* @Codex */
+    version: number;
     createdAt: Date;
+    /* @Codex */
+    updatedAt: Date;
+    /* @Codex */
+    deletedAt: Date | null;
+    /* @Codex */
+    deletionReason: string | null;
 };
 
 /* @Codex */
@@ -80,6 +88,12 @@ type TherapyUpdateValues = {
     status?: 'active' | 'suspended' | 'completed';
     startDate?: Date;
     endDate?: Date | null;
+    /* @Codex */
+    updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 };
 
 /* @Codex */
@@ -416,6 +430,7 @@ export function normalizeTherapyCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
 ): WriteNormalizationResult<TherapyCreateValues> {
+    const now = context.now ?? new Date();
     const drugName = parseRequiredString(input.drugName, 'drugName');
     if (!drugName.ok) return drugName;
 
@@ -470,7 +485,11 @@ export function normalizeTherapyCreateInput(
             status: normalizedStatus ?? 'active',
             startDate: startDate.values,
             endDate: nextEndDate,
-            createdAt: context.now ?? new Date(),
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            deletionReason: null,
         },
     };
 }
@@ -491,6 +510,15 @@ export function normalizeTherapyUpdateInput(
     const endDate = parseOptionalNullableDate(input.endDate, 'endDate');
     if (!endDate.ok) return endDate;
 
+    const updatedAt = parseOptionalDate(input.updatedAt, 'updatedAt');
+    if (!updatedAt.ok) return updatedAt;
+
+    const deletedAt = parseOptionalNullableDate(input.deletedAt, 'deletedAt');
+    if (!deletedAt.ok) return deletedAt;
+
+    const deletionReason = parseOptionalNullableString(input.deletionReason, 'deletionReason');
+    if (!deletionReason.ok) return deletionReason;
+
     const aic = parseOptionalNullableString(input.aic, 'aic');
     if (!aic.ok) return aic;
 
@@ -510,6 +538,7 @@ export function normalizeTherapyUpdateInput(
     if (!diagnosisName.ok) return diagnosisName;
 
     const hasStatus = Object.prototype.hasOwnProperty.call(input, 'status');
+    const hasDeletionReason = Object.prototype.hasOwnProperty.call(input, 'deletionReason');
     let status: TherapyUpdateValues['status'];
     if (hasStatus) {
         const parsedStatus = parseTherapyStatus(input.status);
@@ -530,7 +559,10 @@ export function normalizeTherapyUpdateInput(
         diagnosisName.values === undefined &&
         status === undefined &&
         startDate.values === undefined &&
-        endDate.values === undefined
+        endDate.values === undefined &&
+        updatedAt.values === undefined &&
+        deletedAt.values === undefined &&
+        !hasDeletionReason
     ) {
         return { ok: false, error: 'No valid fields to update' };
     }
@@ -549,6 +581,9 @@ export function normalizeTherapyUpdateInput(
             status,
             startDate: startDate.values,
             endDate: endDate.values,
+            updatedAt: updatedAt.values ?? new Date(),
+            deletedAt: deletedAt.values,
+            deletionReason: hasDeletionReason ? deletionReason.values : undefined,
         },
     };
 }

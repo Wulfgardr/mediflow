@@ -9,7 +9,7 @@ import {
     normalizeEntryUpdateInput,
     normalizeTherapyCreateInput,
     normalizeTherapyUpdateInput,
-} from './api-v1-clinical-write-normalization';
+} from './api-v1-clinical-write-normalization.ts';
 
 test('normalizeEntryCreateInput rejects invalid required fields before the DB layer', () => {
     assert.deepEqual(
@@ -191,6 +191,27 @@ test('normalizeTherapyUpdateInput allows partial valid updates and nullable fiel
     assert.equal(result.values.aic, null);
     assert.equal(result.values.diagnosisName, null);
     assert.equal(result.values.atc, undefined);
+    assert.ok(result.values.updatedAt instanceof Date);
+});
+
+test('normalizeTherapyUpdateInput allows explicit soft delete restore fields', () => {
+    const deleteResult = normalizeTherapyUpdateInput({
+        deletedAt: '2026-05-02T10:00:00.000Z',
+        deletionReason: 'Duplicato',
+    });
+    assert.equal(deleteResult.ok, true);
+    if (!deleteResult.ok) return;
+    assert.equal(deleteResult.values.deletedAt?.toISOString(), '2026-05-02T10:00:00.000Z');
+    assert.equal(deleteResult.values.deletionReason, 'Duplicato');
+
+    const restoreResult = normalizeTherapyUpdateInput({
+        deletedAt: null,
+        deletionReason: null,
+    });
+    assert.equal(restoreResult.ok, true);
+    if (!restoreResult.ok) return;
+    assert.equal(restoreResult.values.deletedAt, null);
+    assert.equal(restoreResult.values.deletionReason, null);
 });
 
 test('normalizeCheckupCreateInput rejects invalid required fields and invalid status values', () => {

@@ -85,7 +85,7 @@ Le superfici principali sono tre:
 | --- | --- | --- |
 | `/api/*` | sessione web | CRUD web e overview locale |
 | `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
-| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario versionato |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario/terapie versionati |
 
 Punti da non perdere:
 

@@ -90,6 +90,14 @@ try {
     ensureColumn('therapies', 'diagnosis_code', 'diagnosis_code TEXT');
     /* @Codex */
     ensureColumn('therapies', 'diagnosis_name', 'diagnosis_name TEXT');
+    /* @Codex */
+    ensureColumn('therapies', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    /* @Codex */
+    ensureColumn('therapies', 'updated_at', 'updated_at INTEGER');
+    /* @Codex */
+    ensureColumn('therapies', 'deleted_at', 'deleted_at INTEGER');
+    /* @Codex */
+    ensureColumn('therapies', 'deletion_reason', 'deletion_reason TEXT');
 } catch (error) {
     console.warn('[MediFlow] Therapies schema check skipped:', error);
 }

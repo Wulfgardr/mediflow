@@ -118,7 +118,15 @@ export const therapies = sqliteTable('therapies', {
     status: text('status').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    /* @Codex */
+    deletionReason: text('deletion_reason'),
 });
 
 /* @Codex */

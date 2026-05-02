@@ -9,7 +9,7 @@ final class HomeBaseBonjourDiscoveryTests: XCTestCase {
         let txtRecord = NetService.data(fromTXTRecord: [
             HomeBaseBonjourService.txtKeyDisplay: Data("Studio Demo".utf8),
             HomeBaseBonjourService.txtKeyNode: Data("node-42".utf8),
-            HomeBaseBonjourService.txtKeyProtocol: Data("1.8.0".utf8),
+            HomeBaseBonjourService.txtKeyProtocol: Data("1.9.0".utf8),
             HomeBaseBonjourService.txtKeyMode: Data("network-home-base".utf8),
             HomeBaseBonjourService.txtKeyPin: Data("abc123".utf8),
         ])
@@ -29,7 +29,7 @@ final class HomeBaseBonjourDiscoveryTests: XCTestCase {
                 serverURLString: "https://mediflow-smoke.local:3443",
                 tlsPin: "abc123",
                 nodeId: "node-42",
-                protocolVersion: "1.8.0",
+                protocolVersion: "1.9.0",
                 operatingMode: "network-home-base"
             )
         )
