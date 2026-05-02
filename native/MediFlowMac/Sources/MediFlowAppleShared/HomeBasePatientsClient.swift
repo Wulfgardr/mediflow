@@ -127,6 +127,37 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     }
 }
 
+/* @Codex */
+public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let type: String?
+    public let title: String?
+    public let content: String?
+    public let deletedAt: Date?
+    public let deletionReason: String?
+
+    public init(
+        version: Int,
+        type: String? = nil,
+        title: String? = nil,
+        content: String? = nil,
+        deletedAt: Date? = nil,
+        deletionReason: String? = nil
+    ) {
+        self.version = version
+        self.type = type
+        self.title = title
+        self.content = content
+        self.deletedAt = deletedAt
+        self.deletionReason = deletionReason
+    }
+}
+
+/* @Codex */
+public struct HomeBaseMutationAcknowledgement: Decodable, Equatable, Sendable {
+    public let success: Bool
+}
+
 public enum HomeBaseClientError: LocalizedError, Equatable {
     case invalidServerURL
     case insecureTransport
@@ -282,6 +313,30 @@ public actor HomeBasePatientsClient {
             body: encode(payload)
         )
         return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateEntry(
+        patientId: String,
+        entryId: String,
+        payload: HomeBaseEntryUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("entries")
+            .appendingPathComponent(entryId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
     static func cookieHeader(sessionCookie: String, ambulatoryId: String?) -> String {

@@ -109,11 +109,13 @@ stato `offline degradato` in sola consultazione; non esistono ancora scritture
 offline o coda di merge mobile.
 
 La prima scrittura mobile paired esposta nella shell condivisa e il diario
-clinico: dalla scheda paziente iPhone/iPad si possono leggere le ultime voci e
-inviare una nuova voce online all'home-base. Ogni create usa un identificativo
-client-side stabile per evitare duplicati se la rete cade dopo il commit; update,
-annullamento e gli altri moduli clinici restano da estendere nello stesso
-boundary `/api/v1/network/*`.
+clinico: dalla scheda paziente iPhone/iPad si possono leggere le ultime voci,
+inviare una nuova voce online all'home-base, modificare una voce non annullata e
+annullarla con soft-delete reviewable. Ogni create usa un identificativo
+client-side stabile per evitare duplicati se la rete cade dopo il commit; update
+e annullamento usano la `version` della voce e mostrano il conflitto come
+richiesta di ricarica/confronto. Terapie, controlli e osservazioni restano da
+estendere nello stesso boundary `/api/v1/network/*`.
 
 ---
 

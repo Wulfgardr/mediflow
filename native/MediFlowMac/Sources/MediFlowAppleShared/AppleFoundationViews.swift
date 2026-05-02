@@ -539,6 +539,8 @@ public struct HomeBaseRuntimeStatusView: View {
 private struct PairedPatientsWorkspaceView: View {
     @StateObject private var model = PairedPatientsWorkspaceModel()
     @State private var confirmsClearingPairing = false
+    @State private var confirmsDeletingEntry = false
+    @State private var deletionCandidateId: String?
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -552,6 +554,20 @@ private struct PairedPatientsWorkspaceView: View {
         .background(PlatformColors.groupedBackground)
         .task {
             await model.performAutomaticActionsIfNeeded()
+        }
+        .confirmationDialog(
+            "Annullare questa voce diario?",
+            isPresented: $confirmsDeletingEntry,
+            titleVisibility: .visible
+        ) {
+            Button("Annulla voce", role: .destructive) {
+                guard let deletionCandidateId else { return }
+                self.deletionCandidateId = nil
+                Task { await model.softDeleteEntry(id: deletionCandidateId) }
+            }
+            Button("Mantieni", role: .cancel) {}
+        } message: {
+            Text("La voce resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
         }
     }
 
@@ -769,10 +785,76 @@ private struct PairedPatientsWorkspaceView: View {
                             Text("Voce annullata")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.orange)
+                        } else if model.canMutateEntry(entry) {
+                            HStack(spacing: 8) {
+                                Button {
+                                    model.startEditingEntry(entry)
+                                } label: {
+                                    Label("Modifica", systemImage: "pencil")
+                                }
+                                .font(.caption)
+                                .accessibilityIdentifier("homebase-edit-entry-button-\(entry.id)")
+
+                                Button(role: .destructive) {
+                                    deletionCandidateId = entry.id
+                                    confirmsDeletingEntry = true
+                                } label: {
+                                    Label("Annulla", systemImage: "xmark.circle")
+                                }
+                                .font(.caption)
+                                .accessibilityIdentifier("homebase-delete-entry-button-\(entry.id)")
+                            }
                         }
                     }
                     .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            if model.isEditingEntry {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Modifica voce online", systemImage: "pencil")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Titolo", text: $model.editEntryTitle)
+                        .accessibilityIdentifier("homebase-edit-entry-title-field")
+                    Picker("Tipo", selection: $model.editEntryType) {
+                        ForEach(PairedDiaryEntryType.allCases) { type in
+                            Text(type.title).tag(type)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("homebase-edit-entry-type-picker")
+                    TextEditor(text: $model.editEntryContent)
+                        .frame(minHeight: 90)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(PlatformColors.separator, lineWidth: 1)
+                        )
+                        .accessibilityIdentifier("homebase-edit-entry-content-field")
+                    HStack(spacing: 8) {
+                        Text("\(model.editEntryContent.count)/2000")
+                            .font(.caption2)
+                            .foregroundStyle(model.editEntryContent.count <= 2000 ? Color.secondary : Color.red)
+                        Spacer(minLength: 8)
+                        Button("Annulla") {
+                            model.cancelEditingEntry()
+                        }
+                        .font(.caption)
+                        .accessibilityIdentifier("homebase-cancel-edit-entry-button")
+                        Button {
+                            Task { await model.updateEditingEntry() }
+                        } label: {
+                            Label("Salva modifiche", systemImage: "checkmark.circle")
+                        }
+                        .font(.caption)
+                        .disabled(!model.canUpdateEditingEntry)
+                        .accessibilityIdentifier("homebase-update-entry-button")
+                    }
+                    Text("Disponibile solo online. Se la versione non coincide, ricarica il diario prima di riprovare.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -838,6 +920,11 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     @Published var newEntryContent = ""
+    @Published private(set) var editingEntryId: String?
+    @Published private(set) var editingEntryVersion: Int?
+    @Published var editEntryTitle = ""
+    @Published var editEntryType: PairedDiaryEntryType = .note
+    @Published var editEntryContent = ""
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -950,6 +1037,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             self.selectedPatient = nil
             self.entries = []
+            self.cancelEditingEntry()
             do {
                 try self.persistPairing()
                 try self.cacheStore.savePatientList(
@@ -983,6 +1071,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.cancelEditingEntry()
             self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
         }
     }
@@ -1002,6 +1091,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.cancelEditingEntry()
             self.statusMessage = "\(self.entries.count) voci diario caricate."
         }
     }
@@ -1050,6 +1140,103 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    /* @Codex */
+    func startEditingEntry(_ entry: HomeBaseEntrySummary) {
+        guard canMutateEntry(entry) else { return }
+        editingEntryId = entry.id
+        editingEntryVersion = entry.version
+        editEntryTitle = entry.title
+        editEntryType = PairedDiaryEntryType(rawValue: entry.type) ?? .note
+        editEntryContent = entry.content
+        statusMessage = "Modifica voce diario pronta."
+    }
+
+    /* @Codex */
+    func cancelEditingEntry() {
+        editingEntryId = nil
+        editingEntryVersion = nil
+        editEntryTitle = ""
+        editEntryType = .note
+        editEntryContent = ""
+    }
+
+    /* @Codex */
+    func updateEditingEntry() async {
+        guard canUpdateEditingEntry else { return }
+        guard let patientId = selectedPatient?.id,
+              let entryId = editingEntryId,
+              let version = editingEntryVersion,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let title = editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let content = editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let type = editEntryType.rawValue
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateEntry(
+                patientId: patientId,
+                entryId: entryId,
+                payload: HomeBaseEntryUpdatePayload(
+                    version: version,
+                    type: type,
+                    title: title,
+                    content: content
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.cancelEditingEntry()
+            self.entries = try await self.makeClient().fetchEntries(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Voce diario aggiornata sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func softDeleteEntry(id entryId: String) async {
+        guard let entry = entries.first(where: { $0.id == entryId }),
+              canMutateEntry(entry) else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateEntry(
+                patientId: patientId,
+                entryId: entry.id,
+                payload: HomeBaseEntryUpdatePayload(
+                    version: entry.version,
+                    deletedAt: Date(),
+                    deletionReason: "mobile-paired-operator-cancelled"
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            if self.editingEntryId == entry.id {
+                self.cancelEditingEntry()
+            }
+            self.entries = try await self.makeClient().fetchEntries(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Voce diario annullata sull'home-base."
+        }
+    }
+
     func savePairing() async {
         guard pairedCredentials != nil else {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
@@ -1082,6 +1269,7 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             newEntryType = .note
             newEntryContent = ""
             newEntryDraftId = UUID().uuidString
+            cancelEditingEntry()
             connectionState = .notLoaded
             reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
             discoveryMessage = nil
@@ -1180,9 +1368,19 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
+            } else if case HomeBaseClientError.httpStatus(let status, _) = error,
+                      status == 409 {
+                statusMessage = "Conflitto versione: ricarica il diario e confronta la voce prima di salvare."
+                errorMessage = nil
+                return
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    /* @Codex */
+    var isEditingEntry: Bool {
+        editingEntryId != nil
     }
 
     var canCreateEntry: Bool {
@@ -1192,6 +1390,30 @@ private final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && newEntryContent.count <= 2000
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canUpdateEditingEntry: Bool {
+        editingEntryId != nil
+            && editingEntryVersion != nil
+            && selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && editEntryContent.count <= 2000
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canMutateEntry(_ entry: HomeBaseEntrySummary) -> Bool {
+        entry.deletedAt == nil
+            && selectedPatient?.id == entry.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
             && !isWorking
     }
 }

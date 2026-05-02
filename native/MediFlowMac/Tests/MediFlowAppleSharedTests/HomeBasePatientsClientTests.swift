@@ -215,6 +215,148 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseCreatedResource(id: "entry-2", version: 1))
     }
 
+    /* @Codex */
+    func testUpdateEntryPutsNetworkDiaryPayload() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1/entries/entry-1"
+            )
+
+            let body = try self.readRequestBody(from: request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["version"] as? Int, 4)
+            XCTAssertEqual(payload["type"] as? String, "phone")
+            XCTAssertEqual(payload["title"] as? String, "Telefonata aggiornata")
+            XCTAssertEqual(payload["content"] as? String, "Caregiver ricontattata.")
+            XCTAssertNil(payload["deletedAt"])
+            XCTAssertNil(payload["deletionReason"])
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let result = try await client.updateEntry(
+            patientId: "patient-1",
+            entryId: "entry-1",
+            payload: HomeBaseEntryUpdatePayload(
+                version: 4,
+                type: "phone",
+                title: "Telefonata aggiornata",
+                content: "Caregiver ricontattata."
+            ),
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: nil
+        )
+
+        XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
+    }
+
+    /* @Codex */
+    func testSoftDeleteEntryPutsDeletedAtAndReason() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1/entries/entry-1"
+            )
+
+            let body = try self.readRequestBody(from: request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["version"] as? Int, 5)
+            XCTAssertEqual(payload["deletedAt"] as? String, "2026-05-02T12:00:00Z")
+            XCTAssertEqual(payload["deletionReason"] as? String, "mobile-paired-operator-cancelled")
+            XCTAssertNil(payload["content"])
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let result = try await client.updateEntry(
+            patientId: "patient-1",
+            entryId: "entry-1",
+            payload: HomeBaseEntryUpdatePayload(
+                version: 5,
+                deletedAt: Date(timeIntervalSince1970: 1_777_723_200),
+                deletionReason: "mobile-paired-operator-cancelled"
+            ),
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: nil
+        )
+
+        XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
+    }
+
+    /* @Codex */
+    func testUpdateEntrySurfacesVersionConflictPayload() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1/entries/entry-1"
+            )
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 409,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = """
+            {
+              "error": "Conflict",
+              "code": "VERSION_CONFLICT",
+              "entity": "entry",
+              "recordId": "entry-1",
+              "expectedVersion": 4,
+              "currentVersion": 5,
+              "currentUpdatedAt": "2026-05-02T12:10:00.000Z",
+              "currentState": "present",
+              "currentSnapshot": {
+                "id": "entry-1",
+                "patientId": "patient-1",
+                "version": 5,
+                "updatedAt": "2026-05-02T12:10:00.000Z",
+                "deletedAt": null
+              }
+            }
+            """.data(using: .utf8)!
+            return (response, data)
+        }
+
+        do {
+            _ = try await client.updateEntry(
+                patientId: "patient-1",
+                entryId: "entry-1",
+                payload: HomeBaseEntryUpdatePayload(version: 4, content: "Stale"),
+                credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+                sessionCookie: "mediflow_session=session-123",
+                ambulatoryId: nil
+            )
+            XCTFail("Expected version conflict")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {

@@ -158,6 +158,10 @@
         {
           "type": "issue",
           "value": "WUL-206"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-208"
         }
       ]
     },
