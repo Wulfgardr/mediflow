@@ -400,6 +400,34 @@ actor LocalAPIClient {
         return try decode([ExemptionSummary].self, from: data)
     }
 
+    /* @Codex */
+    func catalogCount(_ kind: CatalogKind) async throws -> Int {
+        let request = try makeCatalogRequest(
+            kind,
+            queryItems: [URLQueryItem(name: "count", value: "1")]
+        )
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try decode(CatalogCountResponse.self, from: data).count
+    }
+
+    /* @Codex */
+    func importCatalog(_ kind: CatalogKind, jsonData: Data) async throws -> Int? {
+        var request = try makeCatalogRequest(kind, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+        return try? decode(CatalogImportResponse.self, from: data).count
+    }
+
+    /* @Codex */
+    func clearCatalog(_ kind: CatalogKind) async throws {
+        let request = try makeCatalogRequest(kind, method: "DELETE")
+        let (data, response) = try await data(for: request)
+        try validate(data: data, response: response)
+    }
+
     func searchICD(query: String) async throws -> [ICDResult] {
         let request = try makeRootRequest(
             path: "icd/proxy",
@@ -589,6 +617,20 @@ actor LocalAPIClient {
             try applyAuth(to: &request)
         }
         return request
+    }
+
+    /* @Codex */
+    private func makeCatalogRequest(
+        _ kind: CatalogKind,
+        method: String = "GET",
+        queryItems: [URLQueryItem] = []
+    ) throws -> URLRequest {
+        switch kind.routeScope {
+        case .apiV1:
+            return try makeRequest(path: kind.path, method: method, queryItems: queryItems)
+        case .rootApi:
+            return try makeRootRequest(path: kind.path, method: method, queryItems: queryItems)
+        }
     }
 
     private func applyAuth(to request: inout URLRequest) throws {
@@ -1185,6 +1227,51 @@ struct DrugSummary: Identifiable, Decodable, Equatable {
     let atc: String?
 
     var id: String { aic }
+}
+
+/* @Codex */
+enum CatalogKind: String, CaseIterable, Identifiable, Equatable {
+    case drugs
+    case exemptions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .drugs: return "Farmaci"
+        case .exemptions: return "Esenzioni"
+        }
+    }
+
+    var path: String {
+        switch self {
+        case .drugs: return "drugs"
+        case .exemptions: return "exemptions"
+        }
+    }
+
+    fileprivate var routeScope: CatalogRouteScope {
+        switch self {
+        case .drugs: return .apiV1
+        case .exemptions: return .rootApi
+        }
+    }
+}
+
+/* @Codex */
+private enum CatalogRouteScope {
+    case apiV1
+    case rootApi
+}
+
+/* @Codex */
+private struct CatalogCountResponse: Decodable {
+    let count: Int
+}
+
+/* @Codex */
+private struct CatalogImportResponse: Decodable {
+    let count: Int?
 }
 
 /* @Codex */

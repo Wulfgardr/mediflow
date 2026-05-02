@@ -328,6 +328,105 @@ final class LocalAPIClientAuthTests: XCTestCase {
         try await client.deleteObservation(patientId: "patient-1", observationId: "obs-1")
     }
 
+    func testCatalogCountUsesApiV1ForDrugsAndDecodesCount() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.url?.path, "/api/v1/drugs")
+
+            let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+            let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
+                item.value.map { (item.name, $0) }
+            })
+            XCTAssertEqual(query["count"], "1")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"count":42}"#.data(using: .utf8)!)
+        }
+
+        let count = try await client.catalogCount(.drugs)
+
+        XCTAssertEqual(count, 42)
+    }
+
+    func testCatalogCountUsesRootApiForExemptions() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.url?.path, "/api/exemptions")
+
+            let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+            let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
+                item.value.map { (item.name, $0) }
+            })
+            XCTAssertEqual(query["count"], "1")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"count":7}"#.data(using: .utf8)!)
+        }
+
+        let count = try await client.catalogCount(.exemptions)
+
+        XCTAssertEqual(count, 7)
+    }
+
+    func testImportCatalogPostsRawJsonPayload() async throws {
+        let payload = #"[{"aic":"000001","name":"Farmaco test"}]"#.data(using: .utf8)!
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.url?.path, "/api/v1/drugs")
+
+            let body = try self.readRequestBody(from: request)
+            XCTAssertEqual(body, payload)
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"success":true,"count":1}"#.data(using: .utf8)!)
+        }
+
+        let imported = try await client.importCatalog(.drugs, jsonData: payload)
+
+        XCTAssertEqual(imported, 1)
+    }
+
+    func testClearCatalogUsesDeleteOnExemptionsRootApi() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "DELETE")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.url?.path, "/api/exemptions")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"success":true}"#.data(using: .utf8)!)
+        }
+
+        try await client.clearCatalog(.exemptions)
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> LocalAPIClient {

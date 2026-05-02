@@ -490,6 +490,12 @@ Flusso:
 
 La app macOS usa TLS pinning in `LocalAPIClient`.
 
+La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
+operabilita amministrativa dei dataset condivisi: count/stato, import JSON e
+clear per farmaci ed esenzioni. Le operazioni passano dal backend locale
+(`drugs` via `/api/v1`, esenzioni via route locale token-aware) e non creano
+storage cataloghi parallelo nell'app nativa.
+
 ### Avvio rapido
 
 - Web + servizi: `./Start_MediFlow.command`
