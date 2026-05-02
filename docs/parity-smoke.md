@@ -2,7 +2,7 @@
 # Parity Smoke Harness (Web + macOS)
 
 Stato documento: SECONDARY (runbook operativo)  
-Ultimo aggiornamento: 2026-02-20
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -52,6 +52,25 @@ Esempio offline (solo native):
 ```bash
 MEDIFLOW_PARITY_RUN_WEB=0 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode bash scripts/parity-smoke.sh
 ```
+
+---
+
+## Evidenza WUL-21 strict
+
+Run locale isolato del 2026-05-02:
+
+```bash
+MEDIFLOW_PARITY_REQUIRE_WEB=1 MEDIFLOW_PARITY_REQUIRE_NATIVE=1 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode MEDIFLOW_PARITY_ARTIFACT_DIR=tmp-parity-smoke/wul-21-20260502-strict-rerun bash scripts/parity-smoke.sh
+```
+
+Esito:
+
+- web lane: `PASS` (`e2e/document-import.spec.ts`, `e2e/web-smoke.spec.ts`)
+- native lane: `PASS` (`xcodebuild test`, 45 test)
+- summary locale: `tmp-parity-smoke/wul-21-20260502-strict-rerun/summary.md`
+
+Il run strict valida l'harness web+native required. La click-map manuale
+capability-by-capability resta separata e va completata nel gate `P6`.
 
 ---
 

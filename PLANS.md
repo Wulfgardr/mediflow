@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-05-01
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -223,10 +223,10 @@ Nota operativa:
 
 #### 5a) Sequenza esecutiva parity (step-by-step)
 - [x] `P0` Baseline parity matrix versionata (web vs macOS) sui 6 moduli core, distinguendo chiaramente `contratto API` vs `UI disponibile`. (`docs/parity-matrix.md`)
-- [ ] `P0b` Stabilizzare harness smoke parity (web Playwright + native XCTest/Xcode + click-map macOS) su ambiente isolato/VM.
+- [x] `P0b` Stabilizzare harness smoke parity (web Playwright + native XCTest/Xcode + click-map macOS) su ambiente isolato/VM.
 - [x] `P0b.a` Introdurre runner unificato parity smoke + report artifacts (`scripts/parity-smoke.sh`, `docs/parity-smoke.md`).
 - [x] `P0b.b` Definire checklist click-map macOS per run manuali ripetibili (`docs/parity-click-map-macos.md`).
-- [ ] `P0b.c` Eseguire run VM "strict" (web+native required) con Playwright disponibile e checklist compilata.
+- [x] `P0b.c` Eseguire run strict web+native required con Playwright disponibile. Evidenza `WUL-21` del 2026-05-02: `MEDIFLOW_PARITY_REQUIRE_WEB=1 MEDIFLOW_PARITY_REQUIRE_NATIVE=1 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode`, web smoke `2/2` e Xcode native `45/45` passati; la click-map manuale capability-by-capability resta il gate `P6`.
 - [x] `P1` Pazienti native: completare `edit/delete/archive/search/sort` e filtri stato (`attivi/archiviati`) in UI macOS.
 - [ ] `P2` Esenzioni native: aggiungere selector/search su `/api/v1/exemptions` e salvataggio in create/update paziente.
 - [ ] `P3` Osservazioni native: esporre in UI macOS il CRUD `LOINC + UCUM` già disponibile a contratto (`/api/v1/patients/:id/observations`).
