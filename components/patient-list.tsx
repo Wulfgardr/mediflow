@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Building2, Copy, RotateCcw, Scissors, UserPlus } from 'lucide-react';
+import { Activity, Building2, Copy, RotateCcw, Scissors, Search, UserPlus } from 'lucide-react';
 
 import { CaseLensPanel } from '@/components/case-lens-panel';
 import { ClinicalStreamRow } from '@/components/clinical-stream-row';
@@ -201,6 +201,14 @@ export default function PatientList() {
         }
         setSelectedIds(new Set(patients.map((patient) => patient.id)));
     }, [patients, selectedIds]);
+
+    /* @Codex */
+    const isFiltered = Boolean(search.trim()) || viewMode !== 'active';
+
+    const clearFilters = useCallback(() => {
+        setSearch('');
+        setViewMode('active');
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = async (event: KeyboardEvent) => {
@@ -434,11 +442,36 @@ export default function PatientList() {
                                     </div>
                                 </section>
                             ))
+                        ) : isFiltered ? (
+                            <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-10 text-center">
+                                <Search className="mx-auto h-10 w-10 text-[color:rgba(112,106,100,0.34)]" />
+                                <h3 className="mt-3 text-lg font-semibold text-[color:var(--mf-ink)]">Nessun caso trovato</h3>
+                                <p className="mt-2 text-sm text-[color:var(--mf-muted)]">
+                                    Filtri o ricerca attuali non producono risultati.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="mt-5 inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/84 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                                >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Cancella filtri
+                                </button>
+                            </div>
                         ) : (
                             <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-10 text-center">
-                                <Building2 className="mx-auto h-10 w-10 text-[color:rgba(112,106,100,0.34)]" />
-                                <h3 className="mt-3 text-lg font-semibold text-[color:var(--mf-ink)]">Nessun caso trovato</h3>
-                                <p className="mt-2 text-sm text-[color:var(--mf-muted)]">Prova a cambiare ricerca o ambito di vista.</p>
+                                <UserPlus className="mx-auto h-10 w-10 text-[color:rgba(112,106,100,0.34)]" />
+                                <h3 className="mt-3 text-lg font-semibold text-[color:var(--mf-ink)]">Nessun paziente</h3>
+                                <p className="mt-2 text-sm text-[color:var(--mf-muted)]">
+                                    Aggiungi il primo caso per iniziare a costruire la cartella.
+                                </p>
+                                <Link
+                                    href="/patients/new"
+                                    className="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-[color:var(--mf-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[color:rgba(15,123,104,0.88)]"
+                                >
+                                    <UserPlus className="h-4 w-4" />
+                                    Aggiungi primo paziente
+                                </Link>
                             </div>
                         )
                     ) : patients && patients.length > 0 ? (
@@ -455,11 +488,36 @@ export default function PatientList() {
                                 {renderStream(patients, currentAmbulatory?.name)}
                             </div>
                         </section>
+                    ) : isFiltered ? (
+                        <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-10 text-center">
+                            <Search className="mx-auto h-10 w-10 text-[color:rgba(112,106,100,0.34)]" />
+                            <h3 className="mt-3 text-lg font-semibold text-[color:var(--mf-ink)]">Nessun caso trovato</h3>
+                            <p className="mt-2 text-sm text-[color:var(--mf-muted)]">
+                                Filtri o ricerca attuali non producono risultati.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="mt-5 inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/84 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Cancella filtri
+                            </button>
+                        </div>
                     ) : (
                         <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-10 text-center">
                             <UserPlus className="mx-auto h-10 w-10 text-[color:rgba(112,106,100,0.34)]" />
                             <h3 className="mt-3 text-lg font-semibold text-[color:var(--mf-ink)]">Nessun paziente</h3>
-                            <p className="mt-2 text-sm text-[color:var(--mf-muted)]">Inizia aggiungendo il primo caso in questo ambulatorio.</p>
+                            <p className="mt-2 text-sm text-[color:var(--mf-muted)]">
+                                Aggiungi il primo caso in questo ambulatorio per iniziare.
+                            </p>
+                            <Link
+                                href="/patients/new"
+                                className="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-[color:var(--mf-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[color:rgba(15,123,104,0.88)]"
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                Aggiungi primo paziente
+                            </Link>
                         </div>
                     )}
                 </div>
