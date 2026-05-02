@@ -7,6 +7,7 @@ import { Activity, Building2, Copy, RotateCcw, Scissors, Search, UserPlus } from
 import { CaseLensPanel } from '@/components/case-lens-panel';
 import { ClinicalStreamRow } from '@/components/clinical-stream-row';
 import { GlassCommandCapsule } from '@/components/glass-command-capsule';
+import { PatientAgendaWorklist } from '@/components/patient-agenda-worklist';
 import { db, type Ambulatory, type Patient } from '@/lib/db';
 import { usePatientClipboard } from '@/hooks/use-patient-clipboard';
 import { useLiveQuery, notifyDbChange } from '@/lib/live-query';
@@ -418,6 +419,10 @@ export default function PatientList() {
 
                 <div className="mt-4 space-y-4">
                     {selectionToolbar}
+
+                    {patients && patients.length > 0 ? (
+                        <PatientAgendaWorklist patients={patients} />
+                    ) : null}
 
                     {isGlobalView ? (
                         patientGroups.length > 0 ? (

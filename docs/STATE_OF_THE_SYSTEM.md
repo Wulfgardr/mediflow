@@ -341,7 +341,7 @@ Disponibile:
 - diario clinico;
 - terapie;
 - osservazioni;
-- appuntamenti/checkup;
+- appuntamenti/checkup e agenda operativa sui casi visibili;
 - allegati;
 - archiviazione paziente;
 - campi strutturati e projection documentale;

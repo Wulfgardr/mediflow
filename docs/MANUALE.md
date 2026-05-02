@@ -63,6 +63,9 @@ Puoi creare più ambulatori (es. "Studio Roma", "Guardia Medica").
 * **Diario Clinico**: Al centro. Scrivi le note visita per visita.
 * **Storia**: A destra vedi i riassunti dei vecchi documenti.
 
+La lista pazienti mostra anche una piccola **agenda operativa** sui casi visibili:
+PRIAMO, valutazioni, visite e follow-up già pianificati nella sezione controlli.
+
 ---
 
 ## 4. AI locale (senza internet)
