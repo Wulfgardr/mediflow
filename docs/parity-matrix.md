@@ -2,7 +2,7 @@
 # Matrice Parity Web <-> macOS (Core)
 
 Stato documento: CANONICAL (parity operativa web/native)  
-Ultimo aggiornamento: 2026-03-17
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -37,7 +37,13 @@ Riferimenti:
 
 ---
 
-## Baseline corrente (2026-02-20)
+## Baseline corrente (frozen native snapshot)
+
+Il run strict `WUL-21` del 2026-05-02 ha validato la lane automatizzata
+web+native (`web 2/2`, Xcode native `45/45`), ma non cambia gli stati modulo:
+la click-map manuale `P6` non e stata eseguita e nessun modulo core e ancora
+`FULL`. I residui restano tracciati in Linear sotto `WUL-23`, `WUL-24`,
+`WUL-25`, `WUL-76` e `WUL-77`.
 
 | Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
 | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -55,7 +55,7 @@ MEDIFLOW_PARITY_RUN_WEB=0 MEDIFLOW_PARITY_NATIVE_RUNNER=xcode bash scripts/parit
 
 ---
 
-## Evidenza WUL-21 strict
+## Evidenza WUL-21 / WUL-26 automated strict
 
 Run locale isolato del 2026-05-02:
 
@@ -69,8 +69,11 @@ Esito:
 - native lane: `PASS` (`xcodebuild test`, 45 test)
 - summary locale: `tmp-parity-smoke/wul-21-20260502-strict-rerun/summary.md`
 
-Il run strict valida l'harness web+native required. La click-map manuale
-capability-by-capability resta separata e va completata nel gate `P6`.
+Il run strict valida l'harness web+native required e chiude la sola lane
+automatizzata `P0b.c`. Non e sufficiente per dichiarare `WUL-26` Done come
+chiusura parity completa: la click-map manuale capability-by-capability resta
+separata nel gate `P6`, e i gap modulo residui restano in `WUL-23`, `WUL-24`,
+`WUL-25`, `WUL-76` e `WUL-77`.
 
 ---
 

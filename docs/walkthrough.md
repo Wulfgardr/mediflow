@@ -569,6 +569,8 @@ sequenceDiagram
   layer completi restano incrementali.
 - Il vecchio shell macOS resta congelato: la parity non riparte su quello
   snapshot.
+- `WUL-26` non puo chiudere la parity come Done finche la shell nativa
+  ricostruita non supera una click-map capability-by-capability.
 - Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
 
 ---

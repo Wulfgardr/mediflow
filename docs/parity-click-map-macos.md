@@ -2,7 +2,7 @@
 # Checklist Click-Map macOS (Parity Sweep)
 
 Stato documento: SECONDARY (checklist operativa)  
-Ultimo aggiornamento: 2026-02-20
+Ultimo aggiornamento: 2026-05-02
 
 ---
 
@@ -99,3 +99,10 @@ Riferimenti:
 - Esito complessivo: `PASS` / `FAIL`
 - Blocchi trovati:
 - Note:
+
+## Esito WUL-26
+
+Non eseguito. Il run strict `WUL-21` del 2026-05-02 copre la sola lane
+automatizzata web+native; la click-map capability-by-capability resta il gate
+manuale `P6` e va rieseguita sul nuovo shell nativo, non sullo snapshot macOS
+congelato.
