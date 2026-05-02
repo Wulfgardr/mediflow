@@ -69,6 +69,21 @@ Riferimenti:
 
 ---
 
+## Scenario mirato WUL-22 - Esenzioni paziente
+
+Stato codice: chiuso in `WUL-22` come selector/search/save nativo per esenzioni
+in create/edit paziente via `/api/v1/exemptions`. Questa checklist resta
+evidenza manuale `P6`; il catalogo Settings resta separato in `WUL-25`.
+
+- [ ] Nuovo paziente: sezione `Esenzioni` visibile nel form.
+- [ ] Nuovo paziente: ricerca per codice o descrizione restituisce opzioni dal catalogo.
+- [ ] Nuovo paziente: selezione codice mostra chip e salva la scheda.
+- [ ] Modifica paziente: codici esenzione esistenti vengono caricati correttamente.
+- [ ] Modifica paziente: rimozione di tutti i codici persiste come lista vuota.
+- [ ] Detail paziente: i codici salvati sono visibili dopo reload.
+
+---
+
 ## Scenario mirato WUL-23 - Osservazioni LOINC/UCUM
 
 Stato codice: chiuso in `WUL-23` come CRUD nativo LOINC/UCUM gia esposto e
