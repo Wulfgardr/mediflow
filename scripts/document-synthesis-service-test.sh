@@ -10,4 +10,5 @@ npx tsc -p "$ROOT_DIR/tsconfig.document-synthesis-test.json"
 node --test \
     "$OUT_DIR/document-synthesis-service.test.js" \
     "$OUT_DIR/document-evidence-pack.test.js" \
-    "$OUT_DIR/document-evidence-backfill.test.js"
+    "$OUT_DIR/document-evidence-backfill.test.js" \
+    "$OUT_DIR/document-source-provenance-audit.test.js"
