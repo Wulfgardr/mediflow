@@ -101,8 +101,122 @@ test('buildEvidenceQueue marks deleted diary entries as superseded and excludes 
     assert.equal(queue.items[0].source.type, 'diary_entry');
     assert.equal(queue.items[0].source.version, '3');
     assert.equal(queue.items[0].governance.freshness, 'recent');
-    assert.equal(queue.items[0].renderableClaims.length, 1);
+    assert.ok(queue.items[0].renderableClaims.length >= 1);
     assert.equal(queue.items[1].renderableClaims.length, 0);
+});
+
+test('buildEvidenceQueue projects diary entries as citable retrieval-only evidence', () => {
+    const content = [
+        'Nega febbre o dispnea alla rivalutazione telefonica.',
+        'Controllo programmato tra sette giorni con diario dei sintomi.',
+    ].join(' ');
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        diaryEntries: [
+            {
+                id: 'entry-follow-up',
+                patientId: 'patient-1',
+                type: 'phone',
+                title: 'Follow-up sintetico',
+                date: '2026-04-20T00:00:00.000Z',
+                content,
+                version: 5,
+            },
+        ],
+    });
+
+    const item = queue.items[0];
+    assert.equal(item.source.id, 'diary:entry-follow-up');
+    assert.equal(item.source.type, 'diary_entry');
+    assert.equal(item.governance.reason, 'included');
+    assert.ok(item.renderableClaims.some((claim) => claim.kind === 'diary_negation'));
+    assert.ok(item.renderableClaims.some((claim) => claim.kind === 'diary_follow_up'));
+    assert.ok(item.renderableClaims.some((claim) => claim.kind === 'diary_plan'));
+
+    for (const claim of item.renderableClaims) {
+        assert.equal(typeof claim.citation.offsetStart, 'number');
+        assert.equal(typeof claim.citation.offsetEnd, 'number');
+        assert.equal(claim.citation.sourceId, 'diary:entry-follow-up');
+        assert.equal(
+            content.slice(claim.citation.offsetStart as number, claim.citation.offsetEnd as number).trim(),
+            claim.citation.snippet,
+        );
+    }
+});
+
+test('buildEvidenceQueue suppresses older diary evidence within the same retrieval domain', () => {
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        diaryEntries: [
+            {
+                id: 'entry-old',
+                patientId: 'patient-1',
+                type: 'visit',
+                date: '2026-03-01T00:00:00.000Z',
+                content: 'Piano precedente: controllo mensile del sintomo sintetico.',
+                domainKey: 'synthetic-follow-up-domain',
+            },
+            {
+                id: 'entry-new',
+                patientId: 'patient-1',
+                type: 'visit',
+                date: '2026-04-10T00:00:00.000Z',
+                content: 'Piano aggiornato: rivalutazione tra sette giorni del sintomo sintetico.',
+                domainKey: 'synthetic-follow-up-domain',
+            },
+        ],
+    });
+
+    assert.equal(queue.totals.included, 1);
+    assert.equal(queue.totals.suppressedStale, 1);
+    assert.equal(queue.items[0].id, 'diary:entry-old');
+    assert.equal(queue.items[0].governance.reason, 'suppressed_stale');
+    assert.equal(queue.items[0].governance.freshness, 'stale');
+    assert.equal(queue.items[0].governance.suppressedBySourceId, 'diary:entry-new');
+    assert.equal(queue.items[0].renderableClaims.length, 0);
+    assert.equal(queue.items[1].governance.reason, 'included');
+});
+
+test('buildEvidenceQueue marks old diary entries as historical when they remain retrievable', () => {
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        diaryEntries: [
+            {
+                id: 'entry-history',
+                patientId: 'patient-1',
+                type: 'note',
+                date: '2025-01-10T00:00:00.000Z',
+                content: 'Nota storica sintetica utile solo come contesto longitudinale.',
+                domainKey: 'synthetic-history-domain',
+            },
+        ],
+    });
+
+    assert.equal(queue.items[0].governance.reason, 'included');
+    assert.ok(queue.items[0].renderableClaims.some((claim) => claim.kind === 'diary_historical'));
+});
+
+test('buildEvidenceQueue diary indexing does not emit structured clinical writes', () => {
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        diaryEntries: [
+            {
+                id: 'entry-retrieval-only',
+                patientId: 'patient-1',
+                type: 'note',
+                date: '2026-04-11T00:00:00.000Z',
+                content: 'Nota sintetica per retrieval citabile senza promozione strutturata.',
+            },
+        ],
+    });
+
+    assert.equal(queue.items.length, 1);
+    assert.equal(queue.items[0].source.type, 'diary_entry');
+    assert.equal(queue.items.some((item) => item.source.type === 'structured_chart'), false);
 });
 
 test('buildEvidenceQueue includes reviewed structured chart data without model calls', () => {

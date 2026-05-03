@@ -316,3 +316,23 @@ presente nella fonte sintetica. Il corpus include anche un caso avversario
 `adversarial-fabricated-citation`: il validator passa solo se quel caso viene
 classificato come failure di citation correctness, cosi il benchmark dimostra di
 saper intercettare citazioni fabbricate invece di misurare solo coverage.
+
+## Diary evidence indexing
+
+`WUL-215` estende il contract `mediflow.evidence_queue.v1` con una proiezione
+retrieval-only del diario clinico:
+
+- ogni entry resta una fonte `diary:<entry_id>`;
+- le citazioni usano offset JavaScript UTF-16 verificabili sulla stringa
+  sorgente e uno snippet sintetico/locale;
+- i tag temporali (`recent`, `historical`, `follow_up`, `plan`,
+  `negation`, `suspended_or_resolved`) sono deterministici e rule-based;
+- `domainKey` e opzionale, caller-provided e non deve essere derivato da LLM,
+  embedding, training o promozione clinica automatica;
+- una entry storica nello stesso `domainKey` di una entry piu recente viene
+  marcata `suppressed_stale`, resta auditabile come item della queue e punta a
+  `suppressedBySourceId`, ma non emette claim renderizzabili.
+
+Questa lane non scrive diagnosi, terapie, problemi o altre tabelle cliniche
+strutturate. I consumer runtime devono passare dal contract WUL-216 prima di
+usare l'evidenza indicizzata.

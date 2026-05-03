@@ -26,6 +26,15 @@ export type EvidenceQueueDecisionReason =
 export type EvidenceQueueFreshness = 'recent' | 'stale' | 'undated';
 
 /* @Codex */
+export type EvidenceQueueDiaryTemporalTag =
+    | 'recent'
+    | 'historical'
+    | 'suspended_or_resolved'
+    | 'follow_up'
+    | 'plan'
+    | 'negation';
+
+/* @Codex */
 export interface EvidenceQueueAttachmentInput {
     id: string;
     patientId: string;
@@ -41,9 +50,17 @@ export interface EvidenceQueueDiaryInput {
     id: string;
     patientId: string;
     date: string | Date;
+    type?: string | null;
+    title?: string | null;
     content?: string | null;
     deletedAt?: string | Date | null;
     version?: string | number | null;
+    /**
+     * Deterministic caller-provided retrieval bucket. v1 must not derive this
+     * through embeddings, LLM calls, training or free-text clinical promotion.
+     */
+    domainKey?: string | null;
+    status?: string | null;
 }
 
 /* @Codex */
@@ -67,6 +84,7 @@ export interface BuildEvidenceQueueInput {
 
 /* @Codex */
 export interface EvidenceQueueCitation {
+    /** Source ids are unique inside a patient-scoped queue; offsets use JS UTF-16 string indices. */
     sourceId: string;
     page?: number;
     sectionId?: string;
@@ -104,6 +122,7 @@ export interface EvidenceQueueItem {
         freshness: EvidenceQueueFreshness;
         reason: EvidenceQueueDecisionReason;
         reasonDetail: string;
+        suppressedBySourceId?: string;
     };
     renderableClaims: EvidenceQueueRenderableClaim[];
 }
@@ -126,6 +145,8 @@ export interface EvidenceQueue {
 }
 
 const MIN_SIGNAL_CHARS = 24;
+const DIARY_SNIPPET_RADIUS = 90;
+const DIARY_HISTORICAL_DAYS = 180;
 
 function stableDate(value: string | Date | null | undefined): string | undefined {
     if (!value) return undefined;
@@ -135,6 +156,10 @@ function stableDate(value: string | Date | null | undefined): string | undefined
 
 function compactText(value: string | null | undefined): string {
     return (value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function plainText(value: string | null | undefined): string {
+    return (value ?? '').replace(/\r\n/g, '\n').trim();
 }
 
 function versionString(value: string | number | null | undefined): string {
@@ -186,6 +211,116 @@ function artifactClaims(sourceId: string, artifact: DocumentParseEvidenceArtifac
             },
         };
     });
+}
+
+function entryTypeLabel(input: EvidenceQueueDiaryInput): string {
+    const type = compactText(input.type);
+    const title = compactText(input.title);
+    if (title) return `${type || 'diario'}: ${title}`;
+    return type || 'diario';
+}
+
+function diaryTemporalTags(
+    input: EvidenceQueueDiaryInput,
+    content: string,
+    generatedAt: string,
+): EvidenceQueueDiaryTemporalTag[] {
+    const haystack = `${input.type ?? ''} ${input.title ?? ''} ${input.status ?? ''} ${content}`.toLowerCase();
+    const tags = new Set<EvidenceQueueDiaryTemporalTag>();
+    const entryDate = stableDate(input.date);
+    const entryTime = entryDate ? new Date(entryDate).getTime() : undefined;
+    const generatedTime = new Date(generatedAt).getTime();
+
+    if (!entryTime || !Number.isFinite(generatedTime)) {
+        tags.add('historical');
+    } else {
+        const ageDays = (generatedTime - entryTime) / 86_400_000;
+        tags.add(ageDays > DIARY_HISTORICAL_DAYS ? 'historical' : 'recent');
+    }
+
+    if (/\b(sospes[aoie]|sospende|interrott[aoie]|risolt[aoie]|terminat[aoie]|resolved|stopped|discontinued)\b/u.test(haystack)) {
+        tags.add('suspended_or_resolved');
+    }
+    if (/\b(follow[- ]?up|controllo|rivalutazione|richiamo|review|recheck)\b/u.test(haystack)) {
+        tags.add('follow_up');
+    }
+    if (/\b(piano|programma|programmato|indicazione|si propone|planned|plan)\b/u.test(haystack)) {
+        tags.add('plan');
+    }
+    if (/\b(nega|negata|negato|non riferisce|assenza di|senza|no evidence|denies)\b/u.test(haystack)) {
+        tags.add('negation');
+    }
+
+    return [...tags];
+}
+
+function sentenceBounds(content: string, index: number): { start: number; end: number } {
+    let start = index;
+    while (start > 0 && !/[.!?\n]/u.test(content[start - 1])) start -= 1;
+
+    let end = index;
+    while (end < content.length && !/[.!?\n]/u.test(content[end])) end += 1;
+    if (end < content.length) end += 1;
+
+    start = Math.max(0, Math.min(start, content.length));
+    end = Math.max(start, Math.min(end, content.length));
+
+    if (end - start > DIARY_SNIPPET_RADIUS * 2) {
+        start = Math.max(0, index - DIARY_SNIPPET_RADIUS);
+        end = Math.min(content.length, index + DIARY_SNIPPET_RADIUS);
+    }
+
+    return { start, end };
+}
+
+function diaryEvidenceClaims(
+    sourceId: string,
+    input: EvidenceQueueDiaryInput,
+    content: string,
+    generatedAt: string,
+): EvidenceQueueRenderableClaim[] {
+    const tags = diaryTemporalTags(input, content, generatedAt);
+    const anchors: Array<{ tag: EvidenceQueueDiaryTemporalTag; index: number }> = [];
+    const lower = content.toLowerCase();
+
+    const tagNeedles: Array<[EvidenceQueueDiaryTemporalTag, RegExp]> = [
+        ['suspended_or_resolved', /\b(sospes[aoie]|sospende|interrott[aoie]|risolt[aoie]|terminat[aoie]|resolved|stopped|discontinued)\b/u],
+        ['follow_up', /\b(follow[- ]?up|controllo|rivalutazione|richiamo|review|recheck)\b/u],
+        ['plan', /\b(piano|programma|programmato|indicazione|si propone|planned|plan)\b/u],
+        ['negation', /\b(nega|negata|negato|non riferisce|assenza di|senza|no evidence|denies)\b/u],
+    ];
+
+    for (const [tag, regex] of tagNeedles) {
+        if (!tags.includes(tag)) continue;
+        const match = regex.exec(lower);
+        if (match?.index !== undefined) anchors.push({ tag, index: match.index });
+    }
+
+    if (anchors.length === 0) anchors.push({ tag: tags.includes('historical') ? 'historical' : 'recent', index: 0 });
+
+    const seen = new Set<string>();
+    const claims: EvidenceQueueRenderableClaim[] = [];
+    for (const { tag, index } of anchors) {
+        const bounds = sentenceBounds(content, index);
+        const key = `${bounds.start}:${bounds.end}:${tag}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const snippet = content.slice(bounds.start, bounds.end).trim();
+
+        claims.push({
+            id: `${sourceId}:${tag}:${bounds.start}-${bounds.end}`,
+            kind: `diary_${tag}`,
+            label: `Diario clinico ${entryTypeLabel(input)} (${tag})`,
+            citation: {
+                sourceId,
+                offsetStart: bounds.start,
+                offsetEnd: bounds.end,
+                snippet,
+            },
+        });
+    }
+
+    return claims;
 }
 
 function buildAttachmentParseEvidenceItem(
@@ -259,15 +394,22 @@ function buildAttachmentItems(input: EvidenceQueueAttachmentInput, generatedAt: 
     return [buildAttachmentSummaryItem(input, generatedAt)];
 }
 
-function buildDiaryItem(input: EvidenceQueueDiaryInput, generatedAt: string): EvidenceQueueItem {
+function buildDiaryItem(
+    input: EvidenceQueueDiaryInput,
+    generatedAt: string,
+    suppressedBySourceId: string | undefined,
+): EvidenceQueueItem {
     const sourceId = `diary:${input.id}`;
-    const content = compactText(input.content);
+    const content = plainText(input.content);
     const deletedAt = stableDate(input.deletedAt);
     const reason: EvidenceQueueDecisionReason = deletedAt
         ? 'superseded'
-        : content.length >= MIN_SIGNAL_CHARS
-            ? 'included'
-            : 'low_signal';
+        : suppressedBySourceId
+            ? 'suppressed_stale'
+            : compactText(content).length >= MIN_SIGNAL_CHARS
+                ? 'included'
+                : 'low_signal';
+    const claims = reason === 'included' ? diaryEvidenceClaims(sourceId, input, content, generatedAt) : [];
 
     return {
         id: sourceId,
@@ -275,7 +417,7 @@ function buildDiaryItem(input: EvidenceQueueDiaryInput, generatedAt: string): Ev
             id: sourceId,
             type: 'diary_entry',
             patientId: input.patientId,
-            label: 'Diario clinico',
+            label: `Diario clinico (${entryTypeLabel(input)})`,
             version: versionString(input.version),
         },
         provenance: {
@@ -284,27 +426,48 @@ function buildDiaryItem(input: EvidenceQueueDiaryInput, generatedAt: string): Ev
         },
         governance: {
             priority: 60,
-            freshness: freshnessFromDate(input.date),
+            freshness: reason === 'suppressed_stale' ? 'stale' : freshnessFromDate(input.date),
             reason,
             reasonDetail: deletedAt
                 ? 'Diary entry is deleted or superseded and must not render as active evidence.'
+                : reason === 'suppressed_stale'
+                    ? 'Diary entry is older than a newer diary source in the same retrieval domain.'
                 : reason === 'included'
-                    ? 'Diary entry is available as retrieval-only evidence.'
+                    ? 'Diary entry is available as retrieval-only evidence with citable offsets.'
                     : 'Diary entry is absent or too low-signal for evidence queue inclusion.',
+            suppressedBySourceId,
         },
-        renderableClaims: reason === 'included'
-            ? [{
-                id: `${sourceId}:entry`,
-                kind: 'diary_entry',
-                label: 'Diario clinico disponibile per retrieval citabile',
-                citation: {
-                    sourceId,
-                    offsetStart: 0,
-                    offsetEnd: content.length,
-                },
-            }]
-            : [],
+        renderableClaims: reason === 'included' ? claims : [],
     };
+}
+
+function diaryStaleSuppressorSourceId(
+    input: EvidenceQueueDiaryInput,
+    allDiaryEntries: EvidenceQueueDiaryInput[],
+): string | undefined {
+    const domainKey = compactText(input.domainKey);
+    const date = stableDate(input.date);
+    if (!domainKey || !date || stableDate(input.deletedAt)) return undefined;
+    const time = new Date(date).getTime();
+
+    const newer = allDiaryEntries
+        .filter((entry) => {
+            if (entry.id === input.id || stableDate(entry.deletedAt)) return false;
+            if (compactText(entry.domainKey) !== domainKey) return false;
+            const otherDate = stableDate(entry.date);
+            return otherDate ? new Date(otherDate).getTime() > time : false;
+        })
+        .sort((left, right) => {
+            const leftDate = stableDate(left.date);
+            const rightDate = stableDate(right.date);
+            return new Date(rightDate ?? 0).getTime() - new Date(leftDate ?? 0).getTime();
+        })[0];
+
+    return newer ? `diary:${newer.id}` : undefined;
+}
+
+function buildDiaryItems(inputs: EvidenceQueueDiaryInput[], generatedAt: string): EvidenceQueueItem[] {
+    return inputs.map((entry) => buildDiaryItem(entry, generatedAt, diaryStaleSuppressorSourceId(entry, inputs)));
 }
 
 function buildStructuredChartItem(input: EvidenceQueueStructuredChartInput, generatedAt: string): EvidenceQueueItem {
@@ -342,9 +505,10 @@ function buildStructuredChartItem(input: EvidenceQueueStructuredChartInput, gene
 /* @Codex */
 export function buildEvidenceQueue(input: BuildEvidenceQueueInput): EvidenceQueue {
     const generatedAt = stableDate(input.generatedAt) || new Date().toISOString();
+    const diaryEntries = input.diaryEntries ?? [];
     const items = [
         ...(input.attachments ?? []).flatMap((attachment) => buildAttachmentItems(attachment, generatedAt)),
-        ...(input.diaryEntries ?? []).map((entry) => buildDiaryItem(entry, generatedAt)),
+        ...buildDiaryItems(diaryEntries, generatedAt),
         ...(input.structuredChartItems ?? []).map((item) => buildStructuredChartItem(item, generatedAt)),
     ];
 

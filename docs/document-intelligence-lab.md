@@ -164,3 +164,10 @@ Quando emerge un fallimento su materiale realistico locale:
 
 Il vault privato serve quindi a **generare nuovi archetipi sintetici migliori**,
 non a sostituire il corpus canonico.
+
+Per il diario clinico e per raccolte locali sensibili come `Downloads` /
+`Sanita Personale`, la stessa regola vale in modo stretto: i documenti possono
+ispirare solo pattern redatti e fixture sintetiche. Non vanno copiati in repo,
+prompt, issue, report, log, corpus benchmark o input Claude; eventuali esempi
+operativi devono essere ricreati come casi sintetici senza PHI/PII o
+identificativi real-shaped.
