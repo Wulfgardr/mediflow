@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Download, Check, Shield, Sparkles } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Download, Check, Shield, Sparkles, Activity, KeyRound, Wrench, ChevronDown, Stethoscope, HardDrive } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
@@ -571,15 +571,16 @@ export default function SettingsPage() {
     /* @Codex */
     const railItems = [
         { href: '#account', label: 'Account', description: 'Profilo, PIN, accesso', icon: <User className="h-4 w-4" /> },
-        { href: '#ai', label: 'AI locale', description: 'Modelli, budget, runtime', icon: <Bot className="h-4 w-4" /> },
+        { href: '#ai', label: 'AI locale', description: 'Modelli, ruoli, runtime', icon: <Bot className="h-4 w-4" /> },
+        { href: '#backups', label: 'Backup', description: 'Schedulazione e ripristino', icon: <HardDrive className="h-4 w-4" /> },
         { href: '#data', label: 'Cataloghi', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
-        { href: '#operations', label: 'Sistema', description: 'Diagnostica e manutenzione', icon: <Server className="h-4 w-4" /> },
-        { href: '#backups', label: 'Backup', description: 'Schedulazione e restore', icon: <Download className="h-4 w-4" /> },
+        { href: '#operations', label: 'Sistema', description: 'Diagnostica e strumenti', icon: <Server className="h-4 w-4" /> },
         { href: '#appearance', label: 'Aspetto', description: 'Trasparenza e movimento', icon: <Sparkles className="h-4 w-4" /> },
     ];
 
     return (
-        <div className="space-y-8 pb-10">
+        <div className="space-y-8 overflow-x-hidden pb-10">
+            {/* Hero */}
             <div
                 className={cn(
                     isWorkbench
@@ -597,20 +598,20 @@ export default function SettingsPage() {
 
                 <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-3">
-                        <div className="section-kicker">Impostazioni locali</div>
+                        <div className="section-kicker">Workstation locale</div>
                         <div>
                             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
                                 Impostazioni
                             </h1>
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                Configurazione di questo workstation: account, AI, cataloghi, backup e manutenzione. Usa la navigazione per saltare alla famiglia che ti serve.
+                                Account, AI, backup, cataloghi e diagnostica di questo computer. I dati clinici restano locali.
                             </p>
                         </div>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="apple-subsection min-w-[210px]">
-                            <p className="section-kicker">Utente corrente</p>
+                            <p className="section-kicker">Operatore</p>
                             <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{user?.displayName || 'Admin'}</p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
                         </div>
@@ -619,6 +620,7 @@ export default function SettingsPage() {
                 </div>
             </div>
 
+            {/* Mobile area picker */}
             <div className="xl:hidden">
                 <div
                     className={cn(
@@ -627,13 +629,7 @@ export default function SettingsPage() {
                             : 'glass-panel p-3',
                     )}
                 >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="section-kicker">Navigazione</p>
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Vai a sezione</h2>
-                        </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Scorri &rarr;</p>
-                    </div>
+                    <p className="section-kicker mb-2 px-1">Aree</p>
                     <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                         {railItems.map((item) => (
                             <SettingsRailLink key={item.href} {...item} compact />
@@ -643,6 +639,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[230px_minmax(0,1fr)]">
+                {/* Desktop area rail */}
                 <aside className="hidden xl:block">
                     <div
                         className={cn(
@@ -651,11 +648,8 @@ export default function SettingsPage() {
                                 : 'glass-panel sticky top-6 p-4',
                         )}
                     >
-                        <div className="mb-4">
-                            <p className="section-kicker">Navigazione</p>
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Sezioni</h2>
-                        </div>
-                        <div className="space-y-3">
+                        <p className="section-kicker mb-3">Aree</p>
+                        <div className="space-y-2">
                             {railItems.map((item) => (
                                 <SettingsRailLink key={item.href} {...item} />
                             ))}
@@ -664,6 +658,943 @@ export default function SettingsPage() {
                 </aside>
 
                 <div className="space-y-10">
+                    {/* === Account === */}
+                    <section id="account" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Account"
+                            title="Profilo e accesso"
+                            description="Identità mostrata nei documenti generati e rotazione del PIN di sblocco."
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-emerald-100/80 p-2 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                        <User className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Profilo</p>
+                                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Nome medico e ambulatorio</h2>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Mostrati in intestazione, ricette e referti generati.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="doctor-name" className={SETTINGS_LABEL_CLASS}>
+                                            Nome medico
+                                        </label>
+                                        <input
+                                            id="doctor-name"
+                                            name="doctorName"
+                                            type="text"
+                                            value={profile.doctorName}
+                                            onChange={(e) => setProfile({ ...profile, doctorName: e.target.value })}
+                                            placeholder="es. Dr. Mario Rossi"
+                                            autoComplete="name"
+                                            className={SETTINGS_INPUT_CLASS}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="clinic-name" className={SETTINGS_LABEL_CLASS}>
+                                            Nome ambulatorio
+                                        </label>
+                                        <input
+                                            id="clinic-name"
+                                            name="clinicName"
+                                            type="text"
+                                            value={profile.clinicName}
+                                            onChange={(e) => setProfile({ ...profile, clinicName: e.target.value })}
+                                            placeholder="es. Studio Medico Centro"
+                                            autoComplete="organization"
+                                            className={SETTINGS_INPUT_CLASS}
+                                        />
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={saveProfile}
+                                            disabled={isSavingProfile}
+                                            className={SETTINGS_TONED_BUTTON_CLASS.emerald}
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            {isSavingProfile ? 'Salvataggio...' : 'Salva Profilo'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-amber-100/80 p-2 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                                        <KeyRound className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Sicurezza</p>
+                                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Cambio PIN</h2>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>
+                                            PIN attuale
+                                        </label>
+                                        <input
+                                            id="current-pin"
+                                            name="currentPin"
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={pinForm.currentPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
+                                            placeholder="Inserisci il PIN attuale"
+                                            autoComplete="current-password"
+                                            spellCheck={false}
+                                            className={SETTINGS_INPUT_CLASS}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>
+                                            Nuovo PIN
+                                        </label>
+                                        <input
+                                            id="new-pin"
+                                            name="newPin"
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={pinForm.newPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
+                                            placeholder="4-8 caratteri"
+                                            autoComplete="new-password"
+                                            spellCheck={false}
+                                            className={SETTINGS_INPUT_CLASS}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>
+                                            Conferma nuovo PIN
+                                        </label>
+                                        <input
+                                            id="confirm-pin"
+                                            name="confirmPin"
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={pinForm.confirmPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                                            placeholder="Ripeti il nuovo PIN"
+                                            autoComplete="new-password"
+                                            spellCheck={false}
+                                            className={SETTINGS_INPUT_CLASS}
+                                        />
+                                    </div>
+
+                                    {pinFeedback && (
+                                        <div className={cn(
+                                            'rounded-lg border px-3 py-2 text-xs',
+                                            pinFeedback.tone === 'success'
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                : 'border-red-200 bg-red-50 text-red-700'
+                                        )}>
+                                            {pinFeedback.message}
+                                        </div>
+                                    )}
+
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={handleChangePin}
+                                            disabled={isChangingPin}
+                                            className={SETTINGS_TONED_BUTTON_CLASS.amber}
+                                        >
+                                            <Shield className="w-4 h-4" />
+                                            {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* === AI === */}
+                    <section id="ai" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="AI locale"
+                            title="Modelli, ruoli e runtime"
+                            description="Provider locale, modelli per ciascun ruolo clinico e kill switch delle funzioni AI."
+                        />
+
+                        <div className="space-y-6">
+                            {/* Profilo hardware */}
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-sky-100/80 p-2 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200">
+                                        <Cpu className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Profilo hardware</p>
+                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Capacità del computer</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Imposta i modelli di default in base alla RAM disponibile. Sovrascrive le selezioni manuali.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div
+                                        onClick={() => applyHardwareProfile('low')}
+                                        className={cn(
+                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
+                                            hardwareProfile === 'low'
+                                                ? "border-emerald-300/80 bg-emerald-50/75 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                        )}
+                                    >
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-200">Light</span>
+                                            {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-200" />}
+                                        </div>
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">&lt; 16GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Usa solo modelli molto compressi (Q4_K_M).</p>
+                                    </div>
+
+                                    <div
+                                        onClick={() => applyHardwareProfile('medium')}
+                                        className={cn(
+                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
+                                            hardwareProfile === 'medium'
+                                                ? "border-indigo-300/80 bg-indigo-50/75 shadow-[0_14px_28px_rgba(79,70,229,0.12)] dark:border-indigo-500/20 dark:bg-indigo-900/10"
+                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                        )}
+                                    >
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-700 dark:text-indigo-200">Balanced</span>
+                                            {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-200" />}
+                                        </div>
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">16-32GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 14B per sintesi e reasoning.</p>
+                                    </div>
+
+                                    <div
+                                        onClick={() => applyHardwareProfile('high')}
+                                        className={cn(
+                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
+                                            hardwareProfile === 'high'
+                                                ? "border-violet-300/80 bg-violet-50/75 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10"
+                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                        )}
+                                    >
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-700 dark:text-violet-200">Pro</span>
+                                            {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4 text-violet-600 dark:text-violet-200" />}
+                                        </div>
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">&gt; 32GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Ruoli del team AI */}
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-emerald-100/80 p-2 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                        <Stethoscope className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Ruoli del team AI</p>
+                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Modelli per superficie clinica</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ogni ruolo usa un modello dedicato. I file vengono scaricati e tenuti in locale.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <ModelSelector
+                                        selectorId="clinical"
+                                        label="Radiologo & Clinico"
+                                        description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
+                                        icon={<Bot className="w-5 h-5" />}
+                                        color="emerald"
+                                        value={aiConfig.model_clinical}
+                                        onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
+                                        recommended={[
+                                            { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Default consigliato)" },
+                                            { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
+                                            { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Bilanciato)" },
+                                            { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
+                                            { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Specialistico medico, non default)" }
+                                        ]}
+                                        provider={aiConfig.provider}
+                                        targetUrl={aiConfig.url}
+                                    />
+
+                                    <ModelSelector
+                                        selectorId="reasoning"
+                                        label="Internista (Reasoning)"
+                                        description="Per riassunti narrativi, chat complesse e Second Opinion."
+                                        icon={<Cpu className="w-5 h-5" />}
+                                        color="purple"
+                                        value={aiConfig.model_reasoning}
+                                        onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
+                                        recommended={[
+                                            { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Potente, default)" },
+                                            { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
+                                            { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Ottimo, 16GB RAM)" },
+                                            { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
+                                            { name: "deepseek-r1:14b", desc: "DeepSeek R1 14B (Reasoning)" }
+                                        ]}
+                                        provider={aiConfig.provider}
+                                        targetUrl={aiConfig.url}
+                                    />
+
+                                    <ModelSelector
+                                        selectorId="ocr"
+                                        label="Segreteria (OCR)"
+                                        description="Per importare documenti cartacei, referti scannerizzati e note."
+                                        icon={<Upload className="w-5 h-5" />}
+                                        color="blue"
+                                        value={aiConfig.model_ocr}
+                                        onChange={(val) => setAiConfig({ ...aiConfig, model_ocr: val })}
+                                        recommended={[
+                                            { name: "deepseek-ocr", desc: "DeepSeek OCR 2 (Consigliato)" },
+                                            { name: "minicpm-v:8b-2.6", desc: "MiniCPM-V 8B (Alternativo)" },
+                                            { name: "llava:13b", desc: "LLaVA 13B (Vision Generalista)" }
+                                        ]}
+                                        provider={aiConfig.provider}
+                                        targetUrl={aiConfig.url}
+                                    />
+
+                                    <AiRolloutGuardNotice
+                                        selections={[
+                                            {
+                                                roleId: 'clinical',
+                                                roleLabel: 'Radiologo & Clinico',
+                                                model: aiConfig.model_clinical,
+                                            },
+                                            {
+                                                roleId: 'reasoning',
+                                                roleLabel: 'Internista (Reasoning)',
+                                                model: aiConfig.model_reasoning,
+                                            },
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Patient Insight runtime policy */}
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-indigo-100/80 p-2 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+                                        <Sparkles className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="section-kicker">Patient Insight</p>
+                                            <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Budget contesto e output</h3>
+                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Quanto contesto leggere e quanto produrre per ogni insight: bilancia velocità e completezza.</p>
+                                        </div>
+                                        <span className="apple-chip whitespace-nowrap">{selectedInsightMode.title}</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {AI_INSIGHT_MODE_OPTIONS.map((option) => {
+                                        const selected = aiInsightSettings.mode === option.value;
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
+                                                className={cn(
+                                                    "rounded-[18px] border px-3 py-3 text-left transition-colors",
+                                                    selected
+                                                        ? "border-indigo-500 bg-white shadow-sm dark:border-indigo-500/40 dark:bg-white/10"
+                                                        : "border-indigo-100 bg-white/70 hover:border-indigo-200 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                                                )}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-white">{option.title}</span>
+                                                    {selected ? <CheckCircle className="h-4 w-4 text-indigo-600 dark:text-indigo-300" /> : null}
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{option.description}</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <p className="mt-3 rounded-[14px] border border-indigo-100/70 bg-indigo-50/50 px-3 py-2 text-[11px] leading-5 text-slate-600 dark:border-indigo-500/15 dark:bg-indigo-900/10 dark:text-slate-300">
+                                    {aiInsightSettings.mode === 'full_auto'
+                                        ? 'Full auto sceglie il budget in base al profilo hardware corrente e alla complessità del caso.'
+                                        : selectedInsightMode.description}
+                                </p>
+
+                                <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                                    <div className="rounded-lg border border-slate-200/70 bg-white/72 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                                        <span className="block text-[10px] uppercase tracking-wide text-slate-400">Profilo hardware</span>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-100">{hardwareProfile}</span>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200/70 bg-white/72 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                                        <span className="block text-[10px] uppercase tracking-wide text-slate-400">Budget runtime</span>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-100">{insightRuntimePreview}</span>
+                                    </div>
+                                </div>
+
+                                {aiInsightSettings.mode === 'manual' && (
+                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                            Documenti massimi
+                                            <input
+                                                type="number"
+                                                min={2}
+                                                max={12}
+                                                value={aiInsightSettings.manualConfig.maxDocuments}
+                                                onChange={(e) => updateManualInsightConfig('maxDocuments', Number.parseInt(e.target.value, 10))}
+                                                className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
+                                            />
+                                        </label>
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                            Caratteri per documento
+                                            <input
+                                                type="number"
+                                                min={120}
+                                                max={480}
+                                                value={aiInsightSettings.manualConfig.maxDocumentSummaryChars}
+                                                onChange={(e) => updateManualInsightConfig('maxDocumentSummaryChars', Number.parseInt(e.target.value, 10))}
+                                                className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
+                                            />
+                                        </label>
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                            Budget contesto documenti
+                                            <input
+                                                type="number"
+                                                min={800}
+                                                max={5000}
+                                                value={aiInsightSettings.manualConfig.maxDocumentContextChars}
+                                                onChange={(e) => updateManualInsightConfig('maxDocumentContextChars', Number.parseInt(e.target.value, 10))}
+                                                className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
+                                            />
+                                        </label>
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                            Output max token
+                                            <input
+                                                type="number"
+                                                min={256}
+                                                max={1200}
+                                                value={aiInsightSettings.manualConfig.outputMaxTokens}
+                                                onChange={(e) => updateManualInsightConfig('outputMaxTokens', Number.parseInt(e.target.value, 10))}
+                                                className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Kill switches */}
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-rose-100/80 p-2 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200">
+                                        <Shield className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Kill switch locali</p>
+                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Disattiva singole funzioni AI</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ogni interruttore blocca la funzione in modo deterministico, anche con i modelli installati.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div
+                                        className={cn(
+                                            "rounded-[18px] border p-4",
+                                            patientInsightEnabled
+                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
+                                        )}
+                                        data-testid="patient-insight-kill-switch-card"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Patient Insight</p>
+                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                    Se spento, la scheda paziente non avvia nuovi insight e il runtime rifiuta la generazione.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <label
+                                                    htmlFor="patientInsightKillSwitch"
+                                                    className={cn(
+                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                                                        patientInsightEnabled
+                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
+                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
+                                                    )}
+                                                >
+                                                    {patientInsightEnabled ? 'Enabled' : 'Disabled'}
+                                                </label>
+                                                <input
+                                                    id="patientInsightKillSwitch"
+                                                    type="checkbox"
+                                                    checked={!patientInsightEnabled}
+                                                    onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
+                                                    aria-label="Disabilita Patient Insight localmente"
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className={cn(
+                                            "rounded-[18px] border p-4",
+                                            documentSynthesisEnabled
+                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
+                                        )}
+                                        data-testid="document-synthesis-kill-switch-card"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Document Synthesis</p>
+                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                    Se spento, OCR e import base restano disponibili, ma il runtime rifiuta analisi clinica e archivio intelligente del documento.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <label
+                                                    htmlFor="documentSynthesisKillSwitch"
+                                                    className={cn(
+                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                                                        documentSynthesisEnabled
+                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
+                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
+                                                    )}
+                                                >
+                                                    {documentSynthesisEnabled ? 'Enabled' : 'Disabled'}
+                                                </label>
+                                                <input
+                                                    id="documentSynthesisKillSwitch"
+                                                    type="checkbox"
+                                                    checked={!documentSynthesisEnabled}
+                                                    onChange={(e) => setDocumentSynthesisEnabled(!e.target.checked)}
+                                                    aria-label="Disabilita Document Synthesis localmente"
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className={cn(
+                                            "rounded-[18px] border p-4",
+                                            smartImportEnabled
+                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
+                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
+                                        )}
+                                        data-testid="smart-import-kill-switch-card"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Smart Import</p>
+                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                    Se spento, il pannello paziente non avvia analisi Smart Import e il runtime rifiuta sia generate sia apply.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <label
+                                                    htmlFor="smartImportKillSwitch"
+                                                    className={cn(
+                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                                                        smartImportEnabled
+                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
+                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
+                                                    )}
+                                                >
+                                                    {smartImportEnabled ? 'Enabled' : 'Disabled'}
+                                                </label>
+                                                <input
+                                                    id="smartImportKillSwitch"
+                                                    type="checkbox"
+                                                    checked={!smartImportEnabled}
+                                                    onChange={(e) => setSmartImportEnabled(!e.target.checked)}
+                                                    aria-label="Disabilita Smart Import localmente"
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Connessione runtime + Save */}
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-slate-100/80 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                                        <Server className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Connessione runtime</p>
+                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Provider locale</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Solo Ollama in locale: nessun dato esce dal computer.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="flex items-center rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                        Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama (locale)</span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={aiConfig.url}
+                                        onChange={(e) => setAiConfig({ ...aiConfig, url: e.target.value })}
+                                        placeholder="http://127.0.0.1:11434/v1"
+                                        aria-label="URL provider Ollama"
+                                        className={`${SETTINGS_INPUT_CLASS} font-mono text-xs`}
+                                    />
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-between gap-3">
+                                    <label
+                                        htmlFor="advancedFit"
+                                        className="inline-flex cursor-pointer items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            id="advancedFit"
+                                            checked={showAdvanced}
+                                            onChange={(e) => setShowAdvanced(e.target.checked)}
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 dark:border-white/10 dark:bg-white/5"
+                                        />
+                                        Mostra opzioni avanzate
+                                    </label>
+                                </div>
+
+                                {showAdvanced && (
+                                    <div className="mt-3 rounded-[18px] border border-dashed border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/5">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="dockerMode"
+                                                checked={isDockerApp}
+                                                onChange={(e) => {
+                                                    const newVal = e.target.checked;
+                                                    setIsDockerApp(newVal);
+                                                    setAiConfig(prev => ({
+                                                        ...prev,
+                                                        url: newVal
+                                                            ? "http://host.docker.internal:11434/v1"
+                                                            : "http://127.0.0.1:11434/v1"
+                                                    }));
+                                                }}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 dark:border-white/10 dark:bg-white/5"
+                                            />
+                                            <label htmlFor="dockerMode" className="cursor-pointer text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                                Docker Internal Host (se l&apos;app è in container)
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200/70 pt-4 dark:border-white/10">
+                                    <button
+                                        onClick={saveAiConfig}
+                                        disabled={isSavingAi}
+                                        className={SETTINGS_TONED_BUTTON_CLASS.indigo}
+                                    >
+                                        <Save className="w-4 h-4" />
+                                        {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
+                                    </button>
+
+                                    <button
+                                        onClick={testAiConnection}
+                                        className={SETTINGS_SECONDARY_BUTTON_CLASS}
+                                    >
+                                        <RefreshCw className={cn("w-4 h-4", aiTestStatus === 'testing' && "animate-spin")} />
+                                        Test Connessione
+                                    </button>
+
+                                    <p className="ml-auto text-[10px] text-slate-400 italic">
+                                        CPU alta? Riavvia Ollama (`docker restart ollama`).
+                                    </p>
+                                </div>
+
+                                {aiHealth && (
+                                    <div className={cn(
+                                        "mt-4 animate-in slide-in-from-top-2 fade-in rounded-[18px] border p-3 text-sm space-y-1",
+                                        aiHealth.status === 'ok'
+                                            ? "border-emerald-200/70 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200"
+                                            : "border-red-200/70 bg-red-50/80 text-red-800 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
+                                    )}>
+                                        <div className="flex items-start gap-2 font-semibold">
+                                            {aiHealth.status === 'ok' ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}
+                                            <p>{aiHealth.status === 'ok' ? 'Sistema AI operativo' : 'Problema rilevato'}</p>
+                                        </div>
+                                        <p className="pl-6 text-xs opacity-90">{aiHealth.message}</p>
+                                    </div>
+                                )}
+
+                                {aiTestStatus === 'success' && (
+                                    <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-emerald-200/70 bg-emerald-50/80 p-3 text-xs text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200">
+                                        <CheckCircle className="w-4 h-4" />
+                                        Connessione a Ollama riuscita.
+                                    </div>
+                                )}
+                                {aiTestStatus === 'error' && (
+                                    <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-red-200/70 bg-red-50/80 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        Impossibile connettersi. Controlla che Ollama sia attivo.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Read-only governance */}
+                            <details className="group rounded-[24px] border border-slate-200/70 bg-white/60 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                                    <div>
+                                        <p className="section-kicker">Governance (sola lettura)</p>
+                                        <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Parliament e readiness rollout</h3>
+                                    </div>
+                                    <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="space-y-4 border-t border-slate-200/70 px-5 py-5 dark:border-white/10">
+                                    <AiModelParliamentPanel />
+                                    <AiRolloutReadinessPanel />
+                                </div>
+                            </details>
+                        </div>
+                    </section>
+
+                    {/* === Backup === */}
+                    <section id="backups" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Backup"
+                            title="Continuità e ripristino"
+                            description="Schedulazione automatica e ripristino manuale degli archivi cifrati locali."
+                        />
+                        <div className="space-y-6">
+                            <BackupSchedulerUI />
+                            <BackupRestoreUI />
+                        </div>
+                    </section>
+
+                    {/* === Cataloghi === */}
+                    <section id="data" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Cataloghi"
+                            title="Farmaci ed esenzioni"
+                            description="Database locali per il prescrittore. Importa e aggiorna senza rete."
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-2xl bg-blue-100/80 p-2 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                                        <Database className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="section-kicker">Farmaci</p>
+                                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Database AIFA offline</h2>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            Elenco farmaci rimborsabili usato dal prescrittore.{' '}
+                                            <a
+                                                href="https://www.aifa.gov.it/web/guest/liste-dei-farmaci"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:underline dark:text-blue-400"
+                                            >
+                                                Fonte: AIFA Open Data
+                                            </a>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="rounded-[22px] border border-blue-200/60 bg-blue-50/80 p-4 flex items-center justify-between dark:border-blue-500/20 dark:bg-blue-900/10">
+                                        <div>
+                                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Farmaci indicizzati</p>
+                                            <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                                                {drugStats !== null ? drugStats.toLocaleString() : '-'}
+                                            </p>
+                                        </div>
+                                        <Server className="w-8 h-8 text-blue-200 dark:text-blue-800" />
+                                    </div>
+
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleAifaUpload}
+                                        accept=".csv"
+                                        className="hidden"
+                                        disabled={importing}
+                                        aria-label="Carica file CSV AIFA"
+                                    />
+
+                                    {!importing ? (
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,box-shadow] hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
+                                        >
+                                            <Upload className="w-5 h-5" />
+                                            <span className="font-medium">Carica file AIFA (.csv)</span>
+                                        </button>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs text-gray-500">
+                                                <span>Importazione in corso...</span>
+                                                <span>{progress}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                                <div className="bg-blue-600 h-2.5 rounded-full transition-[width] duration-300 progress-bar-width" data-progress={progress}></div>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
+                                        </div>
+                                    )}
+
+                                    {drugStats !== null && drugStats > 0 && (
+                                        <button
+                                            onClick={handleClearDrugs}
+                                            className="text-xs text-red-500 hover:text-red-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <AlertTriangle className="w-3 h-3" />
+                                            Svuota database farmaci
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <ExemptionDbManager />
+                        </div>
+                    </section>
+
+                    {/* === Sistema === */}
+                    <section id="operations" className="space-y-4 scroll-mt-24">
+                        <SettingsSectionIntro
+                            kicker="Sistema"
+                            title="Diagnostica e manutenzione"
+                            description="Stato dei servizi runtime, gestione ambulatori, strumenti avanzati e azioni irreversibili."
+                        />
+
+                        <div className="space-y-6">
+                            <ServiceArchitecturePanel />
+                            <DiagnosticHub />
+
+                            <div className={SETTINGS_CARD_CLASS}>
+                                <div className="flex items-start gap-3">
+                                    <div className="rounded-2xl bg-blue-100/80 p-2 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                                        <Activity className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="section-kicker">Ambulatori</p>
+                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Sedi e contesti</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Gestisci più sedi e cambia rapidamente contesto operativo.</p>
+                                    </div>
+                                    <a
+                                        href="/settings/ambulatories"
+                                        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20"
+                                    >
+                                        Apri gestione &rarr;
+                                    </a>
+                                </div>
+                            </div>
+
+                            <UpdateAwarenessPanel />
+
+                            {/* Advanced tools (devs / native) */}
+                            <details className="group rounded-[24px] border border-slate-200/70 bg-white/55 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="rounded-2xl bg-slate-100/80 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                                            <Wrench className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <p className="section-kicker">Strumenti avanzati</p>
+                                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Dati di test e launcher nativo</h3>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Solo diagnostica e sviluppo.</p>
+                                        </div>
+                                    </div>
+                                    <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="grid grid-cols-1 gap-4 border-t border-slate-200/70 px-5 py-5 md:grid-cols-2 dark:border-white/10">
+                                    <div className="apple-subsection flex flex-col justify-between">
+                                        <div className="mb-3">
+                                            <p className="section-kicker">Sviluppo</p>
+                                            <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati di test</h4>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Genera pazienti e documenti fittizi per collaudare l&apos;applicazione.</p>
+                                        </div>
+                                        <div className="flex items-center justify-end">
+                                            <DataSeeder />
+                                        </div>
+                                    </div>
+
+                                    <div className="apple-subsection flex flex-col justify-between">
+                                        <div className="mb-3">
+                                            <p className="section-kicker">Desktop</p>
+                                            <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">App nativa macOS</h4>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Avvia la shell nativa quando disponibile sul sistema.</p>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <button
+                                                onClick={openNativeApp}
+                                                disabled={nativeLaunchState === 'loading'}
+                                                className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/76 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:text-slate-400"
+                                            >
+                                                {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
+                                            </button>
+                                            {nativeLaunchState === 'success' && (
+                                                <span className="text-xs text-green-600">Aperta</span>
+                                            )}
+                                            {nativeLaunchState === 'error' && (
+                                                <span className="text-xs text-red-600">Errore</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                            {/* Danger Zone */}
+                            <div className="rounded-[24px] border border-red-200/60 bg-red-50/60 p-5 md:p-6 dark:border-red-500/20 dark:bg-red-900/10">
+                                <div className="mb-5 flex items-start gap-3">
+                                    <div className="rounded-xl bg-red-100 p-2 text-red-600 dark:bg-red-500/15 dark:text-red-200">
+                                        <AlertTriangle className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="section-kicker">Zona pericolo</p>
+                                        <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            Operazioni che riportano il workstation a uno stato precedente. Richiedono riconfigurazione.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-4 rounded-[20px] border border-red-100 bg-white/78 p-4 dark:border-red-900/50 dark:bg-red-950/20 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-red-100">Reset onboarding</p>
+                                        <p className="text-xs text-slate-500 dark:text-red-200/70">Cancella profilo utente e chiavi. I pazienti restano invariati.</p>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm("Sei sicuro? Questo cancellerà il tuo profilo utente e ti riporterà alla configurazione iniziale.\n\nI dati dei pazienti NON verranno persi, ma dovrai riconfigurare l'accesso.")) {
+                                                try {
+                                                    const res = await fetch('/api/auth/reset', { method: 'POST' });
+                                                    if (res.ok) {
+                                                        window.location.href = '/';
+                                                    } else {
+                                                        alert("Errore durante il reset.");
+                                                    }
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    alert("Errore di connessione.");
+                                                }
+                                            }
+                                        }}
+                                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color,box-shadow] hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
+                                    >
+                                        Reset Completo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* === Aspetto (cosmetic, last) === */}
                     <section id="appearance" data-testid="settings-appearance-section" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
                             kicker="Aspetto"
@@ -733,897 +1664,6 @@ export default function SettingsPage() {
                         </div>
                     </section>
 
-                    <section id="account" className="space-y-4 scroll-mt-24">
-                        <SettingsSectionIntro
-                            kicker="Account"
-                            title="Profilo e accesso"
-                            description="Nome medico, ambulatorio e rotazione del PIN."
-                        />
-
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* --- Profile Section --- */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    <div className="mb-5">
-                        <p className="section-kicker">Profilo</p>
-                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Nome medico e ambulatorio</h2>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Etichette mostrate nell&apos;intestazione della shell e nei documenti generati.</p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="doctor-name" className={SETTINGS_LABEL_CLASS}>
-                                Nome Medico
-                            </label>
-                            <input
-                                id="doctor-name"
-                                name="doctorName"
-                                type="text"
-                                value={profile.doctorName}
-                                onChange={(e) => setProfile({ ...profile, doctorName: e.target.value })}
-                                placeholder="es. Dr. Mario Rossi"
-                                autoComplete="name"
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="clinic-name" className={SETTINGS_LABEL_CLASS}>
-                                Nome Ambulatorio
-                            </label>
-                            <input
-                                id="clinic-name"
-                                name="clinicName"
-                                type="text"
-                                value={profile.clinicName}
-                                onChange={(e) => setProfile({ ...profile, clinicName: e.target.value })}
-                                placeholder="es. Studio Medico Centro"
-                                autoComplete="organization"
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div className="pt-2">
-                            <button
-                                onClick={saveProfile}
-                                disabled={isSavingProfile}
-                                className={SETTINGS_TONED_BUTTON_CLASS.emerald}
-                            >
-                                <Save className="w-4 h-4" />
-                                {isSavingProfile ? 'Salvataggio...' : 'Salva Profilo'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- Security Section --- */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    <div className="mb-5">
-                        <p className="section-kicker">Sicurezza</p>
-                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Cambio PIN</h2>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>
-                                PIN attuale
-                            </label>
-                            <input
-                                id="current-pin"
-                                name="currentPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.currentPin}
-                                onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
-                                placeholder="Inserisci il PIN attuale"
-                                autoComplete="current-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>
-                                Nuovo PIN
-                            </label>
-                            <input
-                                id="new-pin"
-                                name="newPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.newPin}
-                                onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
-                                placeholder="4-8 caratteri"
-                                autoComplete="new-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>
-                                Conferma nuovo PIN
-                            </label>
-                            <input
-                                id="confirm-pin"
-                                name="confirmPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.confirmPin}
-                                onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
-                                placeholder="Ripeti il nuovo PIN"
-                                autoComplete="new-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <p className="text-xs text-gray-500">
-                            Il cambio PIN fa il re-wrap della stessa master key: i dati restano leggibili, ma dal prossimo unlock servirà il nuovo PIN.
-                        </p>
-
-                        {pinFeedback && (
-                            <div className={cn(
-                                'rounded-lg border px-3 py-2 text-xs',
-                                pinFeedback.tone === 'success'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-red-200 bg-red-50 text-red-700'
-                            )}>
-                                {pinFeedback.message}
-                            </div>
-                        )}
-
-                        <div className="pt-2">
-                            <button
-                                onClick={handleChangePin}
-                                disabled={isChangingPin}
-                                className={SETTINGS_TONED_BUTTON_CLASS.amber}
-                            >
-                                <Shield className="w-4 h-4" />
-                                {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                        </div>
-                    </section>
-
-                    <section id="ai" className="space-y-4 scroll-mt-24">
-                        <SettingsSectionIntro
-                            kicker="AI locale"
-                            title="Modelli, ruoli e runtime"
-                            description="Profilo hardware, modelli assegnati ai ruoli clinici, budget insight e connessione al provider locale."
-                        />
-
-                {/* --- AI Config Section --- */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    <div className="mb-6">
-                        <p className="section-kicker">Configurazione AI</p>
-                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Team clinico virtuale</h2>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Profilo hardware, modelli per ogni ruolo, budget insight e provider locale.</p>
-                    </div>
-
-                        <div className="space-y-6">
-                        {/* 1. Hardware Profile Selector */}
-                        <div className={SETTINGS_SECTION_CARD_CLASS}>
-                            <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                                <Cpu className="w-4 h-4" />
-                                Profilo Hardware
-                            </label>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div
-                                    onClick={() => applyHardwareProfile('low')}
-                                    className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                        hardwareProfile === 'low'
-                                            ? "border-emerald-300/80 bg-emerald-50/75 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                    )}
-                                >
-                                    <div className="mb-2 flex items-center justify-between gap-3">
-                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-200">Light</span>
-                                        {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-200" />}
-                                    </div>
-                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">&lt; 16GB RAM</p>
-                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Usa solo modelli molto compressi (Q4_K_M).</p>
-                                </div>
-
-                                <div
-                                    onClick={() => applyHardwareProfile('medium')}
-                                    className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                        hardwareProfile === 'medium'
-                                            ? "border-indigo-300/80 bg-indigo-50/75 shadow-[0_14px_28px_rgba(79,70,229,0.12)] dark:border-indigo-500/20 dark:bg-indigo-900/10"
-                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                    )}
-                                >
-                                    <div className="mb-2 flex items-center justify-between gap-3">
-                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-700 dark:text-indigo-200">Balanced</span>
-                                        {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-200" />}
-                                    </div>
-                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">16-32GB RAM</p>
-                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 14B per sintesi e reasoning.</p>
-                                </div>
-
-                                <div
-                                    onClick={() => applyHardwareProfile('high')}
-                                    className={cn(
-                                        "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                        hardwareProfile === 'high'
-                                            ? "border-violet-300/80 bg-violet-50/75 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10"
-                                            : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                    )}
-                                >
-                                    <div className="mb-2 flex items-center justify-between gap-3">
-                                        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-700 dark:text-violet-200">Pro</span>
-                                        {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4 text-violet-600 dark:text-violet-200" />}
-                                    </div>
-                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">&gt; 32GB RAM</p>
-                                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 grid gap-2 md:grid-cols-2">
-                                <p className="rounded-[18px] border border-sky-200/60 bg-sky-50/80 px-3 py-2 text-xs leading-5 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200">
-                                    Per usare provider non locali serve connettivita attiva e relativa configurazione API.
-                                </p>
-                                <p className="rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-2 text-xs leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                                    Il profilo hardware sovrascrive i modelli selezionati. Passa a configurazione personalizzata se vuoi controllo manuale.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* 2. Task Assignment with Model Selector */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                                <Bot className="w-4 h-4" />
-                                Ruoli del Team AI
-                            </h3>
-
-                            <ModelSelector
-                                selectorId="clinical"
-                                label="Radiologo & Clinico"
-                                description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
-                                icon={<Bot className="w-5 h-5" />}
-                                color="emerald"
-                                value={aiConfig.model_clinical}
-                                onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
-                                recommended={[
-                                    { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Default consigliato)" },
-                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
-                                    { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Bilanciato)" },
-                                    { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
-                                    { name: "hf.co/unsloth/medgemma-1.5-4b-it-GGUF", desc: "MedGemma 4B (Specialistico medico, non default)" }
-                                ]}
-                                provider={aiConfig.provider}
-                                targetUrl={aiConfig.url}
-                            />
-
-                            <ModelSelector
-                                selectorId="reasoning"
-                                label="Internista (Reasoning)"
-                                description="Per riassunti narrativi, chat complesse e “Second Opinion”."
-                                icon={<Cpu className="w-5 h-5" />}
-                                color="purple"
-                                value={aiConfig.model_reasoning}
-                                onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
-                                recommended={[
-                                    { name: "qwen3.5:35b-a3b", desc: "Qwen 3.5 35B A3B (Potente, default)" },
-                                    { name: "qwen2.5:32b", desc: "Qwen 2.5 32B (Compatibilita legacy)" },
-                                    { name: "qwen2.5:14b", desc: "Qwen 2.5 14B (Ottimo, 16GB RAM)" },
-                                    { name: "qwen2.5:7b", desc: "Qwen 2.5 7B (Leggero)" },
-                                    { name: "deepseek-r1:14b", desc: "DeepSeek R1 14B (Reasoning)" }
-                                ]}
-                                provider={aiConfig.provider}
-                                targetUrl={aiConfig.url}
-                            />
-
-                            <ModelSelector
-                                selectorId="ocr"
-                                label="Segreteria (OCR)"
-                                description="Per importare documenti cartacei, referti scannerizzati e note."
-                                icon={<Upload className="w-5 h-5" />}
-                                color="blue"
-                                value={aiConfig.model_ocr}
-                                onChange={(val) => setAiConfig({ ...aiConfig, model_ocr: val })}
-                                recommended={[
-                                    { name: "deepseek-ocr", desc: "DeepSeek OCR 2 (Consigliato)" },
-                                    { name: "minicpm-v:8b-2.6", desc: "MiniCPM-V 8B (Alternativo)" },
-                                    { name: "llava:13b", desc: "LLaVA 13B (Vision Generalista)" }
-                                ]}
-                                provider={aiConfig.provider}
-                                targetUrl={aiConfig.url}
-                            />
-
-                            <AiRolloutGuardNotice
-                                selections={[
-                                    {
-                                        roleId: 'clinical',
-                                        roleLabel: 'Radiologo & Clinico',
-                                        model: aiConfig.model_clinical,
-                                    },
-                                    {
-                                        roleId: 'reasoning',
-                                        roleLabel: 'Internista (Reasoning)',
-                                        model: aiConfig.model_reasoning,
-                                    },
-                                ]}
-                            />
-                        </div>
-
-                        {/* @Codex */}
-                        <div className="rounded-[24px] border border-indigo-100/80 bg-indigo-50/45 p-4 shadow-[0_12px_24px_rgba(79,70,229,0.06)] space-y-4 dark:border-indigo-500/20 dark:bg-indigo-900/10">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <h3 className="text-sm font-bold text-indigo-900">AI Patient Insight</h3>
-                                    <p className="text-[11px] text-indigo-800/80">
-                                        Budget del contesto e dell&apos;output per l&apos;insight clinico sintetico.
-                                    </p>
-                                </div>
-                                <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                                    {selectedInsightMode.title}
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {AI_INSIGHT_MODE_OPTIONS.map((option) => {
-                                    const selected = aiInsightSettings.mode === option.value;
-                                    return (
-                                        <button
-                                            key={option.value}
-                                            type="button"
-                                            onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
-                                            className={cn(
-                                                "rounded-[18px] border px-3 py-3 text-left transition-colors",
-                                                selected
-                                                    ? "border-indigo-500 bg-white shadow-sm"
-                                                    : "border-indigo-100 bg-white/70 hover:border-indigo-200"
-                                            )}
-                                        >
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-xs font-bold text-gray-900">{option.title}</span>
-                                                {selected ? <CheckCircle className="h-4 w-4 text-indigo-600" /> : null}
-                                            </div>
-                                            <p className="mt-1 text-[11px] text-gray-600">{option.description}</p>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 text-[11px] text-gray-600">
-                                {aiInsightSettings.mode === 'full_auto'
-                                    ? 'Full auto usa il profilo hardware corrente e la complessita del caso per scegliere il budget.'
-                                    : selectedInsightMode.description}
-                            </div>
-
-                            <div
-                                className={cn(
-                                    "rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(79,70,229,0.06)]",
-                                    patientInsightEnabled
-                                        ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                        : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                )}
-                                data-testid="patient-insight-kill-switch-card"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Kill switch locale</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                                            Se spento, la scheda paziente non avvia nuovi insight e il path runtime rifiuta la generazione in modo deterministico.
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <label
-                                            htmlFor="patientInsightKillSwitch"
-                                            className={cn(
-                                                "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                patientInsightEnabled
-                                                    ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                    : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                            )}
-                                        >
-                                            {patientInsightEnabled ? 'Enabled' : 'Disabled'}
-                                        </label>
-                                        <input
-                                            id="patientInsightKillSwitch"
-                                            type="checkbox"
-                                            checked={!patientInsightEnabled}
-                                            onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
-                                            aria-label="Disabilita Patient Insight localmente"
-                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div
-                                className={cn(
-                                    "rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(79,70,229,0.06)]",
-                                    documentSynthesisEnabled
-                                        ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                        : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                )}
-                                data-testid="document-synthesis-kill-switch-card"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Kill switch Document Synthesis</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                                            Se spento, OCR e import base restano disponibili, ma il path runtime rifiuta analisi clinica e archivio intelligente del documento in modo deterministico.
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <label
-                                            htmlFor="documentSynthesisKillSwitch"
-                                            className={cn(
-                                                "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                documentSynthesisEnabled
-                                                    ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                    : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                            )}
-                                        >
-                                            {documentSynthesisEnabled ? 'Enabled' : 'Disabled'}
-                                        </label>
-                                        <input
-                                            id="documentSynthesisKillSwitch"
-                                            type="checkbox"
-                                            checked={!documentSynthesisEnabled}
-                                            onChange={(e) => setDocumentSynthesisEnabled(!e.target.checked)}
-                                            aria-label="Disabilita Document Synthesis localmente"
-                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div
-                                className={cn(
-                                    "rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(79,70,229,0.06)]",
-                                    smartImportEnabled
-                                        ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                        : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                )}
-                                data-testid="smart-import-kill-switch-card"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Kill switch Smart Import</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                                            Se spento, il pannello paziente non avvia analisi Smart Import e il path runtime rifiuta sia generate sia apply in modo deterministico.
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <label
-                                            htmlFor="smartImportKillSwitch"
-                                            className={cn(
-                                                "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                smartImportEnabled
-                                                    ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                    : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                            )}
-                                        >
-                                            {smartImportEnabled ? 'Enabled' : 'Disabled'}
-                                        </label>
-                                        <input
-                                            id="smartImportKillSwitch"
-                                            type="checkbox"
-                                            checked={!smartImportEnabled}
-                                            onChange={(e) => setSmartImportEnabled(!e.target.checked)}
-                                            aria-label="Disabilita Smart Import localmente"
-                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600">
-                                <div className="rounded-lg bg-white px-3 py-2 border border-indigo-100">
-                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">Profilo hardware</span>
-                                    <span className="font-semibold text-gray-800">{hardwareProfile}</span>
-                                </div>
-                                <div className="rounded-lg bg-white px-3 py-2 border border-indigo-100">
-                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">Budget runtime</span>
-                                    <span className="font-semibold text-gray-800">{insightRuntimePreview}</span>
-                                </div>
-                            </div>
-
-                            {aiInsightSettings.mode === 'manual' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <label className="text-xs font-medium text-gray-700">
-                                        Documenti massimi
-                                        <input
-                                            type="number"
-                                            min={2}
-                                            max={12}
-                                            value={aiInsightSettings.manualConfig.maxDocuments}
-                                            onChange={(e) => updateManualInsightConfig('maxDocuments', Number.parseInt(e.target.value, 10))}
-                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
-                                        />
-                                    </label>
-                                    <label className="text-xs font-medium text-gray-700">
-                                        Caratteri per documento
-                                        <input
-                                            type="number"
-                                            min={120}
-                                            max={480}
-                                            value={aiInsightSettings.manualConfig.maxDocumentSummaryChars}
-                                            onChange={(e) => updateManualInsightConfig('maxDocumentSummaryChars', Number.parseInt(e.target.value, 10))}
-                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
-                                        />
-                                    </label>
-                                    <label className="text-xs font-medium text-gray-700">
-                                        Budget contesto documenti
-                                        <input
-                                            type="number"
-                                            min={800}
-                                            max={5000}
-                                            value={aiInsightSettings.manualConfig.maxDocumentContextChars}
-                                            onChange={(e) => updateManualInsightConfig('maxDocumentContextChars', Number.parseInt(e.target.value, 10))}
-                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
-                                        />
-                                    </label>
-                                    <label className="text-xs font-medium text-gray-700">
-                                        Output max token
-                                        <input
-                                            type="number"
-                                            min={256}
-                                            max={1200}
-                                            value={aiInsightSettings.manualConfig.outputMaxTokens}
-                                            onChange={(e) => updateManualInsightConfig('outputMaxTokens', Number.parseInt(e.target.value, 10))}
-                                            className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
-                                        />
-                                    </label>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 3. Provider & Infrastructure */}
-                        <div className="apple-subsection space-y-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <label className="section-kicker">
-                                    Infrastruttura
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="advancedFit"
-                                        checked={showAdvanced}
-                                        onChange={(e) => setShowAdvanced(e.target.checked)}
-                                        className="sr-only"
-                                    />
-                                    <label
-                                        htmlFor="advancedFit"
-                                        className={cn(
-                                            "inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors",
-                                            showAdvanced
-                                                ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/10 dark:text-indigo-200"
-                                                : "border-slate-200/70 bg-white/72 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
-                                        )}
-                                    >
-                                        Avanzate
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="flex items-center rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                                    Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama (Locale)</span>
-                                </div>
-                                <input
-                                    type="text"
-                                    value={aiConfig.url}
-                                    onChange={(e) => setAiConfig({ ...aiConfig, url: e.target.value })}
-                                    placeholder="http://127.0.0.1:11434/v1"
-                                    className={`${SETTINGS_INPUT_CLASS} font-mono text-xs`}
-                                />
-                            </div>
-
-                            {showAdvanced && (
-                                <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/5">
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="dockerMode"
-                                            checked={isDockerApp}
-                                            onChange={(e) => {
-                                                const newVal = e.target.checked;
-                                                setIsDockerApp(newVal);
-                                                setAiConfig(prev => ({
-                                                    ...prev,
-                                                    url: newVal
-                                                        ? "http://host.docker.internal:11434/v1"
-                                                        : "http://127.0.0.1:11434/v1"
-                                                }));
-                                            }}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 dark:border-white/10 dark:bg-white/5"
-                                        />
-                                        <label htmlFor="dockerMode" className="cursor-pointer text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                            Docker Internal Host (se l&apos;app è in container)
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="pt-2 flex items-center gap-3">
-                            <button
-                                onClick={saveAiConfig}
-                                disabled={isSavingAi}
-                                className={SETTINGS_TONED_BUTTON_CLASS.indigo}
-                            >
-                                <Save className="w-4 h-4" />
-                                {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
-                            </button>
-
-                            <button
-                                onClick={testAiConnection}
-                                className={SETTINGS_SECONDARY_BUTTON_CLASS}
-                            >
-                                <RefreshCw className={cn("w-4 h-4", aiTestStatus === 'testing' && "animate-spin")} />
-                                Test Connessione
-                            </button>
-                        </div>
-                        <p className="text-[10px] text-gray-400 italic">
-                            Se l&apos;AI consuma troppa CPU: riavvia Ollama (`docker restart ollama`).
-                        </p>
-
-                        {/* Detailed Diagnostic Panel */}
-                        {aiHealth && (
-                            <div className={cn(
-                                "animate-in slide-in-from-top-2 fade-in rounded-[22px] border p-4 text-sm space-y-2 shadow-[0_10px_22px_rgba(15,23,42,0.04)]",
-                                aiHealth.status === 'ok'
-                                    ? "border-emerald-200/70 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200"
-                                    : "border-red-200/70 bg-red-50/80 text-red-800 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
-                            )}>
-                                <div className="flex items-start gap-2 font-bold">
-                                    {aiHealth.status === 'ok' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
-                                    <div>
-                                        <p>{aiHealth.status === 'ok' ? "Sistema AI Operativo" : "Problema rilevato"}</p>
-                                    </div>
-                                </div>
-
-                                <div className="pl-7 space-y-1 text-xs">
-                                    <p className="opacity-90">{aiHealth.message}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Test Status Indicator */}
-                        {aiTestStatus === 'success' && (
-                            <div className="flex items-center gap-2 rounded-[18px] border border-emerald-200/70 bg-emerald-50/80 p-3 text-xs text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200">
-                                <CheckCircle className="w-4 h-4" />
-                                Connessione a Ollama riuscita!
-                            </div>
-                        )}
-                        {aiTestStatus === 'error' && (
-                            <div className="flex items-center gap-2 rounded-[18px] border border-red-200/70 bg-red-50/80 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200">
-                                <AlertTriangle className="w-4 h-4" />
-                                Impossibile connettersi. Controlla che Ollama sia attivo.
-                            </div>
-                        )}
-
-                        <AiModelParliamentPanel />
-                        <AiRolloutReadinessPanel />
-                    </div>
-                </div>
-                    </section>
-
-                    <section id="data" className="space-y-4 scroll-mt-24">
-                        <SettingsSectionIntro
-                            kicker="Cataloghi"
-                            title="Farmaci ed esenzioni"
-                            description="Database locali usati dal prescrittore. Importa, aggiorna e svuota i cataloghi offline."
-                        />
-
-                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                {/* --- AIFA Database Section --- */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    <div className="mb-5">
-                        <p className="section-kicker">Farmaci</p>
-                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Database AIFA offline</h2>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Elenco farmaci rimborsabili usato dal prescrittore.{' '}
-                            <a
-                                href="https://www.aifa.gov.it/web/guest/liste-dei-farmaci"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                                Fonte: AIFA Open Data
-                            </a>
-                        </p>
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className="rounded-[22px] border border-blue-200/60 bg-blue-50/80 p-4 flex items-center justify-between dark:border-blue-500/20 dark:bg-blue-900/10">
-                            <div>
-                                <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Farmaci Indicizzati</p>
-                                <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                                    {drugStats !== null ? drugStats.toLocaleString() : '-'}
-                                </p>
-                            </div>
-                            <Server className="w-8 h-8 text-blue-200 dark:text-blue-800" />
-                        </div>
-
-                        <div className="space-y-3">
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleAifaUpload}
-                                accept=".csv"
-                                className="hidden"
-                                disabled={importing}
-                                aria-label="Carica file CSV AIFA"
-                            />
-
-                            {!importing ? (
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,box-shadow] hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
-                                >
-                                    <Upload className="w-5 h-5" />
-                                    <span className="font-medium">Carica File AIFA (.csv)</span>
-                                </button>
-                            ) : (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Importazione in corso...</span>
-                                        <span>{progress}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div className="bg-blue-600 h-2.5 rounded-full transition-[width] duration-300 progress-bar-width" data-progress={progress}></div>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
-                                </div>
-                            )}
-
-                            {drugStats !== null && drugStats > 0 && (
-                                <div className="pt-2">
-                                    <button
-                                        onClick={handleClearDrugs}
-                                        className="text-xs text-red-500 hover:text-red-700 hover:underline flex items-center gap-1"
-                                    >
-                                        <AlertTriangle className="w-3 h-3" />
-                                        Svuota database farmaci
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* @Codex */}
-                <ExemptionDbManager />
-                        </div>
-                    </section>
-
-                    <section id="operations" className="space-y-4 scroll-mt-24">
-                        <SettingsSectionIntro
-                            kicker="Sistema"
-                            title="Diagnostica e manutenzione"
-                            description="Architettura servizi, strumenti di sviluppo, gestione ambulatori e azioni irreversibili."
-                        />
-
-                {/* --- System & Maintenance Section --- */}
-                <div className="space-y-6">
-                    <ServiceArchitecturePanel />
-                    <DiagnosticHub />
-
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                        {/* Ambulatory Management */}
-                        <div className="apple-subsection flex flex-col justify-between">
-                            <div className="mb-4">
-                                <p className="section-kicker">Ambulatori</p>
-                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Sedi e contesti</h3>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Gestisci più sedi e cambia rapidamente contesto operativo.</p>
-                            </div>
-                            <div className="flex items-center justify-end">
-                                <a href="/settings/ambulatories" className="inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20">
-                                    Apri gestione &rarr;
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* Developer Tools */}
-                        <div className="apple-subsection flex flex-col justify-between">
-                            <div className="mb-4">
-                                <p className="section-kicker">Sviluppo</p>
-                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati di test</h3>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Genera pazienti e documenti fittizi per collaudare l&apos;applicazione.</p>
-                            </div>
-                            <div className="flex items-center justify-end">
-                                <DataSeeder />
-                            </div>
-                        </div>
-
-                        {/* @Codex: Native app launcher */}
-                        <div className="apple-subsection flex flex-col justify-between">
-                            <div className="mb-4">
-                                <p className="section-kicker">Desktop</p>
-                                <h3 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">App nativa macOS</h3>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Avvia la shell nativa quando disponibile sul sistema.</p>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <button
-                                    onClick={openNativeApp}
-                                    disabled={nativeLaunchState === 'loading'}
-                                    className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/76 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:text-slate-400"
-                                >
-                                    {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
-                                </button>
-                                {nativeLaunchState === 'success' && (
-                                    <span className="text-xs text-green-600">Aperta</span>
-                                )}
-                                {nativeLaunchState === 'error' && (
-                                    <span className="text-xs text-red-600">Errore</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* @Codex: local-only update awareness surface for WUL-32 */}
-                        <UpdateAwarenessPanel />
-                    </div>
-
-                    {/* Danger Zone */}
-                    <div className="rounded-[24px] border border-red-200/60 bg-red-50/60 p-5 md:p-6 dark:border-red-500/20 dark:bg-red-900/10">
-                        <div className="mb-5 flex items-start gap-3">
-                            <div className="rounded-xl bg-red-100 p-2 text-red-600 dark:bg-red-500/15 dark:text-red-200">
-                                <AlertTriangle className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="section-kicker">Zona pericolo</p>
-                                <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                    Provider AI consigliato: Ollama su <code className="font-mono">{aiConfig.url || "localhost:11434"}</code>. Modificare queste azioni può richiedere una nuova configurazione.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-4 rounded-[20px] border border-red-100 bg-white/78 p-4 dark:border-red-900/50 dark:bg-red-950/20 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p className="text-sm font-semibold text-slate-900 dark:text-red-100">Reset Onboarding</p>
-                                <p className="text-xs text-slate-500 dark:text-red-200/70">Cancella profilo utente e chiavi. I pazienti restano invariati.</p>
-                            </div>
-                            <button
-                                onClick={async () => {
-                                    if (confirm("Sei sicuro? Questo cancellerà il tuo profilo utente e ti riporterà alla configurazione iniziale.\n\nI dati dei pazienti NON verranno persi, ma dovrai riconfigurare l'accesso.")) {
-                                        try {
-                                            const res = await fetch('/api/auth/reset', { method: 'POST' });
-                                            if (res.ok) {
-                                                window.location.href = '/';
-                                            } else {
-                                                alert("Errore durante il reset.");
-                                            }
-                                        } catch (e) {
-                                            console.error(e);
-                                            alert("Errore di connessione.");
-                                        }
-                                    }
-                                }}
-                                className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color,box-shadow] hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
-                            >
-                                Reset Completo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                    </section>
-
-                    <section id="backups" className="space-y-4 scroll-mt-24">
-                        <SettingsSectionIntro
-                            kicker="Backup"
-                            title="Continuità e ripristino"
-                            description="Schedulazione automatica e ripristino manuale degli archivi cifrati locali."
-                        />
-                        <div className="space-y-6">
-                            <BackupSchedulerUI />
-                            <BackupRestoreUI />
-                        </div>
-                    </section>
                 </div>
             </div>
         </div >
