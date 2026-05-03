@@ -38,6 +38,7 @@
     "test:ai-context": "bash scripts/ai-context-test.sh",
     "test:document-insight-context": "bash scripts/document-insight-context-test.sh",
     "test:document-synthesis": "bash scripts/document-synthesis-service-test.sh",
+    "test:evidence-queue-contract": "bash scripts/evidence-queue-contract-test.sh",
     "plan:document-evidence-backfill": "bash scripts/document-evidence-backfill-plan.sh",
     "plan:document-evidence-backfill:live": "bash scripts/document-evidence-backfill-live-db.sh",
     "audit:document-source-provenance": "bash scripts/document-source-provenance-audit.sh",
