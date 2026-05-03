@@ -336,3 +336,8 @@ retrieval-only del diario clinico:
 Questa lane non scrive diagnosi, terapie, problemi o altre tabelle cliniche
 strutturate. I consumer runtime devono passare dal contract WUL-216 prima di
 usare l'evidenza indicizzata.
+
+`WUL-218` avvia la migrazione dei consumer usando questa queue in `Patient
+Insight` per la sezione diario: i `sourceRefs` mantengono il formato `[Sx]`
+del prompt, ma portano anche `evidenceSourceId`, `evidenceSchemaVersion` e
+citazione strutturata. Smart Import resta fuori da questa prima slice.
