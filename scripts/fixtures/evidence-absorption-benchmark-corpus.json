@@ -1,0 +1,105 @@
+[
+  {
+    "id": "recent-attachment-and-diary-followup",
+    "description": "Recent attachment plus diary follow-up must both enter the queue with correct citations.",
+    "generatedAt": "2026-05-03T00:00:00.000Z",
+    "patientId": "synthetic-patient-a",
+    "documents": [
+      {
+        "id": "doc-recent-discharge",
+        "fileName": "synthetic-discharge.pdf",
+        "documentDate": "2026-04-20T00:00:00.000Z",
+        "summary": "Dimissione sintetica con follow-up ortopedico.",
+        "rawMarkdown": "Indicazioni alla dimissione\nControllo ortopedico tra 7 giorni.\nStato funzionale\nDeambulazione con ausilio.",
+        "qualityLevel": "green"
+      }
+    ],
+    "diaryEntries": [
+      {
+        "id": "entry-followup",
+        "date": "2026-04-22T00:00:00.000Z",
+        "content": "Il paziente riferisce miglioramento della deambulazione e attende controllo ortopedico.",
+        "version": 1
+      }
+    ],
+    "expectations": {
+      "includedSourceIds": [
+        "attachment:doc-recent-discharge:parse-evidence",
+        "diary:entry-followup"
+      ],
+      "diarySourceIds": [
+        "diary:entry-followup"
+      ],
+      "attachmentSourceIds": [
+        "attachment:doc-recent-discharge:parse-evidence"
+      ]
+    }
+  },
+  {
+    "id": "stale-and-negative-material-suppressed",
+    "description": "Low-signal old document and deleted diary must not leak as active evidence; negative assertion must not render.",
+    "generatedAt": "2026-05-03T00:00:00.000Z",
+    "patientId": "synthetic-patient-b",
+    "documents": [
+      {
+        "id": "doc-low-signal",
+        "fileName": "synthetic-low-signal.pdf",
+        "documentDate": "2025-01-01T00:00:00.000Z",
+        "summary": "No",
+        "rawMarkdown": "No",
+        "lowSignalSummaryOnly": true
+      },
+      {
+        "id": "doc-negative",
+        "fileName": "synthetic-negative.pdf",
+        "documentDate": "2026-04-24T00:00:00.000Z",
+        "summary": "Referto sintetico con negazione.",
+        "rawMarkdown": "Valutazione clinica\nNon evidenza di scompenso cardiaco.\nFollow-up\nControllo ortopedico tra 7 giorni."
+      }
+    ],
+    "diaryEntries": [
+      {
+        "id": "entry-deleted",
+        "date": "2026-04-01T00:00:00.000Z",
+        "content": "Voce annullata con informazioni non piu attive.",
+        "deletedAt": "2026-04-02T00:00:00.000Z",
+        "version": 2
+      }
+    ],
+    "expectations": {
+      "includedSourceIds": [],
+      "forbiddenSourceIds": [
+        "attachment:doc-low-signal:summary",
+        "diary:entry-deleted"
+      ],
+      "forbiddenClaimTokens": [
+        "scompenso cardiaco"
+      ],
+      "attachmentSourceIds": []
+    }
+  },
+  {
+    "id": "adversarial-fabricated-citation",
+    "description": "A deliberately fabricated citation span must be detected by citationCorrectness.",
+    "generatedAt": "2026-05-03T00:00:00.000Z",
+    "patientId": "synthetic-patient-c",
+    "documents": [
+      {
+        "id": "doc-adversarial",
+        "fileName": "synthetic-adversarial.pdf",
+        "documentDate": "2026-04-25T00:00:00.000Z",
+        "summary": "Relazione sintetica con indicazione fisiatrica.",
+        "rawMarkdown": "Indicazioni\nFKT domiciliare da proseguire per due settimane.\nFollow-up\nRivalutazione fisiatrica programmata."
+      }
+    ],
+    "expectations": {
+      "includedSourceIds": [
+        "attachment:doc-adversarial:parse-evidence"
+      ],
+      "attachmentSourceIds": [
+        "attachment:doc-adversarial:parse-evidence"
+      ],
+      "mutateFirstCitationSnippet": "span clinico fabbricato non presente nella fonte"
+    }
+  }
+]

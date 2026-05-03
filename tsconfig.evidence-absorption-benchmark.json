@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-evidence-absorption-benchmark",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "scripts/benchmark-evidence-absorption.ts",
+    "lib/evidence-absorption-benchmark.ts",
+    "lib/evidence-queue-contract.ts",
+    "lib/document-parse-evidence-artifact.ts",
+    "lib/document-evidence-pack.ts",
+    "lib/document-input-normalization.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next/**/*",
+    "tmp-*/**/*"
+  ]
+}

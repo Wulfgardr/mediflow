@@ -278,3 +278,41 @@ Workstream attuale:
 Il benchmark non cambia il runtime operativo e non promuove automaticamente
 nuove policy cliniche. E solo una lane di misura locale per evitare regressioni
 opache.
+
+## Benchmark assorbimento evidenze
+
+`WUL-217` aggiunge una lane complementare e deterministicamente locale per
+misurare l'assorbimento di allegati e diario sopra il contract
+`mediflow.evidence_queue.v1`, senza chiamare il modello generativo.
+
+Comando benchmark:
+
+```bash
+npm run benchmark:evidence-absorption
+```
+
+Gate validator:
+
+```bash
+npm run validate:evidence-absorption
+```
+
+Corpus:
+
+- [scripts/fixtures/evidence-absorption-benchmark-corpus.json](../scripts/fixtures/evidence-absorption-benchmark-corpus.json)
+
+Metriche:
+
+- `relevantSourceRecall`
+- `citationCoverage`
+- `citationCorrectness`
+- `staleLeakageRate`
+- `negativeAssertionLeakage`
+- `diaryEvidenceCoverage`
+- `attachmentEvidenceCoverage`
+
+La metrica `citationCorrectness` verifica che ogni citazione punti a uno span
+presente nella fonte sintetica. Il corpus include anche un caso avversario
+`adversarial-fabricated-citation`: il validator passa solo se quel caso viene
+classificato come failure di citation correctness, cosi il benchmark dimostra di
+saper intercettare citazioni fabbricate invece di misurare solo coverage.
