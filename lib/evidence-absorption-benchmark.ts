@@ -29,6 +29,9 @@ export interface EvidenceAbsorptionBenchmarkCase {
         rawMarkdown: string;
         qualityLevel?: 'green' | 'yellow' | 'red';
         lowSignalSummaryOnly?: boolean;
+        sourceVersion?: string | number;
+        artifactSourceVersion?: string | number;
+        replacedById?: string;
     }>;
     diaryEntries?: Array<{
         id: string;
@@ -117,6 +120,9 @@ function buildQueueForCase(testCase: EvidenceAbsorptionBenchmarkCase): EvidenceQ
                 fileName: document.fileName,
                 createdAt: document.documentDate,
                 summarySnapshot: document.summary,
+                sourceVersion: document.sourceVersion,
+                artifactSourceVersion: document.artifactSourceVersion,
+                replacedById: document.replacedById,
             };
         }
 
@@ -138,6 +144,9 @@ function buildQueueForCase(testCase: EvidenceAbsorptionBenchmarkCase): EvidenceQ
             fileName: document.fileName,
             createdAt: document.documentDate,
             parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(artifact),
+            sourceVersion: document.sourceVersion,
+            artifactSourceVersion: document.artifactSourceVersion,
+            replacedById: document.replacedById,
         };
     });
 

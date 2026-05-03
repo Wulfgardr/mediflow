@@ -101,5 +101,30 @@
       ],
       "mutateFirstCitationSnippet": "span clinico fabbricato non presente nella fonte"
     }
+  },
+  {
+    "id": "replaced-source-invalidated",
+    "description": "A replaced attachment with a stale derived artifact must remain audit-visible but must not render as active evidence.",
+    "generatedAt": "2026-05-03T00:00:00.000Z",
+    "patientId": "synthetic-patient-d",
+    "documents": [
+      {
+        "id": "doc-replaced",
+        "fileName": "synthetic-replaced.pdf",
+        "documentDate": "2026-04-18T00:00:00.000Z",
+        "summary": "Documento sintetico sostituito.",
+        "rawMarkdown": "Follow-up\nControllo sintetico non piu attuale.",
+        "sourceVersion": "2",
+        "artifactSourceVersion": "1",
+        "replacedById": "doc-current"
+      }
+    ],
+    "expectations": {
+      "includedSourceIds": [],
+      "forbiddenSourceIds": [
+        "attachment:doc-replaced:parse-evidence"
+      ],
+      "attachmentSourceIds": []
+    }
   }
 ]

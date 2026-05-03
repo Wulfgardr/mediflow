@@ -73,6 +73,66 @@ test('buildEvidenceQueue keeps summary snapshots as needs-review and non-rendera
     assert.equal(getIncludedEvidenceQueueItems(queue).length, 0);
 });
 
+test('buildEvidenceQueue invalidates replaced attachment evidence without purging audit item', () => {
+    const artifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: 'insight-replaced',
+        attachmentId: 'attachment-replaced',
+        fileName: 'relazione.pdf',
+        documentDate: '2026-04-10T00:00:00.000Z',
+        summary: 'Relazione sintetica con follow-up.',
+        rawMarkdown: 'Controllo sintetico programmato.',
+        diagnoses: [],
+        medications: [],
+    });
+
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        attachments: [
+            {
+                id: 'attachment-replaced',
+                patientId: 'patient-1',
+                fileName: 'relazione.pdf',
+                createdAt: '2026-04-10T00:00:00.000Z',
+                parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(artifact),
+                sourceVersion: '2',
+                artifactSourceVersion: '1',
+                replacedById: 'attachment-current',
+            },
+        ],
+    });
+
+    assert.equal(queue.totals.invalidated, 1);
+    assert.equal(queue.totals.renderableClaims, 0);
+    assert.equal(queue.items[0].governance.reason, 'invalidated');
+    assert.equal(queue.items[0].governance.invalidatedBySourceId, 'attachment:attachment-current:parse-evidence');
+    assert.equal(getIncludedEvidenceQueueItems(queue).length, 0);
+});
+
+test('buildEvidenceQueue invalidates stale diary projections after entry update', () => {
+    const queue = buildEvidenceQueue({
+        patientId: 'patient-1',
+        generatedAt: '2026-05-03T00:00:00.000Z',
+        diaryEntries: [
+            {
+                id: 'entry-updated',
+                patientId: 'patient-1',
+                type: 'note',
+                date: '2026-04-12T00:00:00.000Z',
+                content: 'Nota aggiornata sintetica con rivalutazione programmata.',
+                version: 3,
+                evidenceVersion: 2,
+            },
+        ],
+    });
+
+    assert.equal(queue.totals.invalidated, 1);
+    assert.equal(queue.items[0].source.id, 'diary:entry-updated');
+    assert.equal(queue.items[0].governance.reason, 'invalidated');
+    assert.equal(queue.items[0].renderableClaims.length, 0);
+    assert.equal(getIncludedEvidenceQueueItems(queue).length, 0);
+});
+
 test('buildEvidenceQueue marks deleted diary entries as superseded and excludes them from renderable claims', () => {
     const queue = buildEvidenceQueue({
         patientId: 'patient-1',

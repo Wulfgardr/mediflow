@@ -341,3 +341,9 @@ usare l'evidenza indicizzata.
 Insight` per la sezione diario: i `sourceRefs` mantengono il formato `[Sx]`
 del prompt, ma portano anche `evidenceSourceId`, `evidenceSchemaVersion` e
 citazione strutturata. Smart Import resta fuori da questa prima slice.
+
+`WUL-219` aggiunge la policy di staleness contract-first: fonti cancellate,
+sostituite o con artifact derivato da una versione sorgente non corrente
+restano nella queue come `invalidated`, ma non emettono claim. Il benchmark
+include un caso sintetico di allegato sostituito per bloccare leakage da fonti
+invalidata.

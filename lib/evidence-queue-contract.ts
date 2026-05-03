@@ -20,7 +20,8 @@ export type EvidenceQueueDecisionReason =
     | 'suppressed_stale'
     | 'low_signal'
     | 'superseded'
-    | 'needs_review';
+    | 'needs_review'
+    | 'invalidated';
 
 /* @Codex */
 export type EvidenceQueueFreshness = 'recent' | 'stale' | 'undated';
@@ -43,6 +44,9 @@ export interface EvidenceQueueAttachmentInput {
     parseEvidenceArtifactSnapshot?: string | null;
     summarySnapshot?: string | null;
     sourceVersion?: string | number | null;
+    artifactSourceVersion?: string | number | null;
+    deletedAt?: string | Date | null;
+    replacedById?: string | null;
 }
 
 /* @Codex */
@@ -55,6 +59,7 @@ export interface EvidenceQueueDiaryInput {
     content?: string | null;
     deletedAt?: string | Date | null;
     version?: string | number | null;
+    evidenceVersion?: string | number | null;
     /**
      * Deterministic caller-provided retrieval bucket. v1 must not derive this
      * through embeddings, LLM calls, training or free-text clinical promotion.
@@ -123,6 +128,7 @@ export interface EvidenceQueueItem {
         reason: EvidenceQueueDecisionReason;
         reasonDetail: string;
         suppressedBySourceId?: string;
+        invalidatedBySourceId?: string;
     };
     renderableClaims: EvidenceQueueRenderableClaim[];
 }
@@ -140,6 +146,7 @@ export interface EvidenceQueue {
         lowSignal: number;
         superseded: number;
         needsReview: number;
+        invalidated: number;
         renderableClaims: number;
     };
 }
@@ -189,6 +196,46 @@ function artifactFreshness(artifact: DocumentParseEvidenceArtifact): EvidenceQue
 
 function artifactPriority(artifact: DocumentParseEvidenceArtifact): number {
     return clampPriority(artifact.evidenceMemory.sourceGovernance?.sourcePriority, 70);
+}
+
+function attachmentInvalidation(input: EvidenceQueueAttachmentInput): {
+    invalidated: boolean;
+    detail: string;
+    invalidatedBySourceId?: string;
+} {
+    if (stableDate(input.deletedAt)) {
+        return {
+            invalidated: true,
+            detail: 'Attachment source was deleted and derived evidence must not render as current.',
+        };
+    }
+
+    const replacedById = compactText(input.replacedById);
+    if (replacedById) {
+        return {
+            invalidated: true,
+            detail: 'Attachment source was replaced and derived evidence must not render as current.',
+            invalidatedBySourceId: `attachment:${replacedById}:parse-evidence`,
+        };
+    }
+
+    const currentVersion = versionString(input.sourceVersion);
+    const artifactVersion = versionString(input.artifactSourceVersion);
+    if (input.artifactSourceVersion !== undefined
+        && input.artifactSourceVersion !== null
+        && currentVersion !== artifactVersion) {
+        return {
+            invalidated: true,
+            detail: 'Attachment derived artifact was produced from a stale source version.',
+        };
+    }
+
+    return { invalidated: false, detail: '' };
+}
+
+function diaryInvalidation(input: EvidenceQueueDiaryInput): boolean {
+    if (input.evidenceVersion === undefined || input.evidenceVersion === null) return false;
+    return versionString(input.evidenceVersion) !== versionString(input.version);
 }
 
 function artifactClaims(sourceId: string, artifact: DocumentParseEvidenceArtifact): EvidenceQueueRenderableClaim[] {
@@ -329,8 +376,13 @@ function buildAttachmentParseEvidenceItem(
     artifact: DocumentParseEvidenceArtifact,
 ): EvidenceQueueItem {
     const sourceId = `attachment:${input.id}:parse-evidence`;
+    const invalidation = attachmentInvalidation(input);
     const claims = artifactClaims(sourceId, artifact);
-    const reason: EvidenceQueueDecisionReason = claims.length > 0 ? 'included' : 'low_signal';
+    const reason: EvidenceQueueDecisionReason = invalidation.invalidated
+        ? 'invalidated'
+        : claims.length > 0
+            ? 'included'
+            : 'low_signal';
 
     return {
         id: sourceId,
@@ -350,9 +402,12 @@ function buildAttachmentParseEvidenceItem(
             priority: artifactPriority(artifact),
             freshness: artifactFreshness(artifact),
             reason,
-            reasonDetail: reason === 'included'
+            reasonDetail: invalidation.invalidated
+                ? invalidation.detail
+                : reason === 'included'
                 ? 'Valid parse/evidence artifact with renderable facts.'
                 : 'Valid parse/evidence artifact has no renderable facts.',
+            invalidatedBySourceId: invalidation.invalidatedBySourceId,
         },
         renderableClaims: reason === 'included' ? claims : [],
     };
@@ -360,8 +415,11 @@ function buildAttachmentParseEvidenceItem(
 
 function buildAttachmentSummaryItem(input: EvidenceQueueAttachmentInput, generatedAt: string): EvidenceQueueItem {
     const sourceId = `attachment:${input.id}:summary`;
+    const invalidation = attachmentInvalidation(input);
     const summary = compactText(input.summarySnapshot);
-    const reason: EvidenceQueueDecisionReason = summary.length >= MIN_SIGNAL_CHARS ? 'needs_review' : 'low_signal';
+    const reason: EvidenceQueueDecisionReason = invalidation.invalidated
+        ? 'invalidated'
+        : summary.length >= MIN_SIGNAL_CHARS ? 'needs_review' : 'low_signal';
 
     return {
         id: sourceId,
@@ -380,9 +438,12 @@ function buildAttachmentSummaryItem(input: EvidenceQueueAttachmentInput, generat
             priority: 45,
             freshness: freshnessFromDate(input.createdAt),
             reason,
-            reasonDetail: reason === 'needs_review'
+            reasonDetail: invalidation.invalidated
+                ? invalidation.detail
+                : reason === 'needs_review'
                 ? 'Summary snapshot exists but must be reviewed before consumer promotion.'
                 : 'Summary snapshot is absent or too low-signal for evidence queue inclusion.',
+            invalidatedBySourceId: invalidation.invalidatedBySourceId,
         },
         renderableClaims: [],
     };
@@ -404,6 +465,8 @@ function buildDiaryItem(
     const deletedAt = stableDate(input.deletedAt);
     const reason: EvidenceQueueDecisionReason = deletedAt
         ? 'superseded'
+        : diaryInvalidation(input)
+            ? 'invalidated'
         : suppressedBySourceId
             ? 'suppressed_stale'
             : compactText(content).length >= MIN_SIGNAL_CHARS
@@ -430,6 +493,8 @@ function buildDiaryItem(
             reason,
             reasonDetail: deletedAt
                 ? 'Diary entry is deleted or superseded and must not render as active evidence.'
+                : reason === 'invalidated'
+                    ? 'Diary evidence was produced from a stale entry version and must be reabsorbed before rendering.'
                 : reason === 'suppressed_stale'
                     ? 'Diary entry is older than a newer diary source in the same retrieval domain.'
                 : reason === 'included'
@@ -524,6 +589,7 @@ export function buildEvidenceQueue(input: BuildEvidenceQueueInput): EvidenceQueu
             lowSignal: countReason(items, 'low_signal'),
             superseded: countReason(items, 'superseded'),
             needsReview: countReason(items, 'needs_review'),
+            invalidated: countReason(items, 'invalidated'),
             renderableClaims: items.reduce((total, item) => total + item.renderableClaims.length, 0),
         },
     };
