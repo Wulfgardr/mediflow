@@ -347,3 +347,14 @@ sostituite o con artifact derivato da una versione sorgente non corrente
 restano nella queue come `invalidated`, ma non emettono claim. Il benchmark
 include un caso sintetico di allegato sostituito per bloccare leakage da fonti
 invalidata.
+
+`WUL-221` aggiunge anche un report locale PHI-safe per osservare assorbimento,
+skip e aging senza leggere i contenuti:
+
+```bash
+npm run report:local-absorption-telemetry -- --input scripts/fixtures/local-absorption-telemetry.example.json
+```
+
+Il report espone solo conteggi per reason/source type, coverage artifact, eta
+degli artifact e categorie di gate failure. Non include OCR text, diario,
+summarySnapshot, parse/evidence grezzo, prompt o output modello.

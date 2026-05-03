@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2020",
+    "outDir": "tmp-local-absorption-telemetry",
+    "rootDir": ".",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": false
+  },
+  "include": [
+    "lib/document-parse-evidence-artifact.ts",
+    "lib/evidence-queue-contract.ts",
+    "lib/local-absorption-telemetry.ts",
+    "lib/local-absorption-telemetry.test.ts",
+    "scripts/local-absorption-telemetry.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
