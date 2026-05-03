@@ -167,6 +167,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | Formalizza la slice write paired dei checkup: read/create/update/soft-delete su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | Formalizza la slice write paired delle osservazioni: read/create/update/soft-delete su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0057-local-evidence-absorption-layer.md](./adr/0057-local-evidence-absorption-layer.md) | Proposed ADR `WUL-213`: local evidence absorption layer per rendere allegati e diario fonti citabili/retrieval sopra un contract versionato, senza training, cloud runtime o auto-write clinici. |
+| [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | Proposed ADR `WUL-220`: futura affordance manuale e auditabile per riassorbire una fonte evidence invalidated/superseded, con stati espliciti, motivi PHI-safe e nessuna scrittura clinica strutturata. |
 
 ## Checklist manutenzione indice
 
