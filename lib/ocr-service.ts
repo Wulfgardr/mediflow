@@ -32,6 +32,27 @@ export interface ExtractedDocumentData {
     // Raw extraction
     rawMarkdown: string;
     confidence: number; // 0-1 extraction confidence
+    fallbackEngine?: 'apple_vision';
+}
+
+/* @Codex */
+export function isLowSignalOcrText(value: string | null | undefined): boolean {
+    const compact = (value || '').replace(/\s+/g, ' ').trim();
+    if (!compact) return true;
+    if (/^OCR extraction failed:/i.test(compact)) return true;
+    if (/^(nessuna informazione rilevante|nessun dato rilevante|analisi non disponibile|documento non leggibile)\b/i.test(compact)) {
+        return true;
+    }
+
+    const alphaChars = compact.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)?.length || 0;
+    if (compact.length >= 24 && alphaChars < 12) return true;
+    if (/^(?:\d+\.){10,}\d*$/u.test(compact.replace(/\s+/g, ''))) return true;
+
+    const tokens = compact.split(/\s+/).filter(Boolean);
+    const uniqueTokens = new Set(tokens.map((token) => token.toLowerCase()));
+    if (tokens.length >= 12 && uniqueTokens.size <= 2) return true;
+
+    return false;
 }
 
 // Prompts for different extraction modes
@@ -90,7 +111,7 @@ export async function extractDocumentWithAI(
         if (mode === 'full') {
             return {
                 rawMarkdown: rawResponse,
-                confidence: 0.9
+                confidence: isLowSignalOcrText(rawResponse) ? 0.15 : 0.9
             };
         }
 

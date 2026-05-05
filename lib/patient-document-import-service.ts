@@ -337,6 +337,60 @@ function buildFallbackDrugQuery(value: string): string {
 }
 
 /* @Codex */
+const PIANO_TERAPEUTICO_FIELD_LABEL_REGEX = /^(?:farmaco prescritto|posologia|durata del trattamento|altri trattamenti|prima prescrizione|prosecuzione cura|data controllo|sospensione|motivo della sospensione)\b/i;
+
+/* @Codex */
+function extractPianoTerapeuticoFieldValue(lines: string[], labelPattern: RegExp): string | undefined {
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index].trim();
+        const match = line.match(labelPattern);
+        if (!match) continue;
+
+        const inlineValue = stripTherapyBulletPrefix(match[1] || '').trim();
+        if (inlineValue && !PIANO_TERAPEUTICO_FIELD_LABEL_REGEX.test(inlineValue)) {
+            return inlineValue;
+        }
+
+        for (let cursor = index + 1; cursor < Math.min(lines.length, index + 4); cursor += 1) {
+            const candidate = stripTherapyBulletPrefix(lines[cursor]).trim();
+            if (!candidate) continue;
+            if (PIANO_TERAPEUTICO_FIELD_LABEL_REGEX.test(candidate)) break;
+            return candidate;
+        }
+    }
+
+    return undefined;
+}
+
+/* @Codex */
+function extractPianoTerapeuticoTherapyCandidate(lines: string[]): SmartImportTherapyExtraction[] {
+    const hasTherapeuticPlanContext = lines.some((line) => /piano terapeutico|note aifa|farmaco prescritto/i.test(line));
+    if (!hasTherapeuticPlanContext) return [];
+
+    const drugValue = extractPianoTerapeuticoFieldValue(lines, /^farmaco prescritto\b[:.\-–]?\s*(.*)$/i);
+    if (!drugValue) return [];
+
+    const dosageValue = extractPianoTerapeuticoFieldValue(lines, /^posologia\b[:.\-–]?\s*(.*)$/i);
+    const segment = [drugValue, dosageValue].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const drugMention = buildFallbackDrugMention(drugValue);
+    const drugQuery = buildFallbackDrugQuery(segment);
+    if (!drugMention || !isPlausibleTherapyCandidate({ drugMention, drugQuery })) return [];
+
+    return [{
+        drugMention,
+        drugQuery,
+        dosage: dosageValue?.match(DOSAGE_REGEX)?.[0]?.trim() || segment.match(DOSAGE_REGEX)?.[0]?.trim(),
+        confidence: 'medium',
+        evidence: [
+            'Piano terapeutico AIFA',
+            `Farmaco prescritto: ${drugValue}`,
+            dosageValue ? `Posologia: ${dosageValue}` : undefined,
+        ].filter(Boolean).join(' - '),
+        therapyState: 'active',
+    }];
+}
+
+/* @Codex */
 function isSchedulingOnlyTherapyFragment(value: string): boolean {
     const mention = stripTherapyBulletPrefix(value);
     if (!mention) return true;
@@ -1083,7 +1137,9 @@ function toExplicitDiagnosisCandidates(data: ExtractedPatientData): ExtractedPat
 /* @Codex */
 function extractTherapyCandidatesFromRawSections(rawText: string): SmartImportTherapyExtraction[] {
     const lines = splitDocumentIntoLines(rawText);
-    const candidates: SmartImportTherapyExtraction[] = [];
+    const candidates: SmartImportTherapyExtraction[] = [
+        ...extractPianoTerapeuticoTherapyCandidate(lines),
+    ];
     let currentSection: TherapyDocumentSection = 'unknown';
     let currentHeading: string | undefined;
 

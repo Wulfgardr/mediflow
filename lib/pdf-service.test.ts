@@ -22,6 +22,13 @@ test('extractUsableOcrText normalizes noisy OCR-like headings before downstream 
     );
 });
 
+test('extractUsableOcrText rejects degenerate OCR loops', () => {
+    assert.equal(
+        extractUsableOcrText({ rawMarkdown: '1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.' }),
+        ''
+    );
+});
+
 test('buildOcrFallbackResult promotes low-confidence OCR when usable local text exists', () => {
     const result = buildOcrFallbackResult({
         confidence: 0.2,
@@ -49,4 +56,35 @@ test('parsePatientData extracts name and birth date from signature-style dischar
     assert.equal(parsed.firstName, 'Pasquale');
     assert.equal(parsed.lastName, 'Milone');
     assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1932-02-23');
+});
+
+test('parsePatientData handles surname-first Piano Terapeutico patient labels and address', () => {
+    const parsed = parsePatientData([
+        'Piano Terapeutico',
+        'Paziente: ROSSI MARIA',
+        'Data di nascita: 17.12.1994',
+        'Codice Fiscale: RSSMRA94T57A271J',
+        'Indirizzo: VIA TEST 25 MILANO',
+        'Diagnosi e motivazione clinica della scelta del farmaco',
+        'Trapianto di polmone',
+        'Farmaco prescritto',
+        'CELLCEPT',
+        'Posologia',
+        '500 mg x2',
+    ].join('\n'));
+
+    assert.equal(parsed.firstName, 'MARIA');
+    assert.equal(parsed.lastName, 'ROSSI');
+    assert.equal(parsed.taxCode, 'RSSMRA94T57A271J');
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1994-12-17');
+    assert.equal(parsed.address, 'VIA TEST 25 MILANO');
+    assert.match(parsed.notes || '', /Trapianto di polmone/i);
+    assert.doesNotMatch(parsed.notes || '', /CELLCEPT/i);
+});
+
+test('parsePatientData preserves name-first patient labels when casing is not surname-first', () => {
+    const parsed = parsePatientData('Paziente: Mario Rossi\nData di nascita: 01/02/1970');
+
+    assert.equal(parsed.firstName, 'Mario');
+    assert.equal(parsed.lastName, 'Rossi');
 });

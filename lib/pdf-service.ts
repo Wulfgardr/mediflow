@@ -71,14 +71,28 @@ function looksLikeStructuredPayload(value: string): boolean {
 }
 
 /* @Codex */
+function looksLikeLowSignalOcrText(value: string): boolean {
+    const compact = value.replace(/\s+/g, ' ').trim();
+    if (!compact) return true;
+
+    const alphaChars = compact.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)?.length || 0;
+    if (compact.length >= 24 && alphaChars < 12) return true;
+    if (/^(?:\d+\.){10,}\d*$/u.test(compact.replace(/\s+/g, ''))) return true;
+
+    const tokens = compact.split(/\s+/).filter(Boolean);
+    const uniqueTokens = new Set(tokens.map((token) => token.toLowerCase()));
+    return tokens.length >= 12 && uniqueTokens.size <= 2;
+}
+
+/* @Codex */
 export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
     const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
-    if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown)) {
+    if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown) && !looksLikeLowSignalOcrText(rawMarkdown)) {
         return normalizeDocumentInput(rawMarkdown).normalizedText;
     }
 
     const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
-    if (notes && !isOcrFailureNote(notes)) {
+    if (notes && !isOcrFailureNote(notes) && !looksLikeLowSignalOcrText(notes)) {
         return normalizeDocumentInput(notes).normalizedText;
     }
 
@@ -149,6 +163,16 @@ function stripPatientIdentityTail(value: string): string {
 }
 
 /* @Codex */
+function isLikelySurnameFirstPatientValue(label: string, candidate: string): boolean {
+    if (/^cognome\b.*\bnome$/i.test(label)) return true;
+    if (!/^(paziente|assistito)$/i.test(label.trim())) return false;
+
+    const parts = candidate.split(/\s+/).filter(Boolean);
+    if (parts.length !== 2) return false;
+    return parts.every((part) => part === part.toLocaleUpperCase('it-IT') && /[A-ZÀ-Ý]{2,}/.test(part));
+}
+
+/* @Codex */
 function extractPatientName(text: string): { firstName?: string; lastName?: string } {
     const lines = text
         .split(/\r?\n/)
@@ -178,7 +202,7 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
             if (!candidate) continue;
             const parts = candidate.split(/\s+/).filter(Boolean);
             if (parts.length >= 2) {
-                const surnameFirst = /^cognome\b.*\bnome$/i.test(label);
+                const surnameFirst = isLikelySurnameFirstPatientValue(label, candidate);
                 const given = surnameFirst ? parts.slice(-1).join(' ') : parts.slice(0, -1).join(' ');
                 const family = surnameFirst ? parts.slice(0, -1).join(' ') : parts.slice(-1).join(' ');
                 firstName ||= sanitizePersonValue(given);
@@ -196,6 +220,41 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
     }
 
     return { firstName, lastName };
+}
+
+/* @Codex */
+function extractPatientAddress(text: string): string | undefined {
+    const cleanText = text.replace(/\s+/g, ' ');
+    const match = cleanText.match(/\bindirizzo\s*[:.]?\s*(.{4,140}?)(?=\s+(?:ausl|asl|medico curante|diagnosi|farmaco|posologia|codice fiscale|cf|telefono|data\b|$))/i);
+    if (!match?.[1]) return undefined;
+
+    const address = match[1]
+        .replace(/^[\s:;.,-]+|[\s:;.,-]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(address) ? address : undefined;
+}
+
+/* @Codex */
+function extractClinicalValueAfterLabelLine(text: string): string | undefined {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    for (let index = 0; index < lines.length; index += 1) {
+        if (!/\bdiagnosi\b/i.test(lines[index])) continue;
+
+        for (let cursor = index + 1; cursor < Math.min(lines.length, index + 4); cursor += 1) {
+            const candidate = lines[cursor].trim();
+            if (!candidate) continue;
+            if (/^(?:farmaco|posologia|terapia|data|medico|firma)\b/i.test(candidate)) break;
+            return candidate.replace(/\s+/g, ' ').trim();
+        }
+    }
+
+    return undefined;
 }
 
 /**
@@ -611,12 +670,13 @@ export function parsePatientData(text: string): ExtractedPatientData {
     const extractedName = extractPatientName(text);
     data.firstName = extractedName.firstName;
     data.lastName = extractedName.lastName;
+    data.address = extractPatientAddress(text);
 
     // 4. NOTES / DIAGNOSIS (Improved with Context Window)
     // Keywords to start capture
     const startKeywords = ['diagnosi', 'motivo', 'anamnesi', 'storia', 'problema', 'conclusioni', 'valutazione', 'quesito'];
     // Keywords to stop capture (next section headers)
-    const stopKeywords = ['terapia', 'prossimo', 'data', 'firma', 'cordiali', 'referto', 'medico'];
+    const stopKeywords = ['terapia', 'farmaco', 'posologia', 'prossimo', 'data', 'firma', 'cordiali', 'referto', 'medico'];
 
     // Find the first occurrence of a start keyword
     let bestIndex = -1;
@@ -655,6 +715,11 @@ export function parsePatientData(text: string): ExtractedPatientData {
             // It's a valid extract
         } else {
             data.notes = undefined; // Too short to be useful
+        }
+
+        const nextLineClinicalValue = extractClinicalValueAfterLabelLine(text);
+        if (nextLineClinicalValue && /^diagnosi\b.*\bscelta\b/i.test(data.notes || '')) {
+            data.notes = nextLineClinicalValue;
         }
     }
 

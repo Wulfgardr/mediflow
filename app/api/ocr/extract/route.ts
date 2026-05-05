@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractDocumentWithAI } from '@/lib/ocr-service';
+import { extractDocumentWithAI, isLowSignalOcrText } from '@/lib/ocr-service';
 import { AIService } from '@/lib/ai-service';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 /* @Codex */
+import { execFile } from 'node:child_process';
+/* @Codex */
+import { promises as fs } from 'node:fs';
+/* @Codex */
+import os from 'node:os';
+/* @Codex */
+import path from 'node:path';
+/* @Codex */
+import { promisify } from 'node:util';
+/* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 import { validateLocalTarget } from '@/lib/local-target';
+
+/* @Codex */
+const execFileAsync = promisify(execFile);
+/* @Codex */
+const APPLE_VISION_SCRIPT = path.join(process.cwd(), 'scripts', 'apple-vision-ocr.swift');
+/* @Codex */
+const IMAGE_MIME_EXTENSION: Record<string, string> = {
+    jpeg: 'jpg',
+    jpg: 'jpg',
+    png: 'png',
+    tiff: 'tiff',
+    tif: 'tif',
+    bmp: 'bmp',
+    heic: 'heic',
+    heif: 'heif',
+    webp: 'webp',
+};
 
 /* @Codex */
 async function loadOcrRuntimeSettings() {
@@ -25,6 +52,70 @@ async function loadOcrRuntimeSettings() {
         configuredModel,
         baseUrl,
     };
+}
+
+/* @Codex */
+function decodeImagePayload(image: string): { buffer: Buffer; extension: string } {
+    const dataUrlMatch = image.match(/^data:image\/([a-z0-9.+-]+);base64,(.+)$/i);
+    const extension = IMAGE_MIME_EXTENSION[(dataUrlMatch?.[1] || 'png').toLowerCase()] || 'png';
+    const encoded = dataUrlMatch?.[2] || image;
+    return { buffer: Buffer.from(encoded, 'base64'), extension };
+}
+
+/* @Codex */
+function shouldFallbackToAppleVision(result: Awaited<ReturnType<typeof extractDocumentWithAI>>): boolean {
+    const meaningfulFields = Boolean(
+        result.firstName
+        || result.lastName
+        || result.taxCode
+        || result.birthDate
+        || result.address
+        || result.diagnosis
+        || result.medications?.length
+    );
+    if (meaningfulFields && result.confidence >= 0.5) return false;
+
+    return result.confidence < 0.4
+        || isLowSignalOcrText(result.rawMarkdown)
+        || isLowSignalOcrText(result.notes);
+}
+
+/* @Codex */
+async function extractWithAppleVisionFallback(image: string) {
+    if (process.platform !== 'darwin') return null;
+
+    try {
+        await fs.access(APPLE_VISION_SCRIPT);
+    } catch {
+        return null;
+    }
+
+    const { buffer, extension } = decodeImagePayload(image);
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mediflow-ocr-'));
+    const imagePath = path.join(tempDir, `input.${extension}`);
+
+    try {
+        await fs.writeFile(imagePath, buffer);
+        const { stdout } = await execFileAsync('swift', [APPLE_VISION_SCRIPT, imagePath], {
+            timeout: 45000,
+            maxBuffer: 8 * 1024 * 1024,
+        });
+        const parsed = JSON.parse(stdout);
+        const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
+        if (!parsed.ok || isLowSignalOcrText(text)) return null;
+
+        return {
+            rawMarkdown: text,
+            notes: text.slice(0, 500),
+            confidence: Math.min(0.86, Math.max(0.55, Number(parsed.avg_confidence) || 0.72)),
+            fallbackEngine: 'apple_vision' as const,
+        };
+    } catch (error) {
+        console.warn('[OCR API] Apple Vision fallback failed:', error);
+        return null;
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    }
 }
 
 /**
@@ -67,7 +158,13 @@ export async function POST(request: NextRequest) {
         }
 
         const ai = new AIService('ollama', validation.url.toString(), configuredModel);
-        const result = await extractDocumentWithAI(image, mode, ai);
+        let result = await extractDocumentWithAI(image, mode, ai);
+        if (mode !== 'labs' && shouldFallbackToAppleVision(result)) {
+            const fallback = await extractWithAppleVisionFallback(image);
+            if (fallback) {
+                result = fallback;
+            }
+        }
 
         return NextResponse.json({
             success: true,

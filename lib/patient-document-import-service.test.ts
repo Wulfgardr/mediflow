@@ -328,6 +328,37 @@ test('document import recognizes qualified discharge therapy headings and keeps 
     assert.equal(candidates.some((candidate) => /controllo cardiologico/i.test(candidate.drugMention)), false);
 });
 
+test('document import extracts Piano Terapeutico field-based therapy as reviewable evidence', () => {
+    const candidates = fallbackTherapyCandidates({
+        rawText: [
+            'Piano Terapeutico',
+            'Richiesto per la prescrizione di farmaci secondo le note AIFA',
+            'Paziente: ROSSI MARIA',
+            'Diagnosi e motivazione clinica della scelta del farmaco',
+            'Trapianto di polmone',
+            'Farmaco prescritto',
+            'CELLCEPT',
+            'Posologia',
+            '500 mg x2',
+            'Durata del trattamento prevista fino a',
+            '14 07 2026',
+        ].join('\n'),
+        source: 'hybrid',
+        confidence: 0.84,
+        medications: [],
+    });
+
+    const cellcept = candidates.find((candidate) => /CELLCEPT/i.test(candidate.drugMention));
+
+    assert.ok(cellcept);
+    assert.equal(cellcept?.therapyState, 'active');
+    assert.match(cellcept?.drugQuery || '', /CELLCEPT/i);
+    assert.match(cellcept?.drugQuery || '', /500 mg/i);
+    assert.equal(cellcept?.dosage, '500 mg x2');
+    assert.match(cellcept?.evidence || '', /Piano terapeutico AIFA/i);
+    assert.match(cellcept?.evidence || '', /Farmaco prescritto/i);
+});
+
 test('document import grounds therapies inside the gestionali discharge heading as active discharge therapy', () => {
     const reconciled = reconcileTherapyCandidatesWithDocumentContext(COLUMBUS_DIMISSIONE_DOCUMENT, [
         {

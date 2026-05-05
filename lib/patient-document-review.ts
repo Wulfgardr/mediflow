@@ -257,7 +257,7 @@ const THERAPY_PLAUSIBILITY_RULES: Array<{
 const MANUAL_REVIEW_ONLY_THERAPY_FAMILIES = new Set(['nutrition']);
 
 /* @Codex */
-const CURRENT_THERAPY_EVIDENCE_REGEX = /\bterapia alla dimissione\b|\bterapia domiciliare\b|\bindicazioni terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b/i;
+const CURRENT_THERAPY_EVIDENCE_REGEX = /\bterapia alla dimissione\b|\bterapia domiciliare\b|\bindicazioni terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b|\bpiano terapeutico aifa\b|\bfarmaco prescritto\b/i;
 
 /* @Codex */
 function buildClinicalContextProbe(data: ExtractedPatientData): string {
