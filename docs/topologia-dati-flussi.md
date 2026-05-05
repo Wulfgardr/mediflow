@@ -274,14 +274,21 @@ sequenceDiagram
     participant UI as Web UI
     participant API as Next.js API
     participant OCR as ocr-service
-    participant LLM as Ollama
+    participant LLM as Ollama/DeepSeek OCR
+    participant Vision as Apple Vision (macOS-only)
     participant Synth as document-synthesis-service
     participant DB as SQLite
     Clinician->>UI: Carica PDF/immagine
     UI->>API: Upload documento
     API->>OCR: Estrai testo
-    OCR->>LLM: Richiesta OCR multimodale
-    LLM-->>OCR: Testo estratto
+    OCR->>LLM: Richiesta OCR multimodale primaria
+    LLM-->>OCR: Testo estratto o output low-signal
+    alt macOS + output OCR low-signal
+        OCR->>Vision: Fallback locale Apple Vision
+        Vision-->>OCR: Testo estratto
+    else Windows/Linux o fallback non disponibile
+        OCR-->>API: Failure esplicito se non c'e testo utile
+    end
     OCR-->>API: OCR markdown
     API->>Synth: Analisi clinica strutturata
     Synth->>LLM: Prompt Qwen text-only
@@ -290,6 +297,18 @@ sequenceDiagram
     API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights e diagnosi
     API-->>UI: Esito + dati
 ```
+
+La filiera OCR certificata corrente e platform-aware:
+
+- `Ollama/DeepSeek OCR` resta il motore OCR primario locale.
+- `Apple Vision` e un fallback locale **solo macOS**, attivato quando l'output
+  primario e vuoto o degenerato.
+- Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
+  in MediFlow; senza testo utile dal primario o dal documento, il flusso deve
+  fallire in modo esplicito.
+- Il fallback OCR cambia solo la recognition: Smart Import, nuova anagrafica da
+  documento e Patient Insight restano reviewable e non scrivono dati clinici
+  strutturati senza conferma.
 
 ### 4.5 Documento archiviato -> Patient Insight artifact-first
 

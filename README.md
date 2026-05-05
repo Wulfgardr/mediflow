@@ -23,7 +23,7 @@ Su `main`, oggi, ci sono già queste cose:
 
 - **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso operativo quotidiano più leggibile;
 - **contratto locale `/api/v1`** più esplicito, stabile e riusabile per i client Apple;
-- **document intelligence reviewable**: smart import, nuova anagrafica da documento e primo artifact `parse/evidence`;
+- **document intelligence reviewable**: smart import, nuova anagrafica da documento, primo artifact `parse/evidence` e fallback OCR Apple Vision solo su macOS quando il primario locale e low-signal;
 - **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
 - **modalità `network home-base` paired**: pairing esplicito, capability discovery, accesso remoto ai pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni da client paired;
 - **Mac packaged come home-base**: il bundle macOS usa la shell Apple/home-base come entrypoint, può gestire backend web production e proxy TLS, e mostra diagnostica read-only dei servizi locali opzionali;
@@ -134,7 +134,13 @@ Situazione attuale:
 
 - Node.js (**v20+** consigliato)
 - Docker Desktop (**opzionale**, solo per ICD-11)
-- Ollama (**opzionale**, solo per AI/OCR locale)
+- Ollama (**opzionale**, runtime AI e OCR primario locale)
+
+Su macOS, MediFlow puo usare Apple Vision come fallback OCR locale quando
+Ollama/DeepSeek OCR restituisce testo vuoto o degenerato. Su Windows e Linux non
+esiste oggi un fallback OCR platform-specific equivalente certificato: il flusso
+usa l'OCR primario locale, testo gia presente nel documento, oppure fallisce in
+modo esplicito se non c'e testo utile.
 
 ### Avvio stack web locale
 

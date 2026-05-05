@@ -1,7 +1,8 @@
 # MLX operational parity
 
 > Stato documento: `SECONDARY`, slice `WUL-165`.
-> Le decisioni architetturali prevalenti restano ADR 0028, ADR 0029, ADR 0037 e ADR 0044.
+> Le decisioni architetturali prevalenti restano ADR 0028, ADR 0029, ADR 0037,
+> ADR 0044 e, per il boundary OCR platform-specific, ADR 0059.
 
 ## Decisione
 
@@ -13,8 +14,9 @@ Questo significa:
 - `Ollama` resta il runtime operativo standard dell'app.
 - `MLX` resta confinato a benchmark, diagnostica e superfici esplicitamente
   etichettate come sperimentali o benchmark-only.
-- OCR resta Ollama-only, perché dipende da modelli vision e pipeline già
-  governate separatamente.
+- OCR primario resta Ollama/DeepSeek OCR; l'unica eccezione certificata e il
+  fallback Apple Vision solo macOS descritto in ADR 0059. MLX resta escluso
+  dalla pipeline OCR operativa.
 - Nessun default modello o provider viene cambiato solo perché MLX è presente.
 - Qualunque promozione futura richiede ADR, benchmark lane-specific, stop-rule e
   governance rollout.
@@ -26,7 +28,7 @@ Questo significa:
 | Runtime app (`lib/ai-service.ts`) | Operativo standard | Non operativo | Differenza intenzionale |
 | Health/status locale | Diagnostica `11434` | Diagnostica `8080/v1/models` | Parity read-only |
 | Config provider native | Supportato | Supportato con fallback esplicito | Parity controllata |
-| OCR | Supportato | Escluso | Ollama-only deliberato |
+| OCR | Primario locale; fallback Apple Vision solo macOS | Escluso | MLX fuori dalla pipeline OCR deliberatamente |
 | Benchmark `ai-task-contracts` | `ollama_chat` | `mlx_chat` | Parity benchmark |
 | Model parliament | Runtime distinto | Runtime distinto | Parity reportistica |
 | Start/stop app-managed home-base | Non app-managed | Non app-managed | Parity di non gestione |
@@ -43,10 +45,12 @@ npm run check:mlx-operational-parity
 Il guard non prova la qualità di un modello MLX. Verifica invece che il repository
 mantenga i confini operativi dichiarati:
 
-- runtime applicativo ancora Ollama-only;
+- runtime applicativo generativo ancora Ollama-only;
 - adapter benchmark simmetrici `ollama_chat` / `mlx_chat`;
 - diagnostica home-base read-only per MLX già attivo;
 - fallback native esplicito verso Ollama;
+- OCR primario Ollama/DeepSeek con sola eccezione Apple Vision macOS-only
+  dichiarata da ADR 0059;
 - documentazione del boundary benchmark-only.
 
 ## Verifiche reali opzionali

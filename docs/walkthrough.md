@@ -99,7 +99,8 @@ graph TB
 | --- | --- | --- |
 | Next.js | `3000` | UI web + API locali |
 | TLS Proxy | `3443` | HTTPS locale per il client macOS |
-| Ollama | `11434` | AI clinica + OCR |
+| Ollama | `11434` | AI clinica + OCR primario |
+| Apple Vision OCR | n/a | Fallback OCR locale solo su macOS quando l'OCR primario produce output low-signal |
 | ICD-11 (Docker) | `8888` | Diagnosi ICD-11 |
 | OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
 
@@ -154,6 +155,26 @@ nel runtime ufficiale, ma non dichiarano scorciatoie architetturali oltre quelle
 gia formalizzate nelle ADR e nei documenti SISS. Il diario protesico resta un
 registro locale document-backed: non invia prescrizioni al sistema regionale e
 non dichiara un canale certificato.
+
+### Filiera OCR locale e boundary piattaforma
+
+La lettura documentale usa una catena locale e review-first:
+
+1. input normalizzato localmente;
+2. OCR primario via Ollama/DeepSeek OCR quando disponibile;
+3. rilevamento di output vuoto o degenerato;
+4. fallback Apple Vision **solo su macOS**;
+5. parsing/sintesi locale e review operatore prima di qualunque scrittura
+   clinica strutturata.
+
+Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
+certificato in MediFlow. Su quelle piattaforme il flusso supportato resta OCR
+primario locale via Ollama/DeepSeek OCR, testo gia presente nel documento, o
+failure esplicito se non viene estratto testo utile.
+
+Questo boundary e formalizzato in
+[ADR 0059](./adr/0059-macos-apple-vision-ocr-fallback.md). Non introduce cloud
+OCR, non cambia i vincoli PHI-safe e non rende Smart Import automatico.
 
 ### Diario protesico da documenti Assistente RL
 

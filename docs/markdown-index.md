@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-05-02
+Ultimo aggiornamento: 2026-05-05
 
 ## Come usare questo indice
 
@@ -20,7 +20,7 @@ Ultimo aggiornamento: 2026-05-02
 | [AGENTS.md](../AGENTS.md) | Regole globali per agent, vincoli e processo decisionale. | Sempre, prima di qualsiasi task. |
 | [README.md](../README.md) | Onboarding generale progetto e punti di accesso documentazione. | Sempre, in fase di avvio. |
 | [docs/README.md](./README.md) | Mappa canonica della documentazione (fonte autorevole per tema). | Sempre, per decidere precedenze. |
-| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa dello stato corrente: prodotto, runtime, dati, AI/document intelligence, home-base, SISS/FSE, Apple clients e split private/OSS. | Sempre, quando serve una vista unica e aggiornata senza ricostruire il quadro da piu documenti. |
+| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa dello stato corrente: prodotto, runtime, dati, AI/document intelligence, OCR macOS-only fallback, home-base, SISS/FSE, Apple clients e split private/OSS. | Sempre, quando serve una vista unica e aggiornata senza ricostruire il quadro da piu documenti. |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | Visione architetturale stabile, confini e non-obiettivi. | Sempre, per cambi tecnici non banali. |
 | [SECURITY.md](../SECURITY.md) | Policy sicurezza, threat model e regole redazione/logging. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
@@ -32,14 +32,14 @@ Ultimo aggiornamento: 2026-05-02
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali), con stato reale di `home-base`, document intelligence e shell locale. | Per capire flussi completi e integrazione moduli. |
+| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali), con stato reale di `home-base`, document intelligence, fallback OCR macOS-only e shell locale. | Per capire flussi completi e integrazione moduli. |
 | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Stato canonico complessivo del sistema, pensato come lettura unica per onboarding profondo e review trasversale. | Quando devi capire cosa esiste davvero oggi, cosa e direzione e quali confini non vanno superati. |
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/repository-topology.md](./repository-topology.md) | Mappa concisa delle aree top-level del repo: runtime clinico vs publication/site (`whitepaper/`) vs tooling. | Quando devi capire dove collocare codice/asset o se una cartella è clinical runtime. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato parity web/macOS su moduli core e gap operativi. | Per steering parity e release readiness. |
 | [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md) | Matrice QA Apple-wide WUL-194 con manifest verificabile capability-by-capability. | Quando si lavora su macOS home-base, iPhone/iPad paired, smoke simulator/device o claim di parity Apple-wide. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
-| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
+| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, OCR platform boundary, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
 
 ## Native, setup e testing
 
@@ -83,7 +83,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/openmed-redaction-benchmark.md](./openmed-redaction-benchmark.md) | Runbook operativo per eseguire il benchmark `WUL-96` della lane `redaction.v1` contro un sidecar locale OpenMed. | Quando serve avviare davvero il benchmark PII/redaction con healthcheck, env vars e comando benchmark dedicato. |
 | [docs/clinical-entities-benchmark.md](./clinical-entities-benchmark.md) | Runbook operativo per eseguire la thin slice `clinical_entities.v1` con adapter benchmark-only locali, a partire da `HUMADEX`, e leggere le diagnostiche `missingEntities/unexpectedEntities`. | Quando serve misurare davvero `problem + medication` su corpus sintetico italiano senza toccare il runtime applicativo. |
 | [docs/turboquant-runtime-benchmark.md](./turboquant-runtime-benchmark.md) | Runbook operativo per eseguire la thin slice `WUL-114` su `MLX`, confrontando baseline e varianti `kv_bits` con corpus sintetico dedicato e output JSON comparabile. | Quando serve misurare davvero il path runtime/KV-cache `benchmark-only` di TurboQuant senza toccare il runtime applicativo o il parliament. |
-| [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | Matrice operativa `WUL-165` che rende MLX benchmark-visible e diagnosticabile senza promuoverlo a runtime clinico. | Quando serve distinguere parity di visibilita/guardrail MLX da promozione runtime o da OCR, che resta Ollama-only. |
+| [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | Matrice operativa `WUL-165` che rende MLX benchmark-visible e diagnosticabile senza promuoverlo a runtime clinico. | Quando serve distinguere parity di visibilita/guardrail MLX da promozione runtime o dal boundary OCR primario Ollama/DeepSeek con fallback Apple Vision solo macOS. |
 | [docs/resolver-benchmark.md](./resolver-benchmark.md) | Runbook operativo per benchmarkare i resolver reali WHO ICD-11 e AIFA su corpus sintetici, con metriche su recall, ambiguità, latenza e mismatch di dosage/packaging. | Quando serve misurare i resolver locali veri prima di ritoccare Smart Import, coding o rollout AI. |
 | [docs/patient-insight-benchmark.md](./patient-insight-benchmark.md) | Runbook operativo per misurare `AI Patient Insight` con corpus sintetico dedicato, scoring su focus/citations e validator locale anti-regressione. | Quando si toccano prompt, guardrail o context builder dell'insight e serve un benchmark piu utile del solo controllo JSON. |
 | [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md) | Runbook operativo locale per diagnosticare e recuperare i casi in cui allegati PDF o diario clinico non entrano correttamente nel contesto o nel render finale di `AI Patient Insight`. | Quando un caso reale mostra fallback, follow-up documentale assente o mismatch tra qualita del PDF e resa finale dell'insight. |
@@ -169,6 +169,7 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | Formalizza la slice write paired delle osservazioni: read/create/update/soft-delete su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0057-local-evidence-absorption-layer.md](./adr/0057-local-evidence-absorption-layer.md) | Proposed ADR `WUL-213`: local evidence absorption layer per rendere allegati e diario fonti citabili/retrieval sopra un contract versionato, senza training, cloud runtime o auto-write clinici. |
 | [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | Proposed ADR `WUL-220`: futura affordance manuale e auditabile per riassorbire una fonte evidence invalidated/superseded, con stati espliciti, motivi PHI-safe e nessuna scrittura clinica strutturata. |
+| [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md) | Formalizza il fallback OCR Apple Vision solo macOS: DeepSeek/Ollama resta OCR primario locale, Windows/Linux non hanno fallback platform-specific equivalente dichiarato, Smart Import resta reviewable. |
 
 ## Checklist manutenzione indice
 

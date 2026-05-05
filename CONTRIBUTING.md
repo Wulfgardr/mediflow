@@ -43,6 +43,11 @@ Fonte canonica del protocollo operativo:
 - Docker Desktop (opzionale, per API ICD-11)
 - Ollama (opzionale, per AI/OCR locale)
 
+Nota OCR: Ollama/DeepSeek OCR resta il motore primario locale. Su macOS il
+runtime puo usare Apple Vision come fallback locale quando l'OCR primario
+produce output vuoto o degenerato. Windows e Linux non hanno oggi un fallback
+OCR platform-specific equivalente certificato in MediFlow.
+
 ---
 
 ## Getting started
@@ -150,9 +155,15 @@ Usalo quando tocchi:
 - `lib/document-synthesis-service.ts`
 - `lib/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
+- `lib/ocr-service.ts`
+- `app/api/ocr/extract/route.ts`
 - `components/document-upload.tsx`
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
+
+Se tocchi il fallback OCR macOS, documenta nella PR che Apple Vision e stato
+verificato solo su macOS e che Windows/Linux restano senza fallback
+platform-specific certificato.
 
 ---
 

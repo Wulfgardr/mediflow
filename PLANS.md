@@ -5,7 +5,7 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-05-02
+Ultimo aggiornamento: 2026-05-05
 
 ---
 
@@ -19,7 +19,7 @@ Ultimo aggiornamento: 2026-05-02
 - [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback; primi write remoti limitati a profilo/status paziente, diario, terapie, checkup e osservazioni versionati sotto `WUL-190`, senza hard delete remoto, attachment remoti, cataloghi o sync.
 - [ ] Formalizzare e avviare il rollout Apple-native condiviso (`WUL-187`): ADR architettura shared Apple client (`WUL-188`), hardening trasporto paired (`WUL-189`), boundary write remoto reviewable (`WUL-190`), target shell condivisi (`WUL-191`), macOS `home-base` packaged (`WUL-192`) e client iPhone/iPad paired con parity non-AI + cache locale (`WUL-193`, `WUL-194`). Slice `WUL-192` acquisiti: shell Apple/home-base come entrypoint macOS primario, pannello runtime, start/stop esplicito di backend web production + proxy TLS con escalation locale, guard standalone anti-artefatti locali, health diagnostico read-only per Ollama/Docker-ICD e packaging firmabile/notarizzabile via variabili esplicite. Slice `WUL-194` acquisita: manifest QA Apple-wide con evidenza/gap capability-by-capability. Prima slice `WUL-193`: cache mobile cifrata della lista pazienti, stato `offline degradato` in sola consultazione e copy senza overclaim di scritture offline. Slice diario mobile paired: read + create online idempotente (`WUL-206`) e update/annullamento online con conflitto `version` visibile (`WUL-208`). Slice terapie mobile paired: list/create/update/annullamento online per campi manuali non-AI essenziali, con conflitto `version` visibile e senza prescribing SISS o coda offline (`WUL-209`). Slice controlli/osservazioni mobile paired: list/create/update/annullamento online manuale non-AI su LOINC/UCUM e checkup status versionati, senza AI/OCR/offline queue (`WUL-210`).
 - [x] Portare su `main` la first slice runtime del `document evidence ledger` (`WUL-152`): artifact canonico `parse/evidence` cifrato sugli allegati, consumer iniziale in `Patient Insight`, `documentInsights` mantenuto come compat layer.
-- [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti.
+- [ ] Proseguire la document intelligence separando recognition, source governance e decision layer senza rompere i flussi esistenti. Stato WUL-225/WUL-226: OCR primario locale via Ollama/DeepSeek, fallback Apple Vision certificato solo su macOS per output blank/low-signal, nessun fallback platform-specific equivalente dichiarato su Windows/Linux.
 - [x] Aprire il corpus documentale locale SISS/FSE 2.0 (`WUL-176`) come base per integrazioni regionali piu profonde, con manifest sorgenti, fetch pubblico ripetibile e placeholder `manual-import` per documenti autenticati/non redistribuibili.
 - [x] Portare `WUL-179` al primo stato utile: source sync engine locale con refresh policy, change detection e report di freshness sopra il corpus SISS/FSE.
 - [x] Ritirare i preview profiles funzionali da `main` (`WUL-199`) e promuovere il contesto paziente SISS come parte stabile del `Clinical Workbench`.
@@ -29,7 +29,7 @@ Ultimo aggiornamento: 2026-05-02
 - [x] Formalizzare il primo `patient import decision` reviewable tra review documentale e persistenza prudente, per distillare il create/merge/apply in un contratto riusabile (`WUL-167`).
 - [x] Aggiungere la prima granularita section-aware al `parse/evidence` artifact (`WUL-159`): `sectionMap` opzionale con sezioni classificate, fact anchors `page/section/snippet` e conflitti terapeutici espliciti, senza migrazione DB o auto-write.
 - [x] Ridurre il drift della shell locale con revision fingerprint, `/api/system/revision` e reset `.next` source-aware in `Start_MediFlow.command`.
-- [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115` e `WUL-165`, salvo promozione esplicita sostenuta da benchmark, ADR e stop-rules. Slice `WUL-165` acquisita: MLX diventa benchmark-visible e diagnosticabile in read-only nella home-base, con guard `check:mlx-operational-parity`, ma `Ollama` resta runtime clinico standard e `OCR` resta Ollama-only.
+- [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115` e `WUL-165`, salvo promozione esplicita sostenuta da benchmark, ADR e stop-rules. Slice `WUL-165` acquisita: MLX diventa benchmark-visible e diagnosticabile in read-only nella home-base, con guard `check:mlx-operational-parity`, ma `Ollama` resta runtime clinico generativo standard e motore OCR primario. Dal WUL-225/WUL-226 l'unico fallback OCR platform-specific certificato e Apple Vision su macOS; Windows/Linux restano senza fallback equivalente dichiarato.
 
 Nota operativa:
 - `v0.6.0` e la release corrente formalizzata su `main` il `2026-05-02`
@@ -41,6 +41,7 @@ Nota operativa:
 - `WUL-192` ha raggiunto la definizione minima di packaged home-base: il bundle macOS mostra il shell Apple/home-base, gestisce esplicitamente backend web production e proxy TLS con stop bounded/escalation, espone solo diagnostica read-only per Ollama/Docker-ICD e puo essere firmato/notarizzato tramite variabili esplicite; non dichiara gestione app-managed dei servizi opzionali.
 - `WUL-194` apre la verifica Apple-wide post-WUL-192: `docs/apple-wide-parity-qa.md` e `docs/apple-wide-qa-manifest.json` distinguono capability coperte da comandi/runbook e gap ancora assegnati a `WUL-193` per CRUD UI mobile completa e cache/offline.
 - `WUL-152` ha trasformato ADR 0040 in primo runtime concreto: `parse/evidence` cifrato sugli allegati, `documentInsights` come projection compatibile e consumer iniziale in `Patient Insight`
+- `WUL-225`/`WUL-226` aggiornano la filiera OCR documentale: DeepSeek/Ollama resta primario locale; Apple Vision e fallback locale certificato solo su macOS quando il primario produce output blank/low-signal; Windows/Linux non hanno oggi un fallback OCR platform-specific equivalente e devono fallire esplicitamente quando non c'e testo utile.
 - `WUL-176` ha portato su `main` il corpus documentale locale SISS/FSE: manifest versionato, fetch pubblico ripetibile fuori Git e placeholder `manual-import` per le fonti non redistribuibili
 - `WUL-179` ha completato il primo layer operativo sopra il corpus: `sync` incrementale, `changeState`, policy di refresh e report locale di freshness, senza introdurre ancora scheduling o daemon dedicati
 - `WUL-203` chiude il passaggio documentale post-`WUL-199` / post-`WUL-179`: le mappe, la roadmap, la sintesi architetturale, il changelog e la facciata OSS non devono piu raccontare i preview profiles come runtime disponibile su `main`
@@ -136,8 +137,9 @@ Nota operativa:
 - `WUL-165` chiarisce il significato operativo minimo della parity MLX:
   il path `MLX` e visibile in benchmark, model parliament e diagnostica
   home-base read-only, ma resta fuori dal runtime clinico; il guard
-  `check:mlx-operational-parity` blocca drift su default Ollama, fallback
-  espliciti, OCR Ollama-only e confine benchmark-visible/non-promoted
+  `check:mlx-operational-parity` blocca drift su default Ollama generativo,
+  fallback espliciti e confine benchmark-visible/non-promoted; la successiva
+  eccezione OCR certificata e Apple Vision solo macOS, formalizzata in ADR 0059
 - `WUL-131` apre la governance del `document intelligence lab`: corpus
   canonico `synthetic-only` in repo + vault locale privato per shadow
   evaluation, come ponte tra `WUL-129` e `WUL-111`

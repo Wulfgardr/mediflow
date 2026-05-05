@@ -42,7 +42,8 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 | --- | --- | --- |
 | Web app Next.js | Superficie primaria | UI, `/api/*`, `/api/v1/*`, overview `home-base`, orchestrazione AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
-| Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR locale separato |
+| Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR primario locale separato |
+| Apple Vision OCR | Fallback macOS-only | Seconda lettura locale quando l'OCR primario restituisce output vuoto/degenerato; nessun equivalente certificato Windows/Linux |
 | ICD-11 Docker | Servizio locale opzionale | Resolver diagnostico OMS |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
@@ -96,13 +97,15 @@ Pipeline corrente:
 
 1. upload documento
 2. normalizzazione input locale
-3. OCR locale
-4. estrazione/sintesi con runtime generativo locale
-5. persistenza di:
+3. OCR locale primario via Ollama/DeepSeek OCR
+4. fallback Apple Vision solo su macOS se il primario produce testo low-signal;
+   su Windows/Linux non esiste oggi un fallback platform-specific certificato
+5. estrazione/sintesi con runtime generativo locale
+6. persistenza di:
    - `summarySnapshot`
    - artifact `parse/evidence`
    - `documentInsights` come projection compatibile
-6. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
+7. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
    flow document-driven)
 
 Nota: `Smart Import` resta reviewable e filtra il rumore da fonti senza novita
@@ -133,6 +136,7 @@ clinica quando diagnosi/terapie sono gia presenti.
 - [docs/adr/0038-network-readonly-data-plane-auth-boundary.md](./adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [docs/adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md)
 - [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+- [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md)
 - [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md)
 - [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
 - [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)

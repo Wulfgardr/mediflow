@@ -10,7 +10,7 @@
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-05-02 (`v0.6.0`)
+Ultimo aggiornamento: 2026-05-05 (`v0.6.0` + WUL-226)
 
 ---
 
@@ -44,7 +44,9 @@ La fotografia corrente e questa:
   il prototype oncologico e separato e non definisce MediFlow prodotto.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
-  artifact cifrati `parse/evidence` con prime ancore sezionali.
+  artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
+  Apple Vision e certificato solo su macOS; Windows non ha oggi un fallback OCR
+  platform-specific equivalente in MediFlow.
 - **AI**: runtime locale per default, benchmark e shadow lane separati dal
   prodotto clinico.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -126,6 +128,12 @@ La direzione document intelligence e `artifact-first`:
 
 - il documento viene normalizzato;
 - OCR/estrazione restano locali;
+- OCR primario resta Ollama/DeepSeek OCR quando disponibile;
+- su macOS, se l'OCR primario produce testo vuoto o degenerato, il runtime puo
+  usare Apple Vision come fallback locale;
+- su Windows e Linux non esiste oggi un fallback platform-specific certificato:
+  senza OCR primario utile o testo gia disponibile il flusso deve fallire in modo
+  esplicito;
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
@@ -142,6 +150,7 @@ Documenti/ADR principali:
 
 - [ADR 0040](./adr/0040-document-intelligence-evidence-ledger-and-decision-layers.md)
 - [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+- [ADR 0059](./adr/0059-macos-apple-vision-ocr-fallback.md)
 - [docs/patient-insight-document-troubleshooting.md](./patient-insight-document-troubleshooting.md)
 
 ### 2.5 Le integrazioni regionali restano dentro canali ufficiali
@@ -181,7 +190,8 @@ Documenti/ADR principali:
 | macOS Apple shell | WUL-192 | Entry point del bundle macOS: shell Apple/home-base con pannello runtime, start/stop esplicito di backend web production e proxy TLS, stop bounded/escalation, health diagnostico read-only per Ollama e Docker/ICD | Rebuild controllato, firma/notarizzazione esplicite, Ollama/Docker non app-managed |
 | macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
 | iPhone/iPad | Slice `v0.6.0` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
-| Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost |
+| Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost; OCR primario |
+| Apple Vision OCR | macOS-only fallback | Seconda lettura locale quando DeepSeek/Ollama OCR restituisce output blank/low-signal | Solo macOS, nessun equivalente certificato Windows/Linux |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
@@ -208,7 +218,8 @@ Documenti/ADR principali:
 ### 4.3 Allegati e artifact documentali
 
 1. Upload documento.
-2. Normalizzazione input e OCR locale.
+2. Normalizzazione input e OCR locale: primario Ollama/DeepSeek OCR, con fallback
+   Apple Vision solo su macOS quando l'output primario e low-signal.
 3. Sintesi/estrazione locale.
 4. Persistenza cifrata di:
    - allegato;
@@ -277,7 +288,9 @@ sono documentate o benchmarkate:
 
 `WUL-165` rende MLX benchmark-visible e diagnosticabile in read-only nella
 home-base, ma non lo promuove a runtime clinico: Ollama resta il default
-operativo e l'OCR resta Ollama-only.
+operativo generativo e il motore OCR primario. L'unico fallback OCR
+platform-specific certificato oggi e Apple Vision su macOS; Windows/Linux non
+hanno un fallback OCR equivalente dichiarato.
 
 Per promuovere una lane servono:
 
@@ -388,7 +401,8 @@ Da preservare:
 
 Disponibile:
 
-- OCR/local parsing;
+- OCR/local parsing, con fallback Apple Vision solo su macOS quando il primario
+  locale produce output vuoto o degenerato;
 - review di suggerimenti;
 - soppressione rumore quando una fonte non introduce novita clinica;
 - create-flow document-driven con persistenza prudente delle terapie.

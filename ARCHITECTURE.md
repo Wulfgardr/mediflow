@@ -40,6 +40,8 @@ MediFlow è un **sistema ibrido locale**:
   - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti, write profilo/status e primi read/write diario clinico, terapie, checkup e osservazioni
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
+  - Apple Vision OCR come fallback locale solo macOS quando l'OCR primario
+    produce output vuoto/degenerato
   - ICD-11 Docker API per ricerca diagnosi (localhost)
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
@@ -62,6 +64,7 @@ profilo/status paziente, diario clinico, terapie, checkup e osservazioni per cli
 | Next.js (UI + API) | `http://127.0.0.1:3000` | solo locale |
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | inoltra verso :3000 |
 | Ollama (AI/OCR) | `http://127.0.0.1:11434` | opzionale |
+| Apple Vision OCR | n/a | fallback OCR locale solo macOS; nessun fallback equivalente certificato Windows/Linux |
 | ICD-11 (Docker) | `http://127.0.0.1:8888` | opzionale |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
@@ -173,6 +176,9 @@ flowchart TB
 - Principio local-only: nessuna dipendenza cloud di default.
 - Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
+- Boundary OCR platform-specific: DeepSeek/Ollama resta OCR primario locale;
+  Apple Vision e fallback certificato solo su macOS; Windows/Linux non hanno
+  oggi un fallback OCR platform-specific equivalente dichiarato.
 
 ---
 
