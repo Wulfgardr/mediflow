@@ -11,6 +11,13 @@ import { revivePatientStructuredFields } from './patient-structured-fields';
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 /* @Codex */
 import type { DocumentEvidencePack } from './document-evidence-pack';
+/* @Codex */
+import {
+    buildApiTableFetchErrorMessage,
+    isApiTableAuthUnavailableStatus,
+    isApiTableUnavailableStatus,
+    notifyApiAuthUnavailable,
+} from './api-table-response';
 // Document insight from OCR + AI synthesis
 /* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
@@ -202,7 +209,10 @@ class ApiTable<T> {
     async toArray(): Promise<T[]> {
         const res = await fetch(this.endpoint, { cache: 'no-store' });
         /* @Codex */
-        if (res.status === 401 || res.status === 403) return [];
+        if (isApiTableAuthUnavailableStatus(res.status)) {
+            notifyApiAuthUnavailable(res.status);
+            return [];
+        }
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
         const rawJson = await res.json();
 
@@ -241,8 +251,13 @@ class ApiTable<T> {
 
     async get(id: string): Promise<T | undefined> {
         const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store' });
-        if (res.status === 404) return undefined;
-        if (!res.ok) throw new Error(`Failed to fetch item ${id}`);
+        /* @Codex */
+        if (isApiTableAuthUnavailableStatus(res.status)) {
+            notifyApiAuthUnavailable(res.status);
+            return undefined;
+        }
+        if (isApiTableUnavailableStatus(res.status)) return undefined;
+        if (!res.ok) throw new Error(buildApiTableFetchErrorMessage(this.endpoint, id, res.status, res.statusText));
         const item = this.reviveDates(await res.json());
         return await this.decryptItem(item);
     }

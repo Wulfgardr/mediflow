@@ -42,6 +42,12 @@ export function AuthHealthScreen({
     /* @Codex */
     const friendlyMessage = (() => {
         switch (health.error?.code) {
+            case 'DB_NATIVE_DEPENDENCY_INVALID':
+                return 'Modulo nativo SQLite incompatibile con il runtime Node corrente (mismatch ABI). È necessario ricompilarlo.';
+            case 'DB_NATIVE_DEPENDENCY_MISSING':
+                return 'Modulo nativo SQLite mancante. Reinstalla le dipendenze.';
+            case 'DB_MISSING':
+                return 'Database locale non trovato. Verifica la cartella dati o ripristina un backup.';
             case 'DB_SCHEMA_MISSING':
                 return 'Schema del database mancante. Ripristina un DB valido o esegui le migrazioni.';
             case 'DB_QUERY_FAILED':
@@ -55,8 +61,14 @@ export function AuthHealthScreen({
         }
     })();
 
+    /* @Codex */
+    const remediationCommand = health.error?.remediationCommand;
+    /* @Codex */
+    const nextAction = health.error?.nextAction;
+
     const details = [
         health.db?.state ? ['Stato archivio', formatDbState(health.db.state)] : null,
+        health.error?.category ? ['Categoria', health.error.category] : null,
     ].filter(Boolean) as Array<[string, string]>;
 
     return (
@@ -74,6 +86,27 @@ export function AuthHealthScreen({
                         )}
                     </div>
                 </div>
+
+                {/* @Codex */}
+                {nextAction && (
+                    <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 text-sm text-gray-700">
+                        <div className="font-semibold text-orange-800 mb-1">Prossima azione</div>
+                        <p>{nextAction}</p>
+                    </div>
+                )}
+
+                {/* @Codex */}
+                {remediationCommand && (
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="text-xs font-semibold text-gray-600 mb-2">Comando consigliato (esegui manualmente nel terminale)</div>
+                        <code className="block font-mono text-xs text-gray-900 break-all whitespace-pre-wrap select-all">
+                            {remediationCommand}
+                        </code>
+                        <p className="text-[11px] text-gray-500 mt-2">
+                            Esegui il comando con lo stesso runtime Node usato per avviare MediFlow. Non eseguito automaticamente per sicurezza.
+                        </p>
+                    </div>
+                )}
 
                 {details.length > 0 && (
                     <div className="rounded-2xl border border-orange-100 bg-white p-4">

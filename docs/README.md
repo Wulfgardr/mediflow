@@ -24,6 +24,7 @@ Documenti da consultare **sempre**:
 Documenti da consultare **al bisogno**:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
+- Topologia repository (runtime clinico vs publication/site): [docs/repository-topology.md](./repository-topology.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Playbook orchestrazione lavoro con Linear/Codex: [docs/linear-codex-playbook.md](./linear-codex-playbook.md)

@@ -40,6 +40,8 @@ import {
     type AuthHealthPayload,
     type LoginFailurePayload,
 } from '@/lib/client-auth-api';
+/* @Codex */
+import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
 
 export interface User {
     id: string;
@@ -140,6 +142,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         enabled: isAuthenticated && !isLocked,
         onTimeout: lock,
     });
+
+    /* @Codex */
+    useEffect(() => {
+        const handleApiAuthUnavailable = () => {
+            clearSecuritySession();
+            setActiveMasterKey(null);
+            setIsAuthenticated(false);
+            setIsLocked(true);
+            setAuthErrorMessage('Sessione scaduta. Inserisci il PIN per continuare.');
+        };
+
+        window.addEventListener(MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT, handleApiAuthUnavailable);
+        return () => {
+            window.removeEventListener(MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT, handleApiAuthUnavailable);
+        };
+    }, []);
 
     // Initial check
     useEffect(() => {
