@@ -290,7 +290,7 @@ export default function PatientDetailPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center">
+                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
                                 <p className="text-sm text-[color:var(--mf-muted)]">
                                     Nessuna evidenza documentale in primo piano. I nuovi referti compariranno qui come stack contestuale.
                                 </p>
@@ -351,7 +351,7 @@ export default function PatientDetailPage() {
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
-                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center">
+                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
                                 <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun lavoro pianificato.</p>
                                 <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
                                     Aggiungi pianificazione
@@ -360,7 +360,7 @@ export default function PatientDetailPage() {
                         ) : (
                             <div className="space-y-2">
                                 {checkups.map((checkup) => (
-                                    <div key={checkup.id} className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:bg-white/5">
+                                    <div key={checkup.id} className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/5">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
                                                 <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{checkup.title}</p>

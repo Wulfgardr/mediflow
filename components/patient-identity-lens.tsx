@@ -157,9 +157,9 @@ export function PatientIdentityLens({
                                         Diagnosi ICD-11
                                     </p>
                                     {leadDiagnosis ? (
-                                        <div className="mt-2 rounded-[12px] border border-[color:rgba(94,53,95,0.16)] bg-white/70 p-3 dark:bg-white/5">
+                                        <div className="patient-diagnosis-card mt-2 rounded-[12px] border border-[color:rgba(94,53,95,0.16)] bg-white/70 p-3">
                                             <div className="flex flex-wrap items-start gap-3">
-                                                <span className="inline-flex items-center rounded-full border border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.06)] px-2.5 py-0.5 text-sm font-semibold text-[color:var(--mf-plum)]">
+                                                <span className="patient-code-pill patient-code-pill-plum">
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
@@ -182,7 +182,7 @@ export function PatientIdentityLens({
                                             {secondaryDiagnoses.map((diagnosis) => (
                                                 <span
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--mf-ink)]"
+                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--mf-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--mf-ink)]"
                                                 >
                                                     <span className="font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
@@ -209,7 +209,7 @@ export function PatientIdentityLens({
                                                     key={exemption.code}
                                                     className="flex flex-wrap items-baseline gap-2 text-sm leading-6 text-[color:var(--mf-ink)]"
                                                 >
-                                                    <span className="inline-flex items-center rounded-full border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.06)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--mf-primary)]">
+                                                    <span className="patient-code-pill patient-code-pill-primary">
                                                         {exemption.code}
                                                     </span>
                                                     <span className="min-w-0 flex-1">
@@ -235,7 +235,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:bg-white/4">
+                        <div className="patient-quick-context-card rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>

@@ -529,6 +529,25 @@ body {
   border-color: rgba(255, 247, 240, 0.1);
 }
 
+:root.dark[data-ui-style='redesign'] .patient-quick-context-card,
+:root.dark[data-ui-style='redesign'] .patient-diagnosis-card {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 247, 240, 0.08);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-actions-dock a:not(.ui-btn-primary),
+:root.dark[data-ui-style='redesign'] .patient-actions-dock button:not(.ui-btn-primary) {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 247, 240, 0.1);
+  color: var(--mf-ink);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-actions-dock a:not(.ui-btn-primary):hover,
+:root.dark[data-ui-style='redesign'] .patient-actions-dock button:not(.ui-btn-primary):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(94, 199, 177, 0.3);
+}
+
 :root.dark[data-ui-style='redesign'] .identity-lens-pane,
 :root.dark[data-ui-style='redesign'] .patient-actions-summary,
 :root.dark[data-ui-style='redesign'] .clinical-river-card,
@@ -792,4 +811,377 @@ body {
 /* These allow dynamic widths via CSS custom properties */
 .progress-bar-width {
   width: var(--prog-width, 0%);
+}
+
+/* @Codex: Graphite patient/SISS reusable surfaces — dense, dark-mode aware,
+   no decorative gradients. Built on the same surface language as
+   .patient-detail-section so the SISS panel scans like sibling content. */
+
+.graphite-block {
+  border-radius: 14px;
+  border: 1px solid rgba(112, 106, 100, 0.12);
+  background-color: rgba(255, 252, 247, 0.78);
+  padding: 0.85rem 0.95rem;
+}
+
+:root.dark .graphite-block {
+  border-color: rgba(255, 247, 240, 0.08);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.graphite-divider {
+  border-top: 1px solid rgba(112, 106, 100, 0.12);
+}
+
+:root.dark .graphite-divider {
+  border-top-color: rgba(255, 247, 240, 0.08);
+}
+
+.graphite-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--ui-chip-border);
+  background-color: var(--ui-chip-bg);
+  color: var(--mf-muted);
+  padding: 0.18rem 0.55rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.graphite-chip-tone-info {
+  border-color: rgba(15, 123, 104, 0.22);
+  background-color: rgba(15, 123, 104, 0.07);
+  color: var(--mf-primary);
+}
+
+.graphite-chip-tone-success {
+  border-color: rgba(63, 122, 76, 0.26);
+  background-color: rgba(63, 122, 76, 0.08);
+  color: var(--mf-success);
+}
+
+.graphite-chip-tone-warning {
+  border-color: rgba(197, 138, 47, 0.28);
+  background-color: rgba(197, 138, 47, 0.1);
+  color: var(--mf-warning);
+}
+
+.graphite-chip-tone-critical {
+  border-color: rgba(163, 58, 47, 0.28);
+  background-color: rgba(163, 58, 47, 0.1);
+  color: var(--mf-critical);
+}
+
+.graphite-chip-tone-muted {
+  border-color: rgba(112, 106, 100, 0.18);
+  background-color: transparent;
+  color: var(--mf-muted);
+}
+
+:root.dark .graphite-chip {
+  border-color: rgba(255, 247, 240, 0.12);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--mf-muted);
+}
+
+:root.dark .graphite-chip-tone-info {
+  border-color: rgba(94, 199, 177, 0.36);
+  background-color: rgba(94, 199, 177, 0.12);
+  color: rgb(150, 224, 204);
+}
+
+:root.dark .graphite-chip-tone-success {
+  border-color: rgba(140, 210, 160, 0.32);
+  background-color: rgba(110, 190, 130, 0.12);
+  color: rgb(170, 220, 180);
+}
+
+:root.dark .graphite-chip-tone-warning {
+  border-color: rgba(232, 180, 96, 0.34);
+  background-color: rgba(232, 180, 96, 0.14);
+  color: rgb(240, 200, 130);
+}
+
+:root.dark .graphite-chip-tone-critical {
+  border-color: rgba(232, 130, 116, 0.36);
+  background-color: rgba(232, 110, 96, 0.14);
+  color: rgb(244, 170, 158);
+}
+
+:root.dark .graphite-chip-tone-muted {
+  border-color: rgba(255, 247, 240, 0.14);
+  background-color: transparent;
+  color: var(--mf-muted);
+}
+
+.graphite-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--mf-muted);
+}
+
+.graphite-status-dot.is-recent { background-color: var(--mf-success); }
+.graphite-status-dot.is-stale  { background-color: var(--mf-warning); }
+.graphite-status-dot.is-absent { background-color: rgba(112, 106, 100, 0.4); }
+
+:root.dark .graphite-status-dot.is-recent { background-color: rgb(140, 210, 160); }
+:root.dark .graphite-status-dot.is-stale  { background-color: rgb(240, 200, 130); }
+:root.dark .graphite-status-dot.is-absent { background-color: rgba(255, 247, 240, 0.28); }
+
+.graphite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--mf-ink);
+  background-color: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(112, 106, 100, 0.08);
+}
+
+:root.dark .graphite-row {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 247, 240, 0.06);
+}
+
+.graphite-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 10px;
+  border: 1px solid rgba(112, 106, 100, 0.16);
+  background-color: rgba(255, 252, 247, 0.92);
+  color: var(--mf-ink);
+  padding: 0.3rem 0.6rem;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.graphite-mini-btn:hover:not(:disabled) {
+  border-color: rgba(15, 123, 104, 0.32);
+  color: var(--mf-primary);
+}
+
+.graphite-mini-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.graphite-mini-btn:focus-visible {
+  outline: 2px solid rgba(15, 123, 104, 0.4);
+  outline-offset: 2px;
+}
+
+:root.dark .graphite-mini-btn {
+  border-color: rgba(255, 247, 240, 0.12);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--mf-ink);
+}
+
+:root.dark .graphite-mini-btn:hover:not(:disabled) {
+  border-color: rgba(94, 199, 177, 0.38);
+  color: rgb(150, 224, 204);
+}
+
+.siss-action-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  border-radius: 12px;
+  border: 1px solid rgba(112, 106, 100, 0.14);
+  background-color: rgba(255, 252, 247, 0.88);
+  padding: 0.58rem 0.7rem;
+  text-align: left;
+  color: var(--mf-ink);
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  min-height: 0;
+}
+
+.siss-action-btn:hover:not(:disabled) {
+  border-color: rgba(15, 123, 104, 0.32);
+  background-color: rgba(255, 255, 255, 0.96);
+}
+
+.siss-action-btn:focus-visible {
+  outline: 2px solid rgba(15, 123, 104, 0.4);
+  outline-offset: 2px;
+}
+
+.siss-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.siss-action-btn-head {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.siss-action-btn-head svg {
+  color: var(--mf-primary);
+}
+
+.siss-action-btn-caption {
+  font-size: 10.8px;
+  line-height: 1.35;
+  color: var(--mf-muted);
+}
+
+:root.dark .siss-action-btn {
+  border-color: rgba(255, 247, 240, 0.1);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--mf-ink);
+}
+
+:root.dark .siss-action-btn:hover:not(:disabled) {
+  border-color: rgba(94, 199, 177, 0.36);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+:root.dark .siss-action-btn-head svg {
+  color: rgb(150, 224, 204);
+}
+
+.siss-feedback {
+  border-radius: 12px;
+  border: 1px solid;
+  padding: 0.6rem 0.75rem;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.siss-feedback-success {
+  border-color: rgba(63, 122, 76, 0.3);
+  background-color: rgba(63, 122, 76, 0.08);
+  color: var(--mf-success);
+}
+
+.siss-feedback-warning {
+  border-color: rgba(197, 138, 47, 0.32);
+  background-color: rgba(197, 138, 47, 0.1);
+  color: var(--mf-warning);
+}
+
+.siss-feedback-error {
+  border-color: rgba(163, 58, 47, 0.32);
+  background-color: rgba(163, 58, 47, 0.1);
+  color: var(--mf-critical);
+}
+
+:root.dark .siss-feedback-success {
+  border-color: rgba(140, 210, 160, 0.32);
+  background-color: rgba(110, 190, 130, 0.1);
+  color: rgb(170, 220, 180);
+}
+
+:root.dark .siss-feedback-warning {
+  border-color: rgba(232, 180, 96, 0.34);
+  background-color: rgba(232, 180, 96, 0.12);
+  color: rgb(240, 200, 130);
+}
+
+:root.dark .siss-feedback-error {
+  border-color: rgba(232, 130, 116, 0.34);
+  background-color: rgba(232, 110, 96, 0.12);
+  color: rgb(244, 170, 158);
+}
+
+.siss-blocked-list {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.siss-blocked-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(112, 106, 100, 0.12);
+  background-color: rgba(255, 252, 247, 0.7);
+}
+
+:root.dark .siss-blocked-item {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 247, 240, 0.08);
+}
+
+@media (min-width: 640px) {
+  .siss-blocked-item {
+    grid-template-columns: minmax(140px, 0.8fr) minmax(0, 1.6fr) minmax(0, 1.4fr);
+    gap: 0.6rem;
+    align-items: baseline;
+  }
+}
+
+.siss-blocked-item-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mf-ink);
+}
+
+.siss-blocked-item-caption {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--mf-muted);
+}
+
+.siss-blocked-item-reason {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--mf-warning);
+}
+
+:root.dark .siss-blocked-item-reason {
+  color: rgb(240, 200, 130);
+}
+
+/* @Codex: Patient identity lens — code pills that work in dark too. */
+.patient-code-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 0.05rem 0.5rem;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.patient-code-pill-plum {
+  border-color: rgba(94, 53, 95, 0.22);
+  background-color: rgba(94, 53, 95, 0.08);
+  color: var(--mf-plum);
+}
+
+.patient-code-pill-primary {
+  border-color: rgba(15, 123, 104, 0.22);
+  background-color: rgba(15, 123, 104, 0.08);
+  color: var(--mf-primary);
+}
+
+:root.dark .patient-code-pill-plum {
+  border-color: rgba(200, 150, 200, 0.36);
+  background-color: rgba(200, 150, 200, 0.12);
+  color: rgb(220, 180, 220);
+}
+
+:root.dark .patient-code-pill-primary {
+  border-color: rgba(94, 199, 177, 0.36);
+  background-color: rgba(94, 199, 177, 0.12);
+  color: rgb(150, 224, 204);
 }
