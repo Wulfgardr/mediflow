@@ -1185,3 +1185,87 @@ body {
   background-color: rgba(94, 199, 177, 0.12);
   color: rgb(150, 224, 204);
 }
+
+/* Patient agenda worklist - dark-mode treatments only.
+   Light mode keeps the inline Tailwind tints embedded in the component. */
+:root.dark .patient-agenda-worklist {
+  background-color: rgba(26, 22, 26, 0.86);
+  border-color: rgba(255, 247, 240, 0.08);
+  box-shadow: 0 16px 30px rgba(6, 5, 7, 0.42);
+}
+
+:root.dark .patient-agenda-worklist .agenda-overdue-meta {
+  color: rgb(244, 170, 158);
+}
+
+:root.dark .patient-agenda-worklist .agenda-filter {
+  border-color: rgba(255, 247, 240, 0.12);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--mf-muted);
+}
+
+:root.dark .patient-agenda-worklist .agenda-filter:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  color: var(--mf-ink);
+}
+
+:root.dark .patient-agenda-worklist .agenda-filter:focus-visible {
+  outline: 2px solid rgba(94, 199, 177, 0.4);
+  outline-offset: 2px;
+}
+
+:root.dark .patient-agenda-worklist .agenda-filter.is-active {
+  border-color: rgba(94, 199, 177, 0.36);
+  background-color: rgba(94, 199, 177, 0.14);
+  color: rgb(150, 224, 204);
+}
+
+:root.dark .patient-agenda-worklist .agenda-list {
+  border-color: rgba(255, 247, 240, 0.08);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+:root.dark .patient-agenda-worklist .agenda-list > li + li {
+  border-top-color: rgba(255, 247, 240, 0.06);
+}
+
+:root.dark .patient-agenda-worklist .agenda-row:hover {
+  background-color: rgba(94, 199, 177, 0.08);
+}
+
+:root.dark .patient-agenda-worklist .agenda-row-chevron {
+  color: rgba(255, 247, 240, 0.34);
+}
+
+:root.dark .patient-agenda-worklist .agenda-row:hover .agenda-row-chevron {
+  color: rgb(150, 224, 204);
+}
+
+:root.dark .patient-agenda-worklist .agenda-row-notes {
+  color: rgba(255, 247, 240, 0.5);
+}
+
+:root.dark .patient-agenda-worklist .agenda-badge-overdue {
+  background-color: rgba(232, 110, 96, 0.16);
+  color: rgb(244, 170, 158);
+}
+
+:root.dark .patient-agenda-worklist .agenda-badge-today {
+  background-color: rgba(94, 199, 177, 0.16);
+  color: rgb(150, 224, 204);
+}
+
+:root.dark .patient-agenda-worklist .agenda-badge-upcoming {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--mf-ink);
+}
+
+:root.dark .patient-agenda-worklist .agenda-badge-completed,
+:root.dark .patient-agenda-worklist .agenda-badge-cancelled {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--mf-muted);
+}
+
+:root.dark .patient-agenda-worklist .agenda-empty {
+  border-color: rgba(255, 247, 240, 0.14);
+}
