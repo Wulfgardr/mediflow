@@ -459,6 +459,26 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         );
     }
 
+    /* @Codex */
+    if (isLocked || !isAuthenticated) {
+        return (
+            <SecurityContext.Provider value={{
+                isAuthenticated,
+                isLocked: true,
+                requiresSetup: false,
+                user,
+                authErrorMessage,
+                login,
+                setupPin,
+                changePin,
+                lock,
+                updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
+            }}>
+                <LockScreen />
+            </SecurityContext.Provider>
+        );
+    }
+
     // Normal flow with Lock Screen Overlay
     return (
         <SecurityContext.Provider value={{
@@ -475,11 +495,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }}>
             <div className="relative min-h-screen">
                 {children}
-                {isLocked && (
-                    <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-md">
-                        <LockScreen />
-                    </div>
-                )}
             </div>
         </SecurityContext.Provider>
     );

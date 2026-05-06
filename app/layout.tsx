@@ -70,8 +70,8 @@ export default function RootLayout({
         <FlowFieldBackground />
         <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
           <AppRevisionGuard fingerprint={appFingerprint} />
-          <UIAccessibilityProvider>
-            <SecurityProvider>
+          <SecurityProvider>
+            <UIAccessibilityProvider>
               <UIStyleProvider>
               {/* @Codex: lock overlay is rendered by SecurityProvider to avoid duplicate instances */}
                 <PrivacyProvider>
@@ -89,8 +89,8 @@ export default function RootLayout({
                   </div>
                 </PrivacyProvider>
               </UIStyleProvider>
-            </SecurityProvider>
-          </UIAccessibilityProvider>
+            </UIAccessibilityProvider>
+          </SecurityProvider>
         </ThemeProvider>
       </body>
     </html>
