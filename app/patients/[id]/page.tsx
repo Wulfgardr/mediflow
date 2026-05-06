@@ -155,31 +155,29 @@ export default function PatientDetailPage() {
     };
 
     const actionsDock = (
-        <div className="patient-actions-dock rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/76 p-4 shadow-[0_12px_24px_rgba(35,27,22,0.05)] dark:bg-white/4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                Azioni rapide
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Link
-                    href={`/patients/${id}/entries/new`}
-                    className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-                >
-                    <Plus className="h-4 w-4" />
-                    Nuova visita
-                </Link>
+        <div className="patient-actions-dock rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 p-4 dark:bg-white/4">
+            <Link
+                href={`/patients/${id}/entries/new`}
+                className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold"
+            >
+                <Plus className="h-4 w-4" />
+                Nuova visita
+            </Link>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <Link
                     href={`/patients/${id}/edit`}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 text-sm font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(182,106,60,0.26)] hover:text-[color:var(--mf-accent)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(182,106,60,0.26)] hover:text-[color:var(--mf-accent)] dark:bg-white/6"
                 >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-3.5 w-3.5" />
                     Modifica
                 </Link>
                 <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 text-sm font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
                 >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-3.5 w-3.5" />
                     Export FHIR
                 </button>
                 <button
@@ -190,17 +188,19 @@ export default function PatientDetailPage() {
                         const reportService = await import('@/lib/report-service');
                         reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, therapies, observations);
                     }}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 text-sm font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(94,53,95,0.26)] hover:text-[color:var(--mf-plum)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(94,53,95,0.26)] hover:text-[color:var(--mf-plum)] dark:bg-white/6"
                 >
-                    <FileText className="h-4 w-4" />
+                    <FileText className="h-3.5 w-3.5" />
                     Report PDF
                 </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-                <span className="apple-chip">{nonScaleEntries.length} eventi</span>
-                <span className="apple-chip">{(checkups ?? []).length} follow-up</span>
-                <span className="apple-chip">{documentInsights.length} evidenze</span>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-[color:var(--mf-muted)]">
+                <span>{nonScaleEntries.length} eventi</span>
+                <span aria-hidden>·</span>
+                <span>{(checkups ?? []).length} follow-up</span>
+                <span aria-hidden>·</span>
+                <span>{documentInsights.length} evidenze</span>
             </div>
         </div>
     );
@@ -220,8 +220,8 @@ export default function PatientDetailPage() {
                 nextStep={nextStepText}
             />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.92fr)]">
-                <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.92fr)] xl:gap-5">
+                <div className="space-y-4">
                     <SissPatientContextPanel
                         patientId={id}
                         patientTaxCode={patient.taxCode}
@@ -229,7 +229,7 @@ export default function PatientDetailPage() {
 
                     <SissHandoffDiary patientId={id} />
 
-                    <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
+                    <section className="patient-detail-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Timeline</p>
@@ -257,7 +257,7 @@ export default function PatientDetailPage() {
 
                     <ProstheticPrescriptionManager patientId={id} />
 
-                    <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
+                    <section className="patient-detail-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Diario clinico</p>
@@ -272,10 +272,10 @@ export default function PatientDetailPage() {
                     </section>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <AIPatientInsight patient={patient} />
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Evidence Stack</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -290,7 +290,7 @@ export default function PatientDetailPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
+                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center">
                                 <p className="text-sm text-[color:var(--mf-muted)]">
                                     Nessuna evidenza documentale in primo piano. I nuovi referti compariranno qui come stack contestuale.
                                 </p>
@@ -301,7 +301,7 @@ export default function PatientDetailPage() {
                     <PatientSmartImportPanel patient={patient} entries={entries} />
                     <DocumentInsightsPanel patient={patient} />
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Strumenti di scheda</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -332,7 +332,7 @@ export default function PatientDetailPage() {
                         </div>
                     </section>
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Archivio paziente</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Documenti e referti</h3>
@@ -340,7 +340,7 @@ export default function PatientDetailPage() {
                         <DocumentUpload patientId={id} />
                     </section>
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Pianificazione</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -351,16 +351,16 @@ export default function PatientDetailPage() {
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
-                            <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
+                            <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center">
                                 <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun lavoro pianificato.</p>
                                 <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
                                     Aggiungi pianificazione
                                 </Link>
                             </div>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                                 {checkups.map((checkup) => (
-                                    <div key={checkup.id} className="rounded-[24px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 px-4 py-3 dark:bg-white/5">
+                                    <div key={checkup.id} className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:bg-white/5">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
                                                 <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{checkup.title}</p>

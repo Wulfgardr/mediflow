@@ -166,7 +166,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                 {!isAdding && (
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                        className="ui-btn-primary inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold"
                     >
                         <Plus className="w-4 h-4" />
                         Aggiungi Farmaco
