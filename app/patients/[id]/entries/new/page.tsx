@@ -156,7 +156,7 @@ export default function NewEntryPage() {
 
     return (
         <div className="mx-auto max-w-5xl space-y-6">
-            <section className="glass-panel overflow-hidden p-6 md:p-7">
+            <section className="patient-detail-section glass-panel border overflow-hidden p-6 md:p-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-4">
                         <Link
@@ -186,7 +186,7 @@ export default function NewEntryPage() {
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_320px]">
                 <div className="space-y-6">
-                    <div className="glass-panel p-6 md:p-7">
+                    <div className="patient-detail-section glass-panel border p-6 md:p-7">
                         <form onSubmit={handleSubmit} className="space-y-8">
                             <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                                 <div className="space-y-2">
@@ -392,7 +392,7 @@ export default function NewEntryPage() {
                 </div>
 
                 <aside className="space-y-6">
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Editor</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -406,7 +406,7 @@ export default function NewEntryPage() {
                         </div>
                     </section>
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Struttura suggerita</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">

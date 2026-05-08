@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { searchICDHybrid, ICDSearchResult } from '@/lib/icd-service'; // UPDATED Import
-import { Search, X, Server, AlertTriangle } from 'lucide-react';
+import { Search, X, Server } from 'lucide-react';
 
 interface ICDAutocompleteProps {
     value?: { code: string; description: string; system: string };
@@ -88,20 +88,20 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     };
 
     return (
+        // @Codex WUL-229 — ICD autocomplete shares mf-input + mf-popover language with drug picker
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                 <input
                     type="text"
                     value={query}
                     onChange={handleSearch}
                     placeholder="Cerca diagnosi (ICD-11 Official - English)"
-                    className="w-full pl-9 pr-8 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-white/10 dark:bg-black/20 focus:ring-2 focus:ring-blue-500 outline-none uppercase dark:text-white"
+                    className="mf-input mf-input-sm pl-9 pr-9 uppercase"
                 />
-                {/* Loading Indicator */}
                 {isLoading && (
-                    <div className="absolute right-8 top-2.5">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="absolute right-9 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--mf-primary)', borderTopColor: 'transparent' }}></div>
                     </div>
                 )}
 
@@ -112,7 +112,8 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             if (onChange) onChange({ code: '', description: '', system: 'ICD-11' });
                             if (onSelect) onSelect('', '');
                         }}
-                        className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                        style={{ color: 'var(--mf-muted)' }}
                         aria-label="Cancella ricerca"
                     >
                         <X className="w-4 h-4" />
@@ -120,23 +121,19 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 )}
             </div>
 
-            {/* Results Dropdown */}
             {isOpen && results.length > 0 && (
-                <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-white/10 max-h-60 overflow-y-auto">
-                    {/* Header informing sources could be good, but stick to list for now */}
+                <div className="absolute z-[100] w-full mt-2 mf-popover max-h-64 overflow-y-auto">
                     {results.map((item) => (
                         <button
                             key={`${item.system}-${item.code}`}
                             type="button"
                             onClick={() => handleSelect(item)}
-                            className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center justify-between group border-b border-gray-50 dark:border-white/5 last:border-0"
+                            className="mf-popover-row w-full text-left flex items-center justify-between"
                         >
-                            <span className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate">{item.description}</span>
-
-                            <div className="flex items-center gap-2">
-                                {/* System Badge */}
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-blue-100 text-blue-700">
-                                    <Server className="w-3 h-3" />
+                            <span className="font-medium text-sm truncate" style={{ color: 'var(--mf-ink)' }}>{item.description}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="patient-code-pill patient-code-pill-primary text-[10px]">
+                                    <Server className="w-3 h-3 mr-1" />
                                     {item.system} {item.code}
                                 </span>
                             </div>
@@ -146,7 +143,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             )}
 
             {isOpen && results.length === 0 && query.length > 1 && (
-                <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-100 dark:border-white/10 p-3 text-center text-xs text-gray-400 italic">
+                <div className="absolute z-[100] w-full mt-2 mf-popover p-3 text-center text-xs italic" style={{ color: 'var(--mf-muted)' }}>
                     Nessuna corrispondenza. Prova a cercare in Inglese (es. &quot;Amyloid&quot;).
                 </div>
             )}

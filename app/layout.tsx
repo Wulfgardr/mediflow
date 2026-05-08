@@ -13,7 +13,6 @@ import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider'
 import { UIStyleProvider } from '@/components/ui-style-provider';
 import {
   UI_REDUCE_MOTION_STORAGE_KEY,
-  UI_REDUCE_TRANSPARENCY_STORAGE_KEY,
 } from '@/lib/ui-accessibility-preferences';
 
 export const metadata: Metadata = {
@@ -30,7 +29,7 @@ const uiStyleBootstrapScript = `
   try {
     root.dataset.uiStyle = 'redesign';
     root.dataset.uiReduceMotion = localStorage.getItem('${UI_REDUCE_MOTION_STORAGE_KEY}') === 'true' ? 'true' : 'false';
-    root.dataset.uiReduceTransparency = localStorage.getItem('${UI_REDUCE_TRANSPARENCY_STORAGE_KEY}') === 'true' ? 'true' : 'false';
+    root.dataset.uiReduceTransparency = 'false';
 
     const stored = localStorage.getItem('mediflow-theme');
     const resolved = stored === 'dark' || stored === 'light' ? stored : (prefersDark ? 'dark' : 'light');

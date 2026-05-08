@@ -130,27 +130,26 @@ export default function AnalyticsPage() {
     if (!patients) return <div className="p-10 text-center">Caricamento Analisi...</div>;
 
     return (
+        // @Codex WUL-229 — analytics surfaces re-skinned to vitreous tier with MediFlow palette
         <div className="space-y-8">
-            {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/" className="p-2 hover:bg-white rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600" />
+                <Link href="/" className="mf-btn-secondary !p-2 !rounded-full" aria-label="Torna alla home">
+                    <ArrowLeft className="w-5 h-5" />
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Cruscotto Clinico</h1>
-                    <p className="text-gray-500">Analisi avanzata popolazione e patologie</p>
+                    <h1 className="text-3xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Cruscotto Clinico</h1>
+                    <p style={{ color: 'var(--mf-muted)' }}>Analisi avanzata popolazione e patologie</p>
                 </div>
             </div>
 
-            {/* Filters Bar */}
-            <div className="glass-panel p-6 flex flex-col md:flex-row gap-8 items-center">
-                <div className="flex items-center gap-2 text-gray-700 font-bold">
-                    <Filter className="w-5 h-5 text-blue-600" />
+            <div className="mf-section flex flex-col md:flex-row gap-8 items-center">
+                <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--mf-ink)' }}>
+                    <Filter className="w-5 h-5" style={{ color: 'var(--mf-primary)' }} />
                     Filtri Popolazione
                 </div>
 
                 <div className="flex-1 w-full md:w-auto">
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Filtra per Età: {ageRange[0]} - {ageRange[1]} anni</label>
+                    <label className="mf-eyebrow mb-1 block">Filtra per Età: {ageRange[0]} - {ageRange[1]} anni</label>
                     <div className="flex gap-4 items-center">
                         <input
                             type="range"
@@ -159,7 +158,8 @@ export default function AnalyticsPage() {
                             aria-label="Età minima"
                             value={ageRange[0]}
                             onChange={(e) => setAgeRange([parseInt(e.target.value), ageRange[1]])}
-                            className="w-full accent-blue-600"
+                            className="w-full"
+                            style={{ accentColor: 'var(--mf-primary)' }}
                         />
                         <input
                             type="range"
@@ -168,22 +168,30 @@ export default function AnalyticsPage() {
                             aria-label="Età massima"
                             value={ageRange[1]}
                             onChange={(e) => setAgeRange([ageRange[0], parseInt(e.target.value)])}
-                            className="w-full accent-blue-600"
+                            className="w-full"
+                            style={{ accentColor: 'var(--mf-primary)' }}
                         />
                     </div>
                 </div>
 
-                <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-mono text-sm">
+                <div
+                    className="px-4 py-2 rounded-full font-mono text-sm"
+                    style={{
+                        background: 'rgba(15, 123, 104, 0.12)',
+                        color: 'var(--mf-primary)',
+                        border: '1px solid rgba(15, 123, 104, 0.22)'
+                    }}
+                >
                     {stats?.total} Pazienti Selezionati
                 </div>
 
                 <div className="w-full md:w-auto">
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Finestra Audit</label>
+                    <label className="mf-eyebrow mb-1 block">Finestra Audit</label>
                     <select
                         aria-label="Finestra audit"
                         value={auditDays}
                         onChange={(event) => setAuditDays(Number(event.target.value))}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
+                        className="mf-input mf-input-sm appearance-none cursor-pointer"
                     >
                         <option value={7}>Ultimi 7 giorni</option>
                         <option value={30}>Ultimi 30 giorni</option>
@@ -192,109 +200,135 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-panel p-6 border-l-4 border-l-blue-500">
+                <div
+                    className="mf-section border-l-[3px]"
+                    style={{ borderLeftColor: 'var(--mf-primary)' }}
+                >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Presa in Carico</p>
-                            <h3 className="text-3xl font-bold text-gray-800 mt-1">{stats?.takenInCharge}</h3>
+                            <p className="mf-eyebrow">Presa in Carico</p>
+                            <h3 className="text-3xl font-semibold mt-1" style={{ color: 'var(--mf-ink)' }}>{stats?.takenInCharge}</h3>
                         </div>
-                        <Users className="w-8 h-8 text-blue-200" />
+                        <Users className="w-7 h-7" style={{ color: 'rgba(15, 123, 104, 0.4)' }} />
                     </div>
-                    <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="mt-4 w-full rounded-full h-1.5 overflow-hidden" style={{ background: 'rgba(112, 106, 100, 0.18)' }}>
                         <div
-                            className="bg-blue-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
-                            style={{ '--prog-width': `${(stats?.takenInCharge || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
+                            className="h-full transition-all duration-1000 w-[var(--prog-width)]"
+                            style={{
+                                '--prog-width': `${(stats?.takenInCharge || 0) / (stats?.total || 1) * 100}%`,
+                                background: 'linear-gradient(90deg, var(--mf-primary), #2aa37e)'
+                            } as React.CSSProperties}
                         ></div>
                     </div>
-                    <p className="text-xs text-blue-600 mt-2 font-medium">
+                    <p className="text-xs mt-2 font-medium" style={{ color: 'var(--mf-primary)' }}>
                         {Math.round(((stats?.takenInCharge || 0) / (stats?.total || 1)) * 100)}% del totale
                     </p>
                 </div>
 
-                <div className="glass-panel p-6 border-l-4 border-l-orange-500">
+                <div
+                    className="mf-section border-l-[3px]"
+                    style={{ borderLeftColor: 'var(--mf-warning)' }}
+                >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Estemporanei</p>
-                            <h3 className="text-3xl font-bold text-gray-800 mt-1">{stats?.extemp}</h3>
+                            <p className="mf-eyebrow">Estemporanei</p>
+                            <h3 className="text-3xl font-semibold mt-1" style={{ color: 'var(--mf-ink)' }}>{stats?.extemp}</h3>
                         </div>
-                        <Activity className="w-8 h-8 text-orange-200" />
+                        <Activity className="w-7 h-7" style={{ color: 'rgba(202, 138, 4, 0.5)' }} />
                     </div>
-                    <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="mt-4 w-full rounded-full h-1.5 overflow-hidden" style={{ background: 'rgba(112, 106, 100, 0.18)' }}>
                         <div
-                            className="bg-orange-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
-                            style={{ '--prog-width': `${(stats?.extemp || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
+                            className="h-full transition-all duration-1000 w-[var(--prog-width)]"
+                            style={{
+                                '--prog-width': `${(stats?.extemp || 0) / (stats?.total || 1) * 100}%`,
+                                background: 'linear-gradient(90deg, var(--mf-warning), #d8a13a)'
+                            } as React.CSSProperties}
                         ></div>
                     </div>
                 </div>
 
-                <div className="glass-panel p-6 border-l-4 border-l-purple-500">
+                <div
+                    className="mf-section border-l-[3px]"
+                    style={{ borderLeftColor: 'var(--mf-plum)' }}
+                >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Top Patologia</p>
-                            <h3 className="text-xl font-bold text-gray-800 mt-1 truncate max-w-[200px]" title={stats?.topPathologies[0]?.desc}>
+                            <p className="mf-eyebrow">Top Patologia</p>
+                            <h3 className="text-xl font-semibold mt-1 truncate max-w-[200px]" title={stats?.topPathologies[0]?.desc} style={{ color: 'var(--mf-ink)' }}>
                                 {stats?.topPathologies[0]?.desc || 'N/A'}
                             </h3>
                         </div>
-                        <Activity className="w-8 h-8 text-purple-200" />
+                        <Activity className="w-7 h-7" style={{ color: 'rgba(94, 53, 95, 0.45)' }} />
                     </div>
-                    <p className="text-xs text-purple-600 mt-2 font-medium">
+                    <p className="text-xs mt-2 font-medium" style={{ color: 'var(--mf-plum)' }}>
                         {stats?.topPathologies[0]?.count || 0} casi registrati
                     </p>
                 </div>
             </div>
 
-            <div className="glass-panel p-6 space-y-6">
+            <div className="mf-section space-y-6">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                        <h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--mf-ink)' }}>
+                            <ShieldCheck className="w-5 h-5" style={{ color: 'var(--mf-success)' }} />
                             Audit Operativo
                         </h3>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>
                             KPI PHI-safe sugli ultimi {auditDays} giorni da `audit_events`.
                         </p>
                     </div>
                 </div>
 
                 {auditLoading ? (
-                    <div className="rounded-xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500">Caricamento riepilogo audit...</div>
+                    <div className="mf-section mf-section-tight text-sm" style={{ color: 'var(--mf-muted)' }}>Caricamento riepilogo audit...</div>
                 ) : auditError ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 flex items-start gap-2">
+                    <div className="mf-alert mf-alert-warning">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{auditError}</span>
                     </div>
                 ) : auditSummary ? (
                     <>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Eventi Totali</p>
-                                <p className="mt-2 text-3xl font-bold text-emerald-950">{auditSummary.totalEvents}</p>
+                            <div
+                                className="rounded-2xl p-4"
+                                style={{ background: 'rgba(15, 123, 104, 0.08)', border: '1px solid rgba(15, 123, 104, 0.18)' }}
+                            >
+                                <p className="mf-eyebrow" style={{ color: 'var(--mf-primary)' }}>Eventi Totali</p>
+                                <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--mf-ink)' }}>{auditSummary.totalEvents}</p>
                             </div>
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Failure + Denied</p>
-                                <p className="mt-2 text-3xl font-bold text-amber-950">
+                            <div
+                                className="rounded-2xl p-4"
+                                style={{ background: 'rgba(202, 138, 4, 0.1)', border: '1px solid rgba(202, 138, 4, 0.2)' }}
+                            >
+                                <p className="mf-eyebrow" style={{ color: 'var(--mf-warning)' }}>Failure + Denied</p>
+                                <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--mf-ink)' }}>
                                     {auditSummary.outcomes.failure + auditSummary.outcomes.denied}
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Attori Distinti</p>
-                                <p className="mt-2 text-3xl font-bold text-sky-950">{auditSummary.distinctActors}</p>
+                            <div
+                                className="rounded-2xl p-4"
+                                style={{ background: 'rgba(15, 123, 104, 0.06)', border: '1px solid rgba(15, 123, 104, 0.16)' }}
+                            >
+                                <p className="mf-eyebrow" style={{ color: 'var(--mf-primary)' }}>Attori Distinti</p>
+                                <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--mf-ink)' }}>{auditSummary.distinctActors}</p>
                             </div>
-                            <div className="rounded-2xl border border-violet-100 bg-violet-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Evento Top</p>
-                                <p className="mt-2 text-sm font-semibold text-violet-950">
+                            <div
+                                className="rounded-2xl p-4"
+                                style={{ background: 'rgba(94, 53, 95, 0.1)', border: '1px solid rgba(94, 53, 95, 0.2)' }}
+                            >
+                                <p className="mf-eyebrow" style={{ color: 'var(--mf-plum)' }}>Evento Top</p>
+                                <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>
                                     {auditSummary.topEventTypes[0]?.eventType ?? 'Nessuno'}
                                 </p>
-                                <p className="mt-1 text-xs text-violet-700">
+                                <p className="mt-1 text-xs" style={{ color: 'var(--mf-plum)' }}>
                                     {auditSummary.topEventTypes[0]?.count ?? 0} occorrenze
                                 </p>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-gray-200 bg-white/80 p-4 text-sm text-gray-600">
-                            <p className="font-semibold text-gray-800">Distribuzione</p>
+                        <div className="mf-section mf-section-tight text-sm" style={{ color: 'var(--mf-muted)' }}>
+                            <p className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Distribuzione</p>
                             <div className="mt-3 flex flex-wrap gap-4">
                                 <span>Success: <strong>{auditSummary.outcomes.success}</strong></span>
                                 <span>Failure: <strong>{auditSummary.outcomes.failure}</strong></span>
@@ -302,7 +336,7 @@ export default function AnalyticsPage() {
                                 <span>Web/API/Native: <strong>{auditSummary.sourceSurfaces.web}/{auditSummary.sourceSurfaces.api}/{auditSummary.sourceSurfaces.native}</strong></span>
                             </div>
                             {auditSummary.isTruncated && (
-                                <p className="mt-3 text-xs text-amber-700">
+                                <p className="mt-3 text-xs" style={{ color: 'var(--mf-warning)' }}>
                                     Riepilogo basato su un campione locale limitato agli ultimi 500 eventi filtrati.
                                 </p>
                             )}
@@ -311,13 +345,10 @@ export default function AnalyticsPage() {
                 ) : null}
             </div>
 
-            {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                {/* Age Distribution */}
-                <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-gray-400" />
+                <div className="mf-section">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--mf-ink)' }}>
+                        <Clock className="w-5 h-5" style={{ color: 'var(--mf-muted)' }} />
                         Distribuzione Età
                     </h3>
 
@@ -325,13 +356,16 @@ export default function AnalyticsPage() {
                         {Object.entries(stats?.ageDist || {}).map(([range, count]) => (
                             <div key={range}>
                                 <div className="flex justify-between text-sm mb-1">
-                                    <span className="font-medium text-gray-600">{range} anni</span>
-                                    <span className="font-bold text-gray-800">{count}</span>
+                                    <span className="font-medium" style={{ color: 'var(--mf-muted)' }}>{range} anni</span>
+                                    <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{count}</span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3">
+                                <div className="w-full rounded-full h-3" style={{ background: 'rgba(112, 106, 100, 0.18)' }}>
                                     <div
-                                        className="bg-indigo-500 h-full rounded-full opacity-80 w-[var(--prog-width)]"
-                                        style={{ '--prog-width': `${(count / (stats?.total || 1)) * 100}%` } as React.CSSProperties}
+                                        className="h-full rounded-full w-[var(--prog-width)]"
+                                        style={{
+                                            '--prog-width': `${(count / (stats?.total || 1)) * 100}%`,
+                                            background: 'linear-gradient(90deg, var(--mf-plum), #7a4f7c)'
+                                        } as React.CSSProperties}
                                     ></div>
                                 </div>
                             </div>
@@ -339,33 +373,34 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                {/* Pathologies Ranking */}
-                <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-red-500" />
+                <div className="mf-section">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--mf-ink)' }}>
+                        <Activity className="w-5 h-5" style={{ color: 'var(--mf-critical)' }} />
                         Prevalenza Patologie (ICD-9/10)
                     </h3>
 
-                    <div className="space-y-3 h-64 overflow-y-auto pr-2">
+                    <div className="space-y-1 h-64 overflow-y-auto pr-2">
                         {stats?.topPathologies.map((path, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-50 last:border-0">
-                                <div className="w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-xs font-bold shrink-0">
+                            <div key={idx} className="mf-popover-row">
+                                <div
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                                    style={{ background: 'rgba(192, 57, 43, 0.12)', color: 'var(--mf-critical)' }}
+                                >
                                     {idx + 1}
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-800 truncate">{path.desc}</p>
+                                    <p className="text-sm font-medium truncate" style={{ color: 'var(--mf-ink)' }}>{path.desc}</p>
                                 </div>
-                                <div className="text-sm font-bold text-gray-600">
-                                    {path.count} <span className="text-[10px] text-gray-400 font-normal">casi</span>
+                                <div className="text-sm font-semibold" style={{ color: 'var(--mf-muted)' }}>
+                                    {path.count} <span className="text-[10px] font-normal" style={{ color: 'var(--mf-muted)' }}>casi</span>
                                 </div>
                             </div>
                         ))}
                         {stats?.topPathologies.length === 0 && (
-                            <p className="text-center text-gray-400 italic mt-10">Nessuna patologia codificata registrata.</p>
+                            <p className="text-center italic mt-10" style={{ color: 'var(--mf-muted)' }}>Nessuna patologia codificata registrata.</p>
                         )}
                     </div>
                 </div>
-
             </div>
         </div>
     );

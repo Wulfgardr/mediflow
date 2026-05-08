@@ -36,10 +36,17 @@ function ProgressBar({ progress }: { progress: number }) {
     }, [progress]);
 
     return (
-        <div className="mt-6 h-2 bg-gray-200 rounded-full overflow-hidden">
+        // @Codex WUL-229 — progress meter uses MediFlow palette
+        <div
+            className="mt-6 h-1.5 rounded-full overflow-hidden"
+            style={{ background: 'rgba(112, 106, 100, 0.18)' }}
+        >
             <div
                 ref={barRef}
-                className="h-full bg-blue-500 transition-all duration-500 ease-out"
+                className="h-full transition-all duration-500 ease-out"
+                style={{
+                    background: 'linear-gradient(90deg, var(--mf-primary), #2aa37e)'
+                }}
             />
         </div>
     );
@@ -70,24 +77,21 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     const currentQuestion = scale.questions[currentStep];
     const progress = ((currentStep + 1) / scale.questions.length) * 100;
 
-    const progressStyle = { width: `${progress}%` };
-
     return (
-        <div className="glass-panel max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[500px]">
-            {/* Header */}
-            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-indigo-100">
-                <h2 className="text-2xl font-bold text-gray-800">{scale.title}</h2>
-                <p className="text-gray-600 text-sm mt-1">{scale.description}</p>
+        // @Codex WUL-229 — scale engine canvas adopts vitreous tier and option-card primitives
+        <div className="mf-section max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[500px] !p-0">
+            <div className="p-6 graphite-divider">
+                <h2 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>{scale.title}</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--mf-muted)' }}>{scale.description}</p>
 
                 <ProgressBar progress={progress} />
-                <div className="text-right text-xs text-gray-500 mt-1">
+                <div className="text-right text-xs mt-2" style={{ color: 'var(--mf-muted)' }}>
                     Domanda {currentStep + 1} di {scale.questions.length}
                 </div>
             </div>
 
-            {/* Question Body */}
             <div className="flex-1 p-8 flex flex-col justify-center">
-                <h3 className="text-xl font-medium text-gray-800 mb-8 leading-relaxed">
+                <h3 className="text-xl font-medium mb-8 leading-relaxed" style={{ color: 'var(--mf-ink)' }}>
                     {currentQuestion.text}
                 </h3>
 
@@ -97,10 +101,8 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                             <button
                                 onClick={() => handleAnswer(currentQuestion.id, 1)}
                                 className={cn(
-                                    "p-6 rounded-2xl border-2 text-lg font-medium transition-all",
-                                    answers[currentQuestion.id] === 1
-                                        ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
-                                        : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                                    'mf-option-card !p-6 text-lg font-medium justify-center text-center',
+                                    answers[currentQuestion.id] === 1 && 'is-active'
                                 )}
                             >
                                 Sì / Corretto
@@ -108,11 +110,18 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                             <button
                                 onClick={() => handleAnswer(currentQuestion.id, 0)}
                                 className={cn(
-                                    "p-6 rounded-2xl border-2 text-lg font-medium transition-all",
-                                    answers[currentQuestion.id] === 0
-                                        ? "border-red-500 bg-red-50 text-red-700 shadow-md"
-                                        : "border-gray-200 hover:border-red-300 hover:bg-gray-50"
+                                    'mf-option-card !p-6 text-lg font-medium justify-center text-center',
+                                    answers[currentQuestion.id] === 0 && 'is-active'
                                 )}
+                                style={
+                                    answers[currentQuestion.id] === 0
+                                        ? {
+                                            borderColor: 'var(--mf-critical)',
+                                            background: 'rgba(192, 57, 43, 0.08)',
+                                            color: 'var(--mf-critical)'
+                                        }
+                                        : undefined
+                                }
                             >
                                 No / Errato
                             </button>
@@ -124,10 +133,8 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                             key={opt.label}
                             onClick={() => handleAnswer(currentQuestion.id, opt.value)}
                             className={cn(
-                                "w-full p-4 rounded-xl border text-left font-medium transition-all",
-                                answers[currentQuestion.id] === opt.value
-                                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                                    : "border-gray-200 hover:bg-gray-50"
+                                'mf-option-card w-full font-medium',
+                                answers[currentQuestion.id] === opt.value && 'is-active'
                             )}
                         >
                             {opt.label}
@@ -136,11 +143,10 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                 </div>
             </div>
 
-            {/* Footer Controls */}
-            <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+            <div className="p-6 graphite-divider flex justify-between items-center">
                 <button
                     onClick={onCancel}
-                    className="px-6 py-2 text-gray-500 hover:bg-gray-200/50 rounded-lg transition-colors"
+                    className="mf-btn-secondary"
                 >
                     Annulla
                 </button>
@@ -149,7 +155,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                     {currentStep > 0 && (
                         <button
                             onClick={() => setCurrentStep(prev => prev - 1)}
-                            className="px-6 py-2 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-white transition-colors"
+                            className="mf-btn-secondary"
                         >
                             Indietro
                         </button>
@@ -157,7 +163,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                     <button
                         onClick={handleNext}
                         disabled={answers[currentQuestion.id] === undefined}
-                        className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="ui-btn-primary px-8 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {currentStep === scale.questions.length - 1 ? 'Completa' : 'Avanti'}
                     </button>

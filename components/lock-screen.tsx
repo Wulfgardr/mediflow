@@ -55,20 +55,21 @@ export function LockScreen() {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-md transition-all duration-500">
-            <div className="w-full max-w-md p-8 space-y-6 bg-card border rounded-xl shadow-2xl animate-in fade-in zoom-in duration-300">
+        // @Codex WUL-229 — lock chrome adopts the specular tier (modal shell) and shared mf-input/btn primitives
+        <div className="mf-modal-backdrop">
+            <div className="mf-modal-shell w-full max-w-md p-8 space-y-6 animate-in fade-in zoom-in duration-300">
                 <div className="flex flex-col items-center space-y-2 text-center">
-                    <div className="p-4 bg-primary/10 rounded-full">
+                    <div className="p-4 rounded-full" style={{ backgroundColor: 'rgba(15, 123, 104, 0.12)' }}>
                         {requiresSetup ? (
-                            <ShieldCheck className="w-10 h-10 text-primary" />
+                            <ShieldCheck className="w-10 h-10" style={{ color: 'var(--mf-primary)' }} />
                         ) : (
-                            <Lock className="w-10 h-10 text-primary" />
+                            <Lock className="w-10 h-10" style={{ color: 'var(--mf-primary)' }} />
                         )}
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight">
+                    <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
                         {requiresSetup ? 'Crea il tuo PIN' : 'MediFlow Sicurezza'}
                     </h1>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>
                         {requiresSetup
                             ? 'Imposta un PIN di sicurezza per proteggere i dati dei pazienti.'
                             : 'Inserisci il tuo PIN per accedere.'}
@@ -82,7 +83,7 @@ export function LockScreen() {
                             placeholder="Inserisci PIN"
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
-                            className="flex h-12 w-full rounded-md border border-input bg-transparent px-3 py-1 text-center text-lg shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            className="mf-input text-center text-lg tracking-widest"
                             autoFocus
                         />
                     </div>
@@ -94,22 +95,24 @@ export function LockScreen() {
                                 placeholder="Conferma PIN"
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value)}
-                                className="flex h-12 w-full rounded-md border border-input bg-transparent px-3 py-1 text-center text-lg shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mf-input text-center text-lg tracking-widest"
                             />
                         </div>
                     )}
 
                     {(error || authErrorMessage) && (
-                        <div className="flex items-center justify-center space-x-2 text-sm text-destructive animate-pulse">
-                            <AlertCircle className="w-4 h-4" />
-                            <span>{error || authErrorMessage}</span>
+                        <div className="mf-alert mf-alert-critical text-center justify-center" role="alert">
+                            <span className="inline-flex items-center justify-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                <span>{error || authErrorMessage}</span>
+                            </span>
                         </div>
                     )}
 
                     <button
                         type="submit"
                         disabled={loading || !pin}
-                        className="inline-flex items-center justify-center w-full h-10 px-4 py-2 text-sm font-medium transition-colors rounded-md shadow bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        className="ui-btn-primary w-full h-12 px-4 text-sm font-semibold"
                     >
                         {loading ? (
                             <span className="animate-spin">⏳</span>

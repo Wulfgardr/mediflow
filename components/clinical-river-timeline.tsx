@@ -131,7 +131,7 @@ export function ClinicalRiverTimeline({
                                 <div className={`mt-2 h-full min-h-10 w-px ${presentation.line}`} />
                             ) : null}
                         </div>
-                        <article className="clinical-river-card rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-white/68 p-4 shadow-[0_12px_24px_rgba(35,27,22,0.05)] dark:bg-white/4">
+                        <article className="clinical-river-card rounded-[22px] border p-4">
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                     {presentation.label}

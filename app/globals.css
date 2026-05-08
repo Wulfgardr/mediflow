@@ -410,6 +410,111 @@ body {
   border-color: rgba(112, 106, 100, 0.12);
 }
 
+:root[data-ui-style='redesign'] .patient-liquid-workbench,
+:root[data-ui-style='redesign'] .patient-liquid-hero,
+:root[data-ui-style='redesign'] .patient-workbench-shell,
+:root[data-ui-style='redesign'] .patient-workbench-shell > *,
+:root[data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-style='redesign'] .case-lens-panel {
+  min-width: 0;
+}
+
+/* @Codex WUL-229 — Production workbench follows the liquid-glass dummy composition:
+   command chrome first, a dominant selected-patient lens, then the operational stream. */
+:root[data-ui-style='redesign'] .patient-liquid-commandbar {
+  border-radius: 28px;
+  background-color: var(--mf-tier-specular-bg);
+  border-color: var(--mf-tier-specular-border);
+  box-shadow: var(--mf-tier-specular-shadow);
+  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-commandbar > .glass-command-capsule {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-lens {
+  min-height: 20rem;
+  display: grid;
+  align-content: space-between;
+  background:
+    radial-gradient(circle at 82% 92%, rgba(94, 53, 95, 0.12), transparent 18rem),
+    radial-gradient(circle at 12% 8%, rgba(94, 199, 177, 0.16), transparent 16rem),
+    var(--mf-tier-vitreous-bg);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-lens::after {
+  content: "";
+  position: absolute;
+  right: -11%;
+  bottom: -38%;
+  width: min(34rem, 58vw);
+  height: 16rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(94, 199, 177, 0.18), rgba(94, 53, 95, 0.14));
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-name {
+  max-width: 11ch;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-signals {
+  display: grid;
+  align-content: start;
+  background-color: var(--mf-tier-vitreous-bg);
+  border-color: var(--mf-tier-vitreous-border);
+  box-shadow: var(--mf-tier-vitreous-shadow);
+  backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
+  -webkit-backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-signal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border-radius: 20px;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.44);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-signal span {
+  border-radius: 999px;
+  background: rgba(15, 123, 104, 0.1);
+  color: var(--mf-primary);
+  padding: 0.25rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+:root.dark[data-ui-style='redesign'] .patient-liquid-commandbar {
+  background-color: var(--mf-tier-specular-bg);
+  border-color: var(--mf-tier-specular-border);
+  box-shadow: var(--mf-tier-specular-shadow);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-liquid-lens {
+  background:
+    radial-gradient(circle at 82% 92%, rgba(94, 53, 95, 0.18), transparent 18rem),
+    radial-gradient(circle at 12% 8%, rgba(94, 199, 177, 0.12), transparent 16rem),
+    var(--mf-tier-vitreous-bg);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-liquid-signal {
+  background: rgba(255, 255, 255, 0.055);
+}
+
 :root[data-ui-style='redesign'] .clinical-stream-row {
   border-radius: 18px;
   padding: 1rem;
@@ -1184,4 +1289,879 @@ body {
   border-color: rgba(94, 199, 177, 0.36);
   background-color: rgba(94, 199, 177, 0.12);
   color: rgb(150, 224, 204);
+}
+
+/* @Codex WUL-229 — Liquid Glass tier system. Token-driven surface language
+   scoped to the official redesign shell.
+   Specular  = chrome (sidebar shell, mobile header, mobile bottom nav,
+                command capsule). High blur, inner-edge highlight.
+   Vitreous  = workspace (patient identity lens, case lens panel,
+                patient detail sections). Medium blur, soft inner highlight.
+   Crystalline = chips (apple-chip, graphite-chip). Inner highlight only.
+   Falls back to opaque variants under data-ui-reduce-transparency and @media print. */
+
+:root[data-ui-style='redesign'] {
+  --mf-tier-specular-bg: rgba(255, 252, 247, 0.74);
+  --mf-tier-specular-border: rgba(255, 255, 255, 0.6);
+  --mf-tier-specular-shadow:
+    0 18px 38px rgba(35, 27, 22, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 1px 0 0 rgba(255, 255, 255, 0.42),
+    inset -1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+  --mf-tier-specular-blur: 22px;
+  --mf-tier-specular-saturate: 1.06;
+
+  --mf-tier-vitreous-bg: rgba(255, 252, 247, 0.86);
+  --mf-tier-vitreous-border: rgba(112, 106, 100, 0.12);
+  --mf-tier-vitreous-shadow:
+    0 10px 22px rgba(35, 27, 22, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --mf-tier-vitreous-blur: 14px;
+  --mf-tier-vitreous-saturate: 1.02;
+
+  --mf-tier-crystalline-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --mf-focus-ring:
+    0 0 0 2px rgba(15, 123, 104, 0.42),
+    0 0 0 4px rgba(15, 123, 104, 0.16);
+}
+
+:root.dark[data-ui-style='redesign'] {
+  --mf-tier-specular-bg: rgba(28, 24, 27, 0.78);
+  --mf-tier-specular-border: rgba(255, 247, 240, 0.14);
+  --mf-tier-specular-shadow:
+    0 22px 42px rgba(6, 5, 7, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset -1px 0 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+
+  --mf-tier-vitreous-bg: rgba(26, 22, 26, 0.88);
+  --mf-tier-vitreous-border: rgba(255, 247, 240, 0.08);
+  --mf-tier-vitreous-shadow:
+    0 16px 30px rgba(6, 5, 7, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  --mf-tier-crystalline-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --mf-focus-ring:
+    0 0 0 2px rgba(94, 199, 177, 0.5),
+    0 0 0 4px rgba(94, 199, 177, 0.18);
+}
+
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] {
+  --mf-tier-specular-bg: rgba(255, 249, 240, 0.96);
+  --mf-tier-specular-border: rgba(105, 85, 72, 0.2);
+  --mf-tier-specular-shadow: 0 12px 24px rgba(35, 27, 22, 0.1);
+  --mf-tier-specular-blur: 0px;
+  --mf-tier-specular-saturate: 1;
+
+  --mf-tier-vitreous-bg: rgba(255, 249, 240, 0.96);
+  --mf-tier-vitreous-border: rgba(105, 85, 72, 0.18);
+  --mf-tier-vitreous-shadow: 0 8px 18px rgba(35, 27, 22, 0.06);
+  --mf-tier-vitreous-blur: 0px;
+  --mf-tier-vitreous-saturate: 1;
+
+  --mf-tier-crystalline-highlight: none;
+}
+
+:root.dark[data-ui-reduce-transparency='true'][data-ui-style='redesign'] {
+  --mf-tier-specular-bg: rgba(28, 23, 27, 0.96);
+  --mf-tier-specular-border: rgba(255, 247, 240, 0.16);
+  --mf-tier-specular-shadow: 0 14px 26px rgba(6, 5, 7, 0.42);
+
+  --mf-tier-vitreous-bg: rgba(28, 23, 27, 0.96);
+  --mf-tier-vitreous-border: rgba(255, 247, 240, 0.14);
+  --mf-tier-vitreous-shadow: 0 10px 22px rgba(6, 5, 7, 0.32);
+}
+
+/* Specular — chrome surfaces */
+:root[data-ui-style='redesign'] .mediflow-sidebar-shell,
+:root[data-ui-style='redesign'] .mediflow-mobile-header,
+:root[data-ui-style='redesign'] .glass-command-capsule {
+  background-color: var(--mf-tier-specular-bg);
+  border-color: var(--mf-tier-specular-border);
+  box-shadow: var(--mf-tier-specular-shadow);
+  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+}
+
+:root.dark[data-ui-style='redesign'] .mediflow-sidebar-shell,
+:root.dark[data-ui-style='redesign'] .mediflow-mobile-header,
+:root.dark[data-ui-style='redesign'] .glass-command-capsule {
+  background-color: var(--mf-tier-specular-bg);
+  border-color: var(--mf-tier-specular-border);
+  box-shadow: var(--mf-tier-specular-shadow);
+}
+
+:root[data-ui-style='redesign'] .mediflow-mobile-nav {
+  background-color: var(--mf-tier-specular-bg);
+  border-top-color: var(--mf-tier-specular-border);
+  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
+}
+
+:root.dark[data-ui-style='redesign'] .mediflow-mobile-nav {
+  background-color: var(--mf-tier-specular-bg);
+  border-top-color: var(--mf-tier-specular-border);
+}
+
+/* Vitreous — workspace surfaces */
+:root[data-ui-style='redesign'] .case-lens-panel,
+:root[data-ui-style='redesign'] .mediflow-vitreous-panel,
+:root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
+:root[data-ui-style='redesign'] .patient-identity-lens,
+:root[data-ui-style='redesign'] .patient-detail-section,
+:root[data-ui-style='redesign'] .patient-detail-side-section,
+:root[data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-style='redesign'] .clinical-river-card {
+  background-color: var(--mf-tier-vitreous-bg);
+  border-color: var(--mf-tier-vitreous-border);
+  box-shadow: var(--mf-tier-vitreous-shadow);
+}
+
+:root.dark[data-ui-style='redesign'] .case-lens-panel,
+:root.dark[data-ui-style='redesign'] .mediflow-vitreous-panel,
+:root.dark[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
+:root.dark[data-ui-style='redesign'] .patient-identity-lens,
+:root.dark[data-ui-style='redesign'] .patient-detail-section,
+:root.dark[data-ui-style='redesign'] .patient-detail-side-section,
+:root.dark[data-ui-style='redesign'] .patient-inbox-pane,
+:root.dark[data-ui-style='redesign'] .clinical-river-card {
+  background-color: var(--mf-tier-vitreous-bg);
+  border-color: var(--mf-tier-vitreous-border);
+  box-shadow: var(--mf-tier-vitreous-shadow);
+}
+
+:root[data-ui-style='redesign'] .case-lens-panel,
+:root[data-ui-style='redesign'] .mediflow-vitreous-panel,
+:root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
+:root[data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-style='redesign'] .clinical-river-card {
+  backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
+  -webkit-backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
+}
+
+/* Crystalline — chips */
+:root[data-ui-style='redesign'] .apple-chip,
+:root[data-ui-style='redesign'] .graphite-chip {
+  box-shadow: var(--mf-tier-crystalline-highlight);
+}
+
+/* Liquid Glass focus ring on interactive surfaces inside chrome / workspace */
+:root[data-ui-style='redesign'] .mediflow-sidebar-link:focus-visible,
+:root[data-ui-style='redesign'] .mediflow-mobile-link:focus-visible,
+:root[data-ui-style='redesign'] .siss-action-btn:focus-visible,
+:root[data-ui-style='redesign'] .graphite-mini-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring);
+}
+
+/* Reduce-transparency: hard-disable backdrop-filter on tier surfaces */
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-sidebar-shell,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-header,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-nav,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .glass-command-capsule,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-liquid-commandbar,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .case-lens-panel,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-panel,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-side-panel,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .clinical-river-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Print: opaque, no blur, no inner highlight */
+@media print {
+  :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
+  :root[data-ui-style='redesign'] .mediflow-mobile-header,
+  :root[data-ui-style='redesign'] .mediflow-mobile-nav,
+  :root[data-ui-style='redesign'] .glass-command-capsule,
+  :root[data-ui-style='redesign'] .patient-liquid-commandbar,
+  :root[data-ui-style='redesign'] .case-lens-panel,
+  :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
+  :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
+  :root[data-ui-style='redesign'] .patient-identity-lens,
+  :root[data-ui-style='redesign'] .patient-detail-section,
+  :root[data-ui-style='redesign'] .patient-detail-side-section,
+  :root[data-ui-style='redesign'] .patient-inbox-pane,
+  :root[data-ui-style='redesign'] .clinical-river-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: #fff !important;
+    box-shadow: none !important;
+  }
+}
+
+/* @Codex WUL-229 — Reusable liquid-glass primitives applied broadly to forms,
+   modals, dropdowns, secondary buttons and semantic alert blocks so individual
+   pages avoid hand-rolled bg-white/border-gray-* SaaS tokens. */
+
+.mf-input {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 106, 100, 0.18);
+  background-color: rgba(255, 252, 247, 0.78);
+  color: var(--mf-ink);
+  padding: 0.7rem 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.mf-input::placeholder {
+  color: var(--mf-muted);
+}
+
+.mf-input:hover:not(:disabled) {
+  border-color: rgba(15, 123, 104, 0.28);
+}
+
+.mf-input:focus,
+.mf-input:focus-visible {
+  border-color: rgba(15, 123, 104, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    var(--mf-focus-ring, 0 0 0 3px rgba(15, 123, 104, 0.18));
+  background-color: rgba(255, 252, 247, 0.92);
+}
+
+.mf-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mf-input-sm {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.84rem;
+  border-radius: 12px;
+}
+
+.mf-textarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 106, 100, 0.18);
+  background-color: rgba(255, 252, 247, 0.78);
+  color: var(--mf-ink);
+  padding: 0.7rem 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  min-height: 6rem;
+  resize: vertical;
+}
+
+:root.dark .mf-input {
+  border-color: rgba(255, 247, 240, 0.12);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--mf-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:root.dark .mf-input:hover:not(:disabled) {
+  border-color: rgba(94, 199, 177, 0.32);
+}
+
+:root.dark .mf-input:focus,
+:root.dark .mf-input:focus-visible {
+  border-color: rgba(94, 199, 177, 0.5);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+/* Secondary button — calm chrome companion to .ui-btn-primary */
+.mf-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 106, 100, 0.18);
+  background-color: rgba(255, 252, 247, 0.78);
+  color: var(--mf-ink);
+  padding: 0.55rem 1rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  cursor: pointer;
+}
+
+.mf-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(15, 123, 104, 0.32);
+  color: var(--mf-primary);
+  background-color: rgba(255, 252, 247, 0.96);
+}
+
+.mf-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.mf-btn-secondary:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    var(--mf-focus-ring, 0 0 0 3px rgba(15, 123, 104, 0.18));
+}
+
+.mf-btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+:root.dark .mf-btn-secondary {
+  border-color: rgba(255, 247, 240, 0.12);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--mf-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:root.dark .mf-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(94, 199, 177, 0.36);
+  color: rgb(150, 224, 204);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Vitreous section card — workspace block (forms, settings panels, lists) */
+.mf-section {
+  border-radius: var(--ui-card-radius);
+  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
+  background-color: var(--mf-tier-vitreous-bg, rgba(255, 252, 247, 0.86));
+  box-shadow: var(--mf-tier-vitreous-shadow, 0 10px 22px rgba(35, 27, 22, 0.06));
+  padding: 1.25rem 1.35rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.mf-section-tight {
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+}
+
+.mf-icon-disc {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 106, 100, 0.12);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 249, 240, 0.68));
+  color: var(--mf-primary);
+  box-shadow: 0 10px 22px rgba(35, 27, 22, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+:root.dark .mf-icon-disc {
+  border-color: rgba(255, 247, 240, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgb(150, 224, 204);
+}
+
+/* Specular shell — chrome for modals and floating sheets */
+.mf-modal-shell {
+  border-radius: 26px;
+  border: 1px solid var(--mf-tier-specular-border, rgba(255, 255, 255, 0.6));
+  background-color: var(--mf-tier-specular-bg, rgba(255, 252, 247, 0.74));
+  box-shadow: var(--mf-tier-specular-shadow, 0 18px 38px rgba(35, 27, 22, 0.1));
+  backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
+  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
+}
+
+.mf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: radial-gradient(circle at 50% 30%, rgba(35, 27, 22, 0.42), rgba(35, 27, 22, 0.62));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+:root.dark .mf-modal-backdrop {
+  background: radial-gradient(circle at 50% 30%, rgba(6, 5, 7, 0.6), rgba(6, 5, 7, 0.78));
+}
+
+/* Vitreous popover/dropdown — autocomplete suggestions, menus */
+.mf-popover {
+  border-radius: 18px;
+  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
+  background-color: var(--mf-tier-vitreous-bg, rgba(255, 252, 247, 0.92));
+  box-shadow: 0 22px 44px rgba(35, 27, 22, 0.16);
+  backdrop-filter: blur(20px) saturate(1.06);
+  -webkit-backdrop-filter: blur(20px) saturate(1.06);
+  padding: 0.35rem;
+  overflow: hidden;
+}
+
+:root.dark .mf-popover {
+  background-color: rgba(28, 24, 27, 0.94);
+  border-color: rgba(255, 247, 240, 0.1);
+  box-shadow: 0 26px 52px rgba(6, 5, 7, 0.5);
+}
+
+.mf-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--mf-ink);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.mf-popover-row:hover,
+.mf-popover-row[aria-selected='true'],
+.mf-popover-row.is-active {
+  background-color: rgba(15, 123, 104, 0.1);
+  color: var(--mf-primary);
+}
+
+:root.dark .mf-popover-row:hover,
+:root.dark .mf-popover-row[aria-selected='true'],
+:root.dark .mf-popover-row.is-active {
+  background-color: rgba(94, 199, 177, 0.12);
+  color: rgb(150, 224, 204);
+}
+
+/* Semantic alert blocks reused across diagnostics/SISS/import flows */
+.mf-alert {
+  border-radius: 16px;
+  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
+  background-color: var(--mf-tier-vitreous-bg, rgba(255, 252, 247, 0.86));
+  padding: 0.85rem 1rem;
+  color: var(--mf-ink);
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.mf-alert-info {
+  border-color: rgba(15, 123, 104, 0.22);
+  background-color: rgba(15, 123, 104, 0.07);
+  color: var(--mf-primary);
+}
+
+.mf-alert-success {
+  border-color: rgba(63, 122, 76, 0.26);
+  background-color: rgba(63, 122, 76, 0.08);
+  color: var(--mf-success);
+}
+
+.mf-alert-warning {
+  border-color: rgba(197, 138, 47, 0.28);
+  background-color: rgba(197, 138, 47, 0.1);
+  color: var(--mf-warning);
+}
+
+.mf-alert-critical {
+  border-color: rgba(163, 58, 47, 0.28);
+  background-color: rgba(163, 58, 47, 0.1);
+  color: var(--mf-critical);
+}
+
+:root.dark .mf-alert-info {
+  border-color: rgba(94, 199, 177, 0.36);
+  background-color: rgba(94, 199, 177, 0.1);
+  color: rgb(150, 224, 204);
+}
+
+:root.dark .mf-alert-success {
+  border-color: rgba(140, 210, 160, 0.32);
+  background-color: rgba(110, 190, 130, 0.1);
+  color: rgb(170, 220, 180);
+}
+
+:root.dark .mf-alert-warning {
+  border-color: rgba(232, 180, 96, 0.34);
+  background-color: rgba(232, 180, 96, 0.12);
+  color: rgb(240, 200, 130);
+}
+
+:root.dark .mf-alert-critical {
+  border-color: rgba(232, 130, 116, 0.34);
+  background-color: rgba(232, 110, 96, 0.12);
+  color: rgb(244, 170, 158);
+}
+
+/* Step indicator (used by onboarding wizard, multi-step flows). */
+.mf-step-pill {
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--mf-muted);
+  background-color: var(--ui-chip-bg, rgba(255, 252, 247, 0.78));
+  border: 1px solid var(--ui-chip-border, rgba(112, 106, 100, 0.14));
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.mf-step-pill.is-active,
+.mf-step-pill.is-complete {
+  color: white;
+  background: linear-gradient(135deg, var(--mf-primary), #0d5c53);
+  border-color: rgba(15, 123, 104, 0.32);
+  box-shadow: 0 12px 22px rgba(15, 123, 104, 0.22);
+}
+
+.mf-step-divider {
+  height: 2px;
+  width: 2rem;
+  border-radius: 999px;
+  background-color: var(--ui-chip-border, rgba(112, 106, 100, 0.18));
+  transition: background-color 180ms ease;
+}
+
+.mf-step-divider.is-complete {
+  background: linear-gradient(135deg, var(--mf-primary), #0d5c53);
+}
+
+/* Tabs styled like the dummy navigation pills (calmer than chrome buttons) */
+.mf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--mf-muted);
+  padding: 0.55rem 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  cursor: pointer;
+}
+
+.mf-tab:hover {
+  background-color: rgba(15, 123, 104, 0.08);
+  color: var(--mf-primary);
+}
+
+.mf-tab.is-active {
+  background-color: rgba(15, 123, 104, 0.12);
+  color: var(--mf-primary);
+  border-color: rgba(15, 123, 104, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+:root.dark .mf-tab.is-active {
+  background-color: rgba(94, 199, 177, 0.14);
+  color: rgb(150, 224, 204);
+  border-color: rgba(94, 199, 177, 0.3);
+}
+
+/* Soft option card — used by onboarding role choices, scale picker, etc. */
+.mf-option-card {
+  display: grid;
+  gap: 0.4rem;
+  border-radius: 18px;
+  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
+  background-color: var(--mf-tier-vitreous-bg, rgba(255, 252, 247, 0.82));
+  padding: 1rem 1.1rem;
+  text-align: left;
+  cursor: pointer;
+  color: var(--mf-ink);
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.mf-option-card:hover {
+  border-color: rgba(15, 123, 104, 0.32);
+  background-color: rgba(255, 252, 247, 0.96);
+}
+
+.mf-option-card.is-active {
+  border-color: rgba(15, 123, 104, 0.42);
+  background-color: rgba(15, 123, 104, 0.08);
+  box-shadow: 0 12px 22px rgba(15, 123, 104, 0.14);
+}
+
+:root.dark .mf-option-card {
+  border-color: rgba(255, 247, 240, 0.1);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+:root.dark .mf-option-card:hover {
+  border-color: rgba(94, 199, 177, 0.32);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+:root.dark .mf-option-card.is-active {
+  border-color: rgba(94, 199, 177, 0.46);
+  background-color: rgba(94, 199, 177, 0.12);
+}
+
+.mf-option-card:disabled,
+.mf-option-card[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Eyebrow / kicker used in vitreous panels */
+.mf-eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--mf-muted);
+}
+
+/* Small label/helper text inside forms */
+.mf-field-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mf-muted);
+  margin-bottom: 0.35rem;
+}
+
+.mf-field-helper {
+  font-size: 0.74rem;
+  color: var(--mf-muted);
+  margin-top: 0.3rem;
+}
+
+.mf-field-error {
+  font-size: 0.74rem;
+  color: var(--mf-critical);
+  margin-top: 0.3rem;
+}
+
+/* @Codex WUL-229 — tone modifiers re-skin .ui-btn-primary into MediFlow-tinted CTAs */
+.ui-btn-primary.mf-tone-success {
+  background: linear-gradient(135deg, #1e8d6c, #156d54 58%, #0f5b46);
+  box-shadow: 0 16px 30px rgba(30, 141, 108, 0.22);
+}
+
+.ui-btn-primary.mf-tone-warning {
+  background: linear-gradient(135deg, #d8a13a, #b07a1d 58%, #8a5e10);
+  box-shadow: 0 16px 30px rgba(176, 122, 29, 0.22);
+  color: #fffbf2;
+}
+
+.ui-btn-primary.mf-tone-plum {
+  background: linear-gradient(135deg, #7a4f7c, #5e3560 58%, #45264a);
+  box-shadow: 0 16px 30px rgba(94, 53, 96, 0.22);
+}
+
+.ui-btn-primary.mf-tone-critical {
+  background: linear-gradient(135deg, #c0463b, #a13127 58%, #7d231b);
+  box-shadow: 0 16px 30px rgba(192, 70, 59, 0.24);
+}
+
+:root.dark .ui-btn-primary.mf-tone-success {
+  background: linear-gradient(135deg, #2aa37e, #178565 58%, #0f6c50);
+}
+
+/* @Codex WUL-229 — make the real patient workbench unmistakably match the dummy.
+   Earlier redesign rules flattened these surfaces too much; this pass restores
+   glass depth, large focal lenses and carded streams on the two primary views. */
+:root[data-ui-style='redesign'] .patient-liquid-workbench {
+  isolation: isolate;
+  position: relative;
+  display: grid;
+  gap: 1.25rem;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-workbench::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(15, 123, 104, 0.08) 18% 19%, transparent 19% 100%),
+    linear-gradient(64deg, transparent 0 58%, rgba(94, 53, 95, 0.08) 58% 59%, transparent 59% 100%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95), transparent 86%);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-commandbar {
+  position: sticky;
+  top: 1rem;
+  z-index: 20;
+  border-radius: 34px;
+  padding: 0.7rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(255, 249, 240, 0.34)),
+    var(--mf-tier-specular-bg);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 28px 72px rgba(35, 27, 22, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -1px 0 rgba(112, 106, 100, 0.08);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-hero {
+  min-height: min(58vh, 35rem);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-lens {
+  min-height: clamp(25rem, 50vh, 36rem);
+  border-radius: 46px;
+  padding: clamp(1.5rem, 4vw, 3.25rem);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 42%),
+    radial-gradient(ellipse at 78% 78%, rgba(94, 53, 95, 0.22), transparent 22rem),
+    radial-gradient(ellipse at 8% 4%, rgba(94, 199, 177, 0.24), transparent 20rem),
+    radial-gradient(ellipse at 64% 8%, rgba(182, 106, 60, 0.16), transparent 18rem),
+    rgba(255, 252, 247, 0.7);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 34px 90px rgba(35, 27, 22, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    inset 0 -1px 0 rgba(112, 106, 100, 0.08);
+  backdrop-filter: blur(28px) saturate(1.1);
+  -webkit-backdrop-filter: blur(28px) saturate(1.1);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-lens::after {
+  right: -8%;
+  bottom: -18%;
+  width: min(42rem, 62vw);
+  height: 19rem;
+  background:
+    linear-gradient(135deg, rgba(94, 199, 177, 0.26), rgba(94, 53, 95, 0.2) 54%, rgba(182, 106, 60, 0.14));
+  filter: blur(1px);
+  opacity: 0.9;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-name {
+  max-width: 12ch;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-chip-row .graphite-chip {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-signals,
+:root[data-ui-style='redesign'] .patient-inbox-pane,
+:root[data-ui-style='redesign'] .case-lens-panel,
+:root[data-ui-style='redesign'] .patient-identity-lens,
+:root[data-ui-style='redesign'] .patient-detail-section,
+:root[data-ui-style='redesign'] .patient-detail-side-section,
+:root[data-ui-style='redesign'] .patient-actions-dock,
+:root[data-ui-style='redesign'] .patient-ai-insight-panel {
+  border-radius: 34px;
+  border-color: rgba(255, 255, 255, 0.58);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.44), rgba(255, 249, 240, 0.28)),
+    var(--mf-tier-vitreous-bg);
+  box-shadow:
+    0 24px 64px rgba(35, 27, 22, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(24px) saturate(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(1.08);
+}
+
+:root[data-ui-style='redesign'] .patient-workbench-shell {
+  gap: 1.25rem;
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-stream-shell {
+  border-radius: 30px;
+  border-color: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 252, 247, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(18px) saturate(1.04);
+  -webkit-backdrop-filter: blur(18px) saturate(1.04);
+}
+
+:root[data-ui-style='redesign'] .patient-liquid-stream {
+  padding: 0.15rem;
+}
+
+:root[data-ui-style='redesign'] .clinical-stream-row-mailbox {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 249, 240, 0.28)),
+    rgba(255, 252, 247, 0.72);
+  box-shadow:
+    0 14px 34px rgba(35, 27, 22, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+:root[data-ui-style='redesign'] .patient-identity-lens {
+  min-height: 20rem;
+  padding: clamp(1.5rem, 3.5vw, 2.6rem);
+}
+
+:root[data-ui-style='redesign'] .patient-identity-lens::after {
+  content: "";
+  position: absolute;
+  right: -10%;
+  top: -22%;
+  width: min(34rem, 58vw);
+  height: 18rem;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(94, 199, 177, 0.2), rgba(94, 53, 95, 0.16));
+  filter: blur(2px);
+}
+
+:root[data-ui-style='redesign'] .identity-lens-pane,
+:root[data-ui-style='redesign'] .patient-diagnosis-card,
+:root[data-ui-style='redesign'] .patient-quick-context-card,
+:root[data-ui-style='redesign'] .clinical-river-card,
+:root[data-ui-style='redesign'] .evidence-stack-tile,
+:root[data-ui-style='redesign'] .apple-list-row {
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+:root.dark[data-ui-style='redesign'] .patient-liquid-commandbar,
+:root.dark[data-ui-style='redesign'] .patient-liquid-lens,
+:root.dark[data-ui-style='redesign'] .patient-liquid-signals,
+:root.dark[data-ui-style='redesign'] .patient-inbox-pane,
+:root.dark[data-ui-style='redesign'] .case-lens-panel,
+:root.dark[data-ui-style='redesign'] .patient-identity-lens,
+:root.dark[data-ui-style='redesign'] .patient-detail-section,
+:root.dark[data-ui-style='redesign'] .patient-detail-side-section,
+:root.dark[data-ui-style='redesign'] .patient-actions-dock,
+:root.dark[data-ui-style='redesign'] .patient-ai-insight-panel {
+  border-color: rgba(255, 247, 240, 0.12);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 247, 240, 0.03)),
+    rgba(28, 24, 27, 0.74);
+  box-shadow:
+    0 28px 68px rgba(6, 5, 7, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root.dark[data-ui-style='redesign'] .clinical-stream-row-mailbox,
+:root.dark[data-ui-style='redesign'] .patient-liquid-stream-shell,
+:root.dark[data-ui-style='redesign'] .identity-lens-pane,
+:root.dark[data-ui-style='redesign'] .patient-diagnosis-card,
+:root.dark[data-ui-style='redesign'] .patient-quick-context-card,
+:root.dark[data-ui-style='redesign'] .clinical-river-card,
+:root.dark[data-ui-style='redesign'] .evidence-stack-tile,
+:root.dark[data-ui-style='redesign'] .apple-list-row {
+  border-color: rgba(255, 247, 240, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+:root.dark .ui-btn-primary.mf-tone-warning {
+  background: linear-gradient(135deg, #e7b14f, #c08a2e 58%, #946918);
+}
+
+:root.dark .ui-btn-primary.mf-tone-plum {
+  background: linear-gradient(135deg, #a47ca6, #74557a 58%, #4f3357);
 }

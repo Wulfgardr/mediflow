@@ -5,7 +5,7 @@ import Link from 'next/link';
 /* @Codex */
 import { usePathname } from 'next/navigation';
 /* @Codex */
-import { Activity, BarChart3, LayoutDashboard, Settings, Sparkles, Users } from 'lucide-react';
+import { Activity, BarChart3, LayoutDashboard, Settings, Users } from 'lucide-react';
 /* @Codex */
 import { ThemeToggle } from '@/components/theme-toggle';
 /* @Codex */
@@ -24,7 +24,6 @@ const MOBILE_LINKS: Array<{ href: string; name: string; icon: typeof Users; matc
 /* @Codex */
 const MOBILE_SECONDARY_LINKS: Array<{ href: string; label: string; icon: typeof Users }> = [
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/assistant', label: 'Assistant', icon: Sparkles },
 ];
 
 /* @Codex */

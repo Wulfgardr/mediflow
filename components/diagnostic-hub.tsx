@@ -123,7 +123,7 @@ export default function DiagnosticHub() {
     };
 
     return (
-        <div className="glass-panel p-6 md:p-7 space-y-6">
+        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <p className="section-kicker">Controlli runtime</p>

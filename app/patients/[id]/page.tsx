@@ -208,7 +208,6 @@ export default function PatientDetailPage() {
     return (
         <div className="space-y-4">
             <PatientIdentityLens
-                variant="reader"
                 patient={patient}
                 ageLabel={ageLabel}
                 birthDateLabel={birthDateLabel}
@@ -229,7 +228,7 @@ export default function PatientDetailPage() {
 
                     <SissHandoffDiary patientId={id} />
 
-                    <section className="patient-detail-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
+                    <section className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Timeline</p>
@@ -257,7 +256,7 @@ export default function PatientDetailPage() {
 
                     <ProstheticPrescriptionManager patientId={id} />
 
-                    <section className="patient-detail-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
+                    <section className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Diario clinico</p>
@@ -275,7 +274,7 @@ export default function PatientDetailPage() {
                 <div className="space-y-4">
                     <AIPatientInsight patient={patient} />
 
-                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
+                    <section className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Evidence Stack</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -301,7 +300,7 @@ export default function PatientDetailPage() {
                     <PatientSmartImportPanel patient={patient} entries={entries} />
                     <DocumentInsightsPanel patient={patient} />
 
-                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
+                    <section className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Strumenti di scheda</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
@@ -332,7 +331,7 @@ export default function PatientDetailPage() {
                         </div>
                     </section>
 
-                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
+                    <section className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Archivio paziente</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Documenti e referti</h3>
@@ -340,7 +339,7 @@ export default function PatientDetailPage() {
                         <DocumentUpload patientId={id} />
                     </section>
 
-                    <section className="patient-detail-side-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5">
+                    <section className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Pianificazione</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">

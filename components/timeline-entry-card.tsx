@@ -35,19 +35,19 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
     if (!attachments?.length) return null;
 
     return (
-        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
             {attachments.map(file => (
                 <button
                     key={file.id}
                     onClick={() => onView(file)}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 dark:bg-white/5 dark:border-white/10 dark:hover:bg-blue-500/10 dark:hover:border-blue-400/30 dark:hover:text-blue-200 transition-all text-left group"
+                    className="mf-option-card !flex !grid-cols-none items-center gap-2 !rounded-[14px] !p-2 text-left"
                 >
-                    <div className="p-1.5 bg-white rounded border border-gray-100 group-hover:border-blue-100 text-gray-400 group-hover:text-blue-500 dark:bg-white/10 dark:border-white/10 dark:group-hover:border-blue-400/40 dark:group-hover:text-blue-300">
+                    <div className="mf-icon-disc h-7 w-7 !rounded-[10px]">
                         <Paperclip className="w-3 h-3" />
                     </div>
                     <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold truncate">{file.name}</p>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500">{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--mf-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
                     </div>
                 </button>
             ))}
@@ -69,24 +69,24 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
     return (
         <div className={`relative pl-8 ${isDeleted ? 'opacity-60 grayscale' : ''}`}>
             {/* Dot */}
-            <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white dark:border-[color:var(--mf-bg)] ${isDeleted ? 'bg-red-400' : 'bg-indigo-600 dark:bg-indigo-400'}`}></div>
+            <div className={`absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-[color:var(--mf-bg)] ${isDeleted ? 'bg-[color:var(--mf-critical)]' : 'bg-[color:var(--mf-primary)]'}`}></div>
 
             {/* Content */}
-            <div className={`bg-white rounded-2xl p-5 shadow-sm border dark:bg-white/[0.04] dark:shadow-[0_10px_24px_rgba(0,0,0,0.32)] ${isDeleted ? 'border-red-100 bg-red-50/30 dark:border-red-400/25 dark:bg-red-500/10' : 'border-gray-100 dark:border-white/10'}`}>
+            <div className={`mf-section p-5 ${isDeleted ? 'border-[color:rgba(163,58,47,0.26)] bg-[color:rgba(163,58,47,0.08)]' : ''}`}>
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
-                        <div className={`p-1.5 rounded-lg ${isDeleted ? 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300' : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300'}`}>
+                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--mf-critical)]' : ''}`}>
                             <Icon className="w-4 h-4" />
                         </div>
                         <div>
-                            <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 block">
+                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--mf-critical)' : 'var(--mf-primary)' }}>
                                 {TYPE_LABELS[entry.type] || entry.type}
-                                {entry.patientName && <span className="text-gray-400 dark:text-gray-500 font-normal normal-case ml-1"> - {entry.patientName}</span>}
+                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--mf-muted)' }}> - {entry.patientName}</span>}
                             </span>
-                            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--mf-muted)' }}>
                                 <span>{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
                                 {entry.setting && (
-                                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${entry.setting === 'home' ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-400/30 dark:text-amber-200' : 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-400/30 dark:text-emerald-200'}`}>
+                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--mf-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--mf-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
                                         {entry.setting === 'home' ? 'Dom' : 'Amb'}
                                     </span>
@@ -101,7 +101,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onRestore && (
                                 <button
                                     onClick={() => onRestore(entry)}
-                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors dark:text-green-400 dark:hover:bg-green-500/10"
+                                    className="mf-btn-secondary !p-1.5 !text-[color:var(--mf-success)]"
                                     title="Ripristina"
                                 >
                                     <Undo className="w-4 h-4" />
@@ -111,7 +111,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onDelete && (
                                 <button
                                     onClick={() => onDelete(entry)}
-                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:text-gray-500 dark:hover:text-red-300 dark:hover:bg-red-500/10"
+                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--mf-critical)]"
                                     title="Elimina con motivazione"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -123,7 +123,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
 
                 {/* Deleted Reason Banner */}
                 {isDeleted && (
-                    <div className="mb-3 p-2 bg-red-100 rounded-lg text-xs text-red-800 flex items-start gap-2 border border-red-200 dark:bg-red-500/10 dark:text-red-200 dark:border-red-400/30">
+                    <div className="mf-alert mf-alert-critical mb-3 !flex items-start gap-2 text-xs">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                         <div>
                             <span className="font-bold">ELIMINATO: </span>
@@ -137,7 +137,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                 )}
 
                 {/* Main Text Content */}
-                <div className="text-gray-600 dark:text-gray-300">
+                <div style={{ color: 'var(--mf-ink)' }}>
                     <PrivacyBlur>
                         {/* @Codex */}
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
@@ -151,14 +151,14 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
 
                 {/* Scale Metadata Viz */}
                 {entry.metadata?.score !== undefined && (
-                    <div className="mt-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between dark:bg-blue-500/10 dark:border-blue-400/25">
+                    <div className="mf-alert mf-alert-info mt-3 !flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-blue-800 font-bold uppercase dark:text-blue-200">{entry.metadata.title as string}</p>
-                            <div className="text-sm text-blue-900 font-medium dark:text-blue-100">
+                            <p className="text-xs font-bold uppercase">{entry.metadata.title as string}</p>
+                            <div className="text-sm font-medium">
                                 <PrivacyBlur>{entry.metadata.interpretation as string}</PrivacyBlur>
                             </div>
                         </div>
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
+                        <div className="text-2xl font-bold">
                             {entry.metadata.score as number}
                         </div>
                     </div>

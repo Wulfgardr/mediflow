@@ -79,7 +79,7 @@ export default function BackupRestoreUI() {
 
     return (
         <div className="grid gap-6 xl:grid-cols-2">
-            <div className="glass-panel p-6 md:p-7">
+            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Download className="w-5 h-5 text-blue-500" />
@@ -100,7 +100,7 @@ export default function BackupRestoreUI() {
                 </button>
             </div>
 
-            <div className="glass-panel p-6 md:p-7">
+            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
                 <p className="section-kicker">Ripristino controllato</p>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Upload className="w-5 h-5 text-amber-500" />

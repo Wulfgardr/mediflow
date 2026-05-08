@@ -148,55 +148,54 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
 
     const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
 
+    // @Codex WUL-229 — model selector tones now lean on MediFlow tokens (teal/plum) instead of raw tailwind palettes
     const colorClasses = {
         emerald: {
-            iconBg: 'bg-emerald-100/90 dark:bg-emerald-500/15',
-            iconText: 'text-emerald-600 dark:text-emerald-200',
-            title: 'text-emerald-950 dark:text-emerald-100',
-            description: 'text-emerald-900/65 dark:text-emerald-100/70',
-            selectedCard: 'border-emerald-300/80 bg-emerald-50/70 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10',
-            selectedRadio: 'border-emerald-600 bg-emerald-600 dark:border-emerald-300 dark:bg-emerald-300',
-            selectedDot: 'bg-white dark:bg-emerald-950',
-            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
-            downloadBadge: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200 dark:hover:bg-sky-900/20',
-            progress: 'from-emerald-500 to-sky-500',
+            iconStyle: { background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' },
+            titleStyle: { color: 'var(--mf-ink)' },
+            descriptionStyle: { color: 'var(--mf-muted)' },
+            selectedCardStyle: { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)', boxShadow: '0 14px 28px rgba(15, 123, 104, 0.14)' },
+            selectedRadio: 'mf-radio-primary',
+            selectedDot: 'bg-white',
+            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
+            downloadBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)', color: 'var(--mf-primary)' },
+            progressStyle: { background: 'linear-gradient(90deg, var(--mf-primary), var(--mf-primary))' },
         },
         purple: {
-            iconBg: 'bg-violet-100/90 dark:bg-violet-500/15',
-            iconText: 'text-violet-600 dark:text-violet-200',
-            title: 'text-violet-950 dark:text-violet-100',
-            description: 'text-violet-900/65 dark:text-violet-100/70',
-            selectedCard: 'border-violet-300/80 bg-violet-50/70 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10',
-            selectedRadio: 'border-violet-600 bg-violet-600 dark:border-violet-300 dark:bg-violet-300',
-            selectedDot: 'bg-white dark:bg-violet-950',
-            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
-            downloadBadge: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-900/10 dark:text-violet-200 dark:hover:bg-violet-900/20',
-            progress: 'from-violet-500 to-indigo-500',
+            iconStyle: { background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' },
+            titleStyle: { color: 'var(--mf-ink)' },
+            descriptionStyle: { color: 'var(--mf-muted)' },
+            selectedCardStyle: { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)', boxShadow: '0 14px 28px rgba(94, 53, 95, 0.14)' },
+            selectedRadio: 'mf-radio-plum',
+            selectedDot: 'bg-white',
+            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
+            downloadBadgeStyle: { borderColor: 'rgba(94, 53, 95, 0.28)', background: 'rgba(94, 53, 95, 0.10)', color: 'var(--mf-plum)' },
+            progressStyle: { background: 'linear-gradient(90deg, var(--mf-plum), var(--mf-plum))' },
         },
         blue: {
-            iconBg: 'bg-sky-100/90 dark:bg-sky-500/15',
-            iconText: 'text-sky-600 dark:text-sky-200',
-            title: 'text-sky-950 dark:text-sky-100',
-            description: 'text-sky-900/65 dark:text-sky-100/70',
-            selectedCard: 'border-sky-300/80 bg-sky-50/70 shadow-[0_14px_28px_rgba(14,165,233,0.12)] dark:border-sky-500/20 dark:bg-sky-900/10',
-            selectedRadio: 'border-sky-600 bg-sky-600 dark:border-sky-300 dark:bg-sky-300',
-            selectedDot: 'bg-white dark:bg-sky-950',
-            installedBadge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
-            downloadBadge: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200 dark:hover:bg-sky-900/20',
-            progress: 'from-sky-500 to-blue-500',
+            iconStyle: { background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' },
+            titleStyle: { color: 'var(--mf-ink)' },
+            descriptionStyle: { color: 'var(--mf-muted)' },
+            selectedCardStyle: { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)', boxShadow: '0 14px 28px rgba(15, 123, 104, 0.14)' },
+            selectedRadio: 'mf-radio-primary',
+            selectedDot: 'bg-white',
+            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
+            downloadBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)', color: 'var(--mf-primary)' },
+            progressStyle: { background: 'linear-gradient(90deg, var(--mf-primary), var(--mf-primary))' },
         }
     };
     const c = colorClasses[color];
 
     return (
         <div className="apple-subsection space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
+            {/* @Codex WUL-229 — selector header now uses MediFlow icon disc + ink/muted typography */}
             <div className="flex items-start gap-3">
-                <div className={`rounded-2xl p-2.5 ${c.iconBg} ${c.iconText}`}>
+                <div className="rounded-2xl p-2.5" style={c.iconStyle}>
                     {icon}
                 </div>
                 <div className="min-w-0">
-                    <h4 className={`text-sm font-semibold ${c.title}`}>{label}</h4>
-                    <p className={`mt-1 text-[11px] leading-5 ${c.description}`}>{description}</p>
+                    <h4 className="text-sm font-semibold" style={c.titleStyle}>{label}</h4>
+                    <p className="mt-1 text-[11px] leading-5" style={c.descriptionStyle}>{description}</p>
                 </div>
             </div>
 
@@ -208,30 +207,34 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
                             const selected = value === model.name;
 
                             return (
+                                // @Codex WUL-229 — option card switches to mf-option-card primitive with style-driven selection accent
                                 <div
                                     key={model.name}
                                     onClick={() => onChange(model.name)}
-                                    className={`
-                                        relative flex items-center justify-between gap-3 rounded-[20px] border px-3.5 py-3 cursor-pointer transition-[border-color,background-color,box-shadow,transform]
-                                        ${selected
-                                            ? `${c.selectedCard} z-10`
-                                            : 'border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20'
-                                        }
-                                    `}
+                                    className={cn('mf-option-card relative flex items-center justify-between gap-3 !px-3.5 !py-3', selected && 'is-active z-10')}
+                                    style={selected ? c.selectedCardStyle : undefined}
                                 >
                                     <div className="flex min-w-0 items-center gap-3">
-                                        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? c.selectedRadio : 'border-slate-300 dark:border-white/20'}`}>
+                                        <div
+                                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+                                            style={selected
+                                                ? { borderColor: color === 'purple' ? 'var(--mf-plum)' : 'var(--mf-primary)', background: color === 'purple' ? 'var(--mf-plum)' : 'var(--mf-primary)' }
+                                                : { borderColor: 'rgba(112,106,100,0.28)' }}
+                                        >
                                             {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
                                         </div>
                                         <div className="min-w-0">
-                                            <span className="block truncate text-xs font-semibold text-slate-900 dark:text-white">{model.name}</span>
-                                            <span className="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">{model.desc}</span>
+                                            <span className="block truncate text-xs font-semibold" style={{ color: 'var(--mf-ink)' }}>{model.name}</span>
+                                            <span className="mt-0.5 block text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>{model.desc}</span>
                                         </div>
                                     </div>
 
                                     <div className="flex shrink-0 items-center gap-2">
                                         {installed ? (
-                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${c.installedBadge}`}>
+                                            <span
+                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold"
+                                                style={c.installedBadgeStyle}
+                                            >
                                                 <Check className="w-3 h-3" /> Installato
                                             </span>
                                         ) : (
@@ -241,7 +244,8 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
                                                     handlePull(model.name);
                                                 }}
                                                 disabled={isPulling}
-                                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60 ${c.downloadBadge}`}
+                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                                                style={c.downloadBadgeStyle}
                                             >
                                                 {isPulling && pullingModel === model.name ? (
                                                     <RefreshCw className="w-3 h-3 animate-spin" />
@@ -254,9 +258,10 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
                             );
                         })}
 
+                        {/* @Codex WUL-229 — secondary toggles use mf-btn-secondary */}
                         <button
                             onClick={() => setShowCustom(true)}
-                            className="inline-flex items-center justify-center rounded-full border border-dashed border-slate-200/70 bg-white/58 px-4 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/20 dark:hover:text-slate-200"
+                            className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-center border-dashed')}
                         >
                             Usa un modello personalizzato
                         </button>
@@ -273,7 +278,7 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
                         />
                         <button
                             onClick={() => setShowCustom(false)}
-                            className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:text-slate-200"
+                            className={SETTINGS_SECONDARY_BUTTON_CLASS}
                         >
                             Torna ai consigliati
                         </button>
@@ -283,45 +288,40 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
 
             {/* Global Pull Status */}
             {isPulling && (
-                <div className="animate-in fade-in slide-in-from-bottom-2 rounded-[22px] border border-white/70 bg-white/78 p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                // @Codex WUL-229 — pull status card now uses the shared liquid section primitive
+                <div className="mf-section mf-section-tight animate-in fade-in slide-in-from-bottom-2 p-4">
                     <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-white">
+                        <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--mf-ink)' }}>
                             <RefreshCw className="w-3 h-3 animate-spin" />
                             Scaricamento {pullingModel ? `di ${pullingModel}` : 'in corso'}
                         </span>
-                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{pullProgress}%</span>
+                        <span className="text-xs font-mono" style={{ color: 'var(--mf-muted)' }}>{pullProgress}%</span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
+                    <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'rgba(112,106,100,0.18)' }}>
                         <div
-                            className={`h-full bg-gradient-to-r ${c.progress} transition-[width] duration-300`}
-                            style={{ width: `${pullProgress}%` }}
+                            className="h-full transition-[width] duration-300"
+                            style={{ width: `${pullProgress}%`, ...c.progressStyle }}
                         />
                     </div>
-                    <p className="mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">{pullStatus}</p>
+                    <p className="mt-2 truncate text-[11px]" style={{ color: 'var(--mf-muted)' }}>{pullStatus}</p>
                 </div>
             )}
         </div>
     );
 }
 
-/* @Codex */
-const SETTINGS_CARD_CLASS = 'glass-panel p-6 md:p-7';
-/* @Codex */
-const SETTINGS_SECTION_CARD_CLASS = 'apple-subsection p-5 md:p-6';
-/* @Codex */
-const SETTINGS_INPUT_CLASS = 'w-full rounded-2xl border border-white/70 bg-white/76 px-4 py-3 text-sm text-slate-800 shadow-[0_12px_26px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-[border-color,background-color,box-shadow] placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500/30';
-/* @Codex */
-const SETTINGS_LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300';
-/* @Codex */
-const SETTINGS_PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.28)] transition-[box-shadow,transform,opacity] hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.34)] disabled:cursor-not-allowed disabled:opacity-50';
-/* @Codex */
+/* @Codex WUL-229 — settings primitives now defer to the liquid-glass tier classes from globals.css */
+const SETTINGS_CARD_CLASS = 'mf-section p-6 md:p-7';
+const SETTINGS_SECTION_CARD_CLASS = 'mf-section mf-section-tight p-5 md:p-6';
+const SETTINGS_INPUT_CLASS = 'mf-input';
+const SETTINGS_LABEL_CLASS = 'mf-field-label';
+const SETTINGS_PRIMARY_BUTTON_CLASS = 'ui-btn-primary px-5 py-2.5 disabled:opacity-50';
 const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
-    emerald: 'inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(5,150,105,0.22)] transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50',
-    amber: 'inline-flex items-center gap-2 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(217,119,6,0.22)] transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50',
-    indigo: 'inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(79,70,229,0.22)] transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50',
+    emerald: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-success',
+    amber: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-warning',
+    indigo: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-plum',
 };
-/* @Codex */
-const SETTINGS_SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
+const SETTINGS_SECONDARY_BUTTON_CLASS = 'mf-btn-secondary';
 
 /* @Codex */
 function SettingsSectionIntro({
@@ -334,10 +334,11 @@ function SettingsSectionIntro({
     description: string;
 }) {
     return (
+        // @Codex WUL-229 — section intro now uses MediFlow ink/muted tokens for headings
         <div className="space-y-1">
             <p className="section-kicker">{kicker}</p>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
-            <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
+            <h2 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>{title}</h2>
+            <p className="max-w-3xl text-sm leading-6" style={{ color: 'var(--mf-muted)' }}>{description}</p>
         </div>
     );
 }
@@ -357,20 +358,26 @@ function SettingsRailLink({
     compact?: boolean;
 }) {
     return (
+        // @Codex WUL-229 — settings rail entry uses the option-card primitive
         <a
             href={href}
             className={cn(
-                'border border-white/70 bg-white/68 text-left shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-white hover:bg-white/86 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20',
+                'mf-option-card text-left',
                 compact
-                    ? 'inline-flex min-w-max items-center gap-2.5 rounded-full px-4 py-2.5'
-                    : 'flex items-start gap-3 rounded-[22px] px-3.5 py-3'
+                    ? 'inline-flex min-w-max items-center gap-2.5 !rounded-full !px-4 !py-2.5'
+                    : 'flex items-start gap-3 !px-3.5 !py-3'
             )}
         >
-            <span className={cn('text-slate-500 dark:text-slate-300', compact ? '' : 'mt-0.5')}>{icon}</span>
+            <span
+                className={cn(compact ? '' : 'mt-0.5')}
+                style={{ color: 'var(--mf-muted)' }}
+            >
+                {icon}
+            </span>
             <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-800 dark:text-white">{label}</span>
+                <span className="block text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>{label}</span>
                 {!compact ? (
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</span>
+                    <span className="mt-0.5 block text-xs leading-5" style={{ color: 'var(--mf-muted)' }}>{description}</span>
                 ) : null}
             </span>
         </a>
@@ -430,9 +437,7 @@ export default function SettingsPage() {
     const isWorkbench = true;
     const {
         reduceMotion,
-        reduceTransparency,
         setReduceMotion,
-        setReduceTransparency,
     } = useUIAccessibility();
 
     // Load initial data
@@ -575,7 +580,7 @@ export default function SettingsPage() {
         { href: '#backups', label: 'Backup', description: 'Schedulazione e ripristino', icon: <HardDrive className="h-4 w-4" /> },
         { href: '#data', label: 'Cataloghi', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
         { href: '#operations', label: 'Sistema', description: 'Diagnostica e strumenti', icon: <Server className="h-4 w-4" /> },
-        { href: '#appearance', label: 'Aspetto', description: 'Trasparenza e movimento', icon: <Sparkles className="h-4 w-4" /> },
+        { href: '#appearance', label: 'Aspetto', description: 'Movimento e lettura', icon: <Sparkles className="h-4 w-4" /> },
     ];
 
     return (
@@ -584,8 +589,8 @@ export default function SettingsPage() {
             <div
                 className={cn(
                     isWorkbench
-                        ? 'rounded-[28px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.86)] p-6 shadow-[0_18px_36px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-8'
-                        : 'glass-panel liquid-hero p-6 md:p-8',
+                        ? 'mediflow-vitreous-panel glass-panel rounded-[28px] border p-6 md:p-8'
+                        : 'mediflow-vitreous-panel glass-panel liquid-hero border p-6 md:p-8',
                 )}
             >
                 {!isWorkbench ? (
@@ -597,13 +602,14 @@ export default function SettingsPage() {
                 ) : null}
 
                 <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    {/* @Codex WUL-229 — hero copy uses MediFlow ink/muted tokens */}
                     <div className="space-y-3">
                         <div className="section-kicker">Workstation locale</div>
                         <div>
-                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+                            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl" style={{ color: 'var(--mf-ink)' }}>
                                 Impostazioni
                             </h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                            <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: 'var(--mf-muted)' }}>
                                 Account, AI, backup, cataloghi e diagnostica di questo computer. I dati clinici restano locali.
                             </p>
                         </div>
@@ -612,8 +618,8 @@ export default function SettingsPage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="apple-subsection min-w-[210px]">
                             <p className="section-kicker">Operatore</p>
-                            <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{user?.displayName || 'Admin'}</p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
+                            <p className="mt-2 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>{user?.displayName || 'Admin'}</p>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
                         </div>
                         <NetworkOperatingModePanel />
                     </div>
@@ -625,8 +631,8 @@ export default function SettingsPage() {
                 <div
                     className={cn(
                         isWorkbench
-                            ? 'rounded-[24px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.84)] p-3 shadow-[0_16px_32px_rgba(35,27,22,0.05)] backdrop-blur-xl'
-                            : 'glass-panel p-3',
+                            ? 'mediflow-vitreous-panel glass-panel rounded-[24px] border p-3'
+                            : 'mediflow-vitreous-panel glass-panel border p-3',
                     )}
                 >
                     <p className="section-kicker mb-2 px-1">Aree</p>
@@ -644,8 +650,8 @@ export default function SettingsPage() {
                     <div
                         className={cn(
                             isWorkbench
-                                ? 'sticky top-6 rounded-[24px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.84)] p-4 shadow-[0_16px_32px_rgba(35,27,22,0.05)] backdrop-blur-xl'
-                                : 'glass-panel sticky top-6 p-4',
+                                ? 'mediflow-vitreous-panel glass-panel sticky top-6 rounded-[24px] border p-4'
+                                : 'mediflow-vitreous-panel glass-panel sticky top-6 border p-4',
                         )}
                     >
                         <p className="section-kicker mb-3">Aree</p>
@@ -668,14 +674,15 @@ export default function SettingsPage() {
 
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — header icon disc + ink copy mapped to MediFlow tokens */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-emerald-100/80 p-2 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
                                         <User className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="section-kicker">Profilo</p>
-                                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Nome medico e ambulatorio</h2>
-                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Mostrati in intestazione, ricette e referti generati.</p>
+                                        <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Nome medico e ambulatorio</h2>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Mostrati in intestazione, ricette e referti generati.</p>
                                     </div>
                                 </div>
 
@@ -726,14 +733,15 @@ export default function SettingsPage() {
                             </div>
 
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — security card icon switches to MediFlow warning tone */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-amber-100/80 p-2 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(202, 138, 4, 0.16)', color: 'var(--mf-warning)' }}>
                                         <KeyRound className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="section-kicker">Sicurezza</p>
-                                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Cambio PIN</h2>
-                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
+                                        <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Cambio PIN</h2>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
                                     </div>
                                 </div>
 
@@ -793,12 +801,8 @@ export default function SettingsPage() {
                                     </div>
 
                                     {pinFeedback && (
-                                        <div className={cn(
-                                            'rounded-lg border px-3 py-2 text-xs',
-                                            pinFeedback.tone === 'success'
-                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                                : 'border-red-200 bg-red-50 text-red-700'
-                                        )}>
+                                        // @Codex WUL-229 — PIN feedback now uses the mf-alert tone primitives
+                                        <div className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
                                             {pinFeedback.message}
                                         </div>
                                     )}
@@ -829,81 +833,71 @@ export default function SettingsPage() {
                         <div className="space-y-6">
                             {/* Profilo hardware */}
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — hardware tier cards now ride mf-option-card with token-driven accents */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-sky-100/80 p-2 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
                                         <Cpu className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="section-kicker">Profilo hardware</p>
-                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Capacità del computer</h3>
-                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Imposta i modelli di default in base alla RAM disponibile. Sovrascrive le selezioni manuali.</p>
+                                        <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Capacità del computer</h3>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Imposta i modelli di default in base alla RAM disponibile. Sovrascrive le selezioni manuali.</p>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div
                                         onClick={() => applyHardwareProfile('low')}
-                                        className={cn(
-                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                            hardwareProfile === 'low'
-                                                ? "border-emerald-300/80 bg-emerald-50/75 shadow-[0_14px_28px_rgba(16,185,129,0.12)] dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                        )}
+                                        className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'low' && 'is-active')}
+                                        style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-200">Light</span>
-                                            {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-200" />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-primary)' }}>Light</span>
+                                            {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-primary)' }} />}
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">&lt; 16GB RAM</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Usa solo modelli molto compressi (Q4_K_M).</p>
+                                        <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&lt; 16GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Usa solo modelli molto compressi (Q4_K_M).</p>
                                     </div>
 
                                     <div
                                         onClick={() => applyHardwareProfile('medium')}
-                                        className={cn(
-                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                            hardwareProfile === 'medium'
-                                                ? "border-indigo-300/80 bg-indigo-50/75 shadow-[0_14px_28px_rgba(79,70,229,0.12)] dark:border-indigo-500/20 dark:bg-indigo-900/10"
-                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                        )}
+                                        className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'medium' && 'is-active')}
+                                        style={hardwareProfile === 'medium' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-700 dark:text-indigo-200">Balanced</span>
-                                            {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-200" />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Balanced</span>
+                                            {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">16-32GB RAM</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 14B per sintesi e reasoning.</p>
+                                        <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>16-32GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 14B per sintesi e reasoning.</p>
                                     </div>
 
                                     <div
                                         onClick={() => applyHardwareProfile('high')}
-                                        className={cn(
-                                            "rounded-[22px] border px-4 py-4 cursor-pointer transition-[border-color,background-color,box-shadow,transform]",
-                                            hardwareProfile === 'high'
-                                                ? "border-violet-300/80 bg-violet-50/75 shadow-[0_14px_28px_rgba(139,92,246,0.12)] dark:border-violet-500/20 dark:bg-violet-900/10"
-                                                : "border-white/70 bg-white/76 shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-white hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                        )}
+                                        className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'high' && 'is-active')}
+                                        style={hardwareProfile === 'high' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-700 dark:text-violet-200">Pro</span>
-                                            {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4 text-violet-600 dark:text-violet-200" />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Pro</span>
+                                            {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">&gt; 32GB RAM</p>
-                                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
+                                        <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&gt; 32GB RAM</p>
+                                        <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Ruoli del team AI */}
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — AI roles header on MediFlow primary teal */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-emerald-100/80 p-2 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
                                         <Stethoscope className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="section-kicker">Ruoli del team AI</p>
-                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Modelli per superficie clinica</h3>
-                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ogni ruolo usa un modello dedicato. I file vengono scaricati e tenuti in locale.</p>
+                                        <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Modelli per superficie clinica</h3>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni ruolo usa un modello dedicato. I file vengono scaricati e tenuti in locale.</p>
                                     </div>
                                 </div>
 
@@ -982,15 +976,16 @@ export default function SettingsPage() {
 
                             {/* Patient Insight runtime policy */}
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — Patient Insight uses MediFlow plum tone for runtime accent */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-indigo-100/80 p-2 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' }}>
                                         <Sparkles className="h-4 w-4" />
                                     </div>
                                     <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <p className="section-kicker">Patient Insight</p>
-                                            <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Budget contesto e output</h3>
-                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Quanto contesto leggere e quanto produrre per ogni insight: bilancia velocità e completezza.</p>
+                                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Budget contesto e output</h3>
+                                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Quanto contesto leggere e quanto produrre per ogni insight: bilancia velocità e completezza.</p>
                                         </div>
                                         <span className="apple-chip whitespace-nowrap">{selectedInsightMode.title}</span>
                                     </div>
@@ -1004,43 +999,42 @@ export default function SettingsPage() {
                                                 key={option.value}
                                                 type="button"
                                                 onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
-                                                className={cn(
-                                                    "rounded-[18px] border px-3 py-3 text-left transition-colors",
-                                                    selected
-                                                        ? "border-indigo-500 bg-white shadow-sm dark:border-indigo-500/40 dark:bg-white/10"
-                                                        : "border-indigo-100 bg-white/70 hover:border-indigo-200 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                                                )}
+                                                className={cn('mf-option-card text-left !px-3 !py-3', selected && 'is-active')}
+                                                style={selected ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-bold text-slate-900 dark:text-white">{option.title}</span>
-                                                    {selected ? <CheckCircle className="h-4 w-4 text-indigo-600 dark:text-indigo-300" /> : null}
+                                                    <span className="text-xs font-bold" style={{ color: 'var(--mf-ink)' }}>{option.title}</span>
+                                                    {selected ? <CheckCircle className="h-4 w-4" style={{ color: 'var(--mf-plum)' }} /> : null}
                                                 </div>
-                                                <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{option.description}</p>
+                                                <p className="mt-1 text-[11px]" style={{ color: 'var(--mf-muted)' }}>{option.description}</p>
                                             </button>
                                         );
                                     })}
                                 </div>
 
-                                <p className="mt-3 rounded-[14px] border border-indigo-100/70 bg-indigo-50/50 px-3 py-2 text-[11px] leading-5 text-slate-600 dark:border-indigo-500/15 dark:bg-indigo-900/10 dark:text-slate-300">
+                                <p
+                                    className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5"
+                                    style={{ borderColor: 'rgba(94, 53, 95, 0.18)', background: 'rgba(94, 53, 95, 0.06)', color: 'var(--mf-muted)' }}
+                                >
                                     {aiInsightSettings.mode === 'full_auto'
                                         ? 'Full auto sceglie il budget in base al profilo hardware corrente e alla complessità del caso.'
                                         : selectedInsightMode.description}
                                 </p>
 
                                 <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
-                                    <div className="rounded-lg border border-slate-200/70 bg-white/72 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                                        <span className="block text-[10px] uppercase tracking-wide text-slate-400">Profilo hardware</span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-100">{hardwareProfile}</span>
+                                    <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
+                                        <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Profilo hardware</span>
+                                        <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{hardwareProfile}</span>
                                     </div>
-                                    <div className="rounded-lg border border-slate-200/70 bg-white/72 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                                        <span className="block text-[10px] uppercase tracking-wide text-slate-400">Budget runtime</span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-100">{insightRuntimePreview}</span>
+                                    <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
+                                        <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget runtime</span>
+                                        <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{insightRuntimePreview}</span>
                                     </div>
                                 </div>
 
                                 {aiInsightSettings.mode === 'manual' && (
                                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        <label className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
                                             Documenti massimi
                                             <input
                                                 type="number"
@@ -1051,7 +1045,7 @@ export default function SettingsPage() {
                                                 className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                             />
                                         </label>
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        <label className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
                                             Caratteri per documento
                                             <input
                                                 type="number"
@@ -1062,7 +1056,7 @@ export default function SettingsPage() {
                                                 className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                             />
                                         </label>
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        <label className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
                                             Budget contesto documenti
                                             <input
                                                 type="number"
@@ -1073,7 +1067,7 @@ export default function SettingsPage() {
                                                 className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
                                             />
                                         </label>
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        <label className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
                                             Output max token
                                             <input
                                                 type="number"
@@ -1090,43 +1084,40 @@ export default function SettingsPage() {
 
                             {/* Kill switches */}
                             <div className={SETTINGS_CARD_CLASS}>
+                                {/* @Codex WUL-229 — kill switches lean on MediFlow critical/success tone tokens */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-rose-100/80 p-2 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200">
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(192, 57, 43, 0.12)', color: 'var(--mf-critical)' }}>
                                         <Shield className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="section-kicker">Kill switch locali</p>
-                                        <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Disattiva singole funzioni AI</h3>
-                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ogni interruttore blocca la funzione in modo deterministico, anche con i modelli installati.</p>
+                                        <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Disattiva singole funzioni AI</h3>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni interruttore blocca la funzione in modo deterministico, anche con i modelli installati.</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3">
                                     <div
-                                        className={cn(
-                                            "rounded-[18px] border p-4",
-                                            patientInsightEnabled
-                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                        )}
+                                        className="rounded-[18px] border p-4"
+                                        style={patientInsightEnabled
+                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="patient-insight-kill-switch-card"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Patient Insight</p>
-                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Patient Insight</p>
+                                                <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
                                                     Se spento, la scheda paziente non avvia nuovi insight e il runtime rifiuta la generazione.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <label
                                                     htmlFor="patientInsightKillSwitch"
-                                                    className={cn(
-                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                        patientInsightEnabled
-                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                                    )}
+                                                    className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                                    style={patientInsightEnabled
+                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {patientInsightEnabled ? 'Enabled' : 'Disabled'}
                                                 </label>
@@ -1136,37 +1127,34 @@ export default function SettingsPage() {
                                                     checked={!patientInsightEnabled}
                                                     onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
                                                     aria-label="Disabilita Patient Insight localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
+                                                    style={{ accentColor: 'var(--mf-plum)' }}
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
                                     <div
-                                        className={cn(
-                                            "rounded-[18px] border p-4",
-                                            documentSynthesisEnabled
-                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                        )}
+                                        className="rounded-[18px] border p-4"
+                                        style={documentSynthesisEnabled
+                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="document-synthesis-kill-switch-card"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Document Synthesis</p>
-                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Document Synthesis</p>
+                                                <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
                                                     Se spento, OCR e import base restano disponibili, ma il runtime rifiuta analisi clinica e archivio intelligente del documento.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <label
                                                     htmlFor="documentSynthesisKillSwitch"
-                                                    className={cn(
-                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                        documentSynthesisEnabled
-                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                                    )}
+                                                    className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                                    style={documentSynthesisEnabled
+                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {documentSynthesisEnabled ? 'Enabled' : 'Disabled'}
                                                 </label>
@@ -1176,37 +1164,34 @@ export default function SettingsPage() {
                                                     checked={!documentSynthesisEnabled}
                                                     onChange={(e) => setDocumentSynthesisEnabled(!e.target.checked)}
                                                     aria-label="Disabilita Document Synthesis localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
+                                                    style={{ accentColor: 'var(--mf-plum)' }}
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
                                     <div
-                                        className={cn(
-                                            "rounded-[18px] border p-4",
-                                            smartImportEnabled
-                                                ? "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-900/10"
-                                                : "border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10"
-                                        )}
+                                        className="rounded-[18px] border p-4"
+                                        style={smartImportEnabled
+                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="smart-import-kill-switch-card"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Smart Import</p>
-                                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                                <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Smart Import</p>
+                                                <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
                                                     Se spento, il pannello paziente non avvia analisi Smart Import e il runtime rifiuta sia generate sia apply.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <label
                                                     htmlFor="smartImportKillSwitch"
-                                                    className={cn(
-                                                        "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                                        smartImportEnabled
-                                                            ? "border-emerald-200 bg-white text-emerald-700 dark:border-emerald-500/20 dark:bg-white/10 dark:text-emerald-200"
-                                                            : "border-red-200 bg-white text-red-700 dark:border-red-500/20 dark:bg-white/10 dark:text-red-200"
-                                                    )}
+                                                    className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                                    style={smartImportEnabled
+                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {smartImportEnabled ? 'Enabled' : 'Disabled'}
                                                 </label>
@@ -1216,7 +1201,8 @@ export default function SettingsPage() {
                                                     checked={!smartImportEnabled}
                                                     onChange={(e) => setSmartImportEnabled(!e.target.checked)}
                                                     aria-label="Disabilita Smart Import localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:bg-white/5"
+                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
+                                                    style={{ accentColor: 'var(--mf-plum)' }}
                                                 />
                                             </div>
                                         </div>
@@ -1599,37 +1585,20 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="Aspetto"
                             title="Lettura e accessibilità"
-                            description="Controlli di lettura per chi preferisce meno trasparenza o meno movimento. La shell Clinical Workbench è l'unico runtime ufficiale."
+                            description="Controlli di lettura per chi preferisce meno movimento. La shell Clinical Workbench è l'unico runtime ufficiale."
                         />
 
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
                             <div className="apple-subsection" data-testid="ui-accessibility-controls">
                                 <p className="section-kicker">Controlli di lettura</p>
                                 <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                                    Trasparenza e movimento
+                                    Movimento
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                    Disattiva vetro e animazioni quando serve più contrasto o meno stimolo visivo.
+                                    Riduce animazioni e micro-transizioni quando serve meno stimolo visivo.
                                 </p>
 
                                 <div className="mt-5 space-y-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setReduceTransparency(!reduceTransparency)}
-                                        className={cn(
-                                            "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
-                                            reduceTransparency
-                                                ? "border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)]"
-                                                : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
-                                        )}
-                                    >
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Riduci trasparenza</p>
-                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Rende piu opachi vetro, blur e pannelli contestuali.</p>
-                                        </div>
-                                        <span className="apple-chip">{reduceTransparency ? 'Attivo' : 'Disattivo'}</span>
-                                    </button>
-
                                     <button
                                         type="button"
                                         onClick={() => setReduceMotion(!reduceMotion)}

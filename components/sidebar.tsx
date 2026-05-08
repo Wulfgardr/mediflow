@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, Activity, Settings, PlusCircle,
   ChevronRight, ChevronDown, Folder, FolderOpen, FlaskConical,
-  Plus, Building2, Eye, EyeOff, BarChart3, Sparkles
+  Plus, Building2, Eye, EyeOff, BarChart3
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -248,7 +248,6 @@ export function Sidebar() {
         { href: '/diary', name: 'Diario Clinico', icon: LayoutDashboard },
         { href: '/scales', name: 'Scale & Test', icon: Activity },
         { href: '/analytics', name: 'Analytics', icon: BarChart3 },
-        { href: '/assistant', name: 'Assistant', icon: Sparkles },
         { href: '/settings', name: 'Impostazioni', icon: Settings },
     ];
 

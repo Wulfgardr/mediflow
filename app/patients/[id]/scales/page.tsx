@@ -81,11 +81,15 @@ export default function ScalesPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center gap-4">
-                <Link href={`/patients/${id}`} className="p-2 hover:bg-white/50 rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600" />
+            {/* @Codex WUL-229 — patient scale picker aligns with liquid glass workbench */}
+            <div className="mf-section flex items-center gap-4">
+                <Link href={`/patients/${id}`} className="mf-btn-secondary !h-11 !w-11 !p-0" aria-label="Torna alla scheda paziente">
+                    <ArrowLeft className="w-5 h-5" />
                 </Link>
-                <h1 className="text-2xl font-bold text-gray-800">Seleziona Valutazione</h1>
+                <div>
+                    <p className="mf-eyebrow">Scale cliniche</p>
+                    <h1 className="mt-1 text-2xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Seleziona Valutazione</h1>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -93,20 +97,20 @@ export default function ScalesPage() {
                     <button
                         key={scale.id}
                         onClick={() => setSelectedScale(scale)}
-                        className="glass-card p-6 text-left group hover:scale-[1.02] transition-transform"
+                        className="mf-option-card group !p-6"
                     >
                         <div className="flex items-start justify-between mb-4">
-                            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                            <div className="mf-icon-disc h-14 w-14">
                                 <Brain className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">{scale.title}</h3>
-                        <p className="text-gray-500 text-sm leading-relaxed">{scale.description}</p>
+                        <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--mf-ink)' }}>{scale.title}</h3>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>{scale.description}</p>
                     </button>
                 ))}
 
                 {/* Placeholder for more scales */}
-                <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-400 min-h-[200px]">
+                <div className="mf-section flex min-h-[200px] flex-col items-center justify-center border-dashed p-6 text-center" style={{ color: 'var(--mf-muted)' }}>
                     <Activity className="w-8 h-8 mb-2 opacity-50" />
                     <p className="font-medium">Altre scale in arrivo...</p>
                 </div>

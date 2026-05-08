@@ -182,39 +182,40 @@ export default function EditPatientPage() {
         // Stay on page but refresh UI (automatic via liveQuery)
     };
 
-    if (!patient) return <div className="p-8 text-center text-gray-500">Caricamento...</div>;
+    if (!patient) return <div className="mf-section mx-auto mt-8 max-w-md text-center text-sm" style={{ color: 'var(--mf-muted)' }}>Caricamento...</div>;
 
     return (
         <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
             <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
                 <div className="flex items-center gap-5">
-                    <Link href={`/patients/${id}`} className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
-                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
+                    {/* @Codex WUL-229 — edit header uses shared liquid controls */}
+                    <Link href={`/patients/${id}`} className="mf-btn-secondary !h-12 !w-12 !p-0" aria-label="Torna alla scheda paziente">
+                        <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Modalita modifica</p>
+                            <span className="w-2 h-2 rounded-full bg-[color:var(--mf-primary)]" />
+                            <p className="mf-eyebrow">Modalita modifica</p>
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Modifica Paziente</h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Aggiornamento dati clinici e anagrafici</p>
+                        <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Modifica Paziente</h1>
+                        <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Aggiornamento dati clinici e anagrafici</p>
                     </div>
                 </div>
             </div>
 
             {patient.isArchived && (
-                <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/20 p-6 flex items-start gap-4 shadow-xl shadow-amber-500/5">
-                    <div className="p-3 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600">
+                <div className="mf-alert mf-alert-warning mb-10 !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--mf-warning)]">
                         <Archive className="w-6 h-6 shrink-0" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-200">Paziente Archiviato</h3>
-                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                        <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Paziente Archiviato</h3>
+                        <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                             Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
                         </p>
                         <button
                             onClick={handleRestore}
-                            className="mt-4 text-xs font-black uppercase tracking-widest text-amber-800 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors flex items-center gap-1.5"
+                            className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"
                         >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Ripristina in elenco Attivi
@@ -231,21 +232,21 @@ export default function EditPatientPage() {
             />
 
             {/* Danger Zone */}
-            <div className="mt-20 pt-10 border-t border-slate-200 dark:border-white/10">
+            <div className="mt-20 border-t border-[color:rgba(112,106,100,0.12)] pt-10">
                 <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                        <ShieldAlert className="w-5 h-5 text-red-500" />
+                    <div className="mf-icon-disc h-10 w-10 !text-[color:var(--mf-critical)]">
+                        <ShieldAlert className="w-5 h-5" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500/60">Azioni sensibili</p>
-                        <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Zona Pericolo</h3>
+                        <p className="mf-eyebrow !text-[color:var(--mf-critical)]">Azioni sensibili</p>
+                        <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Zona Pericolo</h3>
                     </div>
                 </div>
 
-                <div className="glass-panel p-8 rounded-[32px] border-red-100 dark:border-red-900/20 bg-red-50/30 dark:bg-red-950/5 flex flex-col lg:flex-row items-center justify-between gap-8">
+                <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
                     <div className="max-w-md">
-                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Manutenzione Scheda</h4>
-                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h4 className="mb-2 text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Manutenzione Scheda</h4>
+                        <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                             Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
                         </p>
                     </div>
@@ -257,7 +258,7 @@ export default function EditPatientPage() {
                                 setActionType('export');
                                 setIsActionModalOpen(true);
                             }}
-                            className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-blue-600 dark:text-blue-400 font-bold border border-slate-200 dark:border-white/10 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                            className="mf-btn-secondary flex-1 lg:flex-none"
                         >
                             <Download className="w-4 h-4" />
                             Export FHIR
@@ -269,7 +270,7 @@ export default function EditPatientPage() {
                                     setActionType('archive');
                                     setIsActionModalOpen(true);
                                 }}
-                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-amber-600 dark:text-amber-400 font-bold border border-amber-200 dark:border-amber-900/30 rounded-2xl hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                                className="mf-btn-secondary flex-1 !text-[color:var(--mf-warning)] lg:flex-none"
                             >
                                 <Archive className="w-4 h-4" />
                                 Archivia
@@ -277,7 +278,7 @@ export default function EditPatientPage() {
                         ) : (
                             <button
                                 onClick={handleRestore}
-                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-900/30 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                                className="mf-btn-secondary flex-1 !text-[color:var(--mf-success)] lg:flex-none"
                             >
                                 <RotateCcw className="w-4 h-4" />
                                 Ripristina
@@ -288,7 +289,7 @@ export default function EditPatientPage() {
                                 setActionType('delete');
                                 setIsActionModalOpen(true);
                             }}
-                            className="flex-1 lg:flex-none px-6 py-3 bg-red-600 text-white font-bold rounded-2xl shadow-xl shadow-red-500/20 hover:bg-red-700 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                            className="ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none"
                         >
                             <Trash2 className="w-4 h-4" />
                             Elimina

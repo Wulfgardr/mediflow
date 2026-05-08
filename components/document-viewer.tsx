@@ -23,25 +23,39 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
     }, [file]);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-8 animation-in fade-in duration-200">
-            <div className="bg-white rounded-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/50">
+        // @Codex WUL-229 — full-screen document viewer reuses specular chrome + vitreous canvas
+        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-200" style={{ zIndex: 100 }}>
+            <button
+                type="button"
+                aria-label="Chiudi sfondo"
+                className="absolute inset-0 cursor-default"
+                onClick={onClose}
+            />
+            <div className="mf-modal-shell relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between p-4 graphite-divider">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                        <div
+                            className="p-2 rounded-xl flex items-center justify-center"
+                            style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}
+                        >
                             <FileText className="w-5 h-5" />
                         </div>
-                        <h3 className="font-bold text-gray-800">{fileName}</h3>
+                        <h3 className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--mf-ink)' }}>{fileName}</h3>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500 hover:text-red-500"
+                        className="mf-btn-secondary !p-2 !rounded-full"
                         aria-label="Chiudi"
+                        title="Chiudi"
                     >
-                        <X className="w-6 h-6" />
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 bg-gray-100 relative">
+                <div
+                    className="flex-1 relative"
+                    style={{ background: 'var(--mf-tier-vitreous-bg, rgba(255,252,247,0.55))' }}
+                >
                     {url ? (
                         <iframe
                             src={url}
@@ -49,7 +63,10 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
                             title="Document Preview"
                         />
                     ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div
+                            className="flex items-center justify-center h-full text-sm"
+                            style={{ color: 'var(--mf-muted)' }}
+                        >
                             Caricamento anteprima...
                         </div>
                     )}

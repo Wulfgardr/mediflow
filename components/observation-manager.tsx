@@ -85,7 +85,7 @@ export default function ObservationManager({ patientId }: { patientId: string })
     };
 
     return (
-        <div className="glass-panel p-6 space-y-5">
+        <div className="patient-detail-section glass-panel border p-6 space-y-5">
             <div>
                 <p className="section-kicker">Osservazioni strutturate</p>
                 <div className="mt-1 flex items-center gap-2">

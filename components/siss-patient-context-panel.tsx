@@ -389,7 +389,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
     const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
     const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
     return (
-        <section className="patient-detail-section border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
+        <section className="patient-detail-section border p-5 md:p-6">
             <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
                     <p className="section-kicker">Contesto SISS</p>

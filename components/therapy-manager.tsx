@@ -174,7 +174,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                 )}
             </div>
             {isAdding && (
-                <div className="glass-panel p-4 animate-in fade-in slide-in-from-top-4">
+                <div className="patient-detail-section glass-panel border p-4 animate-in fade-in slide-in-from-top-4">
                     <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
                         <h4 className="font-semibold text-gray-700">{editingId ? 'Modifica Terapia' : 'Nuova Prescrizione'}</h4>
                         <button onClick={cancelEditing} aria-label="Chiudi"><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>

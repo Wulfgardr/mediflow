@@ -161,7 +161,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
     };
 
     return (
-        <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
+        <section className="patient-detail-section rounded-[20px] border p-5 md:p-6">
             <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                     <p className="section-kicker">SISS</p>

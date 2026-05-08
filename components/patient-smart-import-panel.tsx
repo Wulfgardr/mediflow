@@ -510,7 +510,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
     }
 
     return (
-        <div className="glass-panel overflow-hidden rounded-[28px] border-sky-100/50 bg-sky-50/10 p-0 backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
+        <div className="patient-detail-section glass-panel overflow-hidden rounded-[28px] border p-0">
             <div className="border-b border-sky-200/30 p-5 dark:border-white/5">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">

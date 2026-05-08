@@ -2,6 +2,13 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
+# @Codex
+PREFERRED_NODE_BIN="$HOME/.nvm/versions/node/v20.20.2/bin"
+# @Codex
+if [ -x "$PREFERRED_NODE_BIN/node" ] && [ -x "$PREFERRED_NODE_BIN/npm" ]; then
+    export PATH="$PREFERRED_NODE_BIN:$PATH"
+fi
+
 echo "==================================================="
 echo "   🏥 MediFlow - Avvio Completo"
 echo "==================================================="

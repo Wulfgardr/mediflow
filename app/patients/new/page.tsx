@@ -133,15 +133,16 @@ export default function NewPatientPage() {
         <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
             <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
                 <div className="flex items-center gap-5">
-                    <Link href="/" className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
-                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
+                    {/* @Codex WUL-229 — patient creation header follows the liquid command surface */}
+                    <Link href="/" className="mf-btn-secondary !h-12 !w-12 !p-0" aria-label="Torna alla home">
+                        <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pazienti</p>
+                            <span className="w-2 h-2 rounded-full bg-[color:var(--mf-primary)]" />
+                            <p className="mf-eyebrow">Pazienti</p>
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Nuova Anagrafica</h1>
+                        <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Nuova Anagrafica</h1>
                     </div>
                 </div>
             </div>
@@ -162,19 +163,15 @@ export default function NewPatientPage() {
 
             {/* @Codex */}
             {importMeta && (
-                <div className={`mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 p-6 shadow-xl ${
+                <div className={`mf-alert mb-10 animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
                     importMeta.quality?.level === 'red'
-                        ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20 shadow-red-500/5'
+                        ? 'mf-alert-critical'
                         : importMeta.quality?.level === 'green'
-                            ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20 shadow-emerald-500/5'
-                            : 'border-blue-200 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 shadow-blue-500/5'
+                            ? 'mf-alert-success'
+                            : 'mf-alert-info'
                     }`}>
                     <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-2xl ${
-                            importMeta.quality?.level === 'red' ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 
-                            importMeta.quality?.level === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600' : 
-                            'bg-blue-100 dark:bg-blue-900/40 text-blue-600'
-                        }`}>
+                        <div className="mf-icon-disc h-12 w-12 shrink-0">
                             {importMeta.quality?.level === 'red' ? (
                                 <AlertTriangle className="h-6 w-6 shrink-0" />
                             ) : (
@@ -182,10 +179,10 @@ export default function NewPatientPage() {
                             )}
                         </div>
                         <div className="space-y-1">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>
                                 {importMeta.reviewPending ? 'Importazione assistita pronta per review' : 'Importazione assistita applicata al form'}
                             </h3>
-                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                                 {importMeta.diagnosisCount > 0
                                     ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie candidate` : ''}. Verificare i contenuti nel passaggio intermedio prima della conferma finale.`
                                     : importMeta.medicationCount > 0
@@ -193,7 +190,7 @@ export default function NewPatientPage() {
                                         : 'Il documento è stato analizzato correttamente, ma non sono stati individuati campi clinici strutturabili automaticamente.'}
                             </p>
                             {importMeta.quality?.reason && (
-                                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">
+                                <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--mf-muted)' }}>
                                     Qualita documento: {importMeta.quality.reason}
                                 </p>
                             )}

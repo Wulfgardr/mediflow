@@ -83,7 +83,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     };
 
     return (
-        <div className="glass-panel p-6">
+        <div className="patient-detail-side-section glass-panel border p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div className="rounded-2xl bg-amber-50 p-2 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">

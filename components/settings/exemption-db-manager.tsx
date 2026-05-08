@@ -99,7 +99,7 @@ export default function ExemptionDbManager() {
     const percent = total > 0 ? Math.round((progress / total) * 100) : 0;
 
     return (
-        <div className="glass-panel p-6 md:p-7 space-y-5">
+        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                     <Database className="w-6 h-6" />
