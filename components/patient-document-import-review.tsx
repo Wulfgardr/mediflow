@@ -21,6 +21,10 @@ import {
 } from '@/lib/patient-document-review';
 /* @Codex */
 import { buildPatientImportDecision } from '@/lib/patient-import-decision';
+/* @Codex */
+import { buildPatientDocumentDecision } from '@/lib/patient-document-decision';
+/* @Codex */
+import DocumentDecisionReviewCard from '@/components/document-decision-review-card';
 
 interface PatientDocumentImportReviewProps {
     draft: PatientDocumentReviewDraft;
@@ -105,6 +109,8 @@ export default function PatientDocumentImportReview({
     }), [localDraft]);
     /* @Codex */
     const importDecision = useMemo(() => buildPatientImportDecision(localDraft), [localDraft]);
+    /* @Codex */
+    const documentDecision = useMemo(() => buildPatientDocumentDecision(localDraft), [localDraft]);
 
     const tone = qualityTone(localDraft.quality?.level);
 
@@ -174,6 +180,10 @@ export default function PatientDocumentImportReview({
                     </div>
                 </div>
             )}
+
+            <div className="mt-5">
+                <DocumentDecisionReviewCard decision={documentDecision} />
+            </div>
 
             <div className="mt-6 space-y-6">
                 {localDraft.fields.length > 0 && (

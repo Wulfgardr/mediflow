@@ -32,6 +32,8 @@ import {
     type SmartImportReview,
     type SmartImportReviewState,
 } from './patient-smart-import-matching';
+/* @Codex */
+import { isServicePrescriptionLikeTherapy } from './prescription-boundary';
 import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
     assertAiSmartImportEnabledValue,
@@ -679,6 +681,38 @@ async function resolveTherapySuggestion(
     drugCatalogSearch: DrugCatalogSearchLoader
 ): Promise<TherapySmartImportSuggestion> {
     const source = sourceMap.get(suggestion.sourceId || '') || sourceMap.values().next().value as SmartImportSourceRecord | undefined;
+    if (isServicePrescriptionLikeTherapy(suggestion)) {
+        return {
+            id: `therapy:${suggestion.drugMention}:${suggestion.dosage || ''}:${suggestion.activePrinciple || ''}`,
+            drugMention: suggestion.drugMention,
+            drugQuery: suggestion.drugQuery,
+            activePrinciple: suggestion.activePrinciple,
+            dosage: suggestion.dosage,
+            motivation: suggestion.motivation,
+            therapyState: 'uncertain',
+            reviewNote: suggestion.reviewNote,
+            confidence: suggestion.confidence,
+            evidence: {
+                sourceKind: source?.kind || 'patient-notes',
+                sourceId: source?.id || 'patient-notes',
+                label: source?.label || 'Fonte paziente',
+                excerpt: trimSnippet(suggestion.evidence, 180),
+                date: source?.date,
+            },
+            matchType: 'none',
+            canApply: false,
+            blockedReason: 'Prestazione specialistica o impegnativa: non importare come farmaco',
+            review: {
+                state: 'uncertain',
+                summary: 'Prestazione sanitaria esclusa dal piano terapeutico',
+            },
+            resolver: {
+                searchTerms: [],
+                candidates: [],
+            },
+        };
+    }
+
     const searchTerms = buildDrugSearchTerms(suggestion).slice(0, 6);
     const rankedByCandidate = new Map<string, {
         candidate: AifaDrug;

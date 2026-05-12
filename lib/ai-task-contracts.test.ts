@@ -107,6 +107,272 @@ test('smart import extraction keeps only valid structured suggestions', () => {
     assert.equal(parsed.value.data.therapies[0].drugMention, 'Metformina 500 mg');
 });
 
+test('smart import extraction drops service prescriptions from therapy suggestions', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Visita otorinolaringoiatrica',
+                    drugQuery: 'visita otorinolaringoiatrica',
+                    confidence: 'high',
+                    evidence: 'Prescritta visita otorinolaringoiatrica di controllo',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'Amoxicillina 1 g',
+                    drugQuery: 'amoxicillina 1 g',
+                    activePrinciple: 'Amoxicillina',
+                    dosage: '1 g ogni 12 ore',
+                    confidence: 'high',
+                    evidence: 'Prescritta amoxicillina 1 g ogni 12 ore',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 1);
+    assert.equal(parsed.value.data.therapies[0].drugMention, 'Amoxicillina 1 g');
+});
+
+test('smart import extraction keeps drug therapies when evidence mentions a specialist visit', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Amoxicillina 1 g',
+                    drugQuery: 'amoxicillina',
+                    activePrinciple: 'Amoxicillina',
+                    dosage: '1 g ogni 12 ore',
+                    confidence: 'high',
+                    evidence: 'Amoxicillina 1 g prescritta dopo visita ORL',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 1);
+    assert.equal(parsed.value.data.therapies[0].drugMention, 'Amoxicillina 1 g');
+});
+
+test('smart import extraction drops service prescriptions even when evidence contains units', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Prelievo venoso',
+                    drugQuery: 'prelievo venoso',
+                    confidence: 'medium',
+                    evidence: 'Richiesto prelievo venoso con provetta 5 ml',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 0);
+});
+
+test('smart import extraction drops fisioterapia and rehabilitation prescriptions from therapy lane', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Fisioterapia respiratoria',
+                    drugQuery: 'fisioterapia respiratoria',
+                    confidence: 'high',
+                    evidence: 'Prescritta fisioterapia respiratoria 6 sedute di mantenimento',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'Riabilitazione neuromotoria',
+                    drugQuery: 'riabilitazione neuromotoria',
+                    confidence: 'high',
+                    evidence: 'Prescritta riabilitazione neuromotoria 10 sedute ambulatoriali',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'Prestazione riabilitativa cardiologica',
+                    drugQuery: 'prestazione riabilitativa cardiologica',
+                    confidence: 'medium',
+                    evidence: 'Richiesta prestazione riabilitativa cardiologica post-evento',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 0);
+});
+
+test('smart import extraction drops lab tests with units from therapy lane', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Emocromo completo',
+                    drugQuery: 'emocromo completo con formula',
+                    confidence: 'medium',
+                    evidence: 'Richiesto emocromo completo con formula leucocitaria',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'HbA1c',
+                    drugQuery: 'emoglobina glicata',
+                    confidence: 'medium',
+                    evidence: 'Richiesta HbA1c di controllo, target 7%',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'Emoglobina glicata',
+                    drugQuery: 'emoglobina glicata',
+                    confidence: 'medium',
+                    evidence: 'Prescritta emoglobina glicata di controllo periodico',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 0);
+});
+
+test('smart import extraction drops imaging and ECG with units from therapy lane', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'ECG a riposo',
+                    drugQuery: 'ECG a riposo',
+                    confidence: 'medium',
+                    evidence: 'Richiesto ECG a riposo da eseguire entro 30 giorni',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'RX torace',
+                    drugQuery: 'RX torace 2 proiezioni',
+                    confidence: 'medium',
+                    evidence: 'Prescritta RX torace 2 proiezioni standard',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'TC encefalo',
+                    drugQuery: 'TC encefalo senza mdc',
+                    confidence: 'medium',
+                    evidence: 'Prescritta TC encefalo senza mdc per cefalea persistente',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 0);
+});
+
+test('smart import extraction keeps drug therapy whose evidence references fisioterapia follow-up', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Tachipirina 1000 mg',
+                    drugQuery: 'paracetamolo 1000 mg',
+                    activePrinciple: 'Paracetamolo',
+                    dosage: '1000 mg ogni 8 ore',
+                    confidence: 'high',
+                    evidence: 'Tachipirina 1000 mg ogni 8 ore al bisogno; rivalutare in fisioterapia',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 1);
+    assert.equal(parsed.value.data.therapies[0].drugMention, 'Tachipirina 1000 mg');
+});
+
+test('document synthesis extraction filters fisioterapia and lab requests from medication and therapy lanes', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Impegnativa con prestazioni miste',
+        data: {
+            qualityLevel: 'green',
+            qualityReason: 'Documento leggibile',
+            medications: [
+                'Fisioterapia respiratoria',
+                'Riabilitazione neuromotoria 10 sedute',
+                'Emocromo completo con formula',
+                'HbA1c di controllo',
+                'Amoxicillina 1 g ogni 12 ore',
+            ],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [
+                {
+                    drugMention: 'Fisioterapia respiratoria',
+                    drugQuery: 'fisioterapia respiratoria',
+                    confidence: 'high',
+                    evidence: 'Prescritta fisioterapia respiratoria 6 sedute',
+                },
+                {
+                    drugMention: 'Emocromo completo',
+                    drugQuery: 'emocromo completo',
+                    confidence: 'medium',
+                    evidence: 'Richiesto emocromo completo con formula',
+                },
+                {
+                    drugMention: 'Amoxicillina 1 g',
+                    drugQuery: 'amoxicillina',
+                    activePrinciple: 'Amoxicillina',
+                    dosage: '1 g ogni 12 ore',
+                    confidence: 'high',
+                    evidence: 'Prescritta amoxicillina 1 g ogni 12 ore',
+                },
+            ],
+        },
+    }), 'Ricetta sintetica');
+
+    assert.deepEqual(parsed.value.data.medications, ['Amoxicillina 1 g ogni 12 ore']);
+    assert.equal(parsed.value.data.therapyCandidates.length, 1);
+    assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Amoxicillina 1 g');
+});
+
 test('smart import prompt prioritizes current pathology coding and active therapy extraction', () => {
     const prompt = buildSmartImportExtractionPrompt({
         patientId: 'bench-smart-prompt',
@@ -118,6 +384,7 @@ test('smart import prompt prioritizes current pathology coding and active therap
     assert.match(prompt, /label deve restare in italiano clinico sintetico/i);
     assert.match(prompt, /icdQuery deve essere una query breve e specifica in inglese/i);
     assert.match(prompt, /sourceId deve coincidere esattamente con un id presente nelle fonti/i);
+    assert.match(prompt, /prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral/i);
     assert.match(prompt, /chiave breve per ricerca catalogo AIFA/i);
     assert.match(prompt, /preferendo brand o principio attivo con strength se esplicita/i);
     assert.match(prompt, /forma compatibile con il catalogo locale AIFA/i);
@@ -125,6 +392,65 @@ test('smart import prompt prioritizes current pathology coding and active therap
     assert.match(prompt, /se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain/i);
     assert.match(prompt, /non marcare active una terapia futura, condizionale, da valutare/i);
     assert.match(prompt, /switch terapeutico, marca come transition sia il farmaco in uscita sia quello in ingresso/i);
+});
+
+test('document synthesis extraction keeps service prescriptions out of medication lanes', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Impegnativa con prestazione e farmaco separati',
+        data: {
+            qualityLevel: 'green',
+            qualityReason: 'Documento leggibile',
+            medications: [
+                'Visita otorinolaringoiatrica di controllo',
+                'Amoxicillina 1 g ogni 12 ore',
+            ],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [
+                {
+                    drugMention: 'Visita otorinolaringoiatrica',
+                    drugQuery: 'visita otorinolaringoiatrica',
+                    confidence: 'medium',
+                    evidence: 'Richiesta visita otorinolaringoiatrica',
+                },
+                {
+                    drugMention: 'Amoxicillina 1 g',
+                    drugQuery: 'amoxicillina',
+                    activePrinciple: 'Amoxicillina',
+                    dosage: '1 g ogni 12 ore',
+                    confidence: 'high',
+                    evidence: 'Prescritta amoxicillina 1 g ogni 12 ore',
+                },
+            ],
+        },
+    }), 'Ricetta sintetica');
+
+    assert.deepEqual(parsed.value.data.medications, ['Amoxicillina 1 g ogni 12 ore']);
+    assert.equal(parsed.value.data.therapyCandidates.length, 1);
+    assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Amoxicillina 1 g');
+});
+
+test('document synthesis extraction filters legacy service prescription payloads', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary: 'Impegnativa con sola prestazione',
+        qualityLevel: 'green',
+        medications: ['Visita otorinolaringoiatrica di controllo'],
+        diagnoses: [],
+        therapyCandidates: [
+            {
+                drugMention: 'Visita otorinolaringoiatrica',
+                drugQuery: 'visita otorinolaringoiatrica',
+                confidence: 'medium',
+                evidence: 'Richiesta visita otorinolaringoiatrica',
+            },
+        ],
+    }), 'Ricetta sintetica');
+
+    assert.deepEqual(parsed.value.data.medications, []);
+    assert.equal(parsed.value.data.therapyCandidates.length, 0);
+    assert.equal(parsed.value.data.qualityReason, 'Analisi completata con dati parziali');
 });
 
 test('document synthesis extraction falls back when model JSON is invalid', () => {

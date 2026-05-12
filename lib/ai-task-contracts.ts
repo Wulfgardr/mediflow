@@ -1,4 +1,7 @@
 /* @Codex */
+import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
+
+/* @Codex */
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 
 /* @Codex */
@@ -382,7 +385,7 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
 
     if (!drugMention || !evidence) return null;
 
-    return {
+    const therapy = {
         drugMention,
         drugQuery: normalizeCompactText(record.drugQuery, MAX_SMART_IMPORT_TEXT_CHARS) || drugMention,
         activePrinciple: normalizeCompactText(record.activePrinciple, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
@@ -394,6 +397,8 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
         evidence,
         sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
     };
+
+    return isServicePrescriptionLikeTherapy(therapy) ? null : therapy;
 }
 
 export function extractJsonObject(response: string): string | null {
@@ -569,6 +574,11 @@ export function parseDocumentSynthesisExtractionResponse(
                 ),
             )
             : [];
+    const filteredMedications = medications.filter((medication) => !isServicePrescriptionLikeTherapy({
+        drugMention: medication,
+        drugQuery: medication,
+        evidence: medication,
+    }));
 
     const diagnoses = legacyPayload
         ? legacyPayload.diagnoses
@@ -591,13 +601,14 @@ export function parseDocumentSynthesisExtractionResponse(
                 .map(normalizeSmartImportTherapy)
                 .filter((item): item is SmartImportTherapyExtraction => Boolean(item))
             : [];
+    const filteredTherapyCandidates = filterServicePrescriptionTherapyCandidates(therapyCandidates);
 
     const summary = (legacyPayload?.summary || envelope.summary) || buildDocumentFallbackSummary(rawText);
     const qualityLevel = legacyPayload?.qualityLevel ?? normalizeQualityLevel(envelope.data.qualityLevel);
     const qualityReason = legacyPayload?.qualityReason
         || normalizeCompactText(envelope.data.qualityReason, MAX_SHARED_SUMMARY_CHARS)
         || ((legacyPayload?.validJson || envelope.validJson)
-            ? (diagnoses.length > 0 || medications.length > 0
+            ? (diagnoses.length > 0 || filteredMedications.length > 0
                 ? 'Dati clinici strutturati estratti'
                 : 'Analisi completata con dati parziali')
             : 'JSON del modello non valido');
@@ -613,10 +624,10 @@ export function parseDocumentSynthesisExtractionResponse(
             data: {
                 qualityLevel,
                 qualityReason,
-                medications,
+                medications: filteredMedications,
                 diagnoses,
                 problemStatements,
-                therapyCandidates,
+                therapyCandidates: filteredTherapyCandidates,
             },
         },
     };
@@ -755,6 +766,8 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
             'sourceId deve coincidere esattamente con un id presente nelle fonti fornite',
             'massimo 5 diagnosi e 10 terapie',
             'ogni terapia deve rappresentare un singolo farmaco distinto',
+            'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',
+            'se una ricetta/impegnativa prescrive una prestazione specialistica, ignorala come terapia anche se usa parole come prescritta o richiesta',
             'per le terapie usa drugQuery come chiave breve per ricerca catalogo AIFA, preferendo brand o principio attivo con strength se esplicita ma senza frequenza, orari o note accessorie',
             'drugMention e activePrinciple devono essere il piu possibile aderenti al testo sorgente; se il principio attivo e ovvio usa una forma compatibile con il catalogo locale AIFA',
             'in therapies includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
@@ -820,6 +833,8 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
             'summary deve essere un riassunto clinico conciso in plain text, senza markdown',
             'summary massimo 2 frasi brevi e non oltre 220 caratteri circa',
             'in medications includi solo terapie esplicite e correnti nel testo OCR, senza duplicati e senza presidi, detergenti o indicazioni non farmacologiche',
+            'non inserire in medications o therapyCandidates visite specialistiche, prestazioni, esami, controlli, consulenze, impegnative o referral: sono prescrizioni di prestazione, non farmaci',
+            'se il documento e una ricetta/impegnativa per prestazione specialistica, usa summary/quality ma lascia medications e therapyCandidates vuoti salvo farmaci espliciti separati',
             'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR; se il documento non riporta codici espliciti restituisci diagnoses come array vuoto e non inventare placeholder o code vuoti',
             'in problemStatements includi solo patologie attuali, attive o clinicamente rilevanti per la gestione corrente anche se prive di codice esplicito',
             'problemStatements deve usare label in italiano clinico sintetico e icdQuery breve in inglese',

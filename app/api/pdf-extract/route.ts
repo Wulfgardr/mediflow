@@ -115,6 +115,7 @@ export async function POST(req: Request) {
         const loadingTask = pdfjsLib.getDocument({
             data: arrayBuffer,
             // Disable worker for server-side usage (runs in main thread, simpler)
+            disableWorker: true,
             disableFontFace: true,
             verbosity: 0
         });

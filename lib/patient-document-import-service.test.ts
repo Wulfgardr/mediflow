@@ -449,6 +449,45 @@ test('document import merges contextual manual therapy with catalog match for th
     assert.doesNotMatch(merged[0].evidence || '', /paracetamolo/i);
 });
 
+test('document import rejects specialist service prescriptions as therapy candidates', () => {
+    assert.equal(
+        isPlausibleTherapyCandidate({
+            drugMention: 'Visita otorinolaringoiatrica',
+            drugQuery: 'visita otorinolaringoiatrica',
+        }),
+        false,
+    );
+    assert.equal(
+        isPlausibleTherapyCandidate({
+            drugMention: 'Amoxicillina 1 g',
+            drugQuery: 'amoxicillina',
+        }),
+        true,
+    );
+
+    const candidates = fallbackTherapyCandidates({
+        firstName: '',
+        lastName: '',
+        taxCode: '',
+        birthDate: undefined,
+        address: '',
+        phone: '',
+        diagnoses: [],
+        medications: [
+            'Prescritta visita otorinolaringoiatrica di controllo',
+            'Amoxicillina 1 g ogni 12 ore',
+        ],
+        documentSummary: '',
+        notes: '',
+        rawText: '',
+        source: 'regex',
+        confidence: 0.8,
+    }).filter(isPlausibleTherapyCandidate);
+
+    assert.equal(candidates.length, 1);
+    assert.match(candidates[0].drugMention, /Amoxicillina/i);
+});
+
 test('document import does not merge therapies that only share dosage intensity', () => {
     const merged = mergeUniqueTherapies([
         {
