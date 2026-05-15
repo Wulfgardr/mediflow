@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-15 Codex
+- Opened `WUL-271` with a Kree8-inspired but MediFlow-authored full-surface interface mockup: added an isolated `/mockups/kree8` route with seven synthetic clinical cockpit areas, scoped visual-system CSS, ffmpeg-backed motion study artifacts for design review, a root runtime-shell allowlist that keeps the mockup outside the encrypted clinical chrome without changing normal security flow, and design documentation/index updates: `app/mockups/kree8/page.tsx`, `app/mockups/kree8/kree8-mockup.module.css`, `components/root-runtime-shell.tsx`, `app/layout.tsx`, `docs/design/wul-271-kree8-visual-translation.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
+
 ## 2026-05-05 Codex
 - Opened `WUL-226` to document the WUL-225 OCR platform boundary: added ADR 0059 for macOS-only Apple Vision OCR fallback, clarified that DeepSeek/Ollama remains the primary local OCR engine, stated that Windows/Linux have no certified equivalent platform fallback, and aligned canonical state/topology/walkthrough/architecture docs without adding PHI or raw OCR samples: `docs/adr/0059-macos-apple-vision-ocr-fallback.md`, `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `PLANS.md`, `docs/STATE_OF_THE_SYSTEM.md`, `docs/topologia-dati-flussi.md`, `docs/walkthrough.md`, `docs/system_architecture.md`, `docs/mlx-operational-parity.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 

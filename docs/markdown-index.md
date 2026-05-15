@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-05-05
+Ultimo aggiornamento: 2026-05-15
 
 ## Come usare questo indice
 
@@ -104,6 +104,7 @@ Ultimo aggiornamento: 2026-05-05
 | [docs/agent-attribution.md](./agent-attribution.md) | Registro contributi agent (Codex, altri). | Quando si aggiungono cambi non banali da agent. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
+| [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per il mockup full-surface isolato in `/mockups/kree8` (WUL-271). | Quando si rivede il prototipo Kree8 o si valuta come adatterebbe la shell runtime senza promuoverlo. |
 
 ## ADR (decisioni architetturali)
 
