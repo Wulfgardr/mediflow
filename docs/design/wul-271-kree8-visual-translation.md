@@ -1,8 +1,9 @@
-# WUL-271 · Kree8 → MediFlow visual translation
+# WUL-271/WUL-272 · Kree8 → MediFlow visual translation
 
-> Status: design mockup only · **v2 pass** with full clinical-cockpit coverage.
-> Route: `/mockups/kree8` (isolated client page).
-> Scope: full-surface visual reset for review. Not the runtime shell.
+> Status: live root entry on `/` as of `WUL-272`.
+> Review alias: `/mockups/kree8`.
+> Scope: full-surface visual reset promoted to the local web entrypoint as the
+> new app interface direction; real clinical data wiring is tracked by WUL-273.
 
 ## Why this doc exists
 
@@ -22,15 +23,21 @@ This page exists so reviewers can:
 
 - compare each Kree8 device against the chosen MediFlow analogue,
 - judge clinical fitness (density, scanability, status semantics),
-- avoid promoting the look to the runtime shell without explicit sign-off.
+- track what was promoted to the root entry and what still needs a real-data
+  migration before the legacy Graphite surfaces can be fully retired.
 
-## Isolation contract
+The follow-up migration tracker is
+[WUL-273](https://linear.app/wulfgardr/issue/WUL-273/kree8-app-wide-migration-real-data-surfaces-and-route-consolidation).
+
+## Live entry contract
 
 | Concern | How it is enforced |
 | --- | --- |
-| Runtime chrome isolated | `RootRuntimeShell` exact-allows only `/mockups/kree8` and renders that page without `SecurityProvider`, `Sidebar`, `MobileShellChrome`, DB live queries, or the encrypted clinical shell. All other routes keep the normal secure runtime. |
-| No persistent UI selector | The Kree8 surface is reachable only via the route `/mockups/kree8`. Nothing toggles it from the global UI. |
-| Visual overlay | `.shell` is `position: fixed; inset: 0; z-index: 1000;` and now runs without host sidebar/main canvas underneath. |
+| Root entry | `app/page.tsx` renders `Kree8ClinicalCockpit` in `live` mode, so `http://localhost:3000` shows the new line directly after `Start_MediFlow.command`. |
+| Runtime security retained | `RootRuntimeShell` treats `/` as a fullscreen live route: `SecurityProvider`, PIN/session, UI/accessibility/style/privacy providers remain active, but sidebar/mobile chrome and legacy main padding are not mounted around the cockpit. |
+| Review alias | `/mockups/kree8` still renders the same cockpit in `review` mode via the exact mockup allowlist and keeps the escape button for design QA. |
+| No persistent UI selector | No Graphite/Kree8 toggle, no preview profile, no persistent visual mode. This follows [ADR 0060](../adr/0060-kree8-cockpit-live-root-entry.md). |
+| Visual surface | `.shell` is `position: fixed; inset: 0; z-index: 1000;` so the cockpit owns the viewport. |
 | Reduced motion respected | A scoped `@media (prefers-reduced-motion: reduce)` block disables transitions and keyframe animations inside `.shell`. |
 | Data | Synthetic only. No PHI, no real patient screenshots, no remote assets. |
 | Dependencies | No new npm packages. Existing `lucide-react` is used for iconography. |
@@ -83,7 +90,7 @@ working sprite sheet is kept out of Git at
 All motion is gated by the scoped `@media (prefers-reduced-motion: reduce)`
 block.
 
-## Surface map (one route, seven areas)
+## Surface map (root entry, seven areas)
 
 The mockup keeps all major MediFlow surfaces inside the Kree8 frame, so the
 review covers the whole clinical journey, not just a hero page. The v2 pass
@@ -104,6 +111,8 @@ real MediFlow nomenclature.
 ## Interactivity demonstrated
 
 All state is purely local React state — no global store, no network calls.
+This remains deliberate in the first live-entry slice: the visual line is now
+directly visible on `/`, while real patient/data wiring is a separate migration.
 
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
@@ -138,15 +147,11 @@ All state is purely local React state — no global store, no network calls.
 - All readable text uses tokens at or above `--ink-muted` contrast; the very
   light slate is reserved for tabular dates and tiny metadata only.
 
-## What this mockup explicitly does **not** do
+## What this live-entry slice explicitly does **not** do
 
-- Does not change the runtime shell, the sidebar, the global UI style
-  selector, or the theme bootstrapping in `app/layout.tsx`.
-- Does not export tokens or components for reuse — the CSS module is scoped to
-  `.shell` and not imported elsewhere.
-- Does not introduce a new UI style key in `UIStyleProvider`. Promoting the
-  Kree8 look to the runtime would require a follow-up Linear issue and a
-  separate review of token / dark-mode behaviour.
+- Does not migrate all real clinical routes into the Kree8 grammar.
+- Does not introduce a new UI style key in `UIStyleProvider`.
+- Does not add a Graphite/Kree8 selector.
 - Does not load remote assets or real patient data.
 - Does not claim a certified SISS return artifact: the Esito stage records
   the portal outcome as **manually annotated** and labels it `non
@@ -154,7 +159,8 @@ All state is purely local React state — no global store, no network calls.
 
 ## Review checklist
 
-- [ ] Navigate to `/mockups/kree8`, exercise all seven area pills.
+- [ ] Navigate to `/`, exercise all seven area pills.
+- [ ] Navigate to `/mockups/kree8` and confirm it remains only a review alias.
 - [ ] On `Pazienti / incarico`, switch scope between `Ambulatorio locale`,
       `Network paired` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
       patient and confirm the Case Lens preview animates in; click
@@ -183,5 +189,5 @@ All state is purely local React state — no global store, no network calls.
       press states all disabled).
 - [ ] Resize the viewport below 1024px and confirm the rail becomes a
       horizontal scroll-snap strip.
-- [ ] Confirm the runtime sidebar is fully covered and the only escape is the
-      "Esci dal mockup" button in the bottom-right.
+- [ ] Confirm `/` has no visible mockup copy and no escape button.
+- [ ] Confirm the review alias shows "Esci dalla review" in the bottom-right.

@@ -4,6 +4,10 @@
 Date: 2026-04-22  
 Status: Accepted
 
+> Root-entry update: [ADR 0060](./0060-kree8-cockpit-live-root-entry.md)
+> supersedes this decision for the `/` web entrypoint. The no-selector rule
+> remains valid.
+
 > Nota: la parte sui preview profiles funzionali su `main` e stata poi ritirata
 > da [ADR 0050](./0050-functional-preview-profiles-retired-on-mainline.md).
 

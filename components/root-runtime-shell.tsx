@@ -16,6 +16,7 @@ import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider'
 import { UIStyleProvider } from '@/components/ui-style-provider';
 
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
+const FULLSCREEN_LIVE_ROUTES = new Set(['/']);
 
 export function RootRuntimeShell({
   children,
@@ -25,6 +26,8 @@ export function RootRuntimeShell({
   fingerprint: string;
 }) {
   const pathname = usePathname();
+
+  const isFullscreenLiveRoute = FULLSCREEN_LIVE_ROUTES.has(pathname);
 
   if (MOCKUP_ROUTE_ALLOWLIST.has(pathname)) {
     return <>{children}</>;
@@ -39,17 +42,23 @@ export function RootRuntimeShell({
           <UIAccessibilityProvider>
             <UIStyleProvider>
               <PrivacyProvider>
-                <div className="relative z-10 xl:flex">
-                  <div className="hidden xl:block">
-                    <Sidebar />
-                  </div>
-                  <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
-                    <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
-                      <MobileShellChrome />
-                      {children}
-                    </div>
+                {isFullscreenLiveRoute ? (
+                  <main className="relative z-10 min-h-screen">
+                    {children}
                   </main>
-                </div>
+                ) : (
+                  <div className="relative z-10 xl:flex">
+                    <div className="hidden xl:block">
+                      <Sidebar />
+                    </div>
+                    <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
+                      <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <MobileShellChrome />
+                        {children}
+                      </div>
+                    </main>
+                  </div>
+                )}
               </PrivacyProvider>
             </UIStyleProvider>
           </UIAccessibilityProvider>

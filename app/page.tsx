@@ -1,9 +1,5 @@
-import PatientList from '@/components/patient-list';
+import { Kree8ClinicalCockpit } from '@/components/kree8/kree8-clinical-cockpit';
 
 export default function Home() {
-  return (
-    <div className="min-h-[85vh] space-y-6">
-      <PatientList />
-    </div>
-  );
+  return <Kree8ClinicalCockpit surface="live" />;
 }
