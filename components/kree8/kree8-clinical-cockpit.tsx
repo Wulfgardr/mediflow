@@ -514,7 +514,7 @@ function TurnoArea({ filter }: { filter: StatusFilter }) {
       <div className={styles.twoCol}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Agenda di oggi</h2>
+            <h2 className={styles.panelTitle}>Agenda clinica di oggi</h2>
             <PillBadge variant="muted">{visibleAgenda.length} eventi</PillBadge>
             <span className={styles.panelActions}>
               <span className={styles.rowSub}>
@@ -545,7 +545,7 @@ function TurnoArea({ filter }: { filter: StatusFilter }) {
 
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Coda decisioni AI</h2>
+            <h2 className={styles.panelTitle}>Coda decisionale review</h2>
             <PillBadge variant="violet">7 casi</PillBadge>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
@@ -1284,9 +1284,9 @@ function CataloghiArea() {
     version <= 3 ? 'broken' : version <= 8 ? 'fresh' : version <= 16 ? 'ok' : 'stale';
   const freshnessTitle = {
     fresh: 'Catalogo manifesto fresco',
-    ok: 'Catalogo manifesto disponibile',
+    ok: 'Catalogo da verificare',
     stale: 'Catalogo manifesto invecchiato',
-    broken: 'Catalogo manifesto da reimportare',
+    broken: 'Import manuale richiesto',
   }[freshnessTier];
   const freshnessPct = Math.max(8, Math.round(100 - (version - 1) * 4));
   const freshnessClass = classNames(
@@ -1305,8 +1305,8 @@ function CataloghiArea() {
             Governance cataloghi <em>· manifest snapshot v{version}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Stato locale dei cataloghi clinici · selezione manifest senza
-            invocare runtime remoto.
+            Stato locale dei cataloghi clinici · revisione manifest senza
+            invocare runtime remoto o sync cloud.
           </p>
         </div>
       </header>
@@ -1349,10 +1349,10 @@ function CataloghiArea() {
           </div>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             <button type="button" className={styles.ghostBtn}>
-              <RefreshCcw size={13} /> Forza sync
+              <RefreshCcw size={13} /> Verifica manifest
             </button>
             <button type="button" className={styles.primaryBtn}>
-              Applica snapshot
+              Segna snapshot valido
               <ChevronRight size={14} />
             </button>
           </span>
@@ -1379,9 +1379,9 @@ function CataloghiArea() {
             }[c.freshness] as PillVariant;
             const labelText = {
               fresh: 'fresco',
-              ok: 'aggiornato',
+              ok: 'da verificare',
               stale: 'invecchiato',
-              broken: 'import manuale',
+              broken: 'import manuale richiesto',
               off: 'disattivato',
             }[c.freshness];
 
@@ -1839,7 +1839,7 @@ function GovernanceArea() {
             {
               id: 'cloudComparator' as const,
               title: 'Cloud comparator shadow',
-              sub: 'confronto disciplinato vs baseline locale · richiede redaction PII',
+              sub: 'opt-in/off by default · solo case pack redatti fuori runtime clinico',
             },
           ].map((row) => (
             <div key={row.id} className={styles.toggleRow}>
@@ -1892,7 +1892,7 @@ function GovernanceArea() {
             <div className={styles.toggleRowMain}>
               <span className={styles.toggleRowTitle}>Network home-base</span>
               <span className={styles.toggleRowSub}>
-                modalità paired · scope ambulatoriale · read + write governato
+                opt-in LAN paired · scope ambulatoriale · read + write governato
               </span>
             </div>
             <button

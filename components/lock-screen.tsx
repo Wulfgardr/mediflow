@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useSecurity } from './security-provider';
-import { Lock, Unlock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { AlertCircle, KeyRound, Loader2, ShieldCheck, Unlock } from 'lucide-react';
+import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
     const { isLocked, requiresSetup, authErrorMessage, login, setupPin } = useSecurity();
@@ -54,78 +55,127 @@ export function LockScreen() {
         }
     };
 
+    const visibleError = error || authErrorMessage;
+
     return (
-        // @Codex WUL-229 — lock chrome adopts the specular tier (modal shell) and shared mf-input/btn primitives
-        <div className="mf-modal-backdrop">
-            <div className="mf-modal-shell w-full max-w-md p-8 space-y-6 animate-in fade-in zoom-in duration-300">
-                <div className="flex flex-col items-center space-y-2 text-center">
-                    <div className="p-4 rounded-full" style={{ backgroundColor: 'rgba(15, 123, 104, 0.12)' }}>
+        // @Codex WUL-274 — lock chrome mirrors the Kree8 live root without changing auth semantics.
+        <div className={styles.lockShell} aria-label="MediFlow lock screen">
+            <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
+                <div className={styles.brandRow}>
+                    <span className={styles.brandMark}>MF</span>
+                    <span className={styles.brandWord}>
+                        MEDI<b>FLOW</b>
+                    </span>
+                    <span className={styles.statusPill}>
+                        {requiresSetup ? 'setup locale' : 'PIN richiesto'}
+                    </span>
+                </div>
+
+                <div className={styles.headerBlock}>
+                    <div className={styles.kicker}>
                         {requiresSetup ? (
-                            <ShieldCheck className="w-10 h-10" style={{ color: 'var(--mf-primary)' }} />
+                            <>
+                                <ShieldCheck size={13} /> Prima configurazione
+                            </>
                         ) : (
-                            <Lock className="w-10 h-10" style={{ color: 'var(--mf-primary)' }} />
+                            <>
+                                <KeyRound size={13} /> Sessione protetta
+                            </>
                         )}
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
-                        {requiresSetup ? 'Crea il tuo PIN' : 'MediFlow Sicurezza'}
+                    <h1 id="mediflow-lock-title" className={styles.title}>
+                        {requiresSetup ? 'Crea il tuo PIN' : 'Sblocca MediFlow'}
                     </h1>
-                    <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>
+                    <p className={styles.subtitle}>
                         {requiresSetup
-                            ? 'Imposta un PIN di sicurezza per proteggere i dati dei pazienti.'
-                            : 'Inserisci il tuo PIN per accedere.'}
+                            ? 'Crea un PIN per proteggere la sessione locale e la master key.'
+                            : 'Sessione bloccata · inserisci il PIN per riprendere il turno.'}
                     </p>
                 </div>
 
-                <form onSubmit={requiresSetup ? handleSetup : handleLogin} className="space-y-4">
-                    <div className="space-y-2">
+                <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}>
+                    <label className={styles.fieldLabel} htmlFor="mediflow-lock-pin">
+                        PIN operatore
+                    </label>
+                    <div className={styles.inputWrap}>
                         <input
+                            id="mediflow-lock-pin"
                             type="password"
                             placeholder="Inserisci PIN"
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
-                            className="mf-input text-center text-lg tracking-widest"
+                            className={styles.pinInput}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="off"
+                            aria-invalid={Boolean(visibleError)}
+                            aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
+                            disabled={loading}
                             autoFocus
                         />
                     </div>
 
                     {requiresSetup && (
-                        <div className="space-y-2">
+                        <div className={styles.inputWrap}>
                             <input
                                 type="password"
                                 placeholder="Conferma PIN"
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value)}
-                                className="mf-input text-center text-lg tracking-widest"
+                                className={styles.pinInput}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                autoComplete="off"
+                                aria-invalid={Boolean(visibleError)}
+                                aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
+                                disabled={loading}
                             />
                         </div>
                     )}
 
-                    {(error || authErrorMessage) && (
-                        <div className="mf-alert mf-alert-critical text-center justify-center" role="alert">
-                            <span className="inline-flex items-center justify-center gap-2">
-                                <AlertCircle className="w-4 h-4" />
-                                <span>{error || authErrorMessage}</span>
-                            </span>
+                    {visibleError && (
+                        <div
+                            key={visibleError}
+                            id="mediflow-lock-error"
+                            className={styles.errorChip}
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <AlertCircle size={12} />
+                            <span>{visibleError}</span>
                         </div>
                     )}
 
                     <button
                         type="submit"
-                        disabled={loading || !pin}
-                        className="ui-btn-primary w-full h-12 px-4 text-sm font-semibold"
+                        disabled={
+                            loading
+                            || pin.length < 4
+                            || (requiresSetup && confirmPin.length < 4)
+                        }
+                        className={styles.primaryButton}
                     >
                         {loading ? (
-                            <span className="animate-spin">⏳</span>
+                            <>
+                                <Loader2 className={styles.spinner} size={16} />
+                                {requiresSetup ? 'Sto configurando...' : 'Sto sbloccando...'}
+                            </>
                         ) : requiresSetup ? (
                             'Imposta PIN'
                         ) : (
-                            <span className="flex items-center">
-                                <Unlock className="w-4 h-4 mr-2" /> Sblocca
-                            </span>
+                            <>
+                                <Unlock size={16} /> Sblocca
+                            </>
                         )}
                     </button>
                 </form>
-            </div>
+
+                <footer className={styles.footer}>
+                    <span>Sessione locale</span>
+                    <span>Nessun trasferimento di rete</span>
+                    <span>Zero-knowledge</span>
+                </footer>
+            </section>
         </div>
     );
 }

@@ -1,6 +1,7 @@
-# WUL-271/WUL-272 · Kree8 → MediFlow visual translation
+# WUL-271/WUL-272/WUL-274 · Kree8 → MediFlow visual translation
 
 > Status: live root entry on `/` as of `WUL-272`.
+> PIN continuity: lock screen aligned to the live Kree8 grammar as of `WUL-274`.
 > Review alias: `/mockups/kree8`.
 > Scope: full-surface visual reset promoted to the local web entrypoint as the
 > new app interface direction; real clinical data wiring is tracked by WUL-273.
@@ -35,6 +36,7 @@ The follow-up migration tracker is
 | --- | --- |
 | Root entry | `app/page.tsx` renders `Kree8ClinicalCockpit` in `live` mode, so `http://localhost:3000` shows the new line directly after `Start_MediFlow.command`. |
 | Runtime security retained | `RootRuntimeShell` treats `/` as a fullscreen live route: `SecurityProvider`, PIN/session, UI/accessibility/style/privacy providers remain active, but sidebar/mobile chrome and legacy main padding are not mounted around the cockpit. |
+| PIN gate continuity | `LockScreen` uses a scoped Kree8 lock module and remains the only mounted locked surface; it does not mount the cockpit or protected data providers behind the PIN gate. |
 | Review alias | `/mockups/kree8` still renders the same cockpit in `review` mode via the exact mockup allowlist and keeps the escape button for design QA. |
 | No persistent UI selector | No Graphite/Kree8 toggle, no preview profile, no persistent visual mode. This follows [ADR 0060](../adr/0060-kree8-cockpit-live-root-entry.md). |
 | Visual surface | `.shell` is `position: fixed; inset: 0; z-index: 1000;` so the cockpit owns the viewport. |
@@ -59,6 +61,7 @@ leaks into `:root` or other surfaces.
 | Stepper minus/plus | `.stepper` + `.stepperBtn` | Disabled at the boundary; tabular number. |
 | Pricing-row gradient (green) | **dropped in v2** | Replaced by `.freshness` as a white control with a thin semantic left rail (`--rail-green/blue/yellow/coral`) so AIFA stops reading like a celebratory pricing card. |
 | Stage / category tabs | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Used for the SISS handoff staging — augmented with a subtle sweep keyframe on transition. |
+| PIN lock surface | `kree8-lock-screen.module.css` | Cool-gray canvas, raised white card, MF brand mark, slate focus ring, ink primary button, semantic local/zero-knowledge footer. No global token export. |
 
 ### Contrast and type rhythm
 
@@ -116,6 +119,9 @@ directly visible on `/`, while real patient/data wiring is a separate migration.
 
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
+- PIN unlock is visually part of the same app line: scoped lock surface,
+  numeric PIN input, ink unlock action, error chip with a small commit pulse,
+  and local/zero-knowledge captions. Auth semantics stay in `SecurityProvider`.
 - Toolbar filter chips (single-select; rewires the Turno agenda).
 - AI gradient action present in the toolbar (decorative; matches Kree8 cue).
 - Patient inbox scope (`Ambulatorio locale` / `Network paired` / `Tutti`) and
@@ -150,6 +156,8 @@ directly visible on `/`, while real patient/data wiring is a separate migration.
 ## What this live-entry slice explicitly does **not** do
 
 - Does not migrate all real clinical routes into the Kree8 grammar.
+- Does not change PIN/auth/session semantics or mount cockpit data behind the
+  lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.
 - Does not add a Graphite/Kree8 selector.
 - Does not load remote assets or real patient data.
@@ -160,6 +168,10 @@ directly visible on `/`, while real patient/data wiring is a separate migration.
 ## Review checklist
 
 - [ ] Navigate to `/`, exercise all seven area pills.
+- [ ] Load `/` while locked and confirm only the Kree8 PIN surface is mounted;
+      no cockpit copy or protected fetch storm appears before unlock.
+- [ ] Unlock with a valid PIN and confirm the lock surface unmounts directly
+      into the Kree8 cockpit.
 - [ ] Navigate to `/mockups/kree8` and confirm it remains only a review alias.
 - [ ] On `Pazienti / incarico`, switch scope between `Ambulatorio locale`,
       `Network paired` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
