@@ -685,6 +685,100 @@
 .rowSub { font-size: 12px; color: var(--ink-muted); }
 .rowEnd { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 
+.agendaBridge {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 248, 252, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 10px 22px rgba(59, 72, 96, 0.08);
+}
+
+.agendaBridgeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.agendaBridgeHeader :global(svg) { color: var(--pill-blue-fg); }
+
+.agendaBridgeCopy {
+  margin: 8px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.agendaCandidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.agendaCandidateRow {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(59, 72, 96, 0.045);
+}
+
+.agendaCandidateTime {
+  color: var(--ink-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.agendaCandidateMain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agendaCandidateTitle,
+.agendaCandidateMeta,
+.agendaCandidateReason {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendaCandidateTitle {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.agendaCandidateMeta,
+.agendaCandidateReason {
+  color: var(--ink-muted);
+  font-size: 11.3px;
+}
+
+.agendaCandidateEnd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .agendaCandidateRow {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+
+  .agendaCandidateEnd { display: none; }
+}
+
 /* ───────────── stepper ───────────── */
 
 .stepper {

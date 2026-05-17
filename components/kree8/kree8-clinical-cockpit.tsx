@@ -6,7 +6,7 @@
    /mockups/kree8 as a review alias. All data is synthetic in this first visual
    promotion; no PHI, no remote assets, no new npm dependencies. */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity,
@@ -61,6 +61,42 @@ type StageId = 'identity' | 'consent' | 'handoff' | 'outcome';
 type StatusFilter = 'all' | 'urgent' | 'ai' | 'manual';
 type InboxScope = 'ambulatorio' | 'network' | 'tutti';
 type InboxList = 'attivi' | 'archivio';
+
+type ClinicalAgendaBridgeStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+type ClinicalAgendaCandidatePreview = {
+  id: string;
+  title: string;
+  startIso: string;
+  endIso?: string;
+  location?: string;
+  sourceLabel: string;
+  score: number;
+  reasons: string[];
+  reviewState: 'candidate';
+};
+
+type ClinicalAgendaBridgePreview = {
+  enabled: boolean;
+  stats: {
+    candidates: number;
+    parsed: number;
+    ignored: number;
+    invalid: number;
+  };
+  sourceStatuses?: {
+    sourceLabel: string;
+    status: 'ready' | 'missing' | 'unreadable';
+    parsed: number;
+    candidates: number;
+  }[];
+  candidates: ClinicalAgendaCandidatePreview[];
+};
+
+type ClinicalAgendaBridgeClientState = {
+  status: ClinicalAgendaBridgeStatus;
+  data?: ClinicalAgendaBridgePreview;
+};
 
 const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] = [
   { id: 'turno', label: 'Turno clinico', icon: CalendarClock },
@@ -456,7 +492,139 @@ function Toolbar({
 
 /* ───────────────────────── Turno clinico ───────────────────────── */
 
-function TurnoArea({ filter }: { filter: StatusFilter }) {
+function formatCandidateTime(startIso: string): string {
+  const date = new Date(startIso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function summarizeAgendaBridgeSources(data?: ClinicalAgendaBridgePreview): string {
+  if (!data?.sourceStatuses?.length) return '';
+
+  return data.sourceStatuses
+    .map((source) => {
+      if (source.status === 'ready') {
+        return `${source.sourceLabel}: ${source.parsed} letti`;
+      }
+      if (source.status === 'missing') {
+        return `${source.sourceLabel}: cache assente`;
+      }
+      return `${source.sourceLabel}: non leggibile`;
+    })
+    .join(' · ');
+}
+
+function ClinicalAgendaBridgePanel({
+  bridge,
+}: {
+  bridge: ClinicalAgendaBridgeClientState;
+}) {
+  const candidates = bridge.data?.candidates ?? [];
+  const sourceSummary = summarizeAgendaBridgeSources(bridge.data);
+
+  if (bridge.status === 'loading' || bridge.status === 'idle') {
+    return (
+      <div className={styles.agendaBridge}>
+        <div className={styles.agendaBridgeHeader}>
+          <Cloud size={13} />
+          <span>Bridge Zimbra/iCloud</span>
+          <PillBadge variant="muted">lettura locale</PillBadge>
+        </div>
+        <p className={styles.agendaBridgeCopy}>
+          Sto cercando solo segnali clinici o FBF gia presenti nelle cache locali.
+        </p>
+      </div>
+    );
+  }
+
+  if (bridge.status === 'error') {
+    return (
+      <div className={styles.agendaBridge}>
+        <div className={styles.agendaBridgeHeader}>
+          <AlertTriangle size={13} />
+          <span>Bridge Zimbra/iCloud</span>
+          <PillBadge variant="coral">non disponibile</PillBadge>
+        </div>
+        <p className={styles.agendaBridgeCopy}>
+          Nessun dato acquisito. La cockpit resta sulla agenda confermata.
+        </p>
+      </div>
+    );
+  }
+
+  if (!bridge.data?.enabled) {
+    return (
+      <div className={styles.agendaBridge}>
+        <div className={styles.agendaBridgeHeader}>
+          <Cloud size={13} />
+          <span>Bridge Zimbra/iCloud</span>
+          <PillBadge variant="muted">cache assente</PillBadge>
+        </div>
+        <p className={styles.agendaBridgeCopy}>
+          Pronto per leggere le cache evento del mail assistant, senza importare
+          calendario personale o posta.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.agendaBridge}>
+      <div className={styles.agendaBridgeHeader}>
+        <Cloud size={13} />
+        <span>Bridge Zimbra/iCloud</span>
+        <PillBadge variant={candidates.length > 0 ? 'blue' : 'muted'}>
+          {bridge.data.stats.candidates} candidati
+        </PillBadge>
+      </div>
+
+      {candidates.length === 0 ? (
+        <p className={styles.agendaBridgeCopy}>
+          Nessun segnale clinico/FBF nella finestra locale. Nulla viene importato.
+          {sourceSummary ? <span> {sourceSummary}.</span> : null}
+        </p>
+      ) : (
+        <div className={styles.agendaCandidateList}>
+          {candidates.slice(0, 3).map((candidate) => (
+            <div key={candidate.id} className={styles.agendaCandidateRow}>
+              <span className={styles.agendaCandidateTime}>
+                {formatCandidateTime(candidate.startIso)}
+              </span>
+              <span className={styles.agendaCandidateMain}>
+                <span className={styles.agendaCandidateTitle}>
+                  {candidate.title}
+                </span>
+                <span className={styles.agendaCandidateMeta}>
+                  {candidate.sourceLabel}
+                  {candidate.location ? ` · ${candidate.location}` : ''}
+                </span>
+                <span className={styles.agendaCandidateReason}>
+                  {candidate.reasons.slice(0, 2).join(' · ')}
+                </span>
+              </span>
+              <span className={styles.agendaCandidateEnd}>
+                <PillBadge variant="yellow">review</PillBadge>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TurnoArea({
+  filter,
+  agendaBridge,
+}: {
+  filter: StatusFilter;
+  agendaBridge: ClinicalAgendaBridgeClientState;
+}) {
   const visibleAgenda = useMemo(() => {
     if (filter === 'all') return AGENDA;
     if (filter === 'urgent') return AGENDA.filter((r) => r.pill === 'coral' || r.pill === 'yellow');
@@ -516,6 +684,11 @@ function TurnoArea({ filter }: { filter: StatusFilter }) {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Agenda clinica di oggi</h2>
             <PillBadge variant="muted">{visibleAgenda.length} eventi</PillBadge>
+            {agendaBridge.data?.stats.candidates ? (
+              <PillBadge variant="blue">
+                {agendaBridge.data.stats.candidates} esterni
+              </PillBadge>
+            ) : null}
             <span className={styles.panelActions}>
               <span className={styles.rowSub}>
                 filtro: {STATUS_FILTERS.find((f) => f.id === filter)?.label}
@@ -541,6 +714,7 @@ function TurnoArea({ filter }: { filter: StatusFilter }) {
               </p>
             )}
           </div>
+          <ClinicalAgendaBridgePanel bridge={agendaBridge} />
         </section>
 
         <section className={styles.panelInset}>
@@ -2047,15 +2221,17 @@ function GovernanceArea() {
 function AreaContent({
   area,
   filter,
+  agendaBridge,
   onOpenScheda,
 }: {
   area: AreaId;
   filter: StatusFilter;
+  agendaBridge: ClinicalAgendaBridgeClientState;
   onOpenScheda: () => void;
 }) {
   switch (area) {
     case 'turno':
-      return <TurnoArea filter={filter} />;
+      return <TurnoArea filter={filter} agendaBridge={agendaBridge} />;
     case 'incarico':
       return <IncaricoArea onOpenScheda={onOpenScheda} />;
     case 'scheda':
@@ -2078,7 +2254,35 @@ export function Kree8ClinicalCockpit({
 }) {
   const [area, setArea] = useState<AreaId>('turno');
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
+    status: 'idle',
+  });
   const isReview = surface === 'review';
+
+  useEffect(() => {
+    if (isReview) return;
+
+    const controller = new AbortController();
+    setAgendaBridge({ status: 'loading' });
+
+    fetch('/api/clinical-agenda/candidates?days=45&pastDays=1&limit=6', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('clinical agenda bridge unavailable');
+        return response.json() as Promise<ClinicalAgendaBridgePreview>;
+      })
+      .then((data) => {
+        setAgendaBridge({ status: 'ready', data });
+      })
+      .catch((error: Error) => {
+        if (error.name === 'AbortError') return;
+        setAgendaBridge({ status: 'error' });
+      });
+
+    return () => controller.abort();
+  }, [isReview]);
 
   return (
     <div
@@ -2141,6 +2345,7 @@ export function Kree8ClinicalCockpit({
         <AreaContent
           area={area}
           filter={filter}
+          agendaBridge={agendaBridge}
           onOpenScheda={() => setArea('scheda')}
         />
       </section>

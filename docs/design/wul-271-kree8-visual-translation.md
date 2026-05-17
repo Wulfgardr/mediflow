@@ -103,7 +103,7 @@ real MediFlow nomenclature.
 
 | Area pill | Demonstrates |
 | --- | --- |
-| Turno clinico | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards. |
+| Turno clinico | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
 | Pazienti / incarico | Patient inbox with scope chips (Ambulatorio locale / Network paired / Tutti), active/archive toggle, selectable patient rows, sticky Case Lens preview with `Apri scheda` / `Allega documento` / `Prepara handoff SISS`. |
 | Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara handoff SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidence Stack, Smart Import preview with write/note/blocked counters, Lavoro pianificato. |
 | Revisione documenti | Review-first document panel: counters for `write strutturate` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS auto-write, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Applica al form` (no more "timbra"). |
@@ -113,9 +113,13 @@ real MediFlow nomenclature.
 
 ## Interactivity demonstrated
 
-All state is purely local React state — no global store, no network calls.
+Most state remains local React state. Since `WUL-275`, the live root also makes
+one session-protected internal read to `/api/clinical-agenda/candidates` for
+Zimbra/iCloud event-cache candidates. The review alias stays synthetic and does
+not fetch external data.
+
 This remains deliberate in the first live-entry slice: the visual line is now
-directly visible on `/`, while real patient/data wiring is a separate migration.
+directly visible on `/`, while broad patient/data wiring is a separate migration.
 
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
@@ -123,6 +127,8 @@ directly visible on `/`, while real patient/data wiring is a separate migration.
   numeric PIN input, ink unlock action, error chip with a small commit pulse,
   and local/zero-knowledge captions. Auth semantics stay in `SecurityProvider`.
 - Toolbar filter chips (single-select; rewires the Turno agenda).
+- Zimbra/iCloud bridge preview distinguishes external clinical/FBF candidates
+  from confirmed agenda rows and keeps them in manual review state.
 - AI gradient action present in the toolbar (decorative; matches Kree8 cue).
 - Patient inbox scope (`Ambulatorio locale` / `Network paired` / `Tutti`) and
   list mode (`Attivi` / `Archivio`) drive the visible rows; selecting a row
