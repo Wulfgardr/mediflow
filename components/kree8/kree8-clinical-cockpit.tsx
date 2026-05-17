@@ -29,7 +29,6 @@ import {
   KeyRound,
   ListChecks,
   MapPin,
-  Minus,
   Paperclip,
   Pill as PillIcon,
   Plus,
@@ -313,13 +312,28 @@ const DOC_FIELDS: {
   },
 ];
 
-const CATALOGS: {
+/* @Codex */
+type Kree8CatalogFreshness = 'fresh' | 'ok' | 'stale' | 'broken' | 'off';
+
+/* @Codex */
+type Kree8CatalogRow = {
   id: string;
   name: string;
   sub: string;
-  freshness: 'fresh' | 'ok' | 'stale' | 'broken' | 'off';
+  freshness: Kree8CatalogFreshness;
   age: string;
-}[] = [
+  href?: string;
+  actionLabel?: string;
+};
+
+/* @Codex */
+type Kree8CatalogClientState = {
+  status: Kree8PatientStatus;
+  rows: Kree8CatalogRow[];
+  indexedCount: number;
+};
+
+const REVIEW_CATALOGS: Kree8CatalogRow[] = [
   {
     id: 'aifa-pt',
     name: 'AIFA · Piani Terapeutici',
@@ -363,6 +377,13 @@ const CATALOGS: {
     age: '—',
   },
 ];
+
+/* @Codex */
+const REVIEW_CATALOG_STATE: Kree8CatalogClientState = {
+  status: 'ready',
+  rows: REVIEW_CATALOGS,
+  indexedCount: 0,
+};
 
 const REVIEW_AGENDA: Kree8AgendaRow[] = [
   {
@@ -754,6 +775,68 @@ function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined): string
     default:
       return 'Nota';
   }
+}
+
+/* @Codex */
+async function fetchCatalogCount(path: string): Promise<number> {
+  const response = await fetch(path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Catalog count failed: ${response.status}`);
+  const payload = await response.json() as { count?: unknown };
+  return Number(payload.count || 0);
+}
+
+/* @Codex */
+function formatCatalogCount(count: number, singular: string, plural: string): string {
+  const label = count === 1 ? singular : plural;
+  return `${count.toLocaleString('it-IT')} ${label}`;
+}
+
+/* @Codex */
+function catalogFreshnessFromCount(count: number): Kree8CatalogFreshness {
+  return count > 0 ? 'fresh' : 'broken';
+}
+
+/* @Codex */
+function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8CatalogClientState {
+  const rows: Kree8CatalogRow[] = [
+    {
+      id: 'aic',
+      name: 'AIFA · AIC farmaci',
+      sub: drugCount > 0
+        ? 'Prontuario farmaci indicizzato nel database locale.'
+        : 'Nessun farmaco indicizzato: importa confezioni.csv dalle impostazioni.',
+      freshness: catalogFreshnessFromCount(drugCount),
+      age: formatCatalogCount(drugCount, 'farmaco', 'farmaci'),
+      href: '/settings#data',
+      actionLabel: drugCount > 0 ? 'Gestisci' : 'Importa',
+    },
+    {
+      id: 'exemptions',
+      name: 'Esenzioni · codifiche locali',
+      sub: exemptionCount > 0
+        ? 'Catalogo esenzioni disponibile per ricerca anagrafica.'
+        : 'Nessuna esenzione indicizzata: importa TXT/CSV dalle impostazioni.',
+      freshness: catalogFreshnessFromCount(exemptionCount),
+      age: formatCatalogCount(exemptionCount, 'codice', 'codici'),
+      href: '/settings#data',
+      actionLabel: exemptionCount > 0 ? 'Gestisci' : 'Importa',
+    },
+    {
+      id: 'icd',
+      name: 'ICD-11 API locale',
+      sub: 'Servizio locale gestito dal launcher; nessun runtime remoto richiesto.',
+      freshness: 'ok',
+      age: 'porta 8888',
+      href: '/settings#operations',
+      actionLabel: 'Diagnostica',
+    },
+  ];
+
+  return {
+    status: 'ready',
+    rows,
+    indexedCount: drugCount + exemptionCount,
+  };
 }
 
 /* @Codex */
@@ -2863,41 +2946,83 @@ function RevisioneArea() {
 
 /* ───────────────────────── Cataloghi locali ───────────────────────── */
 
-function CataloghiArea() {
-  const TOTAL_MANIFESTS = 24;
-  const [version, setVersion] = useState(7);
-  const [selectedCatalogId, setSelectedCatalogId] = useState(CATALOGS[0]?.id ?? '');
-  const [catalogAction, setCatalogAction] = useState<'idle' | 'verified' | 'validated'>('idle');
-  const selectedCatalog = CATALOGS.find((catalog) => catalog.id === selectedCatalogId) ?? CATALOGS[0];
+function CataloghiArea({ isReview }: { isReview: boolean }) {
+  const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
+  const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
+    async () => {
+      if (isReview) return REVIEW_CATALOG_STATE;
+      try {
+        const [drugCount, exemptionCount] = await Promise.all([
+          fetchCatalogCount('/api/drugs?count=1'),
+          fetchCatalogCount('/api/exemptions?count=1'),
+        ]);
+        return buildLiveCatalogState(drugCount, exemptionCount);
+      } catch (error) {
+        console.error('[MediFlow] Kree8 catalog status failed:', error);
+        return {
+          status: 'error',
+          rows: [],
+          indexedCount: 0,
+        };
+      }
+    },
+    [isReview],
+    isReview ? REVIEW_CATALOG_STATE : {
+      status: 'loading',
+      rows: [],
+      indexedCount: 0,
+    },
+  );
 
-  const freshnessTier =
-    version <= 3 ? 'broken' : version <= 8 ? 'fresh' : version <= 16 ? 'ok' : 'stale';
-  const freshnessTitle = {
-    fresh: 'Catalogo manifesto fresco',
-    ok: 'Catalogo da verificare',
-    stale: 'Catalogo manifesto invecchiato',
-    broken: 'Import manuale richiesto',
-  }[freshnessTier];
-  const freshnessPct = Math.max(8, Math.round(100 - (version - 1) * 4));
+  const catalogs = catalogState?.rows ?? [];
+  const selectedCatalog = catalogs.find((catalog) => catalog.id === selectedCatalogId) ?? catalogs[0];
+  const availableCatalogs = catalogs.filter((catalog) => catalog.freshness === 'fresh' || catalog.freshness === 'ok').length;
+  const needsImport = catalogs.some((catalog) => catalog.freshness === 'broken');
+  const isLoading = catalogState?.status === 'loading' || catalogState?.status === 'idle';
+  const freshnessTier: Kree8CatalogFreshness =
+    catalogState?.status === 'error' ? 'broken' : needsImport ? 'stale' : 'fresh';
+  const freshnessTitle =
+    catalogState?.status === 'error'
+      ? 'Cataloghi non leggibili'
+      : needsImport
+        ? 'Import cataloghi incompleto'
+        : 'Cataloghi locali disponibili';
+  const freshnessPct = catalogs.length
+    ? Math.round((availableCatalogs / catalogs.length) * 100)
+    : isLoading
+      ? 0
+      : 8;
   const freshnessClass = classNames(
     styles.freshness,
-    freshnessTier === 'ok' && styles.freshnessOk,
     freshnessTier === 'stale' && styles.freshnessStale,
     freshnessTier === 'broken' && styles.freshnessBroken,
   );
+
+  useEffect(() => {
+    if (!catalogs.length) return;
+    if (!catalogs.some((catalog) => catalog.id === selectedCatalogId)) {
+      setSelectedCatalogId(catalogs[0].id);
+    }
+  }, [catalogs, selectedCatalogId]);
 
   return (
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Cataloghi locali · AIFA · ICD · esenzioni</p>
+          <p className={styles.areaCaption}>Cataloghi locali · dati indicizzati</p>
           <h1 className={styles.areaTitle}>
-            Governance cataloghi <em>· manifest snapshot v{version}</em>
+            Governance cataloghi <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Stato locale dei cataloghi clinici · revisione manifest senza
-            invocare runtime remoto o sync cloud.
+            Stato reale dei cataloghi clinici locali. Import e cancellazioni restano
+            nelle impostazioni complete, con azione esplicita dell&apos;operatore.
           </p>
+        </div>
+        <div className={styles.headerActions}>
+          <Link href="/settings#data" className={styles.primaryBtn}>
+            <Database size={13} />
+            Apri import
+          </Link>
         </div>
       </header>
 
@@ -2907,76 +3032,34 @@ function CataloghiArea() {
           <div className={styles.freshnessLabel}>
             <span className={styles.freshnessTitle}>{freshnessTitle}</span>
             <span className={styles.freshnessSub}>
-              snapshot {version} di {TOTAL_MANIFESTS} · sincronia locale ·
-              ultimo audit 02 mag
+              {isLoading
+                ? 'lettura da API locali protette'
+                : `${availableCatalogs} di ${catalogs.length} pacchetti disponibili · nessun sync cloud`}
             </span>
           </div>
           <span className={styles.freshnessNum}>{freshnessPct}%</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14, flexWrap: 'wrap' }}>
-          <span className={styles.rowSub}>Seleziona manifest snapshot</span>
-          <div className={styles.stepper} role="group" aria-label="Selettore manifest">
-            <button
-              type="button"
-              className={styles.stepperBtn}
-              onClick={() => setVersion((v) => Math.max(1, v - 1))}
-              disabled={version === 1}
-              aria-label="Snapshot precedente"
-            >
-              <Minus size={14} />
-            </button>
-            <span className={styles.stepperVal}>{version}</span>
-            <button
-              type="button"
-              className={styles.stepperBtn}
-              onClick={() => setVersion((v) => Math.min(TOTAL_MANIFESTS, v + 1))}
-              disabled={version === TOTAL_MANIFESTS}
-              aria-label="Snapshot successivo"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
-            <button
-              type="button"
-              className={styles.ghostBtn}
-              onClick={() => setCatalogAction('verified')}
-            >
-              <RefreshCcw size={13} /> Verifica manifest
-            </button>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setCatalogAction('validated')}
-            >
-              Segna snapshot valido
-              <ChevronRight size={14} />
-            </button>
-          </span>
-        </div>
         <p className={styles.panelSubtitle}>
-          {catalogAction === 'validated'
-            ? `Snapshot v${version} marcato come valido per la sessione corrente.`
-            : catalogAction === 'verified'
-              ? `Snapshot v${version} verificato nella sessione corrente.`
-              : selectedCatalog
-                ? `Catalogo selezionato: ${selectedCatalog.name}.`
-                : 'Seleziona un catalogo per vedere lo stato operativo.'}
+          {catalogState?.status === 'error'
+            ? 'Impossibile leggere i conteggi locali in questa sessione.'
+            : selectedCatalog
+              ? `Catalogo selezionato: ${selectedCatalog.name}.`
+              : 'Caricamento stato cataloghi locali.'}
         </p>
       </section>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Cataloghi clinici</h2>
-          <PillBadge variant="muted">{CATALOGS.length} pacchetti</PillBadge>
+          <PillBadge variant="muted">{catalogs.length} pacchetti</PillBadge>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">catalogo locale</PillBadge>
+            <PillBadge variant="green">API locale</PillBadge>
           </span>
         </header>
 
         <div style={{ marginTop: 8 }}>
-          {CATALOGS.map((c) => {
+          {catalogs.map((c) => {
             const variant = {
               fresh: 'green',
               ok: 'blue',
@@ -3011,7 +3094,6 @@ function CataloghiArea() {
                   aria-label={`Apri catalogo ${c.name}`}
                   onClick={() => {
                     setSelectedCatalogId(c.id);
-                    setCatalogAction('idle');
                   }}
                 >
                   Apri
@@ -3020,6 +3102,9 @@ function CataloghiArea() {
               </div>
             );
           })}
+          {!catalogs.length ? (
+            <p className={styles.panelSubtitle}>Caricamento cataloghi locali.</p>
+          ) : null}
         </div>
         {selectedCatalog && (
           <div className={styles.compositeCard} style={{ marginTop: 12 }}>
@@ -3040,6 +3125,14 @@ function CataloghiArea() {
             <p className={styles.rowSub} style={{ margin: 0 }}>
               {selectedCatalog.sub} · aggiornamento {selectedCatalog.age}
             </p>
+            {selectedCatalog.href ? (
+              <div className={styles.caseLensActions} style={{ marginTop: 10 }}>
+                <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>
+                  {selectedCatalog.actionLabel ?? 'Apri'}
+                  <ArrowUpRight size={12} />
+                </Link>
+              </div>
+            ) : null}
           </div>
         )}
       </section>
@@ -3759,7 +3852,7 @@ function AreaContent({
           />
         );
     case 'cataloghi':
-      return <CataloghiArea />;
+      return <CataloghiArea isReview={isReview} />;
     case 'handoff':
       return isReview
         ? <HandoffArea />
