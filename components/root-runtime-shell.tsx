@@ -18,6 +18,14 @@ import { UIStyleProvider } from '@/components/ui-style-provider';
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
 const FULLSCREEN_LIVE_ROUTES = new Set(['/']);
 
+function isKree8PatientRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const patientRoutePrefix = '/patients/';
+  if (!pathname.startsWith(patientRoutePrefix)) return false;
+  const patientSegment = pathname.slice(patientRoutePrefix.length);
+  return Boolean(patientSegment && patientSegment !== 'new' && !patientSegment.includes('/'));
+}
+
 export function RootRuntimeShell({
   children,
   fingerprint,
@@ -27,7 +35,9 @@ export function RootRuntimeShell({
 }) {
   const pathname = usePathname();
 
-  const isFullscreenLiveRoute = FULLSCREEN_LIVE_ROUTES.has(pathname);
+  const isFullscreenLiveRoute =
+    FULLSCREEN_LIVE_ROUTES.has(pathname)
+    || isKree8PatientRoute(pathname);
 
   if (MOCKUP_ROUTE_ALLOWLIST.has(pathname)) {
     return <>{children}</>;

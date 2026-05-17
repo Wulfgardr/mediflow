@@ -137,6 +137,7 @@ type Kree8Patient = {
   lastTouch: string;
   pathway: string;
   href: string;
+  modulesHref: string;
   ageLabel: string;
   summary: string;
   raw: Kree8PatientSource;
@@ -441,6 +442,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     lastTouch: '08 mag · Diario',
     pathway: 'Ambulatorio locale',
     href: '/patients/p1',
+    modulesHref: '/patients/p1/modules',
     ageLabel: '64 anni',
     summary: 'Profilo a cronicità multipla · aderenza terapeutica buona · vitali ultima rilevazione nella norma.',
     raw: { id: 'p1' },
@@ -457,6 +459,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     lastTouch: '07 mag · Documento',
     pathway: 'Ambulatorio locale',
     href: '/patients/p2',
+    modulesHref: '/patients/p2/modules',
     ageLabel: 'Età n/d',
     summary: 'Follow-up e verifica esami in preparazione.',
     raw: { id: 'p2' },
@@ -473,6 +476,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     lastTouch: '06 mag · Visita domic.',
     pathway: 'Network paired',
     href: '/patients/p3',
+    modulesHref: '/patients/p3/modules',
     ageLabel: 'Età n/d',
     summary: 'Percorso territoriale attivo con continuità domiciliare.',
     raw: { id: 'p3' },
@@ -489,6 +493,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     lastTouch: '12 ott 2025',
     pathway: 'Ambulatorio locale',
     href: '/patients/p4',
+    modulesHref: '/patients/p4/modules',
     ageLabel: 'Età n/d',
     summary: 'Percorso chiuso, consultabile come storico clinico. Nessuna azione di scrittura.',
     raw: { id: 'p4' },
@@ -505,6 +510,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     lastTouch: '08 mag · Smart Import',
     pathway: 'Ambulatorio locale',
     href: '/patients/p5',
+    modulesHref: '/patients/p5/modules',
     ageLabel: 'Età n/d',
     summary: 'Documento in coda di revisione.',
     raw: { id: 'p5' },
@@ -613,6 +619,7 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
     lastTouch,
     pathway: 'Ambulatorio locale',
     href: `/patients/${encodeURIComponent(patient.id)}`,
+    modulesHref: `/patients/${encodeURIComponent(patient.id)}/modules`,
     ageLabel: calculatePatientAge(patient.birthDate),
     summary,
     raw: patient,
@@ -1462,7 +1469,7 @@ function IncaricoArea({
               <UserSquare2 size={13} />
               Apri in cockpit
             </button>
-            <Link href={selected.href} className={styles.ghostBtnSm}>
+            <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
               Moduli completi
             </Link>
@@ -1526,7 +1533,7 @@ function RealPatientArea({
           <Link href={`${patient.href}/edit`} className={styles.ghostBtnSm}>
             <Edit3 size={12} /> Anagrafica
           </Link>
-          <Link href={patient.href} className={styles.primaryBtn}>
+          <Link href={patient.modulesHref} className={styles.primaryBtn}>
             <UserSquare2 size={13} /> Moduli completi
           </Link>
         </div>
@@ -1711,7 +1718,7 @@ function RealPatientArea({
                 <Workflow size={12} />
                 Handoff
               </button>
-              <Link href={patient.href} className={styles.ghostBtnSm}>
+              <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
                 Apri dettagli
               </Link>
@@ -2064,7 +2071,7 @@ function LiveDocumentReviewArea({
             Scegli paziente
           </button>
           {patient ? (
-            <Link href={patient.href} className={styles.primaryBtn}>
+            <Link href={patient.modulesHref} className={styles.primaryBtn}>
               <ArrowUpRight size={13} />
               Apri dettagli
             </Link>
@@ -3566,17 +3573,23 @@ function AreaContent({
   }
 }
 
+type Kree8ClinicalCockpitProps = {
+  surface?: 'live' | 'review';
+  initialArea?: AreaId;
+  initialPatientId?: string;
+};
+
 export function Kree8ClinicalCockpit({
   surface = 'live',
-}: {
-  surface?: 'live' | 'review';
-}) {
-  const [area, setArea] = useState<AreaId>('turno');
+  initialArea = 'turno',
+  initialPatientId,
+}: Kree8ClinicalCockpitProps) {
+  const isReview = surface === 'review';
+  const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
     status: 'idle',
   });
-  const isReview = surface === 'review';
   const [patientState, setPatientState] = useState<Kree8PatientClientState>(() => (
     isReview
       ? { status: 'ready', patients: REVIEW_PATIENT_LIST }
@@ -3588,14 +3601,17 @@ export function Kree8ClinicalCockpit({
       : { status: 'idle', rows: [] }
   ));
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
-    isReview ? REVIEW_PATIENT_LIST[0]?.id : undefined
+    isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
 
   const selectedPatient = useMemo(
-    () => patientState.patients.find((patient) => patient.id === selectedPatientId)
-      ?? patientState.patients[0]
-      ?? null,
-    [patientState.patients, selectedPatientId],
+    () => {
+      const selected = patientState.patients.find((patient) => patient.id === selectedPatientId);
+      if (selected) return selected;
+      if (!isReview && initialPatientId && selectedPatientId === initialPatientId) return null;
+      return patientState.patients[0] ?? null;
+    },
+    [initialPatientId, isReview, patientState.patients, selectedPatientId],
   );
 
   /* @Codex */
@@ -3661,6 +3677,12 @@ export function Kree8ClinicalCockpit({
   }, [isReview]);
 
   useEffect(() => {
+    if (isReview || !initialPatientId) return;
+    setSelectedPatientId(initialPatientId);
+    setArea(initialArea);
+  }, [initialArea, initialPatientId, isReview]);
+
+  useEffect(() => {
     if (isReview) return;
 
     if (!livePatientRows) {
@@ -3676,12 +3698,12 @@ export function Kree8ClinicalCockpit({
       status: liveCheckupRows ? 'ready' : 'loading',
       rows: mapCheckupsForKree8(checkups, patients),
     });
-    setSelectedPatientId((current) => (
-      current && patients.some((patient) => patient.id === current)
-        ? current
-        : patients[0]?.id
-    ));
-  }, [isReview, livePatientRows, liveCheckupRows]);
+    setSelectedPatientId((current) => {
+      if (current && patients.some((patient) => patient.id === current)) return current;
+      if (initialPatientId) return initialPatientId;
+      return patients[0]?.id;
+    });
+  }, [initialPatientId, isReview, livePatientRows, liveCheckupRows]);
 
   const patientNavMeta =
     isReview
