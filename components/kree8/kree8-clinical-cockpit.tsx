@@ -2586,6 +2586,64 @@ function LiveGovernanceArea({
 }: {
   patientCount: number;
 }) {
+  const settingsLinks: Array<{
+    href: string;
+    title: string;
+    sub: string;
+    icon: typeof KeyRound;
+    pill: string;
+    variant: PillVariant;
+  }> = [
+    {
+      href: '/settings#account',
+      title: 'Account e PIN',
+      sub: 'profilo operatore, cambio PIN e sicurezza sessione',
+      icon: KeyRound,
+      pill: 'accesso',
+      variant: 'muted',
+    },
+    {
+      href: '/settings#ai',
+      title: 'AI locale',
+      sub: 'provider, modelli, shadow mode e kill switch',
+      icon: Sparkles,
+      pill: 'governato',
+      variant: 'violet',
+    },
+    {
+      href: '/settings#backups',
+      title: 'Backup',
+      sub: 'schedulazione, ripristino e prove operative',
+      icon: HardDrive,
+      pill: 'esplicito',
+      variant: 'blue',
+    },
+    {
+      href: '/settings#data',
+      title: 'Cataloghi',
+      sub: 'AIFA, esenzioni e import locali non distruttivi dal cockpit',
+      icon: Database,
+      pill: 'locale',
+      variant: 'green',
+    },
+    {
+      href: '/settings#operations',
+      title: 'Sistema',
+      sub: 'diagnostica, servizi locali e manutenzione',
+      icon: Activity,
+      pill: 'Mac',
+      variant: 'muted',
+    },
+    {
+      href: '/settings#appearance',
+      title: 'Aspetto',
+      sub: 'riduzione movimento, lettura e stile UI',
+      icon: SettingsIcon,
+      pill: 'utente',
+      variant: 'yellow',
+    },
+  ];
+
   return (
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
@@ -2623,6 +2681,39 @@ function LiveGovernanceArea({
           <p className={styles.panelSubtitle}>Backup e ripristino restano operazioni esplicite sul Mac.</p>
         </section>
       </div>
+
+      <section className={styles.panel}>
+        <header className={styles.panelHeader}>
+          <h2 className={styles.panelTitle}>Moduli impostazioni reali</h2>
+          <span className={styles.panelActions}>
+            <PillBadge variant="green">nessun controllo distruttivo qui</PillBadge>
+          </span>
+        </header>
+        <p className={styles.panelSubtitle}>
+          Il cockpit mostra lo stato e porta al modulo completo quando serve
+          modificare configurazioni, importare cataloghi o avviare backup.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
+          {settingsLinks.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={styles.compositeCard}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className={styles.modeIcon}><Icon size={15} /></span>
+                  <span style={{ minWidth: 0 }}>
+                    <span className={styles.modeTitle}>{item.title}</span>
+                    <br />
+                    <span className={styles.modeSub}>{item.sub}</span>
+                  </span>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <PillBadge variant={item.variant}>{item.pill}</PillBadge>
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
