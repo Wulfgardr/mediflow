@@ -67,6 +67,7 @@ type AreaId =
   | 'turno'
   | 'incarico'
   | 'scheda'
+  | 'diario'
   | 'revisione'
   | 'cataloghi'
   | 'handoff'
@@ -186,6 +187,29 @@ type Kree8AgendaClientState = {
   rows: Kree8AgendaRow[];
 };
 
+/* @Codex */
+type Kree8DiaryEntry = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientCode: string;
+  patientHref: string;
+  title: string;
+  typeLabel: string;
+  dateLabel: string;
+  preview: string;
+  deleted: boolean;
+  attachmentCount: number;
+};
+
+/* @Codex */
+type Kree8DiaryClientState = {
+  status: Kree8PatientStatus;
+  entries: Kree8DiaryEntry[];
+  activeCount: number;
+  patientCount: number;
+};
+
 type Kree8DecisionCard = {
   title: string;
   body: string;
@@ -199,6 +223,7 @@ const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] 
   { id: 'turno', label: 'Turno clinico', icon: CalendarClock },
   { id: 'incarico', label: 'Pazienti / incarico', icon: Inbox },
   { id: 'scheda', label: 'Scheda paziente', icon: UserSquare2 },
+  { id: 'diario', label: 'Diario clinico', icon: FileText },
   { id: 'revisione', label: 'Revisione documenti', icon: FileSearch },
   { id: 'cataloghi', label: 'Cataloghi locali', icon: Database },
   { id: 'handoff', label: 'Handoff regionale', icon: Workflow },
@@ -517,6 +542,20 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
   },
 ];
 
+/* @Codex */
+const REVIEW_DIARY_ENTRIES: Kree8DiaryEntry[] = [
+  { id: 'review-diary-1', patientId: 'p1', patientName: 'M. R.', patientCode: 'AB-2026-014', patientHref: '/patients/p1', title: 'Controllo pressorio domiciliare', typeLabel: 'Visita', dateLabel: '08 mag, 09:30', preview: 'Pressione domiciliare nella norma, terapia confermata e prossimo controllo programmato.', deleted: false, attachmentCount: 1 },
+  { id: 'review-diary-2', patientId: 'p2', patientName: 'C. D.', patientCode: 'CD-2026-088', patientHref: '/patients/p2', title: 'Review esami metabolici', typeLabel: 'Nota', dateLabel: '07 mag, 11:15', preview: 'Documenti in revisione: verificare esenzione e follow-up diabetologico.', deleted: false, attachmentCount: 2 },
+];
+
+/* @Codex */
+const REVIEW_DIARY_STATE: Kree8DiaryClientState = {
+  status: 'ready',
+  entries: REVIEW_DIARY_ENTRIES,
+  activeCount: REVIEW_DIARY_ENTRIES.filter((entry) => !entry.deleted).length,
+  patientCount: new Set(REVIEW_DIARY_ENTRIES.map((entry) => entry.patientId)).size,
+};
+
 function parseStructuredList(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (typeof value !== 'string' || !value.trim()) return [];
@@ -715,6 +754,62 @@ function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined): string
     default:
       return 'Nota';
   }
+}
+
+/* @Codex */
+function compactClinicalText(value: string | null | undefined): string {
+  const plain = (value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plain) return 'Voce senza testo clinico.';
+  return plain.length > 180 ? `${plain.slice(0, 177)}…` : plain;
+}
+
+/* @Codex */
+function buildGlobalDiaryState(
+  entries: ClinicalEntry[],
+  patients: Kree8Patient[],
+): Kree8DiaryClientState {
+  const patientById = new Map(patients.map((patient) => [patient.id, patient]));
+  const recentEntries = entries.slice(0, 50);
+  let activeCount = 0;
+  const patientIds = new Set<string>();
+
+  const mappedEntries = recentEntries.map((entry) => {
+    const patient = patientById.get(entry.patientId);
+    const deleted = Boolean(entry.deletedAt);
+    if (!deleted) {
+      activeCount += 1;
+    }
+    patientIds.add(entry.patientId);
+
+    return {
+      id: entry.id,
+      patientId: entry.patientId,
+      patientName: patient?.name ?? 'Paziente non trovato',
+      patientCode: patient?.code ?? 'CF non disponibile',
+      patientHref: patient?.href ?? `/patients/${encodeURIComponent(entry.patientId)}`,
+      title: entry.title || 'Voce diario',
+      typeLabel: clinicalEntryTypeLabel(entry.type),
+      dateLabel: formatWorkspaceDate(entry.date),
+      preview: compactClinicalText(entry.content),
+      deleted,
+      attachmentCount: Array.isArray(entry.attachments) ? entry.attachments.length : 0,
+    };
+  });
+
+  return {
+    status: 'ready',
+    entries: mappedEntries,
+    activeCount,
+    patientCount: patientIds.size,
+  };
 }
 
 /* @Codex */
@@ -2449,6 +2544,100 @@ function LiveGovernanceArea({
   );
 }
 
+/* ───────────────────────── Diario clinico globale ───────────────────────── */
+
+/* @Codex */
+function DiarioArea({
+  diaryState,
+  onOpenArea,
+}: {
+  diaryState: Kree8DiaryClientState;
+  onOpenArea: (area: AreaId) => void;
+}) {
+  const isLoading = diaryState.status === 'loading' || diaryState.status === 'idle';
+  const visibleEntries = diaryState.entries;
+
+  return (
+    <div className={styles.areaShell}>
+      <header className={styles.areaHeader}>
+        <div>
+          <p className={styles.areaCaption}>Diario clinico · globale</p>
+          <h1 className={styles.areaTitle}>
+            Ultime voci del lavoro clinico <em>· dati locali reali</em>
+          </h1>
+          <p className={styles.areaSubtitle}>
+            Cronologia delle ultime 50 voci cliniche salvate in MediFlow, con
+            rientro immediato nella scheda Kree8 del paziente.
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
+            <Inbox size={12} />
+            Scegli paziente
+          </button>
+          <button type="button" className={styles.primaryBtn} onClick={() => onOpenArea('scheda')}>
+            <UserSquare2 size={13} />
+            Scheda aperta
+          </button>
+          <PillBadge variant="blue">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
+          <PillBadge variant="muted">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
+        </div>
+      </header>
+
+      <section className={styles.panel}>
+        <header className={styles.panelHeader}>
+          <h2 className={styles.panelTitle}>Timeline recente</h2>
+          <PillBadge variant="muted">{visibleEntries.length} voci</PillBadge>
+          <span className={styles.panelActions}>
+            <PillBadge variant="green">IndexedDB/API locale</PillBadge>
+          </span>
+        </header>
+
+        <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+          {isLoading ? (
+            <p className={styles.panelSubtitle}>Caricamento diario clinico locale.</p>
+          ) : visibleEntries.length ? visibleEntries.map((entry) => (
+            <article key={entry.id} className={styles.compositeCard}>
+              <header className={styles.panelHeader}>
+                <span className={styles.evidenceDate}>{entry.dateLabel}</span>
+                <span className={styles.evidenceTitle}>{entry.title}</span>
+                <span className={styles.panelActions}>
+                  <PillBadge variant={entry.deleted ? 'coral' : 'blue'}>{entry.typeLabel}</PillBadge>
+                </span>
+              </header>
+              <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
+                {entry.preview}
+              </p>
+              <div className={styles.identityDock}>
+                <span className={styles.patientName}>{entry.patientName}</span>
+                <PillBadge variant="muted">{entry.patientCode}</PillBadge>
+                {entry.attachmentCount > 0 ? (
+                  <PillBadge variant="violet">
+                    <Paperclip size={11} />
+                    {entry.attachmentCount} allegati
+                  </PillBadge>
+                ) : null}
+                <span className={styles.dockActions}>
+                  <Link href={entry.patientHref} className={styles.ghostBtnSm}>
+                    <UserSquare2 size={12} />
+                    Apri scheda
+                  </Link>
+                  <Link href={`${entry.patientHref}/entries/new`} className={styles.ghostBtnSm}>
+                    <Plus size={12} />
+                    Nuova voce
+                  </Link>
+                </span>
+              </div>
+            </article>
+          )) : (
+            <p className={styles.panelSubtitle}>Nessuna voce clinica nel diario locale.</p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /* ───────────────────────── Revisione documenti ───────────────────────── */
 
 function RevisioneArea() {
@@ -3497,6 +3686,7 @@ function AreaContent({
   agendaBridge,
   patientState,
   agendaState,
+  diaryState,
   selectedPatient,
   selectedPatientId,
   patientWorkspace,
@@ -3510,6 +3700,7 @@ function AreaContent({
   agendaBridge: ClinicalAgendaBridgeClientState;
   patientState: Kree8PatientClientState;
   agendaState: Kree8AgendaClientState;
+  diaryState: Kree8DiaryClientState;
   selectedPatient?: Kree8Patient | null;
   selectedPatientId?: string;
   patientWorkspace?: Kree8PatientWorkspace | null;
@@ -3547,6 +3738,13 @@ function AreaContent({
           patient={selectedPatient}
           workspace={patientWorkspace}
           isReview={isReview}
+          onOpenArea={onOpenArea}
+        />
+      );
+    case 'diario':
+      return (
+        <DiarioArea
+          diaryState={diaryState}
           onOpenArea={onOpenArea}
         />
       );
@@ -3625,6 +3823,26 @@ export function Kree8ClinicalCockpit({
     async () => (isReview ? [] : db.checkups.toArray()),
     [isReview],
   );
+
+  /* @Codex */
+  const liveDiaryRows = useLiveQuery<ClinicalEntry[]>(
+    async () => (isReview ? [] : db.entries.orderBy('date').reverse().limit(50).toArray()),
+    [isReview],
+  );
+
+  /* @Codex */
+  const diaryState = useMemo<Kree8DiaryClientState>(() => {
+    if (isReview) return REVIEW_DIARY_STATE;
+    if (!liveDiaryRows || patientState.status !== 'ready') {
+      return {
+        status: 'loading',
+        entries: [],
+        activeCount: 0,
+        patientCount: 0,
+      };
+    }
+    return buildGlobalDiaryState(liveDiaryRows, patientState.patients);
+  }, [isReview, liveDiaryRows, patientState.patients, patientState.status]);
 
   /* @Codex */
   const patientWorkspace = useLiveQuery<Kree8PatientWorkspace | null>(
@@ -3713,6 +3931,12 @@ export function Kree8ClinicalCockpit({
         : patientState.status === 'error'
           ? '!'
           : '…';
+  const diaryNavMeta =
+    isReview
+      ? String(REVIEW_DIARY_STATE.entries.length)
+      : diaryState.status === 'ready'
+        ? String(diaryState.activeCount)
+        : '…';
 
   return (
     <div
@@ -3734,7 +3958,12 @@ export function Kree8ClinicalCockpit({
         {AREAS.map((a) => {
           const Icon = a.icon;
           const selected = area === a.id;
-          const navMeta = a.id === 'incarico' ? patientNavMeta : a.meta;
+          const navMeta =
+            a.id === 'incarico'
+              ? patientNavMeta
+              : a.id === 'diario'
+                ? diaryNavMeta
+                : a.meta;
           return (
             <button
               key={a.id}
@@ -3779,6 +4008,7 @@ export function Kree8ClinicalCockpit({
           agendaBridge={agendaBridge}
           patientState={patientState}
           agendaState={agendaState}
+          diaryState={diaryState}
           selectedPatient={selectedPatient}
           selectedPatientId={selectedPatientId}
           patientWorkspace={patientWorkspace}

@@ -16,7 +16,7 @@ import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider'
 import { UIStyleProvider } from '@/components/ui-style-provider';
 
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
-const FULLSCREEN_LIVE_ROUTES = new Set(['/']);
+const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary']);
 
 function isKree8PatientRoute(pathname: string | null): boolean {
   if (!pathname) return false;

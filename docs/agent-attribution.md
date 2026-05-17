@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-17 Codex
+- Extended `WUL-273` with the global diary Kree8 slice: `/diary` now opens the live cockpit directly on a real local diary area, the cockpit rail includes `Diario clinico` with live active-entry counts, and the new area renders the latest local clinical entries with patient context plus links back to the Kree8 patient sheet and existing new-entry flow while keeping the review alias synthetic: `app/diary/page.tsx`, `components/kree8/kree8-clinical-cockpit.tsx`, `components/root-runtime-shell.tsx`, `docs/agent-attribution.md`
+
 ## 2026-05-16 Codex
 - Extended `WUL-273` with the patient-route Kree8 slice: `/patients/{id}` now opens the live cockpit directly on the selected real patient, the former full patient module page is preserved under `/patients/{id}/modules`, Kree8 action links distinguish cockpit navigation from complete modules, and the route keeps the existing edit/new-entry/scales/SISS/document workflows reachable without widening this branch into write-flow rewrites: `app/patients/[id]/page.tsx`, `app/patients/[id]/modules/page.tsx`, `components/kree8/kree8-clinical-cockpit.tsx`, `components/root-runtime-shell.tsx`, `docs/agent-attribution.md`
 - Opened `WUL-273` with the first real-data cockpit slice after the live Kree8 root exposed synthetic patients on `localhost:3000`: wired `/` live to session-protected `/api/patients` and `/api/checkups`, mapped real local patients into the Kree8 inbox/stat strip/Case Lens/Scheda entry, removed live fallback to review-only patient tokens and static `312/24/7 casi` counts, kept `/mockups/kree8` synthetic for design QA, and updated the Kree8 design contract: `components/kree8/kree8-clinical-cockpit.tsx`, `docs/design/wul-271-kree8-visual-translation.md`, `docs/agent-attribution.md`
