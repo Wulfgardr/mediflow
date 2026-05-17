@@ -219,14 +219,14 @@ type Kree8DecisionCard = {
 };
 
 const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] = [
-  { id: 'turno', label: 'Turno clinico', icon: CalendarClock },
-  { id: 'incarico', label: 'Pazienti / incarico', icon: Inbox },
+  { id: 'turno', label: 'Oggi', icon: CalendarClock },
+  { id: 'incarico', label: 'Pazienti in carico', icon: Inbox },
   { id: 'scheda', label: 'Scheda paziente', icon: UserSquare2 },
   { id: 'diario', label: 'Diario clinico', icon: FileText },
-  { id: 'revisione', label: 'Revisione documenti', icon: FileSearch },
-  { id: 'cataloghi', label: 'Cataloghi locali', icon: Database },
-  { id: 'handoff', label: 'Handoff regionale', icon: Workflow },
-  { id: 'governance', label: 'Governance locale', icon: SettingsIcon },
+  { id: 'revisione', label: 'Documenti', icon: FileSearch },
+  { id: 'cataloghi', label: 'Cataloghi', icon: Database },
+  { id: 'handoff', label: 'Trasmissioni SISS', icon: Workflow },
+  { id: 'governance', label: 'Sistema', icon: SettingsIcon },
 ];
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
@@ -237,10 +237,10 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 ];
 
 const STAGES: { id: StageId; index: number; label: string; title: string }[] = [
-  { id: 'identity', index: 1, label: 'Stage 1', title: 'Identità & ruolo' },
-  { id: 'consent', index: 2, label: 'Stage 2', title: 'Consenso assistito' },
-  { id: 'handoff', index: 3, label: 'Stage 3', title: 'Handoff webapp' },
-  { id: 'outcome', index: 4, label: 'Stage 4', title: 'Esito registrato' },
+  { id: 'identity', index: 1, label: 'Passo 1', title: 'Identità & ruolo' },
+  { id: 'consent', index: 2, label: 'Passo 2', title: 'Consenso assistito' },
+  { id: 'handoff', index: 3, label: 'Passo 3', title: 'Portale ufficiale' },
+  { id: 'outcome', index: 4, label: 'Passo 4', title: 'Esito registrato' },
 ];
 
 const STAGE_ORDER: StageId[] = ['identity', 'consent', 'handoff', 'outcome'];
@@ -308,7 +308,7 @@ const DOC_FIELDS: {
     evidence: '—',
     sourceHint: '',
     blockedReason:
-      'Nessun canale A2A SISS certificato. Solo handoff portale ufficiale + registrazione manuale dell’esito.',
+      'Nessun canale A2A SISS certificato. Solo portale ufficiale + registrazione manuale dell’esito.',
   },
 ];
 
@@ -344,7 +344,7 @@ const REVIEW_CATALOGS: Kree8CatalogRow[] = [
   {
     id: 'aic',
     name: 'AIFA · AIC farmaci',
-    sub: 'manifest v7 di 24 disponibili',
+    sub: 'pacchetto 7 di 24 disponibile',
     freshness: 'ok',
     age: '3 g fa',
   },
@@ -423,7 +423,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
   },
   {
     time: '17:45',
-    title: 'Handoff SISS prescrittivo',
+    title: 'Prescrizione SISS',
     sub: 'Sessione consenso scaduta tra 6g',
     pill: 'coral',
     pillLabel: 'Attenzione',
@@ -520,7 +520,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     statusLabel: 'Territorio attivo',
     diagnoses: ['ADI · medicazione', 'Vitali instabili'],
     lastTouch: '06 mag · Visita domic.',
-    pathway: 'Network paired',
+    pathway: 'Rete locale',
     href: '/patients/p3',
     modulesHref: '/patients/p3/modules',
     ageLabel: 'Età n/d',
@@ -823,8 +823,8 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
     },
     {
       id: 'icd',
-      name: 'ICD-11 API locale',
-      sub: 'Servizio locale gestito dal launcher; nessun runtime remoto richiesto.',
+      name: 'ICD-11 locale',
+      sub: 'Servizio locale gestito dal launcher; nessun servizio remoto richiesto.',
       freshness: 'ok',
       age: 'porta 8888',
       href: '/settings#operations',
@@ -1088,7 +1088,7 @@ function Toolbar({
   );
 }
 
-/* ───────────────────────── Turno clinico ───────────────────────── */
+/* ───────────────────────── Oggi ───────────────────────── */
 
 function formatCandidateTime(startIso: string): string {
   const date = new Date(startIso);
@@ -1149,7 +1149,7 @@ function ClinicalAgendaBridgePanel({
           <PillBadge variant="coral">non disponibile</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
-          Nessun dato acquisito. La cockpit resta sulla agenda confermata.
+          Nessun dato acquisito. L&apos;agenda resta sui passaggi confermati.
         </p>
       </div>
     );
@@ -1287,7 +1287,7 @@ function TurnoArea({
       {
         title: 'Agenda clinica',
         body: agendaState.status === 'ready'
-          ? `${agendaState.rows.length} passaggi pianificati collegati al lavoro del turno.`
+          ? `${agendaState.rows.length} passaggi pianificati collegati alla giornata.`
           : agendaState.status === 'error'
             ? 'Agenda non disponibile: resta visibile la lista pazienti.'
             : 'Preparazione degli appuntamenti.',
@@ -1310,14 +1310,14 @@ function TurnoArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Turno clinico · ambulatorio locale</p>
+          <p className={styles.areaCaption}>Oggi · ambulatorio locale</p>
           <h1 className={styles.areaTitle}>
             Buongiorno, Dr. L.P. <em>oggi, {agendaState.rows.length} appuntamenti locali.</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
-              ? `${patientState.patients.length} pazienti in carico · agenda, documenti e priorità nello stesso turno.`
-              : 'Preparazione del turno dopo sblocco PIN.'}
+              ? `${patientState.patients.length} pazienti in carico · agenda, documenti e priorità della giornata.`
+              : 'Preparazione della giornata dopo sblocco PIN.'}
           </p>
         </div>
       </header>
@@ -1439,7 +1439,7 @@ function TurnoArea({
   );
 }
 
-/* ───────────────────────── Pazienti / incarico ───────────────────────── */
+/* ───────────────────────── Pazienti in carico ───────────────────────── */
 
 function IncaricoArea({
   patients,
@@ -1477,13 +1477,13 @@ function IncaricoArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Pazienti · incarico clinico</p>
+          <p className={styles.areaCaption}>Pazienti in carico</p>
           <h1 className={styles.areaTitle}>
-            Inbox pazienti <em>· flusso clinico governato</em>
+            Lista pazienti <em>· priorità e prossimo passo</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Seleziona un caso, aprilo in cockpit e prepara il prossimo passaggio.'
+              ? 'Seleziona un caso, apri la scheda e prepara il prossimo passaggio.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -1507,7 +1507,7 @@ function IncaricoArea({
             onClick={() => setScope('network')}
           >
             <Cloud size={12} />
-            Network paired
+            Rete locale
           </button>
           <button
             type="button"
@@ -1562,7 +1562,7 @@ function IncaricoArea({
             )}
             {patientStatus === 'error' && (
               <p className={styles.rowSub} style={{ padding: '24px 0' }}>
-                Lista pazienti non disponibile. Verifica sessione e API locale.
+                Lista pazienti non disponibile. Verifica sessione e servizi locali.
               </p>
             )}
             {visible.length === 0 && (
@@ -1617,7 +1617,7 @@ function IncaricoArea({
 
         {selected ? (
         <aside className={styles.caseLens} key={selected.id}>
-          <span className={styles.areaCaption}>Case Lens · anteprima</span>
+          <span className={styles.areaCaption}>Anteprima caso</span>
           <div className={styles.caseLensHero}>
             <span className={styles.caseLensName}>{selected.name}</span>
             <span className={styles.caseLensSub}>
@@ -1645,11 +1645,11 @@ function IncaricoArea({
               disabled={selected.list === 'archivio'}
             >
               <UserSquare2 size={13} />
-              Apri in cockpit
+              Apri scheda
             </button>
             <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
-              Moduli completi
+              Vista completa
             </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
@@ -1657,13 +1657,13 @@ function IncaricoArea({
             </button>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
               <Workflow size={12} />
-              Handoff SISS
+              Prepara SISS
             </button>
           </div>
         </aside>
         ) : (
           <aside className={styles.caseLens}>
-            <span className={styles.areaCaption}>Case Lens · anteprima</span>
+            <span className={styles.areaCaption}>Anteprima caso</span>
             <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
               Nessun paziente reale selezionabile in questa vista.
             </p>
@@ -1701,7 +1701,7 @@ function RealPatientArea({
           </h1>
           <p className={styles.areaSubtitle}>
             Ultimo aggiornamento {patient.lastTouch}. Apri, rivedi e prepara il
-            prossimo passaggio clinico senza uscire dal flusso del turno.
+            prossimo passaggio clinico senza perdere il contesto del caso.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -1712,7 +1712,7 @@ function RealPatientArea({
             <Edit3 size={12} /> Anagrafica
           </Link>
           <Link href={patient.modulesHref} className={styles.primaryBtn}>
-            <UserSquare2 size={13} /> Moduli completi
+            <UserSquare2 size={13} /> Vista completa
           </Link>
         </div>
       </header>
@@ -1894,11 +1894,11 @@ function RealPatientArea({
               </button>
               <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
                 <Workflow size={12} />
-                Handoff
+                Portali SISS
               </button>
               <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
-                Apri dettagli
+                Vista completa
               </Link>
             </div>
           </div>
@@ -1954,7 +1954,7 @@ function SchedaArea({
           </h1>
           <p className={styles.areaSubtitle}>
             Profilo aggiornato il 08 mag · ultimo documento 02 mag · ultima
-            sincronizzazione home-base 5 min fa.
+            sincronizzazione Mac principale 5 min fa.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -1971,7 +1971,7 @@ function SchedaArea({
             <Sparkles size={12} /> Smart Import
           </button>
           <button type="button" className={styles.primaryBtn}>
-            <Workflow size={13} /> Prepara handoff SISS
+            <Workflow size={13} /> Prepara SISS
           </button>
         </div>
       </header>
@@ -2157,7 +2157,7 @@ function SchedaArea({
               <FileText size={14} color="var(--ink-muted)" />
               <span className={styles.evidenceTitle}>Referto cardiologico — DOC-2026-241</span>
             </header>
-            <span className={styles.rowSub}>3 write strutturate · 2 note da riconciliare · 1 bloccato</span>
+            <span className={styles.rowSub}>3 campi aggiornabili · 2 note da riconciliare · 1 bloccato</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <PillBadge variant="green">match AIFA</PillBadge>
               <PillBadge variant="blue">match ICD</PillBadge>
@@ -2251,7 +2251,7 @@ function LiveDocumentReviewArea({
           {patient ? (
             <Link href={patient.modulesHref} className={styles.primaryBtn}>
               <ArrowUpRight size={13} />
-              Apri dettagli
+              Vista completa
             </Link>
           ) : null}
         </div>
@@ -2374,7 +2374,7 @@ function LiveHandoffArea({
     if (!patient) {
       setFeedback({
         kind: 'error',
-        message: 'Seleziona un paziente prima di aprire un handoff regionale.',
+        message: 'Seleziona un paziente prima di aprire un portale regionale.',
       });
       return;
     }
@@ -2452,7 +2452,7 @@ function LiveHandoffArea({
           patientId: patient.id,
           action,
           moduleLabel: payload.title,
-          reason: 'Handoff avviato dalla shell Kree8 live.',
+          reason: 'Portale regionale aperto dalla scheda MediFlow.',
           startedAt: now,
           outcome: 'started',
           correlationId: payload.correlationId,
@@ -2477,7 +2477,7 @@ function LiveHandoffArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Handoff regionale</p>
+          <p className={styles.areaCaption}>Trasmissioni SISS</p>
           <h1 className={styles.areaTitle}>
             Preparazione SISS <em>· contesto paziente e diario</em>
           </h1>
@@ -2552,10 +2552,10 @@ function LiveHandoffArea({
             <header className={styles.panelHeader}>
               <span className={styles.evidenceTitle}>
                 {feedback.kind === 'success'
-                  ? 'Handoff avviato'
+                  ? 'Portale aperto'
                   : feedback.kind === 'warning'
-                    ? 'Handoff da completare'
-                    : 'Handoff non avviato'}
+                    ? 'Passaggio da completare'
+                    : 'Portale non avviato'}
               </span>
               <PillBadge
                 variant={
@@ -2605,7 +2605,7 @@ function LiveGovernanceArea({
     {
       href: '/settings#ai',
       title: 'AI locale',
-      sub: 'provider, modelli, shadow mode e kill switch',
+      sub: 'provider, modelli, controlli e confronto',
       icon: Sparkles,
       pill: 'governato',
       variant: 'violet',
@@ -2621,7 +2621,7 @@ function LiveGovernanceArea({
     {
       href: '/settings#data',
       title: 'Cataloghi',
-      sub: 'AIFA, esenzioni e import locali non distruttivi dal cockpit',
+      sub: 'AIFA, esenzioni e import locali non distruttivi',
       icon: Database,
       pill: 'locale',
       variant: 'green',
@@ -2648,7 +2648,7 @@ function LiveGovernanceArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Governance locale</p>
+          <p className={styles.areaCaption}>Sistema</p>
           <h1 className={styles.areaTitle}>
             Stato operativo <em>· sessione, audit, backup</em>
           </h1>
@@ -2676,7 +2676,7 @@ function LiveGovernanceArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Backup</h2>
-            <PillBadge variant="blue">home-base</PillBadge>
+            <PillBadge variant="blue">Mac principale</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>Backup e ripristino restano operazioni esplicite sul Mac.</p>
         </section>
@@ -2684,13 +2684,13 @@ function LiveGovernanceArea({
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Moduli impostazioni reali</h2>
+          <h2 className={styles.panelTitle}>Impostazioni complete</h2>
           <span className={styles.panelActions}>
             <PillBadge variant="green">nessun controllo distruttivo qui</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Il cockpit mostra lo stato e porta al modulo completo quando serve
+          Questa vista mostra lo stato e porta al modulo completo quando serve
           modificare configurazioni, importare cataloghi o avviare backup.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
@@ -2718,7 +2718,7 @@ function LiveGovernanceArea({
   );
 }
 
-/* ───────────────────────── Diario clinico globale ───────────────────────── */
+/* ───────────────────────── Diario clinico ───────────────────────── */
 
 /* @Codex */
 function DiarioArea({
@@ -2735,13 +2735,13 @@ function DiarioArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Diario clinico · globale</p>
+          <p className={styles.areaCaption}>Diario clinico</p>
           <h1 className={styles.areaTitle}>
             Ultime voci del lavoro clinico <em>· dati locali reali</em>
           </h1>
           <p className={styles.areaSubtitle}>
             Cronologia delle ultime 50 voci cliniche salvate in MediFlow, con
-            rientro immediato nella scheda Kree8 del paziente.
+            rientro immediato nella scheda del paziente.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -2751,7 +2751,7 @@ function DiarioArea({
           </button>
           <button type="button" className={styles.primaryBtn} onClick={() => onOpenArea('scheda')}>
             <UserSquare2 size={13} />
-            Scheda aperta
+            Apri scheda
           </button>
           <PillBadge variant="blue">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
           <PillBadge variant="muted">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
@@ -2763,7 +2763,7 @@ function DiarioArea({
           <h2 className={styles.panelTitle}>Timeline recente</h2>
           <PillBadge variant="muted">{visibleEntries.length} voci</PillBadge>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">IndexedDB/API locale</PillBadge>
+            <PillBadge variant="green">dati locali</PillBadge>
           </span>
         </header>
 
@@ -2839,13 +2839,13 @@ function RevisioneArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Revisione documento · review-first</p>
+          <p className={styles.areaCaption}>Revisione documento</p>
           <h1 className={styles.areaTitle}>
             Referto cardiologico <em>· document #DOC-2026-241</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Conferma cosa applicare al form. Nessun auto-write · ogni decisione
-            è auditata localmente.
+            Conferma cosa applicare alla scheda. Nessun aggiornamento automatico:
+            ogni decisione resta nell&apos;audit locale.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -2875,7 +2875,7 @@ function RevisioneArea() {
         <div className={styles.docCounters}>
           <span className={styles.docCounter}>
             <Check size={11} color="var(--pill-green-fg)" />
-            <b>{structuredWrites}</b> write strutturate
+            <b>{structuredWrites}</b> campi aggiornabili
           </span>
           <span className={styles.docCounter}>
             <Edit3 size={11} color="var(--pill-blue-fg)" />
@@ -2939,9 +2939,9 @@ function RevisioneArea() {
               const isBlocked = f.kind === 'blocked';
               const kindLabel =
                 f.kind === 'structured'
-                  ? 'write strutturata'
+                  ? 'campo aggiornabile'
                   : f.kind === 'note'
-                    ? 'note-only'
+                    ? 'solo nota'
                     : 'non integrabile ora';
               return (
                 <div key={f.id} className={styles.fieldRow}>
@@ -3035,7 +3035,7 @@ function RevisioneArea() {
   );
 }
 
-/* ───────────────────────── Cataloghi locali ───────────────────────── */
+/* ───────────────────────── Cataloghi ───────────────────────── */
 
 function CataloghiArea({ isReview }: { isReview: boolean }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
@@ -3077,7 +3077,7 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
       ? 'Cataloghi non leggibili'
       : needsImport
         ? 'Import cataloghi incompleto'
-        : 'Cataloghi locali disponibili';
+        : 'Cataloghi disponibili';
   const freshnessPct = catalogs.length
     ? Math.round((availableCatalogs / catalogs.length) * 100)
     : isLoading
@@ -3100,9 +3100,9 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Cataloghi locali · dati indicizzati</p>
+          <p className={styles.areaCaption}>Cataloghi · dati indicizzati</p>
           <h1 className={styles.areaTitle}>
-            Governance cataloghi <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
+            Stato cataloghi <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
           </h1>
           <p className={styles.areaSubtitle}>
             Stato reale dei cataloghi clinici locali. Import e cancellazioni restano
@@ -3145,7 +3145,7 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
           <h2 className={styles.panelTitle}>Cataloghi clinici</h2>
           <PillBadge variant="muted">{catalogs.length} pacchetti</PillBadge>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">API locale</PillBadge>
+            <PillBadge variant="green">servizi locali</PillBadge>
           </span>
         </header>
 
@@ -3231,7 +3231,7 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
   );
 }
 
-/* ───────────────────────── Handoff regionale (SISS) ───────────────────────── */
+/* ───────────────────────── Trasmissioni SISS ───────────────────────── */
 
 const LAUNCHERS: {
   id: string;
@@ -3243,7 +3243,7 @@ const LAUNCHERS: {
     id: 'prescrittivo',
     label: 'Modulo Prescrittivo',
     caption:
-      'Apri la webapp ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+      'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
     variant: 'blue',
   },
   {
@@ -3291,7 +3291,7 @@ const BLOCKED_CAPS: { id: string; label: string; reason: string }[] = [
   {
     id: 'certificati',
     label: 'Certificati di malattia',
-    reason: 'Modellazione SISS non completa · resta su webapp ufficiale.',
+    reason: 'Modellazione SISS non completa · resta sul portale ufficiale.',
   },
 ];
 
@@ -3303,29 +3303,29 @@ function HandoffArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Handoff regionale · prototipo contestuale</p>
+          <p className={styles.areaCaption}>Trasmissioni SISS · prototipo contestuale</p>
           <h1 className={styles.areaTitle}>
-            Webapp regionali ufficiali <em>· nessun runtime SISS custom</em>
+            Webapp regionali ufficiali <em>· nessun modulo SISS nativo</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Boundary chiari fra identità, consenso, lancio webapp ufficiali e
-            registrazione manuale dell&apos;esito. Nessuna integrazione SISS
-            nativa certificata oggi.
+            Passaggi chiari fra identità, consenso, apertura del portale
+            ufficiale e registrazione manuale dell&apos;esito. Nessuna
+            integrazione SISS nativa certificata oggi.
           </p>
         </div>
       </header>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Launcher contestuali</h2>
+          <h2 className={styles.panelTitle}>Portali disponibili</h2>
           <span className={styles.panelActions}>
             <PillBadge variant="muted">5 webapp ufficiali</PillBadge>
-            <PillBadge variant="green">CF prefilled · solo copia-incolla</PillBadge>
+            <PillBadge variant="green">CF pronto · solo copia-incolla</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Handoff governato verso webapp ufficiali. Il CF del paziente è
-          preparato in clipboard per il copia-incolla.
+          Apertura assistita delle webapp ufficiali. Il CF del paziente è
+          preparato negli appunti per il copia-incolla.
         </p>
         <div className={styles.launcherGrid}>
           {LAUNCHERS.map((l) => (
@@ -3334,7 +3334,7 @@ function HandoffArea() {
                 <ArrowUpRight size={14} color="var(--ink-muted)" />
                 <span className={styles.evidenceTitle}>{l.label}</span>
                 <span style={{ marginLeft: 'auto' }}>
-                  <PillBadge variant={l.variant}>portal-handoff</PillBadge>
+                  <PillBadge variant={l.variant}>via portale SISS</PillBadge>
                 </span>
               </div>
               <p className={styles.launcherTileBody}>{l.caption}</p>
@@ -3351,7 +3351,7 @@ function HandoffArea() {
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Stage handoff</h2>
+          <h2 className={styles.panelTitle}>Passaggi SISS</h2>
           <PillBadge variant="muted">{currentIndex + 1} di {STAGES.length}</PillBadge>
         </header>
 
@@ -3407,15 +3407,15 @@ function HandoffArea() {
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Capability non integrabili oggi</h2>
+          <h2 className={styles.panelTitle}>Funzioni non disponibili in MediFlow</h2>
           <span className={styles.panelActions}>
             <PillBadge variant="coral">
-              <AlertTriangle size={11} /> blocked · WUL-180
+              <AlertTriangle size={11} /> scelta dichiarata
             </PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Boundary canonico: senza SSI qualificata o stack regionale certificato
+          Confine dichiarato: senza SSI qualificata o stack regionale certificato
           MediFlow non re-implementa queste capacità.
         </p>
         <div className={styles.launcherGrid}>
@@ -3487,7 +3487,7 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
         <div style={{ display: 'inline-flex', gap: 8 }}>
           <button type="button" className={styles.ghostBtn}>Revoca consenso</button>
           <button type="button" className={styles.primaryBtn} onClick={onAdvance}>
-            Procedi all&apos;handoff
+            Procedi al portale
             <ChevronRight size={14} />
           </button>
         </div>
@@ -3500,16 +3500,16 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
       <div className={styles.stagePanel}>
         <header style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <ArrowUpRight size={16} color="var(--ink-muted)" />
-          <h3 className={styles.panelTitle}>Handoff verso webapp ufficiale</h3>
+          <h3 className={styles.panelTitle}>Passaggio al portale ufficiale</h3>
           <span style={{ marginLeft: 'auto' }}>
-            <PillBadge variant="blue">portal-handoff</PillBadge>
+            <PillBadge variant="blue">via portale SISS</PillBadge>
           </span>
         </header>
         <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
-          MediFlow non re-implementa la webapp regionale: lancia il portale
+          MediFlow non re-implementa il portale regionale: apre il portale
           ufficiale con scope ridotti e l&apos;esito viene registrato
           manualmente dall&apos;operatore. Nessun viewer FSE embedded, nessun
-          runtime prescrittivo custom.
+          modulo prescrittivo interno.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className={styles.primaryBtn}>
@@ -3543,7 +3543,7 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
         <span className={styles.outcomeText}>
           <b>Nessun artefatto di ritorno certificato.</b> L&apos;esito del
           portale viene <b>annotato manualmente</b> dall&apos;operatore: numero
-          di ricetta, NRE o riferimento incollati dalla webapp. MediFlow non
+          di ricetta, NRE o riferimento incollati dal portale. MediFlow non
           riceve oggi ricevute firmate XML né payload A2A SISS.
         </span>
       </div>
@@ -3553,7 +3553,7 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
         <dt>Esito riportato</dt>
         <dd>Prescrizione emessa · NRE incollato manualmente</dd>
         <dt>Trace locale</dt>
-        <dd>evento <code>handoff.outcome.manual</code> · audit append-only</dd>
+        <dd>evento <code>esito.portale.manuale</code> · audit append-only</dd>
       </dl>
       <div style={{ display: 'inline-flex', gap: 8 }}>
         <button type="button" className={styles.primaryBtn}>
@@ -3568,7 +3568,7 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
   );
 }
 
-/* ───────────────────────── Governance locale ───────────────────────── */
+/* ───────────────────────── Sistema ───────────────────────── */
 
 function GovernanceArea() {
   const [flags, setFlags] = useState({
@@ -3588,12 +3588,12 @@ function GovernanceArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Governance locale · on-device</p>
+          <p className={styles.areaCaption}>Sistema · on-device</p>
           <h1 className={styles.areaTitle}>
-            Comportamenti runtime <em>· nessuna telemetria esterna</em>
+            Impostazioni operative <em>· nessuna telemetria esterna</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Account, AI runtime, modalità di rete, backup, cataloghi e
+            Account, AI locale, modalità di rete, backup, cataloghi e
             diagnostica · tutto resta sul dispositivo.
           </p>
         </div>
@@ -3633,16 +3633,16 @@ function GovernanceArea() {
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>AI runtime · kill-switch</h2>
+            <h2 className={styles.panelTitle}>AI locale · interruttori</h2>
             <span className={styles.panelActions}>
               <PillBadge variant="violet">
-                <Sparkles size={11} /> shadow mode
+                <Sparkles size={11} /> confronto controllato
               </PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Lane AI locali con disattivazione immediata per lane. Nessun fetch
-            cloud nei default.
+            Funzioni AI locali con disattivazione immediata per area. Nessun
+            invio cloud nei default.
           </p>
 
           {[
@@ -3654,12 +3654,12 @@ function GovernanceArea() {
             {
               id: 'smartImport' as const,
               title: 'Smart Import documento',
-              sub: 'estrazione locale reviewable · niente auto-write',
+              sub: 'estrazione locale da rivedere · niente aggiornamenti automatici',
             },
             {
               id: 'cloudComparator' as const,
-              title: 'Cloud comparator shadow',
-              sub: 'opt-in/off by default · solo case pack redatti fuori runtime clinico',
+              title: 'Comparatore cloud',
+              sub: 'spento di default · solo pacchetti redatti fuori uso clinico',
             },
           ].map((row) => (
             <div key={row.id} className={styles.toggleRow}>
@@ -3701,24 +3701,24 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Modalità di rete</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="green">local-only by default</PillBadge>
+              <PillBadge variant="green">locale di default</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Local-only è il default. Network home-base resta opzionale e
-            richiede LAN fidata con nodo paired autorevole.
+            Il lavoro resta sul Mac di default. Il collegamento al Mac principale
+            resta opzionale e richiede una LAN fidata.
           </p>
           <div className={styles.toggleRow}>
             <div className={styles.toggleRowMain}>
-              <span className={styles.toggleRowTitle}>Network home-base</span>
+              <span className={styles.toggleRowTitle}>Mac principale</span>
               <span className={styles.toggleRowSub}>
-                opt-in LAN paired · scope ambulatoriale · read + write governato
+                opt-in su LAN fidata · ambulatorio condiviso · lettura e scrittura governate
               </span>
             </div>
             <button
               type="button"
               aria-pressed={flags.homeBaseNetwork}
-              aria-label={`Network home-base ${flags.homeBaseNetwork ? 'attivo' : 'disattivo'}`}
+              aria-label={`Mac principale ${flags.homeBaseNetwork ? 'attivo' : 'disattivo'}`}
               className={classNames(styles.toggle, flags.homeBaseNetwork && styles.toggleOn)}
               onClick={() => toggle('homeBaseNetwork')}
             />
@@ -3726,10 +3726,10 @@ function GovernanceArea() {
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><Cloud size={16} /></span>
             <span>
-              <span className={styles.modeTitle}>Nodo paired</span>
+              <span className={styles.modeTitle}>Nodo collegato</span>
               <br />
               <span className={styles.modeSub}>
-                home-base macOS · LAN locale · ultimo handshake 12 ms
+                Mac principale · LAN locale · ultimo contatto 12 ms
               </span>
             </span>
             <PillBadge variant="green">attivo</PillBadge>
@@ -3744,7 +3744,7 @@ function GovernanceArea() {
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Snapshot cifrato locale + import manifest AIFA/ICD. Retention
+            Snapshot cifrato locale + import pacchetti AIFA/ICD. Retention
             keep-last-N tracciata in settings.
           </p>
           <div className={styles.toggleRow}>
@@ -3831,7 +3831,7 @@ function GovernanceArea() {
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Versione applicazione corrente, manifest AI parlamento e prossimo
+            Versione applicazione corrente, stato AI locale e prossimo
             check di disponibilità aggiornamenti.
           </p>
           <div className={styles.modeCard}>
@@ -4125,7 +4125,7 @@ export function Kree8ClinicalCockpit({
   return (
     <div
       className={styles.shell}
-      aria-label={isReview ? 'MediFlow · Kree8 review surface' : 'MediFlow · Kree8 live cockpit'}
+      aria-label={isReview ? 'MediFlow · Kree8 review surface' : 'MediFlow · spazio clinico Kree8'}
     >
       <aside className={styles.rail}>
         <div className={styles.brand}>
@@ -4138,7 +4138,7 @@ export function Kree8ClinicalCockpit({
           </span>
         </div>
 
-        <span className={styles.railLabel}>Turno</span>
+        <span className={styles.railLabel}>Navigazione</span>
         {AREAS.map((a) => {
           const Icon = a.icon;
           const selected = area === a.id;
@@ -4178,7 +4178,7 @@ export function Kree8ClinicalCockpit({
         <div className={styles.railFooter}>
           <span className={styles.railTag}>
             <span className={styles.railDot} />
-            home-base locale
+            Mac principale locale
           </span>
           <span>{isReview ? 'Review design' : 'Sessione clinica locale'}</span>
         </div>

@@ -99,26 +99,26 @@ block.
 
 The mockup keeps all major MediFlow surfaces inside the Kree8 frame, so the
 review covers the whole clinical journey, not just a hero page. The v2 pass
-splits the old "Paziente" area into a first-class inbox (`Pazienti / incarico`)
+splits the old "Paziente" area into a first-class list (`Pazienti in carico`)
 and a composite detail (`Scheda paziente`), and renames the rest to mirror the
-real MediFlow nomenclature.
+clinician-facing MediFlow nomenclature.
 
 | Area pill | Demonstrates |
 | --- | --- |
-| Turno clinico | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
-| Pazienti / incarico | Patient inbox with scope chips (Ambulatorio locale / Network paired / Tutti), active/archive toggle, selectable patient rows, sticky Case Lens preview with `Apri scheda` / `Allega documento` / `Prepara handoff SISS`. |
-| Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara handoff SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidence Stack, Smart Import preview with write/note/blocked counters, Lavoro pianificato. |
-| Revisione documenti | Review-first document panel: counters for `write strutturate` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS auto-write, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Applica al form` (no more "timbra"). |
-| Cataloghi locali | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), manifest stepper (1–24), catalog list with status pills. |
-| Handoff regionale | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-stage segmented selector (Identità → Consenso → Handoff → Esito) where the outcome capsule explicitly says the result is **annotato manualmente** — no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
-| Governance locale | Account & PIN, AI runtime kill-switches (`AI Patient Insight`, `Smart Import documento`, `Cloud comparator shadow`) + lane chips, Modalità di rete (`local-only by default` + optional `Network home-base`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni — **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI parliament). |
+| Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
+| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri scheda` / `Vista completa` / `Prepara SISS`. |
+| Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidence Stack, Smart Import preview with write/note/blocked counters, Lavoro pianificato. |
+| Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Applica al form` (no more "timbra"). |
+| Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
+| Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente** — no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
+| Sistema | Account & PIN, AI local controls (`AI Patient Insight`, `Smart Import documento`, `Comparatore cloud`) + lane chips, Modalità di rete (`locale di default` + optional `Mac principale`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni — **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI locale). |
 
 ## Interactivity demonstrated
 
 Most non-migrated panels still use local React state. Since `WUL-273`, the live
 root makes session-protected reads to `/api/patients` and `/api/checkups` after
 unlock, maps them into the Kree8 patient inbox, stat strip, local agenda and
-first Scheda paziente cockpit view, and shows an explicit error/empty state
+first Scheda paziente view, and shows an explicit error/empty state
 instead of falling back to review patients. Since `WUL-275`, the live root also
 reads `/api/clinical-agenda/candidates` for Zimbra/iCloud event-cache candidates.
 The review alias stays synthetic and does not fetch external or clinical data.
@@ -136,22 +136,22 @@ surface is migrated into the Kree8 grammar.
 - Zimbra/iCloud bridge preview distinguishes external clinical/FBF candidates
   from confirmed agenda rows and keeps them in manual review state.
 - AI gradient action present in the toolbar (decorative; matches Kree8 cue).
-- Patient inbox scope (`Ambulatorio locale` / `Network paired` / `Tutti`) and
+- Patient inbox scope (`Ambulatorio locale` / `Rete locale` / `Tutti`) and
   list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
-  rows come from `/api/patients`; selecting a row animates a Case Lens preview;
-  `Apri in cockpit` jumps to the detail area while `Scheda completa` opens the
-  existing patient module.
+  rows come from `/api/patients`; selecting a row animates an `Anteprima caso`
+  preview; `Apri scheda` jumps to the detail area while `Vista completa` opens
+  the dense patient tools route.
 - Scheda paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
 - Document field decision tri-state per row with evidence snippet, kind label
-  (`write strutturata` / `note-only` / `non integrabile ora`), live counters,
+  (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
   commit-pulse on the resulting status pill, and a gated primary action
   (`Applica al form`) once all reviewable rows are processed.
-- Cataloghi manifest stepper drives the numeric snapshot and switches the
-  freshness rail colour.
-- Handoff stage selector walks through 4 stages with stage-specific bodies;
-  the row sweep animation replays on stage change.
+- Cataloghi list and status cards expose the local package state and route
+  import work back to settings.
+- Trasmissioni SISS selector walks through 4 steps with step-specific bodies;
+  the row sweep animation replays on step change.
 - Governance toggles flip an `aria-pressed` state across account/PIN, AI
-  runtime, network mode, backup, audit and update sections.
+  AI, network mode, backup, audit and update sections.
 
 ## Clinical readability guardrails
 
@@ -178,7 +178,7 @@ surface is migrated into the Kree8 grammar.
 - Does not introduce a new UI style key in `UIStyleProvider`.
 - Does not add a Graphite/Kree8 selector.
 - Does not load patient data before PIN/session unlock.
-- Does not claim a certified SISS return artifact: the Esito stage records
+- Does not claim a certified SISS return artifact: the Esito step records
   the portal outcome as **manually annotated** and labels it `non
   certificato`.
 
@@ -194,27 +194,27 @@ surface is migrated into the Kree8 grammar.
       does not show synthetic `312` / `24` / `7 casi` counts, and the page text
       does not contain review-only patient tokens such as `AB-2026-014`.
 - [ ] Navigate to `/mockups/kree8` and confirm it remains only a review alias.
-- [ ] On `Pazienti / incarico`, switch scope between `Ambulatorio locale`,
-      `Network paired` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
-      patient and confirm the Case Lens preview animates in; click
+- [ ] On `Pazienti in carico`, switch scope between `Ambulatorio locale`,
+      `Rete locale` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
+      patient and confirm the `Anteprima caso` preview animates in; click
       `Apri scheda` and confirm it jumps to `Scheda paziente`.
 - [ ] On `Scheda paziente`, exercise the identity dock action shelf and the
       Sintesi AI ⇄ Fonti grezze segmented toggle; scan the Evidence Stack,
       Smart Import preview counters and Lavoro pianificato cards.
-- [ ] On `Revisione documenti`, mark a mix of decisions and confirm the
+- [ ] On `Documenti`, mark a mix of decisions and confirm the
       counters update, the commit-pulse animation replays on each status
       pill, and the primary `Applica al form` only enables when all
       reviewable rows are processed. Confirm the blocked SISS row cannot be
       applied.
-- [ ] On `Cataloghi locali`, step the manifest down to `1` to see the broken
-      rail colour and disabled minus button; step to `24` to see the stale
-      variant. Confirm the panel stays white — no full gradient backgrounds.
-- [ ] On `Handoff regionale`, walk through the 4 stages, confirm the row
+- [ ] On `Cataloghi`, confirm the local package state, import actions and
+      semantic status pills stay legible. Confirm the panel stays white — no
+      full gradient backgrounds.
+- [ ] On `Trasmissioni SISS`, walk through the 4 steps, confirm the row
       sweep animation, the launcher matrix renders the 5 webapps and the
       non-integrable-now cards show 4 blocked capabilities. Confirm the
       Esito step explicitly labels the outcome as manually annotated.
-- [ ] On `Governance locale`, confirm every section (Account & PIN, AI
-      runtime, Modalità di rete, Backup & cataloghi, Diagnostica locale,
+- [ ] On `Sistema`, confirm every section (Account & PIN, AI locale,
+      Modalità di rete, Backup & cataloghi, Diagnostica locale,
       Aggiornamento & stato) reads like a real MediFlow setting block and
       that no copy implies external telemetry.
 - [ ] Toggle the OS-level reduced motion preference and confirm the surface

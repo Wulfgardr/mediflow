@@ -210,12 +210,12 @@ export default function PatientDetailPage() {
             <div className="patient-detail-section border p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <p className="section-kicker">Moduli completi</p>
+                        <p className="section-kicker">Scheda paziente</p>
                         <h1 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            Strumenti estesi della scheda
+                            Vista completa
                         </h1>
                         <p className="mt-1 text-sm text-[color:var(--mf-muted)]">
-                            Questa vista resta disponibile per operazioni dettagliate; la scheda principale ora vive nel cockpit Kree8.
+                            Tutta la scheda paziente in un&apos;unica vista densa. Stessi dati, layout esteso per le sessioni più lunghe.
                         </p>
                     </div>
                     <Link
@@ -223,7 +223,7 @@ export default function PatientDetailPage() {
                         className="ui-btn-primary inline-flex h-10 items-center justify-center gap-2 px-4 text-sm font-semibold"
                     >
                         <Activity className="h-4 w-4" />
-                        Torna al cockpit
+                        Torna alla scheda
                     </Link>
                 </div>
             </div>

@@ -70,7 +70,7 @@ const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
         label: 'Modulo prescrittivo',
-        caption: 'Apri la webapp ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+        caption: 'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
@@ -104,7 +104,7 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
     {
         label: 'Prescrittivo nativo',
         caption: 'Compilazione e invio direttamente dentro MediFlow.',
-        reason: 'Richiede una SSI qualificata SISS e un canale A2A/certificato; il prototipo attuale si ferma all\'handoff browser.',
+        reason: 'Richiede una SSI qualificata SISS e un canale A2A/certificato; oggi MediFlow prepara solo l\'apertura del portale ufficiale.',
     },
     {
         label: 'FSE embedded',
@@ -333,7 +333,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     patientId,
                     action,
                     moduleLabel: actionConfig?.label ?? payload.title,
-                    reason: 'Handoff avviato dal pannello contesto paziente SISS.',
+                    reason: 'Portale regionale aperto dal pannello contesto paziente SISS.',
                     startedAt: now,
                     outcome: 'started',
                     correlationId: payload.correlationId,
@@ -398,7 +398,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         Contesto paziente SISS
                     </h2>
                     <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
-                        Handoff verso le webapp regionali ufficiali (prescrittivo, FSE, anagrafe). Nessuna integrazione SISS nativa certificata: il CF viene preparato per il copia-incolla.
+                        Apertura assistita dei portali regionali ufficiali (prescrittivo, FSE, anagrafe). Nessuna integrazione SISS nativa certificata: il CF viene preparato per il copia-incolla.
                     </p>
                 </div>
 
@@ -569,7 +569,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
 
             <div className="mt-4">
                 <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
-                    Apri webapp regionale
+                    Apri portale regionale
                 </h3>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     {ACTIONS.map((item) => {
@@ -618,7 +618,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     ))}
                 </div>
                 <p className="mt-2 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
-                    Il salto da handoff assistito a integrazione nativa richiede un filone dedicato su qualifica SSI, canale A2A e requisiti regionali certificati.
+                    Il passaggio da apertura assistita a integrazione nativa richiede un filone dedicato su qualifica SSI, canale A2A e requisiti regionali certificati.
                 </p>
             </details>
 
