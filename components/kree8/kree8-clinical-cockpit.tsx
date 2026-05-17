@@ -3,8 +3,8 @@
 /* @Codex */
 /* WUL-272 live Kree8-inspired MediFlow cockpit.
    Renders as the root local web entry in live mode and remains available under
-   /mockups/kree8 as a review alias. All data is synthetic in this first visual
-   promotion; no PHI, no remote assets, no new npm dependencies. */
+   /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
+   live patients/checkups after PIN unlock; the review alias remains synthetic. */
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -46,6 +46,21 @@ import {
   X,
 } from 'lucide-react';
 
+import {
+  db,
+  type Attachment,
+  type Checkup,
+  type ClinicalEntry,
+  type Observation,
+  type Patient,
+  type Therapy,
+} from '@/lib/db';
+import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
+import type {
+  SissPatientContextAction,
+  SissPatientContextHandoffResult,
+} from '@/lib/siss-patient-context-shared';
+import { useLiveQuery } from '@/lib/live-query';
 import styles from './kree8-clinical-cockpit.module.css';
 
 type AreaId =
@@ -61,6 +76,11 @@ type StageId = 'identity' | 'consent' | 'handoff' | 'outcome';
 type StatusFilter = 'all' | 'urgent' | 'ai' | 'manual';
 type InboxScope = 'ambulatorio' | 'network' | 'tutti';
 type InboxList = 'attivi' | 'archivio';
+type HandoffFeedback = {
+  kind: 'success' | 'warning' | 'error';
+  message: string;
+  correlationId?: string | null;
+};
 
 type ClinicalAgendaBridgeStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -98,11 +118,87 @@ type ClinicalAgendaBridgeClientState = {
   data?: ClinicalAgendaBridgePreview;
 };
 
+type Kree8PatientStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+type Kree8PatientSource = Partial<Patient> & {
+  id: string;
+  statusReason?: string | null;
+};
+
+type Kree8Patient = {
+  id: string;
+  name: string;
+  code: string;
+  scope: 'ambulatorio' | 'network';
+  list: InboxList;
+  status: 'green' | 'blue' | 'muted';
+  statusLabel: string;
+  diagnoses: string[];
+  lastTouch: string;
+  pathway: string;
+  href: string;
+  ageLabel: string;
+  summary: string;
+  raw: Kree8PatientSource;
+};
+
+type Kree8PatientClientState = {
+  status: Kree8PatientStatus;
+  patients: Kree8Patient[];
+};
+
+/* @Codex */
+type Kree8PatientWorkspace = {
+  entriesCount: number;
+  latestEntry?: { title: string; date: string; type: string };
+  activeTherapiesCount: number;
+  therapyLabels: string[];
+  pendingCheckupsCount: number;
+  nextCheckup?: { title: string; date: string; pill: PillVariant; pillLabel: string };
+  observationsCount: number;
+  latestObservation?: { label: string; date: string; value: string };
+  attachmentsCount: number;
+  recentAttachmentNames: string[];
+  documentInsightCount: number;
+  codingHints: string[];
+};
+
+type Kree8AgendaRow = {
+  time: string;
+  title: string;
+  sub: string;
+  pill: 'green' | 'blue' | 'yellow' | 'coral' | 'muted' | 'violet';
+  pillLabel: string;
+};
+
+type Kree8CheckupSource = {
+  id: string;
+  patientId: string;
+  date: string | Date;
+  title: string;
+  notes?: string | null;
+  status?: string | null;
+};
+
+type Kree8AgendaClientState = {
+  status: Kree8PatientStatus;
+  rows: Kree8AgendaRow[];
+};
+
+type Kree8DecisionCard = {
+  title: string;
+  body: string;
+  pill: string;
+  pillVariant: PillVariant;
+  action: string;
+  target?: AreaId;
+};
+
 const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] = [
   { id: 'turno', label: 'Turno clinico', icon: CalendarClock },
-  { id: 'incarico', label: 'Pazienti / incarico', icon: Inbox, meta: '312' },
+  { id: 'incarico', label: 'Pazienti / incarico', icon: Inbox },
   { id: 'scheda', label: 'Scheda paziente', icon: UserSquare2 },
-  { id: 'revisione', label: 'Revisione documenti', icon: FileSearch, meta: '24' },
+  { id: 'revisione', label: 'Revisione documenti', icon: FileSearch },
   { id: 'cataloghi', label: 'Cataloghi locali', icon: Database },
   { id: 'handoff', label: 'Handoff regionale', icon: Workflow },
   { id: 'governance', label: 'Governance locale', icon: SettingsIcon },
@@ -242,7 +338,7 @@ const CATALOGS: {
   },
 ];
 
-const AGENDA = [
+const REVIEW_AGENDA: Kree8AgendaRow[] = [
   {
     time: '08:30',
     title: 'Visita ambulatoriale · paziente AB-2026-014',
@@ -287,7 +383,7 @@ const AGENDA = [
   },
 ];
 
-const AI_QUEUE = [
+const AI_QUEUE: Kree8DecisionCard[] = [
   {
     title: 'Follow-up suggerito',
     body:
@@ -332,18 +428,7 @@ const PATIENT_SOURCES = [
   { date: '04 apr 2026', text: 'Visita · obiettività cardiopolmonare nei limiti. Programmato follow-up.' },
 ];
 
-const PATIENT_LIST: {
-  id: string;
-  name: string;
-  code: string;
-  scope: 'ambulatorio' | 'network';
-  list: InboxList;
-  status: 'green' | 'blue' | 'muted';
-  statusLabel: string;
-  diagnoses: string[];
-  lastTouch: string;
-  pathway: string;
-}[] = [
+const REVIEW_PATIENT_LIST: Kree8Patient[] = [
   {
     id: 'p1',
     name: 'M. R.',
@@ -355,6 +440,10 @@ const PATIENT_LIST: {
     diagnoses: ['Ipertensione', 'Dislipidemia', 'BPCO lieve'],
     lastTouch: '08 mag · Diario',
     pathway: 'Ambulatorio locale',
+    href: '/patients/p1',
+    ageLabel: '64 anni',
+    summary: 'Profilo a cronicità multipla · aderenza terapeutica buona · vitali ultima rilevazione nella norma.',
+    raw: { id: 'p1' },
   },
   {
     id: 'p2',
@@ -367,6 +456,10 @@ const PATIENT_LIST: {
     diagnoses: ['Esenzione 031', 'Diabete tipo 2'],
     lastTouch: '07 mag · Documento',
     pathway: 'Ambulatorio locale',
+    href: '/patients/p2',
+    ageLabel: 'Età n/d',
+    summary: 'Follow-up e verifica esami in preparazione.',
+    raw: { id: 'p2' },
   },
   {
     id: 'p3',
@@ -379,6 +472,10 @@ const PATIENT_LIST: {
     diagnoses: ['ADI · medicazione', 'Vitali instabili'],
     lastTouch: '06 mag · Visita domic.',
     pathway: 'Network paired',
+    href: '/patients/p3',
+    ageLabel: 'Età n/d',
+    summary: 'Percorso territoriale attivo con continuità domiciliare.',
+    raw: { id: 'p3' },
   },
   {
     id: 'p4',
@@ -391,6 +488,10 @@ const PATIENT_LIST: {
     diagnoses: ['Storico clinico', 'Percorso chiuso'],
     lastTouch: '12 ott 2025',
     pathway: 'Ambulatorio locale',
+    href: '/patients/p4',
+    ageLabel: 'Età n/d',
+    summary: 'Percorso chiuso, consultabile come storico clinico. Nessuna azione di scrittura.',
+    raw: { id: 'p4' },
   },
   {
     id: 'p5',
@@ -403,8 +504,313 @@ const PATIENT_LIST: {
     diagnoses: ['Nuova anagrafica', 'Documento in coda'],
     lastTouch: '08 mag · Smart Import',
     pathway: 'Ambulatorio locale',
+    href: '/patients/p5',
+    ageLabel: 'Età n/d',
+    summary: 'Documento in coda di revisione.',
+    raw: { id: 'p5' },
   },
 ];
+
+function parseStructuredList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseDiagnosisLabels(value: unknown): string[] {
+  return parseStructuredList(value)
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const code = typeof record.code === 'string' ? record.code.trim() : '';
+      const description =
+        typeof record.description === 'string'
+          ? record.description.trim()
+          : typeof record.name === 'string'
+            ? record.name.trim()
+            : '';
+      if (code && description) return `${code} · ${description}`;
+      return description || code || null;
+    })
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 3);
+}
+
+function formatPatientDate(value: string | Date | null | undefined): string {
+  if (!value) return 'n/d';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'n/d';
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: 'short',
+  }).format(date);
+}
+
+function calculatePatientAge(value: string | Date | null | undefined): string {
+  if (!value) return 'Età n/d';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Età n/d';
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const hasBirthdayPassed =
+    now.getMonth() > date.getMonth()
+    || (now.getMonth() === date.getMonth() && now.getDate() >= date.getDate());
+  if (!hasBirthdayPassed) age -= 1;
+  return age >= 0 && age < 130 ? `${age} anni` : 'Età n/d';
+}
+
+function maskTaxCode(value: string | null | undefined): string {
+  if (!value?.trim()) return 'CF non disponibile';
+  const trimmed = value.trim().toUpperCase();
+  if (
+    trimmed.startsWith('ENC:')
+    || trimmed.includes('[LOCKED')
+    || trimmed.length > 32
+    || !/^[A-Z0-9]{16}$/.test(trimmed)
+  ) {
+    return 'CF non disponibile';
+  }
+  return trimmed.length <= 6 ? trimmed : `CF …${trimmed.slice(-6)}`;
+}
+
+function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
+  const firstName = patient.firstName?.trim() || '';
+  const lastName = patient.lastName?.trim() || '';
+  const name = [lastName, firstName].filter(Boolean).join(' ') || 'Paziente senza nome';
+  const diagnoses = parseDiagnosisLabels(patient.diagnoses);
+  const isArchived = Boolean(patient.isArchived);
+  const isAdi = Boolean(patient.isAdi);
+  const lastTouch = formatPatientDate(patient.updatedAt ?? patient.createdAt);
+  const summary =
+    patient.aiSummary?.trim()
+    || patient.monitoringProfile?.trim()
+    || patient.statusReason?.trim()
+    || patient.notes?.trim()
+    || (isArchived
+      ? 'Percorso chiuso, consultabile come storico clinico.'
+      : isAdi
+        ? 'Percorso territoriale attivo con continuità domiciliare.'
+        : 'Caso in carico con quadro clinico da mantenere aggiornato.');
+
+  return {
+    id: patient.id,
+    name,
+    code: maskTaxCode(patient.taxCode),
+    scope: 'ambulatorio',
+    list: isArchived ? 'archivio' : 'attivi',
+    status: isArchived ? 'muted' : isAdi ? 'green' : diagnoses.length > 0 ? 'blue' : 'green',
+    statusLabel: isArchived ? 'Archiviato' : isAdi ? 'ADI' : diagnoses.length > 0 ? 'In carico' : 'Attivo',
+    diagnoses: diagnoses.length > 0
+      ? diagnoses
+      : [isArchived ? 'Storico clinico' : isAdi ? 'ADI territoriale' : 'Profilo da completare'],
+    lastTouch,
+    pathway: 'Ambulatorio locale',
+    href: `/patients/${encodeURIComponent(patient.id)}`,
+    ageLabel: calculatePatientAge(patient.birthDate),
+    summary,
+    raw: patient,
+  };
+}
+
+function formatCheckupTime(value: string | Date): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('it-IT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+}
+
+function classifyCheckupPill(checkup: Kree8CheckupSource): Pick<Kree8AgendaRow, 'pill' | 'pillLabel'> {
+  const status = checkup.status ?? 'pending';
+  const date = new Date(checkup.date);
+  const now = new Date();
+
+  if (status === 'completed') return { pill: 'green', pillLabel: 'Completato' };
+  if (status === 'cancelled') return { pill: 'muted', pillLabel: 'Annullato' };
+  if (!Number.isNaN(date.getTime()) && date.getTime() < now.getTime() && !isSameCalendarDay(date, now)) {
+    return { pill: 'coral', pillLabel: 'Scaduto' };
+  }
+  if (!Number.isNaN(date.getTime()) && isSameCalendarDay(date, now)) {
+    return { pill: 'yellow', pillLabel: 'Oggi' };
+  }
+  return { pill: 'blue', pillLabel: 'Pianificato' };
+}
+
+function mapCheckupsForKree8(
+  checkups: Kree8CheckupSource[],
+  patients: Kree8Patient[],
+): Kree8AgendaRow[] {
+  const patientById = new Map(patients.map((patient) => [patient.id, patient]));
+
+  return checkups
+    .filter((checkup) => checkup.status !== 'cancelled')
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+    .slice(0, 6)
+    .map((checkup) => {
+      const patient = patientById.get(checkup.patientId);
+      const pill = classifyCheckupPill(checkup);
+      return {
+        time: formatCheckupTime(checkup.date),
+        title: checkup.title || 'Appuntamento clinico',
+        sub: patient
+          ? `${patient.name} · ${patient.code}`
+          : 'Paziente locale non risolto nella lista corrente',
+        ...pill,
+      };
+    });
+}
+
+/* @Codex */
+function formatWorkspaceDate(value: string | Date | null | undefined): string {
+  if (!value) return 'n/d';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'n/d';
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+/* @Codex */
+function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined): string {
+  switch (type) {
+    case 'visit':
+      return 'Visita';
+    case 'phone':
+      return 'Telefonata';
+    case 'exam':
+      return 'Esame';
+    case 'hospitalization':
+      return 'Ricovero';
+    case 'access':
+      return 'Accesso';
+    case 'scale':
+      return 'Scala';
+    case 'remote':
+      return 'Remoto';
+    case 'note':
+    default:
+      return 'Nota';
+  }
+}
+
+/* @Codex */
+function summarizeObservation(observation: Observation): string {
+  const unit = observation.unitCode ? ` ${observation.unitCode}` : '';
+  return `${observation.display || observation.code}: ${observation.value}${unit}`;
+}
+
+/* @Codex */
+function buildCodingHints(
+  patient: Kree8Patient,
+  therapies: Therapy[],
+  attachments: Attachment[],
+): string[] {
+  const hints: string[] = [];
+  const structuredDiagnoses = parseDiagnosisLabels(patient.raw.diagnoses);
+  const hasCodedDiagnosis = structuredDiagnoses.some((diagnosis) => /^[A-Z][0-9A-Z.-]*\s*·/.test(diagnosis));
+  const therapiesWithoutDiagnosis = therapies.filter((therapy) => therapy.status === 'active' && !therapy.diagnosisCode);
+
+  if (!hasCodedDiagnosis) {
+    hints.push('Diagnosi da collegare a codifica clinica');
+  }
+  if (therapiesWithoutDiagnosis.length > 0) {
+    hints.push(`${therapiesWithoutDiagnosis.length} terapie senza aggancio diagnosi`);
+  }
+  if (attachments.length > 0) {
+    hints.push('Documenti recenti da usare per confermare codifiche');
+  }
+
+  return hints.slice(0, 3);
+}
+
+/* @Codex */
+function buildPatientWorkspace({
+  patient,
+  entries,
+  therapies,
+  checkups,
+  observations,
+  attachments,
+}: {
+  patient: Kree8Patient;
+  entries: ClinicalEntry[];
+  therapies: Therapy[];
+  checkups: Checkup[];
+  observations: Observation[];
+  attachments: Attachment[];
+}): Kree8PatientWorkspace {
+  const activeEntries = entries
+    .filter((entry) => !entry.deletedAt)
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+  const activeTherapies = therapies
+    .filter((therapy) => therapy.status === 'active')
+    .sort((left, right) => new Date(right.updatedAt ?? right.createdAt).getTime() - new Date(left.updatedAt ?? left.createdAt).getTime());
+  const pendingCheckups = checkups
+    .filter((checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+  const latestObservations = observations
+    .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
+  const recentAttachments = attachments
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const nextCheckup = pendingCheckups[0];
+  const latestEntry = activeEntries[0];
+  const latestObservation = latestObservations[0];
+  const documentInsightCount = Array.isArray(patient.raw.documentInsights)
+    ? patient.raw.documentInsights.length
+    : 0;
+
+  return {
+    entriesCount: activeEntries.length,
+    latestEntry: latestEntry
+      ? {
+        title: latestEntry.title || 'Voce diario',
+        date: formatWorkspaceDate(latestEntry.date),
+        type: clinicalEntryTypeLabel(latestEntry.type),
+      }
+      : undefined,
+    activeTherapiesCount: activeTherapies.length,
+    therapyLabels: activeTherapies
+      .slice(0, 3)
+      .map((therapy) => [therapy.drugName, therapy.dosage].filter(Boolean).join(' · ')),
+    pendingCheckupsCount: pendingCheckups.length,
+    nextCheckup: nextCheckup
+      ? {
+        title: nextCheckup.title || 'Follow-up',
+        date: formatWorkspaceDate(nextCheckup.date),
+        ...classifyCheckupPill(nextCheckup),
+      }
+      : undefined,
+    observationsCount: latestObservations.length,
+    latestObservation: latestObservation
+      ? {
+        label: summarizeObservation(latestObservation),
+        date: formatWorkspaceDate(latestObservation.observedAt),
+        value: String(latestObservation.value),
+      }
+      : undefined,
+    attachmentsCount: recentAttachments.length,
+    recentAttachmentNames: recentAttachments.slice(0, 3).map((attachment) => attachment.name || 'Documento clinico'),
+    documentInsightCount,
+    codingHints: buildCodingHints(patient, activeTherapies, recentAttachments),
+  };
+}
 
 function classNames(...parts: (string | false | undefined)[]) {
   return parts.filter(Boolean).join(' ');
@@ -448,17 +854,24 @@ function PillBadge({
 function Toolbar({
   filter,
   setFilter,
+  onOpenArea,
 }: {
   filter: StatusFilter;
   setFilter: (id: StatusFilter) => void;
+  onOpenArea: (area: AreaId) => void;
 }) {
   return (
     <div className={styles.toolbar}>
-      <div className={styles.search}>
+      <button
+        type="button"
+        className={styles.search}
+        onClick={() => onOpenArea('incarico')}
+        aria-label="Apri ricerca pazienti e incarichi"
+      >
         <Search size={14} />
         <span>Cerca paziente, ICD, esenzione, documento…</span>
         <kbd>⌘K</kbd>
-      </div>
+      </button>
       {STATUS_FILTERS.map((f) => (
         <button
           key={f.id}
@@ -474,11 +887,11 @@ function Toolbar({
           {f.label}
         </button>
       ))}
-      <button type="button" className={styles.toolChip}>
+      <button type="button" className={styles.toolChip} onClick={() => onOpenArea('revisione')}>
         <Upload size={13} />
         Carica
       </button>
-      <button type="button" className={styles.aiButton}>
+      <button type="button" className={styles.aiButton} onClick={() => onOpenArea('revisione')}>
         <Sparkles size={13} />
         Chiedi a MediFlow
       </button>
@@ -621,16 +1034,92 @@ function ClinicalAgendaBridgePanel({
 function TurnoArea({
   filter,
   agendaBridge,
+  patientState,
+  agendaState,
+  isReview,
+  onOpenArea,
 }: {
   filter: StatusFilter;
   agendaBridge: ClinicalAgendaBridgeClientState;
+  patientState: Kree8PatientClientState;
+  agendaState: Kree8AgendaClientState;
+  isReview: boolean;
+  onOpenArea: (area: AreaId) => void;
 }) {
   const visibleAgenda = useMemo(() => {
-    if (filter === 'all') return AGENDA;
-    if (filter === 'urgent') return AGENDA.filter((r) => r.pill === 'coral' || r.pill === 'yellow');
-    if (filter === 'ai') return AGENDA.filter((r) => r.pill === 'violet');
-    return AGENDA.filter((r) => r.pill === 'green' || r.pill === 'blue' || r.pill === 'muted');
-  }, [filter]);
+    if (filter === 'all') return agendaState.rows;
+    if (filter === 'urgent') return agendaState.rows.filter((r) => r.pill === 'coral' || r.pill === 'yellow');
+    if (filter === 'ai') return agendaState.rows.filter((r) => r.pill === 'violet');
+    return agendaState.rows.filter((r) => r.pill === 'green' || r.pill === 'blue' || r.pill === 'muted');
+  }, [agendaState.rows, filter]);
+  const activePatientCount = patientState.patients.filter((patient) => patient.list === 'attivi').length;
+  const patientCountLabel =
+    patientState.status === 'loading' || patientState.status === 'idle'
+      ? '…'
+      : patientState.status === 'error'
+        ? '—'
+        : String(activePatientCount);
+  const patientTrendLabel =
+    patientState.status === 'ready'
+      ? `${patientState.patients.length} schede in carico`
+      : patientState.status === 'error'
+        ? 'pazienti non disponibili'
+        : 'aggiornamento in corso';
+  const todayVisitCount = agendaState.rows.filter((row) => row.pillLabel === 'Oggi').length;
+  const visitCountLabel =
+    agendaState.status === 'loading' || agendaState.status === 'idle'
+      ? '…'
+      : agendaState.status === 'error'
+        ? '—'
+        : String(todayVisitCount);
+  const visitSubLabel =
+    agendaState.status === 'ready'
+      ? `${agendaState.rows.length} passaggi pianificati`
+      : agendaState.status === 'error'
+        ? 'agenda non disponibile'
+        : 'aggiornamento agenda';
+  const documentCountLabel = isReview ? '24' : '—';
+  const documentSubLabel = isReview
+    ? '7 con suggerimento AI'
+    : 'apri revisione documentale';
+  const decisionCountLabel = isReview ? '7' : '—';
+  const decisionSubLabel = isReview
+    ? '2 oltre SLA'
+    : 'priorità dal paziente selezionato';
+  const decisionCards: Kree8DecisionCard[] = isReview
+    ? AI_QUEUE
+    : [
+      {
+        title: 'Pazienti in carico',
+        body: patientState.status === 'ready'
+          ? `${patientState.patients.length} schede disponibili per triage, diario e follow-up.`
+          : 'Preparazione della lista pazienti.',
+        pill: patientState.status === 'error' ? 'Errore' : 'In carico',
+        pillVariant: patientState.status === 'error' ? 'coral' : 'green',
+        action: 'Vai ai pazienti',
+        target: 'incarico',
+      },
+      {
+        title: 'Agenda clinica',
+        body: agendaState.status === 'ready'
+          ? `${agendaState.rows.length} passaggi pianificati collegati al lavoro del turno.`
+          : agendaState.status === 'error'
+            ? 'Agenda non disponibile: resta visibile la lista pazienti.'
+            : 'Preparazione degli appuntamenti.',
+        pill: agendaState.status === 'error' ? 'Errore' : 'Agenda',
+        pillVariant: agendaState.status === 'error' ? 'coral' : 'blue',
+        action: 'Rivedi agenda',
+        target: 'turno',
+      },
+      {
+        title: 'Revisione e codifiche',
+        body: 'Usa la scheda paziente per rivedere documenti, suggerimenti AI e codifiche prima di applicare aggiornamenti clinici.',
+        pill: 'AI',
+        pillVariant: 'violet',
+        action: 'Apri revisione',
+        target: 'revisione',
+      },
+    ];
 
   return (
     <div className={styles.areaShell}>
@@ -638,11 +1127,12 @@ function TurnoArea({
         <div>
           <p className={styles.areaCaption}>Turno clinico · ambulatorio locale</p>
           <h1 className={styles.areaTitle}>
-            Buongiorno, Dr. L.P. <em>oggi, 6 turni governati.</em>
+            Buongiorno, Dr. L.P. <em>oggi, {agendaState.rows.length} appuntamenti locali.</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Sintetizzati 240 documenti questa settimana · margin AI &lt; 3% ·
-            ultimo backup locale 02:14.
+            {patientState.status === 'ready'
+              ? `${patientState.patients.length} pazienti in carico · agenda, documenti e priorità nello stesso turno.`
+              : 'Preparazione del turno dopo sblocco PIN.'}
           </p>
         </div>
       </header>
@@ -650,31 +1140,31 @@ function TurnoArea({
       <div className={styles.statsRow}>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Pazienti attivi</span>
-          <span className={styles.statValue}>312</span>
+          <span className={styles.statValue}>{patientCountLabel}</span>
           <span className={styles.statTrend}>
-            <ArrowUpRight size={12} /> +4 questa settimana
+            <ArrowUpRight size={12} /> {patientTrendLabel}
           </span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Documenti in coda</span>
-          <span className={styles.statValue}>24</span>
+          <span className={styles.statValue}>{documentCountLabel}</span>
           <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
-            7 con suggerimento AI
+            {documentSubLabel}
           </span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Visite oggi</span>
-          <span className={styles.statValue}>18</span>
+          <span className={styles.statValue}>{visitCountLabel}</span>
           <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
-            3 domiciliari · 15 ambulatoriali
+            {visitSubLabel}
           </span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Decisioni AI in attesa</span>
-          <span className={styles.statValue}>7</span>
+          <span className={styles.statValue}>{decisionCountLabel}</span>
           <span className={classNames(styles.statTrend, styles.statTrendDown)}>
             <ArrowUpRight size={12} style={{ transform: 'rotate(90deg)' }} />
-            2 oltre SLA
+            {decisionSubLabel}
           </span>
         </div>
       </div>
@@ -710,7 +1200,11 @@ function TurnoArea({
             ))}
             {visibleAgenda.length === 0 && (
               <p className={styles.rowSub} style={{ padding: '24px 0' }}>
-                Nessun evento per il filtro selezionato.
+                {agendaState.status === 'ready'
+                  ? 'Nessun appuntamento per il filtro selezionato.'
+                  : agendaState.status === 'error'
+                    ? 'Agenda non disponibile.'
+                    : 'Caricamento appuntamenti…'}
               </p>
             )}
           </div>
@@ -719,16 +1213,20 @@ function TurnoArea({
 
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Coda decisionale review</h2>
-            <PillBadge variant="violet">7 casi</PillBadge>
+            <h2 className={styles.panelTitle}>
+              {isReview ? 'Coda decisionale review' : 'Coda operativa'}
+            </h2>
+            <PillBadge variant="violet">
+              {isReview ? '7 casi' : 'oggi'}
+            </PillBadge>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-            {AI_QUEUE.map((card) => (
+            {decisionCards.map((card) => (
               <div key={card.title} className={styles.compositeCard}>
                 <header style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className={styles.evidenceTitle}>{card.title}</span>
                   <span style={{ marginLeft: 'auto' }}>
-                    <PillBadge variant={card.pillVariant as PillVariant}>
+                    <PillBadge variant={card.pillVariant}>
                       {card.pill}
                     </PillBadge>
                   </span>
@@ -740,6 +1238,9 @@ function TurnoArea({
                   type="button"
                   className={styles.ghostBtnSm}
                   style={{ alignSelf: 'flex-start' }}
+                  onClick={() => {
+                    if (card.target) onOpenArea(card.target);
+                  }}
                 >
                   {card.action}
                   <ChevronRight size={13} />
@@ -755,24 +1256,37 @@ function TurnoArea({
 
 /* ───────────────────────── Pazienti / incarico ───────────────────────── */
 
-function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
+function IncaricoArea({
+  patients,
+  patientStatus,
+  selectedPatientId,
+  onSelectPatient,
+  onOpenArea,
+  onOpenScheda,
+}: {
+  patients: Kree8Patient[];
+  patientStatus: Kree8PatientStatus;
+  selectedPatientId?: string;
+  onSelectPatient: (patientId: string) => void;
+  onOpenArea: (area: AreaId) => void;
+  onOpenScheda: () => void;
+}) {
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
-  const [selectedId, setSelectedId] = useState<string>('p1');
 
   const visible = useMemo(
     () =>
-      PATIENT_LIST.filter((p) => {
+      patients.filter((p) => {
         if (list === 'attivi' && p.list !== 'attivi') return false;
         if (list === 'archivio' && p.list !== 'archivio') return false;
         if (scope === 'tutti') return true;
         if (scope === 'ambulatorio') return p.scope === 'ambulatorio';
         return p.scope === 'network';
       }),
-    [scope, list],
+    [patients, scope, list],
   );
 
-  const selected = PATIENT_LIST.find((p) => p.id === selectedId) ?? visible[0] ?? PATIENT_LIST[0];
+  const selected = patients.find((p) => p.id === selectedPatientId) ?? visible[0] ?? patients[0] ?? null;
 
   return (
     <div className={styles.areaShell}>
@@ -783,8 +1297,11 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
             Inbox pazienti <em>· flusso clinico governato</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Scope ambulatoriale, network paired o intero distretto · selezione
-            singola con anteprima Case Lens.
+            {patientStatus === 'ready'
+              ? 'Seleziona un caso, aprilo in cockpit e prepara il prossimo passaggio.'
+              : patientStatus === 'error'
+                ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
+                : 'Preparazione della lista pazienti.'}
           </p>
         </div>
       </header>
@@ -845,21 +1362,33 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
             </h2>
             <PillBadge variant="muted">{visible.length} risultati</PillBadge>
             <span className={styles.panelActions}>
-              <button type="button" className={styles.ghostBtnSm}>
+              <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
                 Nuova anagrafica
-              </button>
+              </Link>
             </span>
           </header>
 
           <div style={{ marginTop: 8 }}>
+            {patientStatus === 'loading' && (
+              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+                Caricamento pazienti…
+              </p>
+            )}
+            {patientStatus === 'error' && (
+              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+                Lista pazienti non disponibile. Verifica sessione e API locale.
+              </p>
+            )}
             {visible.length === 0 && (
               <p className={styles.rowSub} style={{ padding: '24px 0' }}>
-                Nessun paziente nell&apos;ambito selezionato.
+                {patientStatus === 'ready'
+                  ? 'Nessun paziente nell’ambito selezionato.'
+                  : 'In attesa dei dati paziente.'}
               </p>
             )}
             {visible.map((p) => {
-              const isSelected = p.id === selected.id;
+              const isSelected = p.id === selected?.id;
               const dotClass =
                 p.status === 'green'
                   ? styles.patientDotGreen
@@ -874,7 +1403,7 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
                     styles.patientRow,
                     isSelected && styles.patientRowSelected,
                   )}
-                  onClick={() => setSelectedId(p.id)}
+                  onClick={() => onSelectPatient(p.id)}
                   aria-pressed={isSelected}
                 >
                   <span className={classNames(styles.patientDot, dotClass)} />
@@ -901,12 +1430,13 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
           </div>
         </section>
 
+        {selected ? (
         <aside className={styles.caseLens} key={selected.id}>
           <span className={styles.areaCaption}>Case Lens · anteprima</span>
           <div className={styles.caseLensHero}>
             <span className={styles.caseLensName}>{selected.name}</span>
             <span className={styles.caseLensSub}>
-              {selected.code} · {selected.pathway} · ultimo evento {selected.lastTouch}
+              {selected.code} · {selected.ageLabel} · ultimo aggiornamento {selected.lastTouch}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -920,9 +1450,7 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
             </PillBadge>
           </div>
           <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
-            {selected.list === 'archivio'
-              ? 'Percorso chiuso, consultabile come storico clinico. Nessuna azione di scrittura.'
-              : 'Profilo a cronicità multipla · aderenza terapeutica buona · vitali ultima rilevazione nella norma.'}
+            {selected.summary}
           </p>
           <div className={styles.caseLensActions}>
             <button
@@ -932,18 +1460,30 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
               disabled={selected.list === 'archivio'}
             >
               <UserSquare2 size={13} />
-              Apri scheda
+              Apri in cockpit
             </button>
-            <button type="button" className={styles.ghostBtnSm}>
+            <Link href={selected.href} className={styles.ghostBtnSm}>
+              <ArrowUpRight size={12} />
+              Moduli completi
+            </Link>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
-              Allega documento
+              Documenti
             </button>
-            <button type="button" className={styles.ghostBtnSm}>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
               <Workflow size={12} />
-              Prepara handoff SISS
+              Handoff SISS
             </button>
           </div>
         </aside>
+        ) : (
+          <aside className={styles.caseLens}>
+            <span className={styles.areaCaption}>Case Lens · anteprima</span>
+            <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
+              Nessun paziente reale selezionabile in questa vista.
+            </p>
+          </aside>
+        )}
       </div>
     </div>
   );
@@ -951,8 +1491,273 @@ function IncaricoArea({ onOpenScheda }: { onOpenScheda: () => void }) {
 
 /* ───────────────────────── Scheda paziente ───────────────────────── */
 
-function SchedaArea() {
+function RealPatientArea({
+  patient,
+  workspace,
+  onOpenArea,
+}: {
+  patient: Kree8Patient;
+  workspace?: Kree8PatientWorkspace | null;
+  onOpenArea: (area: AreaId) => void;
+}) {
+  const isWorkspaceLoading = workspace === undefined;
+  const latestEntry = workspace?.latestEntry;
+  const nextCheckup = workspace?.nextCheckup;
+  const latestObservation = workspace?.latestObservation;
+  const codingHints = workspace?.codingHints ?? [];
+
+  return (
+    <div className={styles.areaShell}>
+      <header className={styles.areaHeader}>
+        <div>
+          <p className={styles.areaCaption}>Scheda paziente</p>
+          <h1 className={styles.areaTitle}>
+            {patient.name} <em>· {patient.ageLabel}</em>
+          </h1>
+          <p className={styles.areaSubtitle}>
+            Ultimo aggiornamento {patient.lastTouch}. Apri, rivedi e prepara il
+            prossimo passaggio clinico senza uscire dal flusso del turno.
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <Link href={`${patient.href}/entries/new`} className={styles.ghostBtnSm}>
+            <Plus size={12} /> Nuova voce
+          </Link>
+          <Link href={`${patient.href}/edit`} className={styles.ghostBtnSm}>
+            <Edit3 size={12} /> Anagrafica
+          </Link>
+          <Link href={patient.href} className={styles.primaryBtn}>
+            <UserSquare2 size={13} /> Moduli completi
+          </Link>
+        </div>
+      </header>
+
+      <section className={styles.panel}>
+        <div className={styles.identityDock}>
+          <div className={styles.identityChips}>
+            {patient.diagnoses.map((diagnosis) => (
+              <PillBadge key={diagnosis} variant="blue">{diagnosis}</PillBadge>
+            ))}
+            <PillBadge variant={patient.status === 'muted' ? 'muted' : patient.status === 'blue' ? 'blue' : 'green'}>
+              {patient.statusLabel}
+            </PillBadge>
+            <PillBadge variant="muted">{patient.code}</PillBadge>
+          </div>
+          <span style={{ marginLeft: 'auto' }}>
+            <PillBadge variant={patient.status === 'muted' ? 'muted' : 'green'}>
+              <ShieldCheck size={11} />
+              In carico
+            </PillBadge>
+          </span>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <h2 className={styles.panelTitle}>Quadro rapido</h2>
+          <div className={styles.insightBody}>
+            <p style={{ margin: 0 }}>{patient.summary}</p>
+          </div>
+        </div>
+      </section>
+
+      <div className={styles.statsRow}>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Diario</span>
+          <span className={styles.statValue}>{isWorkspaceLoading ? '…' : workspace?.entriesCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
+            {isWorkspaceLoading ? 'caricamento diario' : latestEntry ? `${latestEntry.type} · ${latestEntry.date}` : 'nessuna voce recente'}
+          </span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Terapie attive</span>
+          <span className={styles.statValue}>{isWorkspaceLoading ? '…' : workspace?.activeTherapiesCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
+            {isWorkspaceLoading ? 'caricamento terapie' : workspace?.therapyLabels[0] ?? 'nessun piano attivo'}
+          </span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Follow-up</span>
+          <span className={styles.statValue}>{isWorkspaceLoading ? '…' : workspace?.pendingCheckupsCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
+            {isWorkspaceLoading ? 'caricamento agenda' : nextCheckup ? `${nextCheckup.title} · ${nextCheckup.date}` : 'nessun passaggio aperto'}
+          </span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Documenti</span>
+          <span className={styles.statValue}>{isWorkspaceLoading ? '…' : workspace?.attachmentsCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
+            {isWorkspaceLoading ? 'caricamento archivio' : workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili` : 'archivio consultabile'}
+          </span>
+        </div>
+      </div>
+
+      <div className={styles.twoCol}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Lavoro clinico</h2>
+            <PillBadge variant="blue">priorità del caso</PillBadge>
+          </header>
+          <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+            <div className={styles.compositeCard}>
+              <header className={styles.panelHeader}>
+                <span className={styles.evidenceTitle}>Diario e timeline</span>
+                <PillBadge variant="muted">{workspace?.entriesCount ?? 0} voci</PillBadge>
+              </header>
+              <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
+                {isWorkspaceLoading
+                  ? 'Caricamento diario clinico.'
+                  : latestEntry
+                  ? `${latestEntry.title} · ${latestEntry.date}`
+                  : 'Apri una nuova voce o consulta la timeline completa.'}
+              </p>
+              <Link href={`${patient.href}/entries/new`} className={styles.ghostBtnSm} style={{ alignSelf: 'flex-start' }}>
+                <Plus size={12} />
+                Registra passaggio
+              </Link>
+            </div>
+
+            <div className={styles.compositeCard}>
+              <header className={styles.panelHeader}>
+                <span className={styles.evidenceTitle}>Terapie e osservazioni</span>
+                <PillBadge variant="green">{workspace?.activeTherapiesCount ?? 0} attive</PillBadge>
+              </header>
+              <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
+                {isWorkspaceLoading
+                  ? 'Caricamento terapie e osservazioni.'
+                  : workspace?.therapyLabels.length
+                  ? workspace.therapyLabels.join(' · ')
+                  : 'Nessuna terapia attiva in evidenza.'}
+              </p>
+              <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
+                {isWorkspaceLoading
+                  ? 'Osservazioni in aggiornamento.'
+                  : latestObservation
+                  ? `Ultima osservazione: ${latestObservation.label} · ${latestObservation.date}`
+                  : 'Nessuna osservazione recente.'}
+              </p>
+            </div>
+
+            <div className={styles.compositeCard}>
+              <header className={styles.panelHeader}>
+                <span className={styles.evidenceTitle}>Agenda del caso</span>
+                <PillBadge variant={nextCheckup?.pill ?? 'muted'}>
+                  {nextCheckup?.pillLabel ?? 'libera'}
+                </PillBadge>
+              </header>
+              <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
+                {isWorkspaceLoading
+                  ? 'Caricamento follow-up del caso.'
+                  : nextCheckup
+                  ? `${nextCheckup.title} · ${nextCheckup.date}`
+                  : 'Nessun follow-up aperto: pianifica il prossimo controllo se necessario.'}
+              </p>
+              <button type="button" className={styles.ghostBtnSm} style={{ alignSelf: 'flex-start' }} onClick={() => onOpenArea('turno')}>
+                <CalendarClock size={12} />
+                Vai all&apos;agenda
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.panelInset}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Documenti e codifiche</h2>
+            <PillBadge variant={codingHints.length ? 'violet' : 'green'}>
+              {codingHints.length ? `${codingHints.length} cue` : 'allineato'}
+            </PillBadge>
+          </header>
+          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+            <div>
+              <span className={styles.fieldKind}>AI coding</span>
+              {codingHints.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                  {codingHints.map((hint) => (
+                    <div key={hint} className={styles.evidenceItem}>
+                      <span className={styles.evidenceTitle}>{hint}</span>
+                      <span className={styles.evidenceSnippet}>Verifica in revisione documentale prima di applicare.</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.panelSubtitle}>Nessuna codifica sospesa in primo piano.</p>
+              )}
+            </div>
+
+            <div>
+              <span className={styles.fieldKind}>Archivio recente</span>
+              {workspace?.recentAttachmentNames.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                  {workspace.recentAttachmentNames.map((name) => (
+                    <div key={name} className={styles.evidenceItem}>
+                      <span className={styles.evidenceTitle}>{name}</span>
+                      <span className={styles.evidenceSnippet}>Apri documenti paziente per allegati, sintesi e review.</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.panelSubtitle}>Nessun documento recente agganciato.</p>
+              )}
+            </div>
+
+            <div className={styles.caseLensActions}>
+              <button type="button" className={styles.primaryBtn} onClick={() => onOpenArea('revisione')}>
+                <Sparkles size={13} />
+                Revisione AI
+              </button>
+              <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('cataloghi')}>
+                <Database size={12} />
+                Cataloghi
+              </button>
+              <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
+                <Workflow size={12} />
+                Handoff
+              </button>
+              <Link href={patient.href} className={styles.ghostBtnSm}>
+                <ArrowUpRight size={12} />
+                Apri dettagli
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SchedaArea({
+  patient,
+  workspace,
+  isReview,
+  onOpenArea,
+}: {
+  patient?: Kree8Patient | null;
+  workspace?: Kree8PatientWorkspace | null;
+  isReview: boolean;
+  onOpenArea: (area: AreaId) => void;
+}) {
   const [view, setView] = useState<'ai' | 'source'>('ai');
+
+  if (!isReview && patient) {
+    return <RealPatientArea patient={patient} workspace={workspace} onOpenArea={onOpenArea} />;
+  }
+
+  if (!isReview && !patient) {
+    return (
+      <div className={styles.areaShell}>
+        <header className={styles.areaHeader}>
+          <div>
+            <p className={styles.areaCaption}>Scheda paziente</p>
+            <h1 className={styles.areaTitle}>
+              Nessun paziente selezionato <em>· seleziona un caso in carico</em>
+            </h1>
+            <p className={styles.areaSubtitle}>
+              Apri un paziente dalla lista in carico per vedere quadro rapido,
+              azioni, documenti e follow-up del caso.
+            </p>
+          </div>
+        </header>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.areaShell}>
@@ -1225,6 +2030,418 @@ function SchedaArea() {
   );
 }
 
+/* @Codex */
+function LiveDocumentReviewArea({
+  patient,
+  workspace,
+  onOpenArea,
+}: {
+  patient?: Kree8Patient | null;
+  workspace?: Kree8PatientWorkspace | null;
+  onOpenArea: (area: AreaId) => void;
+}) {
+  const isWorkspaceLoading = workspace === undefined;
+  const codingHints = workspace?.codingHints ?? [];
+  const documentNames = workspace?.recentAttachmentNames ?? [];
+
+  return (
+    <div className={styles.areaShell}>
+      <header className={styles.areaHeader}>
+        <div>
+          <p className={styles.areaCaption}>Revisione documenti</p>
+          <h1 className={styles.areaTitle}>
+            Coda clinica <em>· codifiche, evidenze, allegati</em>
+          </h1>
+          <p className={styles.areaSubtitle}>
+            {patient
+              ? `Contesto aperto su ${patient.name}: rivedi documenti e suggerimenti prima di aggiornare la scheda.`
+              : 'Seleziona un paziente per vedere documenti, codifiche e suggerimenti collegati.'}
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
+            <Inbox size={12} />
+            Scegli paziente
+          </button>
+          {patient ? (
+            <Link href={patient.href} className={styles.primaryBtn}>
+              <ArrowUpRight size={13} />
+              Apri dettagli
+            </Link>
+          ) : null}
+        </div>
+      </header>
+
+      <div className={styles.statsRow}>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Documenti</span>
+          <span className={styles.statValue}>{workspace === undefined ? '…' : workspace?.attachmentsCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>allegati del caso</span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Sintesi</span>
+          <span className={styles.statValue}>{workspace === undefined ? '…' : workspace?.documentInsightCount ?? 0}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>evidenze estratte</span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Codifiche</span>
+          <span className={styles.statValue}>{workspace === undefined ? '…' : codingHints.length}</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>da confermare</span>
+        </div>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Cataloghi</span>
+          <span className={styles.statValue}>4</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, ICD, esenzioni, LOINC</span>
+        </div>
+      </div>
+
+      <div className={styles.twoCol}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Documenti del caso</h2>
+            <PillBadge variant="muted">{documentNames.length} recenti</PillBadge>
+          </header>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {isWorkspaceLoading ? (
+              <p className={styles.panelSubtitle}>Caricamento documenti del paziente.</p>
+            ) : documentNames.length ? documentNames.map((name) => (
+              <div key={name} className={styles.compositeCard}>
+                <header className={styles.panelHeader}>
+                  <FileText size={14} color="var(--ink-muted)" />
+                  <span className={styles.evidenceTitle}>{name}</span>
+                  <PillBadge variant="blue">da leggere</PillBadge>
+                </header>
+                <p className={styles.rowSub} style={{ margin: 0 }}>
+                  Apri il dettaglio paziente per allegato, OCR e sintesi clinica.
+                </p>
+              </div>
+            )) : (
+              <p className={styles.panelSubtitle}>Nessun documento recente agganciato al paziente selezionato.</p>
+            )}
+          </div>
+        </section>
+
+        <section className={styles.panelInset}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Suggerimenti AI</h2>
+            <PillBadge variant={codingHints.length ? 'violet' : 'green'}>
+              {codingHints.length ? 'review' : 'ok'}
+            </PillBadge>
+          </header>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {isWorkspaceLoading ? (
+              <p className={styles.panelSubtitle}>Caricamento suggerimenti e codifiche.</p>
+            ) : codingHints.length ? codingHints.map((hint) => (
+              <div key={hint} className={styles.evidenceItem}>
+                <Sparkles size={14} color="var(--pill-violet-fg)" />
+                <span>
+                  <span className={styles.evidenceTitle}>{hint}</span>
+                  <span className={styles.evidenceSnippet}>Conferma con evidenza prima di scrivere in scheda.</span>
+                </span>
+              </div>
+            )) : (
+              <p className={styles.panelSubtitle}>Nessun suggerimento in primo piano per il paziente selezionato.</p>
+            )}
+          </div>
+          <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('cataloghi')}>
+              <Database size={12} />
+              Cataloghi
+            </button>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
+              <UserSquare2 size={12} />
+              Torna alla scheda
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* @Codex */
+function isSissPatientContextHandoffResult(
+  payload: unknown,
+): payload is SissPatientContextHandoffResult {
+  if (!payload || typeof payload !== 'object') return false;
+  const candidate = payload as Partial<SissPatientContextHandoffResult>;
+  return candidate.status === 'handoff'
+    && typeof candidate.action === 'string'
+    && typeof candidate.title === 'string'
+    && typeof candidate.handoffUrl === 'string'
+    && typeof candidate.correlationId === 'string'
+    && typeof candidate.message === 'string';
+}
+
+/* @Codex */
+function LiveHandoffArea({
+  patient,
+  onOpenArea,
+}: {
+  patient?: Kree8Patient | null;
+  onOpenArea: (area: AreaId) => void;
+}) {
+  const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
+  const [feedback, setFeedback] = useState<HandoffFeedback | null>(null);
+  const fiscalCodeReady = patient ? patient.code !== 'CF non disponibile' : false;
+
+  const startHandoff = async (action: SissPatientContextAction) => {
+    if (!patient) {
+      setFeedback({
+        kind: 'error',
+        message: 'Seleziona un paziente prima di aprire un handoff regionale.',
+      });
+      return;
+    }
+    if (!fiscalCodeReady && action !== 'menu.open') {
+      setFeedback({
+        kind: 'warning',
+        message: 'Il modulo prescrittivo richiede un codice fiscale valido nel profilo paziente.',
+      });
+      return;
+    }
+
+    setActiveAction(action);
+    setFeedback(null);
+    const popupWindow = prepareSissPortalWindow();
+    if (!popupWindow) {
+      setFeedback({
+        kind: 'error',
+        message: 'Popup SISS bloccato dal browser. Consenti i popup e riprova.',
+      });
+      setActiveAction(null);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/siss/context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId: patient.id, action }),
+      });
+      const payload = await response.json().catch(() => null) as unknown;
+
+      if (!response.ok) {
+        popupWindow.close();
+        const errorPayload = payload && typeof payload === 'object'
+          ? payload as { error?: unknown; correlationId?: unknown }
+          : null;
+        setFeedback({
+          kind: 'error',
+          message: typeof errorPayload?.error === 'string'
+            ? errorPayload.error
+            : 'Flusso SISS non disponibile.',
+          correlationId: typeof errorPayload?.correlationId === 'string'
+            ? errorPayload.correlationId
+            : null,
+        });
+        return;
+      }
+
+      if (!isSissPatientContextHandoffResult(payload)) {
+        popupWindow.close();
+        throw new Error('Risposta SISS non valida');
+      }
+
+      const handoffResult = await completeSissPortalHandoff({
+        handoffUrl: payload.handoffUrl,
+        clipboardText: payload.clipboardText ?? undefined,
+        successMessage: payload.message,
+        popupWindow,
+      });
+
+      if (!handoffResult.opened) {
+        popupWindow.close();
+      }
+
+      setFeedback({
+        kind: handoffResult.success ? 'success' : handoffResult.opened ? 'warning' : 'error',
+        message: `${payload.title}: ${handoffResult.message}`,
+        correlationId: payload.correlationId,
+      });
+
+      if (handoffResult.opened) {
+        const now = new Date();
+        void db.sissHandoffs.add({
+          id: crypto.randomUUID(),
+          patientId: patient.id,
+          action,
+          moduleLabel: payload.title,
+          reason: 'Handoff avviato dalla shell Kree8 live.',
+          startedAt: now,
+          outcome: 'started',
+          correlationId: payload.correlationId,
+          createdAt: now,
+          updatedAt: now,
+        }).catch((error) => {
+          console.warn('[MediFlow] Kree8 SISS handoff diary write failed:', error);
+        });
+      }
+    } catch (error) {
+      popupWindow.close();
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Errore inatteso nel flusso SISS.',
+      });
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
+  return (
+    <div className={styles.areaShell}>
+      <header className={styles.areaHeader}>
+        <div>
+          <p className={styles.areaCaption}>Handoff regionale</p>
+          <h1 className={styles.areaTitle}>
+            Preparazione SISS <em>· contesto paziente e diario</em>
+          </h1>
+          <p className={styles.areaSubtitle}>
+            {patient
+              ? `Contesto aperto su ${patient.name}: prepara consenso, azione regionale e nota di esito.`
+              : 'Seleziona un paziente prima di preparare un passaggio verso i portali regionali.'}
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
+            <Inbox size={12} />
+            Scegli paziente
+          </button>
+          {patient ? (
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              disabled={activeAction === 'prescription.create' || !fiscalCodeReady}
+              onClick={() => void startHandoff('prescription.create')}
+            >
+              <Workflow size={13} />
+              {!fiscalCodeReady
+                ? 'CF richiesto'
+                : activeAction === 'prescription.create'
+                  ? 'Apertura…'
+                  : 'Apri modulo SISS'}
+            </button>
+          ) : null}
+        </div>
+      </header>
+
+      <div className={styles.threeCol}>
+        {[
+          { title: 'Identità e consenso', sub: patient ? `${patient.code} · ${patient.ageLabel}` : 'paziente non selezionato', pill: fiscalCodeReady ? 'pronto' : 'attesa', variant: fiscalCodeReady ? 'green' as const : 'muted' as const },
+          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto locale', pill: 'assistita', variant: 'blue' as const },
+          { title: 'Esito', sub: 'registra risultato e prossima azione in diario', pill: 'diario', variant: 'violet' as const },
+        ].map((item) => (
+          <section key={item.title} className={styles.panel}>
+            <header className={styles.panelHeader}>
+              <h2 className={styles.panelTitle}>{item.title}</h2>
+              <PillBadge variant={item.variant}>{item.pill}</PillBadge>
+            </header>
+            <p className={styles.panelSubtitle}>{item.sub}</p>
+          </section>
+        ))}
+      </div>
+
+      <section className={styles.panelInset}>
+        <header className={styles.panelHeader}>
+          <h2 className={styles.panelTitle}>Azioni rapide</h2>
+          <PillBadge variant="muted">portali ufficiali</PillBadge>
+        </header>
+        <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
+          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('cataloghi')}>
+            <Database size={12} />
+            Verifica cataloghi
+          </button>
+          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
+            <UserSquare2 size={12} />
+            Quadro paziente
+          </button>
+          {patient ? (
+            <Link href={`${patient.href}/entries/new`} className={styles.ghostBtnSm}>
+              <Plus size={12} />
+              Nota esito
+            </Link>
+          ) : null}
+        </div>
+        {feedback ? (
+          <div className={styles.compositeCard} style={{ marginTop: 12 }}>
+            <header className={styles.panelHeader}>
+              <span className={styles.evidenceTitle}>
+                {feedback.kind === 'success'
+                  ? 'Handoff avviato'
+                  : feedback.kind === 'warning'
+                    ? 'Handoff da completare'
+                    : 'Handoff non avviato'}
+              </span>
+              <PillBadge
+                variant={
+                  feedback.kind === 'success'
+                    ? 'green'
+                    : feedback.kind === 'warning'
+                      ? 'yellow'
+                      : 'coral'
+                }
+              >
+                /api/siss/context
+              </PillBadge>
+            </header>
+            <p className={styles.rowSub} style={{ margin: 0 }}>
+              {feedback.message}
+              {feedback.correlationId ? ` · ${feedback.correlationId}` : ''}
+            </p>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+/* @Codex */
+function LiveGovernanceArea({
+  patientCount,
+}: {
+  patientCount: number;
+}) {
+  return (
+    <div className={styles.areaShell}>
+      <header className={styles.areaHeader}>
+        <div>
+          <p className={styles.areaCaption}>Governance locale</p>
+          <h1 className={styles.areaTitle}>
+            Stato operativo <em>· sessione, audit, backup</em>
+          </h1>
+          <p className={styles.areaSubtitle}>
+            Controlli locali della sessione clinica: nessun dato sanitario lascia il dispositivo.
+          </p>
+        </div>
+      </header>
+
+      <div className={styles.threeCol}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Sessione</h2>
+            <PillBadge variant="green">attiva</PillBadge>
+          </header>
+          <p className={styles.panelSubtitle}>{patientCount} pazienti disponibili nel turno corrente.</p>
+        </section>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Audit</h2>
+            <PillBadge variant="muted">locale</PillBadge>
+          </header>
+          <p className={styles.panelSubtitle}>Eventi append-only consultabili dagli strumenti di sistema.</p>
+        </section>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Backup</h2>
+            <PillBadge variant="blue">home-base</PillBadge>
+          </header>
+          <p className={styles.panelSubtitle}>Backup e ripristino restano operazioni esplicite sul Mac.</p>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────── Revisione documenti ───────────────────────── */
 
 function RevisioneArea() {
@@ -1453,6 +2670,9 @@ function RevisioneArea() {
 function CataloghiArea() {
   const TOTAL_MANIFESTS = 24;
   const [version, setVersion] = useState(7);
+  const [selectedCatalogId, setSelectedCatalogId] = useState(CATALOGS[0]?.id ?? '');
+  const [catalogAction, setCatalogAction] = useState<'idle' | 'verified' | 'validated'>('idle');
+  const selectedCatalog = CATALOGS.find((catalog) => catalog.id === selectedCatalogId) ?? CATALOGS[0];
 
   const freshnessTier =
     version <= 3 ? 'broken' : version <= 8 ? 'fresh' : version <= 16 ? 'ok' : 'stale';
@@ -1522,15 +2742,32 @@ function CataloghiArea() {
             </button>
           </div>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
-            <button type="button" className={styles.ghostBtn}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={() => setCatalogAction('verified')}
+            >
               <RefreshCcw size={13} /> Verifica manifest
             </button>
-            <button type="button" className={styles.primaryBtn}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => setCatalogAction('validated')}
+            >
               Segna snapshot valido
               <ChevronRight size={14} />
             </button>
           </span>
         </div>
+        <p className={styles.panelSubtitle}>
+          {catalogAction === 'validated'
+            ? `Snapshot v${version} marcato come valido per la sessione corrente.`
+            : catalogAction === 'verified'
+              ? `Snapshot v${version} verificato nella sessione corrente.`
+              : selectedCatalog
+                ? `Catalogo selezionato: ${selectedCatalog.name}.`
+                : 'Seleziona un catalogo per vedere lo stato operativo.'}
+        </p>
       </section>
 
       <section className={styles.panel}>
@@ -1538,7 +2775,7 @@ function CataloghiArea() {
           <h2 className={styles.panelTitle}>Cataloghi clinici</h2>
           <PillBadge variant="muted">{CATALOGS.length} pacchetti</PillBadge>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">scope locale · nessun fetch remoto</PillBadge>
+            <PillBadge variant="green">catalogo locale</PillBadge>
           </span>
         </header>
 
@@ -1572,7 +2809,15 @@ function CataloghiArea() {
                   {c.age}
                 </span>
                 <PillBadge variant={variant}>{labelText}</PillBadge>
-                <button type="button" className={styles.ghostBtnSm}>
+                <button
+                  type="button"
+                  className={styles.ghostBtnSm}
+                  aria-label={`Apri catalogo ${c.name}`}
+                  onClick={() => {
+                    setSelectedCatalogId(c.id);
+                    setCatalogAction('idle');
+                  }}
+                >
                   Apri
                   <ChevronRight size={13} />
                 </button>
@@ -1580,6 +2825,27 @@ function CataloghiArea() {
             );
           })}
         </div>
+        {selectedCatalog && (
+          <div className={styles.compositeCard} style={{ marginTop: 12 }}>
+            <header className={styles.panelHeader}>
+              <span className={styles.evidenceTitle}>{selectedCatalog.name}</span>
+              <PillBadge
+                variant={{
+                  fresh: 'green',
+                  ok: 'blue',
+                  stale: 'yellow',
+                  broken: 'coral',
+                  off: 'muted',
+                }[selectedCatalog.freshness] as PillVariant}
+              >
+                selezionato
+              </PillBadge>
+            </header>
+            <p className={styles.rowSub} style={{ margin: 0 }}>
+              {selectedCatalog.sub} · aggiornamento {selectedCatalog.age}
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -2222,28 +3488,81 @@ function AreaContent({
   area,
   filter,
   agendaBridge,
+  patientState,
+  agendaState,
+  selectedPatient,
+  selectedPatientId,
+  patientWorkspace,
+  isReview,
+  onSelectPatient,
+  onOpenArea,
   onOpenScheda,
 }: {
   area: AreaId;
   filter: StatusFilter;
   agendaBridge: ClinicalAgendaBridgeClientState;
+  patientState: Kree8PatientClientState;
+  agendaState: Kree8AgendaClientState;
+  selectedPatient?: Kree8Patient | null;
+  selectedPatientId?: string;
+  patientWorkspace?: Kree8PatientWorkspace | null;
+  isReview: boolean;
+  onSelectPatient: (patientId: string) => void;
+  onOpenArea: (area: AreaId) => void;
   onOpenScheda: () => void;
 }) {
   switch (area) {
     case 'turno':
-      return <TurnoArea filter={filter} agendaBridge={agendaBridge} />;
+      return (
+        <TurnoArea
+          filter={filter}
+          agendaBridge={agendaBridge}
+          patientState={patientState}
+          agendaState={agendaState}
+          isReview={isReview}
+          onOpenArea={onOpenArea}
+        />
+      );
     case 'incarico':
-      return <IncaricoArea onOpenScheda={onOpenScheda} />;
+      return (
+        <IncaricoArea
+          patients={patientState.patients}
+          patientStatus={patientState.status}
+          selectedPatientId={selectedPatientId}
+          onSelectPatient={onSelectPatient}
+          onOpenArea={onOpenArea}
+          onOpenScheda={onOpenScheda}
+        />
+      );
     case 'scheda':
-      return <SchedaArea />;
+      return (
+        <SchedaArea
+          patient={selectedPatient}
+          workspace={patientWorkspace}
+          isReview={isReview}
+          onOpenArea={onOpenArea}
+        />
+      );
     case 'revisione':
-      return <RevisioneArea />;
+      return isReview
+        ? <RevisioneArea />
+        : (
+          <LiveDocumentReviewArea
+            patient={selectedPatient}
+            workspace={patientWorkspace}
+            onOpenArea={onOpenArea}
+          />
+        );
     case 'cataloghi':
       return <CataloghiArea />;
     case 'handoff':
-      return <HandoffArea />;
+      return isReview
+        ? <HandoffArea />
+        : <LiveHandoffArea patient={selectedPatient} onOpenArea={onOpenArea} />;
     case 'governance':
-      return <GovernanceArea />;
+      return isReview
+        ? <GovernanceArea />
+        : <LiveGovernanceArea patientCount={patientState.patients.length} />;
   }
 }
 
@@ -2258,6 +3577,63 @@ export function Kree8ClinicalCockpit({
     status: 'idle',
   });
   const isReview = surface === 'review';
+  const [patientState, setPatientState] = useState<Kree8PatientClientState>(() => (
+    isReview
+      ? { status: 'ready', patients: REVIEW_PATIENT_LIST }
+      : { status: 'idle', patients: [] }
+  ));
+  const [agendaState, setAgendaState] = useState<Kree8AgendaClientState>(() => (
+    isReview
+      ? { status: 'ready', rows: REVIEW_AGENDA }
+      : { status: 'idle', rows: [] }
+  ));
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
+    isReview ? REVIEW_PATIENT_LIST[0]?.id : undefined
+  ));
+
+  const selectedPatient = useMemo(
+    () => patientState.patients.find((patient) => patient.id === selectedPatientId)
+      ?? patientState.patients[0]
+      ?? null,
+    [patientState.patients, selectedPatientId],
+  );
+
+  /* @Codex */
+  const livePatientRows = useLiveQuery<Patient[]>(
+    async () => (isReview ? [] : db.patients.toArray()),
+    [isReview],
+  );
+
+  /* @Codex */
+  const liveCheckupRows = useLiveQuery<Checkup[]>(
+    async () => (isReview ? [] : db.checkups.toArray()),
+    [isReview],
+  );
+
+  /* @Codex */
+  const patientWorkspace = useLiveQuery<Kree8PatientWorkspace | null>(
+    async () => {
+      if (isReview || !selectedPatient) return null;
+      const patientId = selectedPatient.id;
+      const [entries, therapies, checkups, observations, attachments] = await Promise.all([
+        db.entries.filter((entry) => entry.patientId === patientId).toArray(),
+        db.therapies.filter((therapy) => therapy.patientId === patientId).toArray(),
+        db.checkups.filter((checkup) => checkup.patientId === patientId).toArray(),
+        db.observations.filter((observation) => observation.patientId === patientId).toArray(),
+        db.attachments.filter((attachment) => attachment.patientId === patientId).toArray(),
+      ]);
+
+      return buildPatientWorkspace({
+        patient: selectedPatient,
+        entries,
+        therapies,
+        checkups,
+        observations,
+        attachments,
+      });
+    },
+    [isReview, selectedPatient?.id],
+  );
 
   useEffect(() => {
     if (isReview) return;
@@ -2284,6 +3660,38 @@ export function Kree8ClinicalCockpit({
     return () => controller.abort();
   }, [isReview]);
 
+  useEffect(() => {
+    if (isReview) return;
+
+    if (!livePatientRows) {
+      setPatientState({ status: 'loading', patients: [] });
+      setAgendaState({ status: 'loading', rows: [] });
+      return;
+    }
+
+    const patients = livePatientRows.map(mapPatientForKree8);
+    const checkups = liveCheckupRows ?? [];
+    setPatientState({ status: 'ready', patients });
+    setAgendaState({
+      status: liveCheckupRows ? 'ready' : 'loading',
+      rows: mapCheckupsForKree8(checkups, patients),
+    });
+    setSelectedPatientId((current) => (
+      current && patients.some((patient) => patient.id === current)
+        ? current
+        : patients[0]?.id
+    ));
+  }, [isReview, livePatientRows, liveCheckupRows]);
+
+  const patientNavMeta =
+    isReview
+      ? '312'
+      : patientState.status === 'ready'
+        ? String(patientState.patients.filter((patient) => patient.list === 'attivi').length)
+        : patientState.status === 'error'
+          ? '!'
+          : '…';
+
   return (
     <div
       className={styles.shell}
@@ -2304,6 +3712,7 @@ export function Kree8ClinicalCockpit({
         {AREAS.map((a) => {
           const Icon = a.icon;
           const selected = area === a.id;
+          const navMeta = a.id === 'incarico' ? patientNavMeta : a.meta;
           return (
             <button
               key={a.id}
@@ -2314,19 +3723,19 @@ export function Kree8ClinicalCockpit({
             >
               <Icon size={15} />
               <span>{a.label}</span>
-              {a.meta && <span className={styles.navMeta}>{a.meta}</span>}
+              {navMeta && <span className={styles.navMeta}>{navMeta}</span>}
               {selected && <ChevronRight size={14} className={styles.navChevron} />}
             </button>
           );
         })}
 
         <span className={styles.railLabel}>Sessione</span>
-        <button type="button" className={styles.navItem}>
+        <button type="button" className={styles.navItem} onClick={() => setArea('governance')}>
           <Stethoscope size={15} />
           <span>Stato sistema</span>
           <span className={styles.navMeta}>OK</span>
         </button>
-        <button type="button" className={styles.navItem}>
+        <button type="button" className={styles.navItem} onClick={() => setArea('governance')}>
           <ShieldCheck size={15} />
           <span>Audit locale</span>
         </button>
@@ -2334,18 +3743,26 @@ export function Kree8ClinicalCockpit({
         <div className={styles.railFooter}>
           <span className={styles.railTag}>
             <span className={styles.railDot} />
-            home-base locale · 12 ms
+            home-base locale
           </span>
-          <span>{isReview ? 'Review WUL-271 · design reference' : 'Live WUL-272 · localhost root'}</span>
+          <span>{isReview ? 'Review design' : 'Sessione clinica locale'}</span>
         </div>
       </aside>
 
       <section className={styles.canvas}>
-        <Toolbar filter={filter} setFilter={setFilter} />
+        <Toolbar filter={filter} setFilter={setFilter} onOpenArea={setArea} />
         <AreaContent
           area={area}
           filter={filter}
           agendaBridge={agendaBridge}
+          patientState={patientState}
+          agendaState={agendaState}
+          selectedPatient={selectedPatient}
+          selectedPatientId={selectedPatientId}
+          patientWorkspace={patientWorkspace}
+          isReview={isReview}
+          onSelectPatient={setSelectedPatientId}
+          onOpenArea={setArea}
           onOpenScheda={() => setArea('scheda')}
         />
       </section>

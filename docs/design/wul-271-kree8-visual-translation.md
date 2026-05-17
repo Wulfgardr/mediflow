@@ -1,10 +1,12 @@
 # WUL-271/WUL-272/WUL-274 · Kree8 → MediFlow visual translation
 
-> Status: live root entry on `/` as of `WUL-272`.
+> Status: live root entry on `/` as of `WUL-272`; first real-patient
+> cockpit slice in progress under `WUL-273`.
 > PIN continuity: lock screen aligned to the live Kree8 grammar as of `WUL-274`.
 > Review alias: `/mockups/kree8`.
 > Scope: full-surface visual reset promoted to the local web entrypoint as the
-> new app interface direction; real clinical data wiring is tracked by WUL-273.
+> new app interface direction; real clinical data wiring is being migrated in
+> small verified slices under WUL-273.
 
 ## Why this doc exists
 
@@ -41,7 +43,7 @@ The follow-up migration tracker is
 | No persistent UI selector | No Graphite/Kree8 toggle, no preview profile, no persistent visual mode. This follows [ADR 0060](../adr/0060-kree8-cockpit-live-root-entry.md). |
 | Visual surface | `.shell` is `position: fixed; inset: 0; z-index: 1000;` so the cockpit owns the viewport. |
 | Reduced motion respected | A scoped `@media (prefers-reduced-motion: reduce)` block disables transitions and keyframe animations inside `.shell`. |
-| Data | Synthetic only. No PHI, no real patient screenshots, no remote assets. |
+| Data | `/` live reads real local patients and checkups only after PIN/session unlock; `/mockups/kree8` remains synthetic review data. No remote assets and no real patient screenshots in repo. |
 | Dependencies | No new npm packages. Existing `lucide-react` is used for iconography. |
 
 ## Token translation
@@ -113,13 +115,17 @@ real MediFlow nomenclature.
 
 ## Interactivity demonstrated
 
-Most state remains local React state. Since `WUL-275`, the live root also makes
-one session-protected internal read to `/api/clinical-agenda/candidates` for
-Zimbra/iCloud event-cache candidates. The review alias stays synthetic and does
-not fetch external data.
+Most non-migrated panels still use local React state. Since `WUL-273`, the live
+root makes session-protected reads to `/api/patients` and `/api/checkups` after
+unlock, maps them into the Kree8 patient inbox, stat strip, local agenda and
+first Scheda paziente cockpit view, and shows an explicit error/empty state
+instead of falling back to review patients. Since `WUL-275`, the live root also
+reads `/api/clinical-agenda/candidates` for Zimbra/iCloud event-cache candidates.
+The review alias stays synthetic and does not fetch external or clinical data.
 
-This remains deliberate in the first live-entry slice: the visual line is now
-directly visible on `/`, while broad patient/data wiring is a separate migration.
+This is still a thin migration slice: documents, therapies, diary, observations
+and full patient actions continue to open the existing real modules until each
+surface is migrated into the Kree8 grammar.
 
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
@@ -131,8 +137,10 @@ directly visible on `/`, while broad patient/data wiring is a separate migration
   from confirmed agenda rows and keeps them in manual review state.
 - AI gradient action present in the toolbar (decorative; matches Kree8 cue).
 - Patient inbox scope (`Ambulatorio locale` / `Network paired` / `Tutti`) and
-  list mode (`Attivi` / `Archivio`) drive the visible rows; selecting a row
-  animates a Case Lens preview; `Apri scheda` jumps to the detail area.
+  list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
+  rows come from `/api/patients`; selecting a row animates a Case Lens preview;
+  `Apri in cockpit` jumps to the detail area while `Scheda completa` opens the
+  existing patient module.
 - Scheda paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
 - Document field decision tri-state per row with evidence snippet, kind label
   (`write strutturata` / `note-only` / `non integrabile ora`), live counters,
@@ -162,11 +170,14 @@ directly visible on `/`, while broad patient/data wiring is a separate migration
 ## What this live-entry slice explicitly does **not** do
 
 - Does not migrate all real clinical routes into the Kree8 grammar.
+- Does not migrate documents, therapies, diary, observations or write workflows
+  into the Kree8 grammar yet; those actions continue through the existing real
+  patient routes.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.
 - Does not add a Graphite/Kree8 selector.
-- Does not load remote assets or real patient data.
+- Does not load patient data before PIN/session unlock.
 - Does not claim a certified SISS return artifact: the Esito stage records
   the portal outcome as **manually annotated** and labels it `non
   certificato`.
@@ -178,6 +189,10 @@ directly visible on `/`, while broad patient/data wiring is a separate migration
       no cockpit copy or protected fetch storm appears before unlock.
 - [ ] Unlock with a valid PIN and confirm the lock surface unmounts directly
       into the Kree8 cockpit.
+- [ ] On `/` live, confirm `/api/patients` and `/api/checkups` return local data
+      after unlock, the sidebar patient count is real, the Turno stat strip
+      does not show synthetic `312` / `24` / `7 casi` counts, and the page text
+      does not contain review-only patient tokens such as `AB-2026-014`.
 - [ ] Navigate to `/mockups/kree8` and confirm it remains only a review alias.
 - [ ] On `Pazienti / incarico`, switch scope between `Ambulatorio locale`,
       `Network paired` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a

@@ -288,7 +288,16 @@
     0 0 0 1px rgba(15, 23, 42, 0.04);
   color: var(--ink-subtle);
   font-size: 13px;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 140ms var(--motion-spring),
+    box-shadow 160ms var(--motion-ease);
 }
+
+.search:hover { transform: translateY(-1px); }
+.search:active { transform: scale(0.99); }
 
 .search span {
   min-width: 0;
