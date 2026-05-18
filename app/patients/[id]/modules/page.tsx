@@ -182,7 +182,7 @@ export default function PatientDetailPage() {
                 className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold"
             >
                 <Plus className="h-4 w-4" />
-                Nuova visita
+                Nuova voce
             </Link>
 
             <div className="mt-3 grid gap-2 sm:grid-cols-3">

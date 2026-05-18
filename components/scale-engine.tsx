@@ -78,20 +78,20 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     const progress = ((currentStep + 1) / scale.questions.length) * 100;
 
     return (
-        // @Codex WUL-229 — scale engine canvas adopts vitreous tier and option-card primitives
-        <div className="mf-section max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[500px] !p-0">
-            <div className="p-6 graphite-divider">
-                <h2 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>{scale.title}</h2>
-                <p className="text-sm mt-1" style={{ color: 'var(--mf-muted)' }}>{scale.description}</p>
+        // @Codex WUL-273 — scale engine can live inside the Kree8 workspace without the old page chrome.
+        <div className="patient-detail-section mx-auto flex min-h-[500px] w-full max-w-3xl flex-col overflow-hidden border !p-0">
+            <div className="border-b border-[color:rgba(112,106,100,0.12)] p-6">
+                <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)]">{scale.title}</h2>
+                <p className="mt-1 text-sm text-[color:var(--mf-muted)]">{scale.description}</p>
 
                 <ProgressBar progress={progress} />
-                <div className="text-right text-xs mt-2" style={{ color: 'var(--mf-muted)' }}>
+                <div className="mt-2 text-right text-xs text-[color:var(--mf-muted)]">
                     Domanda {currentStep + 1} di {scale.questions.length}
                 </div>
             </div>
 
-            <div className="flex-1 p-8 flex flex-col justify-center">
-                <h3 className="text-xl font-medium mb-8 leading-relaxed" style={{ color: 'var(--mf-ink)' }}>
+            <div className="flex flex-1 flex-col justify-center p-6 md:p-8">
+                <h3 className="mb-8 text-xl font-medium leading-relaxed text-[color:var(--mf-ink)]">
                     {currentQuestion.text}
                 </h3>
 
@@ -105,7 +105,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                                     answers[currentQuestion.id] === 1 && 'is-active'
                                 )}
                             >
-                                Sì / Corretto
+                                Sì / corretto
                             </button>
                             <button
                                 onClick={() => handleAnswer(currentQuestion.id, 0)}
@@ -123,7 +123,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                                         : undefined
                                 }
                             >
-                                No / Errato
+                                No / non corretto
                             </button>
                         </div>
                     )}
@@ -143,7 +143,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                 </div>
             </div>
 
-            <div className="p-6 graphite-divider flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:rgba(112,106,100,0.12)] p-5 md:p-6">
                 <button
                     onClick={onCancel}
                     className="mf-btn-secondary"
@@ -151,7 +151,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                     Annulla
                 </button>
 
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                     {currentStep > 0 && (
                         <button
                             onClick={() => setCurrentStep(prev => prev - 1)}

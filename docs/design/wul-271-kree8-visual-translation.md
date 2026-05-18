@@ -136,6 +136,11 @@ existing rich-text editor, attachment upload, OCR/document synthesis and save
 flow, but the route-level language is Kree8-native: `Diario clinico`, `Nuova
 voce clinica`, `Luogo`, `Tipo di voce`, `Resoconto`, `Allegati`.
 
+`/patients/[id]/scales/[scaleId]` now follows the same workspace rule for
+patient-bound assessments launched from Cartella completa. The runner keeps the
+existing scoring/save behavior and presents context, questions and diary save as
+one clinical flow.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
