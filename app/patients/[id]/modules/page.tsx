@@ -362,8 +362,8 @@ export default function PatientDetailPage() {
                                 <span>GDS</span>
                                 <Plus className="h-4 w-4 text-[color:var(--mf-primary)]" />
                             </Link>
-                            <Link href="/scales" className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
-                                Vedi tutte le scale
+                            <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
+                                Apri libreria scale
                             </Link>
                         </div>
                     </section>

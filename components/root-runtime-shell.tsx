@@ -28,7 +28,7 @@ function isKree8PatientRoute(pathname: string | null): boolean {
 
 function isKree8PatientWorkspaceRoute(pathname: string | null): boolean {
   if (!pathname) return false;
-  return /^\/patients\/[^/]+\/(?:modules|entries\/new|scales\/[^/]+)$/.test(pathname);
+  return /^\/patients\/[^/]+\/(?:modules|entries\/new|scales(?:\/[^/]+)?)$/.test(pathname);
 }
 
 export function RootRuntimeShell({
