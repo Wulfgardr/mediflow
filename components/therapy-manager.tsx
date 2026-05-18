@@ -28,6 +28,13 @@ const therapySchema = z.object({
 
 type TherapyFormValues = z.infer<typeof therapySchema>;
 
+const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-[11px]';
+const inputClassName = 'w-full rounded-[14px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 py-2.5 text-sm text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[color:rgba(112,106,100,0.48)] focus:border-[color:rgba(15,123,104,0.32)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)] read-only:bg-[color:rgba(247,243,237,0.58)] dark:border-white/10 dark:bg-white/5 dark:read-only:bg-white/4';
+const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
+const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] hover:text-[color:var(--mf-primary)] dark:bg-white/6';
+const statusButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:rgba(112,106,100,0.14)] bg-[color:rgba(247,243,237,0.72)] px-3 text-xs font-semibold text-[color:var(--mf-muted)] transition-colors hover:border-[color:rgba(182,106,60,0.28)] hover:text-[color:var(--mf-accent)] dark:bg-white/5';
+const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors';
+
 export default function TherapyManager({ patientId }: { patientId: string }) {
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,9 +43,8 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
 
     const therapies = useLiveQuery(
         async () => {
-            const items = await db.therapies.filter((t: any) => t.patientId === patientId).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const items = await db.therapies.filter((therapy: Therapy) => therapy.patientId === patientId).toArray();
+            return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
         },
         [patientId]
     );
@@ -70,10 +76,8 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
         setValue('activePrinciple', therapy.activePrinciple);
         setValue('dosage', therapy.dosage);
         setValue('motivation', therapy.motivation);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((therapy as any).diagnosisCode && (therapy as any).diagnosisName) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setSelectedDiagnosis({ code: (therapy as any).diagnosisCode, title: (therapy as any).diagnosisName });
+        if (therapy.diagnosisCode && therapy.diagnosisName) {
+            setSelectedDiagnosis({ code: therapy.diagnosisCode, title: therapy.diagnosisName });
         } else {
             setSelectedDiagnosis(null);
         }
@@ -151,37 +155,59 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
     };
 
     const handleSoftDelete = async (id: string) => {
-        if (confirm('Eliminare questo farmaco? (Usare questa opzione solo per errori di inserimento. Per interrompere una terapia, usare "Termina" o "Sospendi")')) {
+        if (confirm('Eliminare questo farmaco dalla cartella? Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.')) {
             await db.therapies.delete(id);
         }
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                    <Pill className="w-5 h-5 text-[color:var(--mf-muted)]" />
-                    Terapie
-                </h3>
+        <section className="patient-detail-section border p-5 md:p-6">
+            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p className="section-kicker">Terapie</p>
+                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
+                        <Pill className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                        Terapie farmacologiche
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                        Farmaci attivi, sospesi e conclusi restano nello stesso registro locale della cartella.
+                    </p>
+                </div>
                 {!isAdding && (
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="ui-btn-primary inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold"
+                        className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold"
                     >
                         <Plus className="w-4 h-4" />
-                        Aggiungi terapia
+                        Nuova terapia
                     </button>
                 )}
             </div>
+
             {isAdding && (
-                <div className="patient-detail-section glass-panel border p-4 animate-in fade-in slide-in-from-top-4">
-                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                        <h4 className="font-semibold text-gray-700">{editingId ? 'Modifica terapia' : 'Nuova terapia'}</h4>
-                        <button onClick={cancelEditing} aria-label="Chiudi"><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
+                <div className="mb-6 rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-[color:rgba(255,255,255,0.72)] p-4 shadow-[0_18px_45px_rgba(54,45,38,0.06)] animate-in fade-in slide-in-from-top-4 dark:border-white/10 dark:bg-white/5 md:p-5">
+                    <div className="mb-5 flex items-start justify-between gap-3 border-b border-[color:rgba(112,106,100,0.11)] pb-4 dark:border-white/10">
+                        <div>
+                            <p className="section-kicker">Registro terapia</p>
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
+                                {editingId ? 'Modifica terapia' : 'Nuova terapia'}
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                Salva farmaco, posologia e indicazione clinica nella cartella locale.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={cancelEditing}
+                            aria-label="Chiudi scheda terapia"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/86 text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)] dark:bg-white/6"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <div className="flex items-center gap-4 mb-4">
-                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <div className="mb-4">
+                        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-[13px] border border-[color:rgba(112,106,100,0.14)] bg-white/76 px-3 text-sm font-semibold text-[color:var(--mf-ink)] dark:border-white/10 dark:bg-white/5">
                             <input
                                 type="checkbox"
                                 checked={isGalenic}
@@ -195,23 +221,23 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                         setValue('atc', '');
                                     }
                                 }}
-                                className="w-4 h-4 rounded text-slate-700 focus:ring-slate-500 border-gray-300"
+                                className="h-4 w-4 rounded border-[color:rgba(112,106,100,0.22)] text-[color:var(--mf-primary)] focus:ring-[color:rgba(15,123,104,0.22)]"
                             />
                             <Beaker className="w-4 h-4" />
-                            Preparazione manuale / galenica
+                            Farmaco manuale o galenico
                         </label>
                     </div>
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-500 uppercase flex items-center justify-between">
+                                <label className={fieldLabelClassName}>
                                     <span>Farmaco</span>
-                                    {!isGalenic && <span className="text-[10px] text-[color:var(--mf-muted)] flex items-center gap-1"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
+                                    {!isGalenic && <span className="inline-flex items-center gap-1 text-[10px] text-[color:var(--mf-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
                                 </label>
 
                                 {isGalenic ? (
-                                    <input {...register('drugName')} className="w-full p-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-slate-500 outline-none" placeholder="Es. preparazione magistrale..." />
+                                    <input {...register('drugName')} className={inputClassName} placeholder="Es. preparazione magistrale..." />
                                 ) : (
                                     <div className="relative">
                                         <DrugAutocomplete
@@ -235,21 +261,21 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                 {errors.drugName && <p className="text-xs text-red-500">{errors.drugName.message}</p>}
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Principio attivo</label>
-                                <input {...register('activePrinciple')} className="w-full p-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-slate-500 outline-none" placeholder="Es. Furosemide" readOnly={!isGalenic} />
+                                <label className={fieldLabelClassName}>Principio attivo</label>
+                                <input {...register('activePrinciple')} className={inputClassName} placeholder="Es. Furosemide" readOnly={!isGalenic} />
                             </div>
                             <div className="col-span-full space-y-1">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Posologia</label>
-                                <input {...register('dosage')} className="w-full p-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-slate-500 outline-none" placeholder="Es. 1 cp ore 8:00, 1/2 cp ore 20:00" />
+                                <label className={fieldLabelClassName}>Posologia</label>
+                                <input {...register('dosage')} className={inputClassName} placeholder="Es. 1 cp ore 8:00, 1/2 cp ore 20:00" />
                                 {errors.dosage && <p className="text-xs text-red-500">{errors.dosage.message}</p>}
                             </div>
                             <div className="col-span-full space-y-1">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Motivazione / Note</label>
-                                <textarea {...register('motivation')} className="w-full p-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-slate-500 outline-none" placeholder="Per scompenso cardiaco..." />
+                                <label className={fieldLabelClassName}>Indicazione o nota clinica</label>
+                                <textarea {...register('motivation')} className={textareaClassName} placeholder="Es. scompenso cardiaco, dolore cronico, prevenzione..." />
                             </div>
 
                             <div className="col-span-full space-y-1">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Indicazione clinica</label>
+                                <label className={fieldLabelClassName}>Collegamento clinico</label>
 
                                 {/* Quick Suggestions */}
                                 {patient && (
@@ -259,7 +285,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                                 key={d.code}
                                                 type="button"
                                                 onClick={() => setSelectedDiagnosis({ code: d.code, title: d.description })}
-                                                className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${selectedDiagnosis?.code === d.code ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                                                className={`${chipClassName} ${selectedDiagnosis?.code === d.code ? 'border-[color:rgba(15,123,104,0.32)] bg-[color:rgba(15,123,104,0.10)] text-[color:var(--mf-primary)]' : 'border-[color:rgba(112,106,100,0.14)] bg-white/82 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] dark:bg-white/5'}`}
                                             >
                                                 {d.description}
                                             </button>
@@ -267,14 +293,14 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis({ code: 'PREV', title: 'Prevenzione' })}
-                                            className={`text-[10px] px-2 py-1 rounded-full border flex items-center gap-1 transition-colors ${selectedDiagnosis?.code === 'PREV' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-green-200 text-green-600 hover:bg-green-50'}`}
+                                            className={`${chipClassName} ${selectedDiagnosis?.code === 'PREV' ? 'border-[color:rgba(15,123,104,0.32)] bg-[color:rgba(15,123,104,0.10)] text-[color:var(--mf-primary)]' : 'border-[color:rgba(15,123,104,0.18)] bg-white/82 text-[color:var(--mf-primary)] hover:bg-[color:rgba(15,123,104,0.06)] dark:bg-white/5'}`}
                                         >
                                             <Shield className="w-3 h-3" /> Prevenzione
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis(null)}
-                                            className={`text-[10px] px-2 py-1 rounded-full border flex items-center gap-1 transition-colors ${!selectedDiagnosis ? 'bg-gray-200 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50'}`}
+                                            className={`${chipClassName} ${!selectedDiagnosis ? 'border-[color:rgba(112,106,100,0.24)] bg-[color:rgba(247,243,237,0.92)] text-[color:var(--mf-ink)]' : 'border-[color:rgba(112,106,100,0.14)] bg-white/82 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] dark:bg-white/5'}`}
                                         >
                                             <Ban className="w-3 h-3" /> Nessuna
                                         </button>
@@ -285,10 +311,10 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                     onSelect={(code, title) => setSelectedDiagnosis({ code, title })}
                                     initialValue={selectedDiagnosis}
                                 />
-                                <p className="text-[10px] text-gray-400">
+                                <p className="text-xs leading-5 text-[color:var(--mf-muted)]">
                                     {selectedDiagnosis?.code === 'PREV'
-                                        ? "Indicazione: Prevenzione"
-                                        : (selectedDiagnosis ? "Nuove diagnosi verranno aggiunte alla scheda paziente." : "Opzionale: Collega a una diagnosi")}
+                                        ? 'Indicazione: prevenzione.'
+                                        : (selectedDiagnosis ? 'La diagnosi selezionata viene mantenuta come contesto della terapia.' : 'Opzionale: collega una diagnosi o lascia la terapia senza indicazione codificata.')}
                                 </p>
                             </div>
                         </div>
@@ -297,7 +323,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                         {/* @Codex */}
                         <input type="hidden" {...register('atc')} />
                         <div className="flex justify-end pt-2 gap-2">
-                            <button type="button" onClick={cancelEditing} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">Annulla</button>
+                            <button type="button" onClick={cancelEditing} className={quietButtonClassName}>Annulla</button>
                             <button type="submit" className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold">
                                 {editingId ? 'Aggiorna terapia' : 'Salva terapia'}
                             </button>
@@ -308,40 +334,38 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
 
             <div className="space-y-4">
                 {activeTherapies.length === 0 && suspendedTherapies.length === 0 ? (
-                    <div className="p-8 text-center bg-gray-50/50 dark:bg-white/5 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">Nessuna terapia attiva al momento.</p>
+                    <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.22)] bg-[color:rgba(247,243,237,0.48)] p-8 text-center dark:border-white/12 dark:bg-white/5">
+                        <p className="text-sm leading-6 text-[color:var(--mf-muted)]">
+                            Nessuna terapia attiva registrata. Aggiungi una terapia quando serve tenere traccia di farmaco e posologia.
+                        </p>
                     </div>
                 ) : (
                     <>
                         {/* ACTIVE */}
                         {activeTherapies.map(t => (
-                            <div key={t.id} className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row justify-between items-start gap-4">
+                            <div key={t.id} className="flex flex-col items-start justify-between gap-4 rounded-[18px] border border-[color:rgba(112,106,100,0.13)] bg-white/86 p-4 shadow-[0_18px_45px_rgba(54,45,38,0.05)] dark:border-white/10 dark:bg-white/5 sm:flex-row">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h4 className="font-semibold text-gray-800 dark:text-white text-base">{t.drugName}</h4>
-                                        {t.activePrinciple && <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300 rounded-full">{t.activePrinciple}</span>}
+                                        <h4 className="text-base font-semibold text-[color:var(--mf-ink)]">{t.drugName}</h4>
+                                        {t.activePrinciple && <span className="rounded-full bg-[color:rgba(247,243,237,0.85)] px-2 py-0.5 text-xs font-medium text-[color:var(--mf-muted)] dark:bg-white/10">{t.activePrinciple}</span>}
                                     </div>
                                     <p className="text-[color:var(--mf-ink)] dark:text-slate-100 font-medium mt-1">{t.dosage}</p>
 
-                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                    {(t as any).diagnosisCode && (
+                                    {t.diagnosisCode && (
                                         <div className="mt-1 flex items-center gap-1.5">
-                                            <span className="text-[10px] bg-gray-50 dark:bg-white/5 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded border border-gray-200 dark:border-white/10 font-medium">
-                                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                {(t as any).diagnosisCode}
+                                            <span className="rounded border border-[color:rgba(112,106,100,0.14)] bg-[color:rgba(247,243,237,0.58)] px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5">
+                                                {t.diagnosisCode}
                                             </span>
-                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                            <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[220px]" title={(t as any).diagnosisName}>
-                                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                {(t as any).diagnosisName}
+                                            <span className="max-w-[220px] truncate text-xs text-[color:var(--mf-muted)]" title={t.diagnosisName}>
+                                                {t.diagnosisName}
                                             </span>
                                         </div>
                                     )}
 
-                                    {t.motivation && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">&quot;{t.motivation}&quot;</p>}
+                                    {t.motivation && <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">{t.motivation}</p>}
 
                                     {(t.atc || t.aic) && (
-                                        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] font-mono uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                                        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] font-mono uppercase tracking-wide text-[color:rgba(112,106,100,0.72)]">
                                             {t.atc ? <span>ATC {t.atc}</span> : null}
                                             {t.aic ? <span>AIC {t.aic}</span> : null}
                                         </p>
@@ -350,7 +374,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
                                         onClick={() => startEditing(t)}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors border border-gray-200"
+                                        className={quietButtonClassName}
                                         title="Modifica terapia"
                                     >
                                         <Pencil className="w-3.5 h-3.5" />
@@ -359,7 +383,7 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
 
                                     <button
                                         onClick={() => updateStatus(t.id, 'suspended')}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg text-xs font-medium transition-colors border border-orange-100"
+                                        className={statusButtonClassName}
                                         title="Sospendi temporaneamente"
                                     >
                                         <Clock className="w-3.5 h-3.5" />
@@ -368,17 +392,18 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
 
                                     <button
                                         onClick={() => updateStatus(t.id, 'completed')}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg text-xs font-medium transition-colors border border-gray-200"
+                                        className={statusButtonClassName}
                                         title="Termina terapia"
                                     >
                                         <StopCircle className="w-3.5 h-3.5" />
-                                        Termina
+                                        Concludi
                                     </button>
 
                                     <button
                                         onClick={() => handleSoftDelete(t.id)}
-                                        className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Elimina (Errore Inserimento)"
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-[11px] text-[color:rgba(112,106,100,0.46)] transition-colors hover:bg-red-50 hover:text-red-600"
+                                        title="Elimina solo se inserito per errore"
+                                        aria-label={`Elimina ${t.drugName} solo se inserito per errore`}
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -389,30 +414,30 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                         {/* SUSPENDED */}
                         {suspendedTherapies.length > 0 && (
                             <div className="space-y-2 mt-4">
-                                <h5 className="text-xs font-bold text-[color:var(--mf-muted)] uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <h5 className="section-kicker mb-2 flex items-center gap-2">
                                     <Clock className="w-3 h-3" /> Terapie sospese
                                 </h5>
                                 {suspendedTherapies.map(t => (
-                                    <div key={t.id} className="p-3 bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-500/20 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-3 opacity-90 transition-opacity">
+                                    <div key={t.id} className="flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:rgba(182,106,60,0.18)] bg-[color:rgba(247,243,237,0.66)] p-3 dark:border-white/10 dark:bg-white/5 sm:flex-row sm:items-center">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-orange-900 dark:text-orange-100">{t.drugName}</span>
-                                                <span className="text-xs bg-orange-200 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 px-1.5 py-0.5 rounded">SOSPESO</span>
+                                                <span className="font-semibold text-[color:var(--mf-ink)]">{t.drugName}</span>
+                                                <span className="rounded-full bg-white/78 px-2 py-0.5 text-xs font-semibold text-[color:var(--mf-accent)] dark:bg-white/10">Sospesa</span>
                                             </div>
-                                            <p className="text-xs text-orange-800 dark:text-orange-200 mt-0.5">{t.dosage}</p>
+                                            <p className="mt-0.5 text-xs text-[color:var(--mf-muted)]">{t.dosage}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => updateStatus(t.id, 'active')}
-                                                className="flex items-center gap-1 px-3 py-1 bg-white hover:bg-orange-100 border border-orange-200 text-orange-700 rounded-md text-xs font-medium shadow-sm"
+                                                className={quietButtonClassName}
                                             >
                                                 <Play className="w-3 h-3" /> Riprendi
                                             </button>
                                             <button
                                                 onClick={() => updateStatus(t.id, 'completed')}
-                                                className="flex items-center gap-1 px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 rounded-md text-xs font-medium"
+                                                className={statusButtonClassName}
                                             >
-                                                <StopCircle className="w-3 h-3" /> Termina
+                                                <StopCircle className="w-3 h-3" /> Concludi
                                             </button>
                                         </div>
                                     </div>
@@ -424,24 +449,23 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
             </div>
 
             {endedTherapies.length > 0 && (
-                <div className="pt-4 border-t border-gray-100">
-                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Terapie concluse</h5>
-                    <div className="space-y-2 opacity-60 hover:opacity-100 transition-opacity">
+                <div className="mt-6 border-t border-[color:rgba(112,106,100,0.11)] pt-4 dark:border-white/10">
+                    <h5 className="section-kicker mb-3">Terapie concluse</h5>
+                    <div className="space-y-2">
                         {endedTherapies.map(t => (
-                            <div key={t.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-white/5 rounded-lg grayscale hover:grayscale-0 transition-all group">
+                            <div key={t.id} className="group flex items-center justify-between gap-3 rounded-[16px] border border-[color:rgba(112,106,100,0.10)] bg-[color:rgba(247,243,237,0.46)] p-3 dark:border-white/10 dark:bg-white/5">
                                 <div>
-                                    <span className="font-semibold text-gray-700 dark:text-gray-400 line-through decoration-gray-400">{t.drugName}</span>
-                                    <div className="text-xs text-gray-500 dark:text-gray-500">
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        Terminato il {format(new Date((t as any).updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}
+                                    <span className="font-semibold text-[color:var(--mf-muted)] line-through decoration-[color:rgba(112,106,100,0.42)]">{t.drugName}</span>
+                                    <div className="text-xs text-[color:var(--mf-muted)]">
+                                        Conclusa il {format(new Date(t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}
                                     </div>
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
                                     <button
                                         onClick={() => updateStatus(t.id, 'active')}
-                                        className="text-xs px-2 py-1 border border-gray-200 bg-white text-gray-700 rounded hover:bg-gray-50"
+                                        className={quietButtonClassName}
                                     >
-                                        Riattiva terapia
+                                        Riattiva
                                     </button>
                                 </div>
                             </div>
@@ -449,6 +473,6 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }
