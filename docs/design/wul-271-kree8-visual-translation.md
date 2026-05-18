@@ -106,7 +106,7 @@ clinician-facing MediFlow nomenclature.
 | Area pill | Demonstrates |
 | --- | --- |
 | Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
-| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri scheda` / `Cartella completa` / `Prepara SISS`. |
+| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri scheda` / `Strumenti clinici` / `Prepara SISS`. |
 | Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
 | Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
 | Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
@@ -123,29 +123,29 @@ instead of falling back to review patients. Since `WUL-275`, the live root also
 reads `/api/clinical-agenda/candidates` for Zimbra/iCloud event-cache candidates.
 The review alias stays synthetic and does not fetch external or clinical data.
 
-`/patients/[id]/modules` is now treated as **Cartella completa**: a Kree8
-fullscreen deep-work route for the same patient. The root navigates, the Scheda
-decides and summarizes, the Cartella completa executes longer clinical work
-such as therapies, observations, protesica, scales, document upload and diary
-review. Its inner tools still reuse the existing real components until each
-one receives its own Kree8-native internal pass.
+`/patients/[id]/modules` is now treated as the **Scheda paziente**: the Kree8
+fullscreen patient workspace that hosts the full set of `strumenti clinici`.
+The root navigates, the Scheda paziente decides, summarizes and executes the
+longer clinical work — therapies, observations, protesica, scales, document
+upload and diary review. Its inner tools still reuse the existing real
+components until each one receives its own Kree8-native internal pass.
 
 `/patients/[id]/entries/new` now follows the same fullscreen workspace rule for
-the primary write action from Scheda and Cartella completa. It keeps the
+the primary write action launched from the Scheda paziente. It keeps the
 existing rich-text editor, attachment upload, OCR/document synthesis and save
 flow, but the route-level language is Kree8-native: `Diario clinico`, `Nuova
 voce clinica`, `Luogo`, `Tipo di voce`, `Resoconto`, `Allegati`.
 
 `/patients/[id]/scales` and `/patients/[id]/scales/[scaleId]` now follow the
-same workspace rule for patient-bound assessments launched from Cartella
-completa. The picker uses the real local `SCALES` registry, while the runner
+same workspace rule for patient-bound assessments launched from the Scheda
+paziente. The picker uses the real local `SCALES` registry, while the runner
 keeps the existing scoring/save behavior and presents context, questions and
 diary save as one clinical flow.
 
 `/patients/[id]/edit` now follows the same workspace rule for patient record
 maintenance. The existing `PatientForm`, FSE/FHIR export validation, archive,
 restore and delete behavior remain unchanged, but the route-level frame is
-Kree8-native and returns to Cartella completa.
+Kree8-native and returns to the Scheda paziente.
 
 `/patients/new` now follows the same workspace rule for creating a record from
 the live cockpit. The PDF/image import, document-review gate, duplicate tax-code
@@ -182,8 +182,8 @@ zone" wording.
 - Patient inbox scope (`Ambulatorio locale` / `Rete locale` / `Tutti`) and
   list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
   rows come from `/api/patients`; selecting a row animates an `Anteprima caso`
-  preview; `Apri scheda` jumps to the detail area while `Cartella completa`
-  opens the dense patient tools route.
+  preview; `Apri scheda` jumps to the detail area while `Strumenti clinici`
+  opens the patient workspace route at `/patients/[id]/modules`.
 - Scheda paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
 - Document field decision tri-state per row with evidence snippet, kind label
   (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
@@ -217,8 +217,8 @@ zone" wording.
   into the Kree8 grammar yet; those actions continue through the existing real
   patient components until their own slices. Patient creation, new diary entry,
   global scale catalog, analytics, settings, ambulatories, patient scale
-  picker/runner, edit and Cartella completa are already framed as Kree8
-  workspaces.
+  picker/runner, edit and the Scheda paziente workspace are already framed as
+  Kree8 surfaces.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.

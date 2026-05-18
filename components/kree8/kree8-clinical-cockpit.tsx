@@ -3979,8 +3979,8 @@ function GovernanceArea() {
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Snapshot cifrato locale + import pacchetti AIFA/ICD. Retention
-            keep-last-N tracciata in settings.
+            Snapshot cifrato locale + import pacchetti AIFA/ICD. La retention
+            degli ultimi backup è gestita dalle impostazioni.
           </p>
           <div className={styles.toggleRow}>
             <div className={styles.toggleRowMain}>

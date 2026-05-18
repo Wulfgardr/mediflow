@@ -126,7 +126,7 @@ export default function DiagnosticHub() {
         <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="section-kicker">Controlli runtime</p>
+                    <p className="section-kicker">Servizi locali</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-indigo-500" />
                         Diagnostica di Sistema

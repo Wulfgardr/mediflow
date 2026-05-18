@@ -724,7 +724,7 @@ export default function SettingsPage() {
                     <section id="ai" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
                             kicker="AI locale"
-                            title="Modelli, ruoli e runtime"
+                            title="Modelli, ruoli e motore locale"
                             description="Provider locale, modelli per ciascun ruolo clinico e interruttori di sicurezza delle funzioni AI."
                         />
 
@@ -924,7 +924,7 @@ export default function SettingsPage() {
                                         </span>
                                     </div>
                                     <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
-                                        <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget runtime</span>
+                                        <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget AI locale</span>
                                         <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{insightRuntimePreview}</span>
                                     </div>
                                 </div>
@@ -1125,14 +1125,14 @@ export default function SettingsPage() {
                                 </div>
                             </div>
 
-                            {/* Connessione runtime + Save */}
+                            {/* Connessione locale + Save */}
                             <div className={SETTINGS_CARD_CLASS}>
                                 <div className="mb-5 flex items-start gap-3">
                                     <div className="rounded-2xl bg-slate-100/80 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                                         <Server className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="section-kicker">Connessione runtime</p>
+                                        <p className="section-kicker">Connessione locale</p>
                                         <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Provider locale</h3>
                                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Solo Ollama in locale: nessun dato esce dal computer.</p>
                                     </div>
@@ -1544,7 +1544,7 @@ export default function SettingsPage() {
                                 data-testid="ui-style-runtime-notice"
                                 className="apple-subsection self-start text-sm leading-6 text-slate-500 dark:text-slate-400"
                             >
-                                <p className="section-kicker">Runtime</p>
+                                <p className="section-kicker">Spazio operativo</p>
                                 <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
                                     Vista unica MediFlow
                                 </p>

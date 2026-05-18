@@ -45,7 +45,7 @@ export default function ScalesPage() {
             title="Scale cliniche"
             subtitle="Scegli una scala, somministrala nel contesto giusto e salva il risultato come voce del diario del paziente."
             backHref={`/patients/${id}/modules#scale`}
-            backLabel="Torna alla cartella completa"
+            backLabel="Torna alla scheda paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
             statusLabel={`${scales.length} scale disponibili dalla libreria locale.`}
             navItems={workspaceNavItems}
@@ -115,7 +115,7 @@ export default function ScalesPage() {
                             Risultato nel diario
                         </h3>
                         <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">
-                            Il punteggio salvato diventa una voce clinica di tipo scala, riutilizzabile nella timeline, nei report e nella cartella completa.
+                            Il punteggio salvato diventa una voce clinica di tipo scala, riutilizzabile nella timeline, nei report e negli strumenti clinici della scheda paziente.
                         </p>
                     </section>
                 </aside>

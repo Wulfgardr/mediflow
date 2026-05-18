@@ -216,7 +216,7 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Runtime locale</p>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Motore locale</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiLocalRuntimeLabel ?? 'Ollama locale del nodo'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
