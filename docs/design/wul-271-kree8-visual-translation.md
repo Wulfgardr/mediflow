@@ -158,6 +158,12 @@ route no longer presents mock or coming-soon scale cards: it derives the visible
 catalog from the real local `SCALES` registry, then asks for a patient inline
 before launching the patient-bound runner.
 
+`/settings` and `/settings/ambulatories` now use the Kree8 workspace shell as
+system surfaces instead of the legacy sidebar frame. The settings entry keeps
+theme and privacy controls available inside the page, while ambulatories uses
+the same shell to manage local clinical contexts without the old "root/test
+zone" wording.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
@@ -204,8 +210,8 @@ before launching the patient-bound runner.
 - Does not migrate all documents, therapies, diary or observations internals
   into the Kree8 grammar yet; those actions continue through the existing real
   patient components until their own slices. Patient creation, new diary entry,
-  global scale catalog, patient scale picker/runner, edit and Cartella completa
-  are already framed as Kree8 workspaces.
+  global scale catalog, settings, ambulatories, patient scale picker/runner,
+  edit and Cartella completa are already framed as Kree8 workspaces.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.

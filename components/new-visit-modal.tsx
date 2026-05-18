@@ -56,7 +56,7 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
             <div className="flex justify-between items-center p-4 graphite-divider">
-                <h3 className="font-semibold text-lg" style={{ color: 'var(--mf-ink)' }}>Nuova Visita</h3>
+                <h3 className="font-semibold text-lg" style={{ color: 'var(--mf-ink)' }}>Apri scheda</h3>
                 <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi">
                     <X className="w-4 h-4" />
                 </button>
@@ -73,8 +73,8 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                                 <Users className="w-5 h-5" />
                             </div>
                             <div className="flex-1">
-                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Paziente in Carico</h4>
-                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Seleziona un paziente esistente dalla lista</p>
+                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Scheda esistente</h4>
+                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Cerca una scheda già presente</p>
                             </div>
                             <ChevronRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                         </button>
@@ -87,8 +87,8 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                                 <UserPlus className="w-5 h-5" />
                             </div>
                             <div className="flex-1">
-                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Nuovo Paziente</h4>
-                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Crea una nuova scheda paziente</p>
+                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Nuova scheda</h4>
+                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Crea una scheda anagrafica e clinica</p>
                             </div>
                             <ChevronRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                         </button>
@@ -101,7 +101,7 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                                 autoFocus
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Cerca per nome o codice fiscale..."
+                                placeholder="Cerca per nome o codice fiscale"
                                 className="mf-input pl-10"
                             />
                         </div>

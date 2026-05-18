@@ -79,11 +79,11 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                             <Building2 className="w-5 h-5" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-semibold leading-tight" style={{ color: 'var(--mf-ink)' }}>Nuovo Ambulatorio</h2>
-                            <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>Crea una nuova unità operativa o sede</p>
+                            <h2 className="text-lg font-semibold leading-tight" style={{ color: 'var(--mf-ink)' }}>Nuova sede o reparto</h2>
+                            <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>Aggiungi un contesto clinico locale</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" title="Chiudi">
+                    <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" title="Chiudi" aria-label="Chiudi">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -91,7 +91,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     <div className="grid grid-cols-1 gap-5">
                         <div className="col-span-1">
-                            <label className="mf-field-label">Nome Ambulatorio</label>
+                            <label className="mf-field-label">Nome sede o reparto</label>
                             <input
                                 autoFocus
                                 value={name}
@@ -102,7 +102,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                         </div>
 
                         <div className="col-span-1">
-                            <label className="mf-field-label">Indirizzo / Note</label>
+                            <label className="mf-field-label">Indirizzo o note</label>
                             <input
                                 value={address}
                                 onChange={(e) => setAddress(e.target.value)}
@@ -114,15 +114,15 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
                         <div>
-                            <label className="mf-field-label">Gerarchia (Genitore)</label>
+                            <label className="mf-field-label">Sede superiore</label>
                             <div className="relative">
                                 <select
                                     value={parentId}
                                     onChange={(e) => setParentId(e.target.value)}
                                     className="mf-input mf-input-sm appearance-none pr-9 cursor-pointer"
-                                    title="Seleziona Ambulatorio Genitore"
+                                    title="Seleziona sede superiore"
                                 >
-                                    <option value="">Nessuno (Root)</option>
+                                    <option value="">Sede principale</option>
                                     {ambulatories?.map(a => (
                                         <option key={a.id} value={a.id}>{a.name}</option>
                                     ))}
@@ -138,10 +138,10 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                                 value={type}
                                 onChange={(e) => setType(e.target.value as 'live' | 'test')}
                                 className="mf-input mf-input-sm appearance-none cursor-pointer"
-                                title="Seleziona Tipo Ambulatorio"
+                                title="Seleziona tipo sede"
                             >
-                                <option value="live">Produzione (Reale)</option>
-                                <option value="test">Test / Sandbox</option>
+                                <option value="live">Clinico</option>
+                                <option value="test">Test</option>
                             </select>
                         </div>
                     </div>
@@ -154,7 +154,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                             className="ui-btn-primary px-5 py-2.5 disabled:opacity-50"
                         >
                             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                            Crea Ambulatorio
+                            Aggiungi
                         </button>
                     </div>
                 </form>

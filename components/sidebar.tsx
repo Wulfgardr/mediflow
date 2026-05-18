@@ -245,8 +245,8 @@ export function Sidebar() {
 
     const links = [
         { href: '/', name: 'Pazienti', icon: Users, matchPrefixes: ['/patients'] as string[] },
-        { href: '/diary', name: 'Diario Clinico', icon: LayoutDashboard },
-        { href: '/scales', name: 'Scale & Test', icon: Activity },
+        { href: '/diary', name: 'Diario', icon: LayoutDashboard },
+        { href: '/scales', name: 'Scale', icon: Activity },
         { href: '/analytics', name: 'Analytics', icon: BarChart3 },
         { href: '/settings', name: 'Impostazioni', icon: Settings },
     ];
@@ -279,7 +279,7 @@ export function Sidebar() {
                                 <span className="block text-[13px] text-gray-900 dark:text-gray-100 font-bold truncate">
                                     {profile?.doctor}
                                 </span>
-                                <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Sessione Attiva</span>
+                                <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Sessione locale</span>
                             </div>
                         </div>
                     </div>
@@ -333,7 +333,7 @@ export function Sidebar() {
                             className="w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
                         >
                             <PlusCircle className="w-4 h-4" />
-                            <span>Nuova Visita</span>
+                            <span>Apri scheda</span>
                         </button>
                     </div>
                 </div>

@@ -433,7 +433,7 @@ export default function PatientList() {
                 <article className="patient-liquid-lens mediflow-vitreous-panel relative overflow-hidden rounded-[32px] border p-6 md:p-8">
                     <div className="relative z-10 max-w-3xl">
                         <p className="section-kicker">
-                            {isGlobalView ? 'Clinical Workbench' : 'Inbox locale'}
+                            {isGlobalView ? 'Tutte le schede' : 'Questo ambulatorio'}
                         </p>
                         <h1 className="patient-liquid-name mt-4 text-[clamp(2.65rem,7vw,6rem)] font-semibold leading-[0.9] text-[color:var(--mf-ink)]">
                             {focusedPatient ? (
@@ -510,7 +510,7 @@ export default function PatientList() {
                             href={focusedPatient ? `/patients/${focusedPatient.id}/entries/new` : '/analytics'}
                             className="inline-flex items-center justify-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/68 px-4 py-2.5 text-sm font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
                         >
-                            {focusedPatient ? 'Nuova visita' : 'Board'}
+                            {focusedPatient ? 'Nuova voce clinica' : 'Board operativa'}
                             <HeartPulse className="h-4 w-4" />
                         </Link>
                     </div>

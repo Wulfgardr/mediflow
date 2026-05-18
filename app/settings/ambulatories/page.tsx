@@ -5,6 +5,13 @@ import { db, Ambulatory } from '@/lib/db';
 import { Building2, Plus, Trash2, Check, MapPin, Loader2, CornerDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+
+/* @Codex */
+const AMBULATORY_NAV_ITEMS = [
+    { href: '#nuova-sede', label: 'Nuova sede', meta: 'creazione' },
+    { href: '#sedi', label: 'Sedi', meta: 'contesti' },
+];
 
 export default function AmbulatoryManagerPage() {
     const [ambulatories, setAmbulatories] = useState<Ambulatory[]>([]);
@@ -64,7 +71,8 @@ export default function AmbulatoryManagerPage() {
     };
 
     const handleClear = async (id: string) => {
-        if (!confirm("ATTENZIONE: Stai per eliminare TUTTI i pazienti in questo ambiente di TEST. Continuare?")) return;
+        const target = ambulatories.find((item) => item.id === id);
+        if (!confirm(`Svuotare "${target?.name || 'ambiente di test'}"? Verranno eliminati tutti i pazienti di questo ambiente di test.`)) return;
         setIsClearing(true);
         try {
             const res = await fetch('/api/ambulatories/clear', {
@@ -73,7 +81,7 @@ export default function AmbulatoryManagerPage() {
                 body: JSON.stringify({ ambulatoryId: id })
             });
             if (!res.ok) throw new Error("Failed to clear");
-            alert("Contenitore svuotato con successo.");
+            alert("Ambiente di test svuotato.");
         } catch (e) {
             console.error(e);
             alert("Errore durante lo svuotamento");
@@ -83,13 +91,13 @@ export default function AmbulatoryManagerPage() {
     };
 
     // Helper to build tree
-    interface AmbulatoryNode extends Ambulatory {
-        children: AmbulatoryNode[];
+    interface AmbulatoryNodeData extends Ambulatory {
+        children: AmbulatoryNodeData[];
     }
 
-    const buildTree = (items: Ambulatory[]): AmbulatoryNode[] => {
-        const map = new Map<string, AmbulatoryNode>();
-        const roots: AmbulatoryNode[] = [];
+    const buildTree = (items: Ambulatory[]): AmbulatoryNodeData[] => {
+        const map = new Map<string, AmbulatoryNodeData>();
+        const roots: AmbulatoryNodeData[] = [];
 
         items.forEach(item => {
             map.set(item.id, { ...item, children: [] });
@@ -107,7 +115,7 @@ export default function AmbulatoryManagerPage() {
         return roots;
     };
 
-    const AmbulatoryNode = ({ node, level = 0 }: { node: AmbulatoryNode, level?: number }) => (
+    const AmbulatoryNode = ({ node, level = 0 }: { node: AmbulatoryNodeData, level?: number }) => (
         <div className="space-y-4">
             <div
                 role="treeitem"
@@ -126,8 +134,8 @@ export default function AmbulatoryManagerPage() {
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold flex items-center gap-2 text-[color:var(--mf-ink)] dark:text-white">
                         {node.name}
-                        {node.isDefault && <span className="bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] text-xs px-2 py-0.5 rounded-full border border-[color:rgba(15,123,104,0.22)]">System Default</span>}
-                        {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--mf-warning)] text-xs px-2 py-0.5 rounded-full font-mono uppercase border border-[color:rgba(197,138,47,0.28)]">TEST ZONE</span>}
+                        {node.isDefault && <span className="bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] text-xs px-2 py-0.5 rounded-full border border-[color:rgba(15,123,104,0.22)]">Predefinito</span>}
+                        {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--mf-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:rgba(197,138,47,0.28)]">Test</span>}
                     </h3>
                     {node.address && (
                         <div className="text-sm text-[color:var(--mf-muted)] flex items-center gap-1">
@@ -143,8 +151,8 @@ export default function AmbulatoryManagerPage() {
                     <button
                         onClick={() => handleAddChild(node.id)}
                         className="flex items-center gap-1.5 px-3 py-1 bg-[color:rgba(15,123,104,0.1)] hover:bg-[color:rgba(15,123,104,0.16)] text-[color:var(--mf-primary)] rounded-lg text-sm font-medium transition-colors mr-2 border border-[color:rgba(15,123,104,0.22)]"
-                        title="Aggiungi Reparto/Figlio"
-                        aria-label="Aggiungi Reparto"
+                        title="Aggiungi reparto"
+                        aria-label="Aggiungi reparto"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Reparto
@@ -158,8 +166,8 @@ export default function AmbulatoryManagerPage() {
                     {!node.isDefault && (
                         <button
                             onClick={() => handleSetDefault(node.id)}
-                            title="Imposta come System Default"
-                            aria-label="Imposta come Default"
+                            title="Imposta come sede predefinita"
+                            aria-label="Imposta come sede predefinita"
                             className="p-2 hover:bg-[color:rgba(15,123,104,0.1)] rounded-lg text-[color:var(--mf-muted)] hover:text-[color:var(--mf-primary)] transition-colors"
                         >
                             <Check className="w-5 h-5" />
@@ -168,8 +176,8 @@ export default function AmbulatoryManagerPage() {
                     {node.type === 'test' && (
                         <button
                             onClick={() => handleClear(node.id)}
-                            title="Svuota Contenitore (Elimina tutti i pazienti)"
-                            aria-label="Svuota Contenitore"
+                            title="Svuota ambiente di test"
+                            aria-label="Svuota ambiente di test"
                             className="px-3 py-1 border border-[color:rgba(163,58,47,0.28)] text-[color:var(--mf-critical)] hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-sm font-medium transition-colors"
                             disabled={isClearing}
                         >
@@ -178,7 +186,7 @@ export default function AmbulatoryManagerPage() {
                     )}
                     <button
                         onClick={() => handleDelete(node.id)}
-                        aria-label="Elimina Ambulatorio"
+                        aria-label="Elimina sede"
                         className="p-2 hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-[color:var(--mf-critical)]/80 hover:text-[color:var(--mf-critical)] transition-colors"
                     >
                         <Trash2 className="w-5 h-5" />
@@ -231,19 +239,17 @@ export default function AmbulatoryManagerPage() {
     };
 
     return (
-        <div className="container mx-auto p-6 max-w-4xl space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2 text-[color:var(--mf-ink)] dark:text-white">
-                        <Building2 className="w-8 h-8 text-[color:var(--mf-primary)]" />
-                        Gestione Ambulatori
-                    </h1>
-                    <p className="text-[color:var(--mf-muted)]">Configura le sedi e gli ambulatori disponibili.</p>
-                </div>
-            </div>
-
-            <div className={cn(
-                'bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 shadow-sm transition-all',
+        <Kree8WorkspaceShell
+            eyebrow="Sistema"
+            title="Sedi e ambulatori"
+            subtitle="Organizza i contesti clinici locali e scegli la sede predefinita per il lavoro quotidiano."
+            backHref="/settings"
+            backLabel="Torna alle impostazioni"
+            statusLabel={isLoading ? 'Caricamento contesti locali...' : `${ambulatories.length} contesti configurati sul Mac.`}
+            navItems={AMBULATORY_NAV_ITEMS}
+        >
+            <section id="nuova-sede" className={cn(
+                'patient-detail-section mf-section p-6 md:p-8 transition-all',
                 newParentId ? 'border-[color:rgba(15,123,104,0.38)] ring-1 ring-[color:rgba(15,123,104,0.22)]' : 'border-[color:rgba(112,106,100,0.14)]',
             )}>
                 <div className="mb-6 flex items-center gap-4 border-b border-[color:rgba(112,106,100,0.14)] pb-4">
@@ -252,10 +258,10 @@ export default function AmbulatoryManagerPage() {
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-[color:var(--mf-ink)] dark:text-white flex items-center gap-2">
-                            Apri un Ambulatorio
+                            Nuova sede o reparto
                             {newParentId && <span className="text-sm font-normal bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] px-2 py-1 rounded-full flex items-center gap-1 border border-[color:rgba(15,123,104,0.22)]"><CornerDownRight className="w-3 h-3" /> Reparto di: {ambulatories.find(a => a.id === newParentId)?.name}</span>}
                         </h3>
-                        <p className="text-sm text-[color:var(--mf-muted)]">Inaugura una nuova sede clinica o un reparto.</p>
+                        <p className="text-sm text-[color:var(--mf-muted)]">Aggiungi una sede clinica o un reparto collegato a un contesto esistente.</p>
                     </div>
                 </div>
 
@@ -263,26 +269,26 @@ export default function AmbulatoryManagerPage() {
                     <div className="flex flex-col md:flex-row gap-4">
                         <input
                             ref={nameInputRef}
-                            placeholder="Nome Ambulatorio (es. Cardiologia)"
+                            placeholder="Nome sede o reparto (es. Cardiologia)"
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-[color:rgba(112,106,100,0.2)] rounded-lg bg-white/60 dark:bg-white/6 text-sm outline-none focus:border-[color:rgba(15,123,104,0.38)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)] transition-[border-color,box-shadow]"
+                            className="mf-input flex-1"
                         />
                         <input
                             placeholder="Indirizzo (opzionale)"
                             value={newAddress}
                             onChange={(e) => setNewAddress(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-[color:rgba(112,106,100,0.2)] rounded-lg bg-white/60 dark:bg-white/6 text-sm outline-none focus:border-[color:rgba(15,123,104,0.38)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)] transition-[border-color,box-shadow]"
+                            className="mf-input flex-1"
                         />
                     </div>
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-center">
                         <select
                             value={newParentId}
                             onChange={(e) => setNewParentId(e.target.value)}
-                            aria-label="Ambulatorio Genitore"
-                            className="flex-1 px-3 py-2 border border-[color:rgba(112,106,100,0.2)] rounded-lg bg-white/60 dark:bg-white/6 text-sm outline-none focus:border-[color:rgba(15,123,104,0.38)]"
+                            aria-label="Sede superiore"
+                            className="mf-input min-w-0"
                         >
-                            <option value="">Nessun Genitore (Root)</option>
+                            <option value="">Sede principale</option>
                             {ambulatories.map(a => (
                                 <option key={a.id} value={a.id}>{a.name}</option>
                             ))}
@@ -290,10 +296,10 @@ export default function AmbulatoryManagerPage() {
                         <select
                             value={newType}
                             onChange={(e) => setNewType(e.target.value as 'live' | 'test')}
-                            aria-label="Tipo Ambulatorio"
-                            className="w-32 px-3 py-2 border border-[color:rgba(112,106,100,0.2)] rounded-lg bg-white/60 dark:bg-white/6 text-sm outline-none focus:border-[color:rgba(15,123,104,0.38)]"
+                            aria-label="Tipo sede"
+                            className="mf-input min-w-0"
                         >
-                            <option value="live">Live</option>
+                            <option value="live">Clinico</option>
                             <option value="test">Test</option>
                         </select>
                         <button
@@ -306,9 +312,18 @@ export default function AmbulatoryManagerPage() {
                         </button>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div className="grid grid-cols-1 gap-4">
+            <section id="sedi" className="patient-detail-section mf-section p-6 md:p-8">
+                <div className="mb-5">
+                    <p className="section-kicker">Contesti locali</p>
+                    <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Sedi configurate</h2>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                        La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
                 {isLoading ? (
                     <div className="text-center py-10 text-[color:var(--mf-muted)]">Caricamento...</div>
                 ) : ambulatories.length === 0 ? (
@@ -322,7 +337,8 @@ export default function AmbulatoryManagerPage() {
                         ))}
                     </div>
                 )}
-            </div>
-        </div>
+                </div>
+            </section>
+        </Kree8WorkspaceShell>
     );
 }

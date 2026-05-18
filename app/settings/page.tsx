@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
-import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Download, Check, Shield, Sparkles, Activity, KeyRound, Wrench, ChevronDown, Stethoscope, HardDrive } from 'lucide-react';
+import { Upload, Database, Bot, Save, RefreshCw, AlertTriangle, CheckCircle, Server, User, Cpu, Download, Check, Shield, Sparkles, Activity, KeyRound, Wrench, ChevronDown, Stethoscope, Eye, EyeOff } from 'lucide-react';
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';
 import DataSeeder from '@/components/data-seeder';
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
 /* @Codex */
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
@@ -28,6 +30,8 @@ import NetworkOperatingModePanel from '@/components/settings/network-operating-m
 /* @Codex */
 import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { usePrivacy } from '@/components/privacy-provider';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -343,48 +347,6 @@ function SettingsSectionIntro({
     );
 }
 
-/* @Codex */
-function SettingsRailLink({
-    href,
-    icon,
-    label,
-    description,
-    compact = false,
-}: {
-    href: string;
-    icon: ReactNode;
-    label: string;
-    description: string;
-    compact?: boolean;
-}) {
-    return (
-        // @Codex WUL-229 — settings rail entry uses the option-card primitive
-        <a
-            href={href}
-            className={cn(
-                'mf-option-card text-left',
-                compact
-                    ? 'inline-flex min-w-max items-center gap-2.5 !rounded-full !px-4 !py-2.5'
-                    : 'flex items-start gap-3 !px-3.5 !py-3'
-            )}
-        >
-            <span
-                className={cn(compact ? '' : 'mt-0.5')}
-                style={{ color: 'var(--mf-muted)' }}
-            >
-                {icon}
-            </span>
-            <span className="min-w-0">
-                <span className="block text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>{label}</span>
-                {!compact ? (
-                    <span className="mt-0.5 block text-xs leading-5" style={{ color: 'var(--mf-muted)' }}>{description}</span>
-                ) : null}
-            </span>
-        </a>
-    );
-}
-
-
 export default function SettingsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -395,6 +357,7 @@ export default function SettingsPage() {
 
     // --- Profile State ---
     const { user, updateUser, changePin } = useSecurity();
+    const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
     const [profile, setProfile] = useState({
         doctorName: '',
         clinicName: ''
@@ -434,7 +397,6 @@ export default function SettingsPage() {
     const [isDockerApp, setIsDockerApp] = useState(false);
     // @Codex
     const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    const isWorkbench = true;
     const {
         reduceMotion,
         setReduceMotion,
@@ -574,48 +536,53 @@ export default function SettingsPage() {
     };
 
     /* @Codex */
-    const railItems = [
-        { href: '#account', label: 'Account', description: 'Profilo, PIN, accesso', icon: <User className="h-4 w-4" /> },
-        { href: '#ai', label: 'AI locale', description: 'Modelli, ruoli, runtime', icon: <Bot className="h-4 w-4" /> },
-        { href: '#backups', label: 'Backup', description: 'Schedulazione e ripristino', icon: <HardDrive className="h-4 w-4" /> },
-        { href: '#data', label: 'Cataloghi', description: 'Farmaci ed esenzioni', icon: <Database className="h-4 w-4" /> },
-        { href: '#operations', label: 'Sistema', description: 'Diagnostica e strumenti', icon: <Server className="h-4 w-4" /> },
-        { href: '#appearance', label: 'Aspetto', description: 'Movimento e lettura', icon: <Sparkles className="h-4 w-4" /> },
+    const settingsNavItems = [
+        { href: '#status', label: 'Stato', meta: 'locale' },
+        { href: '#account', label: 'Account', meta: 'profilo' },
+        { href: '#ai', label: 'AI locale', meta: 'modelli' },
+        { href: '#backups', label: 'Backup', meta: 'archivi' },
+        { href: '#data', label: 'Cataloghi', meta: 'farmaci' },
+        { href: '#operations', label: 'Sistema', meta: 'servizi' },
+        { href: '#appearance', label: 'Aspetto', meta: 'lettura' },
     ];
 
     return (
-        <div className="space-y-8 overflow-x-hidden pb-10">
-            {/* Hero */}
-            <div
-                className={cn(
-                    isWorkbench
-                        ? 'mediflow-vitreous-panel glass-panel rounded-[28px] border p-6 md:p-8'
-                        : 'mediflow-vitreous-panel glass-panel liquid-hero border p-6 md:p-8',
-                )}
-            >
-                {!isWorkbench ? (
-                    <>
-                        <div className="liquid-orb -left-10 top-0 h-32 w-32 bg-sky-300/35" />
-                        <div className="liquid-orb right-4 top-6 h-28 w-28 bg-violet-300/28" />
-                        <div className="liquid-orb bottom-4 left-1/3 h-24 w-24 bg-emerald-200/20" />
-                    </>
-                ) : null}
-
-                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    {/* @Codex WUL-229 — hero copy uses MediFlow ink/muted tokens */}
-                    <div className="space-y-3">
-                        <div className="section-kicker">Workstation locale</div>
-                        <div>
-                            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl" style={{ color: 'var(--mf-ink)' }}>
-                                Impostazioni
-                            </h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: 'var(--mf-muted)' }}>
-                                Account, AI, backup, cataloghi e diagnostica di questo computer. I dati clinici restano locali.
-                            </p>
+        <Kree8WorkspaceShell
+            eyebrow="Sistema"
+            title="Impostazioni"
+            subtitle="Account, AI locale, backup, cataloghi e diagnostica del Mac che ospita MediFlow."
+            backHref="/"
+            backLabel="Torna ai pazienti"
+            statusLabel="I dati clinici e i servizi restano locali."
+            navItems={settingsNavItems}
+        >
+            <section id="status" className="patient-detail-section mf-section p-6 md:p-8 scroll-mt-24">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
+                    <div>
+                        <p className="section-kicker">Postazione locale</p>
+                        <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                            Stato operativo
+                        </h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                            Da qui si regolano accesso, modelli, archivi e servizi del computer. Nessun dato clinico viene inviato fuori dal dispositivo.
+                        </p>
+                        <div className="mt-5 flex flex-wrap items-center gap-3">
+                            <div className="[&>div]:mx-0">
+                                <ThemeToggle />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={togglePrivacyMode}
+                                className="mf-btn-secondary"
+                                aria-pressed={isPrivacyMode}
+                            >
+                                {isPrivacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                {isPrivacyMode ? 'Privacy attiva' : 'Privacy spenta'}
+                            </button>
                         </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                         <div className="apple-subsection min-w-[210px]">
                             <p className="section-kicker">Operatore</p>
                             <p className="mt-2 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>{user?.displayName || 'Admin'}</p>
@@ -624,46 +591,9 @@ export default function SettingsPage() {
                         <NetworkOperatingModePanel />
                     </div>
                 </div>
-            </div>
+            </section>
 
-            {/* Mobile area picker */}
-            <div className="xl:hidden">
-                <div
-                    className={cn(
-                        isWorkbench
-                            ? 'mediflow-vitreous-panel glass-panel rounded-[24px] border p-3'
-                            : 'mediflow-vitreous-panel glass-panel border p-3',
-                    )}
-                >
-                    <p className="section-kicker mb-2 px-1">Aree</p>
-                    <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                        {railItems.map((item) => (
-                            <SettingsRailLink key={item.href} {...item} compact />
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-[230px_minmax(0,1fr)]">
-                {/* Desktop area rail */}
-                <aside className="hidden xl:block">
-                    <div
-                        className={cn(
-                            isWorkbench
-                                ? 'mediflow-vitreous-panel glass-panel sticky top-6 rounded-[24px] border p-4'
-                                : 'mediflow-vitreous-panel glass-panel sticky top-6 border p-4',
-                        )}
-                    >
-                        <p className="section-kicker mb-3">Aree</p>
-                        <div className="space-y-2">
-                            {railItems.map((item) => (
-                                <SettingsRailLink key={item.href} {...item} />
-                            ))}
-                        </div>
-                    </div>
-                </aside>
-
-                <div className="space-y-10">
+            <div className="space-y-10">
                     {/* === Account === */}
                     <section id="account" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
@@ -1472,12 +1402,12 @@ export default function SettingsPage() {
                                         <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Sedi e contesti</h3>
                                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Gestisci più sedi e cambia rapidamente contesto operativo.</p>
                                     </div>
-                                    <a
+                                    <Link
                                         href="/settings/ambulatories"
                                         className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20"
                                     >
                                         Apri gestione &rarr;
-                                    </a>
+                                    </Link>
                                 </div>
                             </div>
 
@@ -1585,7 +1515,7 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="Aspetto"
                             title="Lettura e accessibilità"
-                            description="Controlli di lettura per chi preferisce meno movimento. La shell Clinical Workbench è l'unico runtime ufficiale."
+                            description="Controlli di lettura per chi preferisce meno movimento durante il lavoro clinico."
                         />
 
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -1624,17 +1554,16 @@ export default function SettingsPage() {
                             >
                                 <p className="section-kicker">Runtime</p>
                                 <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                                    Clinical Workbench
+                                    Vista unica MediFlow
                                 </p>
                                 <p className="mt-2 text-xs leading-5">
-                                    Inbox pazienti a sinistra, reader del caso a destra. Nessuna modalità alternativa da scegliere.
+                                    Schede, strumenti e impostazioni usano lo stesso spazio operativo.
                                 </p>
                             </aside>
                         </div>
                     </section>
 
-                </div>
             </div>
-        </div >
+        </Kree8WorkspaceShell>
     );
 }
