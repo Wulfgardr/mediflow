@@ -45,7 +45,7 @@ export default function ScalesPage() {
             title="Scale cliniche"
             subtitle="Scegli una scala, somministrala nel contesto giusto e salva il risultato come voce del diario del paziente."
             backHref={`/patients/${id}/modules#scale`}
-            backLabel="Torna a cartella e strumenti"
+            backLabel="Torna alla cartella completa"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
             statusLabel={`${scales.length} scale disponibili dalla libreria locale.`}
             navItems={workspaceNavItems}

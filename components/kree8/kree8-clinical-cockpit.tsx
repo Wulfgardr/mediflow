@@ -221,7 +221,7 @@ type Kree8DecisionCard = {
 const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] = [
   { id: 'turno', label: 'Agenda', icon: CalendarClock },
   { id: 'incarico', label: 'Pazienti', icon: Inbox },
-  { id: 'scheda', label: 'Scheda rapida', icon: UserSquare2 },
+  { id: 'scheda', label: 'Quadro paziente', icon: UserSquare2 },
   { id: 'diario', label: 'Diario', icon: FileText },
   { id: 'revisione', label: 'Documenti', icon: FileSearch },
   { id: 'cataloghi', label: 'Cataloghi', icon: Database },
@@ -1827,7 +1827,7 @@ function IncaricoArea({
           <div className={styles.caseLensHero}>
             <span className={styles.caseLensName}>{selected.name}</span>
             <span className={styles.caseLensSub}>
-              {selected.code} · {selected.ageLabel} · ultimo aggiornamento {selected.lastTouch}
+              {selected.ageLabel} · aggiornato {selected.lastTouch}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1846,11 +1846,11 @@ function IncaricoArea({
           <div className={styles.caseLensActions}>
             <Link href={selected.href} className={styles.primaryBtn}>
               <UserSquare2 size={13} />
-              {selected.list === 'archivio' ? 'Apri scheda archivio' : 'Apri scheda'}
+              {selected.list === 'archivio' ? 'Apri quadro archivio' : 'Apri quadro'}
             </Link>
             <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
-              Cartella e strumenti
+              Cartella completa
             </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
@@ -1898,7 +1898,7 @@ function RealPatientArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Scheda rapida</p>
+          <p className={styles.areaCaption}>Quadro paziente</p>
           <h1 className={styles.areaTitle}>
             {patient.name} <em>· {patient.ageLabel}</em>
           </h1>
@@ -1915,7 +1915,7 @@ function RealPatientArea({
             <Edit3 size={12} /> Anagrafica
           </Link>
           <Link href={patient.modulesHref} className={styles.primaryBtn}>
-            <UserSquare2 size={13} /> Cartella e strumenti
+            <UserSquare2 size={13} /> Cartella completa
           </Link>
         </div>
       </header>
@@ -2101,7 +2101,7 @@ function RealPatientArea({
               </Link>
               <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
-                Cartella e strumenti
+                Cartella completa
               </Link>
             </div>
           </div>
@@ -2133,12 +2133,12 @@ function SchedaArea({
       <div className={styles.areaShell}>
         <header className={styles.areaHeader}>
           <div>
-            <p className={styles.areaCaption}>Scheda rapida</p>
+            <p className={styles.areaCaption}>Quadro paziente</p>
             <h1 className={styles.areaTitle}>
               Nessun paziente selezionato <em>· seleziona un caso in carico</em>
             </h1>
             <p className={styles.areaSubtitle}>
-              Apri un paziente dalla lista in carico per vedere quadro rapido,
+              Apri un paziente dalla lista in carico per vedere quadro paziente,
               azioni, documenti e follow-up del caso.
             </p>
           </div>
@@ -2151,7 +2151,7 @@ function SchedaArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Scheda rapida · cronicità multipla</p>
+          <p className={styles.areaCaption}>Quadro paziente · cronicità multipla</p>
           <h1 className={styles.areaTitle}>
             M. R. <em>· 64 · M · caso dimostrativo AB-2026-014</em>
           </h1>
@@ -2500,7 +2500,7 @@ function LiveDocumentReviewArea({
                   <PillBadge variant="blue">da leggere</PillBadge>
                 </header>
                 <p className={styles.rowSub} style={{ margin: 0 }}>
-                  Apri Cartella e strumenti per allegati, OCR e sintesi clinica.
+                  Apri la cartella completa per allegati, OCR e sintesi clinica.
                 </p>
               </div>
             )) : (
@@ -2742,7 +2742,7 @@ function LiveHandoffArea({
           {patient ? (
             <Link href={patient.href} className={styles.ghostBtnSm}>
               <UserSquare2 size={12} />
-              Scheda rapida
+              Quadro paziente
             </Link>
           ) : (
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>

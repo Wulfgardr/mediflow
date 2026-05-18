@@ -251,6 +251,15 @@
 .shell :global(.patient-actions-dock) { border-radius: 18px !important; }
 .shell :global(.glass-panel) { backdrop-filter: none !important; }
 
+.shell :global(.patient-identity-lens) {
+  min-height: 0 !important;
+  padding: 28px !important;
+}
+
+.shell :global(.patient-identity-lens::after) {
+  display: none !important;
+}
+
 .shell :global(.patient-quick-context-card),
 .shell :global(.patient-diagnosis-card),
 .shell :global(.identity-lens-pane),

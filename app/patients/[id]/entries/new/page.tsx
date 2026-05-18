@@ -171,7 +171,7 @@ export default function NewEntryPage() {
             title="Nuova voce clinica"
             subtitle="Registra una visita, un contatto remoto o una nota breve senza uscire dal lavoro sul paziente."
             backHref={`/patients/${id}`}
-            backLabel="Torna alla scheda rapida"
+            backLabel="Torna al quadro paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
             statusLabel="Scrittura locale: allegati e sintesi documento restano sul dispositivo."
             navItems={workspaceNavItems}

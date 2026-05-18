@@ -196,7 +196,7 @@ export default function EditPatientPage() {
                 title="Modifica dati"
                 subtitle="Caricamento della scheda locale prima di mostrare il form."
                 backHref={`/patients/${id}/modules`}
-                backLabel="Torna a cartella e strumenti"
+                backLabel="Torna alla cartella completa"
                 statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
@@ -211,7 +211,7 @@ export default function EditPatientPage() {
             title="Modifica dati"
             subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale senza uscire dalla cartella."
             backHref={`/patients/${id}/modules`}
-            backLabel="Torna a cartella e strumenti"
+            backLabel="Torna alla cartella completa"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             statusLabel="Scrittura locale: ogni modifica resta nella banca dati MediFlow."
             navItems={workspaceNavItems}
