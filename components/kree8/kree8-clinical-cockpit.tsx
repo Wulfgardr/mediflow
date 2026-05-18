@@ -1851,7 +1851,7 @@ function IncaricoArea({
             </Link>
             <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
-              Cartella completa
+              Apri scheda
             </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
@@ -1916,7 +1916,7 @@ function RealPatientArea({
             <Edit3 size={12} /> Anagrafica
           </Link>
           <Link href={patient.modulesHref} className={styles.primaryBtn}>
-            <UserSquare2 size={13} /> Cartella completa
+            <UserSquare2 size={13} /> Apri scheda
           </Link>
         </div>
       </header>
@@ -2102,7 +2102,7 @@ function RealPatientArea({
               </Link>
               <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
-                Cartella completa
+                Apri scheda
               </Link>
             </div>
           </div>
@@ -2501,7 +2501,7 @@ function LiveDocumentReviewArea({
                   <PillBadge variant="blue">da leggere</PillBadge>
                 </header>
                 <p className={styles.rowSub} style={{ margin: 0 }}>
-                  Apri la cartella completa per allegati, OCR e sintesi clinica.
+                  Apri la scheda paziente per allegati, OCR e sintesi clinica.
                 </p>
               </div>
             )) : (
@@ -2872,7 +2872,7 @@ function LiveGovernanceArea({
             Stato operativo <em>· sessione, audit, backup</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Controlli locali della sessione clinica: nessun dato sanitario lascia il dispositivo.
+            Sessione, audit e backup gestiti in locale. I dati clinici non lasciano il dispositivo.
           </p>
         </div>
       </header>
@@ -4414,7 +4414,7 @@ export function Kree8ClinicalCockpit({
             <span className={styles.railDot} />
             Mac principale locale
           </span>
-          <span>{isReview ? 'Review design' : 'Sessione clinica locale'}</span>
+          <span>{isReview ? 'Review design' : 'Dati in locale'}</span>
         </div>
       </aside>
 

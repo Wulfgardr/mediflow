@@ -85,13 +85,13 @@ export default function PatientDetailPage() {
     if (!patient) {
         return (
             <Kree8WorkspaceShell
-                eyebrow="Cartella paziente"
-                title="Cartella completa"
-                subtitle="Caricamento della cartella locale in corso."
+                eyebrow="Scheda clinica"
+                title="Scheda paziente"
+                subtitle="Caricamento della scheda paziente in corso."
                 backHref="/"
                 backLabel="Pazienti"
             >
-                <div className={workspaceStyles.loadingCard}>Caricamento cartella paziente...</div>
+                <div className={workspaceStyles.loadingCard}>Caricamento scheda paziente...</div>
             </Kree8WorkspaceShell>
         );
     }
@@ -230,9 +230,9 @@ export default function PatientDetailPage() {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Cartella paziente"
-            title="Cartella completa"
-            subtitle="Dati, timeline, terapie, documenti e valutazioni in un unico spazio di lavoro."
+            eyebrow="Scheda clinica"
+            title="Scheda paziente"
+            subtitle="Dati, timeline, terapie, documenti e valutazioni del paziente in un'unica vista."
             backHref={`/patients/${id}`}
             backLabel="Quadro paziente"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
