@@ -1507,13 +1507,20 @@ export default function SettingsPage() {
                             <div className="apple-subsection" data-testid="ui-accessibility-controls">
                                 <p className="section-kicker">Controlli di lettura</p>
                                 <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                                    Movimento
+                                    Tema e movimento
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                    Riduce animazioni e micro-transizioni quando serve meno stimolo visivo.
+                                    Cambia tema della postazione e riduce animazioni quando serve meno stimolo visivo.
                                 </p>
 
                                 <div className="mt-5 space-y-3">
+                                    <div className="flex items-center justify-between gap-4 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 px-4 py-3 dark:bg-white/6">
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Tema interfaccia</p>
+                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Chiaro, scuro o automatico secondo il Mac.</p>
+                                        </div>
+                                        <ThemeToggle />
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => setReduceMotion(!reduceMotion)}

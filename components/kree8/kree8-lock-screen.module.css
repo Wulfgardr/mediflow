@@ -9,7 +9,7 @@
   --ink: #0f172a;
   --ink-strong: #1e293b;
   --ink-muted: #475569;
-  --ink-subtle: #64748b;
+  --ink-subtle: #52606d;
   --line: rgba(15, 23, 42, 0.05);
   --line-strong: rgba(15, 23, 42, 0.08);
   --pill-blue-bg: #dbeafe;
@@ -18,6 +18,12 @@
   --pill-coral-fg: #9a3412;
   --pill-muted-bg: #eef0f2;
   --pill-muted-fg: #475569;
+  --solid-action-bg: #0f172a;
+  --solid-action-fg: #ffffff;
+  --brand-dot-bg: #0f172a;
+  --brand-dot-fg: #ffffff;
+  --surface-glow: rgba(255, 255, 255, 0.4);
+  --focus-ring: rgba(15, 23, 42, 0.32);
   --shadow-card: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
   --shadow-panel: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -32,13 +38,40 @@
   padding: 24px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, var(--surface-glow), rgba(255, 255, 255, 0)),
     var(--canvas);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
     "Inter", "Segoe UI", system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
+}
+
+:global(html.dark) .lockShell {
+  --surface: #0f172a;
+  --surface-soft: #111827;
+  --surface-inset: #1e293b;
+  --canvas: #020617;
+  --ink: #f8fafc;
+  --ink-strong: #e2e8f0;
+  --ink-muted: #cbd5e1;
+  --ink-subtle: #b6c2d0;
+  --line: rgba(226, 232, 240, 0.10);
+  --line-strong: rgba(226, 232, 240, 0.16);
+  --pill-blue-bg: rgba(148, 163, 184, 0.18);
+  --pill-blue-fg: #dbeafe;
+  --pill-coral-bg: rgba(248, 113, 113, 0.16);
+  --pill-coral-fg: #fecaca;
+  --pill-muted-bg: rgba(148, 163, 184, 0.14);
+  --pill-muted-fg: #cbd5e1;
+  --solid-action-bg: #e2e8f0;
+  --solid-action-fg: #020617;
+  --brand-dot-bg: #e2e8f0;
+  --brand-dot-fg: #020617;
+  --surface-glow: rgba(255, 255, 255, 0.06);
+  --focus-ring: rgba(226, 232, 240, 0.42);
+  --shadow-card: 0 0 0 1px rgba(226, 232, 240, 0.10), 0 10px 24px rgba(0, 0, 0, 0.28);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
 }
 
 .lockCard {
@@ -62,8 +95,8 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
-  color: #fff;
+  background: var(--brand-dot-bg);
+  color: var(--brand-dot-fg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -175,9 +208,9 @@
 }
 
 .pinInput:focus {
-  border-color: rgba(15, 23, 42, 0.32);
+  border-color: var(--focus-ring);
   background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 24%, transparent);
 }
 
 .pinInput:disabled {
@@ -214,8 +247,8 @@
   min-height: 50px;
   border: 0;
   border-radius: 14px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--solid-action-bg);
+  color: var(--solid-action-fg);
   padding: 12px 18px;
   font-size: 14px;
   font-weight: 650;

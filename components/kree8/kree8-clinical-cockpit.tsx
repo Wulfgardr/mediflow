@@ -60,6 +60,7 @@ import type {
   SissPatientContextHandoffResult,
 } from '@/lib/siss-patient-context-shared';
 import { useLiveQuery } from '@/lib/live-query';
+import { ThemeToggle } from '@/components/theme-toggle';
 import styles from './kree8-clinical-cockpit.module.css';
 
 type AreaId =
@@ -4371,7 +4372,10 @@ export function Kree8ClinicalCockpit({
           <span className={styles.brandWord}>
             MEDI<b>FLOW</b>
           </span>
-          <span style={{ marginLeft: 'auto' }}>
+          <span className={styles.brandActions}>
+            <span className={styles.brandThemeToggle}>
+              <ThemeToggle />
+            </span>
             <Bell size={14} color="var(--ink-subtle)" />
           </span>
         </div>
@@ -4403,6 +4407,9 @@ export function Kree8ClinicalCockpit({
         })}
 
         <div className={styles.railFooter}>
+          <div className={styles.railThemeToggle} aria-label="Tema interfaccia">
+            <ThemeToggle />
+          </div>
           <span className={styles.railTag}>
             <span className={styles.railDot} />
             Mac principale locale
