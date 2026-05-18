@@ -3,12 +3,14 @@
 import { ApiConflictError, db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
-import Link from 'next/link';
+import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
 import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
+/* @Codex */
+import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 /* @Codex */
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
@@ -54,7 +56,7 @@ export default function EditPatientPage() {
             // Handle Checkups (Diffing)
             // 1. Get current IDs to find deletions
             const existingCheckups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
-            const existingIds = new Set(existingCheckups.map(c => c.id));
+            const existingCheckupById = new Map(existingCheckups.map(c => [c.id, c]));
             const comingIds = new Set(checkups.filter((c: any) => c.id).map((c: any) => c.id));
 
             // Delete removed
@@ -73,7 +75,7 @@ export default function EditPatientPage() {
                 notes: c.notes,
                 status: c.status || 'pending',
                 source: c.source || 'manual',
-                createdAt: c.id ? existingCheckups.find(ex => ex.id === c.id)?.createdAt || new Date() : new Date()
+                createdAt: c.id ? existingCheckupById.get(c.id)?.createdAt || new Date() : new Date()
             }));
 
             if (toPut.length > 0) {
@@ -182,129 +184,143 @@ export default function EditPatientPage() {
         // Stay on page but refresh UI (automatic via liveQuery)
     };
 
-    if (!patient) return <div className="mf-section mx-auto mt-8 max-w-md text-center text-sm" style={{ color: 'var(--mf-muted)' }}>Caricamento...</div>;
+    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
+        { href: '#dati', label: 'Dati' },
+        { href: '#azioni', label: 'Azioni' },
+    ];
+
+    if (!patient) {
+        return (
+            <Kree8WorkspaceShell
+                eyebrow="Scheda paziente"
+                title="Modifica dati"
+                subtitle="Caricamento della scheda locale prima di mostrare il form."
+                backHref={`/patients/${id}/modules`}
+                backLabel="Torna alla cartella"
+                statusLabel="Nessun dato è stato modificato."
+                navItems={[]}
+            >
+                <div className={workspaceStyles.loadingCard}>Caricamento scheda...</div>
+            </Kree8WorkspaceShell>
+        );
+    }
 
     return (
-        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
-                <div className="flex items-center gap-5">
-                    {/* @Codex WUL-229 — edit header uses shared liquid controls */}
-                    <Link href={`/patients/${id}`} className="mf-btn-secondary !h-12 !w-12 !p-0" aria-label="Torna alla scheda paziente">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-[color:var(--mf-primary)]" />
-                            <p className="mf-eyebrow">Modalita modifica</p>
+        <Kree8WorkspaceShell
+            eyebrow="Scheda paziente"
+            title="Modifica dati"
+            subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale senza uscire dalla cartella."
+            backHref={`/patients/${id}/modules`}
+            backLabel="Torna alla cartella"
+            patientLabel={`${patient.lastName} ${patient.firstName}`}
+            statusLabel="Scrittura locale: ogni modifica resta nella banca dati MediFlow."
+            navItems={workspaceNavItems}
+        >
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
+                {patient.isArchived && (
+                    <div className="mf-alert mf-alert-warning !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--mf-warning)]">
+                            <Archive className="w-6 h-6 shrink-0" />
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Modifica Paziente</h1>
-                        <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Aggiornamento dati clinici e anagrafici</p>
-                    </div>
-                </div>
-            </div>
-
-            {patient.isArchived && (
-                <div className="mf-alert mf-alert-warning mb-10 !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--mf-warning)]">
-                        <Archive className="w-6 h-6 shrink-0" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Paziente Archiviato</h3>
-                        <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
-                            Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
-                        </p>
-                        <button
-                            onClick={handleRestore}
-                            className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            Ripristina in elenco Attivi
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <PatientForm
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                defaultValues={patient as any}
-                onSubmit={onSubmit}
-                isEditMode={true}
-            />
-
-            {/* Danger Zone */}
-            <div className="mt-20 border-t border-[color:rgba(112,106,100,0.12)] pt-10">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="mf-icon-disc h-10 w-10 !text-[color:var(--mf-critical)]">
-                        <ShieldAlert className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="mf-eyebrow !text-[color:var(--mf-critical)]">Azioni sensibili</p>
-                        <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Zona Pericolo</h3>
-                    </div>
-                </div>
-
-                <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
-                    <div className="max-w-md">
-                        <h4 className="mb-2 text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Manutenzione Scheda</h4>
-                        <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
-                            Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setActionType('export');
-                                setIsActionModalOpen(true);
-                            }}
-                            className="mf-btn-secondary flex-1 lg:flex-none"
-                        >
-                            <Download className="w-4 h-4" />
-                            Export FHIR
-                        </button>
-
-                        {!patient.isArchived ? (
-                            <button
-                                onClick={() => {
-                                    setActionType('archive');
-                                    setIsActionModalOpen(true);
-                                }}
-                                className="mf-btn-secondary flex-1 !text-[color:var(--mf-warning)] lg:flex-none"
-                            >
-                                <Archive className="w-4 h-4" />
-                                Archivia
-                            </button>
-                        ) : (
+                        <div>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Paziente archiviato</h3>
+                            <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
+                            </p>
                             <button
                                 onClick={handleRestore}
-                                className="mf-btn-secondary flex-1 !text-[color:var(--mf-success)] lg:flex-none"
+                                className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"
                             >
-                                <RotateCcw className="w-4 h-4" />
-                                Ripristina
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Ripristina in elenco Attivi
                             </button>
-                        )}
-                        <button
-                            onClick={() => {
-                                setActionType('delete');
-                                setIsActionModalOpen(true);
-                            }}
-                            className="ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Elimina
-                        </button>
+                        </div>
+                    </div>
+                )}
+
+                <div id="dati" className={workspaceStyles.anchorStack}>
+                    <PatientForm
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        defaultValues={patient as any}
+                        onSubmit={onSubmit}
+                        isEditMode={true}
+                    />
+                </div>
+
+                <div id="azioni" className="border-t border-[color:rgba(112,106,100,0.12)] pt-6">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="mf-icon-disc h-10 w-10 !text-[color:var(--mf-critical)]">
+                            <ShieldAlert className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="mf-eyebrow !text-[color:var(--mf-critical)]">Azioni sensibili</p>
+                            <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Stato scheda ed export</h3>
+                        </div>
+                    </div>
+
+                    <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
+                        <div className="max-w-md">
+                            <h4 className="mb-2 text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Operazioni sulla scheda</h4>
+                            <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActionType('export');
+                                    setIsActionModalOpen(true);
+                                }}
+                                className="mf-btn-secondary flex-1 lg:flex-none"
+                            >
+                                <Download className="w-4 h-4" />
+                                Export FHIR
+                            </button>
+
+                            {!patient.isArchived ? (
+                                <button
+                                    onClick={() => {
+                                        setActionType('archive');
+                                        setIsActionModalOpen(true);
+                                    }}
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-warning)] lg:flex-none"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                    Archivia
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleRestore}
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-success)] lg:flex-none"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Ripristina
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setActionType('delete');
+                                    setIsActionModalOpen(true);
+                                }}
+                                className="ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Elimina
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <PatientActionModal
-                isOpen={isActionModalOpen}
-                onClose={() => setIsActionModalOpen(false)}
-                onConfirm={handleAction}
-                patientName={`${patient.firstName} ${patient.lastName}`}
-                actionType={actionType}
-            />
-        </div>
+                <PatientActionModal
+                    isOpen={isActionModalOpen}
+                    onClose={() => setIsActionModalOpen(false)}
+                    onConfirm={handleAction}
+                    patientName={`${patient.firstName} ${patient.lastName}`}
+                    actionType={actionType}
+                />
+            </div>
+        </Kree8WorkspaceShell>
     );
 }

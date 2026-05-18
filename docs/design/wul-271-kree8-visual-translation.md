@@ -142,6 +142,11 @@ completa. The picker uses the real local `SCALES` registry, while the runner
 keeps the existing scoring/save behavior and presents context, questions and
 diary save as one clinical flow.
 
+`/patients/[id]/edit` now follows the same workspace rule for patient record
+maintenance. The existing `PatientForm`, FSE/FHIR export validation, archive,
+restore and delete behavior remain unchanged, but the route-level frame is
+Kree8-native and returns to Cartella completa.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
