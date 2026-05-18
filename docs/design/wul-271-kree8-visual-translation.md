@@ -158,6 +158,12 @@ route no longer presents mock or coming-soon scale cards: it derives the visible
 catalog from the real local `SCALES` registry, then asks for a patient inline
 before launching the patient-bound runner.
 
+`/analytics` now follows the same workspace rule for the local population
+cruscotto. The route reads real local patient counts, ADI flags, structured
+diagnoses and `/api/system/audit` summary data; it no longer shows legacy
+zero-value cards such as `Presa in Carico`, `Estemporanei` or `Top Patologia`,
+and avoids mock-style wording such as `Cruscotto Clinico`.
+
 `/settings` and `/settings/ambulatories` now use the Kree8 workspace shell as
 system surfaces instead of the legacy sidebar frame. The settings entry keeps
 theme and privacy controls available inside the page, while ambulatories uses
@@ -210,8 +216,9 @@ zone" wording.
 - Does not migrate all documents, therapies, diary or observations internals
   into the Kree8 grammar yet; those actions continue through the existing real
   patient components until their own slices. Patient creation, new diary entry,
-  global scale catalog, settings, ambulatories, patient scale picker/runner,
-  edit and Cartella completa are already framed as Kree8 workspaces.
+  global scale catalog, analytics, settings, ambulatories, patient scale
+  picker/runner, edit and Cartella completa are already framed as Kree8
+  workspaces.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.
@@ -256,6 +263,10 @@ zone" wording.
       Modalità di rete, Backup & cataloghi, Diagnostica locale,
       Aggiornamento & stato) reads like a real MediFlow setting block and
       that no copy implies external telemetry.
+- [ ] On `/analytics`, confirm the route opens without the legacy sidebar,
+      the cards use only real local counts (schede, ADI, diagnosi and audit),
+      and no text still says `Cruscotto Clinico`, `Presa in Carico`,
+      `Estemporanei`, `Top Patologia` or `Prevalenza Patologie`.
 - [ ] Toggle the OS-level reduced motion preference and confirm the surface
       stops animating (area entrance, Case Lens slide, sweep, commit-pulse,
       press states all disabled).

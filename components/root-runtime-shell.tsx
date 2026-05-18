@@ -16,7 +16,8 @@ import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider'
 import { UIStyleProvider } from '@/components/ui-style-provider';
 
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
-const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary', '/patients/new', '/scales', '/settings', '/settings/ambulatories']);
+// @Codex Keep route additions aligned with docs/design/wul-271-kree8-visual-translation.md.
+const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary', '/patients/new', '/scales', '/analytics', '/settings', '/settings/ambulatories']);
 
 function isKree8PatientRoute(pathname: string | null): boolean {
   if (!pathname) return false;
