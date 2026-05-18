@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-18 Codex
+- Extended `WUL-273` with Kree8 navigation and copy polish after Claude CLI review: the root toolbar search now focuses a real patient-list filter, patient previews sanitize metadata-like AI/status payloads before display, governance shortcuts link to concrete `/settings#...` sections, review-mode SISS/system buttons no longer sit inert, and settings AI kill switches/hardware labels use clearer Italian clinical copy: `components/kree8/kree8-clinical-cockpit.tsx`, `components/kree8/kree8-clinical-cockpit.module.css`, `app/settings/page.tsx`, `docs/agent-attribution.md`
+
 ## 2026-05-17 Codex
 - Extended `WUL-273` with the Kree8 governance/settings bridge: the live `Governance locale` area now keeps the complete `/settings` implementation intact while surfacing direct Kree8 links into account/PIN, AI, backup, catalog, system, and appearance modules, preserving destructive controls in the full settings surfaces: `components/kree8/kree8-clinical-cockpit.tsx`, `docs/agent-attribution.md`
 - Extended `WUL-273` with the live catalog Kree8 slice: `/api/drugs?count=1` now exposes an efficient local AIFA count, settings drug stats use that count endpoint, and the Kree8 `Cataloghi locali` area reads protected local AIFA/esenzioni counts instead of synthetic manifest snapshots while linking destructive import/clear workflows back to full settings: `app/api/drugs/route.ts`, `lib/aifa-importer.ts`, `components/kree8/kree8-clinical-cockpit.tsx`, `docs/agent-attribution.md`

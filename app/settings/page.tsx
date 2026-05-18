@@ -782,7 +782,7 @@ export default function SettingsPage() {
                                         style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-primary)' }}>Light</span>
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-primary)' }}>Leggero</span>
                                             {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-primary)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&lt; 16GB RAM</p>
@@ -795,7 +795,7 @@ export default function SettingsPage() {
                                         style={hardwareProfile === 'medium' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Balanced</span>
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Bilanciato</span>
                                             {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>16-32GB RAM</p>
@@ -808,7 +808,7 @@ export default function SettingsPage() {
                                         style={hardwareProfile === 'high' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Pro</span>
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Avanzato</span>
                                             {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&gt; 32GB RAM</p>
@@ -954,7 +954,9 @@ export default function SettingsPage() {
                                 <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
                                     <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
                                         <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Profilo hardware</span>
-                                        <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{hardwareProfile}</span>
+                                        <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>
+                                            {hardwareProfile === 'low' ? 'Leggero' : hardwareProfile === 'medium' ? 'Bilanciato' : 'Avanzato'}
+                                        </span>
                                     </div>
                                     <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
                                         <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget runtime</span>
@@ -1049,17 +1051,23 @@ export default function SettingsPage() {
                                                         ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
-                                                    {patientInsightEnabled ? 'Enabled' : 'Disabled'}
+                                                    {patientInsightEnabled ? 'Attivo' : 'Spento'}
                                                 </label>
-                                                <input
+                                                <button
                                                     id="patientInsightKillSwitch"
-                                                    type="checkbox"
-                                                    checked={!patientInsightEnabled}
-                                                    onChange={(e) => setPatientInsightEnabled(!e.target.checked)}
-                                                    aria-label="Disabilita Patient Insight localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
-                                                    style={{ accentColor: 'var(--mf-plum)' }}
-                                                />
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={patientInsightEnabled}
+                                                    aria-label="Patient Insight locale"
+                                                    onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
+                                                    style={{ background: patientInsightEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                >
+                                                    <span
+                                                        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                                        style={{ transform: patientInsightEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                                    />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1086,17 +1094,23 @@ export default function SettingsPage() {
                                                         ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
-                                                    {documentSynthesisEnabled ? 'Enabled' : 'Disabled'}
+                                                    {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
                                                 </label>
-                                                <input
+                                                <button
                                                     id="documentSynthesisKillSwitch"
-                                                    type="checkbox"
-                                                    checked={!documentSynthesisEnabled}
-                                                    onChange={(e) => setDocumentSynthesisEnabled(!e.target.checked)}
-                                                    aria-label="Disabilita Document Synthesis localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
-                                                    style={{ accentColor: 'var(--mf-plum)' }}
-                                                />
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={documentSynthesisEnabled}
+                                                    aria-label="Document Synthesis locale"
+                                                    onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
+                                                    style={{ background: documentSynthesisEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                >
+                                                    <span
+                                                        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                                        style={{ transform: documentSynthesisEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                                    />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1123,17 +1137,23 @@ export default function SettingsPage() {
                                                         ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
-                                                    {smartImportEnabled ? 'Enabled' : 'Disabled'}
+                                                    {smartImportEnabled ? 'Attivo' : 'Spento'}
                                                 </label>
-                                                <input
+                                                <button
                                                     id="smartImportKillSwitch"
-                                                    type="checkbox"
-                                                    checked={!smartImportEnabled}
-                                                    onChange={(e) => setSmartImportEnabled(!e.target.checked)}
-                                                    aria-label="Disabilita Smart Import localmente"
-                                                    className="h-4 w-4 rounded border-slate-300 focus:ring-2 dark:border-white/10 dark:bg-white/5"
-                                                    style={{ accentColor: 'var(--mf-plum)' }}
-                                                />
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={smartImportEnabled}
+                                                    aria-label="Smart Import locale"
+                                                    onClick={() => setSmartImportEnabled(!smartImportEnabled)}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
+                                                    style={{ background: smartImportEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                >
+                                                    <span
+                                                        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                                        style={{ transform: smartImportEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                                    />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>

@@ -1330,6 +1330,66 @@
   flex-wrap: wrap;
 }
 
+.patientScopeActions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.patientSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.patientSearchField {
+  min-width: 0;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--ink-muted);
+  padding: 9px 12px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 0 0 1px var(--line);
+}
+
+.patientSearchField input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.patientSearchField input::placeholder {
+  color: var(--ink-subtle);
+}
+
+.patientSearchClear {
+  border: 0;
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+  border-radius: var(--radius-pill);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.patientSearchClear:hover {
+  color: var(--ink);
+}
+
 .scopeChip {
   display: inline-flex;
   align-items: center;
@@ -1421,6 +1481,18 @@
 .caseLensSub { font-size: 12px; color: var(--ink-muted); }
 
 .caseLensActions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .patientScopeActions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .patientSearchRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
 
 /* ───────────── identity dock (patient detail) ───────────── */
 

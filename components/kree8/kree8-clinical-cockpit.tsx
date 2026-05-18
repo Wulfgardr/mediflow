@@ -6,7 +6,7 @@
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
    live patients/checkups after PIN unlock; the review alias remains synthetic. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity,
@@ -222,11 +222,11 @@ const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] 
   { id: 'turno', label: 'Oggi', icon: CalendarClock },
   { id: 'incarico', label: 'Pazienti in carico', icon: Inbox },
   { id: 'scheda', label: 'Scheda paziente', icon: UserSquare2 },
-  { id: 'diario', label: 'Diario clinico', icon: FileText },
-  { id: 'revisione', label: 'Documenti', icon: FileSearch },
-  { id: 'cataloghi', label: 'Cataloghi', icon: Database },
-  { id: 'handoff', label: 'Trasmissioni SISS', icon: Workflow },
-  { id: 'governance', label: 'Sistema', icon: SettingsIcon },
+  { id: 'diario', label: 'Diario', icon: FileText },
+  { id: 'revisione', label: 'Documenti e referti', icon: FileSearch },
+  { id: 'cataloghi', label: 'Cataloghi locali', icon: Database },
+  { id: 'handoff', label: 'Portali regionali', icon: Workflow },
+  { id: 'governance', label: 'Sistema e impostazioni', icon: SettingsIcon },
 ];
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
@@ -646,6 +646,152 @@ function maskTaxCode(value: string | null | undefined): string {
   return trimmed.length <= 6 ? trimmed : `CF …${trimmed.slice(-6)}`;
 }
 
+/* @Codex */
+function normalizeClinicalSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* @Codex */
+function formatKnownMonitoringProfile(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === 'taken_in_charge') {
+    return 'Presa in carico attiva. Apri la scheda per diario, terapie e documenti.';
+  }
+  if (normalized === 'extemporaneous' || normalized === 'episodic') {
+    return 'Accesso estemporaneo. Apri la scheda per completare contesto e prossimo passaggio.';
+  }
+  return null;
+}
+
+/* @Codex */
+function isMetadataLikeClinicalText(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (trimmed.startsWith('ENC:') || trimmed.includes('[LOCKED')) return true;
+  if (/^[A-Z0-9_.:-]{24,}$/i.test(trimmed)) return true;
+  if (/^\s*[\[{]/.test(trimmed) && /["{}[\]:]/.test(trimmed)) return true;
+  if (/(^|[,{]\s*)"(?:id|type|source|payload|metadata|createdAt|updatedAt|hash|raw|version)"\s*:/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/* @Codex */
+function extractReadableClinicalText(value: unknown, depth = 0): string | null {
+  if (depth > 2 || value == null) return null;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (/^\s*[\[{]/.test(trimmed)) {
+      try {
+        return extractReadableClinicalText(JSON.parse(trimmed) as unknown, depth + 1);
+      } catch {
+        return isMetadataLikeClinicalText(trimmed) ? null : trimmed;
+      }
+    }
+
+    return isMetadataLikeClinicalText(trimmed) ? null : trimmed;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => extractReadableClinicalText(item, depth + 1))
+      .filter((item): item is string => Boolean(item));
+    return items.length ? items.join(' · ') : null;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const priorityKeys = [
+      'summary',
+      'clinicalSummary',
+      'currentState',
+      'text',
+      'content',
+      'description',
+      'reason',
+      'statusReason',
+      'note',
+      'notes',
+      'label',
+      'name',
+    ];
+    for (const key of priorityKeys) {
+      const extracted = extractReadableClinicalText(record[key], depth + 1);
+      if (extracted) return extracted;
+    }
+  }
+
+  return null;
+}
+
+/* @Codex */
+function compactPatientPreviewText(value: string): string | null {
+  const plain = value
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^\s*(?:[-*]|\d+\.)\s*/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plain || isMetadataLikeClinicalText(plain)) return null;
+  return plain.length > 230 ? `${plain.slice(0, 227).trim()}…` : plain;
+}
+
+/* @Codex */
+function buildPatientPreviewSummary(
+  patient: Kree8PatientSource,
+  isArchived: boolean,
+  isAdi: boolean,
+): string {
+  const candidates: unknown[] = [
+    patient.aiSummary,
+    patient.notes,
+    patient.statusReason,
+  ];
+
+  for (const candidate of candidates) {
+    const extracted = extractReadableClinicalText(candidate);
+    const compact = extracted ? compactPatientPreviewText(extracted) : null;
+    if (compact) return compact;
+  }
+
+  const profileSummary = formatKnownMonitoringProfile(patient.monitoringProfile);
+  if (profileSummary) return profileSummary;
+
+  if (isArchived) return 'Percorso clinico chiuso. Consultabile in sola lettura.';
+  if (isAdi) return 'Percorso territoriale attivo con continuità domiciliare.';
+  return 'Apri la scheda per leggere diario, terapie e documenti del paziente.';
+}
+
+/* @Codex */
+function patientMatchesSearch(patient: Kree8Patient, query: string): boolean {
+  if (!query) return true;
+  const searchable = normalizeClinicalSearch([
+    patient.name,
+    patient.code,
+    patient.raw.taxCode ?? '',
+    patient.ageLabel,
+    patient.pathway,
+    patient.statusLabel,
+    patient.lastTouch,
+    patient.summary,
+    ...patient.diagnoses,
+  ].join(' '));
+  return searchable.includes(query);
+}
+
 function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
   const firstName = patient.firstName?.trim() || '';
   const lastName = patient.lastName?.trim() || '';
@@ -654,16 +800,7 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
   const isArchived = Boolean(patient.isArchived);
   const isAdi = Boolean(patient.isAdi);
   const lastTouch = formatPatientDate(patient.updatedAt ?? patient.createdAt);
-  const summary =
-    patient.aiSummary?.trim()
-    || patient.monitoringProfile?.trim()
-    || patient.statusReason?.trim()
-    || patient.notes?.trim()
-    || (isArchived
-      ? 'Percorso chiuso, consultabile come storico clinico.'
-      : isAdi
-        ? 'Percorso territoriale attivo con continuità domiciliare.'
-        : 'Caso in carico con quadro clinico da mantenere aggiornato.');
+  const summary = buildPatientPreviewSummary(patient, isArchived, isAdi);
 
   return {
     id: patient.id,
@@ -1040,22 +1177,23 @@ function Toolbar({
   filter,
   setFilter,
   onOpenArea,
+  onSearchRequest,
 }: {
   filter: StatusFilter;
   setFilter: (id: StatusFilter) => void;
   onOpenArea: (area: AreaId) => void;
+  onSearchRequest: () => void;
 }) {
   return (
     <div className={styles.toolbar}>
       <button
         type="button"
         className={styles.search}
-        onClick={() => onOpenArea('incarico')}
-        aria-label="Apri ricerca pazienti e incarichi"
+        onClick={onSearchRequest}
+        aria-label="Apri la ricerca nella lista pazienti"
       >
         <Search size={14} />
-        <span>Cerca paziente, ICD, esenzione, documento…</span>
-        <kbd>⌘K</kbd>
+        <span>Filtra pazienti in elenco</span>
       </button>
       {STATUS_FILTERS.map((f) => (
         <button
@@ -1078,7 +1216,7 @@ function Toolbar({
       </button>
       <button type="button" className={styles.aiButton} onClick={() => onOpenArea('revisione')}>
         <Sparkles size={13} />
-        Chiedi a MediFlow
+        Rivedi documenti
       </button>
       <span className={styles.avatarPill}>
         <span className={styles.avatarDot}>LP</span>
@@ -1130,7 +1268,7 @@ function ClinicalAgendaBridgePanel({
       <div className={styles.agendaBridge}>
         <div className={styles.agendaBridgeHeader}>
           <Cloud size={13} />
-          <span>Bridge Zimbra/iCloud</span>
+          <span>Suggerimenti da e-mail e agenda</span>
           <PillBadge variant="muted">lettura locale</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
@@ -1145,7 +1283,7 @@ function ClinicalAgendaBridgePanel({
       <div className={styles.agendaBridge}>
         <div className={styles.agendaBridgeHeader}>
           <AlertTriangle size={13} />
-          <span>Bridge Zimbra/iCloud</span>
+          <span>Suggerimenti da e-mail e agenda</span>
           <PillBadge variant="coral">non disponibile</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
@@ -1160,7 +1298,7 @@ function ClinicalAgendaBridgePanel({
       <div className={styles.agendaBridge}>
         <div className={styles.agendaBridgeHeader}>
           <Cloud size={13} />
-          <span>Bridge Zimbra/iCloud</span>
+          <span>Suggerimenti da e-mail e agenda</span>
           <PillBadge variant="muted">cache assente</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
@@ -1175,7 +1313,7 @@ function ClinicalAgendaBridgePanel({
     <div className={styles.agendaBridge}>
       <div className={styles.agendaBridgeHeader}>
         <Cloud size={13} />
-        <span>Bridge Zimbra/iCloud</span>
+        <span>Suggerimenti da e-mail e agenda</span>
         <PillBadge variant={candidates.length > 0 ? 'blue' : 'muted'}>
           {bridge.data.stats.candidates} candidati
         </PillBadge>
@@ -1206,7 +1344,7 @@ function ClinicalAgendaBridgePanel({
                 </span>
               </span>
               <span className={styles.agendaCandidateEnd}>
-                <PillBadge variant="yellow">review</PillBadge>
+                <PillBadge variant="yellow">da rivedere</PillBadge>
               </span>
             </div>
           ))}
@@ -1399,7 +1537,7 @@ function TurnoArea({
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>
-              {isReview ? 'Coda decisionale review' : 'Coda operativa'}
+              {isReview ? 'Documenti da revisionare' : 'Da fare oggi'}
             </h2>
             <PillBadge variant="violet">
               {isReview ? '7 casi' : 'oggi'}
@@ -1445,6 +1583,7 @@ function IncaricoArea({
   patients,
   patientStatus,
   selectedPatientId,
+  searchFocusSignal,
   onSelectPatient,
   onOpenArea,
   onOpenScheda,
@@ -1452,14 +1591,24 @@ function IncaricoArea({
   patients: Kree8Patient[];
   patientStatus: Kree8PatientStatus;
   selectedPatientId?: string;
+  searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onOpenScheda: () => void;
 }) {
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
+  const [query, setQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const normalizedQuery = useMemo(() => normalizeClinicalSearch(query), [query]);
 
-  const visible = useMemo(
+  useEffect(() => {
+    if (searchFocusSignal <= 0) return;
+    searchInputRef.current?.focus();
+    searchInputRef.current?.select();
+  }, [searchFocusSignal]);
+
+  const scopedPatients = useMemo(
     () =>
       patients.filter((p) => {
         if (list === 'attivi' && p.list !== 'attivi') return false;
@@ -1470,8 +1619,12 @@ function IncaricoArea({
       }),
     [patients, scope, list],
   );
+  const visible = useMemo(
+    () => scopedPatients.filter((patient) => patientMatchesSearch(patient, normalizedQuery)),
+    [normalizedQuery, scopedPatients],
+  );
 
-  const selected = patients.find((p) => p.id === selectedPatientId) ?? visible[0] ?? patients[0] ?? null;
+  const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
 
   return (
     <div className={styles.areaShell}>
@@ -1518,7 +1671,7 @@ function IncaricoArea({
             Tutti gli ambulatori
           </button>
 
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
+          <span className={styles.patientScopeActions}>
             <button
               type="button"
               className={classNames(styles.scopeChip, list === 'attivi' && styles.scopeChipActive)}
@@ -1537,6 +1690,31 @@ function IncaricoArea({
             </button>
           </span>
         </div>
+        <div className={styles.patientSearchRow}>
+          <label className={styles.patientSearchField}>
+            <Search size={14} />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cerca per nome, CF, diagnosi o nota clinica"
+              aria-label="Cerca nella lista pazienti"
+            />
+          </label>
+          {query ? (
+            <button
+              type="button"
+              className={styles.patientSearchClear}
+              onClick={() => {
+                setQuery('');
+                searchInputRef.current?.focus();
+              }}
+            >
+              Cancella
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <div className={styles.inboxLayout}>
@@ -1546,6 +1724,7 @@ function IncaricoArea({
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
             <PillBadge variant="muted">{visible.length} risultati</PillBadge>
+            {normalizedQuery ? <PillBadge variant="blue">ricerca attiva</PillBadge> : null}
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
@@ -1567,7 +1746,9 @@ function IncaricoArea({
             )}
             {visible.length === 0 && (
               <p className={styles.rowSub} style={{ padding: '24px 0' }}>
-                {patientStatus === 'ready'
+                {patientStatus === 'ready' && normalizedQuery
+                  ? `Nessun risultato per “${query.trim()}”. Modifica la ricerca o cambia ambito.`
+                  : patientStatus === 'ready'
                   ? 'Nessun paziente nell’ambito selezionato.'
                   : 'In attesa dei dati paziente.'}
               </p>
@@ -1617,7 +1798,7 @@ function IncaricoArea({
 
         {selected ? (
         <aside className={styles.caseLens} key={selected.id}>
-          <span className={styles.areaCaption}>Anteprima caso</span>
+          <span className={styles.areaCaption}>Anteprima paziente</span>
           <div className={styles.caseLensHero}>
             <span className={styles.caseLensName}>{selected.name}</span>
             <span className={styles.caseLensSub}>
@@ -1642,10 +1823,9 @@ function IncaricoArea({
               type="button"
               className={styles.primaryBtn}
               onClick={onOpenScheda}
-              disabled={selected.list === 'archivio'}
             >
               <UserSquare2 size={13} />
-              Apri scheda
+              {selected.list === 'archivio' ? 'Apri storico' : 'Apri scheda'}
             </button>
             <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
@@ -1653,7 +1833,7 @@ function IncaricoArea({
             </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
-              Documenti
+              Documenti e referti
             </button>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
               <Workflow size={12} />
@@ -1663,9 +1843,11 @@ function IncaricoArea({
         </aside>
         ) : (
           <aside className={styles.caseLens}>
-            <span className={styles.areaCaption}>Anteprima caso</span>
+            <span className={styles.areaCaption}>Anteprima paziente</span>
             <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
-              Nessun paziente reale selezionabile in questa vista.
+              {normalizedQuery
+                ? 'Nessun paziente corrisponde alla ricerca corrente.'
+                : 'Nessun paziente reale selezionabile in questa vista.'}
             </p>
           </aside>
         )}
@@ -1737,7 +1919,7 @@ function RealPatientArea({
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <h2 className={styles.panelTitle}>Quadro rapido</h2>
+          <h2 className={styles.panelTitle}>Sintesi del caso</h2>
           <div className={styles.insightBody}>
             <p style={{ margin: 0 }}>{patient.summary}</p>
           </div>
@@ -1778,7 +1960,7 @@ function RealPatientArea({
       <div className={styles.twoCol}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Lavoro clinico</h2>
+            <h2 className={styles.panelTitle}>Prossime azioni cliniche</h2>
             <PillBadge variant="blue">priorità del caso</PillBadge>
           </header>
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
@@ -1847,7 +2029,7 @@ function RealPatientArea({
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Documenti e codifiche</h2>
             <PillBadge variant={codingHints.length ? 'violet' : 'green'}>
-              {codingHints.length ? `${codingHints.length} cue` : 'allineato'}
+              {codingHints.length ? `${codingHints.length} da rivedere` : 'allineato'}
             </PillBadge>
           </header>
           <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
@@ -2010,7 +2192,7 @@ function SchedaArea({
                 className={classNames(styles.segItem, view === 'ai' && styles.segSelected)}
                 onClick={() => setView('ai')}
               >
-                Sintesi AI
+                Riepilogo clinico (AI)
               </button>
               <button
                 type="button"
@@ -2019,7 +2201,7 @@ function SchedaArea({
                 className={classNames(styles.segItem, view === 'source' && styles.segSelected)}
                 onClick={() => setView('source')}
               >
-                Fonti grezze
+                Documenti originali
               </button>
             </div>
           </span>
@@ -2159,8 +2341,8 @@ function SchedaArea({
             </header>
             <span className={styles.rowSub}>3 campi aggiornabili · 2 note da riconciliare · 1 bloccato</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <PillBadge variant="green">match AIFA</PillBadge>
-              <PillBadge variant="blue">match ICD</PillBadge>
+              <PillBadge variant="green">farmaco riconosciuto AIFA</PillBadge>
+              <PillBadge variant="blue">diagnosi codificata ICD</PillBadge>
               <PillBadge variant="yellow">posologia incerta</PillBadge>
               <PillBadge variant="coral">SISS bloccato</PillBadge>
             </div>
@@ -2477,7 +2659,7 @@ function LiveHandoffArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Trasmissioni SISS</p>
+          <p className={styles.areaCaption}>Portali regionali (SISS)</p>
           <h1 className={styles.areaTitle}>
             Preparazione SISS <em>· contesto paziente e diario</em>
           </h1>
@@ -2595,51 +2777,59 @@ function LiveGovernanceArea({
     variant: PillVariant;
   }> = [
     {
+      href: '/settings#status',
+      title: 'Stato postazione',
+      sub: 'stato sessione, servizi e dati locali',
+      icon: Activity,
+      pill: 'operativo',
+      variant: 'green',
+    },
+    {
       href: '/settings#account',
-      title: 'Account e PIN',
-      sub: 'profilo operatore, cambio PIN e sicurezza sessione',
+      title: 'Account e PIN di sblocco',
+      sub: 'profilo medico, ambulatorio e rotazione PIN',
       icon: KeyRound,
-      pill: 'accesso',
+      pill: 'locale',
       variant: 'muted',
     },
     {
       href: '/settings#ai',
-      title: 'AI locale',
-      sub: 'provider, modelli, controlli e confronto',
+      title: 'Modelli AI locali',
+      sub: 'provider, modelli attivi e controlli di sicurezza',
       icon: Sparkles,
-      pill: 'governato',
+      pill: 'controlli attivi',
       variant: 'violet',
     },
     {
       href: '/settings#backups',
-      title: 'Backup',
+      title: 'Backup cifrati',
       sub: 'schedulazione, ripristino e prove operative',
       icon: HardDrive,
-      pill: 'esplicito',
+      pill: 'manuale',
       variant: 'blue',
     },
     {
       href: '/settings#data',
-      title: 'Cataloghi',
-      sub: 'AIFA, esenzioni e import locali non distruttivi',
+      title: 'Cataloghi clinici',
+      sub: 'AIFA, ICD ed esenzioni locali',
       icon: Database,
-      pill: 'locale',
+      pill: 'dati locali',
       variant: 'green',
     },
     {
       href: '/settings#operations',
-      title: 'Sistema',
-      sub: 'diagnostica, servizi locali e manutenzione',
+      title: 'Diagnostica e servizi',
+      sub: 'servizi locali, manutenzione e app nativa',
       icon: Activity,
-      pill: 'Mac',
+      pill: 'Mac locale',
       variant: 'muted',
     },
     {
       href: '/settings#appearance',
-      title: 'Aspetto',
-      sub: 'riduzione movimento, lettura e stile UI',
+      title: 'Lettura e accessibilità',
+      sub: 'riduzione movimento, leggibilità e stile UI',
       icon: SettingsIcon,
-      pill: 'utente',
+      pill: 'preferenze',
       variant: 'yellow',
     },
   ];
@@ -2648,7 +2838,7 @@ function LiveGovernanceArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Sistema</p>
+          <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
             Stato operativo <em>· sessione, audit, backup</em>
           </h1>
@@ -2684,14 +2874,14 @@ function LiveGovernanceArea({
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Impostazioni complete</h2>
+          <h2 className={styles.panelTitle}>Apri una sezione precisa</h2>
           <span className={styles.panelActions}>
             <PillBadge variant="green">nessun controllo distruttivo qui</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Questa vista mostra lo stato e porta al modulo completo quando serve
-          modificare configurazioni, importare cataloghi o avviare backup.
+          Ogni voce apre direttamente la sezione di impostazioni dove si cambia
+          configurazione, si importano cataloghi o si avvia un controllo.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
           {settingsLinks.map((item) => {
@@ -3303,7 +3493,7 @@ function HandoffArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Trasmissioni SISS · prototipo contestuale</p>
+          <p className={styles.areaCaption}>Portali regionali (SISS) · prototipo contestuale</p>
           <h1 className={styles.areaTitle}>
             Webapp regionali ufficiali <em>· nessun modulo SISS nativo</em>
           </h1>
@@ -3329,19 +3519,24 @@ function HandoffArea() {
         </p>
         <div className={styles.launcherGrid}>
           {LAUNCHERS.map((l) => (
-            <button key={l.id} type="button" className={styles.launcherTile}>
+            <button
+              key={l.id}
+              type="button"
+              className={styles.launcherTile}
+              onClick={() => setStage('handoff')}
+            >
               <div className={styles.launcherTileHeader}>
                 <ArrowUpRight size={14} color="var(--ink-muted)" />
                 <span className={styles.evidenceTitle}>{l.label}</span>
                 <span style={{ marginLeft: 'auto' }}>
-                  <PillBadge variant={l.variant}>via portale SISS</PillBadge>
+                  <PillBadge variant={l.variant}>apre portale ufficiale</PillBadge>
                 </span>
               </div>
               <p className={styles.launcherTileBody}>{l.caption}</p>
               <div className={styles.launcherTileFoot}>
                 <PillBadge variant="muted">CF pronto</PillBadge>
                 <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                  Apri <ArrowUpRight size={11} />
+                  Apri passaggio <ArrowUpRight size={11} />
                 </span>
               </div>
             </button>
@@ -3397,6 +3592,7 @@ function HandoffArea() {
         <div style={{ marginTop: 16 }}>
           <HandoffStageBody
             stage={stage}
+            onStageChange={setStage}
             onAdvance={() => {
               const next = STAGE_ORDER[Math.min(STAGE_ORDER.length - 1, currentIndex + 1)];
               setStage(next);
@@ -3437,7 +3633,15 @@ function HandoffArea() {
   );
 }
 
-function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () => void }) {
+function HandoffStageBody({
+  stage,
+  onAdvance,
+  onStageChange,
+}: {
+  stage: StageId;
+  onAdvance: () => void;
+  onStageChange: (stage: StageId) => void;
+}) {
   if (stage === 'identity') {
     return (
       <div className={styles.stagePanel}>
@@ -3485,7 +3689,9 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
           <dd>evento <code>consent.granted</code> · timestamp 09:12</dd>
         </dl>
         <div style={{ display: 'inline-flex', gap: 8 }}>
-          <button type="button" className={styles.ghostBtn}>Revoca consenso</button>
+          <button type="button" className={styles.ghostBtn} onClick={() => onStageChange('identity')}>
+            Registra revoca e torna a identità
+          </button>
           <button type="button" className={styles.primaryBtn} onClick={onAdvance}>
             Procedi al portale
             <ChevronRight size={14} />
@@ -3512,11 +3718,11 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
           modulo prescrittivo interno.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className={styles.primaryBtn}>
+          <button type="button" className={styles.primaryBtn} onClick={onAdvance}>
             Apri FSE Viewer ufficiale
             <ArrowUpRight size={13} />
           </button>
-          <button type="button" className={styles.ghostBtn}>
+          <button type="button" className={styles.ghostBtn} onClick={onAdvance}>
             Apri Modulo Prescrittivo Regionale
             <ArrowUpRight size={13} />
           </button>
@@ -3556,13 +3762,13 @@ function HandoffStageBody({ stage, onAdvance }: { stage: StageId; onAdvance: () 
         <dd>evento <code>esito.portale.manuale</code> · audit append-only</dd>
       </dl>
       <div style={{ display: 'inline-flex', gap: 8 }}>
-        <button type="button" className={styles.primaryBtn}>
+        <Link href="/diary" className={styles.primaryBtn}>
           Annota esito sul diario
           <ChevronRight size={14} />
-        </button>
-        <button type="button" className={styles.ghostBtn}>
+        </Link>
+        <Link href="/settings#operations" className={styles.ghostBtn}>
           Esporta audit
-        </button>
+        </Link>
       </div>
     </div>
   );
@@ -3618,7 +3824,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>ultima rotazione 18 apr · scadenza 90 gg</span>
             </span>
-            <button type="button" className={styles.ghostBtnSm}>Ruota PIN</button>
+            <Link href="/settings#account" className={styles.ghostBtnSm}>Ruota PIN</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><UserSquare2 size={16} /></span>
@@ -3627,7 +3833,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>Dr. L.P. · distretto fittizio 7</span>
             </span>
-            <button type="button" className={styles.ghostBtnSm}>Modifica</button>
+            <Link href="/settings#account" className={styles.ghostBtnSm}>Modifica</Link>
           </div>
         </section>
 
@@ -3680,8 +3886,8 @@ function GovernanceArea() {
           <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {[
               { name: 'qwen3.5 · locale', tag: 'attivo', variant: 'green' as const },
-              { name: 'mlx · benchmark only', tag: 'visibile', variant: 'blue' as const },
-              { name: 'openmed · redaction', tag: 'shadow', variant: 'violet' as const },
+              { name: 'mlx · solo benchmark', tag: 'visibile', variant: 'blue' as const },
+              { name: 'openmed · redazione dati', tag: 'osservazione', variant: 'violet' as const },
               { name: 'gpt-5.4 · cloud', tag: 'opt-in', variant: 'muted' as const },
             ].map((m) => (
               <div key={m.name} className={styles.compositeCard}>
@@ -3769,7 +3975,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>02:14 · 318 MB · preflight OK</span>
             </span>
-            <button type="button" className={styles.ghostBtnSm}>Esegui ora</button>
+            <Link href="/settings#backups" className={styles.ghostBtnSm}>Esegui ora</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><Database size={16} /></span>
@@ -3778,7 +3984,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>AIFA · ICD · esenzioni · LOINC manuale</span>
             </span>
-            <button type="button" className={styles.ghostBtnSm}>Apri import</button>
+            <Link href="/settings#data" className={styles.ghostBtnSm}>Apri import</Link>
           </div>
         </section>
 
@@ -3843,7 +4049,7 @@ function GovernanceArea() {
                 prossimo check 16 mag 06:00 · canale stable
               </span>
             </span>
-            <button type="button" className={styles.ghostBtnSm}>Cerca aggiornamenti</button>
+            <Link href="/settings#operations" className={styles.ghostBtnSm}>Cerca aggiornamenti</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><ShieldCheck size={16} /></span>
@@ -3851,7 +4057,7 @@ function GovernanceArea() {
               <span className={styles.modeTitle}>AI parliament</span>
               <br />
               <span className={styles.modeSub}>
-                4 modelli censiti · 1 attivo · 3 visibili / shadow
+                4 modelli censiti · 1 attivo · 3 in osservazione
               </span>
             </span>
             <PillBadge variant="violet">parlamento sano</PillBadge>
@@ -3874,6 +4080,7 @@ function AreaContent({
   selectedPatient,
   selectedPatientId,
   patientWorkspace,
+  patientSearchFocusSignal,
   isReview,
   onSelectPatient,
   onOpenArea,
@@ -3888,6 +4095,7 @@ function AreaContent({
   selectedPatient?: Kree8Patient | null;
   selectedPatientId?: string;
   patientWorkspace?: Kree8PatientWorkspace | null;
+  patientSearchFocusSignal: number;
   isReview: boolean;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
@@ -3911,6 +4119,7 @@ function AreaContent({
           patients={patientState.patients}
           patientStatus={patientState.status}
           selectedPatientId={selectedPatientId}
+          searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
           onOpenScheda={onOpenScheda}
@@ -3969,6 +4178,7 @@ export function Kree8ClinicalCockpit({
   const isReview = surface === 'review';
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
     status: 'idle',
   });
@@ -4185,7 +4395,15 @@ export function Kree8ClinicalCockpit({
       </aside>
 
       <section className={styles.canvas}>
-        <Toolbar filter={filter} setFilter={setFilter} onOpenArea={setArea} />
+        <Toolbar
+          filter={filter}
+          setFilter={setFilter}
+          onOpenArea={setArea}
+          onSearchRequest={() => {
+            setArea('incarico');
+            setPatientSearchFocusSignal((current) => current + 1);
+          }}
+        />
         <AreaContent
           area={area}
           filter={filter}
@@ -4196,6 +4414,7 @@ export function Kree8ClinicalCockpit({
           selectedPatient={selectedPatient}
           selectedPatientId={selectedPatientId}
           patientWorkspace={patientWorkspace}
+          patientSearchFocusSignal={patientSearchFocusSignal}
           isReview={isReview}
           onSelectPatient={setSelectedPatientId}
           onOpenArea={setArea}
