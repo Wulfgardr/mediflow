@@ -130,6 +130,12 @@ such as therapies, observations, protesica, scales, document upload and diary
 review. Its inner tools still reuse the existing real components until each
 one receives its own Kree8-native internal pass.
 
+`/patients/[id]/entries/new` now follows the same fullscreen workspace rule for
+the primary write action from Scheda and Cartella completa. It keeps the
+existing rich-text editor, attachment upload, OCR/document synthesis and save
+flow, but the route-level language is Kree8-native: `Diario clinico`, `Nuova
+voce clinica`, `Luogo`, `Tipo di voce`, `Resoconto`, `Allegati`.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
