@@ -173,13 +173,13 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 className={cn(
                     "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all",
                     isDragActive
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10"
-                        : "border-gray-300 dark:border-white/10 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
+                        ? "border-slate-400 bg-slate-50 dark:bg-white/10"
+                        : "border-gray-300 dark:border-white/10 hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
                 )}
             >
                 <input {...getInputProps()} />
-                <div className="p-3 bg-blue-100/50 rounded-full mb-3">
-                    {isProcessing ? <Loader2 className="w-6 h-6 text-blue-600 animate-spin" /> : <Upload className="w-6 h-6 text-blue-600" />}
+                <div className="mb-3 rounded-full bg-slate-100 p-3 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                    {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
                 <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
                 <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file).</p>
@@ -199,7 +199,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                     data-testid="document-upload-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.
@@ -209,7 +209,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="glass-card p-3 flex items-center gap-3 group hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors">
+                    <div key={file.id} className="glass-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
                         <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500 dark:text-red-400 border border-red-100 dark:border-white/5">
                             <FileText className="w-5 h-5" />
                         </div>
@@ -220,7 +220,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 {new Date(file.createdAt).toLocaleDateString()}
                             </p>
                             {file.summarySnapshot && (
-                                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">
+                                <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">
                                     AI: {file.summarySnapshot}
                                 </p>
                             )}
@@ -229,7 +229,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                         <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
                                 title="Visualizza"
                             >
                                 <Eye className="w-4 h-4" />

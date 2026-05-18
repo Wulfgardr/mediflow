@@ -336,13 +336,13 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
     if (!patient.aiSummary && !isGenerating) {
         return (
-            <div className="patient-ai-insight-panel glass-panel overflow-hidden rounded-[28px] border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.04)] p-6 backdrop-blur-xl dark:border-[color:rgba(94,53,95,0.2)] dark:bg-[color:rgba(94,53,95,0.08)]">
+            <div className="patient-ai-insight-panel glass-panel overflow-hidden rounded-[28px] border-slate-200/70 bg-white/70 p-6 backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
                 <div className="flex flex-col items-center text-center space-y-5">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[linear-gradient(135deg,var(--mf-plum),var(--mf-primary),var(--mf-accent))] text-white shadow-[0_12px_24px_rgba(94,53,95,0.18)]">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-900">
                         <Sparkles className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--mf-plum)]">Supporto clinico</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Supporto clinico</p>
                         <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Genera supporto di ragionamento clinico</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                             Ottieni sintesi, red flag, dati mancanti e follow-up suggeriti senza trasformare la scheda in una chat generica.
@@ -357,7 +357,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
                     <button
                         onClick={generateInsight}
-                        className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--mf-plum),var(--mf-primary))] px-8 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5"
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         <Sparkles className="w-4 h-4" />
                         Avvia supporto
@@ -372,7 +372,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
             <div className="border-b border-slate-200/50 p-5 dark:border-white/5">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-[color:rgba(94,53,95,0.08)] text-[color:var(--mf-plum)] dark:bg-[color:rgba(94,53,95,0.12)]">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                             <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
@@ -422,16 +422,16 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 {isGenerating ? (
                     <div className="py-12 text-center space-y-4">
                         <div className="relative mx-auto h-16 w-16">
-                            <RefreshCw className="w-16 h-16 text-[color:rgba(94,53,95,0.2)] animate-[spin_3s_linear_infinite]" />
-                            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-[color:var(--mf-plum)] animate-pulse" />
+                            <RefreshCw className="w-16 h-16 text-slate-300 animate-[spin_3s_linear_infinite] dark:text-white/15" />
+                            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-slate-700 animate-pulse dark:text-slate-200" />
                         </div>
                         <div className="space-y-1">
-                            <p className="text-sm font-bold text-[color:var(--mf-plum)] dark:text-[color:rgba(255,255,255,0.86)]">Analisi in corso</p>
+                            <p className="text-sm font-bold text-slate-700 dark:text-[color:rgba(255,255,255,0.86)]">Analisi in corso</p>
                             <p className="text-[10px] font-medium uppercase tracking-widest text-[color:var(--mf-muted)]">{progress}</p>
                         </div>
 
-                        <div className="mx-auto w-48 overflow-hidden rounded-full bg-[color:rgba(94,53,95,0.1)] dark:bg-[color:rgba(94,53,95,0.14)]">
-                            <div className="h-1 animate-[shimmer_1.5s_infinite_linear] bg-[linear-gradient(90deg,var(--mf-plum),var(--mf-primary),var(--mf-accent))]" style={{ width: '40%' }} />
+                        <div className="mx-auto w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                            <div className="h-1 animate-[shimmer_1.5s_infinite_linear] bg-[linear-gradient(90deg,#111827,#475569,#111827)]" style={{ width: '40%' }} />
                         </div>
                         
                         <button
@@ -444,8 +444,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                 ) : readable.kind === 'structured' ? (
                     <div className="space-y-5">
                         {readable.nextSteps.length > 0 && (
-                            <div className="rounded-[24px] bg-[color:rgba(15,123,104,0.08)] p-4 dark:bg-[color:rgba(15,123,104,0.12)]">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--mf-primary)]">
+                            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Follow-up proposto
                                 </p>
                                 <div className="mt-3 space-y-2">
@@ -454,7 +454,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                                             key={`${index}-${step}`}
                                             className="flex gap-3 text-sm font-medium text-slate-800 dark:text-slate-100"
                                         >
-                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color:rgba(15,123,104,0.12)] text-[10px] text-[color:var(--mf-primary)] dark:bg-[color:rgba(15,123,104,0.16)]">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
                                                 {index + 1}
                                             </span>
                                             <PrivacyBlur intensity="sm">{step}</PrivacyBlur>
@@ -476,14 +476,14 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         )}
 
                         {readable.alerts.length > 0 && (
-                            <div className="rounded-[24px] border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/10 dark:bg-amber-900/10">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">
+                            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Attenzioni
                                 </p>
-                                <ul className="mt-3 space-y-2 text-sm font-medium text-amber-900 dark:text-amber-100">
+                                <ul className="mt-3 space-y-2 text-sm font-medium text-slate-800 dark:text-slate-100">
                                     {readable.alerts.map((item, index) => (
                                         <li key={`${index}-${item}`} className="flex gap-2">
-                                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
                                             <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
                                         </li>
                                     ))}
@@ -515,18 +515,18 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     </div>
                 ) : (
                     <div
-                        className="rounded-[24px] border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/10 dark:bg-amber-900/10"
+                        className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/5"
                         data-testid="patient-insight-unreadable"
                     >
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
                             <div className="min-w-0 space-y-1">
-                                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                     {readable.reason === 'json-envelope'
                                         ? 'Insight salvato non leggibile'
                                         : 'Insight non ancora disponibile'}
                                 </p>
-                                <p className="text-xs leading-5 text-amber-900/80 dark:text-amber-100/80">
+                                <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
                                     {readable.reason === 'json-envelope'
                                         ? "Il supporto AI ha salvato una risposta in un formato che non possiamo mostrare in chiaro. Rigenera l'insight per ottenere sintesi, attenzioni e prossimi passi."
                                         : "Avvia il supporto al ragionamento per produrre sintesi, attenzioni e prossimi passi."}
@@ -536,7 +536,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                                         type="button"
                                         onClick={generateInsight}
                                         disabled={isGenerating || !patientInsightEnabled}
-                                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-900 px-3 text-xs font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                                     >
                                         <RefreshCw className="h-3 w-3" />
                                         Rigenera

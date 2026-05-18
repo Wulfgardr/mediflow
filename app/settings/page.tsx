@@ -39,7 +39,6 @@ interface ModelSelectorProps {
     label: string;
     description: string;
     icon: ReactNode;
-    color: 'emerald' | 'purple' | 'blue';
     value: string;
     onChange: (val: string) => void;
     recommended: { name: string; desc: string }[];
@@ -47,7 +46,7 @@ interface ModelSelectorProps {
     targetUrl: string;
 }
 
-function ModelSelector({ selectorId, label, description, icon, color, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
+function ModelSelector({ selectorId, label, description, icon, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
     const [installedModels, setInstalledModels] = useState<string[]>([]);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(false);
@@ -152,43 +151,17 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
 
     const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
 
-    // @Codex WUL-229 — model selector tones now lean on MediFlow tokens (teal/plum) instead of raw tailwind palettes
-    const colorClasses = {
-        emerald: {
-            iconStyle: { background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' },
-            titleStyle: { color: 'var(--mf-ink)' },
-            descriptionStyle: { color: 'var(--mf-muted)' },
-            selectedCardStyle: { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)', boxShadow: '0 14px 28px rgba(15, 123, 104, 0.14)' },
-            selectedRadio: 'mf-radio-primary',
-            selectedDot: 'bg-white',
-            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
-            downloadBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)', color: 'var(--mf-primary)' },
-            progressStyle: { background: 'linear-gradient(90deg, var(--mf-primary), var(--mf-primary))' },
-        },
-        purple: {
-            iconStyle: { background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' },
-            titleStyle: { color: 'var(--mf-ink)' },
-            descriptionStyle: { color: 'var(--mf-muted)' },
-            selectedCardStyle: { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)', boxShadow: '0 14px 28px rgba(94, 53, 95, 0.14)' },
-            selectedRadio: 'mf-radio-plum',
-            selectedDot: 'bg-white',
-            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
-            downloadBadgeStyle: { borderColor: 'rgba(94, 53, 95, 0.28)', background: 'rgba(94, 53, 95, 0.10)', color: 'var(--mf-plum)' },
-            progressStyle: { background: 'linear-gradient(90deg, var(--mf-plum), var(--mf-plum))' },
-        },
-        blue: {
-            iconStyle: { background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' },
-            titleStyle: { color: 'var(--mf-ink)' },
-            descriptionStyle: { color: 'var(--mf-muted)' },
-            selectedCardStyle: { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)', boxShadow: '0 14px 28px rgba(15, 123, 104, 0.14)' },
-            selectedRadio: 'mf-radio-primary',
-            selectedDot: 'bg-white',
-            installedBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.10)', color: 'var(--mf-primary)' },
-            downloadBadgeStyle: { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)', color: 'var(--mf-primary)' },
-            progressStyle: { background: 'linear-gradient(90deg, var(--mf-primary), var(--mf-primary))' },
-        }
+    const modelSelectorTone = {
+        iconStyle: { background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' },
+        titleStyle: { color: 'var(--mf-ink)' },
+        descriptionStyle: { color: 'var(--mf-muted)' },
+        selectedCardStyle: { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)', boxShadow: '0 14px 28px rgba(15, 23, 42, 0.08)' },
+        selectedDot: 'bg-white',
+        installedBadgeStyle: { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.9)', color: 'var(--mf-ink)' },
+        downloadBadgeStyle: { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.72)', color: 'var(--mf-ink)' },
+        progressStyle: { background: 'linear-gradient(90deg, #111827, #475569)' },
     };
-    const c = colorClasses[color];
+    const c = modelSelectorTone;
 
     return (
         <div className="apple-subsection space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
@@ -222,7 +195,7 @@ function ModelSelector({ selectorId, label, description, icon, color, value, onC
                                         <div
                                             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
                                             style={selected
-                                                ? { borderColor: color === 'purple' ? 'var(--mf-plum)' : 'var(--mf-primary)', background: color === 'purple' ? 'var(--mf-plum)' : 'var(--mf-primary)' }
+                                                ? { borderColor: 'var(--mf-ink)', background: 'var(--mf-ink)' }
                                                 : { borderColor: 'rgba(112,106,100,0.28)' }}
                                         >
                                             {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
@@ -320,11 +293,6 @@ const SETTINGS_SECTION_CARD_CLASS = 'mf-section mf-section-tight p-5 md:p-6';
 const SETTINGS_INPUT_CLASS = 'mf-input';
 const SETTINGS_LABEL_CLASS = 'mf-field-label';
 const SETTINGS_PRIMARY_BUTTON_CLASS = 'ui-btn-primary px-5 py-2.5 disabled:opacity-50';
-const SETTINGS_TONED_BUTTON_CLASS: Record<'emerald' | 'amber' | 'indigo', string> = {
-    emerald: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-success',
-    amber: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-warning',
-    indigo: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50 mf-tone-plum',
-};
 const SETTINGS_SECONDARY_BUTTON_CLASS = 'mf-btn-secondary';
 
 /* @Codex */
@@ -606,7 +574,7 @@ export default function SettingsPage() {
                             <div className={SETTINGS_CARD_CLASS}>
                                 {/* @Codex WUL-229 — header icon disc + ink copy mapped to MediFlow tokens */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                                         <User className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -653,7 +621,7 @@ export default function SettingsPage() {
                                         <button
                                             onClick={saveProfile}
                                             disabled={isSavingProfile}
-                                            className={SETTINGS_TONED_BUTTON_CLASS.emerald}
+                                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
                                         >
                                             <Save className="w-4 h-4" />
                                             {isSavingProfile ? 'Salvataggio...' : 'Salva profilo'}
@@ -665,7 +633,7 @@ export default function SettingsPage() {
                             <div className={SETTINGS_CARD_CLASS}>
                                 {/* @Codex WUL-229 — security card icon switches to MediFlow warning tone */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(202, 138, 4, 0.16)', color: 'var(--mf-warning)' }}>
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                                         <KeyRound className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -741,7 +709,7 @@ export default function SettingsPage() {
                                         <button
                                             onClick={handleChangePin}
                                             disabled={isChangingPin}
-                                            className={SETTINGS_TONED_BUTTON_CLASS.amber}
+                                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
                                         >
                                             <Shield className="w-4 h-4" />
                                             {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
@@ -765,7 +733,7 @@ export default function SettingsPage() {
                             <div className={SETTINGS_CARD_CLASS}>
                                 {/* @Codex WUL-229 — hardware tier cards now ride mf-option-card with token-driven accents */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                                         <Cpu className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -779,11 +747,11 @@ export default function SettingsPage() {
                                     <div
                                         onClick={() => applyHardwareProfile('low')}
                                         className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'low' && 'is-active')}
-                                        style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(15, 123, 104, 0.08)' } : undefined}
+                                        style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-primary)' }}>Leggero</span>
-                                            {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-primary)' }} />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Leggero</span>
+                                            {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&lt; 16GB RAM</p>
                                         <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Usa solo modelli molto compressi (Q4_K_M).</p>
@@ -792,11 +760,11 @@ export default function SettingsPage() {
                                     <div
                                         onClick={() => applyHardwareProfile('medium')}
                                         className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'medium' && 'is-active')}
-                                        style={hardwareProfile === 'medium' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
+                                        style={hardwareProfile === 'medium' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Bilanciato</span>
-                                            {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Bilanciato</span>
+                                            {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>16-32GB RAM</p>
                                         <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 14B per sintesi e reasoning.</p>
@@ -805,11 +773,11 @@ export default function SettingsPage() {
                                     <div
                                         onClick={() => applyHardwareProfile('high')}
                                         className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'high' && 'is-active')}
-                                        style={hardwareProfile === 'high' ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
+                                        style={hardwareProfile === 'high' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                                     >
                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-plum)' }}>Avanzato</span>
-                                            {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-plum)' }} />}
+                                            <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Avanzato</span>
+                                            {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
                                         </div>
                                         <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&gt; 32GB RAM</p>
                                         <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
@@ -819,9 +787,9 @@ export default function SettingsPage() {
 
                             {/* Ruoli del team AI */}
                             <div className={SETTINGS_CARD_CLASS}>
-                                {/* @Codex WUL-229 — AI roles header on MediFlow primary teal */}
+                                {/* @Codex WUL-273 — AI roles header follows the neutral settings surface. */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                                         <Stethoscope className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -837,7 +805,6 @@ export default function SettingsPage() {
                                         label="Radiologo & Clinico"
                                         description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
                                         icon={<Bot className="w-5 h-5" />}
-                                        color="emerald"
                                         value={aiConfig.model_clinical}
                                         onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
                                         recommended={[
@@ -856,7 +823,6 @@ export default function SettingsPage() {
                                         label="Internista (Reasoning)"
                                         description="Per riassunti narrativi, chat complesse e Second Opinion."
                                         icon={<Cpu className="w-5 h-5" />}
-                                        color="purple"
                                         value={aiConfig.model_reasoning}
                                         onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
                                         recommended={[
@@ -875,7 +841,6 @@ export default function SettingsPage() {
                                         label="Segreteria (OCR)"
                                         description="Per importare documenti cartacei, referti scannerizzati e note."
                                         icon={<Upload className="w-5 h-5" />}
-                                        color="blue"
                                         value={aiConfig.model_ocr}
                                         onChange={(val) => setAiConfig({ ...aiConfig, model_ocr: val })}
                                         recommended={[
@@ -906,9 +871,9 @@ export default function SettingsPage() {
 
                             {/* Patient Insight runtime policy */}
                             <div className={SETTINGS_CARD_CLASS}>
-                                {/* @Codex WUL-229 — Patient Insight uses MediFlow plum tone for runtime accent */}
+                                {/* @Codex WUL-273 — Patient Insight runtime settings stay neutral and role-led. */}
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' }}>
+                                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                                         <Sparkles className="h-4 w-4" />
                                     </div>
                                     <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
@@ -930,11 +895,11 @@ export default function SettingsPage() {
                                                 type="button"
                                                 onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
                                                 className={cn('mf-option-card text-left !px-3 !py-3', selected && 'is-active')}
-                                                style={selected ? { borderColor: 'rgba(94, 53, 95, 0.32)', background: 'rgba(94, 53, 95, 0.08)' } : undefined}
+                                                style={selected ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="text-xs font-bold" style={{ color: 'var(--mf-ink)' }}>{option.title}</span>
-                                                    {selected ? <CheckCircle className="h-4 w-4" style={{ color: 'var(--mf-plum)' }} /> : null}
+                                                    {selected ? <CheckCircle className="h-4 w-4" style={{ color: 'var(--mf-ink)' }} /> : null}
                                                 </div>
                                                 <p className="mt-1 text-[11px]" style={{ color: 'var(--mf-muted)' }}>{option.description}</p>
                                             </button>
@@ -944,7 +909,7 @@ export default function SettingsPage() {
 
                                 <p
                                     className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5"
-                                    style={{ borderColor: 'rgba(94, 53, 95, 0.18)', background: 'rgba(94, 53, 95, 0.06)', color: 'var(--mf-muted)' }}
+                                    style={{ borderColor: 'rgba(15, 23, 42, 0.12)', background: 'rgba(248, 250, 252, 0.85)', color: 'var(--mf-muted)' }}
                                 >
                                     {aiInsightSettings.mode === 'full_auto'
                                         ? 'MediFlow sceglie automaticamente quante fonti leggere in base al profilo della postazione e alla complessità del caso.'
@@ -1016,7 +981,7 @@ export default function SettingsPage() {
 
                             {/* AI safety toggles */}
                             <div className={SETTINGS_CARD_CLASS}>
-                                {/* @Codex WUL-229 — kill switches lean on MediFlow critical/success tone tokens */}
+                                {/* @Codex WUL-273 — active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
                                 <div className="mb-5 flex items-start gap-3">
                                     <div className="rounded-2xl p-2" style={{ background: 'rgba(192, 57, 43, 0.12)', color: 'var(--mf-critical)' }}>
                                         <Shield className="h-4 w-4" />
@@ -1032,7 +997,7 @@ export default function SettingsPage() {
                                     <div
                                         className="rounded-[18px] border p-4"
                                         style={patientInsightEnabled
-                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
                                             : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="patient-insight-kill-switch-card"
                                     >
@@ -1048,7 +1013,7 @@ export default function SettingsPage() {
                                                     htmlFor="patientInsightKillSwitch"
                                                     className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                                     style={patientInsightEnabled
-                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-ink)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {patientInsightEnabled ? 'Attivo' : 'Spento'}
@@ -1060,8 +1025,8 @@ export default function SettingsPage() {
                                                     aria-checked={patientInsightEnabled}
                                                     aria-label="Patient Insight locale"
                                                     onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
-                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
-                                                    style={{ background: patientInsightEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
+                                                    style={{ background: patientInsightEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                                 >
                                                     <span
                                                         className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -1075,7 +1040,7 @@ export default function SettingsPage() {
                                     <div
                                         className="rounded-[18px] border p-4"
                                         style={documentSynthesisEnabled
-                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
                                             : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="document-synthesis-kill-switch-card"
                                     >
@@ -1091,7 +1056,7 @@ export default function SettingsPage() {
                                                     htmlFor="documentSynthesisKillSwitch"
                                                     className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                                     style={documentSynthesisEnabled
-                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-ink)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
@@ -1103,8 +1068,8 @@ export default function SettingsPage() {
                                                     aria-checked={documentSynthesisEnabled}
                                                     aria-label="Document Synthesis locale"
                                                     onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
-                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
-                                                    style={{ background: documentSynthesisEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
+                                                    style={{ background: documentSynthesisEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                                 >
                                                     <span
                                                         className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -1118,7 +1083,7 @@ export default function SettingsPage() {
                                     <div
                                         className="rounded-[18px] border p-4"
                                         style={smartImportEnabled
-                                            ? { borderColor: 'rgba(15, 123, 104, 0.28)', background: 'rgba(15, 123, 104, 0.08)' }
+                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
                                             : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
                                         data-testid="smart-import-kill-switch-card"
                                     >
@@ -1134,7 +1099,7 @@ export default function SettingsPage() {
                                                     htmlFor="smartImportKillSwitch"
                                                     className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                                     style={smartImportEnabled
-                                                        ? { borderColor: 'rgba(15, 123, 104, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-primary)' }
+                                                        ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-ink)' }
                                                         : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
                                                 >
                                                     {smartImportEnabled ? 'Attivo' : 'Spento'}
@@ -1146,8 +1111,8 @@ export default function SettingsPage() {
                                                     aria-checked={smartImportEnabled}
                                                     aria-label="Smart Import locale"
                                                     onClick={() => setSmartImportEnabled(!smartImportEnabled)}
-                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(94,53,95,0.28)]"
-                                                    style={{ background: smartImportEnabled ? 'var(--mf-primary)' : 'rgba(112,106,100,0.2)' }}
+                                                    className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
+                                                    style={{ background: smartImportEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                                 >
                                                     <span
                                                         className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -1197,7 +1162,7 @@ export default function SettingsPage() {
                                             id="advancedFit"
                                             checked={showAdvanced}
                                             onChange={(e) => setShowAdvanced(e.target.checked)}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 dark:border-white/10 dark:bg-white/5"
+                                            className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-white/10 dark:bg-white/5"
                                         />
                                         Mostra opzioni avanzate
                                     </label>
@@ -1220,7 +1185,7 @@ export default function SettingsPage() {
                                                             : "http://127.0.0.1:11434/v1"
                                                     }));
                                                 }}
-                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 dark:border-white/10 dark:bg-white/5"
+                                                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-white/10 dark:bg-white/5"
                                             />
                                             <label htmlFor="dockerMode" className="cursor-pointer text-xs leading-5 text-slate-500 dark:text-slate-400">
                                                 Docker Internal Host (se l&apos;app è in container)
@@ -1233,7 +1198,7 @@ export default function SettingsPage() {
                                     <button
                                         onClick={saveAiConfig}
                                         disabled={isSavingAi}
-                                        className={SETTINGS_TONED_BUTTON_CLASS.indigo}
+                                        className={SETTINGS_PRIMARY_BUTTON_CLASS}
                                     >
                                         <Save className="w-4 h-4" />
                                         {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
@@ -1256,7 +1221,7 @@ export default function SettingsPage() {
                                     <div className={cn(
                                         "mt-4 animate-in slide-in-from-top-2 fade-in rounded-[18px] border p-3 text-sm space-y-1",
                                         aiHealth.status === 'ok'
-                                            ? "border-emerald-200/70 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200"
+                                            ? "border-slate-200 bg-slate-50 text-slate-800 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                                             : "border-red-200/70 bg-red-50/80 text-red-800 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
                                     )}>
                                         <div className="flex items-start gap-2 font-semibold">
@@ -1268,7 +1233,7 @@ export default function SettingsPage() {
                                 )}
 
                                 {aiTestStatus === 'success' && (
-                                    <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-emerald-200/70 bg-emerald-50/80 p-3 text-xs text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200">
+                                    <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                                         <CheckCircle className="w-4 h-4" />
                                         Connessione a Ollama riuscita.
                                     </div>
@@ -1322,7 +1287,7 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                             <div className={SETTINGS_CARD_CLASS}>
                                 <div className="mb-5 flex items-start gap-3">
-                                    <div className="rounded-2xl bg-blue-100/80 p-2 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                                    <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                                         <Database className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -1334,7 +1299,7 @@ export default function SettingsPage() {
                                                 href="https://www.aifa.gov.it/web/guest/liste-dei-farmaci"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-blue-600 hover:underline dark:text-blue-400"
+                                                className="text-slate-700 underline-offset-2 hover:underline dark:text-slate-200"
                                             >
                                                 Fonte: AIFA Open Data
                                             </a>
@@ -1343,14 +1308,14 @@ export default function SettingsPage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="rounded-[22px] border border-blue-200/60 bg-blue-50/80 p-4 flex items-center justify-between dark:border-blue-500/20 dark:bg-blue-900/10">
+                                    <div className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
                                         <div>
-                                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Farmaci indicizzati</p>
-                                            <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Farmaci indicizzati</p>
+                                            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                                                 {drugStats !== null ? drugStats.toLocaleString() : '-'}
                                             </p>
                                         </div>
-                                        <Server className="w-8 h-8 text-blue-200 dark:text-blue-800" />
+                                        <Server className="w-8 h-8 text-slate-300 dark:text-white/20" />
                                     </div>
 
                                     <input
@@ -1366,7 +1331,7 @@ export default function SettingsPage() {
                                     {!importing ? (
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="w-full flex items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,box-shadow] hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/70 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-blue-500/30 dark:hover:bg-blue-900/10"
+                                            className="flex w-full items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 shadow-[0_10px_22px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,box-shadow] hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/25 dark:hover:bg-white/10"
                                         >
                                             <Upload className="w-5 h-5" />
                                             <span className="font-medium">Carica file AIFA (.csv)</span>
@@ -1378,7 +1343,7 @@ export default function SettingsPage() {
                                                 <span>{progress}%</span>
                                             </div>
                                             <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                                <div className="bg-blue-600 h-2.5 rounded-full transition-[width] duration-300 progress-bar-width" data-progress={progress}></div>
+                                                <div className="h-2.5 rounded-full bg-slate-900 transition-[width] duration-300 progress-bar-width dark:bg-white" data-progress={progress}></div>
                                             </div>
                                             <p className="text-[10px] text-gray-400 text-center">Non chiudere la pagina.</p>
                                         </div>
@@ -1414,7 +1379,7 @@ export default function SettingsPage() {
 
                             <div className={SETTINGS_CARD_CLASS}>
                                 <div className="flex items-start gap-3">
-                                    <div className="rounded-2xl bg-blue-100/80 p-2 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                                    <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                                         <Activity className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -1424,7 +1389,7 @@ export default function SettingsPage() {
                                     </div>
                                     <Link
                                         href="/settings/ambulatories"
-                                        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-200 dark:hover:bg-blue-900/20"
+                                        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                                     >
                                         Apri gestione &rarr;
                                     </Link>
@@ -1475,7 +1440,7 @@ export default function SettingsPage() {
                                                 {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
                                             </button>
                                             {nativeLaunchState === 'success' && (
-                                                <span className="text-xs text-green-600">Aperta</span>
+                                                <span className="text-xs text-slate-600 dark:text-slate-300">Aperta</span>
                                             )}
                                             {nativeLaunchState === 'error' && (
                                                 <span className="text-xs text-red-600">Errore</span>
@@ -1555,7 +1520,7 @@ export default function SettingsPage() {
                                         className={cn(
                                             "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
                                             reduceMotion
-                                                ? "border-[color:rgba(94,53,95,0.22)] bg-[color:rgba(94,53,95,0.08)]"
+                                                ? "border-[color:rgba(15,23,42,0.22)] bg-[color:rgba(248,250,252,0.9)]"
                                                 : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
                                         )}
                                     >

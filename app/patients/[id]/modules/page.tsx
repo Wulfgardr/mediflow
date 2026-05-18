@@ -190,7 +190,7 @@ export default function PatientDetailPage() {
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <Link
                     href={`/patients/${id}/edit`}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(182,106,60,0.26)] hover:text-[color:var(--mf-accent)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <Pencil className="h-3.5 w-3.5" />
                     Modifica
@@ -198,7 +198,7 @@ export default function PatientDetailPage() {
                 <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <Download className="h-3.5 w-3.5" />
                     Export FHIR
@@ -211,7 +211,7 @@ export default function PatientDetailPage() {
                         const reportService = await import('@/lib/report-service');
                         reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, therapies, observations);
                     }}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(112,106,100,0.14)] bg-white/86 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(94,53,95,0.26)] hover:text-[color:var(--mf-plum)] dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <FileText className="h-3.5 w-3.5" />
                     Report PDF
@@ -375,7 +375,7 @@ export default function PatientDetailPage() {
                                 <span>GDS</span>
                                 <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
                             </Link>
-                            <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
+                            <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]">
                                 Apri libreria scale
                             </Link>
                         </div>
@@ -394,7 +394,7 @@ export default function PatientDetailPage() {
                         {!checkups || checkups.length === 0 ? (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
                                 <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun follow-up pianificato.</p>
-                                <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
+                                <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-ink)] hover:underline">
                                     Aggiungi follow-up
                                 </Link>
                             </div>
@@ -413,7 +413,7 @@ export default function PatientDetailPage() {
                                         </div>
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
+                                <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]">
                                     Gestisci follow-up
                                 </Link>
                             </div>

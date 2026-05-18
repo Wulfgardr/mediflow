@@ -21,9 +21,9 @@ function Badge({
 }) {
     const toneClass = {
         neutral: 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300',
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
-        warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200',
-        preview: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200',
+        success: 'border-slate-200/80 bg-white/76 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
+        warning: 'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
+        preview: 'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
     }[tone];
 
     return (
@@ -117,7 +117,7 @@ export default function NetworkOperatingModePanel() {
                     className={cn(
                         INPUT_SEGMENT_CLASS,
                         overview?.session.operatingMode === 'local-only'
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200'
+                            ? 'border-slate-300 bg-slate-50 text-slate-900 dark:border-white/20 dark:bg-white/10 dark:text-slate-100'
                             : 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
                     )}
                 >
@@ -131,7 +131,7 @@ export default function NetworkOperatingModePanel() {
                     className={cn(
                         INPUT_SEGMENT_CLASS,
                         overview?.session.operatingMode === 'network-home-base'
-                            ? 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200'
+                            ? 'border-slate-300 bg-slate-50 text-slate-900 dark:border-white/20 dark:bg-white/10 dark:text-slate-100'
                             : 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
                     )}
                 >
@@ -183,7 +183,7 @@ export default function NetworkOperatingModePanel() {
                         className={cn(
                             'rounded-[18px] border p-4 transition-colors',
                             state.code === viewModel.currentState.code
-                                ? 'border-sky-300/80 bg-sky-50/70 dark:border-sky-500/20 dark:bg-sky-900/10'
+                                ? 'border-slate-300 bg-slate-50/80 dark:border-white/20 dark:bg-white/10'
                                 : 'border-white/70 bg-white/68 dark:border-white/10 dark:bg-white/5'
                         )}
                     >
@@ -313,7 +313,7 @@ export default function NetworkOperatingModePanel() {
                         className={cn(
                             'rounded-[18px] border p-4 transition-colors',
                             state.code === viewModel.currentReplicaState.code
-                                ? 'border-emerald-300/80 bg-emerald-50/60 dark:border-emerald-500/20 dark:bg-emerald-900/10'
+                                ? 'border-slate-300 bg-slate-50/80 dark:border-white/20 dark:bg-white/10'
                                 : 'border-white/70 bg-white/68 dark:border-white/10 dark:bg-white/5'
                         )}
                     >
@@ -328,7 +328,7 @@ export default function NetworkOperatingModePanel() {
             </div>
 
             {error ? (
-                <div className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
+                <div className="mt-4 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                     {error}
                 </div>
             ) : null}

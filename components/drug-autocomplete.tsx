@@ -11,7 +11,11 @@ interface DrugAutocompleteProps {
     defaultValue?: string;
 }
 
-export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmaco o principio attivp...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
+const drugInputClassName = 'h-11 w-full rounded-[14px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 py-2.5 pl-9 pr-9 text-sm text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[color:rgba(100,116,139,0.58)] focus:border-[color:rgba(15,23,42,0.28)] focus:shadow-[0_0_0_4px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5';
+const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/96 p-2 shadow-[0_22px_60px_rgba(54,45,38,0.14)] backdrop-blur dark:border-white/10 dark:bg-[color:rgba(24,24,22,0.96)]';
+const drugRowClassName = 'w-full rounded-[14px] px-3 py-3 text-left transition-colors hover:bg-[color:rgba(248,250,252,0.86)] focus:bg-[color:rgba(248,250,252,0.86)] focus:outline-none dark:hover:bg-white/6 dark:focus:bg-white/6';
+
+export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per nome o principio attivo...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
     const [query, setQuery] = useState(defaultValue);
     const [results, setResults] = useState<AifaDrug[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -30,15 +34,26 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
                     const firstToken = tokens[0].toLowerCase();
 
                     const allDrugs = await db.drugs.toArray();
+                    const candidateByAic = new Map<string, AifaDrug>();
+                    let nameMatchCount = 0;
+                    let principleMatchCount = 0;
 
-                    const nameMatches = allDrugs.filter((d: any) => d.name.toLowerCase().startsWith(firstToken)).slice(0, 50);
-                    const principleMatches = allDrugs.filter((d: any) => d.activePrinciple && d.activePrinciple.toLowerCase().startsWith(firstToken)).slice(0, 50);
+                    for (const drug of allDrugs) {
+                        if (nameMatchCount < 50 && drug.name.toLowerCase().startsWith(firstToken)) {
+                            candidateByAic.set(drug.aic, drug);
+                            nameMatchCount += 1;
+                        }
+                        if (
+                            principleMatchCount < 50 &&
+                            drug.activePrinciple?.toLowerCase().startsWith(firstToken)
+                        ) {
+                            candidateByAic.set(drug.aic, drug);
+                            principleMatchCount += 1;
+                        }
+                        if (nameMatchCount >= 50 && principleMatchCount >= 50) break;
+                    }
 
-                    // 2. Merge and Deduplicate
-                    const merged = [...nameMatches, ...principleMatches];
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const uniqueMap = new Map(merged.map((item: any) => [item.aic, item]));
-                    const unique = Array.from(uniqueMap.values());
+                    const unique = Array.from(candidateByAic.values());
 
                     // 3. Smart Filtering: Check if ALL tokens match anywhere in the drug data
                     // This allows searching for "Depakin 500" where "500" might be in the packaging
@@ -91,19 +106,20 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={placeholder}
                     autoFocus={autoFocus}
-                    className="mf-input mf-input-sm pl-9 pr-9 uppercase"
+                    className={drugInputClassName}
                 />
 
                 {isLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--mf-primary)', borderTopColor: 'transparent' }}></div>
+                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--mf-ink)', borderTopColor: 'transparent' }}></div>
                     </div>
                 )}
 
                 {!isLoading && query && (
                     <button
+                        type="button"
                         onClick={() => setQuery('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(248,250,252,0.86)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/8"
                         style={{ color: 'var(--mf-muted)' }}
                         title="Cancella ricerca"
                         aria-label="Cancella ricerca"
@@ -114,36 +130,38 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute z-[100] w-full mt-2 mf-popover max-h-80 overflow-y-auto">
-                    <div className="px-2 py-1.5 mb-1 graphite-divider flex justify-between items-center text-[10px] uppercase font-semibold" style={{ color: 'var(--mf-muted)' }}>
-                        <span>Risultati ({results.length})</span>
-                        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> Database AIFA</span>
+                <div className={drugPopoverClassName}>
+                    <div className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--mf-muted)] dark:border-white/10">
+                        <span>Risultati catalogo ({results.length})</span>
+                        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> AIFA locale</span>
                     </div>
 
                     {results.map((drug) => (
                         <button
                             key={drug.aic}
+                            type="button"
                             onClick={() => handleSelect(drug)}
-                            className="mf-popover-row w-full text-left items-start"
+                            className={drugRowClassName}
+                            aria-label={`Seleziona ${drug.name}`}
                         >
                             <div className="flex justify-between items-start w-full">
                                 <div className="flex-1 pr-2">
-                                    <div className="font-semibold text-sm" style={{ color: 'var(--mf-ink)' }}>{drug.name}</div>
+                                    <div className="text-sm font-semibold text-[color:var(--mf-ink)]">{drug.name}</div>
                                     {drug.packaging && (
-                                        <div className="text-xs mt-0.5 font-medium" style={{ color: 'var(--mf-muted)' }}>{drug.packaging}</div>
+                                        <div className="mt-0.5 text-xs font-medium text-[color:var(--mf-muted)]">{drug.packaging}</div>
                                     )}
-                                    <div className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--mf-primary)' }}>
+                                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-[color:var(--mf-muted)]">
                                         <Activity className="w-3 h-3" />
                                         {drug.activePrinciple}
                                     </div>
-                                    <div className="text-[10px] mt-1 truncate" style={{ color: 'var(--mf-muted)' }}>
+                                    <div className="mt-1 truncate text-[10px] text-[color:rgba(112,106,100,0.72)]">
                                         {drug.company} {drug.class ? `• Fascia ${drug.class}` : ''} {drug.atc ? `• ATC: ${drug.atc}` : ''}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="apple-chip text-[10px] font-mono">AIC: {drug.aic}</span>
+                                    <span className="apple-chip font-mono text-[10px]">AIC {drug.aic}</span>
                                     {drug.price !== undefined && drug.price > 0 && (
-                                        <div className="text-xs font-medium mt-1" style={{ color: 'var(--mf-muted)' }}>€ {drug.price.toFixed(2)}</div>
+                                        <div className="mt-1 text-xs font-medium text-[color:var(--mf-muted)]">€ {drug.price.toFixed(2)}</div>
                                     )}
                                 </div>
                             </div>
@@ -153,10 +171,10 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca farmac
             )}
 
             {isOpen && query.length > 2 && results.length === 0 && !isLoading && (
-                <div className="absolute z-[100] w-full mt-2 mf-popover p-4 text-center">
-                    <Pill className="w-7 h-7 mx-auto mb-2" style={{ color: 'var(--mf-muted)' }} />
-                    <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Nessun farmaco trovato nel database.</p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--mf-muted)' }}>Prova a cercare per principio attivo o usa l&apos;inserimento manuale (Galenico).</p>
+                <div className={`${drugPopoverClassName} p-5 text-center`}>
+                    <Pill className="mx-auto mb-2 h-7 w-7 text-[color:var(--mf-muted)]" />
+                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Nessun farmaco trovato nel catalogo locale.</p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">Prova nome commerciale o principio attivo, oppure usa “Farmaco manuale o galenico”.</p>
                 </div>
             )}
         </div>
