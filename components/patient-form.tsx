@@ -80,7 +80,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
 
                             <div className="flex-1 w-full min-w-0">
-                                <label className="section-kicker mb-1.5 block">Patologia / Ricerca Clinica</label>
+                                <label className="section-kicker mb-1.5 block">Diagnosi o ricerca clinica</label>
                                 <div className="relative">
                                     <ICDAutocomplete
                                         value={{
@@ -115,7 +115,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                 className="mf-btn-secondary w-full md:w-auto"
             >
                 <Plus className="w-4 h-4" />
-                Aggiungi Diagnosi
+                Aggiungi diagnosi
             </button>
         </div>
     );
@@ -191,7 +191,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                 className="mf-btn-secondary w-full md:w-auto"
             >
                 <Plus className="w-4 h-4" />
-                Aggiungi pianificazione
+                Aggiungi passaggio
             </button>
         </div>
     );
@@ -248,7 +248,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         </div>
                         <div>
                             <p className="mf-eyebrow">Dati anagrafici</p>
-                            <h3 className={FORM_TITLE_CLASS}>Profilo Paziente</h3>
+                            <h3 className={FORM_TITLE_CLASS}>Profilo paziente</h3>
                         </div>
                     </div>
                 </div>
@@ -275,7 +275,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Codice Fiscale <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS}>Codice fiscale <span className="text-red-500">*</span></label>
                         <input
                             {...register('taxCode')}
                             className={`${FORM_INPUT_CLASS} uppercase font-mono font-bold tracking-wider`}
@@ -287,7 +287,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                     <div className="space-y-1">
                         <div className="flex justify-between items-center mb-1.5">
-                            <label className="mf-field-label mb-0">Data di Nascita</label>
+                            <label className="mf-field-label mb-0">Data di nascita</label>
                             {estimatedAge !== null && (
                                 <span className="apple-chip">Stima età ~{estimatedAge} anni ({estimatedYear})</span>
                             )}
@@ -310,13 +310,13 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="mf-eyebrow">Reperibilità</p>
-                        <h3 className={FORM_TITLE_CLASS}>Contatti & Recapiti</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Contatti e recapiti</h3>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Indirizzo di Residenza</label>
+                        <label className={FORM_LABEL_CLASS}>Indirizzo di residenza</label>
                         <input
                             {...register('address')}
                             className={FORM_INPUT_CLASS}
@@ -337,13 +337,13 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="col-span-full space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Caregiver / Riferimento Familiare</label>
+                        <label className={FORM_LABEL_CLASS}>Caregiver o riferimento</label>
                         <div className="relative">
                             <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-plum)' }} />
                             <input
                                 {...register('caregiver')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
-                                placeholder="Es. Nome Cognome (figlio/a) - Tel..."
+                                placeholder="Es. Maria Rossi, figlia, +39..."
                             />
                         </div>
                     </div>
@@ -358,7 +358,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="mf-eyebrow">Codifica clinica</p>
-                        <h3 className={FORM_TITLE_CLASS}>Patologie e Diagnosi (ICD-11)</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Diagnosi e problemi attivi</h3>
                     </div>
                 </div>
 
@@ -388,7 +388,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="mf-eyebrow">Assetto amministrativo</p>
-                        <h3 className={FORM_TITLE_CLASS}>Codici Esenzione</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Esenzioni</h3>
                     </div>
                 </div>
 
@@ -420,7 +420,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="mf-eyebrow">Profilo assistenziale</p>
-                        <h3 className={FORM_TITLE_CLASS}>Inquadramento Clinico</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Inquadramento clinico</h3>
                     </div>
                 </div>
 
@@ -441,14 +441,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         </div>
 
                         <div className="flex-1 space-y-2">
-                            <label className={FORM_LABEL_CLASS}>Profilo Monitoraggio</label>
+                            <label className={FORM_LABEL_CLASS}>Tipo di presa in carico</label>
                             <div className="relative">
                                 <select
                                     {...register('monitoringProfile')}
                                     className={`mf-input appearance-none cursor-pointer pr-10 font-semibold ${currentStatus === 'taken_in_charge' ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}
                                 >
-                                    <option value="taken_in_charge">Presa in Carico (Continua)</option>
-                                    <option value="extemporaneous">Estemporanea (One Shot)</option>
+                                    <option value="taken_in_charge">Continuativa</option>
+                                    <option value="extemporaneous">Episodica</option>
                                 </select>
                                 <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
                                     <ChevronDown className="h-4 w-4" style={{ color: 'var(--mf-muted)' }} />
@@ -474,11 +474,11 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Note Globali & Anamnesi Sociale</label>
+                        <label className={FORM_LABEL_CLASS}>Note cliniche e contesto</label>
                         <textarea
                             {...register('notes')}
                             className={`${FORM_INPUT_CLASS} min-h-[140px] leading-relaxed`}
-                            placeholder="Informazioni aggiuntive, contesto familiare, codici accesso, preferenze del paziente..."
+                            placeholder="Informazioni utili, contesto familiare, accessi, preferenze del paziente..."
                         />
                     </div>
                 </div>
@@ -486,7 +486,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6 graphite-divider">
                 <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
-                    I campi contrassegnati con <span style={{ color: 'var(--mf-critical)' }}>*</span> sono obbligatori per la corretta gestione clinica.
+                    Campi obbligatori per creare la scheda: <span style={{ color: 'var(--mf-critical)' }}>*</span>.
                 </p>
                 <button
                     type="submit"
@@ -494,7 +494,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     className="ui-btn-primary w-full md:w-auto px-8 py-3.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Save className="w-5 h-5" />
-                    {isSubmitting ? 'Salvataggio in corso…' : (isEditMode ? 'Aggiorna Scheda Paziente' : 'Crea Nuova Scheda')}
+                    {isSubmitting ? 'Salvataggio in corso…' : (isEditMode ? 'Aggiorna scheda' : 'Crea scheda')}
                 </button>
             </div>
         </form>

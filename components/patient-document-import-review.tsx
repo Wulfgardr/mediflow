@@ -115,7 +115,7 @@ export default function PatientDocumentImportReview({
     const tone = qualityTone(localDraft.quality?.level);
 
     return (
-        <div className={`glass-panel mb-10 rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
+        <div className={`glass-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
             <div className="flex flex-col gap-5 border-b border-black/5 pb-6 dark:border-white/5 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone.icon}`}>
@@ -123,14 +123,14 @@ export default function PatientDocumentImportReview({
                     </div>
                     <div className="space-y-2">
                         <div>
-                            <p className="section-kicker">Review documento</p>
+                            <p className="section-kicker">Controllo documento</p>
                             <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                                Conferma cosa applicare al form
+                                Scegli cosa portare nella scheda
                             </h2>
                         </div>
                         <p className={`max-w-3xl text-sm leading-relaxed ${tone.text}`}>
-                            In questa slice i dati estratti non entrano piu direttamente nel create patient:
-                            puoi confermare, correggere o escludere ogni gruppo prima di applicarli al form.
+                            I dati estratti restano in bozza: puoi confermare, correggere o escludere
+                            ogni gruppo prima di applicarlo alla scheda.
                         </p>
                         <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
@@ -143,7 +143,7 @@ export default function PatientDocumentImportReview({
                                 {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {importDecision.summary.structuredDiagnosisCount} write diagnosi · {importDecision.summary.structuredTherapyCount} write terapie · {importDecision.summary.noteOnlyTherapyCount} note da riconciliare
+                                {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
                             </span>
                         </div>
                     </div>
@@ -155,7 +155,7 @@ export default function PatientDocumentImportReview({
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
                 >
                     <X className="h-4 w-4" />
-                    Scarta import
+                    Scarta documento
                 </button>
             </div>
 
@@ -170,7 +170,7 @@ export default function PatientDocumentImportReview({
                     </div>
                     <div className="space-y-1">
                         <p className="text-sm font-bold text-slate-900 dark:text-white">
-                            Qualita documento: {localDraft.quality.reason}
+                            Qualità documento: {localDraft.quality.reason}
                         </p>
                         {localDraft.sourceExcerpt && (
                             <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
@@ -432,7 +432,7 @@ export default function PatientDocumentImportReview({
             <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-6 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <FileSearch className="h-4 w-4" />
-                    L&apos;applicazione al form resta esplicita: nessun campo viene salvato in automatico.
+                    Il passaggio alla scheda resta esplicito: nessun campo viene salvato in automatico.
                 </div>
 
                 <button
@@ -441,7 +441,7 @@ export default function PatientDocumentImportReview({
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-6 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-500/20 transition-[background-color,opacity,transform] hover:bg-blue-700 active:scale-95"
                 >
                     <CheckCircle2 className="h-4 w-4" />
-                    Applica al form
+                    Porta nella scheda
                 </button>
             </div>
         </div>

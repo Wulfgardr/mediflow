@@ -108,7 +108,7 @@ clinician-facing MediFlow nomenclature.
 | Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
 | Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri scheda` / `Cartella completa` / `Prepara SISS`. |
 | Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
-| Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Applica al form` (no more "timbra"). |
+| Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
 | Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
 | Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente** — no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
 | Sistema | Account & PIN, AI local controls (`AI Patient Insight`, `Smart Import documento`, `Comparatore cloud`) + lane chips, Modalità di rete (`locale di default` + optional `Mac principale`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni — **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI locale). |
@@ -147,6 +147,12 @@ maintenance. The existing `PatientForm`, FSE/FHIR export validation, archive,
 restore and delete behavior remain unchanged, but the route-level frame is
 Kree8-native and returns to Cartella completa.
 
+`/patients/new` now follows the same workspace rule for creating a record from
+the live cockpit. The PDF/image import, document-review gate, duplicate tax-code
+check, `PatientForm`, checkup persistence and therapy persistence remain the
+existing real flows; only the route-level frame and clinician-facing copy move
+to the Kree8 grammar.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
@@ -165,7 +171,7 @@ Kree8-native and returns to Cartella completa.
 - Document field decision tri-state per row with evidence snippet, kind label
   (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
   commit-pulse on the resulting status pill, and a gated primary action
-  (`Applica al form`) once all reviewable rows are processed.
+  (`Porta nella scheda`) once all reviewable rows are processed.
 - Cataloghi list and status cards expose the local package state and route
   import work back to settings.
 - Trasmissioni SISS selector walks through 4 steps with step-specific bodies;
@@ -190,9 +196,11 @@ Kree8-native and returns to Cartella completa.
 ## What this live-entry slice explicitly does **not** do
 
 - Does not migrate all real clinical routes into the Kree8 grammar.
-- Does not migrate documents, therapies, diary, observations or write workflows
+- Does not migrate all documents, therapies, diary or observations internals
   into the Kree8 grammar yet; those actions continue through the existing real
-  patient routes.
+  patient components until their own slices. Patient creation, new diary entry,
+  patient scale picker/runner, edit and Cartella completa are already framed as
+  Kree8 workspaces.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.
@@ -223,7 +231,7 @@ Kree8-native and returns to Cartella completa.
       Smart Import preview counters and Prossimi passaggi cards.
 - [ ] On `Documenti`, mark a mix of decisions and confirm the
       counters update, the commit-pulse animation replays on each status
-      pill, and the primary `Applica al form` only enables when all
+      pill, and the primary `Porta nella scheda` only enables when all
       reviewable rows are processed. Confirm the blocked SISS row cannot be
       applied.
 - [ ] On `Cataloghi`, confirm the local package state, import actions and

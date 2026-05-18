@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { db } from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import Link from 'next/link';
+import { AlertTriangle, CheckCircle2, FileSearch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
+/* @Codex */
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 /* @Codex */
 import PatientDocumentImportReview from '@/components/patient-document-import-review';
 /* @Codex */
@@ -129,25 +130,50 @@ export default function NewPatientPage() {
         }
     };
 
+    const statusLabel = pendingImportReview
+        ? 'Documento pronto: scegli cosa portare nella scheda.'
+        : importedData
+            ? 'Dati applicati alla scheda: controlla i campi e conferma.'
+            : 'Nessun dato è stato salvato: la scheda viene creata solo quando confermi.';
+
+    const navItems = [
+        { href: '#documento', label: 'Documento', meta: 'opzionale' },
+        ...(importMeta ? [{
+            href: '#controllo',
+            label: 'Controllo',
+            meta: pendingImportReview ? 'pre-compilazione' : 'completato',
+        }] : []),
+        { href: '#dati', label: 'Dati', meta: 'scheda' },
+    ];
+
     return (
-        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
-                <div className="flex items-center gap-5">
-                    {/* @Codex WUL-229 — patient creation header follows the liquid command surface */}
-                    <Link href="/" className="mf-btn-secondary !h-12 !w-12 !p-0" aria-label="Torna alla home">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-[color:var(--mf-primary)]" />
-                            <p className="mf-eyebrow">Pazienti</p>
+        <Kree8WorkspaceShell
+            eyebrow="Paziente"
+            title="Nuova scheda"
+            subtitle="Crea una scheda partendo da un documento clinico oppure inserendo i dati manualmente. Ogni dato importato passa da un controllo prima del salvataggio."
+            backHref="/"
+            backLabel="Torna alla lista"
+            statusLabel={statusLabel}
+            navItems={navItems}
+        >
+            <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                            <FileSearch className="h-5 w-5" />
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Nuova Anagrafica</h1>
+                        <div className="space-y-1">
+                            <p className="mf-eyebrow">Documento clinico</p>
+                            <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                                Usa un documento quando è utile
+                            </h2>
+                            <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
+                                PDF e immagini vengono letti localmente. MediFlow propone dati anagrafici,
+                                diagnosi e terapie, ma non scrive nulla finché non confermi cosa usare.
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="mb-10">
                 <PdfImporter onDataExtracted={(data) => {
                     const imported = data as ExtractedPatientData;
                     /* @Codex */
@@ -159,78 +185,82 @@ export default function NewPatientPage() {
                         reviewPending: true,
                     });
                 }} />
-            </div>
+            </section>
 
             {/* @Codex */}
             {importMeta && (
-                <div className={`mf-alert mb-10 animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
-                    importMeta.quality?.level === 'red'
-                        ? 'mf-alert-critical'
-                        : importMeta.quality?.level === 'green'
-                            ? 'mf-alert-success'
-                            : 'mf-alert-info'
-                    }`}>
-                    <div className="flex items-start gap-4">
-                        <div className="mf-icon-disc h-12 w-12 shrink-0">
-                            {importMeta.quality?.level === 'red' ? (
-                                <AlertTriangle className="h-6 w-6 shrink-0" />
-                            ) : (
-                                <CheckCircle2 className="h-6 w-6 shrink-0" />
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>
-                                {importMeta.reviewPending ? 'Importazione assistita pronta per review' : 'Importazione assistita applicata al form'}
-                            </h3>
-                            <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
-                                {importMeta.diagnosisCount > 0
-                                    ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie candidate` : ''}. Verificare i contenuti nel passaggio intermedio prima della conferma finale.`
-                                    : importMeta.medicationCount > 0
-                                        ? `Sono state estratte ${importMeta.medicationCount} terapie candidate. Conferma o correggi i gruppi proposti prima di applicarli al form.`
-                                        : 'Il documento è stato analizzato correttamente, ma non sono stati individuati campi clinici strutturabili automaticamente.'}
-                            </p>
-                            {importMeta.quality?.reason && (
-                                <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--mf-muted)' }}>
-                                    Qualita documento: {importMeta.quality.reason}
+                <section id="controllo" className="space-y-4 scroll-mt-40">
+                    <div className={`mf-alert animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
+                        importMeta.quality?.level === 'red'
+                            ? 'mf-alert-critical'
+                            : importMeta.quality?.level === 'green'
+                                ? 'mf-alert-success'
+                                : 'mf-alert-info'
+                        }`}>
+                        <div className="flex items-start gap-4">
+                            <div className="mf-icon-disc h-12 w-12 shrink-0">
+                                {importMeta.quality?.level === 'red' ? (
+                                    <AlertTriangle className="h-6 w-6 shrink-0" />
+                                ) : (
+                                    <CheckCircle2 className="h-6 w-6 shrink-0" />
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                                    {importMeta.reviewPending ? 'Documento pronto: scegli cosa portare nella scheda' : 'Dati importati nella scheda'}
+                                </h3>
+                                <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                    {importMeta.diagnosisCount > 0
+                                        ? `Ho trovato ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}. Controlla cosa tenere prima di compilare la scheda.`
+                                        : importMeta.medicationCount > 0
+                                            ? `Ho trovato ${importMeta.medicationCount} terapie da valutare. Conferma, correggi o escludi le terapie prima di portarle nella scheda.`
+                                            : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
-                            )}
+                                {importMeta.quality?.reason && (
+                                    <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--mf-muted)' }}>
+                                        Qualità documento: {importMeta.quality.reason}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    {/* @Codex */}
+                    {pendingImportReview && (
+                        <PatientDocumentImportReview
+                            draft={pendingImportReview}
+                            onDismiss={() => {
+                                setPendingImportReview(null);
+                                setImportMeta(null);
+                            }}
+                            onApply={(reviewedDefaults: ReviewedPatientImportDefaults) => {
+                                setImportedData({
+                                    firstName: reviewedDefaults.firstName,
+                                    lastName: reviewedDefaults.lastName,
+                                    taxCode: reviewedDefaults.taxCode,
+                                    birthDate: reviewedDefaults.birthDate,
+                                    address: reviewedDefaults.address,
+                                    phone: reviewedDefaults.phone,
+                                    notes: reviewedDefaults.notes,
+                                    diagnoses: reviewedDefaults.diagnoses,
+                                    therapies: reviewedDefaults.therapies,
+                                });
+                                setPendingImportReview(null);
+                                setImportMeta((current) => current ? { ...current, reviewPending: false } : current);
+                                setFormSeed((current) => current + 1);
+                            }}
+                        />
+                    )}
+                </section>
             )}
 
-            {/* @Codex */}
-            {pendingImportReview && (
-                <PatientDocumentImportReview
-                    draft={pendingImportReview}
-                    onDismiss={() => {
-                        setPendingImportReview(null);
-                        setImportMeta(null);
-                    }}
-                    onApply={(reviewedDefaults: ReviewedPatientImportDefaults) => {
-                        setImportedData({
-                            firstName: reviewedDefaults.firstName,
-                            lastName: reviewedDefaults.lastName,
-                            taxCode: reviewedDefaults.taxCode,
-                            birthDate: reviewedDefaults.birthDate,
-                            address: reviewedDefaults.address,
-                            phone: reviewedDefaults.phone,
-                            notes: reviewedDefaults.notes,
-                            diagnoses: reviewedDefaults.diagnoses,
-                            therapies: reviewedDefaults.therapies,
-                        });
-                        setPendingImportReview(null);
-                        setImportMeta((current) => current ? { ...current, reviewPending: false } : current);
-                        setFormSeed((current) => current + 1);
-                    }}
+            <div id="dati" className="scroll-mt-40">
+                <PatientForm
+                    onSubmit={onSubmit}
+                    defaultValues={importedData || undefined}
+                    key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
                 />
-            )}
-
-            <PatientForm
-                onSubmit={onSubmit}
-                defaultValues={importedData || undefined}
-                key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
-            />
-        </div>
+            </div>
+        </Kree8WorkspaceShell>
     );
 }

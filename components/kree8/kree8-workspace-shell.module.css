@@ -23,12 +23,13 @@
 }
 
 .canvas {
+  --k8-canvas-pad: 18px;
   height: 100%;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px;
+  padding: var(--k8-canvas-pad);
   border-radius: 28px;
   background: var(--k8-surface);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.04);
@@ -45,7 +46,7 @@
 .chrome {
   flex: 0 0 auto;
   position: sticky;
-  top: 0;
+  top: calc(-1 * var(--k8-canvas-pad));
   z-index: 20;
   display: flex;
   align-items: flex-start;
@@ -118,7 +119,7 @@
   color: var(--k8-muted);
 }
 
-.statusLine { color: var(--k8-subtle); }
+.statusLine { color: var(--k8-muted); }
 
 .backButton,
 .sectionLink {
@@ -281,7 +282,7 @@
 
 @media (max-width: 760px) {
   .shell { padding: 8px; }
-  .canvas { border-radius: 22px; padding: 10px; }
+  .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
   .chrome { flex-direction: column; align-items: stretch; border-radius: 18px; padding: 14px; }
   .backButton { width: 100%; }
   .title { font-size: 24px; }

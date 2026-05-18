@@ -552,7 +552,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     list: 'attivi',
     status: 'blue',
     statusLabel: 'Smart Import in revisione',
-    diagnoses: ['Nuova anagrafica', 'Documento in coda'],
+    diagnoses: ['Nuova scheda', 'Documento in coda'],
     lastTouch: '08 mag · Smart Import',
     pathway: 'Ambulatorio locale',
     href: '/patients/p5',
@@ -1549,7 +1549,7 @@ function IncaricoArea({
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
-                Nuova anagrafica
+                Nuova scheda
               </Link>
             </span>
           </header>
@@ -2150,7 +2150,7 @@ function SchedaArea({
             </PillBadge>
           </header>
           <p className={styles.panelSubtitle}>
-            Documento in coda · estratti rivedibili prima di applicare al form.
+            Documento in coda · estratti rivedibili prima di portarli nella scheda.
           </p>
           <div className={styles.compositeCard}>
             <header style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2858,7 +2858,7 @@ function RevisioneArea() {
           </button>
           <button type="button" className={styles.primaryBtn} disabled={!canApply}>
             <Check size={14} />
-            Applica al form
+            Porta nella scheda
           </button>
         </div>
       </header>
