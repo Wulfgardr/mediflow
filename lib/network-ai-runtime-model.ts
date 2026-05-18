@@ -22,10 +22,10 @@ const NETWORK_AI_RUNTIME_SURFACES = [
 ] as const;
 
 const NETWORK_AI_RUNTIME_GUARDRAILS = [
-    'AI plane separato dal data plane clinico.',
-    'Solo LAN fidata paired: nessuna esposizione WAN o cloud.',
+    'AI locale separata dai dati clinici.',
+    'Solo rete locale fidata con dispositivi associati: nessuna esposizione WAN o cloud.',
     'Nessun cloud o egress esterno di default.',
-    'Attivazione reale solo dopo benchmark lane-specific e rollout governance.',
+    'Attivazione reale solo dopo benchmark per area AI e governance di rilascio.',
 ] as const;
 
 function normalizeHardwareProfile(value: string | null): NetworkAiRuntimeHardwareProfile {

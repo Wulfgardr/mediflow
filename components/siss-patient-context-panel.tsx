@@ -7,7 +7,7 @@ import { Accessibility, ChevronDown, ExternalLink, FolderOpen, LoaderCircle, Ref
 /* @Codex */
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 /* @Codex */
-import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
+import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
@@ -104,24 +104,30 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
     {
         label: 'Prescrittivo nativo',
         caption: 'Compilazione e invio direttamente dentro MediFlow.',
-        reason: 'Richiede una SSI qualificata SISS e un canale A2A/certificato; oggi MediFlow prepara solo l\'apertura del portale ufficiale.',
+        reason: 'Da aprire nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.',
     },
     {
         label: 'FSE embedded',
         caption: 'Consultazione del fascicolo dentro l\'interfaccia del gestionale.',
-        reason: 'Manca ancora uno stack regionale certificato per autenticazione, policy privacy e scambio documentale dentro l\'app.',
+        reason: 'Da aprire nel portale ufficiale: la consultazione dentro l\'app richiede un percorso regionale certificato.',
     },
     {
         label: 'SGDT',
         caption: 'Accesso contestuale ai percorsi territoriali regionali dal paziente aperto.',
-        reason: 'SGDT risulta un applicativo regionale centralizzato; nel prototipo non c\'e ancora un punto di integrazione paziente-scoped adottabile.',
+        reason: 'Da aprire nel portale regionale: non c\'e ancora un aggancio paziente-specifico utilizzabile in app.',
     },
     {
         label: 'Certificati di malattia',
         caption: 'Emissione contestuale del certificato partendo dal paziente MediFlow.',
-        reason: 'La documentazione SISS esiste, ma non abbiamo ancora modellato scenario, tracciato e vincoli operativi in un adapter dedicato.',
+        reason: 'Da aprire nel portale ufficiale: il percorso certificato per l\'emissione non e ancora collegato.',
     },
 ];
+
+/* @Codex */
+const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
+    'portal-handoff': 'Apertura portali assistita',
+    'certified-api': 'Integrazione regionale certificata',
+};
 
 function isHandoffResponse(value: unknown): value is HandoffResponse {
     return (
@@ -363,15 +369,17 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 ? 'success'
                 : 'muted';
     const readinessLabel = fseReadiness.loading
-        ? 'Pre-check FSE…'
+        ? 'Controllo FSE…'
         : validation?.hasErrors
             ? 'FSE: blocchi'
             : validation?.hasWarnings
-                ? 'FSE: warning'
+                ? 'FSE: attenzioni'
                 : validation
                     ? 'FSE pronta'
-                    : 'Pre-check FSE non disponibile';
+                    : 'Controllo FSE non disponibile';
     const sessionData = sessionStatus.status;
+    const transportLabel = TRANSPORT_MODE_LABEL[summary.transportMode as SissPatientContextTransportMode]
+        ?? 'Apertura portali assistita';
 
     const formatObservedAt = (value: string | null) => {
         if (!value) return 'Non osservato';
@@ -392,18 +400,18 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         <section className="patient-detail-section border p-5 md:p-6">
             <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                    <p className="section-kicker">Contesto SISS</p>
+                    <p className="section-kicker">SISS / FSE</p>
                     <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)] md:text-[17px]">
                         <ShieldCheck className="h-4 w-4 text-[color:var(--mf-primary)]" />
-                        Contesto paziente SISS
+                        SISS e FSE
                     </h2>
                     <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
-                        Apertura assistita dei portali regionali ufficiali (prescrittivo, FSE, anagrafe). Nessuna integrazione SISS nativa certificata: il CF viene preparato per il copia-incolla.
+                        Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="graphite-chip">{summary.transportMode}</span>
+                    <span className="graphite-chip">{transportLabel}</span>
                     <span className={`graphite-chip ${hasTaxCode ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}>
                         {hasTaxCode ? 'CF pronto' : 'CF mancante'}
                     </span>
@@ -423,14 +431,14 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
-                            Sessione SISS
+                            Accesso regionale
                         </h3>
                         <button
                             type="button"
                             onClick={() => void refreshSessionStatus()}
                             disabled={sessionStatus.loading}
                             className="graphite-mini-btn"
-                            aria-label="Aggiorna stato sessione SISS"
+                            aria-label="Aggiorna stato accesso regionale"
                         >
                             {sessionStatus.loading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
                             Aggiorna
@@ -438,7 +446,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     </div>
 
                     {sessionStatus.error ? (
-                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">{sessionStatus.error}</p>
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Stato accesso non leggibile in locale.</p>
                     ) : sessionData ? (
                         <>
                             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -450,7 +458,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                             : 'graphite-chip-tone-muted'
                                 }`}>
                                     <span className={healthDotClassName(sessionData.sessionHealth)} aria-hidden />
-                                    {healthLabel(sessionData.sessionHealth, 'Sessione attiva', 'Sessione vista', 'Sessione assente')}
+                                    {healthLabel(sessionData.sessionHealth, 'Accesso attivo', 'Accesso recente', 'Accesso assente')}
                                 </span>
                                 {remoteSignatureCheckpoint && (
                                     <span className={`graphite-chip ${
@@ -491,29 +499,29 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                             </dl>
 
                             <p className="mt-2 text-[10.5px] uppercase tracking-wide text-[color:var(--mf-muted)]">
-                                Fonte: {sessionData.browserProfile ? `Atlas ${sessionData.browserProfile}` : 'Atlas locale'}
+                                Stato letto localmente
                             </p>
 
                             {sessionData.warning && (
-                                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">{sessionData.warning}</p>
+                                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">Stato accesso non aggiornato di recente.</p>
                             )}
                         </>
                     ) : (
-                        <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Lettura locale Atlas in corso…</p>
+                        <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Controllo locale dell&apos;accesso in corso…</p>
                     )}
                 </div>
 
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
-                            Pre-check FSE
+                            Controllo FSE locale
                         </h3>
                         <button
                             type="button"
                             onClick={() => void refreshFseReadiness()}
                             disabled={fseReadiness.loading}
                             className="graphite-mini-btn"
-                            aria-label="Aggiorna pre-check FSE"
+                            aria-label="Aggiorna controllo FSE locale"
                         >
                             {fseReadiness.loading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
                             Aggiorna
@@ -521,11 +529,11 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     </div>
 
                     <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
-                        Validazione locale per stimare la prontezza dei profili FSE pilotati.
+                        Verifica locale dei dati che servono prima di operare sul fascicolo regionale.
                     </p>
 
                     {fseReadiness.error ? (
-                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">{fseReadiness.error}</p>
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Controllo FSE non disponibile al momento.</p>
                     ) : validation ? (
                         <dl className="mt-2 grid gap-1">
                             <div className="graphite-row">
@@ -540,9 +548,11 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                     Terapie
                                 </dt>
                                 <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
-                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.therapyMedication.total}</span>
-                                    <span className="ml-2">err {validation.therapyMedication.errorCount}</span>
-                                    <span className="ml-2">warn {validation.therapyMedication.warningCount}</span>
+                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.therapyMedication.total} record</span>
+                                    {' · '}
+                                    <span>{validation.therapyMedication.errorCount} blocchi</span>
+                                    {' · '}
+                                    <span>{validation.therapyMedication.warningCount} attenzioni</span>
                                 </dd>
                             </div>
                             <div className="graphite-row">
@@ -554,12 +564,14 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                                 ? 'is-stale'
                                                 : 'is-recent'
                                     }`} aria-hidden />
-                                    Osservazioni
+                                    Parametri
                                 </dt>
                                 <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
-                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.observationVitals.total}</span>
-                                    <span className="ml-2">err {validation.observationVitals.errorCount}</span>
-                                    <span className="ml-2">warn {validation.observationVitals.warningCount}</span>
+                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.observationVitals.total} record</span>
+                                    {' · '}
+                                    <span>{validation.observationVitals.errorCount} blocchi</span>
+                                    {' · '}
+                                    <span>{validation.observationVitals.warningCount} attenzioni</span>
                                 </dd>
                             </div>
                         </dl>
@@ -603,7 +615,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
                     <span className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 text-[color:var(--mf-warning)]" />
-                        Non integrabile oggi
+                        Funzioni non automatiche
                         <span className="graphite-chip graphite-chip-tone-muted">{BLOCKED_CAPABILITIES.length}</span>
                     </span>
                     <ChevronDown className="h-4 w-4 text-[color:var(--mf-muted)] transition-transform group-open:rotate-180" />
@@ -618,7 +630,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     ))}
                 </div>
                 <p className="mt-2 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
-                    Il passaggio da apertura assistita a integrazione nativa richiede un filone dedicato su qualifica SSI, canale A2A e requisiti regionali certificati.
+                    Queste operazioni restano da svolgere nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.
                 </p>
             </details>
 
@@ -642,9 +654,10 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         <div className="min-w-0 space-y-1">
                             <p className="break-words">{feedback.message}</p>
                             {feedback.correlationId && (
-                                <p className="font-mono text-[11px] opacity-80 break-all">
-                                    Correlation ID: {feedback.correlationId}
-                                </p>
+                                <details className="text-[11px] opacity-70">
+                                    <summary className="cursor-pointer select-none">Dettagli tecnici</summary>
+                                    <p className="mt-1 break-all font-mono">Riferimento: {feedback.correlationId}</p>
+                                </details>
                             )}
                         </div>
                     </div>

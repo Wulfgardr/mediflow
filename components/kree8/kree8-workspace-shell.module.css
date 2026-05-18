@@ -49,13 +49,13 @@
   top: calc(-1 * var(--k8-canvas-pad));
   z-index: 20;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px;
   border: 1px solid var(--k8-line);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--k8-shadow);
   backdrop-filter: blur(18px);
 }
@@ -64,67 +64,81 @@
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .brandMark {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  background: var(--k8-soft);
+  border: 1px solid var(--k8-line);
+  color: var(--k8-muted);
+  box-shadow: none;
 }
 
-.heroText { min-width: 0; }
+.heroText { min-width: 0; flex: 1 1 auto; }
 .eyebrow {
   margin: 0;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--k8-subtle);
 }
 
 .title {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
-  font-size: clamp(24px, 3vw, 36px);
-  line-height: 1.05;
+  font-size: clamp(18px, 1.6vw, 22px);
+  line-height: 1.2;
   font-weight: 650;
   letter-spacing: 0;
 }
 
-.title em {
-  font-size: 14px;
-  line-height: 1.4;
-  font-style: normal;
-  font-weight: 500;
-  color: var(--k8-subtle);
+.titleMain {
+  display: inline-block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patientLabel {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--k8-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .subtitle,
 .statusLine {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   max-width: 760px;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--k8-muted);
 }
 
-.statusLine { color: var(--k8-muted); }
+.statusLine {
+  color: var(--k8-subtle);
+  font-size: 11.5px;
+}
 
 .backButton,
 .sectionLink {
   border: 1px solid var(--k8-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--k8-soft);
   color: var(--k8-muted);
   text-decoration: none;
@@ -133,14 +147,23 @@
 
 .backButton {
   flex: 0 0 auto;
-  min-height: 36px;
+  align-self: flex-start;
+  max-width: 240px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 8px 12px;
-  font-size: 12px;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11.5px;
   font-weight: 650;
+}
+
+.backButtonLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .backButton:hover,
@@ -276,6 +299,56 @@
   color: var(--k8-muted) !important;
 }
 
+/* @Codex */
+.shell :global(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
+.shell :global(select),
+.shell :global(textarea) {
+  border: 1px solid var(--k8-line) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: var(--k8-ink) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(input:focus-visible),
+.shell :global(select:focus-visible),
+.shell :global(textarea:focus-visible) {
+  outline: 2px solid rgba(15, 23, 42, 0.32) !important;
+  outline-offset: 1px;
+}
+
+/* @Codex */
+.shell :global(.siss-action-btn) {
+  border-color: var(--k8-line) !important;
+  background: var(--k8-surface) !important;
+  color: var(--k8-ink) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(.siss-action-btn:hover:not(:disabled)) {
+  border-color: var(--k8-line-strong) !important;
+  background: var(--k8-soft) !important;
+}
+
+.shell :global(.patient-ai-insight-panel) {
+  border: 1px solid var(--k8-line) !important;
+  border-radius: 18px !important;
+  background: var(--k8-surface) !important;
+  box-shadow: var(--k8-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+.shell :global(.patient-ai-insight-panel .bg-slate-50) {
+  background: var(--k8-soft) !important;
+}
+
+/* @Codex */
+.shell :global(.ui-btn-primary:disabled),
+.shell :global(.ui-btn-primary[disabled]) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1180px) {
   .workspaceGrid { grid-template-columns: 1fr; }
 }
@@ -283,7 +356,8 @@
 @media (max-width: 760px) {
   .shell { padding: 8px; }
   .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
-  .chrome { flex-direction: column; align-items: stretch; border-radius: 18px; padding: 14px; }
-  .backButton { width: 100%; }
-  .title { font-size: 24px; }
+  .chrome { border-radius: 14px; padding: 12px; }
+  .backButton { max-width: 100%; width: 100%; justify-content: center; }
+  .title { font-size: 18px; }
+  .patientLabel { font-size: 12px; }
 }

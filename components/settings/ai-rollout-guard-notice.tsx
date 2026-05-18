@@ -70,9 +70,9 @@ export default function AiRolloutGuardNotice({
                 </div>
 
                 <div className="min-w-0">
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Guardrail rollout AI</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Controlli rilascio AI</h4>
                     <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                        Richiamo read-only basato sugli artifact `AI-08`: il salvataggio non viene bloccato, ma i modelli sotto riportati non risultano ancora `shadow-ready`.
+                        Avviso in sola lettura basato sui report AI-08: il salvataggio non viene bloccato, ma i modelli sotto riportati non sono ancora pronti per osservazione controllata.
                     </p>
                 </div>
             </div>
@@ -99,7 +99,7 @@ export default function AiRolloutGuardNotice({
                             Ruoli interessati: <span className="font-medium text-slate-800 dark:text-slate-100">{guard.roles.join(', ')}</span>
                         </p>
                         <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                            Lane rilevanti: <span className="font-medium text-slate-800 dark:text-slate-100">{guard.lanes.join(', ')}</span>
+                            Aree AI rilevanti: <span className="font-medium text-slate-800 dark:text-slate-100">{guard.lanes.join(', ')}</span>
                         </p>
                         {guard.blockerMessages.length > 0 ? (
                             <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
@@ -118,11 +118,11 @@ export default function AiRolloutGuardNotice({
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-semibold text-slate-900 dark:text-white">{guard.label}</span>
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700 dark:bg-white/10 dark:text-slate-200">
-                                disabled locally
+                                disattivata localmente
                             </span>
                         </div>
                         <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                            Lane productized attualmente spenta via kill switch locale. Ruoli interessati:{' '}
+                            Funzione disponibile ma attualmente spenta dagli interruttori locali. Ruoli interessati:{' '}
                             <span className="font-medium text-slate-800 dark:text-slate-100">{guard.roles.join(', ')}</span>
                         </p>
                     </div>

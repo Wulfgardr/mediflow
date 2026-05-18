@@ -41,29 +41,29 @@ export function Kree8WorkspaceShell({
     <div className={styles.shell}>
       <main className={styles.canvas}>
         <header className={styles.chrome}>
+          <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
+            <ArrowLeft size={13} aria-hidden />
+            <span className={styles.backButtonLabel}>{backLabel}</span>
+          </Link>
+
           <div className={styles.hero}>
             <span className={styles.brandMark} aria-hidden>
-              <FolderOpen size={14} />
+              <FolderOpen size={12} />
             </span>
             <div className={styles.heroText}>
               <p className={styles.eyebrow}>{eyebrow}</p>
               <h1 className={styles.title}>
-                {title}
-                {patientLabel ? <em>{patientLabel}</em> : null}
+                <span className={styles.titleMain}>{title}</span>
               </h1>
+              {patientLabel ? <p className={styles.patientLabel}>{patientLabel}</p> : null}
               <p className={styles.subtitle}>{subtitle}</p>
               {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
             </div>
           </div>
-
-          <Link href={backHref} className={styles.backButton}>
-            <ArrowLeft size={13} />
-            {backLabel}
-          </Link>
         </header>
 
         {navItems.length > 0 ? (
-          <nav className={styles.sectionRail} aria-label="Sezioni cartella">
+          <nav className={styles.sectionRail} aria-label="Sezioni della vista">
             {navItems.map((item) => (
               <a key={item.href} href={item.href} className={styles.sectionLink}>
                 <span>{item.label}</span>

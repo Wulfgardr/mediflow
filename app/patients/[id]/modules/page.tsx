@@ -85,11 +85,11 @@ export default function PatientDetailPage() {
     if (!patient) {
         return (
             <Kree8WorkspaceShell
-                eyebrow="Scheda paziente"
-                title="Cartella completa"
+                eyebrow="Cartella locale"
+                title="Cartella e strumenti"
                 subtitle="Caricamento della cartella locale in corso."
                 backHref="/"
-                backLabel="Torna ai pazienti"
+                backLabel="Pazienti"
             >
                 <div className={workspaceStyles.loadingCard}>Caricamento cartella paziente...</div>
             </Kree8WorkspaceShell>
@@ -124,13 +124,15 @@ export default function PatientDetailPage() {
                 ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
                 : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#contesto', label: 'Contesto', meta: 'SISS' },
+        { href: '#quadro', label: 'Quadro' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
         { href: '#terapie', label: 'Terapie' },
-        { href: '#osservazioni', label: 'Osservazioni' },
+        { href: '#parametri', label: 'Parametri' },
+        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
         { href: '#documenti', label: 'Documenti', meta: String(documentInsights.length) },
+        { href: '#siss', label: 'SISS/FSE' },
         { href: '#scale', label: 'Scale' },
-        { href: '#passaggi', label: 'Passaggi', meta: String((checkups ?? []).length) },
+        { href: '#follow-up', label: 'Follow-up', meta: String((checkups ?? []).length) },
     ];
 
     const handleExportConfirm = async () => {
@@ -228,52 +230,45 @@ export default function PatientDetailPage() {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Scheda paziente"
-            title="Cartella completa"
-            subtitle="Tutta la cartella nello stesso spazio di lavoro. Stessi dati della scheda, ordinati per lavorarci dentro."
+            eyebrow="Cartella locale"
+            title="Cartella e strumenti"
+            subtitle="Dati, timeline, terapie, documenti e supporto al ragionamento nello stesso spazio."
             backHref={`/patients/${id}`}
-            backLabel="Torna alla scheda"
+            backLabel="Scheda rapida"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
-            statusLabel={`${nonScaleEntries.length} eventi · ${(checkups ?? []).length} prossimi passaggi · ${documentInsights.length} evidenze`}
+            statusLabel={`${nonScaleEntries.length} eventi · ${(checkups ?? []).length} follow-up · ${documentInsights.length} evidenze`}
             navItems={workspaceNavItems}
         >
-            <PatientIdentityLens
-                variant="reader"
-                patient={patient}
-                ageLabel={ageLabel}
-                birthDateLabel={birthDateLabel}
-                diagnoses={diagnosisItems}
-                exemptions={exemptionCodes}
-                exemptionDetails={exemptionDetails ?? []}
-                actions={actionsDock}
-                summary={summaryText}
-                nextStep={nextStepText}
-            />
+            <div id="quadro" className={workspaceStyles.anchorStack}>
+                <PatientIdentityLens
+                    variant="reader"
+                    patient={patient}
+                    ageLabel={ageLabel}
+                    birthDateLabel={birthDateLabel}
+                    diagnoses={diagnosisItems}
+                    exemptions={exemptionCodes}
+                    exemptionDetails={exemptionDetails ?? []}
+                    actions={actionsDock}
+                    summary={summaryText}
+                    nextStep={nextStepText}
+                />
+            </div>
 
             <div className={workspaceStyles.workspaceGrid}>
                 <div className={workspaceStyles.primaryStack}>
-                    <div id="contesto" className={workspaceStyles.anchorStack}>
-                        <SissPatientContextPanel
-                            patientId={id}
-                            patientTaxCode={patient.taxCode}
-                        />
-
-                        <SissHandoffDiary patientId={id} />
-                    </div>
-
                     <section id="timeline" className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Timeline</p>
                                 <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
-                                    Timeline del caso
+                                    Timeline clinica
                                 </h2>
                                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
                                     Visite, controlli e referti nello stesso asse di lettura del caso.
                                 </p>
                             </div>
                             <span className="apple-chip self-start md:self-auto">
-                                {nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} elementi osservabili
+                                {nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} elementi
                             </span>
                         </div>
                         <ClinicalRiverTimeline
@@ -287,16 +282,16 @@ export default function PatientDetailPage() {
                         <TherapyManager patientId={id} />
                     </div>
 
-                    <div id="osservazioni" className={workspaceStyles.anchorStack}>
+                    <div id="parametri" className={workspaceStyles.anchorStack}>
                         <ObservationManager patientId={id} />
                     </div>
 
                     <ProstheticPrescriptionManager patientId={id} />
 
-                    <section className="patient-detail-section border p-5 md:p-6">
+                    <section id="diario" className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
-                                <p className="section-kicker">Diario clinico</p>
+                                <p className="section-kicker">Diario</p>
                                 <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
                                     <FileText className="h-5 w-5 text-[color:var(--mf-muted)]" />
                                     Diario clinico
@@ -306,6 +301,16 @@ export default function PatientDetailPage() {
                         </div>
                         {entries ? <Timeline entries={entries} /> : null}
                     </section>
+
+                    <div id="siss" className={workspaceStyles.anchorStack}>
+                        <span id="contesto" aria-hidden className="sr-only">SISS e FSE</span>
+                        <SissPatientContextPanel
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                        />
+
+                        <SissHandoffDiary patientId={id} />
+                    </div>
                 </div>
 
                 <div className={workspaceStyles.secondaryStack}>
@@ -313,9 +318,9 @@ export default function PatientDetailPage() {
 
                     <section id="documenti" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Evidenze</p>
+                            <p className="section-kicker">Evidenze documentali</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                Referti e note recenti
+                                Referti recenti
                             </h3>
                         </div>
 
@@ -328,7 +333,7 @@ export default function PatientDetailPage() {
                         ) : (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
                                 <p className="text-sm text-[color:var(--mf-muted)]">
-                                    Nessuna evidenza documentale in primo piano. I nuovi referti compariranno qui come stack contestuale.
+                                    Nessuna evidenza documentale in primo piano. I nuovi referti compariranno qui.
                                 </p>
                             </div>
                         )}
@@ -337,30 +342,38 @@ export default function PatientDetailPage() {
                     <PatientSmartImportPanel patient={patient} entries={entries} />
                     <DocumentInsightsPanel patient={patient} />
 
+                    <section className="patient-detail-side-section border p-5">
+                        <div className="mb-4">
+                            <p className="section-kicker">Archivio documenti</p>
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Archivio documenti</h3>
+                        </div>
+                        <DocumentUpload patientId={id} />
+                    </section>
+
                     <section id="scale" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Scale</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <Activity className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                                <Activity className="h-5 w-5 text-[color:var(--mf-muted)]" />
                                 Scale di valutazione
                             </h3>
                         </div>
                         <div className="space-y-3">
                             <Link href={`/patients/${id}/scales/tinetti`} className="apple-list-row">
                                 <span>Tinetti</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/mmse`} className="apple-list-row">
                                 <span>MMSE</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/adl`} className="apple-list-row">
                                 <span>ADL (Katz)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/gds`} className="apple-list-row">
                                 <span>GDS</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
                                 Apri libreria scale
@@ -368,29 +381,21 @@ export default function PatientDetailPage() {
                         </div>
                     </section>
 
-                    <section className="patient-detail-side-section border p-5">
+                    <section id="follow-up" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Documenti</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Documenti del paziente</h3>
-                        </div>
-                        <DocumentUpload patientId={id} />
-                    </section>
-
-                    <section id="passaggi" className="patient-detail-side-section border p-5">
-                        <div className="mb-4">
-                            <p className="section-kicker">Pianificazione</p>
+                            <p className="section-kicker">Follow-up</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <Calendar className="h-5 w-5 text-[color:var(--mf-accent)]" />
-                                Prossimi passaggi
+                                <Calendar className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                                Follow-up
                             </h3>
-                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">PRIAMO, valutazioni, visite, follow-up.</p>
+                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">Valutazioni, visite e controlli pianificati.</p>
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
-                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun passaggio programmato.</p>
+                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun follow-up pianificato.</p>
                                 <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
-                                    Aggiungi pianificazione
+                                    Aggiungi follow-up
                                 </Link>
                             </div>
                         ) : (
@@ -409,7 +414,7 @@ export default function PatientDetailPage() {
                                     </div>
                                 ))}
                                 <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)]">
-                                    Gestisci pianificazione
+                                    Gestisci follow-up
                                 </Link>
                             </div>
                         )}

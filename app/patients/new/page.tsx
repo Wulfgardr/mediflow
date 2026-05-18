@@ -67,7 +67,7 @@ export default function NewPatientPage() {
             if (data.taxCode) {
                 const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode).toArray())[0];
                 if (existing) {
-                    const confirmMsg = `Attenzione: Esiste già un paziente con questo Codice Fiscale.\n\n${existing.lastName} ${existing.firstName}\nID: ${existing.id}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
+                    const confirmMsg = `Esiste già una scheda con questo codice fiscale.\n\n${existing.lastName} ${existing.firstName}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
                     if (confirm(confirmMsg)) {
                         router.push(`/patients/${existing.id}`);
                         return;

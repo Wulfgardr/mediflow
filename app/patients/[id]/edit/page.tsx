@@ -192,11 +192,11 @@ export default function EditPatientPage() {
     if (!patient) {
         return (
             <Kree8WorkspaceShell
-                eyebrow="Scheda paziente"
+                eyebrow="Cartella paziente"
                 title="Modifica dati"
                 subtitle="Caricamento della scheda locale prima di mostrare il form."
                 backHref={`/patients/${id}/modules`}
-                backLabel="Torna alla cartella"
+                backLabel="Torna a cartella e strumenti"
                 statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
@@ -207,11 +207,11 @@ export default function EditPatientPage() {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Scheda paziente"
+            eyebrow="Cartella paziente"
             title="Modifica dati"
             subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale senza uscire dalla cartella."
             backHref={`/patients/${id}/modules`}
-            backLabel="Torna alla cartella"
+            backLabel="Torna a cartella e strumenti"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             statusLabel="Scrittura locale: ogni modifica resta nella banca dati MediFlow."
             navItems={workspaceNavItems}

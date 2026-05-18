@@ -78,7 +78,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
-                                    {isDelete ? 'Elimina Paziente' : isExport ? 'Export FHIR (pre-check FSE)' : 'Archivia Paziente'}
+                                    {isDelete ? 'Elimina scheda' : isExport ? 'Esporta FHIR con controllo FSE' : 'Archivia scheda'}
                                 </h3>
                                 <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
                                     {patientName}
@@ -101,7 +101,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="mf-field-label">Motivazione Eliminazione <span style={{ color: 'var(--mf-critical)' }}>*</span></label>
+                                    <label className="mf-field-label">Motivazione eliminazione <span style={{ color: 'var(--mf-critical)' }}>*</span></label>
                                     <textarea
                                         required
                                         value={deletionReason}
@@ -117,12 +117,12 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 <div className="mf-alert mf-alert-info">
                                     <Check className="w-4 h-4 mt-0.5 shrink-0" />
                                     <div>
-                                        <p>Verrà generato un file <strong>FHIR JSON</strong> con pre-check FSE (errori bloccanti, warning confermabili), contenente:</p>
+                                        <p>Verrà generato un file <strong>FHIR JSON</strong> dopo il controllo FSE locale. Errori bloccanti fermano il download, warning confermabili richiedono conferma.</p>
                                         <ul className="list-disc ml-4 mt-1 opacity-80">
-                                            <li>Anagrafica Paziente</li>
-                                            <li>Storia Diagnostica</li>
-                                            <li>Note e Visite</li>
-                                            <li>Terapie e Valutazioni</li>
+                                            <li>Anagrafica paziente</li>
+                                            <li>Diagnosi registrate</li>
+                                            <li>Note e visite</li>
+                                            <li>Terapie e valutazioni</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -137,7 +137,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 </div>
 
                                 <div>
-                                    <label className="mf-field-label">Motivo Archiviazione</label>
+                                    <label className="mf-field-label">Motivo archiviazione</label>
                                     <select
                                         value={archiveReason}
                                         onChange={(e) => setArchiveReason(e.target.value as ArchiveReason)}
@@ -152,7 +152,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
 
                                 {archiveReason === 'other' && (
                                     <div className="animate-in slide-in-from-top-1 fade-in">
-                                        <label className="mf-field-label">Specifica Altro <span style={{ color: 'var(--mf-warning)' }}>*</span></label>
+                                        <label className="mf-field-label">Specifica altro <span style={{ color: 'var(--mf-warning)' }}>*</span></label>
                                         <textarea
                                             required
                                             value={archiveNote}
@@ -183,7 +183,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 {isSubmitting ? 'Elaborazione...' : (
                                     <>
                                         {isDelete ? <Trash2 className="w-4 h-4" /> : isExport ? <Check className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                                        {isDelete ? 'Sposta nel Cestino' : isExport ? 'Scarica FHIR JSON' : 'Archivia'}
+                                        {isDelete ? 'Sposta nel cestino' : isExport ? 'Scarica FHIR JSON' : 'Archivia'}
                                     </>
                                 )}
                             </button>

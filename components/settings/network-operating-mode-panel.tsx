@@ -78,7 +78,7 @@ export default function NetworkOperatingModePanel() {
             await loadOverview();
         } catch (saveError) {
             console.error(saveError);
-            setError('Impossibile aggiornare la modalita operativa.');
+            setError('Impossibile aggiornare la modalità operativa.');
         } finally {
             setIsSavingMode(false);
         }
@@ -88,7 +88,7 @@ export default function NetworkOperatingModePanel() {
         <div className="apple-subsection min-w-[260px] sm:col-span-2">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="section-kicker">Modalita operativa</p>
+                    <p className="section-kicker">Modalità operativa</p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
                         {viewModel?.currentState.title ?? 'Lettura stato nodo'}
                     </h3>
@@ -199,9 +199,9 @@ export default function NetworkOperatingModePanel() {
             <div className="mt-5 rounded-[20px] border border-white/70 bg-white/66 p-4 dark:border-white/10 dark:bg-white/5">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">AI plane opzionale</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">AI locale opzionale</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {viewModel?.aiRuntimeDescription ?? 'Capability opzionale separata dal data plane clinico.'}
+                            {viewModel?.aiRuntimeDescription ?? 'Funzione opzionale separata dai dati clinici.'}
                         </p>
                     </div>
                     <Badge tone={
@@ -244,7 +244,7 @@ export default function NetworkOperatingModePanel() {
                     <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">Replica snapshot governata</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {viewModel?.backupBoundaryLabel ?? 'Il backup artifact v1 resta separato dal mirror di rete'}
+                            {viewModel?.backupBoundaryLabel ?? 'Il backup v1 resta separato dal mirror di rete'}
                         </p>
                     </div>
                     <Badge tone={viewModel?.currentReplicaState.preview ? 'preview' : 'success'}>

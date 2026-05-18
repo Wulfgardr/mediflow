@@ -542,15 +542,15 @@ export default function SettingsPage() {
         { href: '#ai', label: 'AI locale', meta: 'modelli' },
         { href: '#backups', label: 'Backup', meta: 'archivi' },
         { href: '#data', label: 'Cataloghi', meta: 'farmaci' },
-        { href: '#operations', label: 'Sistema', meta: 'servizi' },
-        { href: '#appearance', label: 'Aspetto', meta: 'lettura' },
+        { href: '#operations', label: 'Servizi', meta: 'locale' },
+        { href: '#appearance', label: 'Lettura', meta: 'tema' },
     ];
 
     return (
         <Kree8WorkspaceShell
             eyebrow="Sistema"
             title="Impostazioni"
-            subtitle="Account, AI locale, backup, cataloghi e diagnostica del Mac che ospita MediFlow."
+            subtitle="Accesso, AI locale, backup, cataloghi e servizi del Mac che ospita MediFlow."
             backHref="/"
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."
@@ -656,7 +656,7 @@ export default function SettingsPage() {
                                             className={SETTINGS_TONED_BUTTON_CLASS.emerald}
                                         >
                                             <Save className="w-4 h-4" />
-                                            {isSavingProfile ? 'Salvataggio...' : 'Salva Profilo'}
+                                            {isSavingProfile ? 'Salvataggio...' : 'Salva profilo'}
                                         </button>
                                     </div>
                                 </div>
@@ -757,7 +757,7 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="AI locale"
                             title="Modelli, ruoli e runtime"
-                            description="Provider locale, modelli per ciascun ruolo clinico e kill switch delle funzioni AI."
+                            description="Provider locale, modelli per ciascun ruolo clinico e interruttori di sicurezza delle funzioni AI."
                         />
 
                         <div className="space-y-6">
@@ -947,7 +947,7 @@ export default function SettingsPage() {
                                     style={{ borderColor: 'rgba(94, 53, 95, 0.18)', background: 'rgba(94, 53, 95, 0.06)', color: 'var(--mf-muted)' }}
                                 >
                                     {aiInsightSettings.mode === 'full_auto'
-                                        ? 'Full auto sceglie il budget in base al profilo hardware corrente e alla complessità del caso.'
+                                        ? 'MediFlow sceglie automaticamente quante fonti leggere in base al profilo della postazione e alla complessità del caso.'
                                         : selectedInsightMode.description}
                                 </p>
 
@@ -1014,7 +1014,7 @@ export default function SettingsPage() {
                                 )}
                             </div>
 
-                            {/* Kill switches */}
+                            {/* AI safety toggles */}
                             <div className={SETTINGS_CARD_CLASS}>
                                 {/* @Codex WUL-229 — kill switches lean on MediFlow critical/success tone tokens */}
                                 <div className="mb-5 flex items-start gap-3">
@@ -1022,9 +1022,9 @@ export default function SettingsPage() {
                                         <Shield className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="section-kicker">Kill switch locali</p>
+                                        <p className="section-kicker">Sicurezza AI</p>
                                         <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Disattiva singole funzioni AI</h3>
-                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni interruttore blocca la funzione in modo deterministico, anche con i modelli installati.</p>
+                                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni interruttore ferma una funzione specifica, anche se i modelli locali sono installati.</p>
                                     </div>
                                 </div>
 
@@ -1040,7 +1040,7 @@ export default function SettingsPage() {
                                             <div>
                                                 <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Patient Insight</p>
                                                 <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
-                                                    Se spento, la scheda paziente non avvia nuovi insight e il runtime rifiuta la generazione.
+                                                    Se spento, la scheda paziente non genera nuovi riepiloghi AI.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -1083,7 +1083,7 @@ export default function SettingsPage() {
                                             <div>
                                                 <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Document Synthesis</p>
                                                 <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
-                                                    Se spento, OCR e import base restano disponibili, ma il runtime rifiuta analisi clinica e archivio intelligente del documento.
+                                                    Se spento, OCR e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -1126,7 +1126,7 @@ export default function SettingsPage() {
                                             <div>
                                                 <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Smart Import</p>
                                                 <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
-                                                    Se spento, il pannello paziente non avvia analisi Smart Import e il runtime rifiuta sia generate sia apply.
+                                                    Se spento, il pannello paziente non propone nuovi suggerimenti Smart Import e non applica quelli in sospeso.
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -1405,7 +1405,7 @@ export default function SettingsPage() {
                         <SettingsSectionIntro
                             kicker="Sistema"
                             title="Diagnostica e manutenzione"
-                            description="Stato dei servizi runtime, gestione ambulatori, strumenti avanzati e azioni irreversibili."
+                            description="Stato dei servizi locali, gestione ambulatori, strumenti avanzati e azioni da confermare."
                         />
 
                         <div className="space-y-6">
@@ -1442,8 +1442,8 @@ export default function SettingsPage() {
                                         </div>
                                         <div>
                                             <p className="section-kicker">Strumenti avanzati</p>
-                                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Dati di test e launcher nativo</h3>
-                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Solo diagnostica e sviluppo.</p>
+                                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Dati dimostrativi e app Mac</h3>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Usali solo per collaudo, manutenzione o avvio della shell locale.</p>
                                         </div>
                                     </div>
                                     <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
@@ -1452,8 +1452,8 @@ export default function SettingsPage() {
                                     <div className="apple-subsection flex flex-col justify-between">
                                         <div className="mb-3">
                                             <p className="section-kicker">Sviluppo</p>
-                                            <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati di test</h4>
-                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Genera pazienti e documenti fittizi per collaudare l&apos;applicazione.</p>
+                                            <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati dimostrativi</h4>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Genera pazienti e documenti sintetici per verificare la postazione.</p>
                                         </div>
                                         <div className="flex items-center justify-end">
                                             <DataSeeder />
@@ -1495,7 +1495,7 @@ export default function SettingsPage() {
                                         <p className="section-kicker">Zona pericolo</p>
                                         <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
                                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                            Operazioni che riportano il workstation a uno stato precedente. Richiedono riconfigurazione.
+                                            Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.
                                         </p>
                                     </div>
                                 </div>
@@ -1523,7 +1523,7 @@ export default function SettingsPage() {
                                         }}
                                         className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color,box-shadow] hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600"
                                     >
-                                        Reset Completo
+                                        Ripeti configurazione iniziale
                                     </button>
                                 </div>
                             </div>

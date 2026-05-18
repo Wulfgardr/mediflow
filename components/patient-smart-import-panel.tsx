@@ -491,10 +491,10 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         <AlertTriangle className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Funzione AI disattivata</p>
                         <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Smart Import disabilitato</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né apply finché il toggle non viene riattivato in Impostazioni.
+                            La funzione è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né applicazioni finché l&apos;interruttore non viene riattivato in Impostazioni.
                         </p>
                     </div>
 
@@ -566,7 +566,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
                             <p className="font-semibold">Smart Import disabilitato localmente</p>
-                            <p className="mt-1">Puoi consultare gli ultimi suggerimenti già generati, ma analisi e apply restano bloccati finché non riattivi il toggle in Impostazioni.</p>
+                            <p className="mt-1">Puoi consultare gli ultimi suggerimenti già generati, ma analisi e applicazione restano bloccate finché non riattivi l&apos;interruttore in Impostazioni.</p>
                         </div>
                     </div>
                 )}

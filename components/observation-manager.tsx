@@ -87,16 +87,19 @@ export default function ObservationManager({ patientId }: { patientId: string })
     return (
         <div className="patient-detail-section glass-panel border p-6 space-y-5">
             <div>
-                <p className="section-kicker">Osservazioni strutturate</p>
+                <p className="section-kicker">Parametri</p>
                 <div className="mt-1 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Osservazioni Codificate (LOINC + UCUM)</h3>
+                    <Activity className="w-5 h-5 text-[color:var(--mf-muted)]" />
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Parametri clinici</h3>
                 </div>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                    Valori misurati per il paziente. La codifica clinica resta visibile come metadata.
+                </p>
             </div>
 
             <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="space-y-1">
-                    <span className="section-kicker">Parametro (LOINC)</span>
+                    <span className="section-kicker">Parametro</span>
                     <select
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
@@ -104,14 +107,19 @@ export default function ObservationManager({ patientId }: { patientId: string })
                     >
                         {loincOptions.map((item) => (
                             <option key={item.code} value={item.code}>
-                                {item.code} - {item.display}
+                                {item.display}
                             </option>
                         ))}
                     </select>
+                    {selectedLoinc ? (
+                        <span className="block text-[10.5px] font-mono uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                            LOINC {selectedLoinc.code}
+                        </span>
+                    ) : null}
                 </label>
 
                 <label className="space-y-1">
-                    <span className="section-kicker">Data/Ora</span>
+                    <span className="section-kicker">Data e ora</span>
                     <input
                         type="datetime-local"
                         value={observedAt}
@@ -132,7 +140,7 @@ export default function ObservationManager({ patientId }: { patientId: string })
                 </label>
 
                 <label className="space-y-1">
-                    <span className="section-kicker">Unità (UCUM)</span>
+                    <span className="section-kicker">Unita</span>
                     <select
                         value={unitCode}
                         onChange={(e) => setUnitCode(e.target.value)}
@@ -140,10 +148,13 @@ export default function ObservationManager({ patientId }: { patientId: string })
                     >
                         {ucumOptions.map((item) => (
                             <option key={item.code} value={item.code}>
-                                {item.code} - {item.display}
+                                {item.display}
                             </option>
                         ))}
                     </select>
+                    <span className="block text-[10.5px] font-mono uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        UCUM {unitCode}
+                    </span>
                 </label>
 
                 <label className="md:col-span-2 space-y-1">
@@ -153,7 +164,7 @@ export default function ObservationManager({ patientId }: { patientId: string })
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
                         className="w-full rounded-2xl border border-slate-200/80 bg-white/90 p-2.5 text-sm dark:border-white/10 dark:bg-white/5"
-                        placeholder="Contesto rilevazione, paziente a riposo, ecc."
+                        placeholder="Contesto della misura, paziente a riposo, ecc."
                     />
                 </label>
 
@@ -161,17 +172,17 @@ export default function ObservationManager({ patientId }: { patientId: string })
                     <button
                         type="submit"
                         disabled={isSaving || value.trim().length === 0}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-[#0A84FF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0077ED] disabled:opacity-50"
+                        className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" />
-                        {isSaving ? 'Salvataggio...' : 'Aggiungi Osservazione'}
+                        {isSaving ? 'Salvataggio...' : 'Registra parametro'}
                     </button>
                 </div>
             </form>
 
             <div className="space-y-2">
                 {!observations || observations.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Nessuna osservazione codificata registrata.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Nessun parametro registrato.</p>
                 ) : (
                     observations.map((item) => (
                         <div
@@ -183,12 +194,10 @@ export default function ObservationManager({ patientId }: { patientId: string })
                                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
                                         {item.display}
                                     </p>
-                                    <p className="font-mono text-xs text-emerald-700 dark:text-emerald-300">
-                                        {item.codeSystem}: {item.code}
-                                    </p>
                                     <p className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
-                                        <Droplets className="w-3.5 h-3.5 text-emerald-500" />
-                                        {item.value} {item.unitCode}
+                                        <Droplets className="w-3.5 h-3.5 text-[color:var(--mf-muted)]" />
+                                        <span className="font-semibold">{item.value}</span>
+                                        <span className="text-slate-500 dark:text-slate-400">{item.unitCode}</span>
                                     </p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">
                                         {new Date(item.observedAt).toLocaleString('it-IT')}
@@ -196,11 +205,14 @@ export default function ObservationManager({ patientId }: { patientId: string })
                                     {item.notes && (
                                         <p className="text-xs italic text-slate-600 dark:text-slate-300">{item.notes}</p>
                                     )}
+                                    <p className="font-mono text-[10.5px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                        {item.codeSystem} {item.code} - UCUM {item.unitCode}
+                                    </p>
                                 </div>
                                 <button
                                     onClick={() => deleteObservation(item.id)}
                                     className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                    title="Elimina osservazione"
+                                    title="Elimina parametro"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>

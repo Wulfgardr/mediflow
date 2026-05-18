@@ -88,17 +88,17 @@ function buildStateCatalog(): NetworkOperatingStateView[] {
         },
         {
             code: 'network-available-not-active',
-            label: 'Network disponibile',
-            title: 'Home-base pronta ma non ancora paired',
-            description: 'Il nodo e preparato in modalita network, ma pairing e accesso multi-device restano ancora da completare esplicitamente.',
+            label: 'Rete disponibile',
+            title: 'Mac principale pronto, associazione non completata',
+            description: 'Il nodo e preparato per la rete locale, ma associazione e accesso da altri dispositivi devono ancora essere completati.',
             preview: false,
             badge: 'Reale',
         },
         {
             code: 'network-active',
-            label: 'Network attiva',
-            title: 'Nodo paired online',
-            description: 'Il nodo paired espone il primo data plane read-only ai client trusted con sessione operatore valida.',
+            label: 'Rete attiva',
+            title: 'Mac associato online',
+            description: 'Il nodo espone il primo canale dati in sola lettura ai dispositivi autorizzati con sessione operatore valida.',
             preview: false,
             badge: 'Reale',
         },
@@ -106,7 +106,7 @@ function buildStateCatalog(): NetworkOperatingStateView[] {
             code: 'offline-fallback',
             label: 'Fallback locale',
             title: 'Nodo non raggiungibile, cache locale degradata',
-            description: 'Stato previsto per il fallback locale read-only dopo pairing, con riallineamento successivo ancora fuori scope.',
+            description: 'Stato previsto per il fallback locale in sola lettura dopo associazione, con riallineamento successivo ancora fuori scope.',
             preview: true,
             badge: 'Anteprima',
         },
@@ -119,31 +119,31 @@ function buildReplicaStateCatalog(): NetworkReplicaStateView[] {
             code: 'local-only',
             label: 'Backup locale',
             title: 'Nessun mirror attivo',
-            description: 'Fuori dalla modalita network il dato resta locale e il backup artifact v1 non viene trattato come replica.',
+            description: 'Fuori dalla modalita rete il dato resta locale e il backup v1 non viene trattato come replica.',
             preview: false,
             badge: 'Reale',
         },
         {
             code: 'unpaired',
             label: 'Pairing richiesto',
-            title: 'Mirror pronto ma non paired',
-            description: 'La modalita network e attiva, ma finche il pairing trusted non esiste non parte alcun riallineamento snapshot.',
+            title: 'Mirror pronto, associazione mancante',
+            description: 'La modalita rete e attiva, ma finche non esiste una associazione non parte alcun riallineamento snapshot.',
             preview: false,
             badge: 'Reale',
         },
         {
             code: 'online',
             label: 'Mirror online',
-            title: 'Nodo paired pronto al riallineamento',
-            description: 'Il pairing trusted e attivo e il nodo puo gia servire il primo data plane read-only, mentre sync e snapshot restano workstream separati.',
+            title: 'Nodo associato pronto al riallineamento',
+            description: 'Associazione attiva: il nodo puo gia servire il primo canale dati in sola lettura; sync e snapshot restano lavori separati.',
             preview: false,
             badge: 'Reale',
         },
         {
             code: 'offline-deferred',
-            label: 'Deferred locale',
+            label: 'Riallineamento in attesa',
             title: 'Rete assente, mirror in coda',
-            description: 'Il lavoro continua in locale, ma il riallineamento verso il nodo resta deferred e richiede un passaggio esplicito successivo.',
+            description: 'Il lavoro continua in locale, ma il riallineamento verso il nodo resta in coda e richiede un passaggio esplicito successivo.',
             preview: true,
             badge: 'Anteprima',
         },
@@ -233,9 +233,9 @@ function aiRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
 function aiRuntimeDescription(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.mode) {
         case 'centralized-available':
-            return 'Il nodo puo esporre il proprio runtime AI locale ai client paired senza spostare il data plane clinico.';
+            return 'Il nodo puo esporre il proprio runtime AI locale ai dispositivi associati senza spostare i dati clinici.';
         case 'centralized-unavailable':
-            return 'La modalita network e attiva, ma il runtime locale del nodo non e in uno stato esponibile ai client paired.';
+            return 'La modalita rete e attiva, ma il runtime locale del nodo non e pronto per i dispositivi associati.';
         case 'local-ai':
         default:
             return 'Il nodo usa il runtime AI solo in locale e non promette inferenza remota o pairing AI.';
@@ -266,7 +266,7 @@ function aiRolloutGateLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.rolloutGate) {
         case 'lane-benchmarks-and-rollout-governance-required':
         default:
-            return 'Benchmark lane-specific + rollout governance prima dell attivazione reale';
+            return 'Benchmark per area AI e governance prima dell attivazione reale';
     }
 }
 
@@ -285,7 +285,7 @@ function aiSurfaceLabel(surface: NetworkAiRuntimeSummary['surfaces'][number]): s
 function replicaAuthorityLabel(replica: NetworkReplicaSummary): string {
     switch (replica.authority) {
         case 'paired-home-base':
-            return 'Nodo paired';
+            return 'Nodo associato';
         case 'local-device':
         default:
             return 'Dispositivo locale';
@@ -318,7 +318,7 @@ function backupBoundaryLabel(replica: NetworkReplicaSummary): string {
     switch (replica.backupBoundary) {
         case 'artifact-v1-remains-backup-only':
         default:
-            return 'Il backup artifact v1 resta separato dal mirror di rete';
+            return 'Il backup v1 resta separato dal mirror di rete';
     }
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, UserPlus, Users, Search, ChevronRight } from 'lucide-react';
+import { ArrowRight, X, UserPlus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
@@ -27,18 +27,23 @@ function Modal({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => 
 export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
-    const [view, setView] = useState<'selection' | 'search'>('selection');
 
     // Fetch patients for search
     const patients = useLiveQuery(
         () => db.patients
             .filter(p => {
-                const term = searchTerm.toLowerCase();
+                const term = searchTerm.trim().toLowerCase();
+                if (!term) return true;
+                const diagnosisText = (p.diagnoses ?? [])
+                    .map((diagnosis) => `${diagnosis.code} ${diagnosis.description}`)
+                    .join(' ')
+                    .toLowerCase();
                 return p.firstName.toLowerCase().includes(term) ||
                     p.lastName.toLowerCase().includes(term) ||
-                    p.taxCode.toLowerCase().includes(term);
+                    p.taxCode.toLowerCase().includes(term) ||
+                    diagnosisText.includes(term);
             })
-            .limit(5)
+            .limit(6)
             .toArray(),
         [searchTerm]
     );
@@ -56,85 +61,69 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
             <div className="flex justify-between items-center p-4 graphite-divider">
-                <h3 className="font-semibold text-lg" style={{ color: 'var(--mf-ink)' }}>Apri scheda</h3>
+                <div>
+                    <h3 className="font-semibold text-lg" style={{ color: 'var(--mf-ink)' }}>Apri una scheda</h3>
+                    <p className="mt-1 text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
+                        Cerca per nome, codice fiscale o diagnosi. Se non esiste, crea una nuova scheda.
+                    </p>
+                </div>
                 <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi">
                     <X className="w-4 h-4" />
                 </button>
             </div>
 
-            <div className="p-6">
-                {view === 'selection' ? (
-                    <div className="grid grid-cols-1 gap-4">
-                        <button
-                            onClick={() => setView('search')}
-                            className="mf-option-card flex items-center gap-4 p-5 group"
-                        >
-                            <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
-                                <Users className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Scheda esistente</h4>
-                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Cerca una scheda già presente</p>
-                            </div>
-                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
-                        </button>
+            <div className="space-y-5 p-6">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                    <input
+                        autoFocus
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Cerca paziente, codice fiscale o diagnosi"
+                        className="mf-input pl-10"
+                    />
+                </div>
 
+                <div className="max-h-[320px] overflow-y-auto space-y-1">
+                    {patients?.map(patient => (
                         <button
-                            onClick={handleNewPatient}
-                            className="mf-option-card flex items-center gap-4 p-5 group"
+                            key={patient.id}
+                            onClick={() => handleSelectPatient(patient.id)}
+                            className="mf-popover-row w-full"
                         >
-                            <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' }}>
-                                <UserPlus className="w-5 h-5" />
+                            <div className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-semibold text-sm" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
+                                {patient.firstName[0]}{patient.lastName[0]}
                             </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Nuova scheda</h4>
-                                <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Crea una scheda anagrafica e clinica</p>
+                            <div className="min-w-0 flex-1 text-left">
+                                <p className="truncate font-semibold" style={{ color: 'var(--mf-ink)' }}>{patient.lastName} {patient.firstName}</p>
+                                <p className="truncate text-xs" style={{ color: 'var(--mf-muted)' }}>
+                                    {patient.taxCode}
+                                    {patient.diagnoses?.[0]?.description ? ` · ${patient.diagnoses[0].description}` : ''}
+                                </p>
                             </div>
-                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                            <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--mf-muted)' }} />
                         </button>
+                    ))}
+                    {patients?.length === 0 && (
+                        <p className="text-center py-4 text-sm" style={{ color: 'var(--mf-muted)' }}>
+                            Nessuna scheda corrisponde alla ricerca.
+                        </p>
+                    )}
+                </div>
+
+                <button
+                    onClick={handleNewPatient}
+                    className="mf-option-card flex w-full items-center gap-4 p-5 group"
+                >
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: 'rgba(94, 53, 95, 0.14)', color: 'var(--mf-plum)' }}>
+                        <UserPlus className="w-5 h-5" />
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
-                            <input
-                                autoFocus
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Cerca per nome o codice fiscale"
-                                className="mf-input pl-10"
-                            />
-                        </div>
-
-                        <div className="max-h-[300px] overflow-y-auto space-y-1">
-                            {patients?.map(patient => (
-                                <button
-                                    key={patient.id}
-                                    onClick={() => handleSelectPatient(patient.id)}
-                                    className="mf-popover-row w-full"
-                                >
-                                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm" style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}>
-                                        {patient.firstName[0]}{patient.lastName[0]}
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{patient.lastName} {patient.firstName}</p>
-                                        <p className="text-xs" style={{ color: 'var(--mf-muted)' }}>{patient.taxCode}</p>
-                                    </div>
-                                </button>
-                            ))}
-                            {patients?.length === 0 && searchTerm && (
-                                <p className="text-center py-4 text-sm" style={{ color: 'var(--mf-muted)' }}>Nessun paziente trovato.</p>
-                            )}
-                        </div>
-
-                        <button
-                            onClick={() => setView('selection')}
-                            className="mf-btn-secondary"
-                        >
-                            Indietro
-                        </button>
+                    <div className="min-w-0 flex-1 text-left">
+                        <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Crea nuova scheda</h4>
+                        <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Anagrafica, diagnosi, diario e allegati partono da una scheda vuota.</p>
                     </div>
-                )}
+                    <ArrowRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                </button>
             </div>
         </Modal>
     );

@@ -178,7 +178,7 @@ function AmbulatoryTree() {
             {breadcrumbs.length > 0 ? (
                 <div className="mb-6 px-1">
                     <p className="section-kicker mb-2 px-1">
-                        Ambiente di Lavoro
+                        Contesto corrente
                     </p>
                     <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/10 shadow-sm relative overflow-hidden group">
                         <div className="relative z-10 flex flex-col gap-1">
@@ -190,7 +190,7 @@ function AmbulatoryTree() {
                                 {breadcrumbs.length > 1 ? (
                                     <span className="truncate">{breadcrumbs[breadcrumbs.length - 2].name}</span>
                                 ) : (
-                                    <span>Sede Principale</span>
+                                    <span>Sede principale</span>
                                 )}
                             </div>
                         </div>
@@ -206,13 +206,13 @@ function AmbulatoryTree() {
             {/* Tree Section Header */}
             <div className="flex items-center justify-between px-2 mb-2">
                 <p className="section-kicker flex items-center gap-2">
-                    Struttura
+                    Sedi
                 </p>
                 <button
                     onClick={() => setShowAddModal(true)}
                     className="p-1 text-gray-400 transition-colors hover:text-[color:var(--mf-primary)]"
-                    title="Nuovo Ambulatorio"
-                    aria-label="Nuovo Ambulatorio"
+                    title="Aggiungi sede o reparto"
+                    aria-label="Aggiungi sede o reparto"
                 >
                     <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -243,11 +243,12 @@ export function Sidebar() {
         doctor: user?.displayName || 'Medico',
     };
 
+    /* @Codex */
     const links = [
         { href: '/', name: 'Pazienti', icon: Users, matchPrefixes: ['/patients'] as string[] },
         { href: '/diary', name: 'Diario', icon: LayoutDashboard },
         { href: '/scales', name: 'Scale', icon: Activity },
-        { href: '/analytics', name: 'Analytics', icon: BarChart3 },
+        { href: '/analytics', name: 'Analisi', icon: BarChart3 },
         { href: '/settings', name: 'Impostazioni', icon: Settings },
     ];
 
@@ -333,7 +334,7 @@ export function Sidebar() {
                             className="w-full flex items-center justify-center gap-2 p-2.5 text-[13px] font-bold rounded-xl bg-gray-900 text-white shadow-sm transition-[opacity,transform,box-shadow] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-gray-900"
                         >
                             <PlusCircle className="w-4 h-4" />
-                            <span>Apri scheda</span>
+                            <span>Trova o crea scheda</span>
                         </button>
                     </div>
                 </div>

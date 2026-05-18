@@ -23,7 +23,7 @@ const MOBILE_LINKS: Array<{ href: string; name: string; icon: typeof Users; matc
 
 /* @Codex */
 const MOBILE_SECONDARY_LINKS: Array<{ href: string; label: string; icon: typeof Users }> = [
-    { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/analytics', label: 'Analisi', icon: BarChart3 },
 ];
 
 /* @Codex */
@@ -42,7 +42,7 @@ export function MobileShellChrome() {
                             </span>
                         </Link>
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
-                            {user?.displayName || 'Clinical Flow'}
+                            {user?.displayName || 'Sessione locale'}
                         </p>
                     </div>
                     <div className="flex items-center gap-1">

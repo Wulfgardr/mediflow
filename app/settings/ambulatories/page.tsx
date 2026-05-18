@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { db, Ambulatory } from '@/lib/db';
-import { Building2, Plus, Trash2, Check, MapPin, Loader2, CornerDownRight } from 'lucide-react';
+import { Building2, Plus, Trash2, MapPin, Loader2, CornerDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
@@ -26,6 +26,9 @@ export default function AmbulatoryManagerPage() {
     const [newParentId, setNewParentId] = useState<string>('');
     const [newType, setNewType] = useState<'live' | 'test'>('live');
     const [isClearing, setIsClearing] = useState(false);
+    // @Codex: Keep hierarchy rendering linear even when the sede list grows.
+    const ambulatoryById = useMemo(() => new Map(ambulatories.map((item) => [item.id, item])), [ambulatories]);
+    const selectedParent = newParentId ? ambulatoryById.get(newParentId) : null;
 
     useEffect(() => {
         loadAmbulatories();
@@ -71,7 +74,7 @@ export default function AmbulatoryManagerPage() {
     };
 
     const handleClear = async (id: string) => {
-        const target = ambulatories.find((item) => item.id === id);
+        const target = ambulatoryById.get(id);
         if (!confirm(`Svuotare "${target?.name || 'ambiente di test'}"? Verranno eliminati tutti i pazienti di questo ambiente di test.`)) return;
         setIsClearing(true);
         try {
@@ -115,13 +118,17 @@ export default function AmbulatoryManagerPage() {
         return roots;
     };
 
-    const AmbulatoryNode = ({ node, level = 0 }: { node: AmbulatoryNodeData, level?: number }) => (
+    const AmbulatoryNode = ({ node, level = 0 }: { node: AmbulatoryNodeData, level?: number }) => {
+        const parent = node.parentId ? ambulatoryById.get(node.parentId) : null;
+        const relationLabel = parent ? `Reparto di ${parent.name}` : 'Sede principale';
+
+        return (
         <div className="space-y-4">
             <div
                 role="treeitem"
                 aria-selected={node.isDefault}
                 className={cn(
-                    "bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 transition-all flex items-center justify-between shadow-sm relative",
+                    "bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 transition-all flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
                     node.isDefault ? "border-[color:rgba(15,123,104,0.38)] shadow-md ring-1 ring-[color:rgba(15,123,104,0.22)]" : "border-[color:rgba(112,106,100,0.14)]",
                     level > 0 && "ml-8 border-l-4 border-l-[color:rgba(15,123,104,0.18)]"
                 )}
@@ -131,48 +138,42 @@ export default function AmbulatoryManagerPage() {
                     <div className="absolute -left-8 top-1/2 w-8 h-px bg-[color:rgba(112,106,100,0.2)]"></div>
                 )}
 
-                <div className="space-y-1">
-                    <h3 className="text-lg font-semibold flex items-center gap-2 text-[color:var(--mf-ink)] dark:text-white">
-                        {node.name}
-                        {node.isDefault && <span className="bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] text-xs px-2 py-0.5 rounded-full border border-[color:rgba(15,123,104,0.22)]">Predefinito</span>}
+                <div className="min-w-0 space-y-2">
+                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)] dark:text-white">
+                        <span className="min-w-0 truncate">{node.name}</span>
+                        {node.isDefault && <span className="bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] text-xs px-2 py-0.5 rounded-full border border-[color:rgba(15,123,104,0.22)]">Predefinita</span>}
                         {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--mf-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:rgba(197,138,47,0.28)]">Test</span>}
                     </h3>
-                    {node.address && (
-                        <div className="text-sm text-[color:var(--mf-muted)] flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {node.address}
-                        </div>
-                    )}
-                    <div className="text-xs text-[color:var(--mf-muted)]/80 font-mono">
-                        ID: {node.id}
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[color:var(--mf-muted)]">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-2.5 py-1 dark:bg-white/5">
+                            <CornerDownRight className="h-3 w-3" />
+                            {relationLabel}
+                        </span>
+                        {node.address && (
+                            <span className="inline-flex min-w-0 items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">{node.address}</span>
+                            </span>
+                        )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     <button
                         onClick={() => handleAddChild(node.id)}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-[color:rgba(15,123,104,0.1)] hover:bg-[color:rgba(15,123,104,0.16)] text-[color:var(--mf-primary)] rounded-lg text-sm font-medium transition-colors mr-2 border border-[color:rgba(15,123,104,0.22)]"
-                        title="Aggiungi reparto"
-                        aria-label="Aggiungi reparto"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[color:rgba(15,123,104,0.1)] hover:bg-[color:rgba(15,123,104,0.16)] text-[color:var(--mf-primary)] rounded-lg text-sm font-medium transition-colors border border-[color:rgba(15,123,104,0.22)]"
+                        title={`Aggiungi reparto sotto ${node.name}`}
+                        aria-label={`Aggiungi reparto sotto ${node.name}`}
                     >
                         <Plus className="w-3.5 h-3.5" />
-                        Reparto
+                        Aggiungi reparto
                     </button>
                     <button
                         onClick={() => handleActivate(node.id)}
-                        className="px-3 py-1 bg-white/60 dark:bg-white/6 hover:bg-white/80 dark:hover:bg-white/10 border border-[color:rgba(112,106,100,0.14)] text-[color:var(--mf-ink)] rounded-lg text-sm font-medium transition-colors"
+                        disabled={node.isDefault}
+                        className="px-3 py-1.5 bg-white/60 dark:bg-white/6 hover:bg-white/80 dark:hover:bg-white/10 border border-[color:rgba(112,106,100,0.14)] text-[color:var(--mf-ink)] rounded-lg text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60"
                     >
-                        Attiva
+                        {node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}
                     </button>
-                    {!node.isDefault && (
-                        <button
-                            onClick={() => handleSetDefault(node.id)}
-                            title="Imposta come sede predefinita"
-                            aria-label="Imposta come sede predefinita"
-                            className="p-2 hover:bg-[color:rgba(15,123,104,0.1)] rounded-lg text-[color:var(--mf-muted)] hover:text-[color:var(--mf-primary)] transition-colors"
-                        >
-                            <Check className="w-5 h-5" />
-                        </button>
-                    )}
                     {node.type === 'test' && (
                         <button
                             onClick={() => handleClear(node.id)}
@@ -202,7 +203,8 @@ export default function AmbulatoryManagerPage() {
                 </div>
             )}
         </div>
-    );
+        );
+    };
 
     const handleDelete = async (id: string) => {
         if (!confirm("Sei sicuro? Questo potrebbe causare problemi ai pazienti associati.")) return;
@@ -259,7 +261,7 @@ export default function AmbulatoryManagerPage() {
                     <div>
                         <h3 className="text-xl font-bold text-[color:var(--mf-ink)] dark:text-white flex items-center gap-2">
                             Nuova sede o reparto
-                            {newParentId && <span className="text-sm font-normal bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] px-2 py-1 rounded-full flex items-center gap-1 border border-[color:rgba(15,123,104,0.22)]"><CornerDownRight className="w-3 h-3" /> Reparto di: {ambulatories.find(a => a.id === newParentId)?.name}</span>}
+                            {selectedParent && <span className="text-sm font-normal bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] px-2 py-1 rounded-full flex items-center gap-1 border border-[color:rgba(15,123,104,0.22)]"><CornerDownRight className="w-3 h-3" /> Reparto di: {selectedParent.name}</span>}
                         </h3>
                         <p className="text-sm text-[color:var(--mf-muted)]">Aggiungi una sede clinica o un reparto collegato a un contesto esistente.</p>
                     </div>

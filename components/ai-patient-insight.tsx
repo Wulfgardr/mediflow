@@ -11,6 +11,8 @@ import { useLiveQuery } from '@/lib/live-query';
 import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
 /* @Codex */
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
+/* @Codex */
+import { parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
     AiPatientInsightDisabledError,
@@ -19,6 +21,185 @@ import {
 
 interface AIPatientInsightProps {
     patient: Patient;
+}
+
+/* @Codex */
+type ReadableInsight =
+    | {
+        kind: 'structured';
+        summary: string;
+        alerts: string[];
+        nextSteps: string[];
+        gaps: string[];
+        sourcesMarkdown: string;
+        limitsMarkdown: string;
+    }
+    | {
+        kind: 'markdown';
+        markdown: string;
+        sourcesMarkdown: string;
+        limitsMarkdown: string;
+    }
+    | {
+        kind: 'unreadable';
+        reason: 'json-envelope' | 'empty';
+    };
+
+/* @Codex */
+const ENVELOPE_HINT_PATTERN = /["']?(?:choices|message|content|role|delta|object|schemaVersion|finish_reason)["']?\s*:/i;
+
+/* @Codex */
+function looksLikeJsonOrEnvelope(content: string): boolean {
+    const trimmed = content.trim();
+    if (!trimmed) return false;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) return true;
+    return ENVELOPE_HINT_PATTERN.test(trimmed.slice(0, 400));
+}
+
+/* @Codex */
+function deepFindReadableString(node: unknown, keys: string[], depth = 0): string | null {
+    if (depth > 6) return null;
+    if (typeof node === 'string') return null;
+    if (Array.isArray(node)) {
+        for (const item of node) {
+            const found = deepFindReadableString(item, keys, depth + 1);
+            if (found) return found;
+        }
+        return null;
+    }
+    if (node && typeof node === 'object') {
+        const record = node as Record<string, unknown>;
+        for (const key of keys) {
+            const value = record[key];
+            if (typeof value === 'string' && value.trim().length > 16) return value;
+        }
+        for (const value of Object.values(record)) {
+            const found = deepFindReadableString(value, keys, depth + 1);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+/* @Codex */
+function asStructured(
+    summary: string,
+    alerts: string[],
+    nextSteps: string[],
+    gaps: string[],
+    diagnostics: { sourcesMarkdown: string; limitsMarkdown: string },
+): ReadableInsight {
+    return {
+        kind: 'structured',
+        summary: summary.replace(/\n+/g, ' ').trim(),
+        alerts: alerts.filter((item) => item && item.trim().length > 0),
+        nextSteps: nextSteps.filter((item) => item && item.trim().length > 0),
+        gaps: gaps.filter((item) => item && item.trim().length > 0),
+        sourcesMarkdown: diagnostics.sourcesMarkdown,
+        limitsMarkdown: diagnostics.limitsMarkdown,
+    };
+}
+
+/* @Codex */
+function coerceInsightToReadable(rawSummary: string): ReadableInsight {
+    const content = (rawSummary || '').trim();
+    if (!content) return { kind: 'unreadable', reason: 'empty' };
+
+    const fromMarkdown = parsePatientInsight(content);
+    const diagnostics = splitInsightDiagnostics(content);
+    const hasStructured = Boolean(
+        fromMarkdown.summary ||
+        fromMarkdown.alerts.length ||
+        fromMarkdown.nextSteps.length ||
+        fromMarkdown.gaps.length,
+    );
+
+    if (hasStructured) {
+        return asStructured(
+            fromMarkdown.summary,
+            fromMarkdown.alerts,
+            fromMarkdown.nextSteps,
+            fromMarkdown.gaps,
+            diagnostics,
+        );
+    }
+
+    if (!looksLikeJsonOrEnvelope(content)) {
+        const mainMarkdown = diagnostics.mainMarkdown || fromMarkdown.fallbackMarkdown;
+        if (mainMarkdown.trim().length === 0) {
+            return { kind: 'unreadable', reason: 'empty' };
+        }
+        return {
+            kind: 'markdown',
+            markdown: mainMarkdown,
+            sourcesMarkdown: diagnostics.sourcesMarkdown,
+            limitsMarkdown: diagnostics.limitsMarkdown,
+        };
+    }
+
+    try {
+        const extraction = parsePatientInsightExtractionResponse(content);
+        const data = extraction.value.data;
+        const hasExtraction = Boolean(
+            data.currentState.length ||
+            data.alerts.length ||
+            data.nextSteps.length ||
+            data.gaps.length,
+        );
+
+        if (hasExtraction) {
+            return asStructured(
+                data.currentState.join(' '),
+                data.alerts,
+                data.nextSteps,
+                data.gaps,
+                diagnostics,
+            );
+        }
+
+        if (extraction.value.summary) {
+            return asStructured(extraction.value.summary, [], [], [], diagnostics);
+        }
+    } catch {
+        // fall through to free-text recovery
+    }
+
+    try {
+        const parsed = JSON.parse(content) as unknown;
+        const inner = deepFindReadableString(parsed, ['content', 'text', 'summary', 'output', 'value', 'markdown']);
+        if (inner) {
+            const innerStructured = parsePatientInsight(inner);
+            const innerDiagnostics = splitInsightDiagnostics(inner);
+            const innerHas = Boolean(
+                innerStructured.summary ||
+                innerStructured.alerts.length ||
+                innerStructured.nextSteps.length ||
+                innerStructured.gaps.length,
+            );
+            if (innerHas) {
+                return asStructured(
+                    innerStructured.summary,
+                    innerStructured.alerts,
+                    innerStructured.nextSteps,
+                    innerStructured.gaps,
+                    innerDiagnostics,
+                );
+            }
+            const innerMarkdown = innerDiagnostics.mainMarkdown || innerStructured.fallbackMarkdown;
+            if (innerMarkdown.trim().length > 0) {
+                return {
+                    kind: 'markdown',
+                    markdown: innerMarkdown,
+                    sourcesMarkdown: innerDiagnostics.sourcesMarkdown,
+                    limitsMarkdown: innerDiagnostics.limitsMarkdown,
+                };
+            }
+        }
+    } catch {
+        // payload was JSON-like but not valid JSON
+    }
+
+    return { kind: 'unreadable', reason: 'json-envelope' };
 }
 
 export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
@@ -32,18 +213,11 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
     const abortControllerRef = useRef<AbortController | null>(null);
     /* @Codex */
-    const parsedInsight = parsePatientInsight(patient.aiSummary || "");
+    const readable = coerceInsightToReadable(patient.aiSummary || '');
     /* @Codex */
-    const hasStructuredInsight = Boolean(
-        parsedInsight.summary ||
-        parsedInsight.alerts.length ||
-        parsedInsight.nextSteps.length ||
-        parsedInsight.gaps.length
+    const hasDiagnostics = readable.kind !== 'unreadable' && Boolean(
+        readable.sourcesMarkdown || readable.limitsMarkdown,
     );
-    /* @Codex */
-    const diagnostics = splitInsightDiagnostics(patient.aiSummary || '');
-    /* @Codex */
-    const hasDiagnostics = Boolean(diagnostics.sourcesMarkdown || diagnostics.limitsMarkdown);
     /* @Codex */
     const patientInsightEnabled = isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value);
 
@@ -142,10 +316,10 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         <AlertTriangle className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Funzione AI disattivata</p>
                         <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Patient Insight disabilitata</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia nuove generazioni finché il toggle non viene riattivato in Impostazioni.
+                            La funzione è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia nuove generazioni finché l&apos;interruttore non viene riattivato in Impostazioni.
                         </p>
                     </div>
 
@@ -240,7 +414,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
                             <p className="font-semibold">Patient Insight disabilitata localmente</p>
-                            <p className="mt-1">Puoi consultare l&apos;ultimo insight salvato, ma la rigenerazione resta bloccata finché non riattivi il toggle in Impostazioni.</p>
+                            <p className="mt-1">Puoi consultare l&apos;ultimo riepilogo salvato, ma la rigenerazione resta bloccata finché non riattivi l&apos;interruttore in Impostazioni.</p>
                         </div>
                     </div>
                 )}
@@ -267,15 +441,15 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             Interrompi
                         </button>
                     </div>
-                ) : hasStructuredInsight ? (
+                ) : readable.kind === 'structured' ? (
                     <div className="space-y-5">
-                        {parsedInsight.nextSteps.length > 0 && (
+                        {readable.nextSteps.length > 0 && (
                             <div className="rounded-[24px] bg-[color:rgba(15,123,104,0.08)] p-4 dark:bg-[color:rgba(15,123,104,0.12)]">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--mf-primary)]">
                                     Follow-up proposto
                                 </p>
                                 <div className="mt-3 space-y-2">
-                                    {parsedInsight.nextSteps.map((step, index) => (
+                                    {readable.nextSteps.map((step, index) => (
                                         <div
                                             key={`${index}-${step}`}
                                             className="flex gap-3 text-sm font-medium text-slate-800 dark:text-slate-100"
@@ -290,24 +464,24 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             </div>
                         )}
 
-                        {parsedInsight.summary && (
+                        {readable.summary && (
                             <div className="px-1">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                     Sintesi clinica
                                 </p>
                                 <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">
-                                    <PrivacyBlur intensity="sm">{parsedInsight.summary}</PrivacyBlur>
+                                    <PrivacyBlur intensity="sm">{readable.summary}</PrivacyBlur>
                                 </p>
                             </div>
                         )}
 
-                        {parsedInsight.alerts.length > 0 && (
+                        {readable.alerts.length > 0 && (
                             <div className="rounded-[24px] border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/10 dark:bg-amber-900/10">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">
                                     Attenzioni
                                 </p>
                                 <ul className="mt-3 space-y-2 text-sm font-medium text-amber-900 dark:text-amber-100">
-                                    {parsedInsight.alerts.map((item, index) => (
+                                    {readable.alerts.map((item, index) => (
                                         <li key={`${index}-${item}`} className="flex gap-2">
                                             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                                             <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
@@ -317,13 +491,13 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             </div>
                         )}
 
-                        {parsedInsight.gaps.length > 0 && (
+                        {readable.gaps.length > 0 && (
                             <div className="px-1">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                     Dati mancanti
                                 </p>
                                 <ul className="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
-                                    {parsedInsight.gaps.map((item, index) => (
+                                    {readable.gaps.map((item, index) => (
                                         <li key={`${index}-${item}`} className="flex gap-2">
                                             <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" />
                                             <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
@@ -333,11 +507,43 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             </div>
                         )}
                     </div>
-                ) : (
+                ) : readable.kind === 'markdown' ? (
                     <div className="prose prose-sm max-w-none rounded-[24px] border border-slate-200/50 bg-slate-50/30 p-4 text-slate-700 dark:border-white/5 dark:bg-white/5 dark:text-slate-300">
                         <PrivacyBlur>
-                            <ReactMarkdown>{diagnostics.mainMarkdown || parsedInsight.fallbackMarkdown}</ReactMarkdown>
+                            <ReactMarkdown>{readable.markdown}</ReactMarkdown>
                         </PrivacyBlur>
+                    </div>
+                ) : (
+                    <div
+                        className="rounded-[24px] border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/10 dark:bg-amber-900/10"
+                        data-testid="patient-insight-unreadable"
+                    >
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            <div className="min-w-0 space-y-1">
+                                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                                    {readable.reason === 'json-envelope'
+                                        ? 'Insight salvato non leggibile'
+                                        : 'Insight non ancora disponibile'}
+                                </p>
+                                <p className="text-xs leading-5 text-amber-900/80 dark:text-amber-100/80">
+                                    {readable.reason === 'json-envelope'
+                                        ? "Il supporto AI ha salvato una risposta in un formato che non possiamo mostrare in chiaro. Rigenera l'insight per ottenere sintesi, attenzioni e prossimi passi."
+                                        : "Avvia il supporto al ragionamento per produrre sintesi, attenzioni e prossimi passi."}
+                                </p>
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={generateInsight}
+                                        disabled={isGenerating || !patientInsightEnabled}
+                                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                                    >
+                                        <RefreshCw className="h-3 w-3" />
+                                        Rigenera
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -347,17 +553,17 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             Fonti e Avvisi
                         </summary>
                         <div className="p-4 pt-0 space-y-3 text-xs text-slate-500 dark:text-slate-400">
-                            {diagnostics.sourcesMarkdown && (
+                            {readable.sourcesMarkdown && (
                                 <div className="prose prose-xs max-w-none dark:prose-invert">
                                     <PrivacyBlur intensity="sm">
-                                        <ReactMarkdown>{diagnostics.sourcesMarkdown}</ReactMarkdown>
+                                        <ReactMarkdown>{readable.sourcesMarkdown}</ReactMarkdown>
                                     </PrivacyBlur>
                                 </div>
                             )}
-                            {diagnostics.limitsMarkdown && (
+                            {readable.limitsMarkdown && (
                                 <div className="prose prose-xs max-w-none dark:prose-invert border-t border-slate-200/50 pt-3 dark:border-white/5">
                                     <PrivacyBlur intensity="sm">
-                                        <ReactMarkdown>{diagnostics.limitsMarkdown}</ReactMarkdown>
+                                        <ReactMarkdown>{readable.limitsMarkdown}</ReactMarkdown>
                                     </PrivacyBlur>
                                 </div>
                             )}
