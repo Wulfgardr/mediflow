@@ -153,6 +153,11 @@ check, `PatientForm`, checkup persistence and therapy persistence remain the
 existing real flows; only the route-level frame and clinician-facing copy move
 to the Kree8 grammar.
 
+`/scales` now follows the same workspace rule for the global scale catalog. The
+route no longer presents mock or coming-soon scale cards: it derives the visible
+catalog from the real local `SCALES` registry, then asks for a patient inline
+before launching the patient-bound runner.
+
 - Area selection on the rail (`navItem`/`navSelected`), with a horizontal
   scroll-snap rail at narrow widths so the surface remains usable on tablets.
 - PIN unlock is visually part of the same app line: scoped lock surface,
@@ -199,8 +204,8 @@ to the Kree8 grammar.
 - Does not migrate all documents, therapies, diary or observations internals
   into the Kree8 grammar yet; those actions continue through the existing real
   patient components until their own slices. Patient creation, new diary entry,
-  patient scale picker/runner, edit and Cartella completa are already framed as
-  Kree8 workspaces.
+  global scale catalog, patient scale picker/runner, edit and Cartella completa
+  are already framed as Kree8 workspaces.
 - Does not change PIN/auth/session semantics or mount cockpit data behind the
   lock screen.
 - Does not introduce a new UI style key in `UIStyleProvider`.
