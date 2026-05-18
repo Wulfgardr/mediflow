@@ -89,7 +89,7 @@ export function LockScreen() {
                     <p className={styles.subtitle}>
                         {requiresSetup
                             ? 'Crea un PIN per proteggere la sessione locale e la master key.'
-                            : 'Sessione bloccata · inserisci il PIN per riprendere il turno.'}
+                            : 'Sessione bloccata · inserisci il PIN per riprendere il lavoro.'}
                     </p>
                 </div>
 

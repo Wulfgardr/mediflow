@@ -108,7 +108,7 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                     <p className="section-kicker">Agenda operativa</p>
                     <h2 className="flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)]">
                         <CalendarClock className="h-4 w-4 text-[color:var(--mf-accent)]" />
-                        Lavoro pianificato per i casi visibili
+                        Prossimi passaggi per i casi visibili
                     </h2>
                     <p className="text-[12px] text-[color:var(--mf-muted)]">
                         {overdueCount > 0 ? (
@@ -179,7 +179,7 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-[13px] font-semibold text-[color:var(--mf-ink)]">
-                                            {checkup.title || 'Lavoro pianificato'}
+                                            {checkup.title || 'Prossimo passaggio'}
                                         </p>
                                         <p className="truncate text-[11px] text-[color:var(--mf-muted)]">
                                             {patientLabel}

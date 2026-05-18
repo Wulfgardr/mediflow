@@ -132,7 +132,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
             {fields.length === 0 && (
                 <div className="mf-section mf-section-tight flex flex-col items-center justify-center py-8 px-6 border-dashed text-center">
                     <Calendar className="w-7 h-7 mb-2" style={{ color: 'var(--mf-muted)' }} />
-                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessun lavoro pianificato.</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessun passaggio programmato.</p>
                     <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
                 </div>
             )}
@@ -161,7 +161,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                             </div>
 
                             <div className="flex-1 w-full">
-                                <label className="mf-field-label">Lavoro pianificato</label>
+                                <label className="mf-field-label">Prossimo passaggio</label>
                                 <input
                                     {...register(`checkups.${index}.title`)}
                                     placeholder="Es. PRIAMO, valutazione ADL, visita programmata, ECG..."
@@ -373,7 +373,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                     <div>
                         <p className="mf-eyebrow">Agenda clinica</p>
-                        <h3 className={FORM_TITLE_CLASS}>Lavoro pianificato</h3>
+                        <h3 className={FORM_TITLE_CLASS}>Prossimi passaggi</h3>
                         <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>PRIAMO, valutazioni, visite programmate, follow-up.</p>
                     </div>
                 </div>

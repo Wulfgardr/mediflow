@@ -26,6 +26,11 @@ function isKree8PatientRoute(pathname: string | null): boolean {
   return Boolean(patientSegment && patientSegment !== 'new' && !patientSegment.includes('/'));
 }
 
+function isKree8PatientWorkspaceRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return /^\/patients\/[^/]+\/modules$/.test(pathname);
+}
+
 export function RootRuntimeShell({
   children,
   fingerprint,
@@ -37,7 +42,8 @@ export function RootRuntimeShell({
 
   const isFullscreenLiveRoute =
     FULLSCREEN_LIVE_ROUTES.has(pathname)
-    || isKree8PatientRoute(pathname);
+    || isKree8PatientRoute(pathname)
+    || isKree8PatientWorkspaceRoute(pathname);
 
   if (MOCKUP_ROUTE_ALLOWLIST.has(pathname)) {
     return <>{children}</>;

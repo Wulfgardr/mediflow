@@ -19,6 +19,8 @@ import SissHandoffDiary from '@/components/siss-handoff-diary';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
 import Timeline from '@/components/timeline';
+import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { db, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
@@ -81,7 +83,17 @@ export default function PatientDetailPage() {
     );
 
     if (!patient) {
-        return <div className="p-8 text-center text-gray-500">Caricamento cartella paziente...</div>;
+        return (
+            <Kree8WorkspaceShell
+                eyebrow="Scheda paziente"
+                title="Cartella completa"
+                subtitle="Caricamento della cartella locale in corso."
+                backHref="/"
+                backLabel="Torna ai pazienti"
+            >
+                <div className={workspaceStyles.loadingCard}>Caricamento cartella paziente...</div>
+            </Kree8WorkspaceShell>
+        );
     }
 
     const diagnosisItems = Array.isArray(patient.diagnoses) ? patient.diagnoses : [];
@@ -111,6 +123,15 @@ export default function PatientDetailPage() {
             : patient.isArchived
                 ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
                 : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
+    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
+        { href: '#contesto', label: 'Contesto', meta: 'SISS' },
+        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
+        { href: '#terapie', label: 'Terapie' },
+        { href: '#osservazioni', label: 'Osservazioni' },
+        { href: '#documenti', label: 'Documenti', meta: String(documentInsights.length) },
+        { href: '#scale', label: 'Scale' },
+        { href: '#passaggi', label: 'Passaggi', meta: String((checkups ?? []).length) },
+    ];
 
     const handleExportConfirm = async () => {
         try {
@@ -206,29 +227,18 @@ export default function PatientDetailPage() {
     );
 
     return (
-        <div className="space-y-4">
-            <div className="patient-detail-section border p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <p className="section-kicker">Scheda paziente</p>
-                        <h1 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            Vista completa
-                        </h1>
-                        <p className="mt-1 text-sm text-[color:var(--mf-muted)]">
-                            Tutta la scheda paziente in un&apos;unica vista densa. Stessi dati, layout esteso per le sessioni più lunghe.
-                        </p>
-                    </div>
-                    <Link
-                        href={`/patients/${id}`}
-                        className="ui-btn-primary inline-flex h-10 items-center justify-center gap-2 px-4 text-sm font-semibold"
-                    >
-                        <Activity className="h-4 w-4" />
-                        Torna alla scheda
-                    </Link>
-                </div>
-            </div>
-
+        <Kree8WorkspaceShell
+            eyebrow="Scheda paziente"
+            title="Cartella completa"
+            subtitle="Tutta la cartella nello stesso spazio di lavoro. Stessi dati della scheda, ordinati per lavorarci dentro."
+            backHref={`/patients/${id}`}
+            backLabel="Torna alla scheda"
+            patientLabel={`${patient.lastName} ${patient.firstName}`}
+            statusLabel={`${nonScaleEntries.length} eventi · ${(checkups ?? []).length} prossimi passaggi · ${documentInsights.length} evidenze`}
+            navItems={workspaceNavItems}
+        >
             <PatientIdentityLens
+                variant="reader"
                 patient={patient}
                 ageLabel={ageLabel}
                 birthDateLabel={birthDateLabel}
@@ -240,16 +250,18 @@ export default function PatientDetailPage() {
                 nextStep={nextStepText}
             />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.92fr)] xl:gap-5">
-                <div className="space-y-4">
-                    <SissPatientContextPanel
-                        patientId={id}
-                        patientTaxCode={patient.taxCode}
-                    />
+            <div className={workspaceStyles.workspaceGrid}>
+                <div className={workspaceStyles.primaryStack}>
+                    <div id="contesto" className={workspaceStyles.anchorStack}>
+                        <SissPatientContextPanel
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                        />
 
-                    <SissHandoffDiary patientId={id} />
+                        <SissHandoffDiary patientId={id} />
+                    </div>
 
-                    <section className="patient-detail-section border p-5 md:p-6">
+                    <section id="timeline" className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Timeline</p>
@@ -271,9 +283,13 @@ export default function PatientDetailPage() {
                         />
                     </section>
 
-                    <TherapyManager patientId={id} />
+                    <div id="terapie" className={workspaceStyles.anchorStack}>
+                        <TherapyManager patientId={id} />
+                    </div>
 
-                    <ObservationManager patientId={id} />
+                    <div id="osservazioni" className={workspaceStyles.anchorStack}>
+                        <ObservationManager patientId={id} />
+                    </div>
 
                     <ProstheticPrescriptionManager patientId={id} />
 
@@ -283,7 +299,7 @@ export default function PatientDetailPage() {
                                 <p className="section-kicker">Diario clinico</p>
                                 <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
                                     <FileText className="h-5 w-5 text-[color:var(--mf-muted)]" />
-                                    Clinical notes
+                                    Diario clinico
                                 </h2>
                             </div>
                             <span className="apple-chip self-start md:self-auto">{nonScaleEntries.length} voci attive</span>
@@ -292,14 +308,14 @@ export default function PatientDetailPage() {
                     </section>
                 </div>
 
-                <div className="space-y-4">
+                <div className={workspaceStyles.secondaryStack}>
                     <AIPatientInsight patient={patient} />
 
-                    <section className="patient-detail-side-section border p-5">
+                    <section id="documenti" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Evidence Stack</p>
+                            <p className="section-kicker">Evidenze</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                Referti, note ed evidenze recenti
+                                Referti e note recenti
                             </h3>
                         </div>
 
@@ -321,12 +337,12 @@ export default function PatientDetailPage() {
                     <PatientSmartImportPanel patient={patient} entries={entries} />
                     <DocumentInsightsPanel patient={patient} />
 
-                    <section className="patient-detail-side-section border p-5">
+                    <section id="scale" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Strumenti di scheda</p>
+                            <p className="section-kicker">Scale</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 <Activity className="h-5 w-5 text-[color:var(--mf-primary)]" />
-                                Valutazioni rapide
+                                Scale di valutazione
                             </h3>
                         </div>
                         <div className="space-y-3">
@@ -354,25 +370,25 @@ export default function PatientDetailPage() {
 
                     <section className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Archivio paziente</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Documenti e referti</h3>
+                            <p className="section-kicker">Documenti</p>
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Documenti del paziente</h3>
                         </div>
                         <DocumentUpload patientId={id} />
                     </section>
 
-                    <section className="patient-detail-side-section border p-5">
+                    <section id="passaggi" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Pianificazione</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 <Calendar className="h-5 w-5 text-[color:var(--mf-accent)]" />
-                                Lavoro pianificato
+                                Prossimi passaggi
                             </h3>
                             <p className="mt-1 text-xs text-[color:var(--mf-muted)]">PRIAMO, valutazioni, visite, follow-up.</p>
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
-                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun lavoro pianificato.</p>
+                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun passaggio programmato.</p>
                                 <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-primary)] hover:underline">
                                     Aggiungi pianificazione
                                 </Link>
@@ -408,6 +424,6 @@ export default function PatientDetailPage() {
                 patientName={`${patient.firstName} ${patient.lastName}`}
                 actionType="export"
             />
-        </div>
+        </Kree8WorkspaceShell>
     );
 }

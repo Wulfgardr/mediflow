@@ -168,7 +168,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                         <Sparkles className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--mf-plum)]">Clinical Reasoning Support</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--mf-plum)]">Supporto clinico</p>
                         <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Genera supporto di ragionamento clinico</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                             Ottieni sintesi, red flag, dati mancanti e follow-up suggeriti senza trasformare la scheda in una chat generica.
@@ -202,7 +202,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Clinical Reasoning Support</h3>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3>
                             {modelLabel && (
                                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel}</p>
                             )}

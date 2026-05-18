@@ -1649,7 +1649,7 @@ function IncaricoArea({
             </button>
             <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
               <ArrowUpRight size={12} />
-              Vista completa
+              Cartella completa
             </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
               <FileText size={12} />
@@ -1712,7 +1712,7 @@ function RealPatientArea({
             <Edit3 size={12} /> Anagrafica
           </Link>
           <Link href={patient.modulesHref} className={styles.primaryBtn}>
-            <UserSquare2 size={13} /> Vista completa
+            <UserSquare2 size={13} /> Cartella completa
           </Link>
         </div>
       </header>
@@ -1898,7 +1898,7 @@ function RealPatientArea({
               </button>
               <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
-                Vista completa
+                Cartella completa
               </Link>
             </div>
           </div>
@@ -2104,7 +2104,7 @@ function SchedaArea({
       <div className={styles.threeCol}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Evidence Stack</h2>
+            <h2 className={styles.panelTitle}>Evidenze recenti</h2>
             <PillBadge variant="muted">5 fonti</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>Referti, note ed evidenze recenti citabili.</p>
@@ -2173,7 +2173,7 @@ function SchedaArea({
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Lavoro pianificato</h2>
+            <h2 className={styles.panelTitle}>Prossimi passaggi</h2>
             <PillBadge variant="muted">3 attività</PillBadge>
           </header>
           {[
@@ -2193,7 +2193,7 @@ function SchedaArea({
             },
             {
               icon: <ListChecks size={14} />,
-              title: 'Valutazioni rapide',
+              title: 'Scale e misure',
               sub: 'Tinetti · MMSE in finestra di rivalutazione',
               tag: 'Scales',
               variant: 'muted' as const,
@@ -2251,7 +2251,7 @@ function LiveDocumentReviewArea({
           {patient ? (
             <Link href={patient.modulesHref} className={styles.primaryBtn}>
               <ArrowUpRight size={13} />
-              Vista completa
+              Cartella completa
             </Link>
           ) : null}
         </div>
@@ -2664,7 +2664,7 @@ function LiveGovernanceArea({
             <h2 className={styles.panelTitle}>Sessione</h2>
             <PillBadge variant="green">attiva</PillBadge>
           </header>
-          <p className={styles.panelSubtitle}>{patientCount} pazienti disponibili nel turno corrente.</p>
+          <p className={styles.panelSubtitle}>{patientCount} pazienti disponibili in elenco.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
