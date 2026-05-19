@@ -509,7 +509,7 @@ export default function SettingsPage() {
         { href: '#account', label: 'Account', meta: 'profilo' },
         { href: '#ai', label: 'AI locale', meta: 'modelli' },
         { href: '#backups', label: 'Backup', meta: 'archivi' },
-        { href: '#data', label: 'Cataloghi', meta: 'farmaci' },
+        { href: '#data', label: 'Repertori', meta: 'AIFA/esenzioni' },
         { href: '#operations', label: 'Servizi', meta: 'locale' },
         { href: '#appearance', label: 'Lettura', meta: 'tema' },
     ];
@@ -518,7 +518,7 @@ export default function SettingsPage() {
         <Kree8WorkspaceShell
             eyebrow="Sistema"
             title="Impostazioni"
-            subtitle="Accesso, AI locale, backup, cataloghi e servizi del Mac che ospita MediFlow."
+            subtitle="Accesso, AI locale, backup, repertori e servizi del Mac che ospita MediFlow."
             backHref="/"
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."
@@ -1276,12 +1276,12 @@ export default function SettingsPage() {
                         </div>
                     </section>
 
-                    {/* === Cataloghi === */}
+                    {/* === Repertori === */}
                     <section id="data" className="space-y-4 scroll-mt-24">
                         <SettingsSectionIntro
-                            kicker="Cataloghi"
-                            title="Farmaci ed esenzioni"
-                            description="Database locali per il prescrittore. Importa e aggiorna senza rete."
+                            kicker="Repertori"
+                            title="Farmaci AIFA ed esenzioni"
+                            description="Repertori locali per la cartella: farmaci AIFA ed esenzioni consultabili anche senza rete."
                         />
 
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

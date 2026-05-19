@@ -251,6 +251,10 @@
 .workspaceBody { flex: 0 0 auto; }
 .anchorStack { scroll-margin-top: 132px; }
 
+.workspaceBody :global(section[id]) {
+  scroll-margin-top: 164px;
+}
+
 .workspaceGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.64fr) minmax(320px, 0.9fr);
@@ -430,6 +434,7 @@
   .shell { padding: 8px; }
   .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
   .chrome { border-radius: 14px; padding: 12px; }
+  .workspaceBody :global(section[id]) { scroll-margin-top: 196px; }
   .backButton { max-width: 100%; width: 100%; justify-content: center; }
   .title { font-size: 18px; }
   .patientLabel { font-size: 12px; }

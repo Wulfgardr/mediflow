@@ -85,14 +85,14 @@ export default function ExemptionDbManager() {
     };
 
     const handleClear = async () => {
-        if (!confirm('Vuoi davvero svuotare l\'intero catalogo esenzioni?')) return;
+        if (!confirm('Vuoi davvero svuotare l\'intero repertorio esenzioni?')) return;
         try {
             await clearExemptionDatabase();
             await refreshStats();
-            setMessage({ type: 'success', text: 'Catalogo esenzioni svuotato.' });
+            setMessage({ type: 'success', text: 'Repertorio esenzioni svuotato.' });
         } catch (error) {
             console.error('Failed to clear exemptions', error);
-            setMessage({ type: 'error', text: 'Impossibile svuotare il catalogo esenzioni.' });
+            setMessage({ type: 'error', text: 'Impossibile svuotare il repertorio esenzioni.' });
         }
     };
 
@@ -105,9 +105,9 @@ export default function ExemptionDbManager() {
                     <Database className="w-6 h-6" />
                 </div>
                 <div>
-                    <p className="section-kicker">Catalogo amministrativo</p>
+                    <p className="section-kicker">Repertorio amministrativo</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Codifiche Esenzioni</h2>
-                    <p className="text-xs text-gray-500">Catalogo locale per ricerca rapida in anagrafica paziente.</p>
+                    <p className="text-xs text-gray-500">Repertorio locale per ricerca rapida in anagrafica paziente.</p>
                 </div>
             </div>
 
@@ -204,7 +204,7 @@ export default function ExemptionDbManager() {
                     className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs text-red-500 hover:text-red-700 dark:bg-red-900/10"
                 >
                     <Trash2 className="w-3 h-3" />
-                    Svuota catalogo
+                    Svuota repertorio
                 </button>
             </div>
         </div>
