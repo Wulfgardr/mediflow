@@ -225,7 +225,7 @@ const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] 
   { id: 'scheda', label: 'Quadro paziente', icon: UserSquare2 },
   { id: 'diario', label: 'Diario', icon: FileText },
   { id: 'revisione', label: 'Documenti', icon: FileSearch },
-  { id: 'cataloghi', label: 'Cataloghi', icon: Database },
+  { id: 'cataloghi', label: 'Repertori', icon: Database },
   { id: 'handoff', label: 'SISS e portali', icon: Workflow },
   { id: 'governance', label: 'Impostazioni', icon: SettingsIcon },
 ];
@@ -327,6 +327,9 @@ const DOC_FIELDS: {
 type Kree8CatalogFreshness = 'fresh' | 'ok' | 'stale' | 'broken' | 'off';
 
 /* @Codex */
+type Kree8CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/* @Codex */
 type Kree8CatalogRow = {
   id: string;
   name: string;
@@ -339,7 +342,7 @@ type Kree8CatalogRow = {
 
 /* @Codex */
 type Kree8CatalogClientState = {
-  status: Kree8PatientStatus;
+  status: Kree8CatalogStatus;
   rows: Kree8CatalogRow[];
   indexedCount: number;
 };
@@ -2477,9 +2480,9 @@ function LiveDocumentReviewArea({
           <span className={classNames(styles.statTrend, styles.statTrendMuted)}>da confermare</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Cataloghi</span>
+          <span className={styles.statLabel}>Repertori</span>
           <span className={styles.statValue}>3</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, ICD, esenzioni</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, esenzioni, ICD</span>
         </div>
       </div>
 
@@ -2534,7 +2537,7 @@ function LiveDocumentReviewArea({
           <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('cataloghi')}>
               <Database size={12} />
-              Cataloghi
+              Repertori
             </button>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
               <UserSquare2 size={12} />
@@ -2737,7 +2740,7 @@ function LiveHandoffArea({
         <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
           <Link href="/settings#data" className={styles.ghostBtnSm}>
             <Database size={12} />
-            Verifica cataloghi
+            Gestisci repertori
           </Link>
           {patient ? (
             <Link href={patient.href} className={styles.ghostBtnSm}>
@@ -2838,7 +2841,7 @@ function LiveGovernanceArea({
     },
     {
       href: '/settings#data',
-      title: 'Cataloghi clinici',
+      title: 'Repertori clinici',
       sub: 'AIFA, ICD ed esenzioni locali',
       icon: Database,
       pill: 'dati locali',
@@ -3292,15 +3295,15 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
     catalogState?.status === 'error' ? 'broken' : needsImport ? 'stale' : 'fresh';
   const freshnessTitle =
     catalogState?.status === 'error'
-      ? 'Cataloghi non leggibili'
+      ? 'Repertori non leggibili'
       : needsImport
-        ? 'Import cataloghi incompleto'
-        : 'Cataloghi disponibili';
+        ? 'Import repertori incompleto'
+        : 'Repertori disponibili';
   const freshnessPct = catalogs.length
     ? Math.round((availableCatalogs / catalogs.length) * 100)
     : isLoading
       ? 0
-      : 8;
+      : 0;
   const freshnessClass = classNames(
     styles.freshness,
     freshnessTier === 'stale' && styles.freshnessStale,
@@ -3318,12 +3321,13 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Cataloghi · dati indicizzati</p>
+          <p className={styles.areaCaption}>Repertori clinici · AIFA, esenzioni, ICD</p>
           <h1 className={styles.areaTitle}>
-            Stato cataloghi <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
+            AIFA, esenzioni e ICD <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Accesso rapido allo stato locale di AIFA, esenzioni e ICD dal turno.
+            Accesso rapido ai repertori che servono durante la cartella: farmaci AIFA,
+            codici esenzione e diagnostica ICD.
             Import e cancellazioni restano nelle impostazioni complete, con azione
             esplicita dell&apos;operatore.
           </p>
@@ -3331,7 +3335,7 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
         <div className={styles.headerActions}>
           <Link href="/settings#data" className={styles.ghostBtn}>
             <Database size={13} />
-            Impostazioni cataloghi
+            Gestisci repertori
           </Link>
         </div>
       </header>
@@ -3354,15 +3358,15 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
           {catalogState?.status === 'error'
             ? 'Impossibile leggere i conteggi locali in questa sessione.'
             : selectedCatalog
-              ? `Catalogo selezionato: ${selectedCatalog.name}.`
-              : 'Caricamento stato cataloghi locali.'}
+              ? `Repertorio selezionato: ${selectedCatalog.name}.`
+              : 'Caricamento stato repertori locali.'}
         </p>
       </section>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Cataloghi clinici</h2>
-          <PillBadge variant="muted">{catalogs.length} pacchetti</PillBadge>
+          <h2 className={styles.panelTitle}>Repertori rapidi</h2>
+          <PillBadge variant="muted">AIFA · esenzioni · ICD</PillBadge>
           <span className={styles.panelActions}>
             <PillBadge variant="green">servizi locali</PillBadge>
           </span>
@@ -3401,19 +3405,19 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
                 <button
                   type="button"
                   className={styles.ghostBtnSm}
-                  aria-label={`Apri catalogo ${c.name}`}
+                  aria-label={`Mostra dettaglio repertorio ${c.name}`}
                   onClick={() => {
                     setSelectedCatalogId(c.id);
                   }}
                 >
-                  Apri
+                  Dettagli
                   <ChevronRight size={13} />
                 </button>
               </div>
             );
           })}
           {!catalogs.length ? (
-            <p className={styles.panelSubtitle}>Caricamento cataloghi locali.</p>
+            <p className={styles.panelSubtitle}>Caricamento repertori locali.</p>
           ) : null}
         </div>
         {selectedCatalog && (
