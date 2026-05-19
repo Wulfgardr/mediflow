@@ -956,7 +956,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
       freshness: catalogFreshnessFromCount(drugCount),
       age: formatCatalogCount(drugCount, 'farmaco', 'farmaci'),
       href: '/settings#data',
-      actionLabel: drugCount > 0 ? 'Gestisci' : 'Importa',
+      actionLabel: drugCount > 0 ? 'Impostazioni' : 'Importa',
     },
     {
       id: 'exemptions',
@@ -967,7 +967,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
       freshness: catalogFreshnessFromCount(exemptionCount),
       age: formatCatalogCount(exemptionCount, 'codice', 'codici'),
       href: '/settings#data',
-      actionLabel: exemptionCount > 0 ? 'Gestisci' : 'Importa',
+      actionLabel: exemptionCount > 0 ? 'Impostazioni' : 'Importa',
     },
     {
       id: 'icd',
@@ -2478,8 +2478,8 @@ function LiveDocumentReviewArea({
         </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Cataloghi</span>
-          <span className={styles.statValue}>4</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, ICD, esenzioni, LOINC</span>
+          <span className={styles.statValue}>3</span>
+          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, ICD, esenzioni</span>
         </div>
       </div>
 
@@ -3323,14 +3323,15 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
             Stato cataloghi <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Stato reale dei cataloghi clinici locali. Import e cancellazioni restano
-            nelle impostazioni complete, con azione esplicita dell&apos;operatore.
+            Accesso rapido allo stato locale di AIFA, esenzioni e ICD dal turno.
+            Import e cancellazioni restano nelle impostazioni complete, con azione
+            esplicita dell&apos;operatore.
           </p>
         </div>
         <div className={styles.headerActions}>
-          <Link href="/settings#data" className={styles.primaryBtn}>
+          <Link href="/settings#data" className={styles.ghostBtn}>
             <Database size={13} />
-            Gestisci cataloghi
+            Impostazioni cataloghi
           </Link>
         </div>
       </header>
