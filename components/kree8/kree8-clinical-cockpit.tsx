@@ -1210,7 +1210,7 @@ function Toolbar({
         aria-label="Apri la ricerca nella lista pazienti"
       >
         <Search size={14} />
-        <span>Cerca paziente</span>
+        <span>Cerca nella lista pazienti</span>
       </button>
       {activeArea === 'turno' ? STATUS_FILTERS.map((f) => (
           <button
