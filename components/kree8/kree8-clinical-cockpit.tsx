@@ -313,13 +313,13 @@ const DOC_FIELDS: {
   },
   {
     id: 'siss',
-    label: 'Trasmissione SISS automatica',
-    value: '—',
+    label: 'Passaggio SISS',
+    value: 'Da completare nel portale ufficiale',
     kind: 'blocked',
     evidence: '—',
     sourceHint: '',
     blockedReason:
-      'Nessun canale A2A SISS certificato. Solo portale ufficiale + registrazione manuale dell’esito.',
+      'Apri il portale ufficiale e registra qui l’esito riportato dal portale.',
   },
 ];
 
@@ -3108,7 +3108,7 @@ function RevisioneArea() {
           </span>
           <span className={styles.docCounter}>
             <AlertTriangle size={11} color="var(--pill-coral-fg)" />
-            <b>{blocked}</b> non integrabile ora
+            <b>{blocked}</b> solo portale ufficiale
           </span>
         </div>
       </section>
@@ -3163,7 +3163,7 @@ function RevisioneArea() {
                   ? 'campo aggiornabile'
                   : f.kind === 'note'
                     ? 'solo nota'
-                    : 'non integrabile ora';
+                    : 'solo portale ufficiale';
               return (
                 <div key={f.id} className={styles.fieldRow}>
                   <div className={styles.fieldHead}>
@@ -3498,23 +3498,23 @@ const LAUNCHERS: {
 const BLOCKED_CAPS: { id: string; label: string; reason: string }[] = [
   {
     id: 'prescr-native',
-    label: 'Prescrittivo nativo',
-    reason: 'Richiede SSI qualificata + canale A2A non ancora autorizzato.',
+    label: 'Prescrizione diretta',
+    reason: 'La prescrizione si completa sul Modulo Prescrittivo Regionale ufficiale.',
   },
   {
     id: 'fse-embedded',
-    label: 'FSE embedded',
-    reason: 'Nessuno stack regionale certificato per viewer FSE in-app.',
+    label: 'Consultazione FSE dentro MediFlow',
+    reason: 'Il fascicolo va consultato nel portale FSE regionale ufficiale.',
   },
   {
     id: 'sgdt',
     label: 'SGDT / PAI',
-    reason: 'Centralizzato regionale · nessun punto d’integrazione paziente-scope.',
+    reason: 'SGDT e PAI restano nel portale regionale centralizzato.',
   },
   {
     id: 'certificati',
     label: 'Certificati di malattia',
-    reason: 'Modellazione SISS non completa · resta sul portale ufficiale.',
+    reason: 'I certificati si emettono nel portale INPS/SISS ufficiale.',
   },
 ];
 
@@ -3526,14 +3526,14 @@ function HandoffArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Portali regionali (SISS) · prototipo contestuale</p>
+          <p className={styles.areaCaption}>Portali regionali (SISS)</p>
           <h1 className={styles.areaTitle}>
-            Webapp regionali ufficiali <em>· nessun modulo SISS nativo</em>
+            Apri il portale con il paziente pronto <em>· atto ufficiale sul portale</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Passaggi chiari fra identità, consenso, apertura del portale
-            ufficiale e registrazione manuale dell&apos;esito. Nessuna
-            integrazione SISS nativa certificata oggi.
+            MediFlow prepara identità, consenso e codice fiscale, poi apre il
+            portale regionale corretto. L&apos;atto certificato si completa sul
+            portale ufficiale e l&apos;esito viene annotato qui.
           </p>
         </div>
       </header>
@@ -3542,13 +3542,13 @@ function HandoffArea() {
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Portali disponibili</h2>
           <span className={styles.panelActions}>
-            <PillBadge variant="muted">5 webapp ufficiali</PillBadge>
+            <PillBadge variant="muted">5 portali ufficiali</PillBadge>
             <PillBadge variant="green">CF pronto · solo copia-incolla</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Apertura assistita delle webapp ufficiali. Il CF del paziente è
-          preparato negli appunti per il copia-incolla.
+          Scegli il portale da aprire: il codice fiscale è preparato per il
+          copia-incolla nella sessione regionale.
         </p>
         <div className={styles.launcherGrid}>
           {LAUNCHERS.map((l) => (
@@ -3569,7 +3569,7 @@ function HandoffArea() {
               <div className={styles.launcherTileFoot}>
                 <PillBadge variant="muted">CF pronto</PillBadge>
                 <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                  Apri passaggio <ArrowUpRight size={11} />
+                  Apri portale <ArrowUpRight size={11} />
                 </span>
               </div>
             </button>
@@ -3582,6 +3582,9 @@ function HandoffArea() {
           <h2 className={styles.panelTitle}>Passaggi SISS</h2>
           <PillBadge variant="muted">{currentIndex + 1} di {STAGES.length}</PillBadge>
         </header>
+        <p className={styles.panelSubtitle}>
+          Identità, consenso, portale ufficiale e nota di esito restano in una sequenza unica.
+        </p>
 
         <div className={styles.stageRow}>
           <span key={stage} className={styles.stageRowSweep} aria-hidden />
@@ -3636,16 +3639,16 @@ function HandoffArea() {
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Funzioni non disponibili in MediFlow</h2>
+          <h2 className={styles.panelTitle}>Azioni da completare sul portale ufficiale</h2>
           <span className={styles.panelActions}>
             <PillBadge variant="coral">
-              <AlertTriangle size={11} /> scelta dichiarata
+              <AlertTriangle size={11} /> da ricordare
             </PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
-          Confine dichiarato: senza SSI qualificata o stack regionale certificato
-          MediFlow non re-implementa queste capacità.
+          MediFlow prepara il passaggio e tiene traccia dell&apos;esito; le azioni
+          certificate restano nei portali regionali o INPS.
         </p>
         <div className={styles.launcherGrid}>
           {BLOCKED_CAPS.map((c) => (
@@ -3654,7 +3657,7 @@ function HandoffArea() {
                 <AlertTriangle size={14} color="var(--pill-coral-fg)" />
                 <span className={styles.evidenceTitle}>{c.label}</span>
                 <span style={{ marginLeft: 'auto' }}>
-                  <PillBadge variant="coral">non integrabile ora</PillBadge>
+                  <PillBadge variant="coral">solo portale ufficiale</PillBadge>
                 </span>
               </div>
               <p className={styles.launcherTileBody}>{c.reason}</p>
@@ -3745,10 +3748,9 @@ function HandoffStageBody({
           </span>
         </header>
         <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
-          MediFlow non re-implementa il portale regionale: apre il portale
-          ufficiale con scope ridotti e l&apos;esito viene registrato
-          manualmente dall&apos;operatore. Nessun viewer FSE embedded, nessun
-          modulo prescrittivo interno.
+          MediFlow apre il portale ufficiale con il contesto del paziente già
+          preparato. Dopo l&apos;azione sul portale, registra qui l&apos;esito e
+          l&apos;eventuale riferimento riportato dall&apos;operatore.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className={styles.primaryBtn} onClick={onAdvance}>
@@ -3774,16 +3776,14 @@ function HandoffStageBody({
         <Check size={16} color="var(--ink-muted)" />
         <h3 className={styles.panelTitle}>Esito registrato manualmente</h3>
         <span style={{ marginLeft: 'auto' }}>
-          <PillBadge variant="yellow">esito manuale · non certificato</PillBadge>
+          <PillBadge variant="yellow">esito registrato a mano</PillBadge>
         </span>
       </header>
       <div className={styles.outcomeCapsule}>
         <AlertTriangle size={14} color="var(--rail-yellow)" />
         <span className={styles.outcomeText}>
-          <b>Nessun artefatto di ritorno certificato.</b> L&apos;esito del
-          portale viene <b>annotato manualmente</b> dall&apos;operatore: numero
-          di ricetta, NRE o riferimento incollati dal portale. MediFlow non
-          riceve oggi ricevute firmate XML né payload A2A SISS.
+          <b>Il portale non rimanda una conferma automatica a MediFlow.</b>
+          Numero di ricetta, NRE o altro riferimento vanno riportati qui a mano.
         </span>
       </div>
       <dl className={styles.stagePanelKv}>
