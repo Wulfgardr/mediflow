@@ -2858,7 +2858,7 @@ function LiveGovernanceArea({
     {
       href: '/settings#appearance',
       title: 'Lettura e accessibilità',
-      sub: 'riduzione movimento, leggibilità e stile UI',
+      sub: 'riduzione movimento, leggibilità e aspetto',
       icon: SettingsIcon,
       pill: 'preferenze',
       variant: 'yellow',
@@ -2892,7 +2892,7 @@ function LiveGovernanceArea({
             <h2 className={styles.panelTitle}>Audit</h2>
             <PillBadge variant="muted">locale</PillBadge>
           </header>
-          <p className={styles.panelSubtitle}>Eventi append-only consultabili dalle impostazioni di sistema.</p>
+          <p className={styles.panelSubtitle}>Registro locale consultabile dalle impostazioni di sistema.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -2907,12 +2907,12 @@ function LiveGovernanceArea({
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Apri una sezione precisa</h2>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">nessun controllo distruttivo qui</PillBadge>
+            <PillBadge variant="green">nessuna modifica diretta qui</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
           Ogni voce apre direttamente la sezione di impostazioni dove si cambia
-          configurazione, si importano cataloghi o si avvia un controllo.
+          configurazione, si importano repertori o si avvia un controllo.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
           {settingsLinks.map((item) => {
@@ -3782,17 +3782,17 @@ function HandoffStageBody({
       <div className={styles.outcomeCapsule}>
         <AlertTriangle size={14} color="var(--rail-yellow)" />
         <span className={styles.outcomeText}>
-          <b>Il portale non rimanda una conferma automatica a MediFlow.</b>
+          <b>Il portale non rimanda una conferma automatica a MediFlow.</b>{' '}
           Numero di ricetta, NRE o altro riferimento vanno riportati qui a mano.
         </span>
       </div>
       <dl className={styles.stagePanelKv}>
-        <dt>Correlation id</dt>
+        <dt>Riferimento interno</dt>
         <dd><code>hndoff-2026-05-15-7a3c</code></dd>
         <dt>Esito riportato</dt>
         <dd>Prescrizione emessa · NRE incollato manualmente</dd>
-        <dt>Trace locale</dt>
-        <dd>evento <code>esito.portale.manuale</code> · audit append-only</dd>
+        <dt>Registro locale</dt>
+        <dd>esito registrato sulla postazione</dd>
       </dl>
       <div style={{ display: 'inline-flex', gap: 8 }}>
         <Link href="/diary" className={styles.primaryBtn}>
@@ -3800,7 +3800,7 @@ function HandoffStageBody({
           <ChevronRight size={14} />
         </Link>
         <Link href="/settings#operations" className={styles.ghostBtn}>
-          Esporta audit
+          Esporta registro
         </Link>
       </div>
     </div>
@@ -3827,13 +3827,13 @@ function GovernanceArea() {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Sistema · on-device</p>
+          <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
-            Impostazioni operative <em>· nessuna telemetria esterna</em>
+            Controlli della postazione <em>· accessi, AI e backup</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Account, AI locale, modalità di rete, backup, cataloghi e
-            diagnostica · tutto resta sul dispositivo.
+            Account, funzioni AI, rete, backup, repertori e controlli locali
+            restano raggiungibili da qui.
           </p>
         </div>
       </header>
@@ -3843,21 +3843,20 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Account &amp; PIN</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">solo locale</PillBadge>
+              <PillBadge variant="muted">postazione</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Profilo operatore e rotazione PIN zero-knowledge. Nessun reset
-            remoto.
+            Profilo operatore e cambio PIN restano sulla postazione.
           </p>
           <div className={styles.modeCard}>
             <span className={styles.modeIcon}><KeyRound size={16} /></span>
             <span>
               <span className={styles.modeTitle}>PIN operatore</span>
               <br />
-              <span className={styles.modeSub}>ultima rotazione 18 apr · scadenza 90 gg</span>
+              <span className={styles.modeSub}>ultimo cambio 18 apr · promemoria 90 gg</span>
             </span>
-            <Link href="/settings#account" className={styles.ghostBtnSm}>Ruota PIN</Link>
+            <Link href="/settings#account" className={styles.ghostBtnSm}>Cambia PIN</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><UserSquare2 size={16} /></span>
@@ -3866,39 +3865,39 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>Operatore configurato · sede locale</span>
             </span>
-            <Link href="/settings#account" className={styles.ghostBtnSm}>Modifica</Link>
+            <Link href="/settings#account" className={styles.ghostBtnSm}>Modifica profilo</Link>
           </div>
         </section>
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>AI locale · interruttori</h2>
+            <h2 className={styles.panelTitle}>Funzioni AI</h2>
             <span className={styles.panelActions}>
               <PillBadge variant="violet">
-                <Sparkles size={11} /> confronto controllato
+                <Sparkles size={11} /> a scelta
               </PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Funzioni AI locali con disattivazione immediata per area. Nessun
-            invio cloud nei default.
+            Le funzioni AI restano spente o attive per area, con controlli
+            rapidi.
           </p>
 
           {[
             {
               id: 'aiInsight' as const,
-              title: 'AI Patient Insight',
-              sub: 'sintesi locale al primo accesso paziente',
+              title: 'Sintesi paziente',
+              sub: 'riassunto locale al primo accesso',
             },
             {
               id: 'smartImport' as const,
-              title: 'Smart Import documento',
-              sub: 'estrazione locale da rivedere · niente aggiornamenti automatici',
+              title: 'Import da documento',
+              sub: 'estrazione da rivedere prima di scrivere',
             },
             {
               id: 'cloudComparator' as const,
-              title: 'Comparatore cloud',
-              sub: 'spento di default · solo pacchetti redatti fuori uso clinico',
+              title: 'Confronto esterno',
+              sub: 'spento di default · solo pacchetti redatti',
             },
           ].map((row) => (
             <div key={row.id} className={styles.toggleRow}>
@@ -3909,19 +3908,19 @@ function GovernanceArea() {
               <button
                 type="button"
                 aria-pressed={flags[row.id]}
-                aria-label={`${row.title} ${flags[row.id] ? 'attivo' : 'disattivo'}`}
+                aria-label={row.title}
                 className={classNames(styles.toggle, flags[row.id] && styles.toggleOn)}
                 onClick={() => toggle(row.id)}
               />
             </div>
           ))}
 
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
             {[
-              { name: 'qwen3.5 · locale', tag: 'attivo', variant: 'green' as const },
-              { name: 'mlx · solo benchmark', tag: 'visibile', variant: 'blue' as const },
-              { name: 'openmed · redazione dati', tag: 'osservazione', variant: 'violet' as const },
-              { name: 'gpt-5.4 · cloud', tag: 'opt-in', variant: 'muted' as const },
+              { name: 'Modello clinico locale', tag: 'attivo', variant: 'green' as const },
+              { name: 'Motore Apple locale', tag: 'in prova', variant: 'blue' as const },
+              { name: 'Redazione dati', tag: 'osservazione', variant: 'violet' as const },
+              { name: 'Confronto esterno', tag: 'su richiesta', variant: 'muted' as const },
             ].map((m) => (
               <div key={m.name} className={styles.compositeCard}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3951,13 +3950,13 @@ function GovernanceArea() {
             <div className={styles.toggleRowMain}>
               <span className={styles.toggleRowTitle}>Mac principale</span>
               <span className={styles.toggleRowSub}>
-                opt-in su LAN fidata · ambulatorio condiviso · lettura e scrittura governate
+                attivalo solo su rete fidata · accesso controllato
               </span>
             </div>
             <button
               type="button"
               aria-pressed={flags.homeBaseNetwork}
-              aria-label={`Mac principale ${flags.homeBaseNetwork ? 'attivo' : 'disattivo'}`}
+              aria-label="Mac principale"
               className={classNames(styles.toggle, flags.homeBaseNetwork && styles.toggleOn)}
               onClick={() => toggle('homeBaseNetwork')}
             />
@@ -3965,10 +3964,10 @@ function GovernanceArea() {
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><Cloud size={16} /></span>
             <span>
-              <span className={styles.modeTitle}>Nodo collegato</span>
+              <span className={styles.modeTitle}>Mac principale</span>
               <br />
               <span className={styles.modeSub}>
-                Mac principale · LAN locale · ultimo contatto 12 ms
+                Mac principale raggiungibile sulla rete locale
               </span>
             </span>
             <PillBadge variant="green">attivo</PillBadge>
@@ -3977,26 +3976,26 @@ function GovernanceArea() {
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Backup &amp; cataloghi</h2>
+            <h2 className={styles.panelTitle}>Backup e repertori</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">launchd notturno</PillBadge>
+              <PillBadge variant="muted">programmato</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Snapshot cifrato locale + import pacchetti AIFA/ICD. La retention
-            degli ultimi backup è gestita dalle impostazioni.
+            Backup locale cifrato e repertori clinici sono gestiti dalle
+            impostazioni dedicate.
           </p>
           <div className={styles.toggleRow}>
             <div className={styles.toggleRowMain}>
               <span className={styles.toggleRowTitle}>Backup automatico</span>
               <span className={styles.toggleRowSub}>
-                snapshot cifrato ogni 4 ore · retention ultimi 12
+                salvataggio cifrato ogni 4 ore · conserva gli ultimi 12
               </span>
             </div>
             <button
               type="button"
               aria-pressed={flags.backup}
-              aria-label={`Backup automatico ${flags.backup ? 'attivo' : 'disattivo'}`}
+              aria-label="Backup automatico"
               className={classNames(styles.toggle, flags.backup && styles.toggleOn)}
               onClick={() => toggle('backup')}
             />
@@ -4006,56 +4005,56 @@ function GovernanceArea() {
             <span>
               <span className={styles.modeTitle}>Ultimo backup</span>
               <br />
-              <span className={styles.modeSub}>02:14 · 318 MB · preflight OK</span>
+              <span className={styles.modeSub}>02:14 · 318 MB · controllo riuscito</span>
             </span>
             <Link href="/settings#backups" className={styles.ghostBtnSm}>Esegui ora</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><Database size={16} /></span>
             <span>
-              <span className={styles.modeTitle}>Import cataloghi</span>
+              <span className={styles.modeTitle}>Import repertori</span>
               <br />
               <span className={styles.modeSub}>AIFA · ICD · esenzioni · LOINC manuale</span>
             </span>
-            <Link href="/settings#data" className={styles.ghostBtnSm}>Apri import</Link>
+            <Link href="/settings#data" className={styles.ghostBtnSm}>Apri repertori</Link>
           </div>
         </section>
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Diagnostica locale</h2>
+            <h2 className={styles.panelTitle}>Controlli locali</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">audit append-only</PillBadge>
+              <PillBadge variant="muted">tracciato</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Log d&apos;uso PHI-safe restano on-device. Nessun invio remoto,
-            nessuna telemetria di prodotto.
+            I controlli registrano solo eventi tecnici essenziali e restano
+            sulla postazione.
           </p>
           <div className={styles.toggleRow}>
             <div className={styles.toggleRowMain}>
-              <span className={styles.toggleRowTitle}>Audit locale</span>
+              <span className={styles.toggleRowTitle}>Registro locale</span>
               <span className={styles.toggleRowSub}>
-                eventi <code>audit.v1</code> on-device · esportabili manualmente
+                eventi essenziali della postazione · esportabili manualmente
               </span>
             </div>
             <button
               type="button"
               aria-pressed={flags.auditLog}
-              aria-label={`Audit locale ${flags.auditLog ? 'attivo' : 'disattivo'}`}
+              aria-label="Registro locale"
               className={classNames(styles.toggle, flags.auditLog && styles.toggleOn)}
               onClick={() => toggle('auditLog')}
             />
           </div>
           <div className={styles.toggleRow}>
             <div className={styles.toggleRowMain}>
-              <span className={styles.toggleRowTitle}>Riduci animazioni</span>
-              <span className={styles.toggleRowSub}>rispetta prefers-reduced-motion del sistema</span>
+              <span className={styles.toggleRowTitle}>Riduzione animazioni</span>
+              <span className={styles.toggleRowSub}>riduce transizioni e movimenti dell&apos;interfaccia</span>
             </div>
             <button
               type="button"
               aria-pressed={flags.reduceMotion}
-              aria-label={`Riduci animazioni ${flags.reduceMotion ? 'attivo' : 'disattivo'}`}
+              aria-label="Riduzione animazioni"
               className={classNames(styles.toggle, flags.reduceMotion && styles.toggleOn)}
               onClick={() => toggle('reduceMotion')}
             />
@@ -4064,14 +4063,14 @@ function GovernanceArea() {
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Aggiornamento &amp; stato</h2>
+            <h2 className={styles.panelTitle}>Versione e stato</h2>
             <span className={styles.panelActions}>
               <PillBadge variant="green">in linea</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Versione applicazione corrente, stato AI locale e prossimo
-            check di disponibilità aggiornamenti.
+            Controlla versione dell&apos;app, stato delle funzioni locali e
+            disponibilità aggiornamenti.
           </p>
           <div className={styles.modeCard}>
             <span className={styles.modeIcon}><RefreshCcw size={16} /></span>
@@ -4079,7 +4078,7 @@ function GovernanceArea() {
               <span className={styles.modeTitle}>MediFlow · v0.6.4 (locale)</span>
               <br />
               <span className={styles.modeSub}>
-                prossimo check 16 mag 06:00 · canale stable
+                prossimo controllo 16 mag 06:00 · canale stabile
               </span>
             </span>
             <Link href="/settings#operations" className={styles.ghostBtnSm}>Cerca aggiornamenti</Link>
@@ -4087,13 +4086,13 @@ function GovernanceArea() {
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><ShieldCheck size={16} /></span>
             <span>
-              <span className={styles.modeTitle}>AI parliament</span>
+              <span className={styles.modeTitle}>Modelli AI</span>
               <br />
               <span className={styles.modeSub}>
-                4 modelli censiti · 1 attivo · 3 in osservazione
+                1 modello attivo · 3 disponibili per prova
               </span>
             </span>
-            <PillBadge variant="violet">parlamento sano</PillBadge>
+            <PillBadge variant="violet">stabile</PillBadge>
           </div>
         </section>
       </div>

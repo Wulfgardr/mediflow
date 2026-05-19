@@ -1711,6 +1711,38 @@
   .settingsGrid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 700px) {
+  .settingsGrid .panel {
+    padding: 14px;
+  }
+
+  .settingsGrid .panelHeader {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settingsGrid .panelActions {
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settingsGrid .modeCard {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settingsGrid .modeCard > :last-child {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .settingsGrid .compositeCard > div {
+    flex-wrap: wrap;
+  }
+}
+
 .settingsGroup {
   display: flex;
   flex-direction: column;
