@@ -17,7 +17,7 @@ Kree8's grammar onto a real clinical management surface.
 
 The **v2 pass** sharpens the surface from "Kree8 with medical labels" into a
 "MediFlow-authored clinical cockpit": the area model now mirrors real MediFlow
-sections, the patient-list/inbox is first-class, the Scheda paziente is a
+sections, the patient-list/inbox is first-class, the Quadro paziente is a
 composite, document review is review-first and surfaces blocked SISS writes,
 and Governance reads like the real settings page instead of a generic
 preferences panel.
@@ -100,14 +100,14 @@ block.
 The mockup keeps all major MediFlow surfaces inside the Kree8 frame, so the
 review covers the whole clinical journey, not just a hero page. The v2 pass
 splits the old "Paziente" area into a first-class list (`Pazienti in carico`)
-and a composite detail (`Scheda paziente`), and renames the rest to mirror the
+and a composite detail (`Quadro paziente`), and renames the rest to mirror the
 clinician-facing MediFlow nomenclature.
 
 | Area pill | Demonstrates |
 | --- | --- |
 | Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
-| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri scheda` / `Strumenti clinici` / `Prepara SISS`. |
-| Scheda paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
+| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri quadro` / `Apri scheda` / `Prepara SISS`. |
+| Quadro paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
 | Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
 | Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
 | Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente** — no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
@@ -118,7 +118,7 @@ clinician-facing MediFlow nomenclature.
 Most non-migrated panels still use local React state. Since `WUL-273`, the live
 root makes session-protected reads to `/api/patients` and `/api/checkups` after
 unlock, maps them into the Kree8 patient inbox, stat strip, local agenda and
-first Scheda paziente view, and shows an explicit error/empty state
+first Quadro paziente view, and shows an explicit error/empty state
 instead of falling back to review patients. Since `WUL-275`, the live root also
 reads `/api/clinical-agenda/candidates` for Zimbra/iCloud event-cache candidates.
 The review alias stays synthetic and does not fetch external or clinical data.
@@ -182,9 +182,10 @@ zone" wording.
 - Patient inbox scope (`Ambulatorio locale` / `Rete locale` / `Tutti`) and
   list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
   rows come from `/api/patients`; selecting a row animates an `Anteprima caso`
-  preview; `Apri scheda` jumps to the detail area while `Strumenti clinici`
-  opens the patient workspace route at `/patients/[id]/modules`.
-- Scheda paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
+  preview; `Apri quadro` jumps to the cockpit overview (`Quadro paziente`)
+  while `Apri scheda` opens the patient workspace route at
+  `/patients/[id]/modules`.
+- Quadro paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
 - Document field decision tri-state per row with evidence snippet, kind label
   (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
   commit-pulse on the resulting status pill, and a gated primary action
@@ -243,8 +244,10 @@ zone" wording.
 - [ ] On `Pazienti in carico`, switch scope between `Ambulatorio locale`,
       `Rete locale` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
       patient and confirm the `Anteprima caso` preview animates in; click
-      `Apri scheda` and confirm it jumps to `Scheda paziente`.
-- [ ] On `Scheda paziente`, exercise the identity dock action shelf and the
+      `Apri quadro` and confirm it jumps to `Quadro paziente`; click
+      `Apri scheda` and confirm it opens the patient workspace at
+      `/patients/[id]/modules`.
+- [ ] On `Quadro paziente`, exercise the identity dock action shelf and the
       Sintesi AI ⇄ Fonti grezze segmented toggle; scan the Evidenze recenti panel,
       Smart Import preview counters and Prossimi passaggi cards.
 - [ ] On `Documenti`, mark a mix of decisions and confirm the

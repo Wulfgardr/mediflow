@@ -1661,7 +1661,7 @@ function IncaricoArea({
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Seleziona un caso, apri la scheda e prepara il prossimo passaggio.'
+              ? 'Seleziona un caso, apri il quadro e prepara il prossimo passaggio.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
