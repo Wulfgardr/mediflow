@@ -230,14 +230,13 @@ const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] 
   { id: 'governance', label: 'Impostazioni', icon: SettingsIcon },
 ];
 
-const PRIMARY_AREA_IDS: AreaId[] = ['turno', 'incarico', 'diario', 'governance'];
+const PRIMARY_AREA_IDS: AreaId[] = ['turno', 'incarico', 'diario', 'cataloghi', 'governance'];
 
 function railAreaIsSelected(navArea: AreaId, currentArea: AreaId): boolean {
   if (navArea === currentArea) return true;
   if (navArea === 'incarico') {
     return currentArea === 'scheda' || currentArea === 'revisione' || currentArea === 'handoff';
   }
-  if (navArea === 'governance') return currentArea === 'cataloghi';
   return false;
 }
 
@@ -2960,7 +2959,7 @@ function DiarioArea({
           </h1>
           <p className={styles.areaSubtitle}>
             Cronologia delle ultime 50 voci cliniche salvate in MediFlow, con
-            rientro immediato nella scheda del paziente.
+            rientro immediato nel quadro del paziente.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -2970,7 +2969,7 @@ function DiarioArea({
           </button>
           <button type="button" className={styles.primaryBtn} onClick={() => onOpenArea('scheda')}>
             <UserSquare2 size={13} />
-            Apri scheda
+            Apri quadro
           </button>
           <PillBadge variant="blue">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
           <PillBadge variant="muted">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
@@ -3013,7 +3012,7 @@ function DiarioArea({
                 <span className={styles.dockActions}>
                   <Link href={entry.patientHref} className={styles.ghostBtnSm}>
                     <UserSquare2 size={12} />
-                    Apri scheda
+                    Apri quadro
                   </Link>
                   <Link href={`${entry.patientHref}/entries/new`} className={styles.ghostBtnSm}>
                     <Plus size={12} />
