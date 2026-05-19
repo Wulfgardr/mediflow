@@ -2889,7 +2889,7 @@ function LiveGovernanceArea({
             <h2 className={styles.panelTitle}>Audit</h2>
             <PillBadge variant="muted">locale</PillBadge>
           </header>
-          <p className={styles.panelSubtitle}>Eventi append-only consultabili dagli strumenti di sistema.</p>
+          <p className={styles.panelSubtitle}>Eventi append-only consultabili dalle impostazioni di sistema.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
