@@ -282,6 +282,10 @@
   letter-spacing: 0.02em;
 }
 
+.navMeta + .navChevron {
+  margin-left: 0;
+}
+
 @media (max-width: 1024px) {
   .navMeta { margin-left: 4px; }
 }
