@@ -3330,7 +3330,7 @@ function CataloghiArea({ isReview }: { isReview: boolean }) {
         <div className={styles.headerActions}>
           <Link href="/settings#data" className={styles.primaryBtn}>
             <Database size={13} />
-            Apri import
+            Gestisci cataloghi
           </Link>
         </div>
       </header>
