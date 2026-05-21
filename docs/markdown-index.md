@@ -102,6 +102,8 @@ Ultimo aggiornamento: 2026-05-16
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/agent-attribution.md](./agent-attribution.md) | Registro contributi agent (Codex, altri). | Quando si aggiungono cambi non banali da agent. |
+| [docs/linear-completed-issues-archive-2026-05-21.md](./linear-completed-issues-archive-2026-05-21.md) | Snapshot operativo delle issue Linear `Done` da usare come base per igiene/archiviazione tracker. | Quando serve liberare spazio Linear o distinguere storico completato da backlog attivo. |
+| [docs/linear-memory-workflow.md](./linear-memory-workflow.md) | Policy e CLI locale per consultare memoria issue completate, generare piani di archiviazione e applicare side effect Linear espliciti. | Prima di creare nuove issue o fare batch hygiene su Linear. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Quando si rivede la nuova linea visuale Kree8, si verifica la root live con dati reali o si pianifica la migrazione delle superfici legacy. |

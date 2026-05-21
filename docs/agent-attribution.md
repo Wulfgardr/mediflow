@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-21 Codex
+- Added Linear memory/hygiene tooling after the completed-issue archive: `scripts/linear-memory-tool.mjs` now supports archive-memory search, archive plans, dry-run archive/delete batches, and explicit GraphQL side effects guarded by `LINEAR_API_KEY`, `--execute`, and `--confirm-delete`; the workflow is documented as a pre-issue memory check so completed Linear history can move to repo Markdown before freeing Linear space: `scripts/linear-memory-tool.mjs`, `docs/linear-memory-workflow.md`, `docs/linear-codex-playbook.md`, `docs/markdown-index.md`, `package.json`, `docs/agent-attribution.md`
+
 ## 2026-05-18 Codex
 - Extended `WUL-273` with Kree8 navigation and copy polish after Claude CLI review: the root toolbar search now focuses a real patient-list filter, patient previews sanitize metadata-like AI/status payloads before display, governance shortcuts link to concrete `/settings#...` sections, review-mode SISS/system buttons no longer sit inert, and settings AI kill switches/hardware labels use clearer Italian clinical copy: `components/kree8/kree8-clinical-cockpit.tsx`, `components/kree8/kree8-clinical-cockpit.module.css`, `app/settings/page.tsx`, `docs/agent-attribution.md`
 

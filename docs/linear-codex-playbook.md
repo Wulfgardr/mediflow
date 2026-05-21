@@ -159,6 +159,33 @@ Nota:
 
 ## Convenzioni obbligatorie (Linear <-> GitHub <-> Codex)
 
+### Check memoria Linear prima di nuove issue
+
+Prima di creare una nuova issue o avviare un workstream che potrebbe duplicare
+lavoro gia svolto, controlla lo storico locale delle issue completate:
+
+```bash
+npm run linear:memory-check -- "<tema o problema>"
+```
+
+Se il tema e gia presente, apri una nuova issue solo quando lo scope e davvero
+un follow-up netto. Registra l'esito nella issue o nel commento operativo:
+
+```text
+Archive check: nessun duplicato trovato.
+```
+
+oppure:
+
+```text
+Archive check: correlata a WUL-235 / WUL-231; nuovo scope perche ...
+```
+
+Per batch di igiene su issue completate, usa
+[docs/linear-memory-workflow.md](./linear-memory-workflow.md) e conserva prima
+uno snapshot Markdown autosufficiente. Non eliminare da Linear issue `Done` se
+la memoria utile non e gia su disco.
+
 ### Charter operativo: chi decide cosa
 
 Leonardo mantiene ownership su priorita, direzione architetturale e approvazione finale.
