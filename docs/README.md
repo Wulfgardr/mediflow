@@ -2,7 +2,7 @@
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-05-15
+Ultimo aggiornamento: 2026-05-20
 
 > [!NOTE]
 > La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
@@ -35,7 +35,7 @@ Documenti da consultare **al bisogno**:
 - QA parity Apple-wide: [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md) e manifest [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - Test concorrenza cross-client sui pazienti: [docs/patient-concurrency-tests.md](./patient-concurrency-tests.md)
 - Tooling documentale Apple (MCP): [docs/apple-docs-mcp.md](./apple-docs-mcp.md)
-- Compliance e roadmap: [docs/COMPLIANCE.md](./COMPLIANCE.md), [docs/ROADMAP.md](./ROADMAP.md), [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md), [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md), [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md), [docs/siss-baseline.md](./siss-baseline.md), [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md), [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md), [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md), [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md), [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md), [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
+- Compliance e roadmap: [docs/COMPLIANCE.md](./COMPLIANCE.md), [docs/ROADMAP.md](./ROADMAP.md), [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md), [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md), [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md), [docs/siss-baseline.md](./siss-baseline.md), [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md), [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md), [docs/private/siss-live-inspections/README.md](./private/siss-live-inspections/README.md), [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md), [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md), [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md), [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md)
 - Corpus documentale SISS/FSE 2.0: [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)
 - Tooling MCP corpus SISS/FSE: [docs/siss-fse-corpus-mcp.md](./siss-fse-corpus-mcp.md)
 - Valutazioni comparative toolkit AI: [docs/openmed-toolkit-evaluation.md](./openmed-toolkit-evaluation.md)
@@ -99,6 +99,7 @@ Documenti da consultare **al bisogno**:
 | Baseline SISS | [docs/siss-baseline.md](./siss-baseline.md) | `CANONICAL` | Stato attuale, fonti ufficiali, matrice del prototipo contestuale e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` -> `WUL-178` -> `WUL-180` per l'integrazione SISS. |
 | Fattibilita SSI/A2A SISS oltre `portal-handoff` | [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md) | `CANONICAL` | Boundary ufficiale del filone `WUL-180`: cosa e integrabile davvero con `SSI`, `A2A`, `webapp` e onboarding regionale, e cosa non e ancora dimostrabile con sole fonti pubbliche. |
 | Modulo Prescrittivo Regionale | [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md) | `CANONICAL` | Nota scenario-specific `WUL-181`: chiarisce per il prescrittivo il boundary tra handoff, richiamo della webapp ufficiale, uso di WS/API e UI custom non ancora dimostrata. |
+| Evidence privata prescrittivo SISS live | [docs/private/siss-live-inspections/README.md](./private/siss-live-inspections/README.md) | `SECONDARY / PRIVATE` | Pacchetto interno `mediflow_private` con mappa live ad alta fedelta, ledger derivato, mock web senza paziente e brief presentazione; la repo OSS mantiene solo la versione generalizzata. |
 | FSE consultazione e consenso | [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md) | `CANONICAL` | Nota scenario-specific che chiarisce per FSE il boundary tra launcher ufficiale, consenso, ruoli/audit, SEB/eventi e viewer/feed embedded non ancora dimostrato. |
 | NAR / Anagrafe Regionale read-only | [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md) | `CANONICAL` | Blueprint scenario-specific per lookup assistito, eligibility, esenzioni, medici prescrittori e ricettari in modalita read-only, senza sync o write regionali. |
 | SGDT/PAI e COT per MMG/SSI | [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md) | `CANONICAL` | Nota scenario-specific che restringe SGDT ai casi PAI/CE-MMG e COT/transizioni documentati, distinguendoli da launcher generici, feed PAI o dispatch COT non dimostrati. |
@@ -182,6 +183,8 @@ Documenti da consultare **al bisogno**:
 - [docs/product_roadmap.md](./product_roadmap.md): alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva è [docs/ROADMAP.md](./ROADMAP.md).
 - `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verità per decisioni architetturali.
 - `docs/private/openhospital-alignment/*`: workspace operativo privato locale. Le decisioni persistenti vanno riallineate su [PLANS.md](../PLANS.md) e/o ADR pubblici.
+- `docs/private/siss-live-inspections/*`: evidence pack privato per letture live del prescrittivo SISS e altri moduli regionali; la versione pubblica deve restare generalizzata.
+- `docs/private/linear-backlog/*`: snapshot operativo privato per storicizzare issue Linear datate prima della pulizia backlog.
 - Alcuni documenti interni restano volutamente fuori dall'export OSS: playbook di orchestrazione, attribution agent, piano operativo di breve e workspace privati locali.
 
 ## Regole rapide di mantenimento

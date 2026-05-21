@@ -4,7 +4,7 @@
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-05-16
+Ultimo aggiornamento: 2026-05-20
 
 ## Come usare questo indice
 
@@ -73,6 +73,9 @@ Ultimo aggiornamento: 2026-05-16
 | [docs/siss-baseline.md](./siss-baseline.md) | Baseline canonica SISS: stato attuale, fonti ufficiali, matrice del prototipo contestuale, gap e sequenza di consegna. | Quando si lavora su `WUL-43`, `WUL-44`, `WUL-45`, `WUL-178` e `WUL-180`. |
 | [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md) | Mappa canonica di fattibilità ufficiale oltre il `portal-handoff`: separa ciò che il SISS rende tecnicamente possibile da ciò che MediFlow può fare davvero solo dopo `SSI`, scenari approvati e onboarding regionale. | Quando si lavora su `WUL-180` o si valuta prescrittivo/FSE/SGDT/Anagrafe oltre l'handoff attuale. |
 | [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md) | Nota canonica `WUL-181` sul Modulo Prescrittivo Regionale: fissa il boundary tra richiamo della webapp ufficiale, possibile supporto WS/API e re-implementazione UI non ancora dimostrata. | Quando si lavora sul prescrittivo regionale oltre il launcher attuale. |
+| [docs/private/siss-live-inspections/README.md](./private/siss-live-inspections/README.md) | Indice privato `mediflow_private` per evidence pack live SISS: mappa originale, ledger derivato e boundary di cosa resta fuori dalla repo pubblica. | Quando serve il materiale ad alta fedelta da browser inspection senza aprire una repo separata. |
+| [docs/private/siss-live-inspections/2026-05-20-siss-prescription-live-map.md](./private/siss-live-inspections/2026-05-20-siss-prescription-live-map.md) | Mappa tecnica privata del flusso prescrittivo SISS osservato il 2026-05-20, con endpoint, payload sintetizzati, popup, priorita, specialistica/farmaceutica e emissione promemoria. | Quando si ricostruisce il comportamento reale del modulo prescrittivo e si confronta con la versione pubblica generalizzata. |
+| [docs/private/siss-live-inspections/2026-05-20-presentation-brief.md](./private/siss-live-inspections/2026-05-20-presentation-brief.md) | Brief privato per riposizionare la presentazione del prescrittivo SISS dopo la lettura live, con asset web-only e storyboard senza screenshot iOS/iPadOS. | Quando serve aggiornare narrativa, screenshot e flowchart operativa del prescrittivo osservato. |
 | [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md) | Nota canonica su FSE consultazione e consenso: fissa il boundary tra launcher ufficiale, consenso, ruoli/audit, SEB/eventi e viewer/feed embedded non ancora dimostrato. | Quando si valuta la consultazione FSE contestuale oltre il launcher attuale. |
 | [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md) | Blueprint canonico NAR / Anagrafe Regionale read-only: capability matrix, contract locale, failure taxonomy e data-minimization per assistiti, eligibility, esenzioni, medici prescrittori e ricettari. | Quando si valuta NAR oltre il launcher Gaia e prima di qualunque runtime custom o sync anagrafica. |
 | [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md) | Nota canonica su SGDT/PAI e COT per MMG/SSI: restringe SGDT ai casi PAI/CE-MMG e COT/transizioni documentati e separa quel perimetro da launcher generici, feed PAI o dispatch COT non dimostrati. | Quando si valuta SGDT oltre il boundary SISS/FSE attuale. |
@@ -107,6 +110,7 @@ Ultimo aggiornamento: 2026-05-16
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Quando si rivede la nuova linea visuale Kree8, si verifica la root live con dati reali o si pianifica la migrazione delle superfici legacy. |
+| [docs/private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md](./private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md) | Snapshot privato delle issue Linear legacy candidate ad archiviazione, creato prima della pulizia del backlog. | Quando si libera Linear da issue datate mantenendo una traccia locale riusabile. |
 
 ## ADR (decisioni architetturali)
 
