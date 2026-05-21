@@ -69,7 +69,7 @@ type AreaId =
   | 'scheda'
   | 'diario'
   | 'revisione'
-  | 'cataloghi'
+  | 'repertori'
   | 'handoff'
   | 'governance';
 type DocDecision = 'pending' | 'apply' | 'note' | 'ignore';
@@ -225,12 +225,12 @@ const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] 
   { id: 'scheda', label: 'Quadro paziente', icon: UserSquare2 },
   { id: 'diario', label: 'Diario', icon: FileText },
   { id: 'revisione', label: 'Documenti', icon: FileSearch },
-  { id: 'cataloghi', label: 'Repertori', icon: Database },
+  { id: 'repertori', label: 'Repertori', icon: Database },
   { id: 'handoff', label: 'SISS e portali', icon: Workflow },
   { id: 'governance', label: 'Impostazioni', icon: SettingsIcon },
 ];
 
-const PRIMARY_AREA_IDS: AreaId[] = ['turno', 'incarico', 'diario', 'cataloghi', 'governance'];
+const PRIMARY_AREA_IDS: AreaId[] = ['turno', 'incarico', 'diario', 'repertori', 'governance'];
 
 function railAreaIsSelected(navArea: AreaId, currentArea: AreaId): boolean {
   if (navArea === currentArea) return true;
@@ -2535,7 +2535,7 @@ function LiveDocumentReviewArea({
             )}
           </div>
           <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('cataloghi')}>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('repertori')}>
               <Database size={12} />
               Repertori
             </button>
@@ -3256,9 +3256,9 @@ function RevisioneArea() {
   );
 }
 
-/* ───────────────────────── Cataloghi ───────────────────────── */
+/* ───────────────────────── Repertori ───────────────────────── */
 
-function CataloghiArea({ isReview }: { isReview: boolean }) {
+function RepertoriArea({ isReview }: { isReview: boolean }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
   const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
     async () => {
@@ -4180,8 +4180,8 @@ function AreaContent({
             onOpenArea={onOpenArea}
           />
         );
-    case 'cataloghi':
-      return <CataloghiArea isReview={isReview} />;
+    case 'repertori':
+      return <RepertoriArea isReview={isReview} />;
     case 'handoff':
       return isReview
         ? <HandoffArea />
