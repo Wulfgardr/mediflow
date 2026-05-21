@@ -300,6 +300,36 @@ test('smart import extraction drops imaging and ECG with units from therapy lane
     assert.equal(parsed.value.data.therapies.length, 0);
 });
 
+test('smart import extraction drops ecocolordoppler specialist services from therapy lane', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [
+                {
+                    drugMention: 'Ecocolordoppler venoso arti inferiori',
+                    drugQuery: 'ecocolordoppler venoso arti inferiori',
+                    confidence: 'high',
+                    evidence: 'Prescritta prestazione codificata: ecocolordoppler venoso arti inferiori',
+                    sourceId: 'document:1',
+                },
+                {
+                    drugMention: 'Color doppler TSA',
+                    drugQuery: 'codice prestazione color doppler TSA',
+                    confidence: 'medium',
+                    evidence: 'Impegnativa specialistica per color doppler TSA',
+                    sourceId: 'document:1',
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.value.data.therapies.length, 0);
+});
+
 test('smart import extraction keeps drug therapy whose evidence references fisioterapia follow-up', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -414,6 +444,45 @@ test('document synthesis extraction keeps service prescriptions out of medicatio
                     drugQuery: 'visita otorinolaringoiatrica',
                     confidence: 'medium',
                     evidence: 'Richiesta visita otorinolaringoiatrica',
+                },
+                {
+                    drugMention: 'Amoxicillina 1 g',
+                    drugQuery: 'amoxicillina',
+                    activePrinciple: 'Amoxicillina',
+                    dosage: '1 g ogni 12 ore',
+                    confidence: 'high',
+                    evidence: 'Prescritta amoxicillina 1 g ogni 12 ore',
+                },
+            ],
+        },
+    }), 'Ricetta sintetica');
+
+    assert.deepEqual(parsed.value.data.medications, ['Amoxicillina 1 g ogni 12 ore']);
+    assert.equal(parsed.value.data.therapyCandidates.length, 1);
+    assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Amoxicillina 1 g');
+});
+
+test('document synthesis extraction keeps coded ecocolordoppler prescriptions out of medication lanes', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Impegnativa specialistica codificata',
+        data: {
+            qualityLevel: 'green',
+            qualityReason: 'Documento leggibile',
+            medications: [
+                'Ecocolordoppler venoso arti inferiori',
+                'Codice prestazione 88.77.2 ecocolordoppler',
+                'Amoxicillina 1 g ogni 12 ore',
+            ],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [
+                {
+                    drugMention: 'Ecocolordoppler venoso arti inferiori',
+                    drugQuery: 'ecocolordoppler venoso arti inferiori',
+                    confidence: 'high',
+                    evidence: 'Prescritta prestazione codificata: ecocolordoppler venoso arti inferiori',
                 },
                 {
                     drugMention: 'Amoxicillina 1 g',
