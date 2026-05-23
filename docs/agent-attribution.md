@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-05-23 Codex
+- Extended `WUL-284` with follow-up hardening for the local workflow monitor: preserved the highest-priority `nextStep` when multiple blockers fire, added a stable global runner install path for LaunchAgent runs outside the active branch, and updated focused tests/runbook/ADR notes without changing the clinical runtime or reading private contents: `scripts/codex-workflow-monitor.mjs`, `scripts/codex-workflow-monitor.test.mjs`, `docs/codex-workflow-monitor.md`, `docs/adr/0063-local-workflow-monitor-control-plane.md`, `docs/agent-attribution.md`
 - Opened `WUL-283` as a bounded replacement for the broader canceled Unicum control-center idea: added a PHI-safe local workflow monitor that reads only Git/check metadata, redacts private-looking paths, produces `continue` / `needs_codex` / `blocked` verdicts, supports optional Ollama/Gemma digest on redacted summaries, bounds local snapshot history, and can install a silent user LaunchAgent while staying outside the clinical runtime: `scripts/codex-workflow-monitor.mjs`, `scripts/codex-workflow-monitor.test.mjs`, `docs/adr/0063-local-workflow-monitor-control-plane.md`, `docs/codex-workflow-monitor.md`, `docs/README.md`, `docs/markdown-index.md`, `package.json`, `docs/agent-attribution.md`
 
 ## 2026-05-21 Codex

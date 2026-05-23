@@ -78,20 +78,33 @@ npm run workflow-monitor -- status
 
 ## Automazione macOS
 
-Installazione LaunchAgent utente:
+Installazione consigliata: runner stabile fuori repo + LaunchAgent utente.
+Questa modalita copia lo script in
+`~/Library/Application Support/MediFlow/workflow-monitor/bin/` e fa puntare
+launchd a quella copia. Cosi il monitor continua a osservare anche branch vecchi
+che non hanno ancora lo script o lo script npm.
+
+```bash
+npm run workflow-monitor -- install-global-runner
+```
+
+Installazione LaunchAgent repo-local, utile solo per sviluppo del monitor:
 
 ```bash
 npm run workflow-monitor -- install-launch-agent
 ```
 
 Se passi `--expected-issue WUL-123` all'installazione, il LaunchAgent conserva
-lo stesso guard nei run periodici.
+lo stesso guard nei run periodici. Per il lavoro quotidiano, pero, evita un
+`expected-issue` fisso: il monitor deve seguire il branch corrente, non
+bloccare tutti i branch diversi dall'ultimo task.
 
 Default:
 
 - label: `com.mediflow.workflow-monitor`;
 - intervallo: `300` secondi;
 - output: `~/Library/Application Support/MediFlow/workflow-monitor/`;
+- runner consigliato: copia stabile nello stesso output dir;
 - modalita modello: `auto`, cioe digest locale solo su verdetti medium/high;
 - esecuzione silenziosa.
 

@@ -68,6 +68,11 @@ fuori repo sotto `~/Library/Application Support/MediFlow/workflow-monitor`.
 L'esecuzione periodica resta silenziosa: serve a frenare drift operativi, non a
 notificare continuamente.
 
+Follow-up operativo: il LaunchAgent deve preferire una copia stabile del runner
+nello stesso stato fuori repo, invece di puntare sempre allo script del branch
+corrente. Questo permette di osservare branch storici che non contengono ancora
+il monitor o il wiring `npm run workflow-monitor`.
+
 ## First Thin Slice
 
 1. Aggiungere `scripts/codex-workflow-monitor.mjs` con comandi `once`,
@@ -76,6 +81,7 @@ notificare continuamente.
    verifiche mancanti e path redatti.
 3. Aggiungere runbook dedicato e wiring npm.
 4. Installare opzionalmente il LaunchAgent locale dopo verifica.
+5. Hardenare l'installazione LaunchAgent con un runner stabile fuori repo.
 
 ## Fuori Scope
 
@@ -84,4 +90,3 @@ notificare continuamente.
 - Dashboard Unicum/control center completo.
 - Integrazione diretta con mail, calendario, Chronicle o database clinico.
 - Cloud model, telemetry o egress di default.
-

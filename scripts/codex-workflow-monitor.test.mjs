@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   buildLaunchAgentPlist,
   evaluateSnapshot,
+  globalRunnerPath,
   parseArgs,
   parsePorcelainStatus,
   resolveEffectiveChecks,
@@ -72,6 +73,41 @@ test("blocks when the expected issue does not match the branch issue", () => {
   assert.equal(verdict.decision.status, "blocked");
   assert.equal(verdict.decision.severity, "high");
   assert.ok(verdict.decision.flags.includes("expected_issue_mismatch"));
+  assert.equal(verdict.decision.nextStep, "Stop edits and switch to the dedicated issue branch.");
+});
+
+test("keeps the highest-priority next step when later checks also fire", () => {
+  const mismatchVerdict = evaluateSnapshot(
+    snapshot({
+      branch: "codex/wul-277-service-prescriptions",
+      branchIssue: "WUL-277",
+      mainDiffFiles: ["scripts/codex-workflow-monitor.mjs"],
+    }),
+    { expectedIssue: "WUL-284" }
+  );
+
+  assert.equal(mismatchVerdict.decision.status, "blocked");
+  assert.ok(mismatchVerdict.decision.flags.includes("tests_not_declared"));
+  assert.equal(mismatchVerdict.decision.nextStep, "Stop edits and switch to the dedicated issue branch.");
+
+  const sensitiveVerdict = evaluateSnapshot(
+    snapshot({
+      branch: "codex/wul-284-workflow-monitor-hardening",
+      branchIssue: "WUL-284",
+      statusFiles: [
+        { status: " M", path: "docs/private/smoke/example.md" },
+        { status: " M", path: "scripts/codex-workflow-monitor.mjs" },
+      ],
+    }),
+    { expectedIssue: "WUL-284" }
+  );
+
+  assert.equal(sensitiveVerdict.decision.status, "blocked");
+  assert.ok(sensitiveVerdict.decision.flags.includes("tests_not_declared"));
+  assert.equal(
+    sensitiveVerdict.decision.nextStep,
+    "Stop and inspect the scope manually before writing or sharing artifacts."
+  );
 });
 
 test("redacts sensitive paths and blocks the workflow", () => {
@@ -107,6 +143,22 @@ test("carries expected issue into LaunchAgent runs when configured", () => {
 
   assert.match(plist, /<string>--expected-issue<\/string>/);
   assert.match(plist, /<string>WUL-283<\/string>/);
+});
+
+test("can build LaunchAgent runs from a stable global runner path", () => {
+  const options = parseArgs([
+    "install-launch-agent",
+    "--repo",
+    "/tmp/mediflow",
+    "--state-dir",
+    "/tmp/mediflow-monitor",
+    "--runner-path",
+    "/tmp/mediflow-monitor/bin/codex-workflow-monitor.mjs",
+  ]);
+  const plist = buildLaunchAgentPlist(options);
+
+  assert.equal(globalRunnerPath("/tmp/mediflow-monitor"), "/tmp/mediflow-monitor/bin/codex-workflow-monitor.mjs");
+  assert.match(plist, /<string>\/tmp\/mediflow-monitor\/bin\/codex-workflow-monitor\.mjs<\/string>/);
 });
 
 test("asks for verification when tooling changes without declared checks", () => {

@@ -30,6 +30,7 @@ Usage:
   npm run workflow-monitor -- watch [--interval-seconds 300] [--quiet]
   npm run workflow-monitor -- status [--json]
   npm run workflow-monitor -- install-launch-agent [--launch-interval-seconds 300]
+  npm run workflow-monitor -- install-global-runner [--launch-interval-seconds 300]
   npm run workflow-monitor -- uninstall-launch-agent
 
 Privacy boundary:
@@ -66,6 +67,7 @@ export function parseArgs(argv) {
     write: false,
     intervalSeconds: 300,
     launchIntervalSeconds: 300,
+    runnerPath: "",
     modelMode: process.env.MEDIFLOW_WORKFLOW_MONITOR_MODEL_MODE || "off",
     model: process.env.MEDIFLOW_WORKFLOW_MONITOR_MODEL || DEFAULT_MODEL,
     ollamaUrl: process.env.MEDIFLOW_WORKFLOW_MONITOR_OLLAMA_URL || DEFAULT_OLLAMA_URL,
@@ -104,6 +106,9 @@ export function parseArgs(argv) {
       index += 1;
     } else if (arg === "--launch-interval-seconds") {
       options.launchIntervalSeconds = Math.max(60, Number.parseInt(requireValue(arg, next), 10) || 300);
+      index += 1;
+    } else if (arg === "--runner-path") {
+      options.runnerPath = requireValue(arg, next);
       index += 1;
     } else if (arg === "--model-mode") {
       options.modelMode = requireValue(arg, next);
@@ -299,13 +304,18 @@ export function evaluateSnapshot(snapshot, options = {}) {
   let severity = "low";
   let status = "continue";
   let nextStep = "Continue on the current workstream.";
+  let nextStepRank = decisionRank(severity, status);
 
   const raise = (nextSeverity, nextStatus, flag, reason, step) => {
     flags.push(flag);
     reasons.push(reason);
     if (severityRank(nextSeverity) > severityRank(severity)) severity = nextSeverity;
     if (statusRank(nextStatus) > statusRank(status)) status = nextStatus;
-    if (step) nextStep = step;
+    const candidateRank = decisionRank(nextSeverity, nextStatus);
+    if (step && candidateRank > nextStepRank) {
+      nextStep = step;
+      nextStepRank = candidateRank;
+    }
   };
 
   if (expectedIssue && snapshot.branchIssue && snapshot.branchIssue !== expectedIssue) {
@@ -435,6 +445,10 @@ function severityRank(value) {
 
 function statusRank(value) {
   return { continue: 0, needs_codex: 1, blocked: 2 }[value] ?? 0;
+}
+
+function decisionRank(severity, status) {
+  return statusRank(status) * 10 + severityRank(severity);
 }
 
 function buildChangeSignature(verdict) {
@@ -690,6 +704,10 @@ function launchAgentPath() {
   return path.join(os.homedir(), "Library", "LaunchAgents", `${LAUNCH_AGENT_LABEL}.plist`);
 }
 
+export function globalRunnerPath(stateDir) {
+  return path.join(stateDir, "bin", "codex-workflow-monitor.mjs");
+}
+
 function escapePlist(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -699,7 +717,7 @@ function escapePlist(value) {
 }
 
 export function buildLaunchAgentPlist(options) {
-  const scriptPath = fileURLToPath(import.meta.url);
+  const scriptPath = options.runnerPath ? path.resolve(options.runnerPath) : fileURLToPath(import.meta.url);
   const args = [
     process.execPath,
     scriptPath,
@@ -771,7 +789,44 @@ function installLaunchAgent(options) {
     label: LAUNCH_AGENT_LABEL,
     path: launchAgentPath(),
     stateDir: options.stateDir,
+    runnerPath: options.runnerPath ? path.resolve(options.runnerPath) : fileURLToPath(import.meta.url),
     intervalSeconds: options.launchIntervalSeconds,
+  };
+}
+
+function installGlobalRunner(options) {
+  ensureStateDir(options.stateDir);
+  const sourcePath = fileURLToPath(import.meta.url);
+  const runnerPath = globalRunnerPath(options.stateDir);
+  fs.mkdirSync(path.dirname(runnerPath), { recursive: true });
+  fs.copyFileSync(sourcePath, runnerPath);
+  fs.chmodSync(runnerPath, 0o755);
+
+  const metadataPath = path.join(options.stateDir, "runner-install.json");
+  const metadata = {
+    version: TOOL_VERSION,
+    installedAt: new Date().toISOString(),
+    sourcePath,
+    runnerPath,
+    repo: path.resolve(options.repo),
+    launchAgentLabel: LAUNCH_AGENT_LABEL,
+    privacyBoundary: {
+      diffContentRead: false,
+      clinicalDatabaseRead: false,
+      privateDocContentRead: false,
+      mailRead: false,
+    },
+  };
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
+
+  const launchAgent = process.platform === "darwin"
+    ? installLaunchAgent({ ...options, runnerPath })
+    : null;
+
+  return {
+    runnerPath,
+    metadataPath,
+    launchAgent,
   };
 }
 
@@ -817,6 +872,11 @@ async function main() {
     }
     if (options.command === "install-launch-agent") {
       const result = installLaunchAgent(options);
+      if (!options.quiet) console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    if (options.command === "install-global-runner") {
+      const result = installGlobalRunner(options);
       if (!options.quiet) console.log(JSON.stringify(result, null, 2));
       return;
     }
