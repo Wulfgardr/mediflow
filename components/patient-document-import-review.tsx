@@ -40,6 +40,7 @@ function cloneDraft(draft: PatientDocumentReviewDraft): PatientDocumentReviewDra
         fields: draft.fields.map((field) => ({ ...field })),
         diagnoses: draft.diagnoses.map((diagnosis) => ({ ...diagnosis })),
         medications: draft.medications.map((medication) => ({ ...medication })),
+        servicePrescriptions: (draft.servicePrescriptions ?? []).map((item) => ({ ...item })),
     };
 }
 
@@ -106,6 +107,7 @@ export default function PatientDocumentImportReview({
         fields: localDraft.fields.filter((field) => field.included).length,
         diagnoses: localDraft.diagnoses.filter((diagnosis) => diagnosis.included).length,
         medications: localDraft.medications.filter((medication) => medication.included).length,
+        servicePrescriptions: (localDraft.servicePrescriptions ?? []).filter((item) => item.included).length,
     }), [localDraft]);
     /* @Codex */
     const importDecision = useMemo(() => buildPatientImportDecision(localDraft), [localDraft]);
@@ -140,10 +142,10 @@ export default function PatientDocumentImportReview({
                                 Confidenza import {Math.round(localDraft.confidence * 100)}%
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie
+                                {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie · {counters.servicePrescriptions} prestazioni
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
+                                {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.servicePrescriptionProposalCount} prestazioni proposte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
                             </span>
                         </div>
                     </div>
@@ -302,6 +304,98 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, description: event.target.value } : item),
                                             }))}
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {(localDraft.servicePrescriptions ?? []).length > 0 && (
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 px-1">
+                            <ClipboardCheck className="h-4 w-4 text-sky-500" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                                Prestazioni prescritte
+                            </h3>
+                        </div>
+
+                        <div className="rounded-[8px] border border-sky-200 bg-sky-50/70 p-4 text-xs leading-relaxed text-sky-800 dark:border-sky-500/20 dark:bg-sky-950/10 dark:text-sky-200">
+                            Queste voci sono visite, esami, imaging o riabilitazione: restano fuori dal piano farmacologico e vengono proposte per il dominio dedicato.
+                        </div>
+
+                        <div className="space-y-3">
+                            {(localDraft.servicePrescriptions ?? []).map((item) => (
+                                <div key={item.id} className="rounded-[8px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{item.serviceName}</p>
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    {item.category ?? 'other'}
+                                                </span>
+                                                {item.confidence && (
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                        {item.confidence}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.evidence && (
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    Evidenza: {item.evidence}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={item.included}
+                                            onChange={() => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => (
+                                                    candidate.id === item.id ? { ...candidate, included: !candidate.included } : candidate
+                                                )),
+                                            }))}
+                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <input
+                                            value={item.serviceName}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceName: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Nome prestazione"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.serviceCode || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceCode: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Codice prestazione"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.clinicalQuestion || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, clinicalQuestion: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Quesito clinico"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.provider || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, provider: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Struttura / specialita"
                                             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     </div>

@@ -187,7 +187,7 @@ export default function ProstheticPrescriptionManager({ patientId }: Props) {
                         Diario ausili e prescrizioni
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                        Registra cosa e stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
+                        Registra cosa è stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -228,8 +228,8 @@ export default function ProstheticPrescriptionManager({ patientId }: Props) {
                             <input className="input-field" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
-                            Descrizione ausilio
-                            <input className="input-field" value={form.description} onChange={(event) => updateForm('description', event.target.value)} placeholder="Carrozzina ad autospinta..." />
+                            Descrizione ausilio <span aria-hidden className="text-rose-600">*</span>
+                            <input className="input-field" value={form.description} onChange={(event) => updateForm('description', event.target.value)} placeholder="Carrozzina ad autospinta..." aria-required="true" />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Misure / configurazione

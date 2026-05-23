@@ -7,7 +7,7 @@ import type {
     ExtractedPatientReviewTherapy,
 } from './pdf-service';
 /* @Codex */
-import type { TherapySuggestionState } from './ai-task-contracts';
+import type { SmartImportServicePrescriptionExtraction, TherapySuggestionState } from './ai-task-contracts';
 /* @Codex */
 import { splitDocumentIntoLines } from './document-excerpt';
 /* @Codex */
@@ -64,6 +64,24 @@ export interface PatientDocumentReviewMedication {
 }
 
 /* @Codex */
+export interface PatientDocumentReviewServicePrescription {
+    id: string;
+    serviceName: string;
+    category: SmartImportServicePrescriptionExtraction['category'];
+    priority?: string;
+    codeSystem?: string;
+    serviceCode?: string;
+    clinicalQuestion?: string;
+    provider?: string;
+    prescribedAt?: string;
+    requestReference?: string;
+    confidence?: SmartImportServicePrescriptionExtraction['confidence'];
+    evidence?: string;
+    included: boolean;
+    sourceLabel: string;
+}
+
+/* @Codex */
 export interface PatientDocumentReviewDraft {
     source: ExtractedPatientData['source'];
     confidence: number;
@@ -76,6 +94,7 @@ export interface PatientDocumentReviewDraft {
     fields: PatientDocumentReviewField[];
     diagnoses: PatientDocumentReviewDiagnosis[];
     medications: PatientDocumentReviewMedication[];
+    servicePrescriptions?: PatientDocumentReviewServicePrescription[];
 }
 
 /* @Codex */
@@ -100,6 +119,18 @@ export interface ReviewedPatientImportDefaults {
         motivation?: string;
         aic?: string;
         atc?: string;
+    }>;
+    servicePrescriptions?: Array<{
+        serviceName: string;
+        category?: SmartImportServicePrescriptionExtraction['category'];
+        priority?: string;
+        codeSystem?: string;
+        serviceCode?: string;
+        clinicalQuestion?: string;
+        provider?: string;
+        prescribedAt?: string;
+        requestReference?: string;
+        evidence?: string;
     }>;
 }
 
@@ -407,6 +438,30 @@ function mapReviewTherapy(
 }
 
 /* @Codex */
+function mapReviewServicePrescription(
+    item: SmartImportServicePrescriptionExtraction,
+    sourceLabel: string,
+    index: number,
+): PatientDocumentReviewServicePrescription {
+    return {
+        id: `service-prescription:${index}:${item.serviceName}`,
+        serviceName: item.serviceName,
+        category: item.category ?? 'other',
+        priority: item.priority,
+        codeSystem: item.codeSystem,
+        serviceCode: item.serviceCode,
+        clinicalQuestion: item.clinicalQuestion,
+        provider: item.provider,
+        prescribedAt: item.prescribedAt,
+        requestReference: item.requestReference,
+        confidence: item.confidence,
+        evidence: item.evidence,
+        included: true,
+        sourceLabel,
+    };
+}
+
+/* @Codex */
 export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): PatientDocumentReviewDraft {
     const sourceLabel = buildSourceLabel(data.source);
     const notesValue = buildSuggestedPatientNotes(data) || '';
@@ -439,6 +494,8 @@ export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): Pat
     const medications = data.reviewTherapies?.length
         ? data.reviewTherapies.map((medication, index) => mapReviewTherapy(data, medication, sourceLabel, index))
         : dedupeStrings(data.medications || []).map((medication, index) => mapLegacyMedication(medication, sourceLabel, index));
+    const servicePrescriptions = (data.servicePrescriptions || [])
+        .map((item, index) => mapReviewServicePrescription(item, sourceLabel, index));
 
     return {
         source: data.source,
@@ -449,6 +506,7 @@ export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): Pat
         fields,
         diagnoses,
         medications,
+        servicePrescriptions,
     };
 }
 

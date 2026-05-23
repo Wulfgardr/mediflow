@@ -49,11 +49,19 @@ function buildEvidence(draft: PatientDocumentReviewDraft): DocumentDecisionEvide
             'patient-document-review',
         ));
     });
+    (draft.servicePrescriptions ?? []).forEach((item, index) => {
+        evidence.push(createDocumentDecisionEvidenceRef(
+            evidenceId('service-prescription', index),
+            compact(item.evidence) || [item.serviceName, item.clinicalQuestion, item.serviceCode].filter(Boolean).join(' '),
+            'patient-document-review',
+        ));
+    });
 
     return evidence;
 }
 
 function classifyDraft(draft: PatientDocumentReviewDraft): DocumentDecisionClassification {
+    if ((draft.servicePrescriptions ?? []).length > 0) return 'specialist_service_prescription';
     if (draft.diagnoses.length > 0) return 'specialist_report';
     if (draft.fields.some((field) => field.key === 'taxCode')) return 'identity_document';
     return 'unknown';
@@ -113,10 +121,20 @@ export function buildPatientDocumentDecision(draft: PatientDocumentReviewDraft):
         rationale: therapy.rationale,
         blockedReason: therapy.action === 'persist_structured' ? undefined : 'prescription_is_not_active_therapy',
     }));
+    const servicePrescriptions = importDecision.servicePrescriptionDecisions.map((item, index): DocumentDecisionDomainItem => ({
+        id: `service-prescription:${item.id}`,
+        label: item.serviceName,
+        action: item.action === 'propose_structured' ? 'create_service_prescription_proposal' : 'blocked',
+        confidence: item.confidence ?? confidenceFromDraft(draft),
+        evidenceRefs: [evidenceId('service-prescription', index)],
+        rationale: item.rationale,
+        blockedReason: item.action === 'propose_structured' ? undefined : 'service_prescription_is_not_drug',
+    }));
     const proposedActions = [
         ...patientFields,
         ...clinicalFacts,
         ...medicationPrescriptions,
+        ...servicePrescriptions,
     ].map(actionFromDomain);
 
     return applyDocumentDecisionGuardrails(buildDocumentDecision({
@@ -127,7 +145,7 @@ export function buildPatientDocumentDecision(draft: PatientDocumentReviewDraft):
         },
         classification: {
             type: classifyDraft(draft),
-            family: draft.medications.length > 0 ? 'prescription' : draft.diagnoses.length > 0 ? 'report' : 'unknown',
+            family: (draft.servicePrescriptions ?? []).length > 0 || draft.medications.length > 0 ? 'prescription' : draft.diagnoses.length > 0 ? 'report' : 'unknown',
             confidence: confidenceFromDraft(draft),
             rationale: draft.quality?.reason || 'Decisione derivata dalla review documentale prima dell apply al form.',
             evidenceRefs: [fallbackEvidenceRef],
@@ -137,6 +155,7 @@ export function buildPatientDocumentDecision(draft: PatientDocumentReviewDraft):
             patientFields,
             clinicalFacts,
             medicationPrescriptions,
+            servicePrescriptions,
         },
         proposedActions,
         humanRequiredFor: ['clinical_write', 'identity_resolution'],

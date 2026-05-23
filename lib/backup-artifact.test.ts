@@ -50,6 +50,7 @@ const basePayload = {
     ],
     observations: [],
     prostheticPrescriptions: [],
+    servicePrescriptions: [],
     sissHandoffs: [],
     patients: [
         {

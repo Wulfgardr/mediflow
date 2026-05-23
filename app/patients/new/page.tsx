@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { db } from '@/lib/db';
+import {
+    db,
+    type ServicePrescriptionCategory,
+    type ServicePrescriptionPriority,
+} from '@/lib/db';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,6 +22,9 @@ import {
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/patient-document-review';
+
+/* @Codex */
+type ImportedServicePrescriptionDraft = NonNullable<ReviewedPatientImportDefaults['servicePrescriptions']>[number];
 
 /* @Codex */
 type ImportedPatientDraft = {
@@ -42,7 +49,50 @@ type ImportedPatientDraft = {
         aic?: string;
         atc?: string;
     }>;
+    servicePrescriptions?: ImportedServicePrescriptionDraft[];
 };
+
+/* @Codex */
+const SERVICE_PRESCRIPTION_CATEGORIES = new Set<ServicePrescriptionCategory>([
+    'lab',
+    'imaging',
+    'visit',
+    'rehab',
+    'screening',
+    'procedure',
+    'other',
+]);
+
+/* @Codex */
+const SERVICE_PRESCRIPTION_PRIORITIES = new Set<ServicePrescriptionPriority>([
+    'U',
+    'B',
+    'D',
+    'P',
+    'routine',
+    'unknown',
+]);
+
+/* @Codex */
+function normalizeServicePrescriptionCategory(
+    value: ImportedServicePrescriptionDraft['category'],
+): ServicePrescriptionCategory {
+    return value && SERVICE_PRESCRIPTION_CATEGORIES.has(value) ? value : 'other';
+}
+
+/* @Codex */
+function normalizeServicePrescriptionPriority(value: string | undefined): ServicePrescriptionPriority {
+    return value && SERVICE_PRESCRIPTION_PRIORITIES.has(value as ServicePrescriptionPriority)
+        ? value as ServicePrescriptionPriority
+        : 'unknown';
+}
+
+/* @Codex */
+function parseImportedServicePrescriptionDate(value: string | undefined, fallback: Date): Date {
+    if (!value) return fallback;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
 
 export default function NewPatientPage() {
     const router = useRouter();
@@ -121,6 +171,31 @@ export default function NewPatientPage() {
                     updatedAt: new Date(),
                 }));
                 await db.therapies.bulkPut(therapyItems);
+            }
+
+            if (Array.isArray(importedData?.servicePrescriptions) && importedData.servicePrescriptions.length > 0) {
+                const now = new Date();
+                const servicePrescriptionItems = importedData.servicePrescriptions
+                    .filter((item) => item.serviceName.trim().length > 0)
+                    .map((item) => ({
+                        id: uuidv4(),
+                        patientId,
+                        prescribedAt: parseImportedServicePrescriptionDate(item.prescribedAt, now),
+                        status: 'prescribed' as const,
+                        category: normalizeServicePrescriptionCategory(item.category),
+                        priority: normalizeServicePrescriptionPriority(item.priority),
+                        codeSystem: item.codeSystem,
+                        serviceCode: item.serviceCode,
+                        serviceName: item.serviceName.trim(),
+                        clinicalQuestion: item.clinicalQuestion,
+                        provider: item.provider,
+                        requestReference: item.requestReference,
+                        source: 'document_review' as const,
+                        notes: item.evidence ? `Evidenza documento: ${item.evidence}` : undefined,
+                        createdAt: now,
+                        updatedAt: now,
+                    }));
+                await db.servicePrescriptions.bulkPut(servicePrescriptionItems);
             }
 
             router.push('/');
@@ -244,6 +319,7 @@ export default function NewPatientPage() {
                                     notes: reviewedDefaults.notes,
                                     diagnoses: reviewedDefaults.diagnoses,
                                     therapies: reviewedDefaults.therapies,
+                                    servicePrescriptions: reviewedDefaults.servicePrescriptions,
                                 });
                                 setPendingImportReview(null);
                                 setImportMeta((current) => current ? { ...current, reviewPending: false } : current);

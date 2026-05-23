@@ -44,7 +44,9 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
     const therapies = useLiveQuery(
         async () => {
             const items = await db.therapies.filter((therapy: Therapy) => therapy.patientId === patientId).toArray();
-            return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+            return items
+                .filter((therapy) => !therapy.deletedAt)
+                .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
         },
         [patientId]
     );

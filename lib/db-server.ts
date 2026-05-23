@@ -214,6 +214,41 @@ try {
 /* @Codex */
 try {
     sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS service_prescriptions (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            prescribed_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'prescribed',
+            category TEXT NOT NULL DEFAULT 'other',
+            priority TEXT,
+            code_system TEXT,
+            service_code TEXT,
+            service_name TEXT NOT NULL,
+            clinical_question TEXT,
+            provider TEXT,
+            scheduled_at INTEGER,
+            performed_at INTEGER,
+            report_received_at INTEGER,
+            outcome_note TEXT,
+            request_reference TEXT,
+            source TEXT NOT NULL DEFAULT 'manual',
+            document_refs TEXT,
+            notes TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_patient_idx ON service_prescriptions(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_prescribed_idx ON service_prescriptions(prescribed_at DESC)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_status_idx ON service_prescriptions(status)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_category_idx ON service_prescriptions(category)').run();
+} catch (error) {
+    console.warn('[MediFlow] Service prescriptions schema check skipped:', error);
+}
+/* @Codex */
+try {
+    sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS siss_handoff_events (
             id TEXT PRIMARY KEY NOT NULL,
             patient_id TEXT NOT NULL,

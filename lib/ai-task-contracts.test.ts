@@ -138,6 +138,8 @@ test('smart import extraction drops service prescriptions from therapy suggestio
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.therapies.length, 1);
     assert.equal(parsed.value.data.therapies[0].drugMention, 'Amoxicillina 1 g');
+    assert.equal(parsed.value.data.servicePrescriptions.length, 1);
+    assert.equal(parsed.value.data.servicePrescriptions[0].serviceName, 'Visita otorinolaringoiatrica');
 });
 
 test('smart import extraction keeps drug therapies when evidence mentions a specialist visit', () => {
@@ -187,6 +189,8 @@ test('smart import extraction drops service prescriptions even when evidence con
 
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.therapies.length, 0);
+    assert.equal(parsed.value.data.servicePrescriptions.length, 1);
+    assert.equal(parsed.value.data.servicePrescriptions[0].category, 'lab');
 });
 
 test('smart import extraction drops fisioterapia and rehabilitation prescriptions from therapy lane', () => {
@@ -224,6 +228,8 @@ test('smart import extraction drops fisioterapia and rehabilitation prescription
 
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.therapies.length, 0);
+    assert.equal(parsed.value.data.servicePrescriptions.length, 3);
+    assert.equal(parsed.value.data.servicePrescriptions[0].category, 'rehab');
 });
 
 test('smart import extraction drops lab tests with units from therapy lane', () => {
@@ -261,6 +267,8 @@ test('smart import extraction drops lab tests with units from therapy lane', () 
 
     assert.equal(parsed.validTask, true);
     assert.equal(parsed.value.data.therapies.length, 0);
+    assert.equal(parsed.value.data.servicePrescriptions.some((item) => item.serviceName.startsWith('Emocromo completo')), true);
+    assert.equal(parsed.value.data.servicePrescriptions[0].category, 'lab');
 });
 
 test('smart import extraction drops imaging and ECG with units from therapy lane', () => {
@@ -401,6 +409,8 @@ test('document synthesis extraction filters fisioterapia and lab requests from m
     assert.deepEqual(parsed.value.data.medications, ['Amoxicillina 1 g ogni 12 ore']);
     assert.equal(parsed.value.data.therapyCandidates.length, 1);
     assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Amoxicillina 1 g');
+    assert.equal(parsed.value.data.servicePrescriptions.length, 4);
+    assert.equal(parsed.value.data.servicePrescriptions.some((item) => item.serviceName.startsWith('Emocromo completo')), true);
 });
 
 test('smart import prompt prioritizes current pathology coding and active therapy extraction', () => {
@@ -460,6 +470,8 @@ test('document synthesis extraction keeps service prescriptions out of medicatio
     assert.deepEqual(parsed.value.data.medications, ['Amoxicillina 1 g ogni 12 ore']);
     assert.equal(parsed.value.data.therapyCandidates.length, 1);
     assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Amoxicillina 1 g');
+    assert.equal(parsed.value.data.servicePrescriptions.length, 1);
+    assert.equal(parsed.value.data.servicePrescriptions[0].serviceName, 'Visita otorinolaringoiatrica di controllo');
 });
 
 test('document synthesis extraction keeps coded ecocolordoppler prescriptions out of medication lanes', () => {
@@ -519,6 +531,7 @@ test('document synthesis extraction filters legacy service prescription payloads
 
     assert.deepEqual(parsed.value.data.medications, []);
     assert.equal(parsed.value.data.therapyCandidates.length, 0);
+    assert.equal(parsed.value.data.servicePrescriptions.length, 1);
     assert.equal(parsed.value.data.qualityReason, 'Analisi completata con dati parziali');
 });
 

@@ -2,6 +2,7 @@ import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from './db';
 import type {
     SmartImportConfidence,
     SmartImportDiagnosisExtraction,
+    SmartImportServicePrescriptionExtraction,
     SmartImportTherapyExtraction,
     TherapySuggestionState,
 } from './ai-task-contracts';
@@ -23,6 +24,7 @@ export interface ExtractedPatientData {
     diagnoses?: DocumentDiagnosisSuggestion[];
     problemStatements?: SmartImportDiagnosisExtraction[];
     therapyCandidates?: SmartImportTherapyExtraction[];
+    servicePrescriptions?: SmartImportServicePrescriptionExtraction[];
     reviewDiagnoses?: ExtractedPatientReviewDiagnosis[];
     reviewTherapies?: ExtractedPatientReviewTherapy[];
     documentSummary?: string;

@@ -176,6 +176,31 @@ export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
 });
 
 /* @Codex */
+export const servicePrescriptions = sqliteTable('service_prescriptions', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category').notNull().default('other'),
+    priority: text('priority'),
+    codeSystem: text('code_system'),
+    serviceCode: text('service_code'),
+    serviceName: text('service_name').notNull(),
+    clinicalQuestion: text('clinical_question'),
+    provider: text('provider'),
+    scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
+    performedAt: integer('performed_at', { mode: 'timestamp' }),
+    reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
+    outcomeNote: text('outcome_note'),
+    requestReference: text('request_reference'),
+    source: text('source').notNull().default('manual'),
+    documentRefs: text('document_refs'),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
 export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),

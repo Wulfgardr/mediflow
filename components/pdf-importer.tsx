@@ -82,6 +82,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     data.medications = analysis.medications;
                     data.problemStatements = analysis.problemStatements;
                     data.therapyCandidates = analysis.therapyCandidates;
+                    data.servicePrescriptions = analysis.servicePrescriptions;
                     data.documentQuality = analysis.quality;
                     data.documentSummary = analysis.summary;
                     if (!data.notes && analysis.summary) {

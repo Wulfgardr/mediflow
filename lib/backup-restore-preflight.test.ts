@@ -19,6 +19,7 @@ const basePayload = {
     messages: [],
     observations: [],
     prostheticPrescriptions: [],
+    servicePrescriptions: [],
     sissHandoffs: [],
     patients: [],
     checkups: [],

@@ -155,6 +155,8 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
     /* @Codex */
+    service_prescriptions: ['serviceName', 'clinicalQuestion', 'provider', 'outcomeNote', 'requestReference', 'documentRefs', 'notes'],
+    /* @Codex */
     siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
@@ -518,6 +520,8 @@ class MedicalApiClient {
     /* @Codex */
     prostheticPrescriptions: ApiTable<ProstheticPrescription>;
     /* @Codex */
+    servicePrescriptions: ApiTable<ServicePrescription>;
+    /* @Codex */
     sissHandoffs: ApiTable<SissHandoffEvent>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
@@ -541,6 +545,8 @@ class MedicalApiClient {
         this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
         /* @Codex */
         this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
+        /* @Codex */
+        this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey);
         /* @Codex */
         this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
@@ -724,6 +730,40 @@ export interface ProstheticPrescription {
     updatedAt?: Date;
 }
 
+/* @Codex */
+export type ServicePrescriptionStatus = 'prescribed' | 'booked' | 'performed' | 'report_received' | 'cancelled';
+
+/* @Codex */
+export type ServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
+
+/* @Codex */
+export type ServicePrescriptionPriority = 'U' | 'B' | 'D' | 'P' | 'routine' | 'unknown';
+
+/* @Codex */
+export interface ServicePrescription {
+    id: string;
+    patientId: string;
+    prescribedAt: Date;
+    status: ServicePrescriptionStatus;
+    category: ServicePrescriptionCategory;
+    priority?: ServicePrescriptionPriority;
+    codeSystem?: string;
+    serviceCode?: string;
+    serviceName: string;
+    clinicalQuestion?: string;
+    provider?: string;
+    scheduledAt?: Date;
+    performedAt?: Date;
+    reportReceivedAt?: Date;
+    outcomeNote?: string;
+    requestReference?: string;
+    source: 'manual' | 'document_review' | 'legacy_therapy_cleanup';
+    documentRefs?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt?: Date;
+}
+
 export interface AifaDrug {
     aic: string;
     name: string;
@@ -769,4 +809,8 @@ export interface Therapy {
     endDate?: Date;
     createdAt: Date;
     updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 }

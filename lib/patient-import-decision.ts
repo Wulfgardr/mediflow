@@ -4,6 +4,7 @@ import type {
     PatientDocumentReviewDraft,
     PatientDocumentReviewField,
     PatientDocumentReviewMedication,
+    PatientDocumentReviewServicePrescription,
     ReviewedPatientImportDefaults,
 } from './patient-document-review';
 
@@ -88,6 +89,24 @@ export interface PatientImportTherapyDecision {
 }
 
 /* @Codex */
+export interface PatientImportServicePrescriptionDecision {
+    id: string;
+    serviceName: string;
+    category?: PatientDocumentReviewServicePrescription['category'];
+    priority?: string;
+    codeSystem?: string;
+    serviceCode?: string;
+    clinicalQuestion?: string;
+    provider?: string;
+    prescribedAt?: string;
+    requestReference?: string;
+    confidence?: PatientDocumentReviewServicePrescription['confidence'];
+    evidence?: string;
+    action: 'propose_structured' | 'ignore';
+    rationale: string;
+}
+
+/* @Codex */
 export interface PatientImportDecision {
     schemaVersion: typeof PATIENT_IMPORT_DECISION_SCHEMA_VERSION;
     generatedAt: string;
@@ -102,11 +121,13 @@ export interface PatientImportDecision {
     fieldDecisions: PatientImportFieldDecision[];
     diagnosisDecisions: PatientImportDiagnosisDecision[];
     therapyDecisions: PatientImportTherapyDecision[];
+    servicePrescriptionDecisions: PatientImportServicePrescriptionDecision[];
     summary: {
         appliedFieldCount: number;
         structuredDiagnosisCount: number;
         structuredTherapyCount: number;
         noteOnlyTherapyCount: number;
+        servicePrescriptionProposalCount: number;
     };
 }
 
@@ -292,6 +313,28 @@ function buildTherapyDecision(medication: PatientDocumentReviewMedication): Pati
 }
 
 /* @Codex */
+function buildServicePrescriptionDecision(item: PatientDocumentReviewServicePrescription): PatientImportServicePrescriptionDecision {
+    return {
+        id: item.id,
+        serviceName: item.serviceName.trim(),
+        category: item.category,
+        priority: item.priority?.trim() || undefined,
+        codeSystem: item.codeSystem?.trim() || undefined,
+        serviceCode: item.serviceCode?.trim() || undefined,
+        clinicalQuestion: item.clinicalQuestion?.trim() || undefined,
+        provider: item.provider?.trim() || undefined,
+        prescribedAt: item.prescribedAt?.trim() || undefined,
+        requestReference: item.requestReference?.trim() || undefined,
+        confidence: item.confidence,
+        evidence: item.evidence,
+        action: item.included && item.serviceName.trim() ? 'propose_structured' : 'ignore',
+        rationale: item.included
+            ? 'Prestazione prescritta distinta dalla terapia farmacologica: proposta per dominio dedicato.'
+            : 'Prestazione esclusa nella review operatore.',
+    };
+}
+
+/* @Codex */
 export function decidePatientImportTarget(input: DecidePatientImportTargetInput): PatientImportTargetDecision {
     const normalizedTaxCode = normalizeTaxCode(input.taxCode);
     const taxCodeMatches = normalizedTaxCode
@@ -366,6 +409,7 @@ export function buildPatientImportDecision(
     const fieldDecisions = draft.fields.map(buildFieldDecision);
     const diagnosisDecisions = draft.diagnoses.map(buildDiagnosisDecision);
     const therapyDecisions = draft.medications.map(buildTherapyDecision);
+    const servicePrescriptionDecisions = (draft.servicePrescriptions ?? []).map(buildServicePrescriptionDecision);
 
     return {
         schemaVersion: PATIENT_IMPORT_DECISION_SCHEMA_VERSION,
@@ -384,11 +428,13 @@ export function buildPatientImportDecision(
         fieldDecisions,
         diagnosisDecisions,
         therapyDecisions,
+        servicePrescriptionDecisions,
         summary: {
             appliedFieldCount: fieldDecisions.filter((decision) => decision.action === 'apply').length,
             structuredDiagnosisCount: diagnosisDecisions.filter((decision) => decision.action === 'apply_structured').length,
             structuredTherapyCount: therapyDecisions.filter((decision) => decision.action === 'persist_structured').length,
             noteOnlyTherapyCount: therapyDecisions.filter((decision) => decision.action === 'append_note').length,
+            servicePrescriptionProposalCount: servicePrescriptionDecisions.filter((decision) => decision.action === 'propose_structured').length,
         },
     };
 }
@@ -457,6 +503,35 @@ export function applyPatientImportDecision(
     );
     if (medicationsBlock) {
         notesParts.push(medicationsBlock);
+    }
+
+    const servicePrescriptions = decision.servicePrescriptionDecisions
+        .filter((item) => item.action === 'propose_structured')
+        .map((item) => ({
+            serviceName: item.serviceName,
+            category: item.category,
+            priority: item.priority,
+            codeSystem: item.codeSystem,
+            serviceCode: item.serviceCode,
+            clinicalQuestion: item.clinicalQuestion,
+            provider: item.provider,
+            prescribedAt: item.prescribedAt,
+            requestReference: item.requestReference,
+            evidence: item.evidence,
+        }));
+    if (servicePrescriptions.length > 0) {
+        nextDefaults.servicePrescriptions = servicePrescriptions;
+        notesParts.push([
+            'Prestazioni prescritte da registrare nel dominio dedicato:',
+            ...servicePrescriptions.map((item) => {
+                const details = [
+                    item.serviceName,
+                    item.serviceCode ? `(${item.serviceCode})` : undefined,
+                    item.clinicalQuestion ? `- ${item.clinicalQuestion}` : undefined,
+                ].filter(Boolean);
+                return `- ${details.join(' ')}`;
+            }),
+        ].join('\n'));
     }
 
     if (notesParts.length > 0) {

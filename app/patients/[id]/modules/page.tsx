@@ -15,6 +15,7 @@ import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
+import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
@@ -127,6 +128,7 @@ export default function PatientDetailPage() {
         { href: '#quadro', label: 'Quadro' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
         { href: '#terapie', label: 'Terapie' },
+        { href: '#prestazioni', label: 'Prestazioni' },
         { href: '#parametri', label: 'Parametri' },
         { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
         { href: '#documenti', label: 'Documenti', meta: String(documentInsights.length) },
@@ -281,6 +283,8 @@ export default function PatientDetailPage() {
                     <div id="terapie" className={workspaceStyles.anchorStack}>
                         <TherapyManager patientId={id} />
                     </div>
+
+                    <ServicePrescriptionManager patientId={id} />
 
                     <div id="parametri" className={workspaceStyles.anchorStack}>
                         <ObservationManager patientId={id} />
