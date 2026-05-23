@@ -35,6 +35,9 @@ export const AUDIT_EVENT_TYPES = [
     'service.prescription.created',
     'service.prescription.updated',
     'service.prescription.deleted',
+    'service.prescription_item.created',
+    'service.prescription_item.updated',
+    'service.prescription_item.deleted',
     'siss.handoff.created',
     'siss.handoff.updated',
     'siss.handoff.deleted',
@@ -45,7 +48,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'prosthetic_prescription' | 'service_prescription' | 'siss_handoff' | 'settings';
+export type AuditSubjectType = 'session' | 'patient' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -373,6 +376,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         observation: 0,
         prosthetic_prescription: 0,
         service_prescription: 0,
+        service_prescription_item: 0,
         siss_handoff: 0,
         settings: 0,
     };

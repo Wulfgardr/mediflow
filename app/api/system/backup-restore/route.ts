@@ -14,6 +14,8 @@ import {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
     servicePrescriptions,
     sissHandoffEvents,
     therapies,
@@ -40,7 +42,9 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'attachments',
     'observations',
     'prostheticPrescriptions',
+    'servicePrescriptionItems',
     'servicePrescriptions',
+    'serviceCatalogEntries',
     'sissHandoffs',
     'checkups',
     'therapies',
@@ -64,6 +68,8 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'observations',
     'prostheticPrescriptions',
     'servicePrescriptions',
+    'servicePrescriptionItems',
+    'serviceCatalogEntries',
     'sissHandoffs',
     'attachments',
     'messages',
@@ -82,6 +88,8 @@ const TABLES = {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
     servicePrescriptions,
     sissHandoffs: sissHandoffEvents,
     therapies,
@@ -99,6 +107,8 @@ const TABLE_LOOKUP = {
     observations,
     patients,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
     servicePrescriptions,
     sissHandoffs: sissHandoffEvents,
     therapies,
@@ -118,6 +128,8 @@ type InsertableTable =
     | typeof patients
     | typeof patientsToAmbulatories
     | typeof prostheticPrescriptions
+    | typeof serviceCatalogEntries
+    | typeof servicePrescriptionItems
     | typeof servicePrescriptions
     | typeof sissHandoffEvents
     | typeof therapies;
@@ -190,6 +202,8 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observationsRows,
         patientsRows,
         prostheticPrescriptionRows,
+        serviceCatalogRows,
+        servicePrescriptionItemRows,
         servicePrescriptionRows,
         sissHandoffRows,
         checkupsRows,
@@ -206,6 +220,8 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         dbServer.select().from(observations),
         dbServer.select().from(patients),
         dbServer.select().from(prostheticPrescriptions),
+        dbServer.select().from(serviceCatalogEntries),
+        dbServer.select().from(servicePrescriptionItems),
         dbServer.select().from(servicePrescriptions),
         dbServer.select().from(sissHandoffEvents),
         dbServer.select().from(checkups),
@@ -242,6 +258,8 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
         patients: sortBackupRows(enrichedPatients),
         prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
+        serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
+        servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
         servicePrescriptions: sortBackupRows(filterRowsByReference(servicePrescriptionRows, 'patientId', patientIds)),
         sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
         checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
@@ -257,6 +275,7 @@ const DATE_FIELDS = new Set([
     'createdAt',
     'date',
     'endDate',
+    'importedAt',
     'observedAt',
     'performedAt',
     'prescribedAt',
@@ -427,6 +446,16 @@ export async function POST(request: Request) {
 
                 if (collection === 'servicePrescriptions') {
                     insertRows(tx, TABLE_LOOKUP.servicePrescriptions, artifact.payload.servicePrescriptions);
+                    continue;
+                }
+
+                if (collection === 'servicePrescriptionItems') {
+                    insertRows(tx, TABLE_LOOKUP.servicePrescriptionItems, artifact.payload.servicePrescriptionItems);
+                    continue;
+                }
+
+                if (collection === 'serviceCatalogEntries') {
+                    insertRows(tx, TABLE_LOOKUP.serviceCatalogEntries, artifact.payload.serviceCatalogEntries);
                     continue;
                 }
 

@@ -201,6 +201,47 @@ export const servicePrescriptions = sqliteTable('service_prescriptions', {
 });
 
 /* @Codex */
+export const servicePrescriptionItems = sqliteTable('service_prescription_items', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescriptionId: text('prescription_id').references(() => servicePrescriptions.id).notNull(),
+    ordinal: integer('ordinal').notNull().default(0),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category'),
+    codeSystem: text('code_system'),
+    serviceCode: text('service_code'),
+    serviceName: text('service_name').notNull(),
+    catalogEntryId: text('catalog_entry_id'),
+    catalogDisplayName: text('catalog_display_name'),
+    matchStatus: text('match_status').notNull().default('unmatched'),
+    confidence: text('confidence'),
+    evidence: text('evidence'),
+    notes: text('notes'),
+    scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
+    performedAt: integer('performed_at', { mode: 'timestamp' }),
+    reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
+    outcomeNote: text('outcome_note'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const serviceCatalogEntries = sqliteTable('service_catalog_entries', {
+    id: text('id').primaryKey(),
+    codeSystem: text('code_system').notNull(),
+    serviceCode: text('service_code').notNull(),
+    displayName: text('display_name').notNull(),
+    category: text('category').notNull().default('other'),
+    branchCode: text('branch_code'),
+    synonyms: text('synonyms'),
+    source: text('source').notNull().default('manual'),
+    version: text('version'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    importedAt: integer('imported_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
 export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),

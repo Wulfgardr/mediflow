@@ -157,6 +157,8 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     service_prescriptions: ['serviceName', 'clinicalQuestion', 'provider', 'outcomeNote', 'requestReference', 'documentRefs', 'notes'],
     /* @Codex */
+    service_prescription_items: ['serviceName', 'catalogDisplayName', 'evidence', 'notes', 'outcomeNote'],
+    /* @Codex */
     siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
@@ -449,6 +451,14 @@ class ApiTable<T> {
         if (obj.startedAt) obj.startedAt = new Date(obj.startedAt);
         /* @Codex */
         if (obj.completedAt) obj.completedAt = new Date(obj.completedAt);
+        /* @Codex */
+        if (obj.scheduledAt) obj.scheduledAt = new Date(obj.scheduledAt);
+        /* @Codex */
+        if (obj.performedAt) obj.performedAt = new Date(obj.performedAt);
+        /* @Codex */
+        if (obj.reportReceivedAt) obj.reportReceivedAt = new Date(obj.reportReceivedAt);
+        /* @Codex */
+        if (obj.importedAt) obj.importedAt = new Date(obj.importedAt);
         return obj;
     }
 
@@ -522,6 +532,10 @@ class MedicalApiClient {
     /* @Codex */
     servicePrescriptions: ApiTable<ServicePrescription>;
     /* @Codex */
+    servicePrescriptionItems: ApiTable<ServicePrescriptionItem>;
+    /* @Codex */
+    serviceCatalogEntries: ApiTable<ServiceCatalogEntry>;
+    /* @Codex */
     sissHandoffs: ApiTable<SissHandoffEvent>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
@@ -547,6 +561,10 @@ class MedicalApiClient {
         this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
         /* @Codex */
         this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey);
+        /* @Codex */
+        this.servicePrescriptionItems = new ApiTable<ServicePrescriptionItem>('/api/service-prescription-items', 'service_prescription_items', getKey);
+        /* @Codex */
+        this.serviceCatalogEntries = new ApiTable<ServiceCatalogEntry>('/api/service-catalog', 'service_catalog_entries', getKey);
         /* @Codex */
         this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
@@ -761,6 +779,50 @@ export interface ServicePrescription {
     documentRefs?: string;
     notes?: string;
     createdAt: Date;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export type ServicePrescriptionItemMatchStatus = 'unmatched' | 'candidate' | 'matched' | 'manual' | 'not_found';
+
+/* @Codex */
+export interface ServicePrescriptionItem {
+    id: string;
+    patientId: string;
+    prescriptionId: string;
+    ordinal: number;
+    status: ServicePrescriptionStatus;
+    category?: ServicePrescriptionCategory;
+    codeSystem?: string;
+    serviceCode?: string;
+    serviceName: string;
+    catalogEntryId?: string;
+    catalogDisplayName?: string;
+    matchStatus: ServicePrescriptionItemMatchStatus;
+    confidence?: 'high' | 'medium' | 'low';
+    evidence?: string;
+    notes?: string;
+    scheduledAt?: Date;
+    performedAt?: Date;
+    reportReceivedAt?: Date;
+    outcomeNote?: string;
+    createdAt: Date;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export interface ServiceCatalogEntry {
+    id: string;
+    codeSystem: string;
+    serviceCode: string;
+    displayName: string;
+    category: ServicePrescriptionCategory;
+    branchCode?: string;
+    synonyms?: string;
+    source: string;
+    version?: string;
+    active: boolean;
+    importedAt?: Date;
     updatedAt?: Date;
 }
 

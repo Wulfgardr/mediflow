@@ -243,6 +243,105 @@ try {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_prescribed_idx ON service_prescriptions(prescribed_at DESC)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_status_idx ON service_prescriptions(status)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_category_idx ON service_prescriptions(category)').run();
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS service_prescription_items (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            prescription_id TEXT NOT NULL,
+            ordinal INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'prescribed',
+            category TEXT,
+            code_system TEXT,
+            service_code TEXT,
+            service_name TEXT NOT NULL,
+            catalog_entry_id TEXT,
+            catalog_display_name TEXT,
+            match_status TEXT NOT NULL DEFAULT 'unmatched',
+            confidence TEXT,
+            evidence TEXT,
+            notes TEXT,
+            scheduled_at INTEGER,
+            performed_at INTEGER,
+            report_received_at INTEGER,
+            outcome_note TEXT,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            FOREIGN KEY (prescription_id) REFERENCES service_prescriptions(id)
+        )
+    `).run();
+    ensureColumn('service_prescription_items', 'patient_id', 'patient_id TEXT');
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_patient_idx ON service_prescription_items(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_prescription_idx ON service_prescription_items(prescription_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_order_idx ON service_prescription_items(prescription_id, ordinal)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_status_idx ON service_prescription_items(status)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_code_idx ON service_prescription_items(code_system, service_code)').run();
+    sqlite.prepare(`
+        INSERT INTO service_prescription_items (
+            id,
+            patient_id,
+            prescription_id,
+            ordinal,
+            status,
+            category,
+            code_system,
+            service_code,
+            service_name,
+            match_status,
+            scheduled_at,
+            performed_at,
+            report_received_at,
+            outcome_note,
+            notes,
+            created_at,
+            updated_at
+        )
+        SELECT
+            id || ':item:0',
+            patient_id,
+            id,
+            0,
+            status,
+            category,
+            code_system,
+            service_code,
+            service_name,
+            CASE
+                WHEN service_code IS NOT NULL AND trim(service_code) <> '' THEN 'manual'
+                ELSE 'unmatched'
+            END,
+            scheduled_at,
+            performed_at,
+            report_received_at,
+            outcome_note,
+            notes,
+            COALESCE(created_at, unixepoch()),
+            COALESCE(updated_at, unixepoch())
+        FROM service_prescriptions
+        WHERE NOT EXISTS (
+            SELECT 1 FROM service_prescription_items
+            WHERE service_prescription_items.prescription_id = service_prescriptions.id
+        )
+    `).run();
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS service_catalog_entries (
+            id TEXT PRIMARY KEY NOT NULL,
+            code_system TEXT NOT NULL,
+            service_code TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'other',
+            branch_code TEXT,
+            synonyms TEXT,
+            source TEXT NOT NULL DEFAULT 'manual',
+            version TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            imported_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS service_catalog_entries_code_idx ON service_catalog_entries(code_system, service_code)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_catalog_entries_display_idx ON service_catalog_entries(display_name)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS service_catalog_entries_category_idx ON service_catalog_entries(category)').run();
 } catch (error) {
     console.warn('[MediFlow] Service prescriptions schema check skipped:', error);
 }

@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ClipboardList,
     FileText,
+    ListChecks,
     LoaderCircle,
     Plus,
     Stethoscope,
@@ -17,6 +18,7 @@ import {
     db,
     type ServicePrescription,
     type ServicePrescriptionCategory,
+    type ServicePrescriptionItem,
     type ServicePrescriptionPriority,
     type ServicePrescriptionStatus,
 } from '@/lib/db';
@@ -44,6 +46,7 @@ type FormState = {
     source: 'manual' | 'document_review';
     documentRefs: string;
     notes: string;
+    itemsText: string;
 };
 
 const STATUS_OPTIONS: Array<{ value: ServicePrescriptionStatus; label: string }> = [
@@ -96,6 +99,7 @@ function emptyForm(): FormState {
         source: 'manual',
         documentRefs: '',
         notes: '',
+        itemsText: '',
     };
 }
 
@@ -142,6 +146,29 @@ function formatDate(value: Date | string | undefined): string | null {
     return parsed.toLocaleDateString('it-IT');
 }
 
+function parseItemDrafts(value: string, fallbackName: string): Array<{ serviceName: string; serviceCode?: string }> {
+    const lines = value
+        .split(/\n|;/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const source = lines.length > 0 ? lines : [fallbackName.trim()].filter(Boolean);
+    return source.map((line) => {
+        const match = line.match(/^([A-Za-z0-9._/-]{2,})\s+(.+)$/);
+        const looksLikeCode = Boolean(match?.[1] && /[0-9._/-]/.test(match[1]));
+        return match && looksLikeCode
+            ? { serviceCode: match[1].trim(), serviceName: match[2].trim() }
+            : { serviceName: line };
+    });
+}
+
+/* @Codex */
+function childServiceCodeForDraft(
+    draft: { serviceName: string; serviceCode?: string },
+    inheritedServiceCode: string | undefined,
+): string | undefined {
+    return draft.serviceCode ?? inheritedServiceCode;
+}
+
 export default function ServicePrescriptionManager({ patientId }: Props) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -158,6 +185,31 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
             );
         },
         [patientId],
+    );
+
+    const prescriptionItems = useLiveQuery(
+        async () => {
+            const items = await db.servicePrescriptionItems
+                .filter((item: ServicePrescriptionItem) => item.patientId === patientId)
+                .toArray();
+            return items.sort((left, right) => left.ordinal - right.ordinal);
+        },
+        [patientId],
+    );
+
+    const itemsByPrescription = useMemo(() => {
+        const map = new Map<string, ServicePrescriptionItem[]>();
+        for (const item of prescriptionItems ?? []) {
+            const current = map.get(item.prescriptionId) ?? [];
+            current.push(item);
+            map.set(item.prescriptionId, current);
+        }
+        return map;
+    }, [prescriptionItems]);
+
+    const parsedItemsPreview = useMemo(
+        () => parseItemDrafts(form.itemsText, form.serviceName),
+        [form.itemsText, form.serviceName],
     );
 
     const openCount = useMemo(
@@ -184,8 +236,9 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
 
         setIsSaving(true);
         try {
+            const prescriptionId = crypto.randomUUID();
             await db.servicePrescriptions.add({
-                id: crypto.randomUUID(),
+                id: prescriptionId,
                 patientId,
                 prescribedAt: new Date(form.prescribedAt),
                 status: form.status,
@@ -207,6 +260,35 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
+
+            const itemDrafts = parseItemDrafts(form.itemsText, form.serviceName);
+            const inheritedServiceCode = itemDrafts.length === 1 ? optionalValue(form.serviceCode) : undefined;
+            await Promise.all(itemDrafts.map((draft, index) => {
+                const serviceCode = childServiceCodeForDraft(draft, inheritedServiceCode);
+                return db.servicePrescriptionItems.add({
+                    id: crypto.randomUUID(),
+                    patientId,
+                    prescriptionId,
+                    ordinal: index,
+                    status: form.status,
+                    category: form.category,
+                    codeSystem: serviceCode ? optionalValue(form.codeSystem) : undefined,
+                    serviceCode,
+                    serviceName: draft.serviceName,
+                    catalogDisplayName: undefined,
+                    catalogEntryId: undefined,
+                    matchStatus: serviceCode ? 'manual' : 'unmatched',
+                    confidence: undefined,
+                    evidence: undefined,
+                    notes: undefined,
+                    scheduledAt: optionalDate(form.scheduledAt),
+                    performedAt: optionalDate(form.performedAt),
+                    reportReceivedAt: optionalDate(form.reportReceivedAt),
+                    outcomeNote: optionalValue(form.outcomeNote),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }));
             setForm(emptyForm());
             setIsFormOpen(false);
         } catch (submitError) {
@@ -216,40 +298,69 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
         }
     };
 
-    const markBooked = async (item: ServicePrescription) => {
+    /* @Codex */
+    const updatePrescriptionAndItems = async (
+        item: ServicePrescription,
+        update: Partial<ServicePrescription>,
+        childUpdate: Partial<ServicePrescriptionItem>,
+    ) => {
         await db.servicePrescriptions.update(item.id, {
-            status: 'booked',
-            scheduledAt: item.scheduledAt ?? new Date(),
+            ...update,
             updatedAt: new Date(),
+        });
+        const children = itemsByPrescription.get(item.id) ?? [];
+        await Promise.all(children.map((child) => db.servicePrescriptionItems.update(child.id, {
+            ...childUpdate,
+            updatedAt: new Date(),
+        })));
+    };
+
+    const markBooked = async (item: ServicePrescription) => {
+        const scheduledAt = item.scheduledAt ?? new Date();
+        await updatePrescriptionAndItems(item, {
+            status: 'booked',
+            scheduledAt,
+        }, {
+            status: 'booked',
+            scheduledAt,
         });
     };
 
     const markPerformed = async (item: ServicePrescription) => {
-        await db.servicePrescriptions.update(item.id, {
+        const performedAt = item.performedAt ?? new Date();
+        await updatePrescriptionAndItems(item, {
             status: 'performed',
-            performedAt: item.performedAt ?? new Date(),
-            updatedAt: new Date(),
+            performedAt,
+        }, {
+            status: 'performed',
+            performedAt,
         });
     };
 
     const markReportReceived = async (item: ServicePrescription) => {
-        await db.servicePrescriptions.update(item.id, {
+        const reportReceivedAt = item.reportReceivedAt ?? new Date();
+        await updatePrescriptionAndItems(item, {
             status: 'report_received',
-            reportReceivedAt: item.reportReceivedAt ?? new Date(),
-            updatedAt: new Date(),
+            reportReceivedAt,
+        }, {
+            status: 'report_received',
+            reportReceivedAt,
         });
     };
 
     const cancelItem = async (item: ServicePrescription) => {
-        await db.servicePrescriptions.update(item.id, {
+        await updatePrescriptionAndItems(item, {
             status: 'cancelled',
-            updatedAt: new Date(),
+        }, {
+            status: 'cancelled',
         });
     };
 
     const deleteItem = async (item: ServicePrescription) => {
         const confirmed = confirm(`Eliminare la prestazione "${item.serviceName}"?`);
         if (!confirmed) return;
+        const children = itemsByPrescription.get(item.id) ?? [];
+        await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true })));
         await db.servicePrescriptions.delete(item.id);
     };
 
@@ -267,7 +378,8 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <span className="apple-chip">{prescriptions?.length ?? 0} voci</span>
+                    <span className="apple-chip">{prescriptions?.length ?? 0} prestazioni</span>
+                    <span className="apple-chip">{prescriptionItems?.length ?? 0} voci</span>
                     <span className="apple-chip">{openCount} aperte</span>
                     <span className="apple-chip">{reportCount} referti</span>
                     <button
@@ -287,16 +399,41 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                     className="mb-5 rounded-[8px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4"
                 >
                     <div className="grid gap-3 md:grid-cols-2">
+                        <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <Stethoscope className="h-3.5 w-3.5" aria-hidden />
+                            Prestazione e voci richieste
+                        </div>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
-                            Nome prestazione <span aria-hidden className="text-rose-600">*</span>
+                            Nome prestazione (raggruppa le voci) <span aria-hidden className="text-rose-600">*</span>
                             <input
                                 className="input-field"
                                 value={form.serviceName}
                                 onChange={(event) => updateForm('serviceName', event.target.value)}
-                                placeholder="es. Visita cardiologica di controllo"
+                                placeholder="es. Esami ematochimici di controllo · Visita cardiologica · RX torace"
                                 aria-required="true"
                             />
                         </label>
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                            <span className="flex items-center gap-1.5">
+                                <ListChecks className="h-3.5 w-3.5" aria-hidden />
+                                Voci richieste - una per riga, opzionale CODICE NOME
+                            </span>
+                            <textarea
+                                className="input-field min-h-28 font-mono text-xs"
+                                value={form.itemsText}
+                                onChange={(event) => updateForm('itemsText', event.target.value)}
+                                placeholder={`EMOCROMO\nD-DIMERO\nLDH\nAST\nALT\nVITAMINA D`}
+                            />
+                            <p className="text-[11px] font-normal text-[color:var(--mf-muted)]">
+                                {form.itemsText.trim().length === 0
+                                    ? 'Lascia vuoto per una singola voce con il nome della prestazione.'
+                                    : `${parsedItemsPreview.length} voci pronte al salvataggio.`}
+                            </p>
+                        </label>
+                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                            Inquadramento e pianificazione
+                        </div>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data prescrizione
                             <input
@@ -342,6 +479,10 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                                 ))}
                             </select>
                         </label>
+                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <FileText className="h-3.5 w-3.5" aria-hidden />
+                            Codifica, contesto e note
+                        </div>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Sistema codice
                             <input
@@ -490,6 +631,7 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                         const canReceiveReport = item.status !== 'report_received' && item.status !== 'cancelled';
                         const canCancel = item.status !== 'cancelled' && item.status !== 'performed' && item.status !== 'report_received';
                         const priority = item.priority ?? 'unknown';
+                        const childItems = itemsByPrescription.get(item.id) ?? [];
                         return (
                             <article
                                 key={item.id}
@@ -502,6 +644,12 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {priority !== 'unknown' && <span className="apple-chip">{priorityLabel(priority)}</span>}
+                                            {childItems.length > 0 && (
+                                                <span className="apple-chip inline-flex items-center gap-1">
+                                                    <ListChecks className="h-3 w-3" aria-hidden />
+                                                    {childItems.length} {childItems.length === 1 ? 'voce' : 'voci'}
+                                                </span>
+                                            )}
                                             {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
                                             {item.source === 'legacy_therapy_cleanup' && <span className="apple-chip">da pulizia diario</span>}
                                         </div>
@@ -550,6 +698,46 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                                         </div>
                                         {item.outcomeNote && (
                                             <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">{item.outcomeNote}</p>
+                                        )}
+                                        {childItems.length > 0 && (
+                                            <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                                    <ListChecks className="h-3.5 w-3.5" aria-hidden />
+                                                    Voci richieste · {childItems.length}
+                                                </p>
+                                                <ul className="divide-y divide-[color:rgba(112,106,100,0.08)]">
+                                                    {childItems.map((child) => {
+                                                        const matchLabel =
+                                                            child.matchStatus === 'matched'
+                                                                ? 'match'
+                                                                : child.matchStatus === 'candidate'
+                                                                    ? 'candidato'
+                                                                    : child.matchStatus === 'manual'
+                                                                        ? 'manuale'
+                                                                        : 'da codificare';
+                                                        return (
+                                                            <li
+                                                                key={child.id}
+                                                                className="flex flex-col gap-1 py-1.5 text-sm md:flex-row md:items-center md:justify-between md:gap-3"
+                                                            >
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className="font-medium text-[color:var(--mf-ink)]">{child.serviceName}</span>
+                                                                    {child.serviceCode && (
+                                                                        <span className="ml-2 font-mono text-xs text-[color:var(--mf-muted)]">
+                                                                            {child.serviceCode}
+                                                                            {child.codeSystem ? ` · ${child.codeSystem}` : ''}
+                                                                        </span>
+                                                                    )}
+                                                                    {!child.serviceCode && (
+                                                                        <span className="ml-2 text-xs italic text-[color:var(--mf-muted)]">in attesa di matching repertorio</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="apple-chip shrink-0 text-[10px]">{matchLabel}</span>
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
                                         )}
                                         {refs.length > 0 && (
                                             <div className="mt-3 flex flex-wrap gap-2">

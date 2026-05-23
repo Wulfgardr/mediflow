@@ -104,6 +104,16 @@ export interface PatientImportServicePrescriptionDecision {
     evidence?: string;
     action: 'propose_structured' | 'ignore';
     rationale: string;
+    items?: Array<{
+        id: string;
+        serviceName: string;
+        category?: PatientDocumentReviewServicePrescription['category'];
+        codeSystem?: string;
+        serviceCode?: string;
+        confidence?: PatientDocumentReviewServicePrescription['confidence'];
+        evidence?: string;
+        action: 'propose_structured' | 'ignore';
+    }>;
 }
 
 /* @Codex */
@@ -331,6 +341,16 @@ function buildServicePrescriptionDecision(item: PatientDocumentReviewServicePres
         rationale: item.included
             ? 'Prestazione prescritta distinta dalla terapia farmacologica: proposta per dominio dedicato.'
             : 'Prestazione esclusa nella review operatore.',
+        items: (item.items ?? []).map((child) => ({
+            id: child.id,
+            serviceName: child.serviceName.trim(),
+            category: child.category,
+            codeSystem: child.codeSystem?.trim() || undefined,
+            serviceCode: child.serviceCode?.trim() || undefined,
+            confidence: child.confidence,
+            evidence: child.evidence,
+            action: child.included && child.serviceName.trim() ? 'propose_structured' : 'ignore',
+        })),
     };
 }
 
@@ -518,6 +538,15 @@ export function applyPatientImportDecision(
             prescribedAt: item.prescribedAt,
             requestReference: item.requestReference,
             evidence: item.evidence,
+            items: (item.items ?? [])
+                .filter((child) => child.action === 'propose_structured')
+                .map((child) => ({
+                    serviceName: child.serviceName,
+                    category: child.category,
+                    codeSystem: child.codeSystem,
+                    serviceCode: child.serviceCode,
+                    evidence: child.evidence,
+                })),
         }));
     if (servicePrescriptions.length > 0) {
         nextDefaults.servicePrescriptions = servicePrescriptions;

@@ -79,6 +79,16 @@ export interface PatientDocumentReviewServicePrescription {
     evidence?: string;
     included: boolean;
     sourceLabel: string;
+    items?: Array<{
+        id: string;
+        serviceName: string;
+        category?: SmartImportServicePrescriptionExtraction['category'];
+        codeSystem?: string;
+        serviceCode?: string;
+        confidence?: SmartImportServicePrescriptionExtraction['confidence'];
+        evidence?: string;
+        included: boolean;
+    }>;
 }
 
 /* @Codex */
@@ -131,6 +141,13 @@ export interface ReviewedPatientImportDefaults {
         prescribedAt?: string;
         requestReference?: string;
         evidence?: string;
+        items?: Array<{
+            serviceName: string;
+            category?: SmartImportServicePrescriptionExtraction['category'];
+            codeSystem?: string;
+            serviceCode?: string;
+            evidence?: string;
+        }>;
     }>;
 }
 
@@ -458,6 +475,16 @@ function mapReviewServicePrescription(
         evidence: item.evidence,
         included: true,
         sourceLabel,
+        items: (item.items ?? []).map((child, childIndex) => ({
+            id: `service-prescription:${index}:item:${childIndex}:${child.serviceName}`,
+            serviceName: child.serviceName,
+            category: child.category ?? item.category ?? 'other',
+            codeSystem: child.codeSystem,
+            serviceCode: child.serviceCode,
+            confidence: child.confidence,
+            evidence: child.evidence,
+            included: true,
+        })),
     };
 }
 

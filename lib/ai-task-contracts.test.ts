@@ -142,6 +142,40 @@ test('smart import extraction drops service prescriptions from therapy suggestio
     assert.equal(parsed.value.data.servicePrescriptions[0].serviceName, 'Visita otorinolaringoiatrica');
 });
 
+test('smart import extraction preserves itemized lab service prescriptions', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [],
+            therapies: [],
+            servicePrescriptions: [
+                {
+                    serviceName: 'Esami ematochimici',
+                    category: 'lab',
+                    confidence: 'high',
+                    evidence: 'Richiesti emocromo, D-dimero, LDH, AST, ALT e vitamina D',
+                    sourceId: 'document:1',
+                    items: [
+                        { serviceName: 'EMOCROMO', category: 'lab', confidence: 'high', evidence: 'emocromo' },
+                        { serviceName: 'D-DIMERO', category: 'lab', confidence: 'high', evidence: 'D-dimero' },
+                        { serviceName: 'LDH', category: 'lab', confidence: 'high', evidence: 'LDH' },
+                        { serviceName: 'AST', category: 'lab', confidence: 'high', evidence: 'AST' },
+                        { serviceName: 'ALT', category: 'lab', confidence: 'high', evidence: 'ALT' },
+                        { serviceName: 'VITAMINA D', category: 'lab', confidence: 'high', evidence: 'vitamina D' },
+                    ],
+                },
+            ],
+        },
+    }));
+
+    assert.equal(parsed.value.data.therapies.length, 0);
+    assert.equal(parsed.value.data.servicePrescriptions.length, 1);
+    assert.equal(parsed.value.data.servicePrescriptions[0].items?.length, 6);
+    assert.equal(parsed.value.data.servicePrescriptions[0].items?.[0].serviceName, 'EMOCROMO');
+});
+
 test('smart import extraction keeps drug therapies when evidence mentions a specialist visit', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,

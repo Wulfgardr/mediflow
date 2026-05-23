@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
-import { servicePrescriptions } from '@/lib/schema';
+import { servicePrescriptionItems, servicePrescriptions } from '@/lib/schema';
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
@@ -129,7 +129,11 @@ export async function DELETE(request: Request, context: RouteContext) {
             .get();
         if (!existing) return NextResponse.json({ error: 'Service prescription not found' }, { status: 404 });
 
-        await dbServer.delete(servicePrescriptions).where(eq(servicePrescriptions.id, id));
+        /* @Codex */
+        dbServer.transaction((tx) => {
+            tx.delete(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, id)).run();
+            tx.delete(servicePrescriptions).where(eq(servicePrescriptions.id, id)).run();
+        });
         await safeWriteAuditEventFromRequest(request, session, {
             eventType: 'service.prescription.deleted',
             subjectType: 'service_prescription',

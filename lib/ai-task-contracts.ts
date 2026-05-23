@@ -88,6 +88,17 @@ export interface SmartImportTherapyExtraction {
 export type SmartImportServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
 
 /* @Codex */
+export interface SmartImportServicePrescriptionItemExtraction {
+    serviceName: string;
+    category?: SmartImportServicePrescriptionCategory;
+    codeSystem?: string;
+    serviceCode?: string;
+    confidence: SmartImportConfidence;
+    evidence: string;
+    sourceId?: string;
+}
+
+/* @Codex */
 export interface SmartImportServicePrescriptionExtraction {
     serviceName: string;
     category?: SmartImportServicePrescriptionCategory;
@@ -101,6 +112,7 @@ export interface SmartImportServicePrescriptionExtraction {
     confidence: SmartImportConfidence;
     evidence: string;
     sourceId?: string;
+    items?: SmartImportServicePrescriptionItemExtraction[];
 }
 
 /* @Codex */
@@ -400,6 +412,29 @@ function normalizeServicePrescriptionCategory(value: unknown): SmartImportServic
     return undefined;
 }
 
+/* @Codex */
+function normalizeServicePrescriptionItem(value: unknown, parent: { category?: SmartImportServicePrescriptionCategory; evidence: string; sourceId?: string }): SmartImportServicePrescriptionItemExtraction | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+    const record = value as Record<string, unknown>;
+    const serviceName = normalizeCompactText(
+        record.serviceName ?? record.name ?? record.display ?? record.label,
+        MAX_SMART_IMPORT_TEXT_CHARS,
+    );
+    const evidence = normalizeCompactText(record.evidence, MAX_SMART_IMPORT_TEXT_CHARS) || parent.evidence;
+    if (!serviceName || !evidence) return null;
+
+    return {
+        serviceName,
+        category: normalizeServicePrescriptionCategory(record.category) ?? parent.category ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
+        codeSystem: normalizeCompactText(record.codeSystem, 80) || undefined,
+        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, 80) || undefined,
+        confidence: normalizeConfidence(record.confidence),
+        evidence,
+        sourceId: normalizeCompactText(record.sourceId, 80) || parent.sourceId,
+    };
+}
+
 function inferServicePrescriptionCategory(text: string): SmartImportServicePrescriptionCategory {
     const normalized = text
         .normalize('NFKD')
@@ -427,7 +462,7 @@ function normalizeServicePrescription(value: unknown): SmartImportServicePrescri
 
     if (!serviceName || !evidence) return null;
 
-    return {
+    const normalized: SmartImportServicePrescriptionExtraction = {
         serviceName,
         category: normalizeServicePrescriptionCategory(record.category) ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
         priority: normalizeCompactText(record.priority, 16).toUpperCase() || undefined,
@@ -441,6 +476,12 @@ function normalizeServicePrescription(value: unknown): SmartImportServicePrescri
         evidence,
         sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
     };
+    const rawItems = Array.isArray(record.items) ? record.items : [];
+    const items = rawItems
+        .map((item) => normalizeServicePrescriptionItem(item, normalized))
+        .filter((item): item is SmartImportServicePrescriptionItemExtraction => Boolean(item));
+    if (items.length > 0) normalized.items = items.slice(0, 20);
+    return normalized;
 }
 
 function normalizeServicePrescriptionFromTherapyLike(value: unknown): SmartImportServicePrescriptionExtraction | null {
@@ -663,6 +704,15 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             therapies.push(normalized);
 
             if (therapies.length >= 10) break;
+        }
+    }
+    if (Array.isArray(envelope.data.servicePrescriptions)) {
+        for (const value of envelope.data.servicePrescriptions) {
+            const normalized = normalizeServicePrescription(value);
+            if (!normalized) continue;
+            if (servicePrescriptions.findIndex((item) => servicePrescriptionDedupeKey(item) === servicePrescriptionDedupeKey(normalized)) >= 0) continue;
+            servicePrescriptions.push(normalized);
+            if (servicePrescriptions.length >= 10) break;
         }
     }
 
@@ -908,6 +958,30 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
         "evidence": "breve evidenza testuale locale",
         "sourceId": "id della fonte usata"
       }
+    ],
+    "servicePrescriptions": [
+      {
+        "serviceName": "contenitore prescrittivo non farmacologico",
+        "category": "lab|imaging|visit|rehab|screening|procedure|other",
+        "priority": "priorita se esplicita",
+        "codeSystem": "sistema di codifica se esplicito",
+        "serviceCode": "codice contenitore se esplicito",
+        "clinicalQuestion": "quesito o motivazione se esplicita",
+        "requestReference": "riferimento impegnativa se esplicito",
+        "confidence": "high|medium|low",
+        "evidence": "breve evidenza testuale locale",
+        "sourceId": "id della fonte usata",
+        "items": [
+          {
+            "serviceName": "singola prestazione o analita esplicito",
+            "category": "lab|imaging|visit|rehab|screening|procedure|other",
+            "codeSystem": "sistema di codifica se esplicito",
+            "serviceCode": "codice se esplicito",
+            "confidence": "high|medium|low",
+            "evidence": "evidenza atomica del singolo atto"
+          }
+        ]
+      }
     ]
   }`,
         [
@@ -922,7 +996,8 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
             'massimo 5 diagnosi e 10 terapie',
             'ogni terapia deve rappresentare un singolo farmaco distinto',
             'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',
-            'se una ricetta/impegnativa prescrive una prestazione specialistica, ignorala come terapia anche se usa parole come prescritta o richiesta',
+            'se una ricetta/impegnativa prescrive una prestazione specialistica, usa servicePrescriptions e non therapies anche se usa parole come prescritta o richiesta',
+            'se una richiesta non farmacologica contiene piu atti, conserva il contenitore in serviceName e spacchetta i singoli atti in items',
             'per le terapie usa drugQuery come chiave breve per ricerca catalogo AIFA, preferendo brand o principio attivo con strength se esplicita ma senza frequenza, orari o note accessorie',
             'drugMention e activePrinciple devono essere il piu possibile aderenti al testo sorgente; se il principio attivo e ovvio usa una forma compatibile con il catalogo locale AIFA',
             'in therapies includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
@@ -994,7 +1069,17 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
         "prescribedAt": "data prescrizione se esplicita",
         "requestReference": "riferimento impegnativa se esplicito",
         "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale"
+        "evidence": "breve evidenza testuale locale",
+        "items": [
+          {
+            "serviceName": "singolo atto richiesto, es. EMOCROMO o AST",
+            "category": "lab|imaging|visit|rehab|screening|procedure|other",
+            "codeSystem": "sistema di codifica se esplicito",
+            "serviceCode": "codice del singolo atto se esplicito",
+            "confidence": "high|medium|low",
+            "evidence": "evidenza atomica del singolo atto"
+          }
+        ]
       }
     ]
   }`,
@@ -1006,6 +1091,8 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
             'non inserire in medications o therapyCandidates visite specialistiche, prestazioni, esami, controlli, consulenze, impegnative o referral: sono prescrizioni di prestazione, non farmaci',
             'se il documento e una ricetta/impegnativa per prestazione specialistica, usa servicePrescriptions e lascia medications e therapyCandidates vuoti salvo farmaci espliciti separati',
             'in servicePrescriptions includi visite specialistiche, laboratorio, imaging, riabilitazione, screening o procedure prescritte; non copiarle in medications o therapyCandidates',
+            'se una richiesta contiene un pannello o piu prestazioni, mantieni il contenitore in serviceName e spacchetta i singoli atti in items, uno per riga clinicamente distinta',
+            'per esami ematochimici esplicita items separati come EMOCROMO, D-DIMERO, LDH, AST, ALT, VITAMINA D quando presenti nel testo; non inventare atti non citati',
             'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR; se il documento non riporta codici espliciti restituisci diagnoses come array vuoto e non inventare placeholder o code vuoti',
             'in problemStatements includi solo patologie attuali, attive o clinicamente rilevanti per la gestione corrente anche se prive di codice esplicito',
             'problemStatements deve usare label in italiano clinico sintetico e icdQuery breve in inglese',
