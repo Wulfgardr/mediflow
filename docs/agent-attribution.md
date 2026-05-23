@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-23 Codex
+- Opened `WUL-283` as a bounded replacement for the broader canceled Unicum control-center idea: added a PHI-safe local workflow monitor that reads only Git/check metadata, redacts private-looking paths, produces `continue` / `needs_codex` / `blocked` verdicts, supports optional Ollama/Gemma digest on redacted summaries, bounds local snapshot history, and can install a silent user LaunchAgent while staying outside the clinical runtime: `scripts/codex-workflow-monitor.mjs`, `scripts/codex-workflow-monitor.test.mjs`, `docs/adr/0063-local-workflow-monitor-control-plane.md`, `docs/codex-workflow-monitor.md`, `docs/README.md`, `docs/markdown-index.md`, `package.json`, `docs/agent-attribution.md`
+
 ## 2026-05-21 Codex
 - Added Linear memory/hygiene tooling after the completed-issue archive: `scripts/linear-memory-tool.mjs` now supports archive-memory search, archive plans, dry-run archive/delete batches, and explicit GraphQL side effects guarded by `LINEAR_API_KEY`, `--execute`, and `--confirm-delete`; the workflow is documented as a pre-issue memory check so completed Linear history can move to repo Markdown before freeing Linear space: `scripts/linear-memory-tool.mjs`, `docs/linear-memory-workflow.md`, `docs/linear-codex-playbook.md`, `docs/markdown-index.md`, `package.json`, `docs/agent-attribution.md`
 

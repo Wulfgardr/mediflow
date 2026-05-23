@@ -25,6 +25,7 @@ Ultimo aggiornamento: 2026-05-20
 | [SECURITY.md](../SECURITY.md) | Policy sicurezza, threat model e regole redazione/logging. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
 | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | Playbook operativo per orchestrare Linear, Codex e GitHub con tracciabilita end-to-end. | Quando imposti processi, naming issue/branch/PR e audit trail. |
+| [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md) | Runbook del monitor locale WUL-283 per branch/scope/privacy/check drift, con LaunchAgent opzionale e digest Ollama redatto. | Quando vuoi controllare automaticamente che il lavoro Codex resti sul branch/issue corretti senza leggere PHI o contenuti privati. |
 | [PLANS.md](../PLANS.md) | Piano engineering operativo (2-6 settimane). | Sempre, per allineare priorità correnti. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 
@@ -105,6 +106,7 @@ Ultimo aggiornamento: 2026-05-20
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/agent-attribution.md](./agent-attribution.md) | Registro contributi agent (Codex, altri). | Quando si aggiungono cambi non banali da agent. |
+| [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md) | Runbook operativo del monitor locale Codex workflow, fuori runtime clinico e basato su soli metadati Git/check. | Quando installi, disinstalli o interpreti il LaunchAgent `com.mediflow.workflow-monitor`. |
 | [docs/linear-completed-issues-archive-2026-05-21.md](./linear-completed-issues-archive-2026-05-21.md) | Snapshot operativo delle issue Linear `Done` da usare come base per igiene/archiviazione tracker. | Quando serve liberare spazio Linear o distinguere storico completato da backlog attivo. |
 | [docs/linear-memory-workflow.md](./linear-memory-workflow.md) | Policy e CLI locale per consultare memoria issue completate, generare piani di archiviazione e applicare side effect Linear espliciti. | Prima di creare nuove issue o fare batch hygiene su Linear. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
@@ -148,6 +150,7 @@ Ultimo aggiornamento: 2026-05-20
 | [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md) | Decisione storica `WUL-196`: Graphite come shell unica; superata per la root entry da ADR 0060, ma conserva il principio no-selector. |
 | [docs/adr/0060-kree8-cockpit-live-root-entry.md](./adr/0060-kree8-cockpit-live-root-entry.md) | Fissa `WUL-272`: la root web `/` mostra il cockpit Kree8 direttamente da `Start_MediFlow.command`, mantenendo sicurezza runtime e nessun selector visuale. |
 | [docs/adr/0061-clinical-agenda-bridge-zimbra-icloud.md](./adr/0061-clinical-agenda-bridge-zimbra-icloud.md) | Fissa `WUL-275`: lettura locale read-only delle cache evento Zimbra/iCloud come candidati clinici/FBF reviewable nella cockpit Kree8, senza import cieco o scritture cliniche. |
+| [docs/adr/0063-local-workflow-monitor-control-plane.md](./adr/0063-local-workflow-monitor-control-plane.md) | Fissa `WUL-283`: monitor locale silenzioso per branch/scope/check drift, con regole deterministic-first e digest Ollama opzionale su metadati redatti. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |
