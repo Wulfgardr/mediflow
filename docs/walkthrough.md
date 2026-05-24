@@ -150,7 +150,7 @@ Implementazione principale:
 - `components/prosthetic-prescription-manager.tsx`
 - `app/settings/page.tsx`
 
-Questo non cambia i boundary canonici: AI, import e contesto SISS sono integrati
+Questo non cambia i boundary canonici: AI, import e contesto SISS sono presenti
 nel runtime ufficiale, ma non dichiarano scorciatoie architetturali oltre quelle
 gia formalizzate nelle ADR e nei documenti SISS. Il diario protesico resta un
 registro locale document-backed: non invia prescrizioni al sistema regionale e

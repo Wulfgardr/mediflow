@@ -22,6 +22,7 @@
     "check:standalone-runtime-bundle": "node scripts/check-standalone-runtime-bundle.mjs",
     "check:apple-wide-qa": "node scripts/check-apple-wide-qa-manifest.mjs",
     "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",
+    "check:claims": "node scripts/check-claims-guard.mjs",
     "workflow-monitor": "node scripts/codex-workflow-monitor.mjs",
     "rehearse:api-v1-compatibility": "node scripts/api-v1-compatibility-rehearsal.mjs",
     "check:never-regress": "node scripts/check-never-regress.mjs",
