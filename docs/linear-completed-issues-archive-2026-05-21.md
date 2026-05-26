@@ -10,7 +10,8 @@ Questo archivio conserva in Markdown le issue Linear `Done` usate come storico o
 - Project principale: `Mediflow`.
 - Stato interrogato: `Done`.
 - Data snapshot: 2026-05-21.
-- Issue non archiviate trovate: 214.
+- Appendice snapshot: 2026-05-26, con 6 issue `Done` create dopo la pulizia iniziale.
+- Issue non archiviate trovate: 214 nel batch iniziale, piu 6 nell'appendice post-cleanup.
 - Complexity check: not applicable; igiene tracker/documentazione, nessun hot path.
 
 ## Pulizia Linear Eseguita
@@ -18,6 +19,7 @@ Questo archivio conserva in Markdown le issue Linear `Done` usate come storico o
 - Snapshot pre-cleanup salvato: 214 issue `Done` non archiviate.
 - Azione eseguita su Linear: `issueArchive(..., trash: true)` sulle 214 issue salvate in questo documento.
 - Verifica post-cleanup: snapshot live Linear del 2026-05-21 con 0 issue `Done` non archiviate nel progetto `Mediflow`.
+- Appendice 2026-05-26: `WUL-276`, `WUL-277`, `WUL-278`, `WUL-279`, `WUL-283` e `WUL-284` sono stati salvati qui ma non ancora archiviati/cestinati in Linear.
 
 ## Issue Done Salvate
 
@@ -237,6 +239,12 @@ Questo archivio conserva in Markdown le issue Linear `Done` usate come storico o
 | [WUL-273](https://linear.app/wulfgardr/issue/WUL-273/kree8-app-wide-migration-real-data-surfaces-and-route-consolidation) | Kree8 app-wide migration: real data surfaces and route consolidation | 2026-05-19 | High | Interface, ux, web | WUL-233 Post-v0.6 objective map: filoni concreti di evoluzione MediFlow | leonardopegollo/wul-273-kree8-app-wide-migration-real-data-surfaces-and-route |
 | [WUL-274](https://linear.app/wulfgardr/issue/WUL-274/kree8-pin-to-cockpit-consolidation-and-quick-access-polish) | Kree8 PIN-to-cockpit consolidation and quick-access polish | 2026-05-16 | High | Interface, ux, web | WUL-273 Kree8 app-wide migration: real data surfaces and route consolidation | leonardopegollo/wul-274-kree8-pin-to-cockpit-consolidation-and-quick-access-polish |
 | [WUL-275](https://linear.app/wulfgardr/issue/WUL-275/kree8-clinical-agenda-bridge-zimbraicloud-candidates) | Kree8 clinical agenda bridge: Zimbra/iCloud candidates | 2026-05-17 | High | Interface, ux, web, data-integrity | WUL-273 Kree8 app-wide migration: real data surfaces and route consolidation | leonardopegollo/wul-275-kree8-clinical-agenda-bridge-zimbraicloud-candidates |
+| [WUL-276](https://linear.app/wulfgardr/issue/WUL-276/bonifica-prestazioni-specialistiche-importate-come-terapie) | Bonifica prestazioni specialistiche importate come terapie | 2026-05-21 | High | AI, bug, data-integrity | WUL-233 Post-v0.6 objective map: filoni concreti di evoluzione MediFlow | leonardopegollo/wul-276-bonifica-prestazioni-specialistiche-importate-come-terapie |
+| [WUL-277](https://linear.app/wulfgardr/issue/WUL-277/prestazioni-da-impegnativa-come-dominio-codificato-separato-dalle) | Prestazioni da impegnativa come dominio codificato separato dalle terapie | 2026-05-23 | High | AI, data-integrity | WUL-233 Post-v0.6 objective map: filoni concreti di evoluzione MediFlow | leonardopegollo/wul-277-prestazioni-da-impegnativa-come-dominio-codificato-separato |
+| [WUL-278](https://linear.app/wulfgardr/issue/WUL-278/service-prescriptions-itemizzazione-codificabile-e-matching-repertorio) | Service prescriptions: itemizzazione codificabile e matching repertorio prestazioni | 2026-05-23 | High | Data, feature, terminology, catalogs, data-integrity | WUL-233 Post-v0.6 objective map: filoni concreti di evoluzione MediFlow | leonardopegollo/wul-278-service-prescriptions-itemizzazione-codificabile-e-matching |
+| [WUL-279](https://linear.app/wulfgardr/issue/WUL-279/intended-purpose-adr-and-claims-linter-for-mediflow-clinical-ai) | Intended purpose ADR and claims linter for MediFlow clinical AI boundaries | 2026-05-24 | High | AI, testing, data-integrity, contract | WUL-233 Post-v0.6 objective map: filoni concreti di evoluzione MediFlow | leonardopegollo/wul-279-intended-purpose-adr-and-claims-linter-for-mediflow-clinical |
+| [WUL-283](https://linear.app/wulfgardr/issue/WUL-283/local-workflow-monitor-for-codex-branch-and-guardrail-drift) | Local workflow monitor for Codex branch and guardrail drift | 2026-05-23 | Medium | Process, feature, guardrail | - | leonardopegollo/wul-283-local-workflow-monitor-for-codex-branch-and-guardrail-drift |
+| [WUL-284](https://linear.app/wulfgardr/issue/WUL-284/harden-local-workflow-monitor-priority-and-global-runner) | Harden local workflow monitor priority and global runner | 2026-05-23 | Medium | Process, improvement, guardrail | WUL-283 Local workflow monitor for Codex branch and guardrail drift | leonardopegollo/wul-284-harden-local-workflow-monitor-priority-and-global-runner |
 
 ## Uso Operativo
 
