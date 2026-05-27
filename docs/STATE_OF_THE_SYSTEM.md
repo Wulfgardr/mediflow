@@ -1,3 +1,10 @@
+---
+summary: "Canonical broad snapshot of current MediFlow product state, runtime boundaries, data model, AI lanes, and integration limits."
+read_when:
+  - "Needing a single current-state overview before planning or implementation."
+  - "Checking whether a feature, integration, or claim is shipped, directional, or out of bounds."
+---
+
 # Stato del Sistema MediFlow
 
 > [!IMPORTANT]

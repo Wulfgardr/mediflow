@@ -143,7 +143,7 @@ function resolveAssistantDir(assistantDir?: string): { dir: string; configuredBy
     if (configured) return { dir: configured, configuredByEnv: true };
 
     return {
-        dir: path.join(homedir(), 'Documents', 'zimbra-mail-assistant'),
+        dir: path.join(/* turbopackIgnore: true */ homedir(), 'Documents', 'zimbra-mail-assistant'),
         configuredByEnv: false,
     };
 }
@@ -242,7 +242,7 @@ function normalizeRawEvent(raw: RawEvent, source: SourceDefinition): ClinicalAge
 }
 
 async function readJsonl(filePath: string): Promise<{ rows: RawEvent[]; invalid: number }> {
-    const content = await readFile(filePath, 'utf8');
+    const content = await readFile(/* turbopackIgnore: true */ filePath, 'utf8');
     const rows: RawEvent[] = [];
     let invalid = 0;
 
@@ -302,7 +302,7 @@ export async function loadClinicalAgendaCandidates(
     let invalid = 0;
 
     try {
-        const dirStatus = await stat(dir);
+        const dirStatus = await stat(/* turbopackIgnore: true */ dir);
         if (!dirStatus.isDirectory()) {
             return emptyResult({ now, configuredByEnv, from, to, sourceStatuses });
         }
@@ -311,7 +311,7 @@ export async function loadClinicalAgendaCandidates(
     }
 
     for (const source of SOURCES) {
-        const sourcePath = path.join(/*turbopackIgnore: true*/ dir, source.relativePath);
+        const sourcePath = path.join(/* turbopackIgnore: true */ dir, source.relativePath);
         const status: ClinicalAgendaSourceStatus = {
             sourceKind: source.kind,
             sourceLabel: source.label,
@@ -325,7 +325,7 @@ export async function loadClinicalAgendaCandidates(
         };
 
         try {
-            const fileStatus = await stat(sourcePath);
+            const fileStatus = await stat(/* turbopackIgnore: true */ sourcePath);
             if (!fileStatus.isFile()) {
                 sourceStatuses.push(status);
                 continue;

@@ -1,3 +1,10 @@
+---
+summary: "Runbook for the local metadata-only Codex workflow monitor and branch/scope/check drift snapshots."
+read_when:
+  - "Working on or diagnosing the local Codex workflow monitor."
+  - "Checking branch, expected issue, privacy boundary, or declared verification drift."
+---
+
 <!-- Codex: WUL-283 -->
 # Codex Workflow Monitor
 

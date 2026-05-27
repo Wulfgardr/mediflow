@@ -1,3 +1,10 @@
+---
+summary: "Complete tracked Markdown index for MediFlow with quick purpose and consultation hints."
+read_when:
+  - "Finding where a MediFlow topic is documented."
+  - "Adding, removing, or renaming Markdown files in the repo."
+---
+
 # Indice Completo Markdown (Repo)
 
 > [!NOTE]

@@ -1,3 +1,10 @@
+---
+summary: "Compact operational architecture overview for the current MediFlow mainline shell, home-base, AI/document lanes, SISS/FSE boundaries, and local guardrails."
+read_when:
+  - "Needing a fast technical architecture overview without reading the full walkthrough."
+  - "Checking current mainline runtime boundaries before implementation or review."
+---
+
 # Architettura di MediFlow (sintesi operativa)
 
 > [!NOTE]

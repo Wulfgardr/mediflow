@@ -77,8 +77,8 @@ export type AiRolloutReadinessArtifactsPayload = {
 function getDefaultDataDir() {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
-            ? path.join(os.homedir(), 'Library', 'Application Support', 'MediFlow')
-            : path.join(os.homedir(), '.mediflow'));
+            ? path.join(/* turbopackIgnore: true */ os.homedir(), 'Library', 'Application Support', 'MediFlow')
+            : path.join(/* turbopackIgnore: true */ os.homedir(), '.mediflow'));
 }
 
 function isAiRolloutLocalControlEnabledValue(value: unknown): boolean {
@@ -86,7 +86,12 @@ function isAiRolloutLocalControlEnabledValue(value: unknown): boolean {
 }
 
 export function getAiRolloutReadinessArtifactPaths(lane: RolloutReadinessArtifactLane) {
-    const directory = path.join(getDefaultDataDir(), 'ai', 'rollout-readiness', lane);
+    const directory = path.join(
+        /* turbopackIgnore: true */ getDefaultDataDir(),
+        'ai',
+        'rollout-readiness',
+        lane
+    );
     return {
         directory,
         jsonPath: path.join(directory, 'latest.json'),
@@ -96,24 +101,24 @@ export function getAiRolloutReadinessArtifactPaths(lane: RolloutReadinessArtifac
 
 export function ensureAiRolloutReadinessArtifactDirectory(lane: RolloutReadinessArtifactLane) {
     const paths = getAiRolloutReadinessArtifactPaths(lane);
-    fs.mkdirSync(paths.directory, { recursive: true });
+    fs.mkdirSync(/* turbopackIgnore: true */ paths.directory, { recursive: true });
     return paths;
 }
 
 export function readAiRolloutReadinessArtifact(lane: RolloutReadinessArtifactLane) {
     const paths = getAiRolloutReadinessArtifactPaths(lane);
-    if (!fs.existsSync(paths.jsonPath)) {
+    if (!fs.existsSync(/* turbopackIgnore: true */ paths.jsonPath)) {
         return null;
     }
 
-    const raw = fs.readFileSync(paths.jsonPath, 'utf8');
-    const stats = fs.statSync(paths.jsonPath);
+    const raw = fs.readFileSync(/* turbopackIgnore: true */ paths.jsonPath, 'utf8');
+    const stats = fs.statSync(/* turbopackIgnore: true */ paths.jsonPath);
 
     return {
         paths,
         updatedAt: stats.mtime.toISOString(),
-        markdown: fs.existsSync(paths.markdownPath)
-            ? fs.readFileSync(paths.markdownPath, 'utf8')
+        markdown: fs.existsSync(/* turbopackIgnore: true */ paths.markdownPath)
+            ? fs.readFileSync(/* turbopackIgnore: true */ paths.markdownPath, 'utf8')
             : null,
         report: JSON.parse(raw) as Record<string, unknown>,
     };

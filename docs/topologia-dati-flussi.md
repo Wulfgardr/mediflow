@@ -1,3 +1,10 @@
+---
+summary: "Canonical MediFlow data-flow topology covering data origin, encryption, persistence, trust boundaries, and protected digital paths."
+read_when:
+  - "Reviewing data flow, encryption, trust boundaries, or PHI-safe routing."
+  - "Changing APIs, document artifacts, local services, network home-base, or security-sensitive workflows."
+---
+
 # Topologia Dati e Flussi - MediFlow
 
 > [!IMPORTANT]

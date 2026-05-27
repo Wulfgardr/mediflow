@@ -1,3 +1,10 @@
+---
+summary: "Canonical MediFlow documentation entrypoint and precedence map."
+read_when:
+  - "Starting any MediFlow task and deciding which docs are authoritative."
+  - "Updating documentation structure, canonical indices, or OSS/private doc boundaries."
+---
+
 # Documentazione MediFlow — Indice Canonico
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.

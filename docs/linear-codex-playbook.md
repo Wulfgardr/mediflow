@@ -1,3 +1,10 @@
+---
+summary: "Operational playbook for Linear, Codex, GitHub branches, PRs, verification, and audit trail."
+read_when:
+  - "Creating, triaging, implementing, or closing Linear-backed MediFlow work."
+  - "Deciding branch naming, PR scope, evidence, and delivery hygiene."
+---
+
 # Playbook Operativo Linear + Codex (MediFlow)
 
 Stato documento: `CANONICAL` (workflow operativo planning -> coding -> audit trail)  

@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-05-27 Codex
+- Closed the MediFlow half of `WUL-285` by keeping the build-warning cleanup narrow: marked runtime filesystem/path calls in the affected storage and observer modules for Turbopack tracing exclusion, added selective routing front matter to high-value technical docs, and verified the branch without touching clinical data, API contracts, schema or private material: `lib/ai-model-parliament-storage.ts`, `lib/ai-rollout-readiness-storage.ts`, `lib/clinical-agenda-bridge.ts`, `lib/data-dir.ts`, `lib/siss-session-observer.ts`, `docs/README.md`, `docs/STATE_OF_THE_SYSTEM.md`, `docs/codex-workflow-monitor.md`, `docs/linear-codex-playbook.md`, `docs/markdown-index.md`, `docs/openapi/README.md`, `docs/system_architecture.md`, `docs/topologia-dati-flussi.md`, `docs/walkthrough.md`
+
 ## 2026-05-24 Codex
 - Opened `WUL-279` with an intended-purpose and claims guard safety-floor slice: added ADR 0065 for allowed/excluded MediFlow clinical claims across AI, SISS/FSE, cloud, diagnosis, triage, prescribing and automation, plus a dependency-free `check:claims` repo scan with explicit allowlist rationale, synthetic self-test and CI workflow, without touching clinical runtime, DB, API or private data: `docs/adr/0065-intended-purpose-and-claims-guard.md`, `scripts/check-claims-guard.mjs`, `.github/workflows/claims-guard.yml`, `package.json`, `docs/README.md`, `docs/markdown-index.md`, `docs/walkthrough.md`, `docs/agent-attribution.md`
 

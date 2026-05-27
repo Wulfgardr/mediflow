@@ -1,3 +1,10 @@
+---
+summary: "Maintenance runbook for the stable MediFlow OpenAPI /api/v1 contract, drift checks, versioning, and documentation workflow."
+read_when:
+  - "Changing or reviewing /api/v1 client-facing API contracts."
+  - "Running OpenAPI drift checks or deciding whether a route belongs in the stable spec."
+---
+
 # OpenAPI `/api/v1` — Runbook di Manutenzione
 
 Stato documento: `SECONDARY`  

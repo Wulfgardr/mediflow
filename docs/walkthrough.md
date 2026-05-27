@@ -1,3 +1,10 @@
+---
+summary: "Canonical end-to-end MediFlow walkthrough for web, native clients, local services, data flow, OCR, home-base, and security."
+read_when:
+  - "Needing an operational walkthrough of MediFlow before implementation or verification."
+  - "Changing flows across web, native, local services, document intelligence, home-base, or security/session boundaries."
+---
+
 # Walkthrough MediFlow (Web + Native)
 
 > [!IMPORTANT]
