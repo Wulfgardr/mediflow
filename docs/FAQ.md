@@ -21,6 +21,8 @@ Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se 
 - import documentale e AI più reviewable;
 - Mac `home-base` packaged e primi client Apple paired;
 - document intelligence `artifact-first` con fonti e conflitti più espliciti;
+- prescrizioni di prestazione separate dalle terapie farmacologiche;
+- root web Kree8 live, senza selector di shell su `main`;
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
 `v0.4` resta una tappa tecnica importante e `v0.5` il consolidamento AI/UI;
@@ -59,8 +61,9 @@ Oggi questo perimetro è:
 
 No, non su `main`.
 
-Oggi esiste una sola shell ufficiale, il `Clinical Workbench / Graphite`, e le
-superfici gia mature vivono direttamente li dentro:
+Oggi esiste una sola direzione live: la root web locale apre il cockpit Kree8,
+senza selector Graphite/Kree8 e senza preview profiles persistiti. Le superfici
+già mature vivono direttamente nel runtime ufficiale:
 
 - stack AI locale;
 - Smart Import reviewable;
@@ -76,13 +79,17 @@ In pratica:
 
 - handoff contestuale paziente;
 - percorso prescrittivo `webapp-assisted`;
-- pre-check locali dove sensati.
+- pre-check locali dove sensati;
+- dominio locale per prescrizioni di prestazione, separato dalle terapie
+  farmacologiche e utile alla review/documentazione del paziente.
 
 Non vuol dire ancora:
 
 - integrazione regionale certificata nativa;
 - consumo arbitrario di REST/WS regionali come se fossero già disponibili;
-- UI prescrittiva custom che sostituisce il modulo ufficiale.
+- UI prescrittiva custom che sostituisce il modulo ufficiale;
+- generazione NRE, invio prescrittivo regionale o writeback FSE/SISS da
+  MediFlow.
 
 ## L'AI manda dati paziente fuori dal computer?
 

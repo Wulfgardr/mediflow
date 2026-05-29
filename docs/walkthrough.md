@@ -135,11 +135,12 @@ graph TB
 
 Nel checkout web esiste oggi una sola shell ufficiale del prodotto:
 
-1. `Clinical Workbench / Graphite`: runtime stabile del checkout corrente.
+1. `Kree8 cockpit`: root web live del checkout corrente, senza selector
+   persistito.
 
 Le superfici AI, Smart Import e contesto paziente SISS non vivono piu dietro un
 selector locale di preview: quando sono considerate mature per `main`, vengono
-integrate direttamente nel workbench ufficiale.
+integrate direttamente nel runtime ufficiale.
 
 In pratica:
 
@@ -152,6 +153,8 @@ In pratica:
 
 Implementazione principale:
 
+- `app/page.tsx`
+- `components/kree8/kree8-clinical-cockpit.tsx`
 - `app/patients/[id]/page.tsx`
 - `components/siss-patient-context-panel.tsx`
 - `components/prosthetic-prescription-manager.tsx`

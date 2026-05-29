@@ -17,7 +17,7 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-05-05 (`v0.6.0` + WUL-226)
+Ultimo aggiornamento: 2026-05-29 (`v0.6.0` + post-v0.6 mainline)
 
 ---
 
@@ -33,8 +33,8 @@ dentro boundary documentati.
 La fotografia corrente e questa:
 
 - **Superficie primaria**: web app Next.js locale, avviata sul Mac.
-- **Shell ufficiale**: `Clinical Workbench / Graphite`, unica shell supportata
-  su `main`.
+- **Shell ufficiale**: cockpit Kree8 come root web live su `main`, senza
+  selector o preview profiles persistiti.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
   server via Drizzle e cifratura client-side dei campi clinici.
 - **Sicurezza di default**: local-only, zero-knowledge a riposo, nessun cloud o
@@ -54,6 +54,12 @@ La fotografia corrente e questa:
   artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
   Apple Vision e certificato solo su macOS; Windows non ha oggi un fallback OCR
   platform-specific equivalente in MediFlow.
+- **Evidence absorption**: il layer locale di assorbimento evidenza e ora
+  misurato con corpus sintetico multi-fonte, recall di fonte, disciplina di
+  citazione, recupero di fonti superate e leakage da fonti stale.
+- **Prescrizioni di prestazione**: visite, esami, imaging, riabilitazione e
+  screening sono separati dalle terapie farmacologiche; gli item figli e il
+  catalog matching restano reviewable e non generano invii regionali.
 - **AI**: runtime locale per default, benchmark e shadow lane separati dal
   prodotto clinico.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -87,20 +93,23 @@ Questo significa che non sono ammessi, senza ADR e documentazione esplicita:
 
 ### 2.2 La shell web ufficiale e una sola
 
-`Clinical Workbench / Graphite` e la shell web ufficiale. I vecchi confronti di
-stile e i `Preview Profiles` funzionali sono ritirati da `main`.
+La root web locale renderizza oggi il cockpit Kree8 come direzione visuale live.
+ADR 0060 supera Graphite per il punto d'ingresso `/`, preservando pero la regola
+piu importante gia decisa: MediFlow non deve tornare a shell concorrenti o a un
+selector permanente.
 
 Conseguenze pratiche:
 
 - non si aggiungono nuovi chooser permanenti per shell alternative;
-- AI, Smart Import e contesto paziente SISS sono parte del workbench quando
-  maturi;
+- AI, Smart Import e contesto paziente SISS restano superfici presenti nel
+  runtime quando mature, senza passare da preview profiles persistiti;
 - nuove sperimentazioni devono vivere come workstream espliciti, non come
   selector nascosti nelle impostazioni;
 - la documentazione pubblica deve parlare di una sola esperienza supportata.
 
 Documenti/ADR principali:
 
+- [ADR 0060](./adr/0060-kree8-cockpit-live-root-entry.md)
 - [ADR 0047](./adr/0047-graphite-workbench-single-official-web-shell.md)
 - [ADR 0050](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
 - [docs/walkthrough.md](./walkthrough.md)
@@ -190,7 +199,7 @@ Documenti/ADR principali:
 
 | Superficie | Stato | Uso reale | Boundary |
 | --- | --- | --- | --- |
-| Web app locale | Primaria | Lavoro clinico quotidiano sul Mac | HTTP localhost, sessione web |
+| Web app locale | Primaria | Lavoro clinico quotidiano sul Mac, root Kree8 live e route cliniche locali | HTTP localhost, sessione web |
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
@@ -428,12 +437,15 @@ Disponibile:
 - launcher/handoff verso percorsi ufficiali;
 - prescrittivo `webapp-assisted`;
 - corpus locale SISS/FSE con sync/freshness;
-- diario locale protesico document-backed e handoff `Protesica-RL`.
+- diario locale protesico document-backed e handoff `Protesica-RL`;
+- dominio locale per prescrizioni di prestazione e item codificabili, separato
+  da terapie farmacologiche e protesica.
 
 Fuori scope:
 
 - canale SISS nativo certificato non dimostrato;
 - UI prescrittiva custom sostitutiva del modulo regionale;
+- generazione NRE, invio regionale o writeback FSE/SISS da MediFlow;
 - scraping aggressivo;
 - bypass di autenticazioni o vincoli regionali.
 
@@ -441,17 +453,16 @@ Fuori scope:
 
 Disponibile:
 
-- shell macOS storica come snapshot;
+- bundle macOS home-base packaged e shell macOS storica come snapshot/parity;
 - contratto `/api/v1`;
 - TLS proxy locale;
 - runbook native/testing/parity;
-- direzione ADR per rebuild family Apple.
+- client iPhone/iPad paired non-AI con cache cifrata degradabile e primi
+  workflow online versionati sui moduli core.
 
 Direzione:
 
-- macOS packaged `home-base`;
 - shared core Swift;
-- iPhone/iPad paired;
 - parity non-AI tramite API;
 - cache locale cifrata derivata e riconciliazione esplicita.
 

@@ -32,14 +32,17 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 4. **Document intelligence prudente**: `documentInsights` resta compat layer,
    mentre gli allegati possono gia persistere un artifact `parse/evidence`
    cifrato consumato in priorita da `AI Patient Insight`.
-5. **Clinical Workbench unico**: Graphite e la shell web ufficiale su `main`;
-   AI, Smart Import e contesto paziente SISS/FSE non dipendono piu da preview
-   profiles runtime.
+5. **Root Kree8 live e una sola shell supportata**: la home web locale usa il
+   cockpit Kree8 come direzione visuale su `main`; AI, Smart Import e contesto
+   paziente SISS/FSE non dipendono piu da preview profiles runtime.
 6. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
    congelata per rebuild e filone iPadOS/iOS ricondotto allo stesso boundary
    `home-base + /api/v1`.
 7. **SISS/FSE documentale governato**: il corpus locale con sync/freshness
    prepara integrazioni future senza dichiarare una catena regionale certificata.
+8. **Prestazioni separate dalle terapie**: prescrizioni di esami, visite,
+   imaging, riabilitazione e screening hanno un dominio locale dedicato, con
+   item figli e matching repertorio preparato ma sempre reviewable.
 
 ---
 
@@ -47,7 +50,7 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 
 | Componente | Stato attuale | Note |
 | --- | --- | --- |
-| Web app Next.js | Superficie primaria | UI, `/api/*`, `/api/v1/*`, overview `home-base`, orchestrazione AI locale |
+| Web app Next.js | Superficie primaria | Root Kree8 live, UI clinica locale, `/api/*`, `/api/v1/*`, overview `home-base`, orchestrazione AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
 | Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR primario locale separato |
 | Apple Vision OCR | Fallback macOS-only | Seconda lettura locale quando l'OCR primario restituisce output vuoto/degenerato; nessun equivalente certificato Windows/Linux |
@@ -118,6 +121,10 @@ Pipeline corrente:
 Nota: `Smart Import` resta reviewable e filtra il rumore da fonti senza novita
 clinica quando diagnosi/terapie sono gia presenti.
 
+Il benchmark di assorbimento evidenza misura questa direzione su corpus
+sintetico multi-fonte: recall delle fonti, disciplina di citazione, recupero di
+fonti superate e contenimento del leakage da fonti stale.
+
 ---
 
 ## Guardrail operativi
@@ -126,8 +133,8 @@ clinica quando diagnosi/terapie sono gia presenti.
   branch/revision/worktree.
 - `Start_MediFlow.command` puo resettare `.next` quando cambia il fingerprint
   della sorgente locale.
-- Il `Clinical Workbench` e l'unico runtime UI supportato su `main`; nuove
-  sperimentazioni non vivono come selector persistito in Settings.
+- Il cockpit Kree8 e la root web live su `main`; nuove sperimentazioni non
+  vivono come selector persistito in Settings.
 - I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
   restano separati dal runtime clinico.
 
@@ -145,9 +152,10 @@ clinica quando diagnosi/terapie sono gia presenti.
 - [docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
 - [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md)
 - [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md)
+- [docs/adr/0060-kree8-cockpit-live-root-entry.md](./adr/0060-kree8-cockpit-live-root-entry.md)
 - [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
 - [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
 
 ---
 
-*Ultimo aggiornamento: 2026-05-02 — v0.6.0 / main corrente*
+*Ultimo aggiornamento: 2026-05-29 - v0.6.0 / post-v0.6 mainline*

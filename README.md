@@ -8,34 +8,40 @@
 ## Perché esiste
 
 Sono **Leo**, medico di distretto.
-MediFlow nasce da un problema molto concreto: nel lavoro clinico quotidiano i software sono spesso lenti, poco leggibili e troppo dipendenti da internet.
+MediFlow nasce da un problema molto concreto: nel lavoro clinico quotidiano i
+software sono spesso lenti, poco leggibili e troppo dipendenti da internet.
 
-Qui l'idea è l'opposto: lavorare bene, in locale, con controllo pieno dei dati e con una struttura abbastanza solida da crescere senza diventare opaca.
+Qui l'idea è l'opposto: lavorare bene, in locale, con controllo pieno dei dati
+e con una struttura abbastanza solida da crescere senza diventare opaca. Non un
+gestionale che chiede al medico di adattarsi alla macchina, ma una cartella
+clinica che prova a rispettare il modo reale in cui si lavora: visita, appunto,
+documento, terapia, dubbio, revisione, continuità.
 
 ## Dove siamo adesso
 
-`v0.6` è la prima release che racconta MediFlow come sistema locale ibrido e non
-solo come web app clinica con AI. `v0.5` resta il consolidamento AI/UI; `v0.6`
-formalizza il salto su home-base, client Apple paired, document intelligence
-artifact-first e governance operativa ripulita.
+`v0.6` racconta MediFlow per quello che sta diventando: non solo una web app
+clinica con AI, ma un sistema locale ibrido. Il Mac resta il nodo autorevole,
+la web app resta la superficie più completa, il contratto `/api/v1` tiene aperta
+la strada ai client Apple paired e la document intelligence cresce come
+evidenza rivedibile, non come automatismo opaco.
 
 Su `main`, oggi, ci sono già queste cose:
 
-- **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso operativo quotidiano più leggibile;
-- **contratto locale `/api/v1`** più esplicito, stabile e riusabile per i client Apple;
-- **document intelligence reviewable**: smart import, nuova anagrafica da documento, primo artifact `parse/evidence` e fallback OCR Apple Vision solo su macOS quando il primario locale e low-signal;
-- **stack AI locale più governato**: benchmark separati, lane `benchmark-only` tenute fuori dal runtime e guardrail più chiari;
-- **modalità `network home-base` paired**: pairing esplicito, capability discovery, accesso remoto ai pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni da client paired;
-- **Mac packaged come home-base**: il bundle macOS usa la shell Apple/home-base come entrypoint, può gestire backend web production e proxy TLS, e mostra diagnostica read-only dei servizi locali opzionali;
-- **client iPhone/iPad paired non-AI**: consultazione, cache cifrata degradabile e primi CRUD online versionati sui moduli core, senza accesso diretto a SQLite e senza coda offline automatica;
-- **boundary SISS più onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza fingere integrazioni regionali certificate che oggi non ci sono;
-- **corpus documentale SISS/FSE locale**: fonti approvate, sync incrementale e report di freschezza restano fuori dal runtime clinico ma guidano le integrazioni future;
-- **Clinical Workbench unico e live**: AI, Smart Import review e contesto paziente SISS vivono nella shell ufficiale senza selector preview su `main`.
+- **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso quotidiano più leggibile;
+- **Kree8 cockpit come root web live**: la home locale apre la nuova grammatica visuale, senza selector o preview profiles persistiti;
+- **contratto locale `/api/v1`** più esplicito, stabile e riusabile per client nativi e superfici locali;
+- **modalità `network home-base` paired**: pairing esplicito, capability discovery, lettura pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni;
+- **Mac packaged come home-base**: il bundle macOS può gestire backend web production e proxy TLS, con diagnostica read-only dei servizi locali opzionali;
+- **client iPhone/iPad paired non-AI**: consultazione, cache cifrata degradabile e primi workflow online versionati, senza accesso diretto a SQLite e senza coda offline automatica;
+- **document intelligence reviewable**: Smart Import, nuova anagrafica da documento, artifact `parse/evidence`, ancore fonte, benchmark di assorbimento evidenza e fallback OCR Apple Vision solo su macOS quando il primario locale e low-signal;
+- **domini clinici più puliti**: le prestazioni prescritte hanno un dominio separato dalle terapie farmacologiche, con item figli e matching repertorio preparato ma non spacciato per invio regionale;
+- **stack AI locale più governato**: benchmark separati, lane `benchmark-only` fuori dal runtime clinico e claims guard contro formulazioni troppo ampie;
+- **boundary SISS/FSE onesto**: handoff contestuale e percorso prescrittivo `webapp-assisted`, senza dichiarare integrazioni regionali certificate che oggi non ci sono.
 
-Per una lettura completa, aggiornata e navigabile dello stato reale del sistema,
+Per una lettura completa, aggiornata e navigabile dello stato reale del sistema
 parti da [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md). È la
 pagina che unisce prodotto, architettura, sicurezza, runtime, boundary SISS/FSE,
-AI/document intelligence, Apple clients e split private/OSS senza dover
+AI/document intelligence, Apple clients e split private/OSS senza costringere a
 ricostruire il quadro da dieci file separati.
 
 ## Cosa cambia rispetto alla `v0.3`
@@ -47,14 +53,15 @@ Il salto, in breve, è questo:
 3. **Più chiarezza sui boundary**: home-base, FSE/SISS, runtime AI, rebuild native e multi-device sono raccontati per quello che sono davvero.
 4. **Più continuità operativa**: la web app resta la base forte, mentre il lavoro Apple-native rientra in un disegno coerente invece di restare un ramo laterale.
 5. **Più concretezza multi-device**: il Mac diventa davvero nodo `home-base`, con client paired e write limitati/versionati già tracciati, pur senza dichiarare sync completo.
+6. **Più autorevolezza nella forma**: la presentazione pubblica deve essere sobria, clinica e verificabile; elegante nel linguaggio, ma senza vendere come fatto ciò che è ancora ricerca.
 
 ## Confini dichiarati, senza ambiguità
 
 - **Local-first di default**: nessuna dipendenza cloud obbligatoria.
 - **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
 - **Apple clients**: la web app resta la superficie più solida sul Mac; il bundle macOS home-base è la nuova base runtime packaged; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
-- **SISS/FSE**: oggi MediFlow orchestra il contesto e richiama i percorsi ufficiali. Non dichiara ancora una integrazione nativa regionale certificata.
-- **Shell web ufficiale**: su `main` esiste un solo `Clinical Workbench`; eventuali nuove slice sperimentali non vivono come selector runtime persistito.
+- **SISS/FSE**: oggi MediFlow prepara il contesto e richiama percorsi ufficiali. Non dichiara integrazione nativa regionale certificata, sincronizzazione FSE, writeback o invio prescrittivo da MediFlow.
+- **Shell web ufficiale**: su `main` esiste una sola direzione live, il cockpit Kree8 sulla root locale; eventuali nuove slice sperimentali non vivono come selector runtime persistito.
 
 ---
 
