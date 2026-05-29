@@ -1,7 +1,7 @@
 # Document Intelligence Lab
 
 Stato documento: `SECONDARY`  
-Ultimo aggiornamento: 2026-04-04
+Ultimo aggiornamento: 2026-05-27
 
 Questa nota traduce [ADR 0032](./adr/0032-document-intelligence-corpus-and-private-shadow-vault.md)
 in una struttura operativa minima per i prossimi cicli AI documentali.
@@ -138,6 +138,8 @@ Serve verificare:
 - focus clinico
 - gerarchia fonti
 - citazioni e stale leakage
+- recupero locale di fonti attese che un input curato manualmente potrebbe
+  omettere
 
 ### Resolver ICD/AIFA
 
@@ -152,6 +154,13 @@ Serve verificare:
 
 Per `redaction`, `clinical_entities` o sidecar futuri, il caso va proiettato in
 modo lane-specific senza riscrivere la semantica del documento sorgente.
+
+Il probe `WUL-286` aggiunge al benchmark di assorbimento evidenze una
+comparazione dichiarativa `curatedSourceIds` vs queue locale: serve a misurare il
+pattern "prima cerco le fonti, poi sintetizzo" senza importare ClinSeekAgent nel
+runtime. Restano fuori scope codice ClinSeekAgent, dati MIMIC, browser/cloud
+tooling, modelli ClinSeek, SQL generato dal modello e qualunque dato paziente
+reale.
 
 ## Regola pratica
 

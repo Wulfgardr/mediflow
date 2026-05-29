@@ -304,6 +304,9 @@ Corpus:
 Metriche:
 
 - `relevantSourceRecall`
+- `curatedSourceRecall`
+- `evidenceSeekingSourceGain`
+- `evidenceSeekingRecoveredSourceIds`
 - `citationCoverage`
 - `citationCorrectness`
 - `staleLeakageRate`
@@ -316,6 +319,16 @@ presente nella fonte sintetica. Il corpus include anche un caso avversario
 `adversarial-fabricated-citation`: il validator passa solo se quel caso viene
 classificato come failure di citation correctness, cosi il benchmark dimostra di
 saper intercettare citazioni fabbricate invece di misurare solo coverage.
+
+`WUL-286` estende il report a `mediflow.evidence_absorption_benchmark.v2` con
+una baseline opzionale `curatedSourceIds`: il caso dichiara quali fonti sarebbero
+entrate in un input curato manualmente e il benchmark misura se la queue locale
+recupera fonti attese ma omesse. La metrica `curatedSourceRecall` misura la
+baseline curata, `evidenceSeekingSourceGain` misura il delta del passaggio locale
+evidence-seeking, e `evidenceSeekingRecoveredSourceIds` rende esplicite le fonti
+recuperate. Questa e una lane sintetica ispirata al pattern ClinSeekAgent, non
+un import di codice, dati, prompt, modello, browser tool o SQL agentico di
+ClinSeekAgent nel runtime MediFlow.
 
 ## Diary evidence indexing
 

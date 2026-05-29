@@ -13,7 +13,7 @@ import {
 } from './evidence-queue-contract';
 
 /* @Codex */
-export const EVIDENCE_ABSORPTION_BENCHMARK_SCHEMA_VERSION = 'mediflow.evidence_absorption_benchmark.v1';
+export const EVIDENCE_ABSORPTION_BENCHMARK_SCHEMA_VERSION = 'mediflow.evidence_absorption_benchmark.v2';
 
 /* @Codex */
 export interface EvidenceAbsorptionBenchmarkCase {
@@ -43,6 +43,7 @@ export interface EvidenceAbsorptionBenchmarkCase {
     structuredChartItems?: BuildEvidenceQueueInput['structuredChartItems'];
     expectations: {
         includedSourceIds: string[];
+        curatedSourceIds?: string[];
         forbiddenSourceIds?: string[];
         forbiddenClaimTokens?: string[];
         diarySourceIds?: string[];
@@ -55,6 +56,9 @@ export interface EvidenceAbsorptionBenchmarkCase {
 export interface EvidenceAbsorptionBenchmarkCaseResult {
     id: string;
     relevantSourceRecall: number;
+    curatedSourceRecall: number;
+    evidenceSeekingSourceGain: number;
+    evidenceSeekingRecoveredSourceIds: string[];
     citationCoverage: number;
     citationCorrectness: number;
     staleLeakageRate: number;
@@ -71,6 +75,8 @@ export interface EvidenceAbsorptionBenchmarkReport {
     caseCount: number;
     aggregate: {
         relevantSourceRecall: number;
+        curatedSourceRecall: number;
+        evidenceSeekingSourceGain: number;
         citationCoverage: number;
         citationCorrectness: number;
         staleLeakageRate: number;
@@ -242,6 +248,13 @@ export function runEvidenceAbsorptionBenchmark(
         const forbiddenSourceIds = testCase.expectations.forbiddenSourceIds ?? [];
         const leakedForbiddenSources = forbiddenSourceIds.filter((sourceId) => includedSourceIds.has(sourceId));
         const relevantSourceRecall = sourceRecall(includedSourceIds, testCase.expectations.includedSourceIds);
+        const curatedSourceIds = new Set(testCase.expectations.curatedSourceIds ?? testCase.expectations.includedSourceIds);
+        const curatedMissingSourceIds = testCase.expectations.includedSourceIds
+            .filter((sourceId) => !curatedSourceIds.has(sourceId));
+        const curatedSourceRecall = sourceRecall(curatedSourceIds, testCase.expectations.includedSourceIds);
+        const evidenceSeekingRecoveredSourceIds = curatedMissingSourceIds
+            .filter((sourceId) => includedSourceIds.has(sourceId));
+        const evidenceSeekingSourceGain = relevantSourceRecall - curatedSourceRecall;
         const citationCoverage = ratio(citedClaims.length, claims.length);
         const citationCorrectness = ratio(correctCitations.length, citedClaims.length);
         const staleLeakageRate = leakageRatio(leakedForbiddenSources.length, forbiddenSourceIds.length);
@@ -257,10 +270,16 @@ export function runEvidenceAbsorptionBenchmark(
         if (negativeAssertionLeakage > 0) findings.push('negative_assertion_leakage');
         if (diaryEvidenceCoverage < 1) findings.push('diary_evidence_coverage');
         if (attachmentEvidenceCoverage < 1) findings.push('attachment_evidence_coverage');
+        if (evidenceSeekingRecoveredSourceIds.length < curatedMissingSourceIds.length) {
+            findings.push('evidence_seeking_recovery_gap');
+        }
 
         return {
             id: testCase.id,
             relevantSourceRecall,
+            curatedSourceRecall,
+            evidenceSeekingSourceGain,
+            evidenceSeekingRecoveredSourceIds,
             citationCoverage,
             citationCorrectness,
             staleLeakageRate,
@@ -283,6 +302,8 @@ export function runEvidenceAbsorptionBenchmark(
         caseCount: caseResults.length,
         aggregate: {
             relevantSourceRecall: average(aggregateCases.map((item) => item.relevantSourceRecall)),
+            curatedSourceRecall: average(aggregateCases.map((item) => item.curatedSourceRecall)),
+            evidenceSeekingSourceGain: average(aggregateCases.map((item) => item.evidenceSeekingSourceGain)),
             citationCoverage: average(aggregateCases.map((item) => item.citationCoverage)),
             citationCorrectness: average(aggregateCases.map((item) => item.citationCorrectness)),
             staleLeakageRate: average(aggregateCases.map((item) => item.staleLeakageRate)),

@@ -69,6 +69,8 @@ function renderMarkdown(report: EvidenceAbsorptionBenchmarkReport): string {
         '## Aggregate',
         '',
         `- relevantSourceRecall: ${report.aggregate.relevantSourceRecall.toFixed(3)}`,
+        `- curatedSourceRecall: ${report.aggregate.curatedSourceRecall.toFixed(3)}`,
+        `- evidenceSeekingSourceGain: ${report.aggregate.evidenceSeekingSourceGain.toFixed(3)}`,
         `- citationCoverage: ${report.aggregate.citationCoverage.toFixed(3)}`,
         `- citationCorrectness: ${report.aggregate.citationCorrectness.toFixed(3)}`,
         `- staleLeakageRate: ${report.aggregate.staleLeakageRate.toFixed(3)}`,
@@ -78,11 +80,14 @@ function renderMarkdown(report: EvidenceAbsorptionBenchmarkReport): string {
         '',
         '## Cases',
         '',
-        '| Case | Source recall | Citation coverage | Citation correctness | Stale leakage | Negative leakage | Diary coverage | Attachment coverage | Findings |',
-        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
+        '| Case | Source recall | Curated recall | Seeking gain | Recovered sources | Citation coverage | Citation correctness | Stale leakage | Negative leakage | Diary coverage | Attachment coverage | Findings |',
+        '| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
         ...report.cases.map((item) => [
             item.id,
             item.relevantSourceRecall.toFixed(3),
+            item.curatedSourceRecall.toFixed(3),
+            item.evidenceSeekingSourceGain.toFixed(3),
+            item.evidenceSeekingRecoveredSourceIds.join('<br>') || 'none',
             item.citationCoverage.toFixed(3),
             item.citationCorrectness.toFixed(3),
             item.staleLeakageRate.toFixed(3),
@@ -112,6 +117,20 @@ function validationFailures(report: EvidenceAbsorptionBenchmarkReport): string[]
     if (normalAverage('negativeAssertionLeakage') > 0) failures.push('negativeAssertionLeakage above 0');
     if (normalAverage('diaryEvidenceCoverage') < 1) failures.push('diaryEvidenceCoverage below 1');
     if (normalAverage('attachmentEvidenceCoverage') < 1) failures.push('attachmentEvidenceCoverage below 1');
+    if (normalCases.some((item) => item.findings.includes('evidence_seeking_recovery_gap'))) {
+        failures.push('evidence seeking failed to recover a curated-input miss');
+    }
+
+    const curatedProbeCases = normalCases.filter((item) => item.curatedSourceRecall < 1);
+    if (
+        curatedProbeCases.length > 0
+        && !curatedProbeCases.some((item) => (
+            item.evidenceSeekingSourceGain > 0
+            && item.evidenceSeekingRecoveredSourceIds.length > 0
+        ))
+    ) {
+        failures.push('no curated-vs-evidence-seeking recovery probe succeeded');
+    }
 
     const adversarial = report.cases.find((item) => item.id === 'adversarial-fabricated-citation');
     if (!adversarial || adversarial.citationCorrectness >= 1 || !adversarial.findings.includes('citation_correctness')) {
@@ -139,6 +158,7 @@ function main(): void {
     process.stderr.write([
         `evidence absorption benchmark: cases=${report.caseCount}`,
         `sourceRecall=${report.aggregate.relevantSourceRecall.toFixed(3)}`,
+        `seekingGain=${report.aggregate.evidenceSeekingSourceGain.toFixed(3)}`,
         `citationCorrectness=${report.aggregate.citationCorrectness.toFixed(3)}`,
         `staleLeakage=${report.aggregate.staleLeakageRate.toFixed(3)}`,
     ].join(' ') + '\n');

@@ -27,6 +27,9 @@
         "attachment:doc-recent-discharge:parse-evidence",
         "diary:entry-followup"
       ],
+      "curatedSourceIds": [
+        "attachment:doc-recent-discharge:parse-evidence"
+      ],
       "diarySourceIds": [
         "diary:entry-followup"
       ],
