@@ -108,6 +108,8 @@
     "test:redaction:resilience": "node --experimental-strip-types scripts/benchmark-redaction-resilience.ts",
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
+    "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
+    "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",
     "test:network:home-base-readonly": "bash scripts/network-home-base-readonly-smoke.sh",
     "test:network:home-base-write": "bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-diary-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-diary-write.test.mjs bash scripts/network-home-base-write-smoke.sh",

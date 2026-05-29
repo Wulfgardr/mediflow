@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { PM2Manager } from '@/lib/pm2-manager';
 /* @Codex */
-import { requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 
 
 // Note: Robust auth check should be added here using sessions.
@@ -23,15 +25,15 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
     // Security Check
     // TODO: Add robust auth check here.
     // For now, we rely on middleware if present, or just proceed.
     // The user requested security.
     /* @Codex */
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         await PM2Manager.connect();
@@ -44,11 +46,11 @@ export async function POST(request: Request) {
     }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE() {
     /* @Codex */
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         await PM2Manager.connect();

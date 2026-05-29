@@ -4,7 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 /* @Codex */
-import { requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -17,11 +19,11 @@ const timestamp = () => {
 };
 
 /* @Codex */
-export async function POST(request: Request) {
+export async function POST() {
     /* @Codex */
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const dbPath = resolveDataPath('medical.db');

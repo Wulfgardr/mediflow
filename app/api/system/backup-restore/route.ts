@@ -22,9 +22,11 @@ import {
 } from '@/lib/schema';
 import {
     forbiddenResponse,
-    requireSessionOrLocalToken,
+    requireSession,
     unauthorizedResponse,
 } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 import {
     BACKUP_COLLECTIONS,
     type BackupArtifact,
@@ -350,10 +352,10 @@ function derivePatientLinks(patientsPayload: BackupArtifact['payload']['patients
 }
 
 /* @Codex */
-export async function GET(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+export async function GET() {
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const payload = await buildBackupDataset();
@@ -372,9 +374,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const body = await request.json();

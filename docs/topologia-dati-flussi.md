@@ -407,6 +407,11 @@ sequenceDiagram
 | `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
+Nota auth: il token locale non porta privilegi admin web. Le route di sistema
+ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
+da `/api/v1/*` restano limitate a bootstrap/supporto locale e diagnostica
+read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
+
 ---
 
 ## 6. Mappa file autorevoli per i flussi
@@ -430,6 +435,9 @@ sequenceDiagram
 - `/api/v1/*` resta versionata e compatibile per client native.
 - `network-home-base` resta opt-in, paired e read-only-first, con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
 - Token locale e sessione devono restare separati (web cookie vs native bearer).
+- Token locale e sessione admin web non sono intercambiabili: un token valido
+  non deve autorizzare audit, backup/restore, scheduler, repair DB o lifecycle
+  MLX.
 - Proxy verso servizi locali sempre allowlist localhost.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.

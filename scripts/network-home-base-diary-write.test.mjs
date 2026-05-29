@@ -228,7 +228,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(deletedDetail.json?.version, 3);
         assert.equal(deletedDetail.json?.deletedAt, '2026-05-02T10:00:00.000Z');
 
-        const createdAudit = await findAuditEvent('entry.created', entryId);
+        const createdAudit = await findAuditEvent('entry.created', entryId, sessionCookie);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -236,11 +236,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['type', 'title', 'date', 'content', 'setting', 'metadata']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('entry.updated', entryId);
+        const updatedAudit = await findAuditEvent('entry.updated', entryId, sessionCookie);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['content']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('entry.deleted', entryId);
+        const deletedAudit = await findAuditEvent('entry.deleted', entryId, sessionCookie);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -266,9 +266,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
     }
 });
 
-async function findAuditEvent(eventType, subjectRef) {
+async function findAuditEvent(eventType, subjectRef, sessionCookie) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=entry&limit=20`, {
-        headers: localApiHeaders(),
+        headers: {
+            Cookie: sessionCookie,
+        },
     });
     assert.equal(audit.response.status, 200);
     assert.ok(Array.isArray(audit.json));

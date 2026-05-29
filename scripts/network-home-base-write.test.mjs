@@ -123,7 +123,9 @@ test('paired patient profile write requires write capability, session, scope, an
         assert.equal(aiField.json?.error, 'Network patient write boundary excludes AI fields');
 
         const audit = await request('GET', `/api/system/audit?eventType=patient.updated&subjectType=patient&limit=20`, {
-            headers: localApiHeaders(),
+            headers: {
+                Cookie: sessionCookie,
+            },
         });
         assert.equal(audit.response.status, 200);
         assert.ok(Array.isArray(audit.json));

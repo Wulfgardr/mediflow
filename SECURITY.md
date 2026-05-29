@@ -79,6 +79,15 @@ MediFlow espone due superfici API:
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
 - Mantenere `/api/v1/*` stabile e retrocompatibile.
+- Il bearer token locale non equivale a una sessione amministrativa umana:
+  route di sistema distruttive o amministrative richiedono session cookie con
+  admin web. In particolare audit, backup export/restore, backup scheduler,
+  repair DB e start/stop MLX non devono accettare solo il token locale.
+- Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
+  supporto/bootstrap, non privilegi admin generali: cataloghi locali,
+  settings/native bootstrap, proxy AI/OCR locale, health/redaction locali,
+  network overview e stato MLX read-only. Ogni nuova eccezione deve documentare
+  perche non richiede una sessione admin web.
 
 ### Trasporto
 
