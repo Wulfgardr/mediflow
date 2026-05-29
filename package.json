@@ -151,9 +151,9 @@
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
-    "next": "16.1.1",
+    "next": "16.2.6",
     "openai": "^6.16.0",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "4.10.38",
     "pm2": "^6.0.14",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -163,6 +163,11 @@
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
     "zod": "^4.2.1"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.10"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
