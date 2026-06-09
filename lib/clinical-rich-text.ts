@@ -17,6 +17,16 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
 
 const RICH_TEXT_HTML_PATTERN = /<\/?(?:p|br|strong|em|u|s|ul|ol|li|h[1-3]|blockquote|b|i|strike|div)\b/i;
 
+/* @Codex */
+// Matches any `<` that does NOT begin a reconstructed allowed tag token (`<tag>` or
+// `</tag>`). After the allowlist pass below every legitimate tag is emitted without
+// attributes, so anything else (malformed/unterminated tags the tag regex could not
+// strip) is neutralized by escaping its `<` to `&lt;`.
+const RESIDUAL_RICH_TEXT_LT_PATTERN = new RegExp(
+    `<(?!/?(?:${Array.from(ALLOWED_RICH_TEXT_TAGS).join('|')})>)`,
+    'gi',
+);
+
 const HTML_ENTITY_MAP: Record<string, string> = {
     '&nbsp;': ' ',
     '&amp;': '&',
@@ -54,7 +64,11 @@ export function sanitizeClinicalRichTextHtml(value: string | null | undefined): 
         .replace(/<(script|style|iframe|object|embed|meta|link)[^>]*>[\s\S]*?<\/\1>/gi, '')
         .replace(/<(script|style|iframe|object|embed|meta|link)[^>]*\/?>/gi, '');
 
-    normalized = normalized.replace(/<(\/?)([a-z0-9]+)(?:\s[^>]*)?>/gi, (_match, slash: string, rawTag: string) => {
+    // Browsers accept `/` (and whitespace) as the separator between a tag name and its
+    // attributes, so `<img/src=x onerror=...>` must be matched here too — otherwise it
+    // slips past the allowlist untouched. See RESIDUAL_RICH_TEXT_LT_PATTERN for the
+    // unterminated-tag backstop.
+    normalized = normalized.replace(/<(\/?)([a-z0-9]+)(?:[\s/][^>]*)?>/gi, (_match, slash: string, rawTag: string) => {
         const tag = rawTag.toLowerCase();
         if (!ALLOWED_RICH_TEXT_TAGS.has(tag)) return '';
         if (tag === 'br') return '<br>';
@@ -65,6 +79,7 @@ export function sanitizeClinicalRichTextHtml(value: string | null | undefined): 
         .replace(/<(p|h1|h2|h3|blockquote)>\s*<\/\1>/gi, '')
         .replace(/(?:<br>\s*){3,}/gi, '<br><br>')
         .replace(/\s+<\/(p|h1|h2|h3|blockquote|li|ul|ol)>/gi, '</$1>')
+        .replace(RESIDUAL_RICH_TEXT_LT_PATTERN, '&lt;')
         .trim();
 }
 
