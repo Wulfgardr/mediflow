@@ -51,7 +51,7 @@ INSERT INTO `service_prescription_items` (
     `updated_at`
 )
 SELECT
-    `id` || ':item:0`,
+    `id` || ':item:0',
     `patient_id`,
     `id`,
     0,
