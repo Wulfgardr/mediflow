@@ -286,6 +286,7 @@ const DATE_FIELDS = new Set([
     'startDate',
     'startedAt',
     'completedAt',
+    'deletedAt',
     'updatedAt',
 ]);
 
