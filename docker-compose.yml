@@ -9,7 +9,7 @@ services:
     container_name: mediflow-icd
     restart: unless-stopped
     ports:
-      - "8888:80"
+      - "127.0.0.1:8888:80"
     environment:
       - acceptLicense=true
       - saveAnalytics=false

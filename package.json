@@ -70,6 +70,7 @@
     "test:fse-validation": "bash scripts/fse-validation-test.sh",
     "test:ai-insight-settings": "bash scripts/ai-insight-settings-test.sh",
     "test:auth-lockout": "bash scripts/auth-lockout-test.sh",
+    "test:clinical-rich-text": "bash scripts/clinical-rich-text-test.sh",
     "test:patient-write-normalization": "bash scripts/patient-write-normalization-test.sh",
     "test:patient-ambulatory-membership": "bash scripts/patient-ambulatory-membership-test.sh",
     "test:patient-soft-delete": "bash scripts/patient-soft-delete-test.sh",
