@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Sviluppo: moved from the monolithic settings page.
+// WUL-297 Sviluppo: moved from the monolithic settings page.
 
 import { useState } from 'react';
 import DataSeeder from '@/components/data-seeder';

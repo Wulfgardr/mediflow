@@ -72,7 +72,7 @@ test('document synthesis kill switch keeps OCR import available but disables cli
   });
 
   await bootstrapUnlockedSession(page, pin);
-  // WUL-297 — kill switches now live on the dedicated AI sub-route.
+  // WUL-297: kill switches now live on the dedicated AI sub-route.
   await page.goto('/settings/ai/funzioni');
   await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 

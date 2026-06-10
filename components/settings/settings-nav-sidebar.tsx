@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — grouped sidebar for the settings information architecture.
+// WUL-297: grouped sidebar for the settings information architecture.
 // Below lg the full nav collapses into a compact disclosure bar (current
 // section + accordion) so sub-route content stays above the fold.
 

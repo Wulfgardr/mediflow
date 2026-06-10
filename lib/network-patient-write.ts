@@ -184,7 +184,7 @@ export async function updateNetworkScopedPatient(
         }
 
         if (hasOwn(body, 'ambulatoryId')) {
-            // WUL-309: set-primary semantics — upsert the scoped association only;
+            // WUL-309: set-primary semantics: upsert the scoped association only;
             // a network client must never rewrite the patient's other memberships.
             upsertPrimaryAmbulatoryMembership(tx, context.patientId, context.scopeAmbulatoryId);
         }

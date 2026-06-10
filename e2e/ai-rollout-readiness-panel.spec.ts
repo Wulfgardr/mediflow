@@ -85,7 +85,7 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
     });
   });
 
-  // WUL-297 — governance/readiness now lives on the AI functions sub-route.
+  // WUL-297: governance/readiness now lives on the AI functions sub-route.
   await page.goto('/settings/ai/funzioni');
   await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 

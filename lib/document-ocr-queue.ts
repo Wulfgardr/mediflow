@@ -54,7 +54,7 @@ export function isDocumentOcrQueueReason(value: unknown): value is DocumentOcrQu
 export function describeDocumentOcrQueueEntry(state: string, reason?: string | null): string {
     const stateLabel = isDocumentOcrQueueState(state) ? DOCUMENT_OCR_QUEUE_STATE_LABELS_IT[state] : state;
     const reasonLabel = isDocumentOcrQueueReason(reason) ? DOCUMENT_OCR_QUEUE_REASON_LABELS_IT[reason] : reason;
-    return reasonLabel ? `${stateLabel} — ${reasonLabel}` : stateLabel;
+    return reasonLabel ? `${stateLabel} · ${reasonLabel}` : stateLabel;
 }
 
 /**

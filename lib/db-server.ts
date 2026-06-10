@@ -15,7 +15,7 @@ const legacyDbPath = path.join(process.cwd(), 'medical.db');
 // A crash inside replaceSqliteDatabase can leave medical.db.repair-tmp-* /
 // medical.db.old-* files behind. If the crash hit the window between retiring
 // medical.db and renaming the staged copy in, the .old-* file is the only
-// surviving database — restore it before opening; everything else is stale.
+// surviving database: restore it before opening; everything else is stale.
 function recoverSwapArtifacts(): void {
     const dir = path.dirname(dbPath);
     const base = path.basename(dbPath);
@@ -55,7 +55,7 @@ recoverSwapArtifacts();
 
 if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
     // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
-    // and stage + rename so a failed copy never leaves a torn medical.db —
+    // and stage + rename so a failed copy never leaves a torn medical.db:
     // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
     const bootStagingPath = `${dbPath}.repair-tmp-boot-${process.pid}`;
     try {

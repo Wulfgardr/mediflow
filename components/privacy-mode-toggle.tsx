@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — persistent header affordance for Privacy Mode. The header is the
+// WUL-297: persistent header affordance for Privacy Mode. The header is the
 // primary surface for the toggle; settings keeps only a pointer.
 
 import { Eye, EyeOff } from 'lucide-react';

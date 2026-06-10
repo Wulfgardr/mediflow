@@ -417,7 +417,7 @@ body {
   min-width: 0;
 }
 
-/* @Codex WUL-229 — Production workbench follows the liquid-glass dummy composition:
+/* @Codex WUL-229: Production workbench follows the liquid-glass dummy composition:
    command chrome first, a dominant selected-patient lens, then the operational stream. */
 :root[data-ui-style='redesign'] .patient-liquid-commandbar {
   border-radius: 28px;
@@ -916,7 +916,7 @@ body {
   width: var(--prog-width, 0%);
 }
 
-/* @Codex: Graphite patient/SISS reusable surfaces — dense, dark-mode aware,
+/* @Codex: Graphite patient/SISS reusable surfaces: dense, dark-mode aware,
    no decorative gradients. Built on the same surface language as
    .patient-detail-section so the SISS panel scans like sibling content. */
 
@@ -1252,7 +1252,7 @@ body {
   color: rgb(240, 200, 130);
 }
 
-/* @Codex: Patient identity lens — code pills that work in dark too. */
+/* @Codex: Patient identity lens: code pills that work in dark too. */
 .patient-code-pill {
   display: inline-flex;
   align-items: center;
@@ -1289,7 +1289,7 @@ body {
   color: rgb(203, 213, 225);
 }
 
-/* @Codex WUL-229 — Liquid Glass tier system. Token-driven surface language
+/* @Codex WUL-229: Liquid Glass tier system. Token-driven surface language
    scoped to the official redesign shell.
    Specular  = chrome (sidebar shell, mobile header, mobile bottom nav,
                 command capsule). High blur, inner-edge highlight.
@@ -1372,7 +1372,7 @@ body {
   --mf-tier-vitreous-shadow: 0 10px 22px rgba(6, 5, 7, 0.32);
 }
 
-/* Specular — chrome surfaces */
+/* Specular: chrome surfaces */
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root[data-ui-style='redesign'] .mediflow-mobile-header,
 :root[data-ui-style='redesign'] .glass-command-capsule {
@@ -1403,7 +1403,7 @@ body {
   border-top-color: var(--mf-tier-specular-border);
 }
 
-/* Vitreous — workspace surfaces */
+/* Vitreous: workspace surfaces */
 :root[data-ui-style='redesign'] .case-lens-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
@@ -1439,7 +1439,7 @@ body {
   -webkit-backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
 }
 
-/* Crystalline — chips */
+/* Crystalline: chips */
 :root[data-ui-style='redesign'] .apple-chip,
 :root[data-ui-style='redesign'] .graphite-chip {
   box-shadow: var(--mf-tier-crystalline-highlight);
@@ -1491,7 +1491,7 @@ body {
   }
 }
 
-/* @Codex WUL-229 — Reusable liquid-glass primitives applied broadly to forms,
+/* @Codex WUL-229: Reusable liquid-glass primitives applied broadly to forms,
    modals, dropdowns, secondary buttons and semantic alert blocks so individual
    pages avoid hand-rolled bg-white/border-gray-* SaaS tokens. */
 
@@ -1570,7 +1570,7 @@ body {
   background-color: rgba(255, 255, 255, 0.07);
 }
 
-/* Secondary button — calm chrome companion to .ui-btn-primary */
+/* Secondary button: calm chrome companion to .ui-btn-primary */
 .mf-btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -1624,7 +1624,7 @@ body {
   background-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Vitreous section card — workspace block (forms, settings panels, lists) */
+/* Vitreous section card: workspace block (forms, settings panels, lists) */
 .mf-section {
   border-radius: var(--ui-card-radius);
   border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
@@ -1656,7 +1656,7 @@ body {
   color: rgb(203, 213, 225);
 }
 
-/* Specular shell — chrome for modals and floating sheets */
+/* Specular shell: chrome for modals and floating sheets */
 .mf-modal-shell {
   border-radius: 26px;
   border: 1px solid var(--mf-tier-specular-border, rgba(255, 255, 255, 0.6));
@@ -1682,7 +1682,7 @@ body {
   background: radial-gradient(circle at 50% 30%, rgba(6, 5, 7, 0.6), rgba(6, 5, 7, 0.78));
 }
 
-/* Vitreous popover/dropdown — autocomplete suggestions, menus */
+/* Vitreous popover/dropdown: autocomplete suggestions, menus */
 .mf-popover {
   border-radius: 18px;
   border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
@@ -1857,7 +1857,7 @@ body {
   border-color: rgba(203, 213, 225, 0.22);
 }
 
-/* Soft option card — used by onboarding role choices, scale picker, etc. */
+/* Soft option card: used by onboarding role choices, scale picker, etc. */
 .mf-option-card {
   display: grid;
   gap: 0.4rem;
@@ -1935,7 +1935,7 @@ body {
   margin-top: 0.3rem;
 }
 
-/* @Codex WUL-273 — legacy tone modifiers now inherit the neutral CTA language. */
+/* @Codex WUL-273: legacy tone modifiers now inherit the neutral CTA language. */
 .ui-btn-primary.mf-tone-success {
   background: var(--ui-btn-primary-bg);
   box-shadow: var(--ui-btn-primary-shadow);
@@ -1961,7 +1961,7 @@ body {
   background: var(--ui-btn-primary-bg);
 }
 
-/* @Codex WUL-229 — make the real patient workbench unmistakably match the dummy.
+/* @Codex WUL-229: make the real patient workbench unmistakably match the dummy.
    Earlier redesign rules flattened these surfaces too much; this pass restores
    glass depth, large focal lenses and carded streams on the two primary views. */
 :root[data-ui-style='redesign'] .patient-liquid-workbench {
@@ -2163,7 +2163,7 @@ body {
   background: var(--ui-btn-primary-bg);
 }
 
-/* @Codex WUL-273 — neutral adapter for legacy Tailwind chroma.
+/* @Codex WUL-273: neutral adapter for legacy Tailwind chroma.
    State should be carried by copy, hierarchy and enabled/disabled controls first.
    Red critical states remain untouched; older blue/green/amber/purple accents are
    mapped to the graphite redesign language. */

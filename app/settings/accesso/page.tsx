@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Accesso: PIN rotation moved from the monolithic settings page.
+// WUL-297 Accesso: PIN rotation moved from the monolithic settings page.
 
 import { useState } from 'react';
 import { KeyRound, Lock, Shield } from 'lucide-react';
@@ -58,7 +58,7 @@ export default function SettingsAccessPage() {
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-229 — security card icon switches to MediFlow warning tone */}
+                    {/* @Codex WUL-229: security card icon switches to MediFlow warning tone */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                             <KeyRound className="h-4 w-4" />
@@ -126,7 +126,7 @@ export default function SettingsAccessPage() {
                         </div>
 
                         {pinFeedback && (
-                            // @Codex WUL-229 — PIN feedback now uses the mf-alert tone primitives
+                            // @Codex WUL-229: PIN feedback now uses the mf-alert tone primitives
                             <div className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
                                 {pinFeedback.message}
                             </div>
@@ -145,7 +145,7 @@ export default function SettingsAccessPage() {
                     </div>
                 </div>
 
-                {/* WUL-297 — sessione locale corrente, con blocco immediato. */}
+                {/* WUL-297: sessione locale corrente, con blocco immediato. */}
                 <div className={SETTINGS_CARD_CLASS}>
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>

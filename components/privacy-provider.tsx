@@ -43,7 +43,7 @@ export function usePrivacy() {
     return context;
 }
 
-// WUL-297 — provider-optional variant for chrome mounted on surfaces without
+// WUL-297: provider-optional variant for chrome mounted on surfaces without
 // the app provider tree (e.g. static mockups): callers render nothing instead
 // of crashing the prerender.
 export function usePrivacyOptional(): PrivacyContextType | undefined {

@@ -65,7 +65,7 @@ export function sanitizeClinicalRichTextHtml(value: string | null | undefined): 
         .replace(/<(script|style|iframe|object|embed|meta|link)[^>]*\/?>/gi, '');
 
     // Browsers accept `/` (and whitespace) as the separator between a tag name and its
-    // attributes, so `<img/src=x onerror=...>` must be matched here too — otherwise it
+    // attributes, so `<img/src=x onerror=...>` must be matched here too; otherwise it
     // slips past the allowlist untouched. See RESIDUAL_RICH_TEXT_LT_PATTERN for the
     // unterminated-tag backstop.
     normalized = normalized.replace(/<(\/?)([a-z0-9]+)(?:[\s/][^>]*)?>/gi, (_match, slash: string, rawTag: string) => {

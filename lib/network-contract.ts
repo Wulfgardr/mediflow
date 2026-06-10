@@ -61,7 +61,7 @@ export function normalizeNetworkOperatingMode(value: string | null | undefined):
 }
 
 /**
- * WUL-307 — data-plane operating-mode gate.
+ * WUL-307: data-plane operating-mode gate.
  *
  * Disabling network-home-base does not revoke stored pairings: it makes every
  * paired-client token inert until the mode is re-enabled. Data-plane routes

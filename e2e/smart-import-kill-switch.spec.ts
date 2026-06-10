@@ -13,7 +13,7 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
   await bootstrapUnlockedSession(page, pin);
 
   const disableSmartImport = async () => {
-    // WUL-297 — kill switches now live on the dedicated AI sub-route.
+    // WUL-297: kill switches now live on the dedicated AI sub-route.
     await page.goto('/settings/ai/funzioni');
     await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 

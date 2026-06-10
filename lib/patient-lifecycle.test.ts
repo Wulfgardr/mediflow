@@ -132,7 +132,7 @@ test('stale version and already-tombstoned deletes do not match (409/404 paths)'
         assert.equal(secondDelete.changes, 0, 'a tombstoned patient must not be re-deletable');
 
         // The conflict snapshot reads through the same active filter, so a tombstoned
-        // row reports `missing` — byte-identical to the old hard-delete contract.
+        // row reports `missing`, byte-identical to the old hard-delete contract.
         const current = db
             .select({
                 id: patients.id,

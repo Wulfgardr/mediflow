@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Profilo: moved from the monolithic settings page.
+// WUL-297 Profilo: moved from the monolithic settings page.
 
 import { useState, useEffect } from 'react';
 import { Save, User } from 'lucide-react';
@@ -71,7 +71,7 @@ export default function SettingsProfilePage() {
             />
 
             <div className={SETTINGS_CARD_CLASS}>
-                {/* @Codex WUL-229 — header icon disc + ink copy mapped to MediFlow tokens */}
+                {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
                 <div className="mb-5 flex items-start gap-3">
                     <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                         <User className="h-4 w-4" />

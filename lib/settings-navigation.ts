@@ -1,4 +1,4 @@
-// WUL-297 — information architecture for the settings sidebar and the
+// WUL-297: information architecture for the settings sidebar and the
 // "Cerca impostazione" quick-jump. Pure data module: no React imports so it
 // stays testable with node --test.
 

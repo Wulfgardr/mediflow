@@ -84,7 +84,7 @@ test('Italian UI vocabulary matches the agreed queue labels', () => {
     assert.equal(DOCUMENT_OCR_QUEUE_STATE_LABELS_IT.manual_review, 'revisione manuale');
     assert.equal(
         describeDocumentOcrQueueEntry('pending', 'text_layer_absent'),
-        `in attesa — ${DOCUMENT_OCR_QUEUE_REASON_LABELS_IT.text_layer_absent}`,
+        `in attesa · ${DOCUMENT_OCR_QUEUE_REASON_LABELS_IT.text_layer_absent}`,
     );
     assert.equal(describeDocumentOcrQueueEntry('processing'), 'in elaborazione');
 });

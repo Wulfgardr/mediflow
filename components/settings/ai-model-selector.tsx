@@ -1,6 +1,6 @@
 'use client';
 
-/* WUL-297 — moved verbatim from app/settings/page.tsx into the AI sub-route. */
+/* WUL-297: moved verbatim from app/settings/page.tsx into the AI sub-route. */
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Check, Download, RefreshCw } from 'lucide-react';
@@ -141,7 +141,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
 
     return (
         <div className="apple-subsection space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
-            {/* @Codex WUL-229 — selector header now uses MediFlow icon disc + ink/muted typography */}
+            {/* @Codex WUL-229: selector header now uses MediFlow icon disc + ink/muted typography */}
             <div className="flex items-start gap-3">
                 <div className="rounded-2xl p-2.5" style={c.iconStyle}>
                     {icon}
@@ -160,7 +160,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             const selected = value === model.name;
 
                             return (
-                                // @Codex WUL-229 — option card switches to mf-option-card primitive with style-driven selection accent
+                                // @Codex WUL-229: option card switches to mf-option-card primitive with style-driven selection accent
                                 <div
                                     key={model.name}
                                     onClick={() => onChange(model.name)}
@@ -211,7 +211,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             );
                         })}
 
-                        {/* @Codex WUL-229 — secondary toggles use mf-btn-secondary */}
+                        {/* @Codex WUL-229: secondary toggles use mf-btn-secondary */}
                         <button
                             onClick={() => setShowCustom(true)}
                             className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-center border-dashed')}
@@ -241,7 +241,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
 
             {/* Global Pull Status */}
             {isPulling && (
-                // @Codex WUL-229 — pull status card now uses the shared liquid section primitive
+                // @Codex WUL-229: pull status card now uses the shared liquid section primitive
                 <div className="mf-section mf-section-tight animate-in fade-in slide-in-from-bottom-2 p-4">
                     <div className="mb-2 flex items-center justify-between gap-3">
                         <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--mf-ink)' }}>

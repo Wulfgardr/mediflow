@@ -44,7 +44,7 @@ function stateFromArtifact(artifact: DocumentOcrReplayArtifact): 'ocr_done' | 'o
  * Applica un replay documentale post-OCR in modo idempotente: lo stesso hash
  * documento con lo stesso testo OCR normalizzato non produce mai un nuovo
  * artifact (outcome 'duplicate', snapshot invariato). Nota: niente fileName
- * nella source — lo snapshot resta privo di PHI e persistibile lato server.
+ * nella source, così lo snapshot resta privo di PHI e persistibile lato server.
  */
 export function applyDocumentOcrReplay(input: ApplyDocumentOcrReplayInput): DocumentOcrReplayApplication {
     const sufficientText = hasUsableDocumentOcrText(input.ocrText);

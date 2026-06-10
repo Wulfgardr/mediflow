@@ -1,6 +1,6 @@
 // WUL-306 (ADR 0066): anti-drift guard for PATIENT_CHILD_TABLES (WUL-316 pattern).
-// Every table that carries a patientId column — whether defined in lib/schema.ts or
-// created via raw SQL in lib/db-server.ts — MUST be covered by the canonical cascade.
+// Every table that carries a patientId column, whether defined in lib/schema.ts or
+// created via raw SQL in lib/db-server.ts, MUST be covered by the canonical cascade.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

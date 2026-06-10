@@ -491,7 +491,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                                     <dt className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">Ultimo modulo</dt>
                                     <dd className="flex items-center gap-2 text-right">
                                         <span className="font-semibold text-[color:var(--mf-ink)]">
-                                            {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : '—'}
+                                            {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : '–'}
                                         </span>
                                         <span className="text-[11px] text-[color:var(--mf-muted)]">{formatObservedAt(sessionData.lastModuleAt)}</span>
                                     </dd>

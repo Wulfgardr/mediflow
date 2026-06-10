@@ -38,7 +38,7 @@ export async function backupSqliteDatabase(sourcePath: string, destPath: string)
 /**
  * Synchronous consistent copy for call sites that cannot await (the module-load
  * legacy migration). VACUUM INTO reads through SQLite, so committed pages still
- * sitting in a -wal sidecar are included — unlike fs.copyFileSync, which tears
+ * sitting in a -wal sidecar are included, unlike fs.copyFileSync, which tears
  * a WAL-mode database. destPath must not exist yet.
  */
 export function copySqliteDatabaseSync(sourcePath: string, destPath: string): void {
@@ -91,7 +91,7 @@ export interface ReplaceSqliteDatabaseOptions {
  * file in, then reopen.
  *
  * Crash/failure safety: the previous DB is never deleted before the staged
- * copy has landed — on failure it is restored from the .old-* name, and a
+ * copy has landed: on failure it is restored from the .old-* name, and a
  * crash inside the window leaves the .old-* file on disk for boot recovery.
  * Swaps of the same destination are serialized: a second concurrent call
  * fails fast with SqliteSwapInProgressError without touching the connection.

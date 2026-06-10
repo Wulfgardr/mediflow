@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Aspetto: moved from the monolithic settings page.
+// WUL-297 Aspetto: moved from the monolithic settings page.
 
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@ export default function SettingsAppearancePage() {
                             <span className="apple-chip">{reduceMotion ? 'Attivo' : 'Disattivo'}</span>
                         </button>
 
-                        {/* WUL-297 — la Privacy Mode vive nell'intestazione dell'app; qui resta un puntatore. */}
+                        {/* WUL-297: la Privacy Mode vive nell'intestazione dell'app; qui resta un puntatore. */}
                         <button
                             type="button"
                             onClick={togglePrivacyMode}

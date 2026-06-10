@@ -34,7 +34,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            // @Codex WUL-229: keep the historical encryption contract intact —
+            // @Codex WUL-229: keep the historical encryption contract intact:
             // login password is for auth, PIN is for the encrypted master key.
             await onComplete({
                 displayName: formData.displayName,
@@ -49,7 +49,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     };
 
     return (
-        // @Codex WUL-229 — onboarding now uses specular shell + crystalline pills
+        // @Codex WUL-229: onboarding now uses specular shell + crystalline pills
         <div className="w-full max-w-2xl mx-auto">
             <div className="mb-8 flex items-center justify-center gap-2" aria-label="Avanzamento setup">
                 {[1, 2, 3, 4].map(i => (

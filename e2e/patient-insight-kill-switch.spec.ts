@@ -7,7 +7,7 @@ test('patient insight kill switch disables generation on patient detail', async 
 
   await bootstrapUnlockedSession(page, pin);
 
-  // WUL-297 — kill switches now live on the dedicated AI sub-route.
+  // WUL-297: kill switches now live on the dedicated AI sub-route.
   await page.goto('/settings/ai/funzioni');
   await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 
-// @Codex WUL-229 — modal shell now follows the specular tier with mf-modal-* primitives
+// @Codex WUL-229: modal shell now follows the specular tier with mf-modal-* primitives
 function Modal({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
     if (!isOpen) return null;
     return (

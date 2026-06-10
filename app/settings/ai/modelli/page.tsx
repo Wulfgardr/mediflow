@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Modelli e Hardware: moved from the monolithic settings page.
+// WUL-297 Modelli e Hardware: moved from the monolithic settings page.
 
 import { useState } from 'react';
 import { AlertTriangle, Bot, CheckCircle, Cpu, RefreshCw, Save, Server, Stethoscope, Upload } from 'lucide-react';
@@ -45,7 +45,7 @@ export default function SettingsAiModelsPage() {
             <div className="space-y-6">
                 {/* Profilo hardware */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-229 — hardware tier cards now ride mf-option-card with token-driven accents */}
+                    {/* @Codex WUL-229: hardware tier cards now ride mf-option-card with token-driven accents */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                             <Cpu className="h-4 w-4" />
@@ -101,7 +101,7 @@ export default function SettingsAiModelsPage() {
 
                 {/* Ruoli del team AI */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-273 — AI roles header follows the neutral settings surface. */}
+                    {/* @Codex WUL-273: AI roles header follows the neutral settings surface. */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                             <Stethoscope className="h-4 w-4" />

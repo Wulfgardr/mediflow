@@ -91,7 +91,7 @@
   backdrop-filter: blur(18px);
 }
 
-/* WUL-297 — back button + persistent privacy toggle share the chrome top row. */
+/* WUL-297: back button + persistent privacy toggle share the chrome top row. */
 .chromeTopRow {
   display: flex;
   align-items: center;
@@ -443,7 +443,7 @@
   .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
   .chrome { border-radius: 14px; padding: 12px; }
   .workspaceBody :global(section[id]) { scroll-margin-top: 196px; }
-  /* WUL-297 — keep room for the privacy toggle on the same row. */
+  /* WUL-297: keep room for the privacy toggle on the same row. */
   .backButton { max-width: 100%; flex: 1 1 auto; justify-content: center; }
   .title { font-size: 18px; }
   .patientLabel { font-size: 12px; }

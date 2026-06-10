@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Backup e Ripristino: moved from the monolithic settings page.
+// WUL-297 Backup e Ripristino: moved from the monolithic settings page.
 
 import BackupRestoreUI from '@/components/backup-restore-ui';
 import BackupSchedulerUI from '@/components/backup-scheduler-ui';

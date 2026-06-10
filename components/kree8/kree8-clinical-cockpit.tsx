@@ -61,7 +61,7 @@ import type {
 } from '@/lib/siss-patient-context-shared';
 import { useLiveQuery } from '@/lib/live-query';
 import { ThemeToggle } from '@/components/theme-toggle';
-// WUL-297 — persistent privacy affordance in the app header.
+// WUL-297: persistent privacy affordance in the app header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import styles from './kree8-clinical-cockpit.module.css';
 
@@ -275,7 +275,7 @@ const DOC_FIELDS: {
     value: 'Ipertensione essenziale non specificata',
     kind: 'structured',
     evidence:
-      '«Paziente con anamnesi positiva per ipertensione essenziale in trattamento con Ramipril 5 mg.» — pag. 1, paragrafo 2',
+      '«Paziente con anamnesi positiva per ipertensione essenziale in trattamento con Ramipril 5 mg.» · pag. 1, paragrafo 2',
     sourceHint: 'confidence 0.91 · qwen3.5 locale',
   },
   {
@@ -292,7 +292,7 @@ const DOC_FIELDS: {
     value: 'Ramipril 5 mg',
     kind: 'structured',
     evidence:
-      '«…in trattamento con Ramipril 5 mg 1 cpr/die.» — pag. 1, paragrafo 2',
+      '«…in trattamento con Ramipril 5 mg 1 cpr/die.» · pag. 1, paragrafo 2',
     sourceHint: 'risolto via AIFA · AIC 029402017',
   },
   {
@@ -301,16 +301,16 @@ const DOC_FIELDS: {
     value: '1 cpr · 1 volta/die · per 90 giorni',
     kind: 'note',
     evidence:
-      '«Si conferma prosecuzione terapia per 90 giorni.» — pag. 2, paragrafo 1',
+      '«Si conferma prosecuzione terapia per 90 giorni.» · pag. 2, paragrafo 1',
     sourceHint: 'pattern verbale non strutturato · annotabile come nota',
   },
   {
     id: 'exemption',
     label: 'Esenzione applicabile',
-    value: '031 — Ipertensione arteriosa',
+    value: '031 · Ipertensione arteriosa',
     kind: 'note',
     evidence:
-      '«Esenzione applicabile 031 — previa verifica del medico curante.» — pag. 2, paragrafo 2',
+      '«Esenzione applicabile 031: previa verifica del medico curante.» · pag. 2, paragrafo 2',
     sourceHint: 'inferita · richiede conferma operatore',
   },
   {
@@ -318,7 +318,7 @@ const DOC_FIELDS: {
     label: 'Passaggio SISS',
     value: 'Da completare nel portale ufficiale',
     kind: 'blocked',
-    evidence: '—',
+    evidence: '–',
     sourceHint: '',
     blockedReason:
       'Apri il portale ufficiale e registra qui l’esito riportato dal portale.',
@@ -390,7 +390,7 @@ const REVIEW_CATALOGS: Kree8CatalogRow[] = [
     name: 'RxNORM map',
     sub: 'non abilitato in questa shell',
     freshness: 'off',
-    age: '—',
+    age: '–',
   },
 ];
 
@@ -841,7 +841,7 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
 
 function formatCheckupTime(value: string | Date): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '–';
   return new Intl.DateTimeFormat('it-IT', {
     hour: '2-digit',
     minute: '2-digit',
@@ -1262,7 +1262,7 @@ function buildOperatorInitials(value: string): string {
 
 function formatCandidateTime(startIso: string): string {
   const date = new Date(startIso);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '–';
   return new Intl.DateTimeFormat('it-IT', {
     day: '2-digit',
     month: 'short',
@@ -1412,7 +1412,7 @@ function TurnoArea({
     patientState.status === 'loading' || patientState.status === 'idle'
       ? '…'
       : patientState.status === 'error'
-        ? '—'
+        ? '–'
         : String(activePatientCount);
   const patientTrendLabel =
     patientState.status === 'ready'
@@ -1425,7 +1425,7 @@ function TurnoArea({
     agendaState.status === 'loading' || agendaState.status === 'idle'
       ? '…'
       : agendaState.status === 'error'
-        ? '—'
+        ? '–'
         : String(todayVisitCount);
   const visitSubLabel =
     agendaState.status === 'ready'
@@ -1433,11 +1433,11 @@ function TurnoArea({
       : agendaState.status === 'error'
         ? 'agenda non disponibile'
         : 'aggiornamento agenda';
-  const documentCountLabel = isReview ? '24' : '—';
+  const documentCountLabel = isReview ? '24' : '–';
   const documentSubLabel = isReview
     ? '7 con suggerimento AI'
     : 'apri revisione documentale';
-  const decisionCountLabel = isReview ? '7' : '—';
+  const decisionCountLabel = isReview ? '7' : '–';
   const decisionSubLabel = isReview
     ? '2 oltre SLA'
     : 'priorità dal paziente selezionato';
@@ -2363,7 +2363,7 @@ function SchedaArea({
           <div className={styles.compositeCard}>
             <header style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <FileText size={14} color="var(--ink-muted)" />
-              <span className={styles.evidenceTitle}>Referto cardiologico — DOC-2026-241</span>
+              <span className={styles.evidenceTitle}>Referto cardiologico · DOC-2026-241</span>
             </header>
             <span className={styles.rowSub}>3 campi aggiornabili · 2 note da riconciliare · 1 bloccato</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -3126,7 +3126,7 @@ function RevisioneArea() {
           </header>
           <article className={styles.docPaper}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <b>Referto cardiologico — sintetico</b>
+              <b>Referto cardiologico · sintetico</b>
               <span className={styles.evidenceDate}>esempio · nessun PHI</span>
             </header>
             <p style={{ margin: 0 }}>
@@ -3139,8 +3139,8 @@ function RevisioneArea() {
               controllo a 6 mesi.
             </p>
             <p style={{ margin: 0 }}>
-              Codifica suggerita <b>I10</b>. Esenzione applicabile <b>031</b>
-              {' '}— previa verifica del medico curante.
+              Codifica suggerita <b>I10</b>. Esenzione applicabile <b>031</b>:
+              previa verifica del medico curante.
             </p>
             <footer style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
               <PillBadge variant="muted">pag 1 di 2</PillBadge>
@@ -4378,7 +4378,7 @@ export function Kree8ClinicalCockpit({
             MEDI<b>FLOW</b>
           </span>
           <span className={styles.brandActions}>
-            {/* WUL-297 — persistent privacy affordance in the app header */}
+            {/* WUL-297: persistent privacy affordance in the app header */}
             <PrivacyModeToggle />
             <span className={styles.brandThemeToggle}>
               <ThemeToggle />
