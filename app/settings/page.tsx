@@ -1,38 +1,44 @@
 'use client';
 
-import { Eye, EyeOff } from 'lucide-react';
-import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+// WUL-297 — /settings is now a thin "Stato sistema" dashboard inside the
+// settings sidebar layout. Legacy #anchor deep-links redirect to the
+// dedicated sub-routes.
+
+import { useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ArrowUpRight } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
 /* @Codex */
 import NetworkOperatingModePanel from '@/components/settings/network-operating-mode-panel';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { usePrivacy } from '@/components/privacy-provider';
+import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
+import { SettingsSectionIntro } from '@/components/settings/settings-ui';
+
+// Old monolithic-page anchors → new sub-routes.
+const LEGACY_ANCHOR_REDIRECTS: Record<string, string> = {
+    '#account': '/settings/profilo',
+    '#ai': '/settings/ai/modelli',
+    '#backups': '/settings/backup',
+    '#data': '/settings/repertori',
+    '#operations': '/settings/diagnostica',
+    '#appearance': '/settings/aspetto',
+};
 
 export default function SettingsPage() {
+    const router = useRouter();
     const { user } = useSecurity();
-    const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
 
-    /* @Codex */
-    const settingsNavItems = [
-        { href: '/settings/profilo', label: 'Profilo', meta: 'account' },
-        { href: '/settings/ai/modelli', label: 'AI locale', meta: 'modelli' },
-        { href: '/settings/backup', label: 'Backup', meta: 'archivi' },
-        { href: '/settings/repertori', label: 'Repertori', meta: 'AIFA/esenzioni' },
-        { href: '/settings/diagnostica', label: 'Diagnostica', meta: 'servizi' },
-        { href: '/settings/aspetto', label: 'Lettura', meta: 'tema' },
-    ];
+    useEffect(() => {
+        const target = LEGACY_ANCHOR_REDIRECTS[window.location.hash];
+        if (target) {
+            router.replace(target);
+        }
+    }, [router]);
 
     return (
-        <Kree8WorkspaceShell
-            eyebrow="Sistema"
-            title="Impostazioni"
-            subtitle="Accesso, AI locale, backup, repertori e servizi del Mac che ospita MediFlow."
-            backHref="/"
-            backLabel="Torna ai pazienti"
-            statusLabel="I dati clinici e i servizi restano locali."
-            navItems={settingsNavItems}
-        >
-            <section id="status" className="patient-detail-section mf-section p-6 md:p-8 scroll-mt-24">
+        <div className="space-y-8" data-testid="settings-overview-section">
+            <section className="patient-detail-section mf-section p-6 md:p-8">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
                     <div>
                         <p className="section-kicker">Postazione locale</p>
@@ -46,15 +52,9 @@ export default function SettingsPage() {
                             <div className="[&>div]:mx-0">
                                 <ThemeToggle />
                             </div>
-                            <button
-                                type="button"
-                                onClick={togglePrivacyMode}
-                                className="mf-btn-secondary"
-                                aria-pressed={isPrivacyMode}
-                            >
-                                {isPrivacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                {isPrivacyMode ? 'Privacy attiva' : 'Privacy spenta'}
-                            </button>
+                            <p className="text-xs" style={{ color: 'var(--mf-muted)' }}>
+                                La Privacy Mode è sempre disponibile dall&apos;intestazione dell&apos;app.
+                            </p>
                         </div>
                     </div>
 
@@ -69,6 +69,51 @@ export default function SettingsPage() {
                 </div>
             </section>
 
-        </Kree8WorkspaceShell>
+            <section className="space-y-4">
+                <SettingsSectionIntro
+                    kicker="Sezioni"
+                    title="Tutte le impostazioni"
+                    description="Le impostazioni sono organizzate per area. Usa la barra laterale o la ricerca rapida (⌘K) per saltare a una sezione."
+                />
+
+                <div className="space-y-6">
+                    {SETTINGS_NAV_GROUPS.map((group) => (
+                        <div key={group.id} className="space-y-2">
+                            <p className="section-kicker">{group.label}</p>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {group.items.map((item) => {
+                                    const isDanger = item.tone === 'danger';
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            href={item.href}
+                                            data-testid={`settings-overview-link-${item.id}`}
+                                            className="mf-section mf-section-tight group flex items-start justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+                                            style={isDanger ? { borderColor: 'rgba(192, 57, 43, 0.3)', background: 'rgba(192, 57, 43, 0.06)' } : undefined}
+                                        >
+                                            <span className="min-w-0">
+                                                <span
+                                                    className="block text-sm font-semibold"
+                                                    style={{ color: isDanger ? 'var(--mf-critical)' : 'var(--mf-ink)' }}
+                                                >
+                                                    {item.label}
+                                                </span>
+                                                <span className="mt-1 block text-[11px] leading-4" style={{ color: 'var(--mf-muted)' }}>
+                                                    {item.description}
+                                                </span>
+                                            </span>
+                                            <ArrowUpRight
+                                                className="h-4 w-4 shrink-0 opacity-50 transition-opacity group-hover:opacity-100"
+                                                style={{ color: isDanger ? 'var(--mf-critical)' : 'var(--mf-muted)' }}
+                                            />
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </div>
     );
 }
