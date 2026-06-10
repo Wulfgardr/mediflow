@@ -279,6 +279,7 @@ const DATE_FIELDS = new Set([
     'endDate',
     'importedAt',
     'observedAt',
+    'ocrQueueUpdatedAt',
     'performedAt',
     'prescribedAt',
     'reportReceivedAt',
@@ -293,7 +294,16 @@ const DATE_FIELDS = new Set([
 function normalizeDateValue(value: unknown): unknown {
     if (value === null || value === undefined || value === '') return null;
     if (value instanceof Date) return value;
-    if (typeof value === 'string' || typeof value === 'number') {
+    if (typeof value === 'number') {
+        // Scheduled-runner artifacts predating WUL-319 carry raw SQLite unix-seconds
+        // integers; unix-milliseconds for any contemporary date are >= 10^12.
+        const milliseconds = Number.isInteger(value) && Math.abs(value) < 1_000_000_000_000
+            ? value * 1000
+            : value;
+        const parsed = new Date(milliseconds);
+        return Number.isNaN(parsed.getTime()) ? value : parsed;
+    }
+    if (typeof value === 'string') {
         const parsed = new Date(value);
         return Number.isNaN(parsed.getTime()) ? value : parsed;
     }

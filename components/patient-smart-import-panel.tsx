@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
     AlertTriangle,
@@ -30,13 +30,17 @@ import {
     type TherapySmartImportSuggestion,
     type TherapySuggestionState,
 } from '@/lib/patient-smart-import-service';
+import type { SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 
 interface PatientSmartImportPanelProps {
     patient: Patient;
     entries?: ClinicalEntry[];
+    /* WUL-262: lets patient detail mirror reviewable/blocked/ready counts in the
+       review-queue summary without duplicating panel state or behavior. */
+    onReviewSnapshotChange?: (snapshot: SmartImportReviewSnapshot) => void;
 }
 
-function countUsableSources(
+export function countUsableSources(
     patient: Patient,
     entries: ClinicalEntry[] | undefined,
     attachmentSummaryCount: number
@@ -283,7 +287,7 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
     );
 }
 
-export default function PatientSmartImportPanel({ patient, entries = [] }: PatientSmartImportPanelProps) {
+export default function PatientSmartImportPanel({ patient, entries = [], onReviewSnapshotChange }: PatientSmartImportPanelProps) {
     const [analysis, setAnalysis] = useState<PatientSmartImportAnalysis | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
@@ -305,9 +309,6 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
     const sourceCount = countUsableSources(patient, entries, attachments?.length || 0);
     const smartImportEnabled = isAiSmartImportEnabledValue(smartImportKillSwitch?.value);
-    if (sourceCount === 0) {
-        return null;
-    }
 
     const reviewableCount = analysis
         ? analysis.diagnoses.filter((diagnosis) => diagnosis.canApply && !selectedDiagnosisIds.includes(diagnosis.id)).length
@@ -318,6 +319,22 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
         + analysis.therapies.filter((therapy) => !therapy.canApply).length
         : 0;
     const selectedCount = countSelectedReviewItems(selectedDiagnosisIds, selectedTherapyIds);
+
+    /* WUL-262: report-only mirror of the review state already shown by this
+       panel; the effect must run before any early return (rules of hooks). */
+    const hasAnalysis = Boolean(analysis);
+    useEffect(() => {
+        onReviewSnapshotChange?.({
+            hasAnalysis,
+            reviewable: reviewableCount,
+            blocked: blockedCount,
+            ready: selectedCount,
+        });
+    }, [onReviewSnapshotChange, hasAnalysis, reviewableCount, blockedCount, selectedCount]);
+
+    if (sourceCount === 0) {
+        return null;
+    }
 
     const updateDiagnosisSuggestion = (
         id: string,
@@ -498,7 +515,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                     </div>
 
                     <Link
-                        href="/settings#ai"
+                        href="/settings/ai/funzioni"
                         className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         Apri Impostazioni AI

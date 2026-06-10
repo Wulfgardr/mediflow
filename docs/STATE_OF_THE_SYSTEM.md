@@ -17,7 +17,7 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-05-29 (`v0.6.0` + post-v0.6 mainline)
+Ultimo aggiornamento: 2026-06-10 (`v0.6.0` + post-v0.6 mainline)
 
 ---
 
@@ -43,7 +43,10 @@ La fotografia corrente e questa:
   riferimento anti-drift per la parte stabile.
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
   verso client paired su rete fidata: lettura pazienti e write versionati
-  limitati a profilo/status, diario, terapie, checkup e osservazioni.
+  limitati a profilo/status, diario, terapie, checkup e osservazioni. Quando la
+  modalita e disattivata i pairing restano salvati ma i token dei client paired
+  diventano inerti: il data plane risponde `403 NETWORK_MODE_DISABLED` finche
+  la modalita non viene riattivata.
 - **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
   superficie primaria, mostra readiness runtime locale e puo gestire
   esplicitamente backend web production e proxy TLS con stop bounded/escalation.
@@ -236,13 +239,17 @@ Documenti/ADR principali:
 1. Upload documento.
 2. Normalizzazione input e OCR locale: primario Ollama/DeepSeek OCR, con fallback
    Apple Vision solo su macOS quando l'output primario e low-signal.
-3. Sintesi/estrazione locale.
-4. Persistenza cifrata di:
+3. Se il testo estratto e assente o insufficiente, il documento entra nella
+   coda OCR-needed con stato e motivo espliciti e nessuna proposta clinica;
+   al completamento dell'OCR il replay per hash documento riapplica la
+   pipeline in modo idempotente.
+4. Sintesi/estrazione locale.
+5. Persistenza cifrata di:
    - allegato;
    - `summarySnapshot`;
    - `parseEvidenceArtifactSnapshot`;
    - projection `documentInsights` quando serve compatibilita.
-5. Consumer reviewable:
+6. Consumer reviewable:
    - `AI Patient Insight`;
    - Smart Import;
    - nuova anagrafica da documento;
@@ -264,16 +271,23 @@ Documenti/ADR principali:
 7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
    del diario con capability diary dedicate e `entries.version`, bloccando hard
    delete, attachment remoti, sync e campi AI/documentali.
-8. Il diario locale condiviso `/api/v1/patients/{id}/entries*` mantiene la
-   stessa semantica reversibile per web/native: lista attiva di default,
-   `includeDeleted=true` per i tombstone, motivo di eliminazione e restore via
-   `PUT`.
+8. Le sotto-risorse cliniche locali condivise `/api/v1/patients/{id}/entries*`,
+   `/api/v1/patients/{id}/therapies*`, `/api/v1/patients/{id}/checkups*` e
+   `/api/v1/patients/{id}/observations*` mantengono per web/native la stessa
+   semantica reversibile e versionata: PUT figli con version guard e `409` su
+   conflitto, lista attiva di default, `includeDeleted=true` per i tombstone,
+   DELETE come soft-delete ovunque e audit che distingue eliminazione da
+   aggiornamento.
 9. `/api/v1/network/patients/{id}/therapies*`,
    `/api/v1/network/patients/{id}/checkups*` e
    `/api/v1/network/patients/{id}/observations*` seguono lo stesso boundary
    paired: capability dedicate, `therapies.version`/`checkups.version`/
    `observations.version`, `409` PHI-safe e soft delete, senza hard delete
    remoto o campi AI/documentali.
+10. Se l'operatore disattiva `network-home-base`, i pairing restano
+    conservati ma ogni token paired diventa inerte: le route del data plane
+    rispondono `403 NETWORK_MODE_DISABLED` finche la modalita non torna
+    attiva.
 
 ---
 
@@ -388,14 +402,29 @@ Disponibile:
 - allegati;
 - archiviazione paziente;
 - campi strutturati e projection documentale;
-- versioning/compare-on-write sui percorsi rilevanti.
+- versioning/compare-on-write sui percorsi rilevanti;
+- ciclo di vita di cancellazione paziente reversibile (ADR 0066): DELETE come
+  tombstone soft-delete version-guarded con `deletedAt`/`deletionReason`,
+  letture filtrate sui soli pazienti attivi via helper condiviso, restore
+  admin esplicito e purge amministrata dry-run/execute per l'erasure GDPR,
+  con audit dedicato (`patient.purged`, `patient.restored`);
+- clear del contenitore di test per membership M2M: esclude i pazienti con
+  membership in ambulatori live e soft-deleta i soli pazienti di test con
+  `deletionReason` dedicata e audit per paziente;
+- PUT profilo con `ambulatoryId` come set-primary: aggiorna la membership
+  primaria senza azzerare le membership multi-ambulatorio.
 
 Da preservare:
 
 - cifratura client-side;
 - conflitti espliciti;
 - audit PHI-safe;
-- niente scritture remote non governate.
+- niente scritture remote non governate;
+- nessuna cancellazione fisica sul percorso caldo: l'erasure passa solo dalla
+  purge amministrata e audited;
+- il placeholder `[LOCKED DATA]` resta solo presentazione: quando la
+  decifratura fallisce il ciphertext originale viene conservato e non va mai
+  sovrascritto.
 
 ### 7.2 Backup, restore e continuita
 
@@ -405,7 +434,13 @@ Disponibile:
 - preflight restore;
 - scheduler notturno via macOS `launchd`;
 - retention `keep-last-N`;
-- guardrail anti-regressione.
+- guardrail anti-regressione;
+- date dei backup schedulati serializzate come stringhe ISO, con restore che
+  riconosce anche i legacy in secondi unix;
+- repair del database crash-safe: backup online better-sqlite3 con checkpoint
+  WAL, swap atomico retire-by-rename, mutex per percorso (una seconda repair
+  concorrente riceve `409`), recovery a boot dei file `.old-*` superstiti e
+  fallback legacy `VACUUM INTO`.
 
 Da preservare:
 
@@ -421,7 +456,14 @@ Disponibile:
   locale produce output vuoto o degenerato;
 - review di suggerimenti;
 - soppressione rumore quando una fonte non introduce novita clinica;
-- create-flow document-driven con persistenza prudente delle terapie.
+- create-flow document-driven con persistenza prudente delle terapie;
+- coda OCR-needed con stati espliciti (pending, processing, ocr_done,
+  ocr_failed, manual_review), motivi tracciati, pannello `Coda OCR` in upload
+  documenti e replay idempotente post-OCR per hash documento: nessuna proposta
+  clinica finche il testo non e sufficiente;
+- estrazione identita documentale prudente: nessun fallback prima-data-trovata
+  per la data di nascita (meglio assente che sbagliata), date costruite in
+  UTC e codice fiscale riconosciuto anche in forma omocodica.
 
 Fuori scope:
 
@@ -472,6 +514,26 @@ Fuori scope corrente:
 - sync cloud;
 - write remote generici;
 - AI plane remoto dentro il data plane clinico.
+
+### 7.6 Impostazioni e superficie di sistema
+
+Disponibile:
+
+- impostazioni riorganizzate in sidebar con sotto-route per area: Generale
+  (profilo, aspetto, ambulatori), Sicurezza e Dati (accesso, backup,
+  repertori), Intelligenza Artificiale (modelli, funzioni), Avanzate
+  (diagnostica, sviluppo, zona pericolo);
+- `/settings` come dashboard sintetica `Stato sistema`, con redirect dalle
+  vecchie ancore legacy;
+- toggle Privacy Mode persistente nell'header dell'app;
+- ricerca rapida delle impostazioni via CMD+K;
+- restore e reset richiedono conferma con parola chiave digitata
+  (`RIPRISTINA` / `RESET`) sulle superfici di avvertimento.
+
+Da preservare:
+
+- le azioni distruttive restano dietro conferma esplicita digitata;
+- la riorganizzazione non introduce nuove superfici remote o cloud.
 
 ---
 

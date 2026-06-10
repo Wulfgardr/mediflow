@@ -11,6 +11,8 @@
   },
   "include": [
     "lib/ocr-service-date.test.ts",
+    "lib/ocr-service.ts",
+    "lib/ai-service.ts",
     "lib/italian-date.ts"
   ]
 }

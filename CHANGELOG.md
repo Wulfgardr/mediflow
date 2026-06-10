@@ -7,6 +7,39 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+> ⚠️ Nota di compatibilità: l'unificazione del ciclo di vita delle sotto-risorse cliniche su `/api/v1` (`WUL-308`) è una breaking change per il client nativo macOS, non ancora adeguato. L'adeguamento è tracciato come blocker di release (`WUL-333`): questa sezione non va rilasciata senza prima aggiornare il client nativo.
+
+### 🔒 Sicurezza dati
+
+- **Dati cifrati mai sovrascritti dal placeholder (`WUL-323`)**: se la decifratura di un campo fallisce, il valore cifrato originale viene preservato; la dicitura `[LOCKED DATA]` è solo di presentazione e non può più essere salvata al posto del dato reale.
+- **Date dei backup pianificati coerenti (`WUL-319`)**: gli artifact di backup serializzano le date come stringhe ISO e il ripristino riconosce anche i valori numerici legacy, evitando date corrotte dopo un restore.
+- **Soft-delete paziente (ADR 0066, `WUL-306`)**: l'eliminazione di un paziente scrive un tombstone reversibile (`deletedAt`/`deletionReason`) con version guard invece di cancellare la riga, senza orfanare i dati clinici figli e con contratto API invariato; nuovi strumenti admin `purge-patient` (erasure GDPR esplicita con dry-run, audit `patient.purged`) e `restore-patient` (audit `patient.restored`), più bonifica degli orfani storici in `fix-orphans` dietro flag esplicito. Rollback sicuro: il codice precedente ignora le nuove colonne.
+- **Token di rete inerti a modalità spenta (`WUL-307`)**: con la modalità `network-home-base` disattivata i token dei client paired non possono più leggere o scrivere dati (`403 NETWORK_MODE_DISABLED`); i pairing restano conservati e tornano operativi alla riattivazione.
+
+### 🔌 API v1
+
+- ⚠️ **Ciclo di vita unificato delle sotto-risorse cliniche (`WUL-308`)**: diario, terapie, checkup e osservazioni su `/api/v1` condividono ora version guard con `409` sulle scritture, liste che escludono i record soft-deleted (opt-in `includeDeleted`), soft delete su tutte le `DELETE` e audit che distingue eliminazione da aggiornamento. Breaking per il client nativo macOS, adeguamento tracciato in `WUL-333`.
+- **Ambulatorio principale senza perdita di appartenenze (`WUL-309`)**: impostare l'ambulatorio dal profilo paziente aggiorna solo l'ambulatorio principale e non cancella più le altre appartenenze multi-ambulatorio, sia sul percorso `/api/v1` sia su quello di rete.
+- **Hardening allegati, checkup e impostazioni (`WUL-326`)**: limite di dimensione sugli allegati (configurabile, default 25 MiB, risposta `413`), accettazione degli envelope cifrati lato client, verifica dell'esistenza del paziente, validazione input sulla creazione checkup (`400`), normalizzazione condivisa dei valori impostazioni, errori generici da `fix-orphans` e `update-awareness` protetto da sessione, mantenendo minimale il probe di revisione usato da launcher e lock screen.
+
+### 🤖 AI/Documenti
+
+- **Coda OCR per documenti senza testo (`WUL-237`)**: i documenti senza testo leggibile entrano in una coda visibile (pannello `Coda OCR`) con stati e motivi in italiano; dopo l'OCR il documento viene rielaborato in modo idempotente e nessuna proposta clinica viene generata finché il testo non è sufficiente.
+- **Estrazione identità documentale più prudente (`WUL-324`)**: la data di nascita non viene più dedotta da una data qualsiasi del documento (meglio assente che sbagliata), le date non slittano più di un giorno per fuso orario e il riconoscimento del codice fiscale gestisce le omocodie.
+- **Errori AI visibili e OCR con timeout (`WUL-325`)**: gli errori durante il download dei modelli Ollama vengono mostrati invece di apparire come successi, la generazione OCR ha ora un timeout configurabile e la redazione OpenMed non altera più il testo in ingresso, mantenendo corretti gli offset delle entità.
+
+### 🖥️ Interfaccia
+
+- **Impostazioni riorganizzate (`WUL-297`)**: da pagina monolitica a sezioni con sidebar (Generale, Sicurezza e Dati, Intelligenza Artificiale, Avanzate), `/settings` come dashboard `Stato sistema` con redirect dei vecchi anchor, ricerca rapida CMD+K, toggle Privacy Mode sempre disponibile nell'header e conferme digitate (`RIPRISTINA`/`RESET`) per le azioni distruttive.
+- **`Cosa rivedere adesso` in scheda paziente (`WUL-262`)**: riepilogo unico di ciò che attende revisione (insight, evidenze, smart import, archivio) con link diretti e motivi di blocco visibili, senza alcuna scrittura automatica.
+- **Motivo dello stato non più perso (`WUL-310`)**: il form di modifica paziente salva di nuovo il campo `statusReason`.
+- **Autocomplete ICD senza risultati obsoleti (`WUL-311`)**: i suggerimenti diagnostici scartano le risposte arrivate fuori ordine e usano un debounce, evitando liste incoerenti durante la digitazione.
+
+### 🧰 Manutenzione
+
+- **Riparazione database a prova di crash (`WUL-321`)**: `repair-db` usa il backup online di SQLite con checkpoint WAL, sostituzione atomica per rinomina, lock per percorso (una seconda riparazione concorrente riceve `409`) e recupero automatico al riavvio dei file residui, con fallback legacy `VACUUM INTO` al boot.
+- **Svuota contenitore test più sicuro (`WUL-322`)**: la pulizia seleziona i pazienti per appartenenza effettiva al contenitore test, esclude chi ha appartenenze attive altrove e applica un soft delete dedicato (motivo `test-container-clear`) in un'unica transazione, con audit per paziente.
+
 ## [0.6.0] - 2026-05-02
 
 > Nota release: `v0.6.0` formalizza il ciclo post-`v0.5.0`: MediFlow non e piu

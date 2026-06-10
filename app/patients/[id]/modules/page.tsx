@@ -13,7 +13,8 @@ import { EvidenceStackTile } from '@/components/evidence-stack-tile';
 import ObservationManager from '@/components/observation-manager';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
-import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
+import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
+import PatientSmartImportPanel, { countUsableSources } from '@/components/patient-smart-import-panel';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -22,15 +23,20 @@ import TherapyManager from '@/components/therapy-manager';
 import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
-import { db, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
+import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } from '@/lib/ai-patient-insight-kill-switch';
+import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/lib/ai-smart-import-kill-switch';
+import { db, type Attachment, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
+import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
+    const [smartImportReview, setSmartImportReview] = useState<SmartImportReviewSnapshot | null>(null);
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
@@ -49,6 +55,13 @@ export default function PatientDetailPage() {
         },
         [id],
     );
+    /* WUL-262: same data the archive and Smart Import panels already read. */
+    const attachments = useLiveQuery(
+        async () => db.attachments.filter((attachment: Attachment) => attachment.patientId === id).toArray(),
+        [id],
+    );
+    const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
+    const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
     /* @Codex */
     const exemptionCodes = Array.isArray(patient?.exemptions) ? patient.exemptions : [];
     /* @Codex */
@@ -124,6 +137,30 @@ export default function PatientDetailPage() {
             : patient.isArchived
                 ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
                 : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
+    /* WUL-262: review-queue summary derived from the same data the panels
+       below already receive — read-only aggregation, no automatic write. */
+    const attachmentItems = attachments ?? [];
+    const attachmentsWithTextCount = attachmentItems.filter((attachment) => attachment.summarySnapshot?.trim()).length;
+    const smartImportSourceCount = countUsableSources(patient, entries, attachmentsWithTextCount);
+    const reviewQueueSummary = buildPatientReviewQueueSummary({
+        insight: {
+            enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
+            hasSummary: Boolean(patient.aiSummary?.trim()),
+        },
+        evidence: documentInsights.map((insight) => ({
+            qualityLevel: insight.quality?.level,
+            appliedDiagnosesCount: insight.autofill?.appliedDiagnoses?.length ?? 0,
+        })),
+        smartImport: {
+            enabled: isAiSmartImportEnabledValue(smartImportKillSwitch?.value),
+            sourceCount: smartImportSourceCount,
+            analysis: smartImportReview ?? undefined,
+        },
+        archive: {
+            attachmentsCount: attachmentItems.length,
+            missingTextCount: attachmentItems.length - attachmentsWithTextCount,
+        },
+    });
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
@@ -254,6 +291,8 @@ export default function PatientDetailPage() {
                     summary={summaryText}
                     nextStep={nextStepText}
                 />
+
+                <PatientReviewQueueSummaryPanel summary={reviewQueueSummary} />
             </div>
 
             <div className={workspaceStyles.workspaceGrid}>
@@ -318,7 +357,9 @@ export default function PatientDetailPage() {
                 </div>
 
                 <div className={workspaceStyles.secondaryStack}>
-                    <AIPatientInsight patient={patient} />
+                    <div id="insight" className={workspaceStyles.anchorStack}>
+                        <AIPatientInsight patient={patient} />
+                    </div>
 
                     <section id="documenti" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
@@ -343,10 +384,18 @@ export default function PatientDetailPage() {
                         )}
                     </section>
 
-                    <PatientSmartImportPanel patient={patient} entries={entries} />
+                    {smartImportSourceCount > 0 ? (
+                        <div id="smart-import" className={workspaceStyles.anchorStack}>
+                            <PatientSmartImportPanel
+                                patient={patient}
+                                entries={entries}
+                                onReviewSnapshotChange={setSmartImportReview}
+                            />
+                        </div>
+                    ) : null}
                     <DocumentInsightsPanel patient={patient} />
 
-                    <section className="patient-detail-side-section border p-5">
+                    <section id="archivio" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Archivio documenti</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Archivio documenti</h3>

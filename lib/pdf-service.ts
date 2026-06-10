@@ -8,6 +8,7 @@ import type {
 } from './ai-task-contracts';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
+import { looksLikeLowSignalOcrText } from './document-ocr-queue';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -72,18 +73,26 @@ function looksLikeStructuredPayload(value: string): boolean {
     return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
 }
 
-/* @Codex */
-function looksLikeLowSignalOcrText(value: string): boolean {
-    const compact = value.replace(/\s+/g, ' ').trim();
-    if (!compact) return true;
+export type PdfTextLayerFailureReason = 'corrupted_pdf' | 'password_protected';
 
-    const alphaChars = compact.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)?.length || 0;
-    if (compact.length >= 24 && alphaChars < 12) return true;
-    if (/^(?:\d+\.){10,}\d*$/u.test(compact.replace(/\s+/g, ''))) return true;
+export class PdfTextLayerUnreadableError extends Error {
+    readonly reason: PdfTextLayerFailureReason;
 
-    const tokens = compact.split(/\s+/).filter(Boolean);
-    const uniqueTokens = new Set(tokens.map((token) => token.toLowerCase()));
-    return tokens.length >= 12 && uniqueTokens.size <= 2;
+    constructor(message: string, reason: PdfTextLayerFailureReason) {
+        super(message);
+        this.name = 'PdfTextLayerUnreadableError';
+        this.reason = reason;
+    }
+}
+
+export class DocumentTextUnavailableError extends Error {
+    readonly textLayerFailure?: PdfTextLayerFailureReason;
+
+    constructor(message: string, textLayerFailure?: PdfTextLayerFailureReason) {
+        super(message);
+        this.name = 'DocumentTextUnavailableError';
+        this.textLayerFailure = textLayerFailure;
+    }
 }
 
 /* @Codex */
@@ -272,7 +281,11 @@ export async function extractTextFromPdf(file: Blob): Promise<string> {
     });
 
     if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
+        const failureReason = err?.textLayer?.reason;
+        if (failureReason === 'corrupted_pdf' || failureReason === 'password_protected') {
+            throw new PdfTextLayerUnreadableError(err.error || "Failed to extract text from PDF", failureReason);
+        }
         throw new Error(err.error || "Failed to extract text from PDF");
     }
 
@@ -552,10 +565,14 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
     // For PDFs, also extract text with pdfjs for regex validation
     let pdfText = '';
+    let textLayerFailure: PdfTextLayerFailureReason | undefined;
     if (isPdf) {
         try {
             pdfText = await extractTextFromPdf(file);
         } catch (e) {
+            if (e instanceof PdfTextLayerUnreadableError) {
+                textLayerFailure = e.reason;
+            }
             console.warn('[PDF Service] PDF text extraction failed', e);
         }
     }
@@ -587,14 +604,19 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     // Last resort: return AI result even with low confidence
     if (aiResult) return aiResult;
 
-    throw new Error('Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.');
+    throw new DocumentTextUnavailableError(
+        'Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.',
+        textLayerFailure,
+    );
 }
 
 /**
  * Validate Italian Codice Fiscale format
  */
 function isValidCodiceFiscale(cf: string): boolean {
-    return /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(cf);
+    // Omocodia replaces digits with L/M/N/P/Q/R/S/T/U/V; keep aligned with
+    // ITALIAN_TAX_CODE_REGEX in document-identity-resolution.ts.
+    return /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/i.test(cf);
 }
 
 /* @Codex */
@@ -652,20 +674,17 @@ export function parsePatientData(text: string): ExtractedPatientData {
     if (cfMatch) data.taxCode = cfMatch[0].toUpperCase();
 
     // 2. BIRTH DATE
-    // 2. BIRTH DATE
-    const dateKeywords = /(?:nato|nata|nascita)\s+(?:il|a)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
+    // Only keyword-anchored dates qualify: an unanchored fallback would promote the first
+    // date in the document (visit/print/report date) to birth date, which is clinically
+    // worse than leaving birthDate empty.
+    const dateKeywords = /(?:nato|nata|nascita)(?:\s+(?:il|a))?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
     const dateMatch = cleanText.match(dateKeywords);
     if (dateMatch) {
         const [, dateStr] = dateMatch;
         const parts = dateStr.split(/[\/\-\.]/);
-        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-    } else {
-        const dateRegex = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/;
-        const fallbackDate = cleanText.match(dateRegex);
-        if (fallbackDate) {
-            const [, d, m, y] = fallbackDate;
-            data.birthDate = new Date(`${y}-${m}-${d}`);
-        }
+        // Zero-pad so Date() always parses as UTC: '1980-1-1' parses as local midnight
+        // and shifts to the previous day on toISOString() in timezones ahead of UTC.
+        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
     }
 
     // 3. NAME

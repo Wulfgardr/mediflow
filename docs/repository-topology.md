@@ -1,6 +1,6 @@
-# Repository Topology — MediFlow
+# Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-05-05
+Ultimo aggiornamento: 2026-06-10
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)

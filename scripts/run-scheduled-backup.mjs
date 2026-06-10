@@ -5,6 +5,8 @@ import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 
+import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
+
 const SETTINGS_KEY = 'backupScheduler';
 
 /* @Codex */
@@ -119,7 +121,7 @@ function buildDataset(db, backupCollections) {
     backupCollections.map((collection) => [
       collection,
       hasTable(db, BACKUP_TABLES[collection])
-        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map(normalizeRowKeys)
+        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
         : [],
     ]),
   );

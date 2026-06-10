@@ -9,7 +9,7 @@ import {
     normalizeEntryUpdateInput,
     normalizeTherapyCreateInput,
     normalizeTherapyUpdateInput,
-} from './api-v1-clinical-write-normalization.ts';
+} from './api-v1-clinical-write-normalization';
 
 test('normalizeEntryCreateInput rejects invalid required fields before the DB layer', () => {
     assert.deepEqual(

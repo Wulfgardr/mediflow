@@ -80,3 +80,4 @@ logs/
 
 # private alignment guides (never publish to OSS repo)
 docs/private/
+/tmp-locked-field-guard-test

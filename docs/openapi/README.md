@@ -5,7 +5,7 @@ read_when:
   - "Running OpenAPI drift checks or deciding whether a route belongs in the stable spec."
 ---
 
-# OpenAPI `/api/v1` — Runbook di Manutenzione
+# OpenAPI `/api/v1`: Runbook di Manutenzione
 
 Stato documento: `SECONDARY`  
 Fonte canonica del contratto: [docs/openapi/mediflow-v1.yaml](./mediflow-v1.yaml)  
@@ -161,6 +161,24 @@ La baseline pubblicata oggi copre:
 
 L'estensione agli altri endpoint `v1` va fatta per moduli stabili, senza
 gonfiare la spec in un unico passaggio.
+
+Nota operativa per `WUL-308` (sotto-risorse cliniche locali, slice
+implementation-only coperta da `contract-policy.json`):
+
+- `/api/v1/patients/{id}/{entries|therapies|checkups|observations}` ora hanno
+  lifecycle uniforme tra le quattro sotto-risorse
+- `PUT` e `DELETE` sul dettaglio richiedono `version` (`400 Version is required`
+  se assente) e rispondono `409` con payload `VERSION_CONFLICT` PHI-safe
+  (stessa shape della slice `network`) su versione stantia
+- `DELETE` scrive un tombstone soft-delete (`deletedAt`/`deletionReason`,
+  default `api-v1-delete`) invece di hard-deletare; il restore passa da `PUT`
+  con `deletedAt: null`
+- le list `GET` nascondono di default le righe soft-deleted e accettano
+  `includeDeleted=true|1` per esporle
+- l'audit distingue `*.deleted` da `*.updated` in base alla transizione di
+  `deletedAt`
+- gli endpoint restano fuori dalla slice OpenAPI pubblicata (tracking `WUL-40`);
+  i dettagli sono registrati nelle `reason` di `contract-policy.json`
 
 Nota operativa per `WUL-150`:
 

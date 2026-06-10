@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-patient-soft-delete-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/schema.ts",
+    "lib/patient-cascade.ts",
+    "lib/patient-cascade.test.ts",
+    "lib/patient-concurrency.ts",
+    "lib/patient-lifecycle.ts",
+    "lib/patient-lifecycle.test.ts",
+    "lib/patient-write-normalization.ts",
+    "lib/test-container-clear.ts",
+    "lib/test-container-clear.test.ts"
+  ]
+}

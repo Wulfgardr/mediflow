@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { searchICDHybrid, ICDSearchResult } from '@/lib/icd-service'; // UPDATED Import
+import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
 import { Search, X, Server } from 'lucide-react';
 
 interface ICDAutocompleteProps {
@@ -17,6 +18,8 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     const [results, setResults] = useState<ICDSearchResult[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // @Codex
+    const latestSearchRef = useRef(createLatestRequestGuard()); // @Codex
 
     // Initial value population
     useEffect(() => {
@@ -43,24 +46,53 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [wrapperRef]);
 
+    // @Codex WUL-311 - prevent delayed ICD lookups from updating an unmounted autocomplete.
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+            latestSearchRef.current.discard();
+        };
+    }, []);
+
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setQuery(val);
 
+        if (debounceRef.current) { // @Codex
+            clearTimeout(debounceRef.current); // @Codex
+            debounceRef.current = null; // @Codex
+        }
+
         if (val.length > 1) {
+            const requestId = latestSearchRef.current.issue(); // @Codex
             setIsLoading(true);
-            try {
-                const matches = await searchICDHybrid(val);
-                setResults(matches);
-                setIsOpen(true);
-            } finally {
-                setIsLoading(false);
-            }
+            debounceRef.current = setTimeout(() => { // @Codex
+                searchICDHybrid(val) // @Codex
+                    .then((matches) => { // @Codex
+                        if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
+                        setResults(matches); // @Codex
+                        setIsOpen(true); // @Codex
+                    }) // @Codex
+                    .catch(() => { // @Codex
+                        if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
+                        setResults([]); // @Codex
+                        setIsOpen(true); // @Codex
+                    }) // @Codex
+                    .finally(() => { // @Codex
+                        if (latestSearchRef.current.isLatest(requestId)) { // @Codex
+                            setIsLoading(false); // @Codex
+                        } // @Codex
+                    }); // @Codex
+            }, 225); // @Codex
         } else {
+            latestSearchRef.current.discard(); // @Codex
             setResults([]);
             setIsOpen(false);
+            setIsLoading(false); // @Codex
         }
 
         // Propagate free text
@@ -70,6 +102,12 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     };
 
     const handleSelect = (item: ICDSearchResult) => {
+        latestSearchRef.current.discard(); // @Codex
+        if (debounceRef.current) { // @Codex
+            clearTimeout(debounceRef.current); // @Codex
+            debounceRef.current = null; // @Codex
+        }
+        setIsLoading(false); // selecting while a search is pending must not leave the spinner stuck
         // Mode 1: Standard onChange
         if (onChange) {
             onChange({
@@ -108,7 +146,15 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 {query && !isLoading && (
                     <button
                         onClick={() => {
+                            latestSearchRef.current.discard(); // @Codex
+                            if (debounceRef.current) { // @Codex
+                                clearTimeout(debounceRef.current); // @Codex
+                                debounceRef.current = null; // @Codex
+                            }
                             setQuery("");
+                            setResults([]); // @Codex
+                            setIsOpen(false); // @Codex
+                            setIsLoading(false); // @Codex
                             if (onChange) onChange({ code: '', description: '', system: 'ICD-11' });
                             if (onSelect) onSelect('', '');
                         }}

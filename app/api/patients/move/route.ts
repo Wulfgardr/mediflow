@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
+// WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
+import { activePatients } from '@/lib/patient-lifecycle';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
         const existingPatients = await dbServer
             .select({ id: patients.id })
             .from(patients)
-            .where(inArray(patients.id, patientIds));
+            .where(and(inArray(patients.id, patientIds), activePatients()));
         const existingIds = new Set(existingPatients.map((item) => item.id));
         const missingPatientIds = patientIds.filter((id) => !existingIds.has(id));
         if (missingPatientIds.length > 0) {

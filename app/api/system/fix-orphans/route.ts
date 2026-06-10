@@ -5,6 +5,13 @@ import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): historical orphan child rows (patient_id no longer resolves)
+import {
+    countOrphanedClinicalRows,
+    purgeOrphanedClinicalRows,
+    totalPatientCascadeRows,
+} from '@/lib/patient-cascade';
+import { safeWriteAuditEventFromRequest } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,24 +31,29 @@ export async function GET() {
         const linkedPids = new Set(allLinks.map(l => l.pid));
         const orphanCount = allPatients.filter(p => !linkedPids.has(p.id)).length;
 
+        // WUL-306 (ADR 0066): report child rows whose patient_id does not resolve.
+        const orphanChildRowCounts = countOrphanedClinicalRows(dbServer);
+
         return NextResponse.json({
             success: true,
             dryRun: true,
             totalPatients: allPatients.length,
             orphanCount,
+            orphanChildRowCounts,
+            totalOrphanChildRows: totalPatientCascadeRows(orphanChildRowCounts),
             targetAmbulatoryId: targetAmb?.id ?? null,
             targetAmbulatoryName: targetAmb?.name ?? null,
             willCreateDefaultAmbulatory: !targetAmb
         });
     } catch (error) {
         console.error("Fix Orphan Dry-Run Error:", error);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return NextResponse.json({ error: String(error), details: (error as any)?.message }, { status: 500 });
+        /* @Codex */
+        return NextResponse.json({ error: 'Failed to inspect orphan patients' }, { status: 500 });
     }
 }
 
 /* @Codex */
-export async function POST() {
+export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
@@ -49,6 +61,10 @@ export async function POST() {
 
     try {
         console.log("Fixing Orphans...");
+
+        // WUL-306 (ADR 0066): orphan child rows are purged only behind an explicit flag.
+        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+        const purgeOrphanedClinicalRowsRequested = body.purgeOrphanedClinicalRows === true;
 
         // 1. Get Target Ambulatory (Default or First)
         let targetAmbId: string | null = null;
@@ -91,10 +107,6 @@ export async function POST() {
 
         console.log(`Found ${orphanPids.length} orphans from ${allPatients.length} total patients.`);
 
-        if (orphanPids.length === 0) {
-            return NextResponse.json({ success: true, fixed: 0, message: "No orphans found. All patients are linked." });
-        }
-
         // 4. Link Orphans
         let fixed = 0;
         for (const pid of orphanPids) {
@@ -107,15 +119,46 @@ export async function POST() {
             fixed++;
         }
 
+        // 5. WUL-306 (ADR 0066): purge child rows whose patient_id no longer resolves,
+        // only behind the explicit flag and AFTER the relink step above.
+        let purgedOrphanChildRows = null;
+        if (purgeOrphanedClinicalRowsRequested) {
+            // @Codex better-sqlite3 transactions are synchronous; promise callbacks break execution.
+            const counts = dbServer.transaction((tx) => purgeOrphanedClinicalRows(tx));
+            purgedOrphanChildRows = counts;
+            await safeWriteAuditEventFromRequest(
+                request,
+                session,
+                {
+                    eventType: 'patient.purged',
+                    subjectType: 'patient',
+                    subjectRef: null,
+                    redactedMetadata: {
+                        reasonCode: 'fix-orphans',
+                        counts: totalPatientCascadeRows(counts),
+                        flags: Object.entries(counts).map(([table, count]) => `purged:${table}:${count}`),
+                    },
+                },
+                '[MediFlow] Orphan purge audit write failed:',
+            );
+        }
+
+        if (fixed === 0 && !purgeOrphanedClinicalRowsRequested) {
+            return NextResponse.json({ success: true, fixed: 0, message: "No orphans found. All patients are linked." });
+        }
+
         return NextResponse.json({
             success: true,
             fixed,
-            message: `Created/Used Default Ambulatory and linked ${fixed} orphan patients to '${targetAmbName}'. Refresh the page.`
+            purgedOrphanChildRows,
+            message: fixed > 0
+                ? `Created/Used Default Ambulatory and linked ${fixed} orphan patients to '${targetAmbName}'. Refresh the page.`
+                : "No orphan patients to relink."
         });
 
     } catch (error) {
         console.error("Fix Orphan Error:", error);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return NextResponse.json({ error: String(error), details: (error as any)?.message }, { status: 500 });
+        /* @Codex */
+        return NextResponse.json({ error: 'Failed to fix orphan patients' }, { status: 500 });
     }
 }

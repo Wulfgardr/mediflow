@@ -1,4 +1,4 @@
-# ARCHITECTURE — MediFlow
+# ARCHITECTURE: MediFlow
 
 Questo documento descrive l'**architettura stabile ad alto livello** di MediFlow.
 Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazione.
@@ -100,6 +100,9 @@ MediFlow espone due superfici API:
   - si attiva solo in modalita `network-home-base`
   - resta read-only-first, con write limitati a profilo/status paziente, diario clinico, terapie, checkup e osservazioni versionati
   - esclude hard delete remoto, attachment remoti, cataloghi, sync, cache offline e campi AI/documentali
+  - disattivare la modalita non revoca i pairing: i token dei client paired
+    diventano inerti e il data plane risponde `403 NETWORK_MODE_DISABLED`
+    finche la modalita non viene riattivata
   - richiede pairing esplicito del device + sessione operatore valida
 
 > Obiettivo: i client native non devono dipendere da scraping HTML o dettagli interni React/Next.
@@ -169,6 +172,10 @@ flowchart TB
   - documentato
   - retrocompatibile all'interno della stessa major
 - `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
+- Cancellazione clinica reversibile: il DELETE di pazienti e delle
+  sotto-risorse cliniche e un tombstone soft-delete version-guarded; la
+  cancellazione fisica passa solo da strumenti amministrativi espliciti e
+  audited (vedi [ADR 0066](./docs/adr/0066-patient-soft-delete-lifecycle.md)).
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
 - `Clinical Workbench / Graphite` resta l'unica shell web ufficiale su `main`;
   nuove sperimentazioni non diventano selector runtime persistiti senza

@@ -10,6 +10,13 @@ import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normali
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
+/* @Codex */
+function parseRequiredDate(value: unknown): Date | null {
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export async function GET(request: Request) {
     /* @Codex */
     const session = await requireSession();
@@ -51,6 +58,19 @@ export async function POST(request: Request) {
         if (body.status !== undefined && !normalizedStatus) {
             return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
         }
+        /* @Codex */
+        if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
+            return NextResponse.json({ error: 'patientId required' }, { status: 400 });
+        }
+        /* @Codex */
+        if (typeof body.title !== 'string' || body.title.trim().length === 0) {
+            return NextResponse.json({ error: 'title required' }, { status: 400 });
+        }
+        /* @Codex */
+        const checkupDate = parseRequiredDate(body.date);
+        if (!checkupDate) {
+            return NextResponse.json({ error: 'Valid checkup date required' }, { status: 400 });
+        }
 
         // Allow client to generate ID or generate it here. 
         // ApiTable shim might send an ID if it's "add" with specific ID, but usually it relies on return.
@@ -64,7 +84,7 @@ export async function POST(request: Request) {
         await dbServer.insert(checkups).values({
             id: newId,
             patientId: body.patientId,
-            date: new Date(body.date),
+            date: checkupDate,
             title: body.title,
             /* @Codex */
             notes: body.notes ?? null,
