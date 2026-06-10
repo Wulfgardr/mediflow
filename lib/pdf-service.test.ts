@@ -1,6 +1,15 @@
+// Pin a timezone ahead of UTC before importing so date parsing is exercised under the
+// conditions where local-time parsing would shift birth dates to the previous day.
+process.env.TZ = 'Europe/Rome';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOcrFallbackResult, extractUsableOcrText, parsePatientData } from './pdf-service';
+import {
+    buildOcrFallbackResult,
+    extractUsableOcrText,
+    mergeExtractedPatientDataWithTextFallback,
+    parsePatientData,
+} from './pdf-service';
 
 test('extractUsableOcrText keeps markdown-like OCR text and ignores structured JSON payloads', () => {
     assert.equal(
@@ -87,4 +96,26 @@ test('parsePatientData preserves name-first patient labels when casing is not su
 
     assert.equal(parsed.firstName, 'Mario');
     assert.equal(parsed.lastName, 'Rossi');
+});
+
+test('parsePatientData leaves birth date empty instead of promoting unanchored document dates', () => {
+    const parsed = parsePatientData('Referto ambulatoriale del 05/03/2024\nPaziente: Mario Rossi\nDiagnosi: controllo di routine');
+
+    assert.equal(parsed.birthDate, undefined);
+});
+
+test('parsePatientData parses single-digit birth dates as UTC without timezone day shift', () => {
+    const parsed = parsePatientData('Sig. Mario Rossi, nato il 1/2/1970.\nLettera di dimissione');
+
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1970-02-01');
+});
+
+test('mergeExtractedPatientDataWithTextFallback keeps AI omocodia tax codes instead of overwriting from text', () => {
+    const merged = mergeExtractedPatientDataWithTextFallback(
+        // Fake omocodia CF: trailing digit replaced by its substitution letter (1 -> M).
+        { rawText: '', source: 'ai', confidence: 0.9, taxCode: 'rssmra94t57a27mj' },
+        'Medico curante Dott. Luigi Verdi, Codice Fiscale VRDLGU70A01F205Z.\nPiano terapeutico.',
+    );
+
+    assert.equal(merged.taxCode, 'RSSMRA94T57A27MJ');
 });

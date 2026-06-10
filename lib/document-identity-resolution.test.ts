@@ -54,6 +54,17 @@ test('tax code resolver marks explicit assisted person CF as patient_cf', () => 
     assert.match(result.evidenceRefs[0].snippet, /Assistito codice fiscale/i);
 });
 
+test('tax code resolver measures label distance on normalized text despite irregular OCR spacing', () => {
+    // OCR-style run of whitespace between the patient label and the CF: the raw-index
+    // distance would favor the physician label that follows the CF and swap the roles.
+    const result = resolveDocumentTaxCodeRoles({
+        text: `Assistito:\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n${SYNTHETIC_PATIENT_CF} medico Dott. Mario Bianchi`,
+    });
+
+    assert.equal(result.taxCodes.length, 1);
+    assert.equal(result.taxCodes[0].role, 'patient_cf');
+});
+
 test('tax code resolver keeps prescriber CF out of patient identity', () => {
     const result = resolveDocumentTaxCodeRoles({
         text: `Medico prescrittore codice fiscale ${SYNTHETIC_PRESCRIBER_CF}. Visita cardiologica.`,
