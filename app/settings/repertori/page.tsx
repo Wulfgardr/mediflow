@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Repertori (AIFA + esenzioni): moved from the monolithic settings page.
+// WUL-297 Repertori (AIFA + esenzioni): moved from the monolithic settings page.
 
 import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Database, Server, Upload } from 'lucide-react';

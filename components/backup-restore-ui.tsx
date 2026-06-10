@@ -5,7 +5,7 @@ import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-
 import { BackupRestorePreflightError, exportRawDatabase, importRawDatabase } from '@/lib/db';
 import { useSecurity } from './security-provider';
 
-// WUL-297 — parola chiave richiesta per confermare il restore.
+// WUL-297: parola chiave richiesta per confermare il restore.
 const RESTORE_CONFIRM_KEYWORD = 'RIPRISTINA';
 
 export default function BackupRestoreUI() {
@@ -44,7 +44,7 @@ export default function BackupRestoreUI() {
         }
     };
 
-    // WUL-297 — il ripristino è un'operazione critica: la conferma richiede
+    // WUL-297: il ripristino è un'operazione critica: la conferma richiede
     // di digitare una parola chiave invece del vecchio confirm() del browser.
     const handleRestoreFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -146,7 +146,7 @@ export default function BackupRestoreUI() {
                 </label>
 
                 {pendingRestoreFile && (
-                    // WUL-297 — superficie di conferma esplicita per il restore.
+                    // WUL-297: superficie di conferma esplicita per il restore.
                     <div
                         data-testid="restore-confirmation-panel"
                         className="mt-4 space-y-3 rounded-[20px] border border-red-200/70 bg-red-50/70 p-4 dark:border-red-500/25 dark:bg-red-900/15"

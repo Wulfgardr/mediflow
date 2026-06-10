@@ -33,7 +33,7 @@ export async function resolveNetworkScope(session: ServerSession): Promise<strin
 }
 
 // WUL-307: disabling network-home-base keeps pairings stored but makes their
-// tokens inert — paired-client data-plane requests are rejected with the
+// tokens inert: paired-client data-plane requests are rejected with the
 // stable NETWORK_MODE_DISABLED code until the mode is re-enabled.
 export async function getNetworkModeGateResponse(): Promise<NextResponse | null> {
     const gate = evaluateNetworkDataPlaneModeGate(await getNetworkOperatingMode());

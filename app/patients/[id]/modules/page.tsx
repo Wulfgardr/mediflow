@@ -138,7 +138,7 @@ export default function PatientDetailPage() {
                 ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
                 : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
     /* WUL-262: review-queue summary derived from the same data the panels
-       below already receive — read-only aggregation, no automatic write. */
+       below already receive: read-only aggregation, no automatic write. */
     const attachmentItems = attachments ?? [];
     const attachmentsWithTextCount = attachmentItems.filter((attachment) => attachment.summarySnapshot?.trim()).length;
     const smartImportSourceCount = countUsableSources(patient, entries, attachmentsWithTextCount);

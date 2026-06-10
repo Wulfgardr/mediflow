@@ -75,7 +75,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        // WUL-306: a soft-deleted patient is gone for the wire contract — PUT answers 404.
+        // WUL-306: a soft-deleted patient is gone for the wire contract: PUT answers 404.
         const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });

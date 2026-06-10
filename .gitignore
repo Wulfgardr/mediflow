@@ -44,7 +44,6 @@ native/**/Build/
 
 # misc
 .DS_Store
-AGENTS.md
 /.texpadtmp/
 *.pem
 certs/

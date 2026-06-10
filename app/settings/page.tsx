@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — /settings is now a thin "Stato sistema" dashboard inside the
+// WUL-297: /settings is now a thin "Stato sistema" dashboard inside the
 // settings sidebar layout. Legacy #anchor deep-links redirect to the
 // dedicated sub-routes.
 

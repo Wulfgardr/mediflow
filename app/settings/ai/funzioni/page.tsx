@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Funzioni e Sicurezza AI: moved from the monolithic settings page.
+// WUL-297 Funzioni e Sicurezza AI: moved from the monolithic settings page.
 
 import { CheckCircle, ChevronDown, Save, Shield, Sparkles } from 'lucide-react';
 import {
@@ -49,7 +49,7 @@ export default function SettingsAiFunctionsPage() {
             <div className="space-y-6">
                 {/* Patient Insight runtime policy */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-273 — Patient Insight runtime settings stay neutral and role-led. */}
+                    {/* @Codex WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
                             <Sparkles className="h-4 w-4" />
@@ -159,7 +159,7 @@ export default function SettingsAiFunctionsPage() {
 
                 {/* AI safety toggles */}
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-273 — active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
+                    {/* @Codex WUL-273: active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'rgba(192, 57, 43, 0.12)', color: 'var(--mf-critical)' }}>
                             <Shield className="h-4 w-4" />
@@ -321,7 +321,7 @@ export default function SettingsAiFunctionsPage() {
                 </div>
 
                 {/* Read-only governance */}
-                {/* WUL-297 — expanded by default now that governance lives on a dedicated page. */}
+                {/* WUL-297: expanded by default now that governance lives on a dedicated page. */}
                 <details open className="group rounded-[24px] border border-slate-200/70 bg-white/60 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
                         <div>

@@ -234,7 +234,7 @@ export default function AmbulatoryManagerPage() {
         setTimeout(() => nameInputRef.current?.focus(), 500);
     };
 
-    // WUL-297 — the page now renders inside the settings sidebar layout.
+    // WUL-297: the page now renders inside the settings sidebar layout.
     return (
         <div className="space-y-6" data-testid="settings-ambulatories-section">
             <SettingsSectionIntro

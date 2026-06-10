@@ -58,7 +58,7 @@ export function LockScreen() {
     const visibleError = error || authErrorMessage;
 
     return (
-        // @Codex WUL-274 — lock chrome mirrors the Kree8 live root without changing auth semantics.
+        // @Codex WUL-274: lock chrome mirrors the Kree8 live root without changing auth semantics.
         <div className={styles.lockShell} aria-label="MediFlow lock screen">
             <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
                 <div className={styles.brandRow}>

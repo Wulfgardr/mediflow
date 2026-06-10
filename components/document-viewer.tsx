@@ -23,7 +23,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
     }, [file]);
 
     return (
-        // @Codex WUL-229 — full-screen document viewer reuses specular chrome + vitreous canvas
+        // @Codex WUL-229: full-screen document viewer reuses specular chrome + vitreous canvas
         <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-200" style={{ zIndex: 100 }}>
             <button
                 type="button"

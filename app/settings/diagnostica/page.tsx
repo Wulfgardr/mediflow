@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Diagnostica: moved from the monolithic settings page.
+// WUL-297 Diagnostica: moved from the monolithic settings page.
 
 import DiagnosticHub from '@/components/diagnostic-hub';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';

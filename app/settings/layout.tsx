@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — settings shell: persistent sidebar + sub-routes.
+// WUL-297 settings shell: persistent sidebar + sub-routes.
 
 import type { ReactNode } from 'react';
 
@@ -30,7 +30,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                 </div>
             </div>
 
-            {/* WUL-297 — CMD+K quick-jump across the settings IA. */}
+            {/* WUL-297: CMD+K quick-jump across the settings IA. */}
             <SettingsSearchOverlay open={isSearchOpen} onClose={closeSearch} />
         </Kree8WorkspaceShell>
     );

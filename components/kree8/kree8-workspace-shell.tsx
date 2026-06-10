@@ -6,7 +6,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 
-// WUL-297 — Privacy Mode is always reachable from the workspace header.
+// WUL-297: Privacy Mode is always reachable from the workspace header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import styles from './kree8-workspace-shell.module.css';
 
@@ -48,7 +48,7 @@ export function Kree8WorkspaceShell({
               <ArrowLeft size={13} aria-hidden />
               <span className={styles.backButtonLabel}>{backLabel}</span>
             </Link>
-            {/* WUL-297 — persistent privacy affordance in the app header */}
+            {/* WUL-297: persistent privacy affordance in the app header */}
             <PrivacyModeToggle showLabel />
           </div>
 

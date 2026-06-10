@@ -124,7 +124,7 @@
 
     <!-- Content embedded directly to avoid CORS issues -->
     <script type="text/markdown" id="markdown-source">
-# 🏥 MediFlow — Architettura di Sistema
+# 🏥 MediFlow · Architettura di Sistema
 
 > [!WARNING]
 > **Stato documento: LEGACY (vista visuale).**
@@ -212,13 +212,13 @@ graph TB
 
 | Layer | Tecnologia | Ruolo | Porta |
 |-------|-----------|-------|-------|
-| **Frontend** | Next.js 15 + React 19 | UI reattiva, SSR | — |
-| **Styling** | TailwindCSS v4, Framer Motion | Design system, animazioni | — |
-| **DB Client** | API Facade (`lib/db.ts`) | Crittografia + REST calls | — |
-| **DB Server** | SQLite + Drizzle ORM | Persistenza tipizzata | — |
+| **Frontend** | Next.js 15 + React 19 | UI reattiva, SSR | – |
+| **Styling** | TailwindCSS v4, Framer Motion | Design system, animazioni | – |
+| **DB Client** | API Facade (`lib/db.ts`) | Crittografia + REST calls | – |
+| **DB Server** | SQLite + Drizzle ORM | Persistenza tipizzata | – |
 | **AI Engine** | Ollama / Apple MLX | Inferenza LLM locale | 11434 / 8080 |
 | **ICD-11** | WHO Official Docker Image | Codifiche diagnosi | 8888 |
-| **Auth** | bcrypt + AES-GCM | Hashing PIN + cifratura dati | — |
+| **Auth** | bcrypt + AES-GCM | Hashing PIN + cifratura dati | – |
 
 ### 3.2 Dipendenze Chiave
 
@@ -496,7 +496,7 @@ services:
 
 ---
 
-*Generato il 5 Febbraio 2026 — MediFlow v0.3.0*
+*Generato il 5 Febbraio 2026 · MediFlow v0.3.0*
     </script>
 
     <script>

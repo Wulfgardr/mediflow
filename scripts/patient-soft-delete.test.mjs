@@ -62,7 +62,7 @@ test('primary patient list reads exclude soft-deleted patients', () => {
 });
 
 // WUL-322 (ADR 0066 Slice 3): the test-container clear must select victims via the
-// M2M membership and tombstone them — never via the stale legacy patients.ambulatoryId
+// M2M membership and tombstone them, never via the stale legacy patients.ambulatoryId
 // column (WUL-300 constraint), never as a hard delete.
 test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
     const source = read('app/api/ambulatories/clear/route.ts');

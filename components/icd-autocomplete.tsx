@@ -126,7 +126,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     };
 
     return (
-        // @Codex WUL-229 — ICD autocomplete shares mf-input + mf-popover language with drug picker
+        // @Codex WUL-229: ICD autocomplete shares mf-input + mf-popover language with drug picker
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />

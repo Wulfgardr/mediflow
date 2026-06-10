@@ -60,7 +60,7 @@ test('settings warns when selected AI model is still on hold in rollout readines
       body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'disabled' }),
     });
   });
-  // WUL-297 — model selectors and the rollout guard live on the AI models sub-route.
+  // WUL-297: model selectors and the rollout guard live on the AI models sub-route.
   await page.goto('/settings/ai/modelli');
   await expect(page).toHaveURL(/\/settings\/ai\/modelli$/);
 

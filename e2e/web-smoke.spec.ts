@@ -23,7 +23,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText('Impostazioni').first()).toBeVisible();
 
-  // WUL-297 — appearance now lives on the /settings/aspetto sub-route.
+  // WUL-297: appearance now lives on the /settings/aspetto sub-route.
   await page.goto('/settings/aspetto');
   await expect(page).toHaveURL(/\/settings\/aspetto$/);
   await expect(page.getByTestId('settings-nav-sidebar')).toBeVisible();

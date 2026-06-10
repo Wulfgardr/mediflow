@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — Zona Pericolo: isolated surface with explicit typed confirmation.
+// WUL-297 Zona Pericolo: isolated surface with explicit typed confirmation.
 
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
@@ -63,7 +63,7 @@ export default function SettingsDangerZonePage() {
                         </p>
                     </div>
 
-                    {/* WUL-297 — conferma esplicita digitando la parola chiave. */}
+                    {/* WUL-297: conferma esplicita digitando la parola chiave. */}
                     <label className="block text-xs font-medium text-red-800 dark:text-red-200">
                         Scrivi <strong>{RESET_CONFIRM_KEYWORD}</strong> per abilitare il reset
                         <input

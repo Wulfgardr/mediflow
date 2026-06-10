@@ -1946,7 +1946,7 @@ function renderMarkdown(report: CloudComparatorReport): string {
         lines.push(`- Principle: ${item}`);
     }
     for (const slice of report.distillation.documentIntelligenceReview.recommendedThinSlices) {
-        lines.push(`- Recommended document slice: ${slice.slug} — ${slice.title}`);
+        lines.push(`- Recommended document slice: ${slice.slug} · ${slice.title}`);
         lines.push(`  Why: ${slice.why}`);
         lines.push(`  Touchpoints: ${slice.repoTouchpoints.join(', ')}`);
     }

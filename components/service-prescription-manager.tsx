@@ -640,7 +640,7 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip">{formatDate(item.prescribedAt) ?? '—'}</span>
+                                            <span className="apple-chip">{formatDate(item.prescribedAt) ?? '–'}</span>
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {priority !== 'unknown' && <span className="apple-chip">{priorityLabel(priority)}</span>}

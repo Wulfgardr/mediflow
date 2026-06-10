@@ -1,4 +1,4 @@
-// WUL-297 — unit coverage for the settings IA model and the quick-jump search.
+// WUL-297: unit coverage for the settings IA model and the quick-jump search.
 // Run with: npm run test:settings-navigation
 
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 // WUL-322 (ADR 0066, Slice 3): membership-based clear of a test container.
-// Selection goes through patientsToAmbulatories ONLY — the stale legacy
+// Selection goes through patientsToAmbulatories ONLY: the stale legacy
 // ambulatory column on patients must never pick deletion sets (WUL-300).
 import { and, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -24,7 +24,7 @@ type TestContainerClearRunner = Pick<BetterSQLite3Database, 'select' | 'update' 
 // Clears one TEST ambulatory (the caller owns the type==='test' safety check):
 // 1. members = patients linked to the container via M2M membership;
 // 2. members that also hold a membership in a live (non-test) ambulatory are
-//    preserved — they only lose the test-container join row, never the patient;
+//    preserved: they only lose the test-container join row, never the patient;
 // 3. test-only members are SOFT-deleted (WUL-306 tombstone, never a hard delete)
 //    with deletionReason='test-container-clear', children left intact;
 // 4. every join row of the cleared container is removed.
@@ -44,7 +44,7 @@ export function clearTestContainerByMembership(
     )];
 
     // Exclusion rule (ADR 0066 punto 4): any membership in a non-test ambulatory
-    // keeps the patient. A NULL type counts as live — when in doubt, never delete.
+    // keeps the patient. A NULL type counts as live: when in doubt, never delete.
     const liveMemberIds = new Set(
         memberIds.length === 0
             ? []

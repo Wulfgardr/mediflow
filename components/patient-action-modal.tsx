@@ -52,7 +52,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
     const accentTint = isDelete ? 'rgba(192, 57, 43, 0.12)' : isExport ? 'rgba(15, 123, 104, 0.12)' : 'rgba(202, 138, 4, 0.16)';
 
     return (
-        // @Codex WUL-229 — patient action modal aligned with specular tier
+        // @Codex WUL-229: patient action modal aligned with specular tier
         <div className="mf-modal-backdrop animate-in fade-in duration-200">
             <button
                 type="button"

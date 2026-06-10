@@ -18,7 +18,7 @@ interface PatientFormProps {
     isEditMode?: boolean;
 }
 
-/* @Codex WUL-229 — patient form sections now inherit the vitreous tier directly */
+/* @Codex WUL-229: patient form sections now inherit the vitreous tier directly */
 const FORM_SECTION_CLASS = 'patient-detail-section mf-section p-7 md:p-9 space-y-7 relative overflow-hidden';
 /* @Codex */
 const FORM_TITLE_CLASS = 'text-lg md:text-xl font-semibold tracking-tight flex items-center gap-3';

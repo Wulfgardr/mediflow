@@ -36,7 +36,7 @@ function ProgressBar({ progress }: { progress: number }) {
     }, [progress]);
 
     return (
-        // @Codex WUL-229 — progress meter uses MediFlow palette
+        // @Codex WUL-229: progress meter uses MediFlow palette
         <div
             className="mt-6 h-1.5 rounded-full overflow-hidden"
             style={{ background: 'rgba(112, 106, 100, 0.18)' }}
@@ -78,7 +78,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     const progress = ((currentStep + 1) / scale.questions.length) * 100;
 
     return (
-        // @Codex WUL-273 — scale engine can live inside the Kree8 workspace without the old page chrome.
+        // @Codex WUL-273: scale engine can live inside the Kree8 workspace without the old page chrome.
         <div className="patient-detail-section mx-auto flex min-h-[500px] w-full max-w-3xl flex-col overflow-hidden border !p-0">
             <div className="border-b border-[color:rgba(112,106,100,0.12)] p-6">
                 <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)]">{scale.title}</h2>

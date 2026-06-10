@@ -482,7 +482,7 @@ class ApiTable<T> {
         const key = this.getMasterKey();
         const copy = { ...item };
         // WUL-323: the side-channel with ciphertext preserved by a failed decrypt
-        // is not user data — strip it from the payload and use it to restore
+        // is not user data: strip it from the payload and use it to restore
         // locked fields instead of re-encrypting the placeholder over them.
         const lockedCiphertext = takeLockedCiphertext(copy);
 

@@ -96,7 +96,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     };
 
     return (
-        // @Codex WUL-229 — drug autocomplete now uses mf-input + mf-popover (vitreous tier)
+        // @Codex WUL-229: drug autocomplete now uses mf-input + mf-popover (vitreous tier)
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />

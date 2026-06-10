@@ -63,7 +63,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
     if (!isOpen || !mounted) return null;
 
     return createPortal(
-        // @Codex WUL-229 — modal chrome aligned with specular tier
+        // @Codex WUL-229: modal chrome aligned with specular tier
         <div className="mf-modal-backdrop animate-in fade-in duration-200">
             <button
                 type="button"

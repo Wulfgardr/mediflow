@@ -342,7 +342,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     <ul className="mt-1 space-y-0.5">
                         {ocrQueueEntries.map((file) => (
                             <li key={file.id} className="truncate">
-                                {file.name} — {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
+                                {file.name} · {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
                             </li>
                         ))}
                     </ul>

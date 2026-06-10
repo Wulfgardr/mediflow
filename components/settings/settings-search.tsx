@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 — "Cerca impostazione": lightweight CMD+K quick-jump across the
+// WUL-297 "Cerca impostazione": lightweight CMD+K quick-jump across the
 // settings IA. No external dependencies: fuzzy matching lives in
 // lib/settings-navigation.ts and navigation goes through next/navigation.
 // Accessibility: the dialog traps focus while open and the input is wired as
@@ -75,7 +75,7 @@ export function SettingsSearchOverlay({
         }
     };
 
-    // WUL-297 — modal behavior: Escape closes, Tab/Shift+Tab cycle within the
+    // WUL-297 modal behavior: Escape closes, Tab/Shift+Tab cycle within the
     // dialog instead of escaping into the aria-hidden background page.
     const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape') {
