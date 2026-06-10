@@ -58,7 +58,7 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
         "INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at) VALUES (?, ?, 'open', 'Test', 1)"
     ).run(`sh-${suffix}`, patientId);
     sqlite.prepare(
-        "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at) VALUES (?, ?, 'http://loinc.org', '8867-4', 'Heart rate', 'http://unitsofmeasure.org', '/min', '70', 1)"
+        "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at) VALUES (?, ?, 'loinc', '8867-4', 'Heart rate', 'ucum', '/min', '70', 1)"
     ).run(`ob-${suffix}`, patientId);
     sqlite.prepare(
         "INSERT INTO checkups (id, patient_id, date, title) VALUES (?, ?, 1, 'Controllo')"
