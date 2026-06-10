@@ -5,19 +5,67 @@ import fs from 'fs';
 import path from 'path';
 import { ensureAuditSqliteSchema } from '@/lib/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
-import { replaceSqliteDatabase } from '@/lib/sqlite-repair';
+import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
 
 // Ensure the data directory exists in production or use project root for dev
 /* @Codex */
 const dbPath = resolveDataPath('medical.db');
 const legacyDbPath = path.join(process.cwd(), 'medical.db');
 
-if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+// A crash inside replaceSqliteDatabase can leave medical.db.repair-tmp-* /
+// medical.db.old-* files behind. If the crash hit the window between retiring
+// medical.db and renaming the staged copy in, the .old-* file is the only
+// surviving database — restore it before opening; everything else is stale.
+function recoverSwapArtifacts(): void {
+    const dir = path.dirname(dbPath);
+    const base = path.basename(dbPath);
+    let entries: string[];
     try {
-        fs.copyFileSync(legacyDbPath, dbPath);
+        entries = fs.readdirSync(dir);
+    } catch {
+        return;
+    }
+    const isSidecar = (name: string) => name.endsWith('-wal') || name.endsWith('-shm');
+    const retired = entries.filter((name) => name.startsWith(`${base}.old-`) && !isSidecar(name));
+    if (!fs.existsSync(dbPath) && retired.length > 0) {
+        const newest = retired
+            .map((name) => ({ name, mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs }))
+            .sort((a, b) => a.mtimeMs - b.mtimeMs)
+            .pop()!.name;
+        try {
+            for (const suffix of ['-wal', '-shm']) {
+                const sidecar = path.join(dir, `${newest}${suffix}`);
+                if (fs.existsSync(sidecar)) fs.renameSync(sidecar, `${dbPath}${suffix}`);
+            }
+            fs.renameSync(path.join(dir, newest), dbPath);
+            console.warn(`[MediFlow] Restored ${base} from interrupted swap artifact ${newest}`);
+        } catch (error) {
+            // Keep the artifacts on disk rather than risk deleting the only copy.
+            console.error('[MediFlow] Failed to restore DB from swap artifact:', error);
+            return;
+        }
+    }
+    for (const name of entries) {
+        if (!name.startsWith(`${base}.repair-tmp`) && !name.startsWith(`${base}.old-`)) continue;
+        const stalePath = path.join(dir, name);
+        if (fs.existsSync(stalePath)) fs.rmSync(stalePath, { force: true });
+    }
+}
+recoverSwapArtifacts();
+
+if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+    // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
+    // and stage + rename so a failed copy never leaves a torn medical.db —
+    // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
+    const bootStagingPath = `${dbPath}.repair-tmp-boot-${process.pid}`;
+    try {
+        fs.rmSync(bootStagingPath, { force: true });
+        copySqliteDatabaseSync(legacyDbPath, bootStagingPath);
+        fs.renameSync(bootStagingPath, dbPath);
         console.log(`[MediFlow] Copied legacy DB to ${dbPath}`);
     } catch (error) {
         console.error('[MediFlow] Failed to copy legacy DB:', error);
+        fs.rmSync(bootStagingPath, { force: true });
     }
 }
 
@@ -391,6 +439,10 @@ applySchemaGuards();
  * an optional consistent pre-swap backup), then reopen and re-apply the schema
  * guards. Queries issued during the brief swap window fail fast instead of
  * reading a torn file.
+ *
+ * Swaps are serialized per destination inside replaceSqliteDatabase: a second
+ * call while one is running rejects with SqliteSwapInProgressError before
+ * touching the shared connection (the route maps it to HTTP 409).
  */
 export async function swapDatabaseFromFile(sourcePath: string, backupPath: string | null): Promise<void> {
     await replaceSqliteDatabase({
@@ -413,6 +465,11 @@ const sqliteHandle = new Proxy({} as Database.Database, {
         return typeof value === 'function'
             ? (value as (...args: unknown[]) => unknown).bind(sqlite)
             : value;
+    },
+    // drizzle 0.45.2 never assigns onto the connection, but forward writes to
+    // the live connection anyway so they can never land on the dummy target.
+    set(_target, prop, value) {
+        return Reflect.set(sqlite, prop, value);
     },
 });
 export const dbServer = drizzle(sqliteHandle);

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 import { swapDatabaseFromFile } from '@/lib/db-server';
+import { SqliteSwapInProgressError } from '@/lib/sqlite-repair';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
 /* @Codex */
@@ -16,7 +17,9 @@ export const dynamic = 'force-dynamic';
 const timestamp = () => {
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    // Millisecond precision: a second-granularity name lets two repairs in the
+    // same second silently overwrite each other's .bak file.
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${now.getMilliseconds().toString().padStart(3, '0')}`;
 };
 
 /* @Codex */
@@ -53,6 +56,9 @@ export async function POST() {
             backupCreated: Boolean(backupPath)
         });
     } catch (error) {
+        if (error instanceof SqliteSwapInProgressError) {
+            return NextResponse.json({ success: false, error: 'Repair already in progress.' }, { status: 409 });
+        }
         console.error('[MediFlow] Repair DB failed:', error);
         return NextResponse.json({ success: false, error: 'Repair failed.' }, { status: 500 });
     }
