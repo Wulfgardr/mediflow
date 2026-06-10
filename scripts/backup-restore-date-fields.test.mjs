@@ -125,6 +125,7 @@ test('backup restore coerces unix-seconds integers from legacy scheduled artifac
 
   assert.equal(normalizeDateValue(null), null);
   assert.equal(normalizeDateValue(''), null);
+});
 
 // WUL-306 (ADR 0066): soft-deleted patients MUST travel in backup artifacts so a
 // restore preserves the tombstone. The export dataset must not filter them out.

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments, patients } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { activePatients } from '@/lib/patient-lifecycle';
+import { and, eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'patientId required' }, { status: 400 });
         }
         /* @Codex */
-        const patient = await dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, body.patientId)).get();
+        // WUL-306 (ADR 0066): soft-deleted patients must not accept new attachments.
+        const patient = await dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, body.patientId), activePatients())).get();
         if (!patient) {
             return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
         }

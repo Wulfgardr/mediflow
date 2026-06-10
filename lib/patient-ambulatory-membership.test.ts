@@ -35,6 +35,8 @@ function createDb() {
             is_adi INTEGER DEFAULT 0,
             is_archived INTEGER DEFAULT 0,
             version INTEGER NOT NULL DEFAULT 1,
+            deleted_at INTEGER,
+            deletion_reason TEXT,
             ambulatory_id TEXT,
             created_at INTEGER DEFAULT (unixepoch()),
             updated_at INTEGER DEFAULT (unixepoch())

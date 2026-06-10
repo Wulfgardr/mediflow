@@ -279,6 +279,7 @@ const DATE_FIELDS = new Set([
     'endDate',
     'importedAt',
     'observedAt',
+    'ocrQueueUpdatedAt',
     'performedAt',
     'prescribedAt',
     'reportReceivedAt',
