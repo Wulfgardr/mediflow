@@ -40,6 +40,7 @@ locale in modo esplicito.
 ## Variabili opzionali
 
 - `MEDIFLOW_LOCAL_API_TOKEN` (token per API locale)
+- `MEDIFLOW_ATTACHMENT_MAX_BYTES` (limite byte per payload allegato in `/api/attachments`, default 25 MiB)
 - `MEDIFLOW_TLS_CERT_DIR` / `MEDIFLOW_TLS_CERT_PATH` / `MEDIFLOW_TLS_KEY_PATH`
 - `MEDIFLOW_TLS_PORT` (default 3443)
 - `MEDIFLOW_HTTP_TARGET` (default http://127.0.0.1:3000)

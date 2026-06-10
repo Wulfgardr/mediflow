@@ -18,10 +18,12 @@ export async function GET(request: Request) {
     try {
         await PM2Manager.connect();
         const status = await PM2Manager.getStatus();
-        PM2Manager.disconnect();
         return NextResponse.json(status);
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
+    } finally {
+        /* @Codex */
+        PM2Manager.disconnect();
     }
 }
 

@@ -6,6 +6,8 @@ import { settings } from '@/lib/schema';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+/* @Codex */
+import { normalizeSettingValue } from '@/lib/settings-value';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
         }
 
         /* @Codex */
-        const persistedValue = typeof value === 'string' ? value : JSON.stringify(value);
+        const persistedValue = normalizeSettingValue(value);
 
         // Upsert (Insert or Update) logic
         // This allows db.settings.put({ key: '...', value: '...' }) to work via POST

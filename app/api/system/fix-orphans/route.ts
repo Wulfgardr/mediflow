@@ -47,8 +47,8 @@ export async function GET() {
         });
     } catch (error) {
         console.error("Fix Orphan Dry-Run Error:", error);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return NextResponse.json({ error: String(error), details: (error as any)?.message }, { status: 500 });
+        /* @Codex */
+        return NextResponse.json({ error: 'Failed to inspect orphan patients' }, { status: 500 });
     }
 }
 
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error("Fix Orphan Error:", error);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return NextResponse.json({ error: String(error), details: (error as any)?.message }, { status: 500 });
+        /* @Codex */
+        return NextResponse.json({ error: 'Failed to fix orphan patients' }, { status: 500 });
     }
 }
