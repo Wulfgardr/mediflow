@@ -43,7 +43,8 @@ export default function EditPatientPage() {
         }
 
         try {
-            const { statusReason, checkups, ...cleanData } = data;
+            /* @Codex */
+            const { checkups, ...cleanData } = data;
             const patientVersion = patient.version;
 
             await db.patients.update(id, {
