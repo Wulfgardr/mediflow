@@ -366,7 +366,8 @@ async function cleanupPatient(patientId) {
             if (!entry?.id || entry.deletedAt) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
                 headers: localApiHeaders(),
-                body: { deletionReason: 'network-home-base-diary-write-cleanup' },
+                // WUL-308: child DELETEs require optimistic concurrency.
+                body: { version: entry.version, deletionReason: 'network-home-base-diary-write-cleanup' },
             });
             assert.equal(deletion.response.status, 200);
         }
