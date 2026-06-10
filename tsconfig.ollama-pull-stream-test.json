@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./tmp-ocr-service-date-test",
+    "outDir": "./tmp-ollama-pull-stream-test",
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2020",
@@ -10,9 +10,7 @@
     "isolatedModules": false
   },
   "include": [
-    "lib/ocr-service-date.test.ts",
-    "lib/ocr-service.ts",
-    "lib/ai-service.ts",
-    "lib/italian-date.ts"
+    "lib/ollama-pull-stream.ts",
+    "lib/ollama-pull-stream.test.ts"
   ]
 }

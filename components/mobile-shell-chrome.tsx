@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation';
 import { Activity, BarChart3, LayoutDashboard, Settings, Users } from 'lucide-react';
 /* @Codex */
 import { ThemeToggle } from '@/components/theme-toggle';
+// WUL-297 — persistent privacy affordance in the app header.
+import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 /* @Codex */
 import { useSecurity } from '@/components/security-provider';
 /* @Codex */
@@ -64,6 +66,8 @@ export function MobileShellChrome() {
                                 </Link>
                             );
                         })}
+                        {/* WUL-297 — persistent privacy affordance in the app header */}
+                        <PrivacyModeToggle />
                         <ThemeToggle />
                     </div>
                 </div>

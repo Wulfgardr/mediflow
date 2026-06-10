@@ -324,7 +324,7 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                     </div>
 
                     <Link
-                        href="/settings#ai"
+                        href="/settings/ai/funzioni"
                         className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         Apri Impostazioni AI

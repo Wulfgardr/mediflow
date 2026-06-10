@@ -17,7 +17,13 @@ import { UIStyleProvider } from '@/components/ui-style-provider';
 
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
 // @Codex Keep route additions aligned with docs/design/wul-271-kree8-visual-translation.md.
-const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary', '/patients/new', '/scales', '/analytics', '/settings', '/settings/ambulatories']);
+const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary', '/patients/new', '/scales', '/analytics']);
+
+// WUL-297 — every settings sub-route renders inside the fullscreen settings shell.
+function isSettingsRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === '/settings' || pathname.startsWith('/settings/');
+}
 
 function isKree8PatientRoute(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -43,6 +49,7 @@ export function RootRuntimeShell({
 
   const isFullscreenLiveRoute =
     FULLSCREEN_LIVE_ROUTES.has(pathname)
+    || isSettingsRoute(pathname)
     || isKree8PatientRoute(pathname)
     || isKree8PatientWorkspaceRoute(pathname);
 

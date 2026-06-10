@@ -158,8 +158,16 @@ export async function POST(request: NextRequest) {
         }
 
         const ai = new AIService('ollama', validation.url.toString(), configuredModel);
-        let result = await extractDocumentWithAI(image, mode, ai);
+        /* @Codex */
+        let result = await extractDocumentWithAI(image, mode, ai, { signal: request.signal });
         if (mode !== 'labs' && shouldFallbackToAppleVision(result)) {
+            /* @Codex */
+            if (request.signal.aborted) {
+                return NextResponse.json(
+                    { success: false, error: 'OCR extraction aborted' },
+                    { status: 499 },
+                );
+            }
             const fallback = await extractWithAppleVisionFallback(image);
             if (fallback) {
                 result = fallback;
