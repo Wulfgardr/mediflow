@@ -8,19 +8,28 @@ import {
   getAppSourceFingerprint,
   getAppWorktreeHash,
 } from '@/lib/app-revision';
+/* @Codex */
+import { requireSession } from '@/lib/server-auth';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
 
 /* @Codex */
 export async function GET() {
+  /* @Codex */
+  const session = await requireSession();
+
   return NextResponse.json(
     {
-      branch: getAppBranch(),
       revision: getAppRevision(),
-      worktreeHash: getAppWorktreeHash(),
       sourceFingerprint: getAppSourceFingerprint(),
       fingerprint: getAppFingerprint(),
+      ...(session
+        ? {
+            branch: getAppBranch(),
+            worktreeHash: getAppWorktreeHash(),
+          }
+        : {}),
     },
     {
       headers: {

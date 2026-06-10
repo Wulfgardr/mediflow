@@ -16,6 +16,11 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/repair-db/route.ts', handlers: ['POST'] },
 ];
 
+/* @Codex */
+const SESSION_REQUIRED_SYSTEM_ROUTES = [
+    { file: 'app/api/system/update-awareness/route.ts', handlers: ['GET'] },
+];
+
 function readSource(file) {
     return fs.readFileSync(path.join(ROOT, file), 'utf8');
 }
@@ -41,6 +46,38 @@ test('admin system routes require a web admin session instead of local-token adm
             assert.doesNotMatch(block, /session\.role\s*!==\s*['"]admin['"]/, `${route.file} ${handler} should not use role-only admin checks`);
         }
     }
+});
+
+/* @Codex */
+test('session-only system metadata routes require a web session before returning local details', () => {
+    for (const route of SESSION_REQUIRED_SYSTEM_ROUTES) {
+        const source = readSource(route.file);
+        assert.match(source, /requireSession/, `${route.file} should read the cookie-backed session`);
+        assert.doesNotMatch(source, /requireSessionOrLocalToken/, `${route.file} should not accept local API token fallback`);
+
+        for (const handler of route.handlers) {
+            const block = handlerSource(source, handler);
+            assert.match(block, /requireSession\(\)/, `${route.file} ${handler} should use requireSession()`);
+            assert.match(block, /unauthorizedResponse\(\)/, `${route.file} ${handler} should return the standard 401`);
+        }
+    }
+});
+
+/* @Codex */
+test('system revision remains unauthenticated but exposes only launcher and drift-check fields without a session', () => {
+    const source = readSource('app/api/system/revision/route.ts');
+    const block = handlerSource(source, 'GET');
+
+    assert.match(source, /requireSession/, 'revision route may read a cookie-backed session for optional detail fields');
+    assert.doesNotMatch(source, /unauthorizedResponse/, 'revision route should not reject unauthenticated launcher and drift probes');
+    assert.match(block, /revision:\s*getAppRevision\(\)/, 'revision route should expose launcher revision');
+    assert.match(block, /sourceFingerprint:\s*getAppSourceFingerprint\(\)/, 'revision route should expose launcher source fingerprint');
+    assert.match(block, /fingerprint:\s*getAppFingerprint\(\)/, 'revision route should expose UI drift fingerprint');
+
+    const unauthenticatedPayload = block.slice(block.indexOf('{'), block.indexOf('...(session'));
+    assert.doesNotMatch(unauthenticatedPayload, /branch:\s*getAppBranch\(\)/, 'revision route should not expose branch without a session');
+    assert.doesNotMatch(unauthenticatedPayload, /worktreeHash:\s*getAppWorktreeHash\(\)/, 'revision route should not expose worktree hash without a session');
+    assert.match(block, /session\s*\?\s*{[\s\S]*branch:\s*getAppBranch\(\)[\s\S]*worktreeHash:\s*getAppWorktreeHash\(\)/, 'revision route should keep detail fields session-only');
 });
 
 test('MLX keeps token-backed status reads but requires web admin for lifecycle writes', () => {
