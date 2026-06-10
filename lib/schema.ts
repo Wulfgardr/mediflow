@@ -55,6 +55,9 @@ export const patients = sqliteTable('patients', {
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    // WUL-306 (ADR 0066): soft-delete tombstone, same lifecycle as entries/therapies/checkups
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    deletionReason: text('deletion_reason'),
     /* @Codex */
     version: integer('version').notNull().default(1),
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
