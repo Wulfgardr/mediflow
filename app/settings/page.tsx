@@ -34,6 +34,14 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { usePrivacy } from '@/components/privacy-provider';
 /* @Codex */
 import { parseOllamaPullStreamLine } from '@/lib/ollama-pull-stream';
+import {
+    SETTINGS_CARD_CLASS,
+    SETTINGS_INPUT_CLASS,
+    SETTINGS_LABEL_CLASS,
+    SETTINGS_PRIMARY_BUTTON_CLASS,
+    SETTINGS_SECONDARY_BUTTON_CLASS,
+    SettingsSectionIntro,
+} from '@/components/settings/settings-ui';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -282,34 +290,6 @@ function ModelSelector({ selectorId, label, description, icon, value, onChange, 
                     <p className="mt-2 truncate text-[11px]" style={{ color: 'var(--mf-muted)' }}>{pullStatus}</p>
                 </div>
             )}
-        </div>
-    );
-}
-
-/* @Codex WUL-229 — settings primitives now defer to the liquid-glass tier classes from globals.css */
-const SETTINGS_CARD_CLASS = 'mf-section p-6 md:p-7';
-const SETTINGS_SECTION_CARD_CLASS = 'mf-section mf-section-tight p-5 md:p-6';
-const SETTINGS_INPUT_CLASS = 'mf-input';
-const SETTINGS_LABEL_CLASS = 'mf-field-label';
-const SETTINGS_PRIMARY_BUTTON_CLASS = 'ui-btn-primary px-5 py-2.5 disabled:opacity-50';
-const SETTINGS_SECONDARY_BUTTON_CLASS = 'mf-btn-secondary';
-
-/* @Codex */
-function SettingsSectionIntro({
-    kicker,
-    title,
-    description,
-}: {
-    kicker: string;
-    title: string;
-    description: string;
-}) {
-    return (
-        // @Codex WUL-229 — section intro now uses MediFlow ink/muted tokens for headings
-        <div className="space-y-1">
-            <p className="section-kicker">{kicker}</p>
-            <h2 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>{title}</h2>
-            <p className="max-w-3xl text-sm leading-6" style={{ color: 'var(--mf-muted)' }}>{description}</p>
         </div>
     );
 }
