@@ -137,6 +137,19 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error("[API] PDF Extraction Failed:", error);
+        const exceptionName = typeof error?.name === 'string' ? error.name : '';
+        if (exceptionName === 'PasswordException') {
+            return NextResponse.json(
+                { error: "PDF protetto da password: testo non estraibile.", textLayer: { state: 'unreadable', reason: 'password_protected' } },
+                { status: 422 }
+            );
+        }
+        if (exceptionName === 'InvalidPDFException') {
+            return NextResponse.json(
+                { error: "PDF corrotto o non valido: testo non estraibile.", textLayer: { state: 'unreadable', reason: 'corrupted_pdf' } },
+                { status: 422 }
+            );
+        }
         return NextResponse.json(
             { error: "Extraction failed: " + (error.message || "Unknown error") },
             { status: 500 }

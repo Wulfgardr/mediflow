@@ -49,6 +49,7 @@
     "test:document-identity-resolution": "bash scripts/document-identity-resolution-test.sh",
     "test:document-domain-decisions": "bash scripts/document-domain-decisions-test.sh",
     "test:document-ocr-decision": "bash scripts/document-ocr-decision-test.sh",
+    "test:document-ocr-queue": "bash scripts/document-ocr-queue-test.sh",
     "test:document-decision-review-view-model": "bash scripts/document-decision-review-view-model-test.sh",
     "test:document-decision-review-card": "bash scripts/document-decision-review-card-test.sh",
     "test:document-decision-model-governance": "bash scripts/document-decision-model-governance-test.sh",

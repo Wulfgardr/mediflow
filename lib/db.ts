@@ -11,6 +11,7 @@ import { revivePatientStructuredFields } from './patient-structured-fields';
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 /* @Codex */
 import type { DocumentEvidencePack } from './document-evidence-pack';
+import type { DocumentOcrQueueReason, DocumentOcrQueueState } from './document-ocr-queue';
 /* @Codex */
 import {
     buildApiTableFetchErrorMessage,
@@ -717,6 +718,11 @@ export interface Attachment {
     summarySnapshot?: string;
     /* @Codex */
     parseEvidenceArtifactSnapshot?: string;
+    ocrQueueState?: DocumentOcrQueueState;
+    ocrQueueReason?: DocumentOcrQueueReason;
+    ocrQueueUpdatedAt?: Date;
+    // Artifact deterministico senza PHI (hash + enum), scritto lato server dal replay.
+    ocrReplayArtifactSnapshot?: string;
     createdAt: Date;
 }
 

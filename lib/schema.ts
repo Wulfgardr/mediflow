@@ -339,6 +339,10 @@ export const attachments = sqliteTable('attachments', {
     summarySnapshot: text('summary_snapshot'),
     /* @Codex */
     parseEvidenceArtifactSnapshot: text('parse_evidence_artifact_snapshot'),
+    ocrQueueState: text('ocr_queue_state'),
+    ocrQueueReason: text('ocr_queue_reason'),
+    ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
+    ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

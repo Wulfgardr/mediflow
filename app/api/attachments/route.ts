@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
+import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/document-ocr-queue';
 
 /* @Codex */
 function serializeAttachment(row: typeof attachments.$inferSelect) {
@@ -65,6 +66,9 @@ export async function POST(request: Request) {
             summarySnapshot: body.summarySnapshot ?? null,
             /* @Codex */
             parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
+            ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
+            ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
+            ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
             createdAt: new Date()
         });
 
