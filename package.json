@@ -68,6 +68,8 @@
     "test:auth-lockout": "bash scripts/auth-lockout-test.sh",
     "test:patient-write-normalization": "bash scripts/patient-write-normalization-test.sh",
     "test:patient-ambulatory-membership": "bash scripts/patient-ambulatory-membership-test.sh",
+    "test:patient-soft-delete": "bash scripts/patient-soft-delete-test.sh",
+    "test:patient-cascade": "node --test scripts/patient-cascade.test.mjs",
     "test:service-prescription-items-catalog-migration": "bash scripts/service-prescription-items-catalog-migration-test.sh",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",

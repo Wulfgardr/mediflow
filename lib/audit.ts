@@ -17,6 +17,8 @@ export const AUDIT_EVENT_TYPES = [
     'patient.updated',
     'patient.deleted',
     'patient.restored',
+    // WUL-306 (ADR 0066): explicit admin erasure of a soft-deleted patient + cascade
+    'patient.purged',
     'checkup.created',
     'checkup.updated',
     'checkup.deleted',

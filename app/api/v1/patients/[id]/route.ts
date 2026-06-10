@@ -8,6 +8,8 @@ import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { PatientDetail } from '@/lib/api/v1/types';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
+// WUL-306 (ADR 0066): soft-delete lifecycle helpers
+import { activePatients, buildPatientTombstoneValues } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 import { upsertPrimaryAmbulatoryMembership } from '@/lib/patient-ambulatory-membership';
@@ -59,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const patient = await dbServer.select().from(patients).where(eq(patients.id, id)).get();
+        const patient = await dbServer.select().from(patients).where(and(eq(patients.id, id), activePatients())).get();
 
         if (!patient) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -117,7 +119,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(eq(patients.id, id)).get();
+        // WUL-306: a soft-deleted patient is gone for the wire contract — PUT answers 404.
+        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -133,7 +136,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const updateResult = await dbServer
             .update(patients)
             .set(normalized.values)
-            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion)))
+            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion), activePatients()))
             .run();
 
         if (updateResult.changes === 0) {
@@ -145,7 +148,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
                     isArchived: patients.isArchived
                 })
                 .from(patients)
-                .where(eq(patients.id, id))
+                .where(and(eq(patients.id, id), activePatients()))
                 .get();
             return NextResponse.json(
                 buildPatientVersionConflictPayload(expectedVersion, id, current ?? null),
@@ -191,15 +194,17 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get();
+        const existing = await dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        /* @Codex */
+        // WUL-306: DELETE keeps the soft-delete tombstone (ADR 0066); clinical child rows
+        // stay linked for the audited admin purge. Wire contract unchanged.
         const deleteResult = await dbServer
-            .delete(patients)
-            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion)))
+            .update(patients)
+            .set(buildPatientTombstoneValues(expectedVersion, 'api-v1-delete'))
+            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion), activePatients()))
             .run();
 
         if (deleteResult.changes === 0) {
@@ -211,7 +216,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
                     isArchived: patients.isArchived
                 })
                 .from(patients)
-                .where(eq(patients.id, id))
+                .where(and(eq(patients.id, id), activePatients()))
                 .get();
             return NextResponse.json(
                 buildPatientVersionConflictPayload(expectedVersion, id, current ?? null),

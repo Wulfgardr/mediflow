@@ -110,6 +110,9 @@ function applySchemaGuards() {
         ensureColumn('patients', 'status_reason', 'status_reason TEXT');
         /* @Codex */
         ensureColumn('patients', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+        // WUL-306 (ADR 0066): soft-delete tombstone columns, additive and idempotent
+        ensureColumn('patients', 'deleted_at', 'deleted_at INTEGER');
+        ensureColumn('patients', 'deletion_reason', 'deletion_reason TEXT');
     } catch (error) {
         console.warn('[MediFlow] Patients schema check skipped:', error);
     }
