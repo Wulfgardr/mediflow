@@ -47,6 +47,7 @@
     "test:document-insight-context": "bash scripts/document-insight-context-test.sh",
     "test:document-synthesis": "bash scripts/document-synthesis-service-test.sh",
     "test:document-decision": "bash scripts/document-decision-test.sh",
+    "test:latest-request-guard": "bash scripts/latest-request-guard-test.sh",
     "test:document-identity-resolution": "bash scripts/document-identity-resolution-test.sh",
     "test:document-domain-decisions": "bash scripts/document-domain-decisions-test.sh",
     "test:document-ocr-decision": "bash scripts/document-ocr-decision-test.sh",
