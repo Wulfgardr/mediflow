@@ -128,7 +128,7 @@ export default function BackupRestoreUI() {
                 <div className="mt-2 mb-4 rounded-[20px] p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 flex gap-3 text-sm text-amber-800 dark:text-amber-200">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
-                        Caricare un backup <strong>sovrascriverà i dati supportati dal restore</strong>.
+                        Caricare un backup <strong>cancellerà TUTTI i dati attuali</strong> e li sostituirà con il contenuto del backup.
                         Il file viene verificato prima della scrittura e rifiutato se il manifest non coincide.
                     </p>
                 </div>
@@ -153,7 +153,10 @@ export default function BackupRestoreUI() {
                     >
                         <div className="flex items-start gap-2 text-sm font-semibold text-red-700 dark:text-red-200">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                            <p>Conferma il ripristino: i dati attuali supportati dal restore verranno sovrascritti.</p>
+                            <p>
+                                ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
+                                quelli del backup. L&apos;operazione non è reversibile.
+                            </p>
                         </div>
                         <p className="text-xs text-red-800/80 dark:text-red-200/80">
                             File selezionato: <code>{pendingRestoreFile.name}</code>{' '}

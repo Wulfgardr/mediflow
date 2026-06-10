@@ -20,7 +20,8 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."
         >
-            <div className="grid gap-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start">
+            {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
+            <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
                 <aside className="lg:sticky lg:top-2">
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>
