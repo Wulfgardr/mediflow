@@ -1,5 +1,6 @@
 /* @Codex */
 import { patients } from '@/lib/schema';
+import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
 
 type PatientInsertValues = typeof patients.$inferInsert;
 type PatientUpdateValues = Partial<PatientInsertValues>;
@@ -144,7 +145,9 @@ export function normalizePatientUpdateInput(
         documentInsights: normalizeNullableStringField(body.documentInsights),
         isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
         isArchived: typeof body.isArchived === 'boolean' ? body.isArchived : undefined,
-        ambulatoryId: normalizeNullableStringField(body.ambulatoryId),
+        // WUL-309: set-primary semantics — blank/non-string ids are ignored so the
+        // denormalized column stays consistent with patients_to_ambulatories.
+        ambulatoryId: normalizePrimaryAmbulatoryIdInput(body.ambulatoryId),
         version: options.expectedVersion + 1,
         birthDate: birthDate.value,
         updatedAt: options.now ?? new Date(),

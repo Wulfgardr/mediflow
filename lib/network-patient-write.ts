@@ -11,6 +11,7 @@ import {
 } from './audit';
 /* @Codex */
 import { dbServer } from './db-server';
+import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from './patient-concurrency';
 /* @Codex */
@@ -180,17 +181,9 @@ export async function updateNetworkScopedPatient(
         }
 
         if (hasOwn(body, 'ambulatoryId')) {
-            tx.delete(patientsToAmbulatories)
-                .where(eq(patientsToAmbulatories.patientId, context.patientId))
-                .run();
-            tx.insert(patientsToAmbulatories)
-                .values({
-                    patientId: context.patientId,
-                    ambulatoryId: context.scopeAmbulatoryId,
-                    assignedAt: new Date(),
-                })
-                .onConflictDoNothing()
-                .run();
+            // WUL-309: set-primary semantics — upsert the scoped association only;
+            // a network client must never rewrite the patient's other memberships.
+            upsertPrimaryAmbulatoryMembership(tx, context.patientId, context.scopeAmbulatoryId);
         }
 
         return { status: 200, value: { success: true }, existing: existing.patient };
