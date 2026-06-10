@@ -42,6 +42,7 @@
     "test:patient-document-decision": "bash scripts/patient-document-decision-test.sh",
     "test:patient-smart-import": "bash scripts/patient-smart-import-test.sh",
     "test:patient-structured-fields": "bash scripts/patient-structured-fields-test.sh",
+    "test:locked-field-guard": "bash scripts/locked-field-guard-test.sh",
     "test:ai-context": "bash scripts/ai-context-test.sh",
     "test:document-insight-context": "bash scripts/document-insight-context-test.sh",
     "test:document-synthesis": "bash scripts/document-synthesis-service-test.sh",

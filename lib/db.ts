@@ -3,6 +3,13 @@
 
 import { encryptData, decryptData } from './security';
 import { notifyDbChange } from './live-query';
+import {
+    LOCKED_DATA_PLACEHOLDER,
+    isLockedDataPlaceholder,
+    isEncryptedFieldValue,
+    rememberLockedCiphertext,
+    takeLockedCiphertext,
+} from './locked-field-guard';
 /* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
 /* @Codex */
@@ -464,17 +471,34 @@ class ApiTable<T> {
 
     // --- Encryption Helpers ---
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async encryptItem(item: any, isPartial = false): Promise<any> {
-        const key = this.getMasterKey();
-        if (!key || !item) return item;
+        if (!item) return item;
 
         const fields = ENCRYPTED_FIELDS[this.tableName];
         if (!fields) return item;
 
+        const key = this.getMasterKey();
         const copy = { ...item };
+        // WUL-323: the side-channel with ciphertext preserved by a failed decrypt
+        // is not user data — strip it from the payload and use it to restore
+        // locked fields instead of re-encrypting the placeholder over them.
+        const lockedCiphertext = takeLockedCiphertext(copy);
 
         for (const field of fields) {
+            if (isLockedDataPlaceholder(copy[field])) {
+                const original = lockedCiphertext?.[field];
+                if (isEncryptedFieldValue(original)) {
+                    copy[field] = original;
+                } else if (isPartial) {
+                    console.warn(`Dropping locked field ${this.tableName}.${field} from update: original ciphertext unavailable`);
+                    delete copy[field];
+                } else {
+                    throw new Error(`Refusing to persist '${LOCKED_DATA_PLACEHOLDER}' for ${this.tableName}.${field}: the original encrypted value is unavailable`);
+                }
+                continue;
+            }
+            if (!key) continue;
             if (copy[field]) {
                 try {
                     const { iv, data } = await encryptData(copy[field], key);
@@ -502,11 +526,22 @@ class ApiTable<T> {
                     if (parts.length === 3) {
                         const iv = parts[1];
                         const ciphertext = parts[2];
-                        item[field] = await decryptData(ciphertext, iv, key);
+                        const decrypted = await decryptData(ciphertext, iv, key);
+                        // decryptData returns null on failure (wrong/stale key):
+                        // treat it like a thrown error, never expose null as data.
+                        if (decrypted === null) {
+                            rememberLockedCiphertext(item, field, item[field]);
+                            item[field] = LOCKED_DATA_PLACEHOLDER;
+                        } else {
+                            item[field] = decrypted;
+                        }
                     }
                 } catch (e) {
                     console.error(`Decryption failed for ${this.tableName}.${field}`, e);
-                    item[field] = '[LOCKED DATA]';
+                    // WUL-323: keep the original ciphertext aside so a later save
+                    // restores it; the placeholder is presentation-only.
+                    rememberLockedCiphertext(item, field, item[field]);
+                    item[field] = LOCKED_DATA_PLACEHOLDER;
                 }
             }
         }
