@@ -1,4 +1,4 @@
-# SISS Prescrittivo Live Inspection — Presentation Brief
+# SISS Prescrittivo Live Inspection: Presentation Brief
 
 Data: 2026-05-20
 Scope: `mediflow_private` only

@@ -1,4 +1,4 @@
-# Security Policy — MediFlow
+# Security Policy: MediFlow
 
 MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
 
@@ -56,6 +56,26 @@ Non copriamo ancora:
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+### Decifratura fallita e conservazione del ciphertext
+
+- Se un campo `ENC:` non si decifra (chiave assente, dato corrotto), la UI
+  mostra il placeholder `[LOCKED DATA]`.
+- Il placeholder e un artefatto di sola presentazione: non deve mai essere
+  persistito.
+- Il ciphertext originale viene conservato e riscritto invariato a ogni save:
+  un salvataggio successivo non deve mai sovrascrivere il dato clinico cifrato
+  con il placeholder o con una sua ri-cifratura.
+
+### Cancellazione paziente ed erasure
+
+- Il DELETE operativo di un paziente e un soft-delete reversibile (tombstone
+  version-guarded), non una cancellazione fisica.
+- L'erasure GDPR passa da una purge amministrata dedicata (dry-run + execute,
+  solo sessione admin web) con audit `patient.purged`; il restore esplicito
+  emette `patient.restored`.
+- I pazienti soft-deleted viaggiano nei backup: una richiesta di erasure deve
+  considerare anche gli artefatti gia esportati, che la purge non raggiunge.
+
 ### Chiavi e PIN
 
 - Il PIN **non viene mai salvato**.
@@ -82,7 +102,8 @@ Regole minime:
 - Il bearer token locale non equivale a una sessione amministrativa umana:
   route di sistema distruttive o amministrative richiedono session cookie con
   admin web. In particolare audit, backup export/restore, backup scheduler,
-  repair DB e start/stop MLX non devono accettare solo il token locale.
+  repair DB, purge e restore paziente e start/stop MLX non devono accettare
+  solo il token locale.
 - Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
   supporto/bootstrap, non privilegi admin generali: cataloghi locali,
   settings/native bootstrap, proxy AI/OCR locale, health/redaction locali,
@@ -99,6 +120,9 @@ Regole minime:
 Quando il nodo passa a `network-home-base`:
 
 - il default locale non cambia: la modalita rete resta un opt-in esplicito
+- disattivare la modalita non revoca i pairing salvati: ogni token paired
+  diventa inerte e le route del data plane rispondono
+  `403 NETWORK_MODE_DISABLED` finche la modalita non viene riattivata
 - `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
   paired
 - il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre

@@ -1,11 +1,11 @@
-# PLANS — MediFlow (Piano Engineering Attivo)
+# PLANS: MediFlow (Piano Engineering Attivo)
 
 Questo è il **piano operativo engineering** (orizzonte settimane), non la roadmap prodotto.
 Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-05-05
+Ultimo aggiornamento: 2026-06-10
 
 ---
 
@@ -13,6 +13,8 @@ Ultimo aggiornamento: 2026-05-05
 
 ### Post-v0.6.0 (validazione sul campo + hardening bounded)
 - [ ] Eseguire validazione sul campo delle superfici UI/AI/home-base rilasciate in `v0.6.0` e riversare bug/regressioni in Linear con priorita esplicite.
+- [x] Eseguire le wave di review trasversale `2026-06-09/10` (tracker `WUL-303`) e implementarne i fix sul branch di integrazione sprint, oggi in review: lifecycle soft-delete paziente con purge/restore amministrati (`WUL-306`, ADR 0066), lifecycle unificato delle sotto-risorse cliniche `/api/v1` (`WUL-308`), semantica SET-PRIMARY sulla membership multi-ambulatorio (`WUL-309`), token paired inerti quando la modalita `network home-base` e disattivata (`WUL-307`), repair-db crash-safe (`WUL-321`), date ISO negli artifact di backup schedulato con restore retro-compatibile (`WUL-319`), guard che preserva il ciphertext originale quando il decrypt fallisce (`WUL-323`), robustezza delle route locali su attachments/checkups/settings/system (`WUL-326`), estrazione identita documentale senza fallback data-di-nascita (`WUL-324`), errori dello stream pull Ollama visibili e timeout OCR abortabile (`WUL-325`), coda OCR-needed con replay idempotente post-OCR (`WUL-237`), sequencing dell'autocomplete ICD (`WUL-311`), `statusReason` preservato nel form paziente (`WUL-310`), clear del test-container basato su membership (`WUL-322`), riepilogo `Cosa rivedere adesso` nel dettaglio paziente (`WUL-262`) e Impostazioni ristrutturate in sidebar + sub-route con dashboard `Stato sistema` (`WUL-297`). Il pacchetto non e ancora release.
+- [ ] Smaltire la nuova coda follow-up post-review `WUL-329`..`WUL-337` come queue di breve termine. Due priorita esplicite: `WUL-333` resta release blocker perche il lifecycle unificato `/api/v1` e breaking per il client macOS nativo, da riallineare prima della prossima release packaged; `WUL-335` traccia lo smoke e2e rotto su `main`.
 - [ ] Mantenere affidabile il verify loop per le patch `0.6.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` / `test:network:home-base-write` / `test:network:home-base-diary-write` / `test:network:home-base-therapy-write` / `test:network:home-base-checkup-write` / `test:network:home-base-observation-write` quando si tocca il boundary paired.
 - [ ] Fissare prima la mappa ufficiale `SSI/A2A` oltre il `portal-handoff` (`WUL-180`) prima di qualunque tentativo di prescrittivo nativo, `FSE` embedded o altri moduli SISS dentro MediFlow.
 - [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).

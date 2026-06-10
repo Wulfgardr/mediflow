@@ -11,7 +11,7 @@
 ## Why this doc exists
 
 The supplied [Kree8](https://www.kree8.studio/) references redefine the whole
-visual line for MediFlow — "via il vecchio", per the brief on WUL-271. This is
+visual line for MediFlow ("via il vecchio", per the brief on WUL-271). This is
 not an incremental Graphite refinement: it is a clean-room translation of
 Kree8's grammar onto a real clinical management surface.
 
@@ -62,14 +62,14 @@ leaks into `:root` or other surfaces.
 | Segmented toggle | `.segmented` + `.segItem`/`.segSelected` | Used for the AI / Source switch on the patient panel. |
 | Stepper minus/plus | `.stepper` + `.stepperBtn` | Disabled at the boundary; tabular number. |
 | Pricing-row gradient (green) | **dropped in v2** | Replaced by `.freshness` as a white control with a thin semantic left rail (`--rail-green/blue/yellow/coral`) so AIFA stops reading like a celebratory pricing card. |
-| Stage / category tabs | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Used for the SISS handoff staging — augmented with a subtle sweep keyframe on transition. |
+| Stage / category tabs | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Used for the SISS handoff staging, augmented with a subtle sweep keyframe on transition. |
 | PIN lock surface | `kree8-lock-screen.module.css` | Cool-gray canvas, raised white card, MF brand mark, slate focus ring, ink primary button, semantic local/zero-knowledge footer. No global token export. |
 
 ### Contrast and type rhythm
 
 - All negative letter-spacing has been removed; titles, stat values and stepper
   digits keep default tracking for clinical reading.
-- `#94a3b8` is no longer used for body or readable text — body now reads
+- `#94a3b8` is no longer used for body or readable text; body now reads
   against `--ink-muted` (`#475569`) or `--ink-strong` (`#1e293b`). The
   faint slate (`--ink-faint`) is reserved for tabular dates and tiny
   numeric metadata.
@@ -110,8 +110,8 @@ clinician-facing MediFlow nomenclature.
 | Quadro paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
 | Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
 | Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
-| Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente** — no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
-| Sistema | Account & PIN, AI local controls (`AI Patient Insight`, `Smart Import documento`, `Comparatore cloud`) + lane chips, Modalità di rete (`locale di default` + optional `Mac principale`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni — **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI locale). |
+| Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente**, with no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
+| Sistema | Account & PIN, AI local controls (`AI Patient Insight`, `Smart Import documento`, `Comparatore cloud`) + lane chips, Modalità di rete (`locale di default` + optional `Mac principale`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni, **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI locale). |
 
 ## Interactivity demonstrated
 
@@ -126,7 +126,7 @@ The review alias stays synthetic and does not fetch external or clinical data.
 `/patients/[id]/modules` is now treated as the **Scheda paziente**: the Kree8
 fullscreen patient workspace that hosts the full set of `strumenti clinici`.
 The root navigates, the Scheda paziente decides, summarizes and executes the
-longer clinical work — therapies, observations, protesica, scales, document
+longer clinical work: therapies, observations, protesica, scales, document
 upload and diary review. Its inner tools still reuse the existing real
 components until each one receives its own Kree8-native internal pass.
 
@@ -202,7 +202,7 @@ zone" wording.
 - Bright neutral canvas, never beige. Old Graphite warm tones are absent.
 - Status colour is reserved for state semantics, not decoration.
 - Gradients only appear in: the AI button. The freshness panel and AIFA card
-  no longer use celebratory gradients — semantic colour is delivered through
+  no longer use celebratory gradients; semantic colour is delivered through
   a thin coloured left rail on a white surface.
 - No decorative orbs. The `FlowFieldBackground` still renders behind, but the
   fixed overlay covers it.
@@ -256,7 +256,7 @@ zone" wording.
       reviewable rows are processed. Confirm the blocked SISS row cannot be
       applied.
 - [ ] On `Cataloghi`, confirm the local package state, import actions and
-      semantic status pills stay legible. Confirm the panel stays white — no
+      semantic status pills stay legible. Confirm the panel stays white, with no
       full gradient backgrounds.
 - [ ] On `Trasmissioni SISS`, walk through the 4 steps, confirm the row
       sweep animation, the launcher matrix renders the 5 webapps and the

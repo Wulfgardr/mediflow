@@ -5,7 +5,7 @@ read_when:
   - "Running OpenAPI drift checks or deciding whether a route belongs in the stable spec."
 ---
 
-# OpenAPI `/api/v1` — Runbook di Manutenzione
+# OpenAPI `/api/v1`: Runbook di Manutenzione
 
 Stato documento: `SECONDARY`  
 Fonte canonica del contratto: [docs/openapi/mediflow-v1.yaml](./mediflow-v1.yaml)  

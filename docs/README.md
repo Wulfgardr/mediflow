@@ -5,7 +5,7 @@ read_when:
   - "Updating documentation structure, canonical indices, or OSS/private doc boundaries."
 ---
 
-# Documentazione MediFlow — Indice Canonico
+# Documentazione MediFlow: Indice Canonico
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
