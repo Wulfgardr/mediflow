@@ -65,9 +65,12 @@ function contextAround(text: string, start: number, end: number, contextWindow: 
     const left = Math.max(0, start - contextWindow);
     const right = Math.min(text.length, end + contextWindow);
     const rawSnippet = text.slice(left, right);
+    // The snippet is whitespace-collapsed, so the tax-code index must be computed on the
+    // same normalized representation or irregular OCR spacing skews the label distances.
+    const normalizedPrefix = text.slice(left, start).replace(/\s+/g, ' ').trimStart();
     return {
         snippet: normalizeText(rawSnippet),
-        taxCodeIndex: start - left,
+        taxCodeIndex: normalizedPrefix.length,
     };
 }
 

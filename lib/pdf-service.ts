@@ -594,7 +594,9 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
  * Validate Italian Codice Fiscale format
  */
 function isValidCodiceFiscale(cf: string): boolean {
-    return /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(cf);
+    // Omocodia replaces digits with L/M/N/P/Q/R/S/T/U/V; keep aligned with
+    // ITALIAN_TAX_CODE_REGEX in document-identity-resolution.ts.
+    return /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/i.test(cf);
 }
 
 /* @Codex */
@@ -652,20 +654,17 @@ export function parsePatientData(text: string): ExtractedPatientData {
     if (cfMatch) data.taxCode = cfMatch[0].toUpperCase();
 
     // 2. BIRTH DATE
-    // 2. BIRTH DATE
-    const dateKeywords = /(?:nato|nata|nascita)\s+(?:il|a)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
+    // Only keyword-anchored dates qualify: an unanchored fallback would promote the first
+    // date in the document (visit/print/report date) to birth date, which is clinically
+    // worse than leaving birthDate empty.
+    const dateKeywords = /(?:nato|nata|nascita)(?:\s+(?:il|a))?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
     const dateMatch = cleanText.match(dateKeywords);
     if (dateMatch) {
         const [, dateStr] = dateMatch;
         const parts = dateStr.split(/[\/\-\.]/);
-        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-    } else {
-        const dateRegex = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/;
-        const fallbackDate = cleanText.match(dateRegex);
-        if (fallbackDate) {
-            const [, d, m, y] = fallbackDate;
-            data.birthDate = new Date(`${y}-${m}-${d}`);
-        }
+        // Zero-pad so Date() always parses as UTC: '1980-1-1' parses as local midnight
+        // and shifts to the previous day on toISOString() in timezones ahead of UTC.
+        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
     }
 
     // 3. NAME
