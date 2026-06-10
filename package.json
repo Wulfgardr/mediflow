@@ -71,6 +71,7 @@
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
     "check:audit-quality-gate": "node scripts/audit-quality-gate.mjs",
     "test:audit": "bash scripts/audit-test.sh",
+    "test:sqlite-repair": "bash scripts/sqlite-repair-test.sh",
     "benchmark:clinical-facts:observations": "node --experimental-strip-types scripts/benchmark-observation-facts.mjs",
     "benchmark:icd-resolver": "node --experimental-strip-types scripts/benchmark-icd-resolver.ts",
     "benchmark:aifa-resolver": "node --experimental-strip-types scripts/benchmark-aifa-resolver.ts",
