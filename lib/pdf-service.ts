@@ -8,6 +8,7 @@ import type {
 } from './ai-task-contracts';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
+import { looksLikeLowSignalOcrText } from './document-ocr-queue';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -72,18 +73,26 @@ function looksLikeStructuredPayload(value: string): boolean {
     return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
 }
 
-/* @Codex */
-function looksLikeLowSignalOcrText(value: string): boolean {
-    const compact = value.replace(/\s+/g, ' ').trim();
-    if (!compact) return true;
+export type PdfTextLayerFailureReason = 'corrupted_pdf' | 'password_protected';
 
-    const alphaChars = compact.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)?.length || 0;
-    if (compact.length >= 24 && alphaChars < 12) return true;
-    if (/^(?:\d+\.){10,}\d*$/u.test(compact.replace(/\s+/g, ''))) return true;
+export class PdfTextLayerUnreadableError extends Error {
+    readonly reason: PdfTextLayerFailureReason;
 
-    const tokens = compact.split(/\s+/).filter(Boolean);
-    const uniqueTokens = new Set(tokens.map((token) => token.toLowerCase()));
-    return tokens.length >= 12 && uniqueTokens.size <= 2;
+    constructor(message: string, reason: PdfTextLayerFailureReason) {
+        super(message);
+        this.name = 'PdfTextLayerUnreadableError';
+        this.reason = reason;
+    }
+}
+
+export class DocumentTextUnavailableError extends Error {
+    readonly textLayerFailure?: PdfTextLayerFailureReason;
+
+    constructor(message: string, textLayerFailure?: PdfTextLayerFailureReason) {
+        super(message);
+        this.name = 'DocumentTextUnavailableError';
+        this.textLayerFailure = textLayerFailure;
+    }
 }
 
 /* @Codex */
@@ -272,7 +281,11 @@ export async function extractTextFromPdf(file: Blob): Promise<string> {
     });
 
     if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
+        const failureReason = err?.textLayer?.reason;
+        if (failureReason === 'corrupted_pdf' || failureReason === 'password_protected') {
+            throw new PdfTextLayerUnreadableError(err.error || "Failed to extract text from PDF", failureReason);
+        }
         throw new Error(err.error || "Failed to extract text from PDF");
     }
 
@@ -552,10 +565,14 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
     // For PDFs, also extract text with pdfjs for regex validation
     let pdfText = '';
+    let textLayerFailure: PdfTextLayerFailureReason | undefined;
     if (isPdf) {
         try {
             pdfText = await extractTextFromPdf(file);
         } catch (e) {
+            if (e instanceof PdfTextLayerUnreadableError) {
+                textLayerFailure = e.reason;
+            }
             console.warn('[PDF Service] PDF text extraction failed', e);
         }
     }
@@ -587,7 +604,10 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     // Last resort: return AI result even with low confidence
     if (aiResult) return aiResult;
 
-    throw new Error('Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.');
+    throw new DocumentTextUnavailableError(
+        'Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.',
+        textLayerFailure,
+    );
 }
 
 /**

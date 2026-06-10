@@ -96,6 +96,11 @@ function applySchemaGuards() {
         ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
         /* @Codex */
         ensureColumn('attachments', 'parse_evidence_artifact_snapshot', 'parse_evidence_artifact_snapshot TEXT');
+        // WUL-237: OCR-needed queue state, additive and idempotent
+        ensureColumn('attachments', 'ocr_queue_state', 'ocr_queue_state TEXT');
+        ensureColumn('attachments', 'ocr_queue_reason', 'ocr_queue_reason TEXT');
+        ensureColumn('attachments', 'ocr_queue_updated_at', 'ocr_queue_updated_at INTEGER');
+        ensureColumn('attachments', 'ocr_replay_artifact_snapshot', 'ocr_replay_artifact_snapshot TEXT');
     } catch (error) {
         console.warn('[MediFlow] Attachments schema check skipped:', error);
     }

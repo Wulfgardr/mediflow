@@ -4,6 +4,83 @@ import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import {
+    canTransitionDocumentOcrQueueState,
+    isDocumentOcrQueueState,
+    type DocumentOcrQueueState,
+} from '@/lib/document-ocr-queue';
+
+export async function PUT(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
+    try {
+        const { id } = await params;
+        const body = await request.json().catch(() => null) as unknown;
+        if (!body || typeof body !== 'object') {
+            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
+        const payload = body as Record<string, unknown>;
+
+        const existing = await dbServer
+            .select({ id: attachments.id, ocrQueueState: attachments.ocrQueueState })
+            .from(attachments)
+            .where(eq(attachments.id, id))
+            .get();
+        if (!existing) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+
+        const updateData: {
+            summarySnapshot?: string | null;
+            parseEvidenceArtifactSnapshot?: string | null;
+            ocrQueueState?: DocumentOcrQueueState;
+            ocrQueueUpdatedAt?: Date;
+        } = {};
+
+        if (Object.prototype.hasOwnProperty.call(payload, 'summarySnapshot')) {
+            if (payload.summarySnapshot === null || payload.summarySnapshot === '') {
+                updateData.summarySnapshot = null;
+            } else if (typeof payload.summarySnapshot === 'string') {
+                updateData.summarySnapshot = payload.summarySnapshot;
+            }
+        }
+
+        if (Object.prototype.hasOwnProperty.call(payload, 'parseEvidenceArtifactSnapshot')) {
+            if (payload.parseEvidenceArtifactSnapshot === null || payload.parseEvidenceArtifactSnapshot === '') {
+                updateData.parseEvidenceArtifactSnapshot = null;
+            } else if (typeof payload.parseEvidenceArtifactSnapshot === 'string') {
+                updateData.parseEvidenceArtifactSnapshot = payload.parseEvidenceArtifactSnapshot;
+            }
+        }
+
+        if (payload.ocrQueueState !== undefined) {
+            if (!isDocumentOcrQueueState(payload.ocrQueueState)) {
+                return NextResponse.json({ error: 'Invalid OCR queue state' }, { status: 400 });
+            }
+            if (!isDocumentOcrQueueState(existing.ocrQueueState)) {
+                return NextResponse.json({ error: 'Attachment is not in the OCR queue' }, { status: 409 });
+            }
+            if (!canTransitionDocumentOcrQueueState(existing.ocrQueueState, payload.ocrQueueState)) {
+                return NextResponse.json({ error: 'Invalid OCR queue state transition' }, { status: 409 });
+            }
+            updateData.ocrQueueState = payload.ocrQueueState;
+            updateData.ocrQueueUpdatedAt = new Date();
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        }
+
+        await dbServer.update(attachments).set(updateData).where(eq(attachments.id, id));
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return NextResponse.json({ error: "Update Failed" }, { status: 500 });
+    }
+}
 
 export async function DELETE(
     request: Request,

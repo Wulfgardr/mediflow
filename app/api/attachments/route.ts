@@ -17,6 +17,7 @@ function resolveMaxAttachmentBytes(): number {
     const configured = Number.parseInt(process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES ?? '', 10);
     return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ATTACHMENT_BYTES;
 }
+import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/document-ocr-queue';
 
 /* @Codex */
 function serializeAttachment(row: typeof attachments.$inferSelect) {
@@ -100,6 +101,9 @@ export async function POST(request: Request) {
             summarySnapshot: body.summarySnapshot ?? null,
             /* @Codex */
             parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
+            ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
+            ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
+            ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
             createdAt: new Date()
         });
 
