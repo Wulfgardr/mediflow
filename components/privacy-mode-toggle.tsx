@@ -4,7 +4,7 @@
 // primary surface for the toggle; settings keeps only a pointer.
 
 import { Eye, EyeOff } from 'lucide-react';
-import { usePrivacy } from '@/components/privacy-provider';
+import { usePrivacyOptional } from '@/components/privacy-provider';
 import { cn } from '@/lib/utils';
 
 export function PrivacyModeToggle({
@@ -14,7 +14,9 @@ export function PrivacyModeToggle({
     showLabel?: boolean;
     className?: string;
 }) {
-    const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+    const privacy = usePrivacyOptional();
+    if (!privacy) return null;
+    const { isPrivacyMode, togglePrivacyMode } = privacy;
     const title = isPrivacyMode ? 'Disattiva Privacy Mode' : 'Attiva Privacy Mode';
 
     return (
