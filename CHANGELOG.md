@@ -20,7 +20,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - ⚠️ **Ciclo di vita unificato delle sotto-risorse cliniche (`WUL-308`)**: diario, terapie, checkup e osservazioni su `/api/v1` condividono ora version guard con `409` sulle scritture, liste che escludono i record soft-deleted (opt-in `includeDeleted`), soft delete su tutte le `DELETE` e audit che distingue eliminazione da aggiornamento. Breaking per il client nativo macOS, adeguamento tracciato in `WUL-333`.
 - **Ambulatorio principale senza perdita di appartenenze (`WUL-309`)**: impostare l'ambulatorio dal profilo paziente aggiorna solo l'ambulatorio principale e non cancella più le altre appartenenze multi-ambulatorio, sia sul percorso `/api/v1` sia su quello di rete.
-- **Hardening allegati, checkup e impostazioni (`WUL-326`)**: limite di dimensione sugli allegati (configurabile, default 25MB, risposta `413`), accettazione degli envelope cifrati lato client, verifica dell'esistenza del paziente, validazione input sulla creazione checkup (`400`), normalizzazione condivisa dei valori impostazioni, errori generici da `fix-orphans` e `update-awareness` protetto da sessione, mantenendo minimale il probe di revisione usato da launcher e lock screen.
+- **Hardening allegati, checkup e impostazioni (`WUL-326`)**: limite di dimensione sugli allegati (configurabile, default 25 MiB, risposta `413`), accettazione degli envelope cifrati lato client, verifica dell'esistenza del paziente, validazione input sulla creazione checkup (`400`), normalizzazione condivisa dei valori impostazioni, errori generici da `fix-orphans` e `update-awareness` protetto da sessione, mantenendo minimale il probe di revisione usato da launcher e lock screen.
 
 ### 🤖 AI/Documenti
 
