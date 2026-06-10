@@ -880,10 +880,15 @@ struct PatientDetailView: View {
             entriesErrorMessage = "Indica il motivo dell'archiviazione."
             return
         }
+        guard let version = entry.version else {
+            entriesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
             try await LocalAPIClient.shared.softDeleteEntry(
                 patientId: patientId,
                 entryId: entry.id,
+                expectedVersion: version,
                 deletedAt: Date(),
                 reason: trimmed
             )
@@ -896,8 +901,16 @@ struct PatientDetailView: View {
     @MainActor
     private func restoreEntry(_ entry: EntrySummary) async {
         pendingRestoreEntry = nil
+        guard let version = entry.version else {
+            entriesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.restoreEntry(patientId: patientId, entryId: entry.id)
+            try await LocalAPIClient.shared.restoreEntry(
+                patientId: patientId,
+                entryId: entry.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             entriesErrorMessage = message(for: error, fallback: "Impossibile ripristinare la voce clinica.")
@@ -908,8 +921,16 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteTherapy(_ therapy: TherapySummary) async {
         pendingDeleteTherapy = nil
+        guard let version = therapy.version else {
+            therapiesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteTherapy(patientId: patientId, therapyId: therapy.id)
+            try await LocalAPIClient.shared.deleteTherapy(
+                patientId: patientId,
+                therapyId: therapy.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             therapiesErrorMessage = message(for: error, fallback: "Impossibile eliminare la terapia.")
@@ -920,8 +941,16 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteCheckup(_ checkup: CheckupSummary) async {
         pendingDeleteCheckup = nil
+        guard let version = checkup.version else {
+            checkupsErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteCheckup(patientId: patientId, checkupId: checkup.id)
+            try await LocalAPIClient.shared.deleteCheckup(
+                patientId: patientId,
+                checkupId: checkup.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'appuntamento.")
@@ -932,13 +961,24 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteObservation(_ observation: ObservationSummary) async {
         pendingDeleteObservation = nil
+        guard let version = observation.version else {
+            observationsErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteObservation(patientId: patientId, observationId: observation.id)
+            try await LocalAPIClient.shared.deleteObservation(
+                patientId: patientId,
+                observationId: observation.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             observationsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'osservazione.")
         }
     }
+
+    // WUL-308: mutations on the clinical sub-resources require the record version.
+    static let missingVersionMessage = "Versione del record non disponibile: ricarica la scheda e riprova."
 
     @MainActor
     private func runAI() async {
@@ -2084,6 +2124,11 @@ private struct EditEntryView: View {
             return
         }
 
+        guard let version = entry.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
+            return
+        }
+
         do {
             guard let encryptedContent = try security.encryptString(trimmed) else {
                 errorMessage = "Impossibile cifrare il contenuto"
@@ -2091,6 +2136,7 @@ private struct EditEntryView: View {
             }
 
             let payload = UpdateEntryPayload(
+                version: version,
                 type: entryType,
                 date: date,
                 content: encryptedContent
@@ -2101,6 +2147,8 @@ private struct EditEntryView: View {
         } catch {
             if let cryptoError = error as? CryptoService.CryptoError {
                 errorMessage = cryptoError.message
+            } else if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
             } else {
                 errorMessage = "Aggiornamento fallito"
             }
@@ -2290,8 +2338,14 @@ private struct EditTherapyView: View {
             return
         }
 
+        guard let version = therapy.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
+            return
+        }
+
         do {
             let payload = UpdateTherapyPayload(
+                version: version,
                 drugName: trimmedDrugName,
                 /* @Codex */
                 aic: aicPatchValue,
@@ -2314,7 +2368,11 @@ private struct EditTherapyView: View {
             onSaved()
             dismiss()
         } catch {
-            errorMessage = "Aggiornamento fallito"
+            if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = "Aggiornamento fallito"
+            }
         }
     }
 
@@ -2409,8 +2467,14 @@ private struct EditCheckupView: View {
             return
         }
 
+        guard let version = checkup.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
+            return
+        }
+
         do {
             let payload = UpdateCheckupPayload(
+                version: version,
                 date: date,
                 title: trimmedTitle,
                 /* @Codex */
@@ -2421,7 +2485,11 @@ private struct EditCheckupView: View {
             onSaved()
             dismiss()
         } catch {
-            errorMessage = "Aggiornamento fallito"
+            if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = "Aggiornamento fallito"
+            }
         }
     }
 }
