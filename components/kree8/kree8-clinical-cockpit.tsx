@@ -958,7 +958,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
         : 'Nessun farmaco indicizzato: importa confezioni.csv dalle impostazioni.',
       freshness: catalogFreshnessFromCount(drugCount),
       age: formatCatalogCount(drugCount, 'farmaco', 'farmaci'),
-      href: '/settings#data',
+      href: '/settings/repertori',
       actionLabel: drugCount > 0 ? 'Impostazioni' : 'Importa',
     },
     {
@@ -969,7 +969,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
         : 'Nessuna esenzione indicizzata: importa TXT/CSV dalle impostazioni.',
       freshness: catalogFreshnessFromCount(exemptionCount),
       age: formatCatalogCount(exemptionCount, 'codice', 'codici'),
-      href: '/settings#data',
+      href: '/settings/repertori',
       actionLabel: exemptionCount > 0 ? 'Impostazioni' : 'Importa',
     },
     {
@@ -2738,7 +2738,7 @@ function LiveHandoffArea({
           <PillBadge variant="muted">portali ufficiali</PillBadge>
         </header>
         <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
-          <Link href="/settings#data" className={styles.ghostBtnSm}>
+          <Link href="/settings/repertori" className={styles.ghostBtnSm}>
             <Database size={12} />
             Gestisci repertori
           </Link>
@@ -2832,7 +2832,7 @@ function LiveGovernanceArea({
       variant: 'violet',
     },
     {
-      href: '/settings#backups',
+      href: '/settings/backup',
       title: 'Backup cifrati',
       sub: 'schedulazione, ripristino e prove operative',
       icon: HardDrive,
@@ -2840,7 +2840,7 @@ function LiveGovernanceArea({
       variant: 'blue',
     },
     {
-      href: '/settings#data',
+      href: '/settings/repertori',
       title: 'Repertori clinici',
       sub: 'AIFA, ICD ed esenzioni locali',
       icon: Database,
@@ -3333,7 +3333,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <Link href="/settings#data" className={styles.ghostBtn}>
+          <Link href="/settings/repertori" className={styles.ghostBtn}>
             <Database size={13} />
             Gestisci repertori
           </Link>
@@ -4007,7 +4007,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>02:14 · 318 MB · controllo riuscito</span>
             </span>
-            <Link href="/settings#backups" className={styles.ghostBtnSm}>Esegui ora</Link>
+            <Link href="/settings/backup" className={styles.ghostBtnSm}>Esegui ora</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><Database size={16} /></span>
@@ -4016,7 +4016,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>AIFA · ICD · esenzioni · LOINC manuale</span>
             </span>
-            <Link href="/settings#data" className={styles.ghostBtnSm}>Apri repertori</Link>
+            <Link href="/settings/repertori" className={styles.ghostBtnSm}>Apri repertori</Link>
           </div>
         </section>
 
