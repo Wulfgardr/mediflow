@@ -353,6 +353,8 @@ async function cleanupPatient(patientId) {
             if (!observation?.id) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/observations/${observation.id}`, {
                 headers: localApiHeaders(),
+                // WUL-308: child DELETEs require optimistic concurrency.
+                body: { version: observation.version },
             });
             assert.equal(deletion.response.status, 200);
         }

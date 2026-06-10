@@ -34,49 +34,49 @@
       "path": "/api/v1/patients/{id}/entries",
       "methods": ["GET", "POST"],
       "trackingIssue": "WUL-40",
-      "reason": "Clinical entry operations are implemented but await a later contract publication pass after the patient thin slice."
+      "reason": "Clinical entry operations are implemented but await a later contract publication pass after the patient thin slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
     },
     {
       "path": "/api/v1/patients/{id}/entries/{entryId}",
       "methods": ["GET", "PUT", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Clinical entry detail mutations remain implementation-only until their payloads are stabilized for broader client use."
+      "reason": "Clinical entry detail mutations remain implementation-only until their payloads are stabilized for broader client use. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE writes a soft-delete tombstone (deletedAt/deletionReason)."
     },
     {
       "path": "/api/v1/patients/{id}/checkups",
       "methods": ["GET", "POST"],
       "trackingIssue": "WUL-40",
-      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open."
+      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
     },
     {
       "path": "/api/v1/patients/{id}/checkups/{checkupId}",
       "methods": ["GET", "PUT", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Checkup detail mutations remain outside the stable documented slice pending follow-up contract expansion."
+      "reason": "Checkup detail mutations remain outside the stable documented slice pending follow-up contract expansion. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting."
     },
     {
       "path": "/api/v1/patients/{id}/therapies",
       "methods": ["GET", "POST"],
       "trackingIssue": "WUL-40",
-      "reason": "Therapy endpoints are implemented for parity work but not yet published as stable client-facing contract."
+      "reason": "Therapy endpoints are implemented for parity work but not yet published as stable client-facing contract. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
     },
     {
       "path": "/api/v1/patients/{id}/therapies/{therapyId}",
       "methods": ["GET", "PUT", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Therapy detail mutations remain implementation-only until a dedicated OpenAPI increment lands."
+      "reason": "Therapy detail mutations remain implementation-only until a dedicated OpenAPI increment lands. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting."
     },
     {
       "path": "/api/v1/patients/{id}/observations",
       "methods": ["GET", "POST"],
       "trackingIssue": "WUL-40",
-      "reason": "Observation collection endpoints are still gated by the clinical parity track and are not part of the current stable slice."
+      "reason": "Observation collection endpoints are still gated by the clinical parity track and are not part of the current stable slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
     },
     {
       "path": "/api/v1/patients/{id}/observations/{observationId}",
       "methods": ["GET", "PUT", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Observation detail mutations remain undocumented until the parity track publishes their stable contract."
+      "reason": "Observation detail mutations remain undocumented until the parity track publishes their stable contract. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting."
     },
     {
       "path": "/api/v1/terminology/systems",
