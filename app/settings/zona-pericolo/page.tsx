@@ -49,7 +49,7 @@ export default function SettingsDangerZonePage() {
                         <p className="section-kicker">Zona pericolo</p>
                         <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.
+                            Il reset cancella la configurazione operatore e richiede di ripetere la procedura di onboarding da zero.
                         </p>
                     </div>
                 </div>

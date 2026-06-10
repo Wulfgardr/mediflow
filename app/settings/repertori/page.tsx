@@ -47,7 +47,7 @@ export default function SettingsRepertoriPage() {
         try {
             // Optional: Clear old DB? existing behavior seems to be additive or overwrite by key?
             // Usually simpler to clear for a fresh import if it's a full list replacement
-            // await clearDrugDatabase(); 
+            // await clearDrugDatabase();
 
             await importAifaCsv(file, (count, total) => {
                 const perc = Math.round((count / total) * 100);
