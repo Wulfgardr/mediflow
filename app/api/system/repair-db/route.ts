@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
+import { swapDatabaseFromFile } from '@/lib/db-server';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
 /* @Codex */
@@ -40,10 +41,12 @@ export async function POST() {
         let backupPath: string | null = null;
         if (fs.existsSync(dbPath)) {
             backupPath = `${dbPath}.bak-${timestamp()}`;
-            fs.copyFileSync(dbPath, backupPath);
         }
 
-        fs.copyFileSync(legacyDbPath, dbPath);
+        // Swap through the shared connection (checkpoint + close, consistent
+        // backup, copy via the SQLite backup API, reopen) so the live file is
+        // never overwritten in place and WAL sidecars cannot leak across DBs.
+        await swapDatabaseFromFile(legacyDbPath, backupPath);
 
         return NextResponse.json({
             success: true,
