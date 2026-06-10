@@ -2824,7 +2824,7 @@ function LiveGovernanceArea({
       variant: 'muted',
     },
     {
-      href: '/settings#ai',
+      href: '/settings/ai/modelli',
       title: 'Modelli AI locali',
       sub: 'provider, modelli attivi e controlli di sicurezza',
       icon: Sparkles,

@@ -72,12 +72,14 @@ test('document synthesis kill switch keeps OCR import available but disables cli
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await page.goto('/settings');
-  await expect(page).toHaveURL(/\/settings$/);
+  // WUL-297 — kill switches now live on the dedicated AI sub-route.
+  await page.goto('/settings/ai/funzioni');
+  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 
-  const killSwitch = page.getByLabel('Disabilita Document Synthesis localmente');
-  await killSwitch.check();
-  await expect(page.getByTestId('document-synthesis-kill-switch-card')).toContainText('Disabled');
+  const killSwitch = page.getByRole('switch', { name: 'Document Synthesis locale' });
+  await killSwitch.click();
+  await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByTestId('document-synthesis-kill-switch-card')).toContainText('Spento');
   const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
   await saveButton.click();
   await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
