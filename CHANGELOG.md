@@ -7,6 +7,10 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+### 🐛 Risolto
+
+- **Soft-delete paziente (ADR 0066, `WUL-306`)**: `DELETE /api/patients/{id}` e `DELETE /api/v1/patients/{id}` scrivono un tombstone `deletedAt`/`deletionReason` version-guarded invece di cancellare la riga, eliminando l'orfanatura delle righe cliniche figlie; contratto wire invariato (stessi `{version}`, 409 e audit `patient.deleted`). Nuovi strumenti admin: `purge-patient` (erasure esplicita audited `patient.purged` con cascade canonica `PATIENT_CHILD_TABLES`), `restore-patient` (`patient.restored`) e bonifica orfani storici in `fix-orphans` dietro flag `purgeOrphanedClinicalRows`. Rollback sicuro: il codice precedente ignora le nuove colonne e i pazienti soft-deleted riappaiono come attivi.
+
 ## [0.6.0] - 2026-05-02
 
 > Nota release: `v0.6.0` formalizza il ciclo post-`v0.5.0`: MediFlow non e piu

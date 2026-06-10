@@ -11,6 +11,8 @@
   },
   "include": [
     "lib/schema.ts",
+    "lib/patient-cascade.ts",
+    "lib/patient-cascade.test.ts",
     "lib/patient-concurrency.ts",
     "lib/patient-lifecycle.ts",
     "lib/patient-lifecycle.test.ts",

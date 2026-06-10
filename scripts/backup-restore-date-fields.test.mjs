@@ -57,3 +57,18 @@ test('backup restore normalizes soft-delete tombstone timestamps', () => {
     'deletedAt must be normalized before restore inserts Drizzle timestamp rows',
   );
 });
+
+// WUL-306 (ADR 0066): soft-deleted patients MUST travel in backup artifacts so a
+// restore preserves the tombstone. The export dataset must not filter them out.
+test('backup export keeps soft-deleted patients (tombstone roundtrip)', () => {
+  const routeSource = fs.readFileSync('app/api/system/backup-restore/route.ts', 'utf8');
+
+  assert.ok(
+    !routeSource.includes('activePatients('),
+    'backup-restore must not apply the activePatients() read filter',
+  );
+  assert.ok(
+    !routeSource.includes('isNull(patients.deletedAt)'),
+    'backup-restore must not filter patients by deletedAt',
+  );
+});

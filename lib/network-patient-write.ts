@@ -13,6 +13,8 @@ import {
 import { dbServer } from './db-server';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from './patient-concurrency';
+// WUL-306 (ADR 0066): network writes treat soft-deleted patients as missing
+import { activePatients } from './patient-lifecycle';
 /* @Codex */
 import { normalizePatientUpdateInput } from './patient-write-normalization';
 /* @Codex */
@@ -93,7 +95,7 @@ function selectPatientConflictSnapshot(
             isArchived: patients.isArchived,
         })
         .from(patients)
-        .where(eq(patients.id, patientId))
+        .where(and(eq(patients.id, patientId), activePatients()))
         .get();
 
     return current ?? null;
@@ -155,6 +157,7 @@ export async function updateNetworkScopedPatient(
             .where(and(
                 eq(patients.id, context.patientId),
                 eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId),
+                activePatients(),
             ))
             .get();
 
@@ -165,7 +168,7 @@ export async function updateNetworkScopedPatient(
         const updateResult = tx
             .update(patients)
             .set(normalized.values)
-            .where(and(eq(patients.id, context.patientId), eq(patients.version, expectedVersion)))
+            .where(and(eq(patients.id, context.patientId), eq(patients.version, expectedVersion), activePatients()))
             .run();
 
         if (updateResult.changes === 0) {

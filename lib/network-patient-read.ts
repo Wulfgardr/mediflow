@@ -1,5 +1,7 @@
 /* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
+// WUL-306 (ADR 0066): network replicas never see soft-deleted patients
+import { activePatients } from './patient-lifecycle';
 /* @Codex */
 import { dbServer } from './db-server';
 /* @Codex */
@@ -59,7 +61,7 @@ export async function listNetworkScopedPatients(scopeAmbulatoryId: string): Prom
         .select({ patient: patients })
         .from(patients)
         .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-        .where(eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId))
+        .where(and(eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId), activePatients()))
         .orderBy(desc(patients.updatedAt));
 
     return rows.map((row) => toPatientSummary(row.patient));
@@ -77,6 +79,7 @@ export async function getNetworkScopedPatientDetail(
         .where(and(
             eq(patients.id, patientId),
             eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
+            activePatients(),
         ))
         .get();
 

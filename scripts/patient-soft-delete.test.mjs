@@ -60,3 +60,55 @@ test('primary patient list reads exclude soft-deleted patients', () => {
         assert.match(source, /activePatients\(\)/, `${file} must filter tombstoned patients from lists`);
     }
 });
+
+// ADR 0066 allowlist guard (WUL-316 style): patients reads outside this list must go
+// through the shared activePatients() predicate; hard deletes are confined to the
+// canonical cascade modules.
+const UNFILTERED_PATIENTS_READ_ALLOWLIST = new Set([
+    'app/api/system/backup-restore/route.ts', // backups must carry tombstones (ADR 0066)
+    'app/api/system/fix-orphans/route.ts', // relink + orphan sweep operate on all rows
+    'app/api/system/migrate/route.ts', // legacy ambulatory backfill, admin maintenance
+    'app/api/system/migrate-m2m/route.ts', // legacy ambulatory backfill, admin maintenance
+    'app/api/system/purge-patient/route.ts', // purge must address tombstoned patients
+    'app/api/system/restore-patient/route.ts', // restore must list/read tombstones
+    'lib/patient-cascade.ts', // orphan subquery scans the full patients table
+]);
+
+const PATIENTS_HARD_DELETE_ALLOWLIST = new Set([
+    'app/api/system/purge-patient/route.ts', // ADR 0066 audited admin erasure
+    'app/api/system/backup-restore/route.ts', // restore clears tables via TABLE_LOOKUP
+    'app/api/ambulatories/clear/route.ts', // legacy WUL-322; converted to soft-delete in slice 3
+]);
+
+function* walkSources(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+            yield* walkSources(entryPath);
+            continue;
+        }
+        if (!entry.isFile()) continue;
+        if (!/\.(ts|tsx)$/.test(entry.name) || entry.name.endsWith('.test.ts')) continue;
+        yield entryPath;
+    }
+}
+
+test('patients table access stays behind activePatients() outside the allowlist', () => {
+    for (const root of ['app', 'lib']) {
+        for (const filePath of walkSources(path.join(ROOT_DIR, root))) {
+            const relativePath = path.relative(ROOT_DIR, filePath);
+            const source = fs.readFileSync(filePath, 'utf8');
+
+            if (source.includes('from(patients)')
+                && !source.includes('activePatients(')
+                && !UNFILTERED_PATIENTS_READ_ALLOWLIST.has(relativePath)) {
+                assert.fail(`${relativePath} reads from(patients) without activePatients() and is not allowlisted`);
+            }
+
+            if (source.includes('.delete(patients)')
+                && !PATIENTS_HARD_DELETE_ALLOWLIST.has(relativePath)) {
+                assert.fail(`${relativePath} hard-deletes patients outside the ADR 0066 allowlist`);
+            }
+        }
+    }
+});

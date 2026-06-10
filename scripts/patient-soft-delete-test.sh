@@ -8,5 +8,5 @@ OUT_DIR="$ROOT_DIR/tmp-patient-soft-delete-test"
 trap 'node -e "require('\''fs'\'').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"' EXIT
 node -e "require('fs').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"
 npx tsc -p "$ROOT_DIR/tsconfig.patient-soft-delete-test.json"
-node --test "$OUT_DIR/patient-lifecycle.test.js"
-node --test "$ROOT_DIR/scripts/patient-soft-delete.test.mjs"
+node --test "$OUT_DIR/patient-lifecycle.test.js" "$OUT_DIR/patient-cascade.test.js"
+node --test "$ROOT_DIR/scripts/patient-soft-delete.test.mjs" "$ROOT_DIR/scripts/patient-cascade.test.mjs"

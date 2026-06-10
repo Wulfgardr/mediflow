@@ -1,0 +1,145 @@
+// WUL-306 (ADR 0066): behavioral coverage for the canonical patient cascade.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import Database from 'better-sqlite3';
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import {
+    PATIENT_CHILD_TABLES,
+    countOrphanedClinicalRows,
+    countPatientCascadeRows,
+    purgeOrphanedClinicalRows,
+    purgePatientCascade,
+    totalPatientCascadeRows,
+    type PatientCascadeCounts,
+} from './patient-cascade';
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+
+function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Database } {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-cascade-'));
+    const sqlite = new Database(path.join(dir, 'medical.db'));
+    const migrationsDir = path.join(ROOT_DIR, 'drizzle');
+    const migrationFiles = fs
+        .readdirSync(migrationsDir)
+        .filter((file) => file.endsWith('.sql'))
+        .sort((left, right) => left.localeCompare(right));
+    for (const fileName of migrationFiles) {
+        const sql = fs
+            .readFileSync(path.join(migrationsDir, fileName), 'utf8')
+            .replace(/^-->\s+statement-breakpoint\s*$/gm, '');
+        if (sql.trim().length === 0) continue;
+        sqlite.exec(sql);
+    }
+    return { sqlite, db: drizzle(sqlite) };
+}
+
+// Obviously fake fixture rows (Mario Rossi style), raw SQL to stay schema-minimal.
+function insertPatientWithChildren(sqlite: Database.Database, patientId: string): void {
+    const suffix = patientId;
+    sqlite.prepare(
+        "INSERT OR IGNORE INTO ambulatories (id, name) VALUES ('amb-test', 'Ambulatorio Test')"
+    ).run();
+    sqlite.prepare(
+        "INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, 'Mario', 'Rossi', 'RSSMRA80A01H501X')"
+    ).run(patientId);
+    sqlite.prepare(
+        "INSERT INTO service_prescriptions (id, patient_id, prescribed_at, service_name) VALUES (?, ?, 1, 'Visita di controllo')"
+    ).run(`sp-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO service_prescription_items (id, patient_id, prescription_id, service_name) VALUES (?, ?, ?, 'Visita di controllo')"
+    ).run(`spi-${suffix}`, patientId, `sp-${suffix}`);
+    sqlite.prepare(
+        "INSERT INTO prosthetic_prescriptions (id, patient_id, prescribed_at, description) VALUES (?, ?, 1, 'Plantare standard')"
+    ).run(`pp-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at) VALUES (?, ?, 'open', 'Test', 1)"
+    ).run(`sh-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at) VALUES (?, ?, 'http://loinc.org', '8867-4', 'Heart rate', 'http://unitsofmeasure.org', '/min', '70', 1)"
+    ).run(`ob-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO checkups (id, patient_id, date, title) VALUES (?, ?, 1, 'Controllo')"
+    ).run(`ck-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO therapies (id, patient_id, drug_name, dosage, status, start_date) VALUES (?, ?, 'Tachipirina', '500 mg', 'active', 1)"
+    ).run(`th-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO entries (id, patient_id, type, date, content) VALUES (?, ?, 'note', 1, 'Nota di test')"
+    ).run(`en-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO attachments (id, patient_id, name, type, size, path) VALUES (?, ?, 'referto.pdf', 'application/pdf', 1, '/tmp/referto.pdf')"
+    ).run(`at-${suffix}`, patientId);
+    sqlite.prepare(
+        "INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, 'amb-test')"
+    ).run(patientId);
+}
+
+function expectAllOnes(counts: PatientCascadeCounts, label: string): void {
+    for (const child of PATIENT_CHILD_TABLES) {
+        assert.equal(counts[child.name], 1, `${label}: expected one ${child.name} row`);
+    }
+}
+
+test('purgePatientCascade deletes every child table and returns per-table counts', () => {
+    const { sqlite, db } = bootstrapDatabase();
+    try {
+        insertPatientWithChildren(sqlite, 'patient-keep');
+        insertPatientWithChildren(sqlite, 'patient-purge');
+
+        expectAllOnes(countPatientCascadeRows(db, 'patient-purge'), 'dry-run');
+
+        const counts = db.transaction((tx) => purgePatientCascade(tx, 'patient-purge'));
+        expectAllOnes(counts, 'purge');
+        assert.equal(totalPatientCascadeRows(counts), PATIENT_CHILD_TABLES.length);
+
+        expectAllOnes(countPatientCascadeRows(db, 'patient-keep'), 'control patient must be untouched');
+        const leftover = countPatientCascadeRows(db, 'patient-purge');
+        assert.equal(totalPatientCascadeRows(leftover), 0, 'purged patient must have zero child rows');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('a mid-transaction failure rolls back the whole cascade', () => {
+    const { sqlite, db } = bootstrapDatabase();
+    try {
+        insertPatientWithChildren(sqlite, 'patient-rollback');
+
+        assert.throws(() => {
+            db.transaction((tx) => {
+                purgePatientCascade(tx, 'patient-rollback');
+                throw new Error('boom');
+            });
+        }, /boom/);
+
+        expectAllOnes(countPatientCascadeRows(db, 'patient-rollback'), 'rollback must restore all child rows');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('orphan helpers only touch children whose patient_id does not resolve', () => {
+    const { sqlite, db } = bootstrapDatabase();
+    try {
+        insertPatientWithChildren(sqlite, 'patient-live');
+        insertPatientWithChildren(sqlite, 'patient-legacy');
+        // Simulate the pre-ADR-0066 hard delete that produced the orphans
+        // (bypassing FK enforcement, like the legacy DBs where the damage happened).
+        sqlite.pragma('foreign_keys = OFF');
+        sqlite.prepare('DELETE FROM patients WHERE id = ?').run('patient-legacy');
+        sqlite.pragma('foreign_keys = ON');
+
+        expectAllOnes(countOrphanedClinicalRows(db), 'orphan dry-run');
+
+        const counts = db.transaction((tx) => purgeOrphanedClinicalRows(tx));
+        expectAllOnes(counts, 'orphan purge');
+
+        expectAllOnes(countPatientCascadeRows(db, 'patient-live'), 'live patient children must survive');
+        assert.equal(totalPatientCascadeRows(countOrphanedClinicalRows(db)), 0, 'no orphans must remain');
+    } finally {
+        sqlite.close();
+    }
+});
