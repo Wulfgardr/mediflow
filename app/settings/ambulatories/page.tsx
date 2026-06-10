@@ -5,13 +5,7 @@ import { db, Ambulatory } from '@/lib/db';
 import { Building2, Plus, Trash2, MapPin, Loader2, CornerDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
-
-/* @Codex */
-const AMBULATORY_NAV_ITEMS = [
-    { href: '#nuova-sede', label: 'Nuova sede', meta: 'creazione' },
-    { href: '#sedi', label: 'Sedi', meta: 'contesti' },
-];
+import { SettingsSectionIntro } from '@/components/settings/settings-ui';
 
 export default function AmbulatoryManagerPage() {
     const [ambulatories, setAmbulatories] = useState<Ambulatory[]>([]);
@@ -240,16 +234,17 @@ export default function AmbulatoryManagerPage() {
         setTimeout(() => nameInputRef.current?.focus(), 500);
     };
 
+    // WUL-297 — the page now renders inside the settings sidebar layout.
     return (
-        <Kree8WorkspaceShell
-            eyebrow="Sistema"
-            title="Sedi e ambulatori"
-            subtitle="Organizza i contesti clinici locali e scegli la sede predefinita per il lavoro quotidiano."
-            backHref="/settings"
-            backLabel="Torna alle impostazioni"
-            statusLabel={isLoading ? 'Caricamento contesti locali...' : `${ambulatories.length} contesti configurati sul Mac.`}
-            navItems={AMBULATORY_NAV_ITEMS}
-        >
+        <div className="space-y-6" data-testid="settings-ambulatories-section">
+            <SettingsSectionIntro
+                kicker="Generale"
+                title="Sedi e ambulatori"
+                description="Organizza i contesti clinici locali e scegli la sede predefinita per il lavoro quotidiano."
+            />
+            <p className="text-xs" style={{ color: 'var(--mf-muted)' }}>
+                {isLoading ? 'Caricamento contesti locali...' : `${ambulatories.length} contesti configurati sul Mac.`}
+            </p>
             <section id="nuova-sede" className={cn(
                 'patient-detail-section mf-section p-6 md:p-8 transition-all',
                 newParentId ? 'border-[color:rgba(15,123,104,0.38)] ring-1 ring-[color:rgba(15,123,104,0.22)]' : 'border-[color:rgba(112,106,100,0.14)]',
@@ -341,6 +336,6 @@ export default function AmbulatoryManagerPage() {
                 )}
                 </div>
             </section>
-        </Kree8WorkspaceShell>
+        </div>
     );
 }

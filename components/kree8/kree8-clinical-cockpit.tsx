@@ -61,6 +61,8 @@ import type {
 } from '@/lib/siss-patient-context-shared';
 import { useLiveQuery } from '@/lib/live-query';
 import { ThemeToggle } from '@/components/theme-toggle';
+// WUL-297 — persistent privacy affordance in the app header.
+import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import styles from './kree8-clinical-cockpit.module.css';
 
 type AreaId =
@@ -978,7 +980,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
       sub: 'Servizio locale gestito dal launcher; nessun servizio remoto richiesto.',
       freshness: 'ok',
       age: 'porta 8888',
-      href: '/settings#operations',
+      href: '/settings/diagnostica',
       actionLabel: 'Diagnostica',
     },
   ];
@@ -2808,7 +2810,7 @@ function LiveGovernanceArea({
     variant: PillVariant;
   }> = [
     {
-      href: '/settings#status',
+      href: '/settings',
       title: 'Stato postazione',
       sub: 'stato sessione, servizi e dati locali',
       icon: Activity,
@@ -2816,7 +2818,7 @@ function LiveGovernanceArea({
       variant: 'green',
     },
     {
-      href: '/settings#account',
+      href: '/settings/profilo',
       title: 'Account e PIN di sblocco',
       sub: 'profilo medico, ambulatorio e rotazione PIN',
       icon: KeyRound,
@@ -2848,7 +2850,7 @@ function LiveGovernanceArea({
       variant: 'green',
     },
     {
-      href: '/settings#operations',
+      href: '/settings/diagnostica',
       title: 'Diagnostica e servizi',
       sub: 'servizi locali, manutenzione e app nativa',
       icon: Activity,
@@ -2856,7 +2858,7 @@ function LiveGovernanceArea({
       variant: 'muted',
     },
     {
-      href: '/settings#appearance',
+      href: '/settings/aspetto',
       title: 'Lettura e accessibilità',
       sub: 'riduzione movimento, leggibilità e aspetto',
       icon: SettingsIcon,
@@ -3799,7 +3801,7 @@ function HandoffStageBody({
           Annota esito sul diario
           <ChevronRight size={14} />
         </Link>
-        <Link href="/settings#operations" className={styles.ghostBtn}>
+        <Link href="/settings/diagnostica" className={styles.ghostBtn}>
           Esporta registro
         </Link>
       </div>
@@ -3856,7 +3858,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>ultimo cambio 18 apr · promemoria 90 gg</span>
             </span>
-            <Link href="/settings#account" className={styles.ghostBtnSm}>Cambia PIN</Link>
+            <Link href="/settings/accesso" className={styles.ghostBtnSm}>Cambia PIN</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><UserSquare2 size={16} /></span>
@@ -3865,7 +3867,7 @@ function GovernanceArea() {
               <br />
               <span className={styles.modeSub}>Operatore configurato · sede locale</span>
             </span>
-            <Link href="/settings#account" className={styles.ghostBtnSm}>Modifica profilo</Link>
+            <Link href="/settings/profilo" className={styles.ghostBtnSm}>Modifica profilo</Link>
           </div>
         </section>
 
@@ -4081,7 +4083,7 @@ function GovernanceArea() {
                 prossimo controllo 16 mag 06:00 · canale stabile
               </span>
             </span>
-            <Link href="/settings#operations" className={styles.ghostBtnSm}>Cerca aggiornamenti</Link>
+            <Link href="/settings/diagnostica" className={styles.ghostBtnSm}>Cerca aggiornamenti</Link>
           </div>
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><ShieldCheck size={16} /></span>
@@ -4376,6 +4378,8 @@ export function Kree8ClinicalCockpit({
             MEDI<b>FLOW</b>
           </span>
           <span className={styles.brandActions}>
+            {/* WUL-297 — persistent privacy affordance in the app header */}
+            <PrivacyModeToggle />
             <span className={styles.brandThemeToggle}>
               <ThemeToggle />
             </span>
