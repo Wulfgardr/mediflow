@@ -16,6 +16,8 @@
     "lib/patient-concurrency.ts",
     "lib/patient-lifecycle.ts",
     "lib/patient-lifecycle.test.ts",
-    "lib/patient-write-normalization.ts"
+    "lib/patient-write-normalization.ts",
+    "lib/test-container-clear.ts",
+    "lib/test-container-clear.test.ts"
   ]
 }

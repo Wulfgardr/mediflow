@@ -61,6 +61,35 @@ test('primary patient list reads exclude soft-deleted patients', () => {
     }
 });
 
+// WUL-322 (ADR 0066 Slice 3): the test-container clear must select victims via the
+// M2M membership and tombstone them — never via the stale legacy patients.ambulatoryId
+// column (WUL-300 constraint), never as a hard delete.
+test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
+    const source = read('app/api/ambulatories/clear/route.ts');
+
+    assert.doesNotMatch(source, /\.delete\(patients\)/, 'clear must never hard-delete patients');
+    assert.doesNotMatch(source, /patients\.ambulatoryId/, 'clear must not select patients via the stale legacy column (WUL-300)');
+    assert.match(source, /clearTestContainerByMembership\(/, 'clear must go through the membership-based helper');
+    assert.match(source, /dbServer\.transaction\(/, 'clear must run in one synchronous transaction');
+
+    // (e) the non-test safety check stays: clearing a LIVE ambulatory is rejected.
+    assert.match(source, /type !== 'test'/, 'clear must keep the test-only safety check');
+    assert.match(source, /status: 403/, 'clearing a non-test ambulatory must stay rejected');
+
+    // (d) one patient.deleted audit event per cleared patient, PHI-safe metadata only.
+    assert.match(source, /for \(const cleared of result\.clearedPatients\)/, 'clear must audit each cleared patient');
+    assert.match(source, /'patient\.deleted'/, 'clear must emit the patient.deleted audit event');
+    assert.match(source, /reasonCode: TEST_CONTAINER_CLEAR_REASON/, 'audit metadata must carry the dedicated deletion reason');
+});
+
+test('the membership-clear helper tombstones with the dedicated reason', () => {
+    const source = read('lib/test-container-clear.ts');
+    assert.match(source, /TEST_CONTAINER_CLEAR_REASON = 'test-container-clear'/);
+    assert.match(source, /buildPatientTombstoneValues\(/, 'helper must reuse the WUL-306 tombstone builder');
+    assert.doesNotMatch(source, /\.delete\(patients\)/, 'helper must never hard-delete patients');
+    assert.doesNotMatch(source, /patients\.ambulatoryId/, 'helper must not read the stale legacy column (WUL-300)');
+});
+
 // ADR 0066 allowlist guard (WUL-316 style): patients reads outside this list must go
 // through the shared activePatients() predicate; hard deletes are confined to the
 // canonical cascade modules.
@@ -77,7 +106,6 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = new Set([
 const PATIENTS_HARD_DELETE_ALLOWLIST = new Set([
     'app/api/system/purge-patient/route.ts', // ADR 0066 audited admin erasure
     'app/api/system/backup-restore/route.ts', // restore clears tables via TABLE_LOOKUP
-    'app/api/ambulatories/clear/route.ts', // legacy WUL-322; converted to soft-delete in slice 3
 ]);
 
 function* walkSources(directory) {
