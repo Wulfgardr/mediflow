@@ -153,6 +153,80 @@ test('paired patient profile write requires write capability, session, scope, an
     }
 });
 
+test('disabling home-base mode makes paired-client tokens inert until re-enabled', async () => {
+    await assertServerReady();
+
+    const ambulatoryId = await resolveDefaultAmbulatoryId();
+    await enableHomeBaseMode();
+    const patientId = await createSeedPatient(ambulatoryId);
+
+    try {
+        const writeClient = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Desk iPad mode gate');
+
+        const login = await request('POST', '/api/auth/login', {
+            body: {
+                username: USERNAME,
+                password: PIN,
+            },
+        });
+        assert.equal(login.response.status, 200);
+        const sessionCookie = extractSessionCookie(login.response);
+
+        await setNetworkMode('local-only');
+
+        const gatedWrite = await request('PUT', `/api/v1/network/patients/${patientId}`, {
+            headers: {
+                ...pairedHeaders(writeClient),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                phone: '+39 333 0000009',
+            },
+        });
+        assert.equal(gatedWrite.response.status, 403);
+        assert.equal(gatedWrite.json?.code, 'NETWORK_MODE_DISABLED');
+
+        const gatedRead = await request('GET', `/api/v1/network/patients/${patientId}`, {
+            headers: {
+                ...pairedHeaders(writeClient),
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(gatedRead.response.status, 403);
+        assert.equal(gatedRead.json?.code, 'NETWORK_MODE_DISABLED');
+
+        await setNetworkMode('network-home-base');
+
+        const update = await request('PUT', `/api/v1/network/patients/${patientId}`, {
+            headers: {
+                ...pairedHeaders(writeClient),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                phone: '+39 333 0000009',
+            },
+        });
+        assert.equal(update.response.status, 200);
+        assert.deepEqual(update.json, { success: true });
+
+        scenarioResults.push({
+            name: 'paired-client mode gate',
+            ambulatoryId,
+            patientId,
+            gatedWriteStatus: gatedWrite.response.status,
+            gatedWriteCode: gatedWrite.json?.code,
+            gatedReadStatus: gatedRead.response.status,
+            reEnabledUpdateStatus: update.response.status,
+            pairedClientId: writeClient.pairedClientId,
+        });
+    } finally {
+        await setNetworkMode('network-home-base');
+        await cleanupPatient(patientId);
+    }
+});
+
 async function assertServerReady() {
     const response = await request('GET', '/api/v1/ambulatories', {
         headers: localApiHeaders(),
@@ -171,12 +245,16 @@ async function resolveDefaultAmbulatoryId() {
     return defaultAmbulatory.id;
 }
 
-async function enableHomeBaseMode() {
+async function setNetworkMode(value) {
     const networkMode = await request('PUT', '/api/settings/network.mode', {
         headers: localApiHeaders(),
-        body: { value: 'network-home-base' },
+        body: { value },
     });
     assert.equal(networkMode.response.status, 200);
+}
+
+async function enableHomeBaseMode() {
+    await setNetworkMode('network-home-base');
 
     const clinicName = await request('PUT', '/api/settings/clinicName', {
         headers: localApiHeaders(),

@@ -60,6 +60,38 @@ export function normalizeNetworkOperatingMode(value: string | null | undefined):
     return value === 'network-home-base' ? 'network-home-base' : 'local-only';
 }
 
+/**
+ * WUL-307 — data-plane operating-mode gate.
+ *
+ * Disabling network-home-base does not revoke stored pairings: it makes every
+ * paired-client token inert until the mode is re-enabled. Data-plane routes
+ * must evaluate this gate after authenticating a paired client and reject the
+ * request with the stable NETWORK_MODE_DISABLED code while the node is not
+ * operating as a home base.
+ */
+export type NetworkDataPlaneModeGateResult =
+    | { allowed: true }
+    | {
+          allowed: false;
+          status: 403;
+          value: { error: 'Forbidden'; code: 'NETWORK_MODE_DISABLED'; message: string };
+      };
+
+export function evaluateNetworkDataPlaneModeGate(
+    operatingMode: NetworkOperatingMode
+): NetworkDataPlaneModeGateResult {
+    if (operatingMode === 'network-home-base') return { allowed: true };
+    return {
+        allowed: false,
+        status: 403,
+        value: {
+            error: 'Forbidden',
+            code: 'NETWORK_MODE_DISABLED',
+            message: 'Home-base network mode is not enabled on this node.',
+        },
+    };
+}
+
 export function deriveNetworkDisplayName(
     snapshot: NetworkSettingsSnapshot,
     hostName: string
