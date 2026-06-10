@@ -32,6 +32,8 @@ import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePrivacy } from '@/components/privacy-provider';
+/* @Codex */
+import { parseOllamaPullStreamLine } from '@/lib/ollama-pull-stream';
 
 // --- Model Selector Component ---
 interface ModelSelectorProps {
@@ -117,22 +119,19 @@ function ModelSelector({ selectorId, label, description, icon, value, onChange, 
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const data = JSON.parse(line);
+                    // @Codex
+                    const data = parseOllamaPullStreamLine(line);
+                    if (!data) continue;
 
-                        if (data.status) setPullStatus(data.status);
-                        if (data.total && data.completed) {
-                            const p = Math.round((data.completed / data.total) * 100);
-                            setPullProgress(p);
-                        }
-                        if (data.error) throw new Error(data.error);
-                    } catch (e) {
-                        // ignore partial
-                        console.warn("Parse error", e);
-                    }
+                    if (data.status) setPullStatus(data.status);
+                    if (data.progress !== undefined) setPullProgress(data.progress);
                 }
             }
+
+            // @Codex
+            const trailingData = parseOllamaPullStreamLine(buffer);
+            if (trailingData?.status) setPullStatus(trailingData.status);
+            if (trailingData?.progress !== undefined) setPullProgress(trailingData.progress);
 
             alert(`Modello ${modelName} installato con successo!`);
             await checkInstalled();

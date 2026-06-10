@@ -31,6 +31,7 @@
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
     "test:document-input-normalization": "bash scripts/document-input-normalization-test.sh",
     "test:ocr-service:date": "bash scripts/ocr-service-date-test.sh",
+    "test:ollama-pull-stream": "bash scripts/ollama-pull-stream-test.sh",
     "test:backup-restore:preflight": "bash scripts/backup-restore-preflight-test.sh",
     "test:backup-restore:date-fields": "node --test scripts/backup-restore-date-fields.test.mjs",
     "test:backup-restore:drill": "node --experimental-strip-types scripts/backup-restore-drill.mjs",

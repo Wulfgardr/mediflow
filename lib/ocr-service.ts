@@ -37,6 +37,65 @@ export interface ExtractedDocumentData {
 }
 
 /* @Codex */
+export interface ExtractDocumentWithAIOptions {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+}
+
+/* @Codex */
+const DEFAULT_OCR_GENERATION_TIMEOUT_MS = 120_000;
+
+/* @Codex */
+export function resolveOcrGenerationTimeoutMs(timeoutMs?: number, envValue = process.env.MEDIFLOW_OCR_GENERATION_TIMEOUT_MS ?? process.env.MEDIFLOW_OCR_TIMEOUT_MS): number {
+    const candidate = timeoutMs ?? (envValue ? Number(envValue) : DEFAULT_OCR_GENERATION_TIMEOUT_MS);
+    return Number.isFinite(candidate) && candidate > 0
+        ? Math.max(1, Math.round(candidate))
+        : DEFAULT_OCR_GENERATION_TIMEOUT_MS;
+}
+
+/* @Codex */
+function createAbortReason(message: string): Error {
+    const error = new Error(message);
+    error.name = 'AbortError';
+    return error;
+}
+
+/* @Codex */
+function createOcrAbortSignal(options?: ExtractDocumentWithAIOptions): { signal: AbortSignal; cleanup: () => void } {
+    const timeoutMs = resolveOcrGenerationTimeoutMs(options?.timeoutMs);
+    const controller = new AbortController();
+    const abortFromCaller = () => {
+        controller.abort(options?.signal?.reason ?? createAbortReason('OCR generation aborted by caller.'));
+    };
+    const timeoutId = setTimeout(() => {
+        controller.abort(createAbortReason(`OCR generation timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+
+    if (options?.signal?.aborted) {
+        abortFromCaller();
+    } else {
+        options?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    }
+
+    return {
+        signal: controller.signal,
+        cleanup: () => {
+            clearTimeout(timeoutId);
+            options?.signal?.removeEventListener('abort', abortFromCaller);
+        },
+    };
+}
+
+/* @Codex */
+function getOcrGenerationErrorMessage(error: unknown, signal: AbortSignal): string {
+    const reason = signal.reason;
+    if (reason instanceof Error && reason.message) return reason.message;
+    if (error instanceof Error && error.name === 'AbortError') return 'OCR generation aborted.';
+    if (error instanceof Error) return error.message;
+    return 'Unknown error';
+}
+
+/* @Codex */
 export function isLowSignalOcrText(value: string | null | undefined): boolean {
     const compact = (value || '').replace(/\s+/g, ' ').trim();
     if (!compact) return true;
@@ -82,7 +141,8 @@ Extract ONLY what is clearly written. Do not invent data.`,
 export async function extractDocumentWithAI(
     imageBase64: string,
     mode: 'full' | 'patient' | 'labs' = 'patient',
-    aiService?: AIService
+    aiService?: AIService,
+    options?: ExtractDocumentWithAIOptions,
 ): Promise<ExtractedDocumentData> {
 
     const ai = aiService ?? await AIService.create('ocr');
@@ -104,8 +164,10 @@ export async function extractDocumentWithAI(
 
     const messages = [{ role: 'user', content }];
 
+    const abortSignal = createOcrAbortSignal(options);
+
     try {
-        const result = await ai.chat(messages, undefined, 4096);
+        const result = await ai.chat(messages, abortSignal.signal, 4096);
         const rawResponse = result.content;
 
         // Parse based on mode
@@ -125,8 +187,10 @@ export async function extractDocumentWithAI(
         return {
             rawMarkdown: '',
             confidence: 0,
-            notes: `OCR extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            notes: `OCR extraction failed: ${getOcrGenerationErrorMessage(error, abortSignal.signal)}`
         };
+    } finally {
+        abortSignal.cleanup();
     }
 }
 
