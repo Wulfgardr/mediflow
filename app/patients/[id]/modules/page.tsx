@@ -14,7 +14,7 @@ import ObservationManager from '@/components/observation-manager';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
-import PatientSmartImportPanel from '@/components/patient-smart-import-panel';
+import PatientSmartImportPanel, { countUsableSources } from '@/components/patient-smart-import-panel';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -141,10 +141,7 @@ export default function PatientDetailPage() {
        below already receive — read-only aggregation, no automatic write. */
     const attachmentItems = attachments ?? [];
     const attachmentsWithTextCount = attachmentItems.filter((attachment) => attachment.summarySnapshot?.trim()).length;
-    const smartImportSourceCount = (patient.notes?.trim() ? 1 : 0)
-        + activeEntries.filter((entry) => entry.content?.trim()).length
-        + documentInsights.length
-        + attachmentsWithTextCount;
+    const smartImportSourceCount = countUsableSources(patient, entries, attachmentsWithTextCount);
     const reviewQueueSummary = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),

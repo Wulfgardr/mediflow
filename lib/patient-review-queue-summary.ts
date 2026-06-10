@@ -266,7 +266,7 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
         'smart-import',
         'Smart Import',
         'gia-applicato',
-        'Nessun suggerimento residuo: tutto applicato o scartato manualmente.',
+        'Nessun suggerimento residuo da rivedere.',
         { anchor },
     );
 }

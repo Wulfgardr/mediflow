@@ -40,7 +40,7 @@ interface PatientSmartImportPanelProps {
     onReviewSnapshotChange?: (snapshot: SmartImportReviewSnapshot) => void;
 }
 
-function countUsableSources(
+export function countUsableSources(
     patient: Patient,
     entries: ClinicalEntry[] | undefined,
     attachmentSummaryCount: number
