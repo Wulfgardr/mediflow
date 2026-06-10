@@ -188,7 +188,7 @@ actor LocalAPIClient {
     func updatePatient(id: String, payload: UpdatePatientPayload) async throws {
         let request = try makeRequest(path: "patients/\(id)", method: "PUT", body: payload)
         let (data, response) = try await data(for: request)
-        try validatePatientMutation(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     /* @Codex */
@@ -196,10 +196,10 @@ actor LocalAPIClient {
         let request = try makeRequest(
             path: "patients/\(id)",
             method: "DELETE",
-            body: DeletePatientPayload(version: expectedVersion)
+            body: DeleteResourcePayload(version: expectedVersion)
         )
         let (data, response) = try await data(for: request)
-        try validatePatientMutation(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     func createEntry(patientId: String, payload: CreateEntryPayload) async throws -> String {
@@ -214,33 +214,34 @@ actor LocalAPIClient {
     func updateEntry(patientId: String, entryId: String, payload: UpdateEntryPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/entries/\(entryId)", method: "PUT", body: payload)
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     func softDeleteEntry(
         patientId: String,
         entryId: String,
+        expectedVersion: Int,
         deletedAt: Date,
         reason: String
     ) async throws {
-        let payload = SoftDeleteEntryPayload(deletedAt: deletedAt, deletionReason: reason)
+        let payload = SoftDeleteEntryPayload(version: expectedVersion, deletedAt: deletedAt, deletionReason: reason)
         let request = try makeRequest(
             path: "patients/\(patientId)/entries/\(entryId)",
             method: "PUT",
             body: payload
         )
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
-    func restoreEntry(patientId: String, entryId: String) async throws {
+    func restoreEntry(patientId: String, entryId: String, expectedVersion: Int) async throws {
         let request = try makeRequest(
             path: "patients/\(patientId)/entries/\(entryId)",
             method: "PUT",
-            body: RestoreEntryPayload()
+            body: RestoreEntryPayload(version: expectedVersion)
         )
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     func createTherapy(patientId: String, payload: CreateTherapyPayload) async throws -> String {
@@ -255,14 +256,18 @@ actor LocalAPIClient {
     func updateTherapy(patientId: String, therapyId: String, payload: UpdateTherapyPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/therapies/\(therapyId)", method: "PUT", body: payload)
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     /* @Codex */
-    func deleteTherapy(patientId: String, therapyId: String) async throws {
-        let request = try makeRequest(path: "patients/\(patientId)/therapies/\(therapyId)", method: "DELETE")
+    func deleteTherapy(patientId: String, therapyId: String, expectedVersion: Int) async throws {
+        let request = try makeRequest(
+            path: "patients/\(patientId)/therapies/\(therapyId)",
+            method: "DELETE",
+            body: DeleteResourcePayload(version: expectedVersion)
+        )
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     func createCheckup(patientId: String, payload: CreateCheckupPayload) async throws -> String {
@@ -277,14 +282,18 @@ actor LocalAPIClient {
     func updateCheckup(patientId: String, checkupId: String, payload: UpdateCheckupPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/checkups/\(checkupId)", method: "PUT", body: payload)
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     /* @Codex */
-    func deleteCheckup(patientId: String, checkupId: String) async throws {
-        let request = try makeRequest(path: "patients/\(patientId)/checkups/\(checkupId)", method: "DELETE")
+    func deleteCheckup(patientId: String, checkupId: String, expectedVersion: Int) async throws {
+        let request = try makeRequest(
+            path: "patients/\(patientId)/checkups/\(checkupId)",
+            method: "DELETE",
+            body: DeleteResourcePayload(version: expectedVersion)
+        )
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     /* @Codex */
@@ -300,14 +309,18 @@ actor LocalAPIClient {
     func updateObservation(patientId: String, observationId: String, payload: UpdateObservationPayload) async throws {
         let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "PUT", body: payload)
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     /* @Codex */
-    func deleteObservation(patientId: String, observationId: String) async throws {
-        let request = try makeRequest(path: "patients/\(patientId)/observations/\(observationId)", method: "DELETE")
+    func deleteObservation(patientId: String, observationId: String, expectedVersion: Int) async throws {
+        let request = try makeRequest(
+            path: "patients/\(patientId)/observations/\(observationId)",
+            method: "DELETE",
+            body: DeleteResourcePayload(version: expectedVersion)
+        )
         let (data, response) = try await data(for: request)
-        try validate(data: data, response: response)
+        try validateVersionedMutation(data: data, response: response)
     }
 
     func testConnection() async throws {
@@ -655,8 +668,9 @@ actor LocalAPIClient {
         }
     }
 
-    /* @Codex */
-    private func validatePatientMutation(data: Data, response: URLResponse) throws {
+    // WUL-308: shared by patient and clinical sub-resource mutations, which all
+    // carry an expected version and answer stale writes with 409 VERSION_CONFLICT.
+    private func validateVersionedMutation(data: Data, response: URLResponse) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw LocalAPIError.unexpectedResponse
         }
@@ -664,7 +678,7 @@ actor LocalAPIClient {
             return
         }
         if httpResponse.statusCode == 409,
-           let payload = try? JSONDecoder().decode(PatientVersionConflictPayload.self, from: data),
+           let payload = try? JSONDecoder().decode(VersionConflictPayload.self, from: data),
            payload.code == "VERSION_CONFLICT" {
             throw LocalAPIError.versionConflict(payload)
         }
@@ -754,7 +768,7 @@ enum LocalAPIError: LocalizedError, Equatable {
     /* @Codex */
     case invalidAIModelsPayload
     /* @Codex */
-    case versionConflict(PatientVersionConflictPayload)
+    case versionConflict(VersionConflictPayload)
 
     var errorDescription: String? {
         switch self {
@@ -978,8 +992,9 @@ struct UpdatePatientPayload: Encodable {
     }
 }
 
-/* @Codex */
-struct DeletePatientPayload: Encodable {
+// WUL-308: DELETE on the patient and on the clinical sub-resources all send
+// the expected version as the JSON body.
+struct DeleteResourcePayload: Encodable {
     let version: Int
 }
 
@@ -991,24 +1006,30 @@ struct CreateEntryPayload: Encodable {
 
 /* @Codex */
 struct UpdateEntryPayload: Encodable {
+    let version: Int
     let type: String?
     let date: Date?
     let content: String?
 }
 
 struct SoftDeleteEntryPayload: Encodable {
+    let version: Int
     let deletedAt: Date
     let deletionReason: String
 }
 
 struct RestoreEntryPayload: Encodable {
+    let version: Int
+
     private enum CodingKeys: String, CodingKey {
+        case version
         case deletedAt
         case deletionReason
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
         try container.encodeNil(forKey: .deletedAt)
         try container.encodeNil(forKey: .deletionReason)
     }
@@ -1036,6 +1057,7 @@ struct CreateTherapyPayload: Encodable {
 
 /* @Codex */
 struct UpdateTherapyPayload: Encodable {
+    let version: Int
     let drugName: String?
     /* @Codex */
     let aic: PatchValue<String>
@@ -1055,6 +1077,7 @@ struct UpdateTherapyPayload: Encodable {
     let endDate: PatchValue<Date>
 
     init(
+        version: Int,
         drugName: String? = nil,
         aic: PatchValue<String> = .omit,
         atc: PatchValue<String> = .omit,
@@ -1067,6 +1090,7 @@ struct UpdateTherapyPayload: Encodable {
         startDate: Date? = nil,
         endDate: PatchValue<Date> = .omit
     ) {
+        self.version = version
         self.drugName = drugName
         self.aic = aic
         self.atc = atc
@@ -1081,6 +1105,7 @@ struct UpdateTherapyPayload: Encodable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case version
         case drugName
         case aic
         case atc
@@ -1096,6 +1121,7 @@ struct UpdateTherapyPayload: Encodable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
         try container.encodeIfPresent(drugName, forKey: .drugName)
         try container.encodePatch(aic, forKey: .aic)
         try container.encodePatch(atc, forKey: .atc)
@@ -1122,17 +1148,20 @@ struct CreateCheckupPayload: Encodable {
 
 /* @Codex */
 struct UpdateCheckupPayload: Encodable {
+    let version: Int
     let date: Date?
     let title: String?
     let notes: PatchValue<String>
     let status: String?
 
     init(
+        version: Int,
         date: Date? = nil,
         title: String? = nil,
         notes: PatchValue<String> = .omit,
         status: String? = nil
     ) {
+        self.version = version
         self.date = date
         self.title = title
         self.notes = notes
@@ -1140,6 +1169,7 @@ struct UpdateCheckupPayload: Encodable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case version
         case date
         case title
         case notes
@@ -1148,6 +1178,7 @@ struct UpdateCheckupPayload: Encodable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
         try container.encodeIfPresent(date, forKey: .date)
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodePatch(notes, forKey: .notes)
@@ -1170,6 +1201,7 @@ struct CreateObservationPayload: Encodable {
 
 /* @Codex */
 struct UpdateObservationPayload: Encodable {
+    let version: Int
     let codeSystem: String?
     let code: String?
     let display: String?
@@ -1225,8 +1257,9 @@ struct APIErrorPayload: Decodable {
     let message: String?
 }
 
-/* @Codex */
-struct PatientVersionConflictPayload: Decodable, Equatable {
+// WUL-308: entity is "patient" or one of the clinical sub-resources
+// (entry/therapy/checkup/observation); all five share this payload shape.
+struct VersionConflictPayload: Decodable, Equatable {
     let error: String
     let code: String
     let entity: String
@@ -1235,14 +1268,17 @@ struct PatientVersionConflictPayload: Decodable, Equatable {
     let currentVersion: Int?
     let currentUpdatedAt: String?
     let currentState: String
-    let currentSnapshot: PatientConflictSnapshot?
+    let currentSnapshot: VersionConflictSnapshot?
 }
 
-/* @Codex */
-struct PatientConflictSnapshot: Decodable, Equatable {
+// Patient snapshots carry isArchived; clinical sub-resource snapshots carry
+// patientId and deletedAt. The unused fields decode as nil.
+struct VersionConflictSnapshot: Decodable, Equatable {
     let id: String
+    let patientId: String?
     let version: Int
     let updatedAt: String?
+    let deletedAt: String?
     let isArchived: Bool?
 }
 

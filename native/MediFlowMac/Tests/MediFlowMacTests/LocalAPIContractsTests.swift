@@ -132,6 +132,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
     func testUpdateTherapyPayloadEncodesNullForClearedOptionalFields() throws {
         let payload = UpdateTherapyPayload(
+            version: 5,
             drugName: "Aspirina",
             aic: .null,
             atc: .value("B01AC06"),
@@ -147,6 +148,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
         let json = try encodeJSONObject(payload)
 
+        XCTAssertEqual(json["version"] as? Int, 5)
         XCTAssertEqual(json["drugName"] as? String, "Aspirina")
         XCTAssertEqual(json["atc"] as? String, "B01AC06")
         XCTAssertEqual(json["activePrinciple"] as? String, "Acido acetilsalicilico")
@@ -212,6 +214,7 @@ final class LocalAPIContractsTests: XCTestCase {
     /* @Codex */
     func testUpdateCheckupPayloadEncodesNullForClearedNotes() throws {
         let payload = UpdateCheckupPayload(
+            version: 2,
             date: Date(timeIntervalSince1970: 0),
             title: "Visita programmata",
             notes: .null,
@@ -220,6 +223,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
         let json = try encodeJSONObject(payload)
 
+        XCTAssertEqual(json["version"] as? Int, 2)
         XCTAssertEqual(json["date"] as? String, "1970-01-01T00:00:00Z")
         XCTAssertEqual(json["title"] as? String, "Visita programmata")
         XCTAssertTrue(json["notes"] is NSNull)
@@ -287,6 +291,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
     func testUpdateObservationPayloadOmitsUnsetFieldsAndKeepsExplicitEdits() throws {
         let payload = UpdateObservationPayload(
+            version: 3,
             codeSystem: nil,
             code: nil,
             display: nil,
@@ -300,6 +305,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
         let json = try encodeJSONObject(payload)
 
+        XCTAssertEqual(json["version"] as? Int, 3)
         XCTAssertNil(json["codeSystem"])
         XCTAssertNil(json["code"])
         XCTAssertNil(json["display"])

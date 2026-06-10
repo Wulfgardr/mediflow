@@ -130,6 +130,7 @@ struct TherapySummary: Identifiable, Decodable {
     let status: String
     let startDate: Date
     let endDate: Date?
+    let version: Int?
     let createdAt: Date?
 }
 
