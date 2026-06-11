@@ -36,7 +36,7 @@
   --accent-ai-fg: #ffffff;
   --solid-action-bg: #0f172a;
   --solid-action-fg: #ffffff;
-  --brand-dot-bg: #0f172a;
+  --brand-dot-bg: #2563eb;
   --brand-dot-fg: #ffffff;
   --rail-bg: linear-gradient(180deg, var(--surface-inset) 0%, var(--canvas) 100%);
   --rail-dot-shadow: rgba(71, 85, 105, 0.18);
@@ -114,8 +114,8 @@
   --accent-ai-fg: #020617;
   --solid-action-bg: #e2e8f0;
   --solid-action-fg: #020617;
-  --brand-dot-bg: #e2e8f0;
-  --brand-dot-fg: #020617;
+  --brand-dot-bg: #93c5fd;
+  --brand-dot-fg: #0f172a;
   --rail-bg: linear-gradient(180deg, #111827 0%, #020617 100%);
   --rail-dot-shadow: rgba(148, 163, 184, 0.22);
   --surface-highlight: rgba(255, 255, 255, 0.08);
