@@ -20,7 +20,7 @@
   --pill-muted-fg: #475569;
   --solid-action-bg: #0f172a;
   --solid-action-fg: #ffffff;
-  --brand-dot-bg: #0f172a;
+  --brand-dot-bg: #2563eb;
   --brand-dot-fg: #ffffff;
   --surface-glow: rgba(255, 255, 255, 0.4);
   --focus-ring: rgba(15, 23, 42, 0.32);
@@ -66,8 +66,8 @@
   --pill-muted-fg: #cbd5e1;
   --solid-action-bg: #e2e8f0;
   --solid-action-fg: #020617;
-  --brand-dot-bg: #e2e8f0;
-  --brand-dot-fg: #020617;
+  --brand-dot-bg: #93c5fd;
+  --brand-dot-fg: #0f172a;
   --surface-glow: rgba(255, 255, 255, 0.06);
   --focus-ring: rgba(226, 232, 240, 0.42);
   --shadow-card: 0 0 0 1px rgba(226, 232, 240, 0.10), 0 10px 24px rgba(0, 0, 0, 0.28);

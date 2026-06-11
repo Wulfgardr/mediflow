@@ -64,6 +64,7 @@ leaks into `:root` or other surfaces.
 | Pricing-row gradient (green) | **dropped in v2** | Replaced by `.freshness` as a white control with a thin semantic left rail (`--rail-green/blue/yellow/coral`) so AIFA stops reading like a celebratory pricing card. |
 | Stage / category tabs | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Used for the SISS handoff staging, augmented with a subtle sweep keyframe on transition. |
 | PIN lock surface | `kree8-lock-screen.module.css` | Cool-gray canvas, raised white card, MF brand mark, slate focus ring, ink primary button, semantic local/zero-knowledge footer. No global token export. |
+| Sober blue accent (from WUL-232) | `--brand-dot-bg`, `--k8-accent` / `--k8-accent-soft` / `--k8-accent-line`, `--k8-focus` | Brand marks on cockpit, workspace and lock screen carry a restrained blue; the workspace uses the accent for focus rings, brand tint and hover hairlines only. Primary actions stay ink and the gradient stays AI-only. |
 
 ### Contrast and type rhythm
 

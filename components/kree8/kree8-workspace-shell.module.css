@@ -23,7 +23,10 @@
   --k8-pill-critical-fg: #9a3412;
   --k8-primary-bg: #0f172a;
   --k8-primary-fg: #ffffff;
-  --k8-focus: rgba(15, 23, 42, 0.32);
+  --k8-accent: #2563eb;
+  --k8-accent-soft: #dbeafe;
+  --k8-accent-line: rgba(37, 99, 235, 0.18);
+  --k8-focus: rgba(37, 99, 235, 0.34);
   --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
   --mf-ink: var(--k8-ink);
   --mf-muted: var(--k8-muted);
@@ -65,7 +68,10 @@
   --k8-pill-critical-fg: #fecaca;
   --k8-primary-bg: #e2e8f0;
   --k8-primary-fg: #020617;
-  --k8-focus: rgba(226, 232, 240, 0.42);
+  --k8-accent: #93c5fd;
+  --k8-accent-soft: rgba(59, 130, 246, 0.18);
+  --k8-accent-line: rgba(147, 197, 253, 0.28);
+  --k8-focus: rgba(147, 197, 253, 0.42);
   --k8-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
 }
 
@@ -130,9 +136,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--k8-soft);
-  border: 1px solid var(--k8-line);
-  color: var(--k8-muted);
+  background: var(--k8-accent-soft);
+  border: 1px solid var(--k8-accent-line);
+  color: var(--k8-accent);
   box-shadow: none;
 }
 
@@ -223,7 +229,7 @@
 
 .backButton:hover,
 .sectionLink:hover {
-  border-color: var(--k8-line-strong);
+  border-color: var(--k8-accent-line);
   background: var(--k8-control-bg);
   color: var(--k8-ink);
 }
