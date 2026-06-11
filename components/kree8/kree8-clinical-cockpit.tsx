@@ -1806,11 +1806,15 @@ function IncaricoArea({
                     </span>
                     <span className={styles.patientMeta}>
                       {p.diagnoses.map((d) => (
-                        <PillBadge key={d} variant="muted">{d}</PillBadge>
+                        <span key={d} className={styles.patientDiagnosisPill}>
+                          <PillBadge variant="muted">{d}</PillBadge>
+                        </span>
                       ))}
                     </span>
-                    <span className={styles.rowSub}>{p.lastTouch}</span>
-                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end' }}>
+                    <span className={classNames(styles.rowSub, styles.patientLastTouch)}>
+                      {p.lastTouch}
+                    </span>
+                    <span className={styles.patientStatusCell}>
                       <PillBadge
                         variant={p.status === 'muted' ? 'muted' : p.status === 'blue' ? 'blue' : 'green'}
                       >
@@ -2906,22 +2910,19 @@ function LiveGovernanceArea({
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Accesso rapido alle impostazioni</h2>
         </header>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
+        <div className={styles.settingsQuickGrid}>
           {settingsLinks.map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={styles.compositeCard}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className={styles.modeIcon}><Icon size={15} /></span>
-                  <span style={{ minWidth: 0 }}>
-                    <span className={styles.modeTitle}>{item.title}</span>
-                    <br />
-                    <span className={styles.modeSub}>{item.sub}</span>
-                  </span>
-                  <span style={{ marginLeft: 'auto' }}>
-                    <PillBadge variant={item.variant}>{item.pill}</PillBadge>
-                  </span>
-                </div>
+              <Link key={item.href} href={item.href} className={styles.settingsQuickItem}>
+                <span className={styles.modeIcon}><Icon size={15} /></span>
+                <span className={styles.settingsQuickText}>
+                  <span className={styles.modeTitle}>{item.title}</span>
+                  <span className={styles.modeSub}>{item.sub}</span>
+                </span>
+                <span className={styles.settingsQuickPill}>
+                  <PillBadge variant={item.variant}>{item.pill}</PillBadge>
+                </span>
               </Link>
             );
           })}
