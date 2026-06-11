@@ -1,11 +1,18 @@
-# MediFlow v0.6.0
+<div align="center">
 
-> Cartella clinica territoriale local-first.
-> Dati vicini al medico, flusso rapido, privacy come impostazione di base.
+# 🩺 MediFlow
 
-![Render reale del cockpit Kree8 senza dati paziente](./screenshot.png)
+**Cartella clinica territoriale local-first.**
 
-_Render reale dell'interfaccia attuale, catturato su un database temporaneo vuoto senza dati paziente._
+Dati vicini al medico, flusso rapido, privacy come impostazione di base.
+
+`v0.6` · Web app locale · AI locale rivedibile · SQLite cifrato · MIT
+
+</div>
+
+![Render reale del cockpit Kree8 con dati dimostrativi sintetici](./screenshot.png)
+
+_Render reale dell'interfaccia attuale, catturato sulla superficie di review con dati dimostrativi sintetici: nessun dato paziente reale._
 
 ## Perché MediFlow
 
@@ -45,7 +52,7 @@ La direzione è quella di uno strumento:
 In questa versione MediFlow include:
 
 - **web app locale** come superficie primaria di lavoro sul Mac;
-- **Kree8 cockpit** come root web live, con una direzione visuale unica e senza selector persistiti;
+- **Kree8 cockpit** come root web live, con una direzione visuale unica e senza selector persistiti: copy asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
 - **database SQLite cifrato**, con approccio zero-knowledge;
 - **backup, audit e contratto `/api/v1`** resi più chiari ed espliciti;
 - **AI locale** per insight e OCR, senza egress di default;

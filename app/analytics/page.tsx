@@ -239,7 +239,7 @@ export default function AnalyticsPage() {
             <Kree8WorkspaceShell
                 eyebrow="Analisi"
                 title="Cruscotto locale"
-                subtitle="Lettura delle schede presenti sul Mac e dell’audit operativo."
+                subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
                 backHref="/"
                 backLabel="Torna ai pazienti"
                 statusLabel="Sto leggendo dal Mac..."
@@ -258,7 +258,7 @@ export default function AnalyticsPage() {
         <Kree8WorkspaceShell
             eyebrow="Analisi"
             title="Cruscotto locale"
-            subtitle="Una vista sintetica sulla popolazione registrata e sui log locali, senza dati fuori dal dispositivo."
+            subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
             backHref="/"
             backLabel="Torna ai pazienti"
             statusLabel={`${stats.totalInRange} schede in ${normalizedAgeRange[0]}-${normalizedAgeRange[1]} anni · ${stats.withoutBirthDate} senza data nascita`}
@@ -448,7 +448,7 @@ export default function AnalyticsPage() {
                             </div>
                             {auditSummary.isTruncated && (
                                 <p className="mt-3 text-xs" style={{ color: K8_TONES.warning.accent }}>
-                                    Riepilogo calcolato sui primi 500 eventi locali nel filtro.
+                                    Riepilogo calcolato sui primi 500 eventi nel filtro.
                                 </p>
                             )}
                         </div>

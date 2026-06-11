@@ -72,7 +72,7 @@ export default function AiRolloutGuardNotice({
                 <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Controlli rilascio AI</h4>
                     <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                        Avviso in sola lettura basato sui report AI-08: il salvataggio non viene bloccato, ma i modelli sotto riportati non sono ancora pronti per osservazione controllata.
+                        Il salvataggio non viene bloccato, ma i modelli elencati non hanno ancora superato la validazione.
                     </p>
                 </div>
             </div>
@@ -92,7 +92,7 @@ export default function AiRolloutGuardNotice({
                                     ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200'
                                     : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
                             )}>
-                                {guard.status}
+                                {guard.status === 'rollback-required' ? 'rollback richiesto' : 'in attesa'}
                             </span>
                         </div>
                         <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">

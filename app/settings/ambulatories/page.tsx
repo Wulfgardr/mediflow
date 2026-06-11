@@ -240,10 +240,10 @@ export default function AmbulatoryManagerPage() {
             <SettingsSectionIntro
                 kicker="Generale"
                 title="Sedi e ambulatori"
-                description="Organizza i contesti clinici locali e scegli la sede predefinita per il lavoro quotidiano."
+                description="Organizza sedi e reparti e scegli la sede predefinita per il lavoro quotidiano."
             />
             <p className="text-xs" style={{ color: 'var(--mf-muted)' }}>
-                {isLoading ? 'Caricamento contesti locali...' : `${ambulatories.length} contesti configurati sul Mac.`}
+                {isLoading ? 'Caricamento sedi...' : `${ambulatories.length} sedi configurate.`}
             </p>
             <section id="nuova-sede" className={cn(
                 'patient-detail-section mf-section p-6 md:p-8 transition-all',
@@ -313,7 +313,7 @@ export default function AmbulatoryManagerPage() {
 
             <section id="sedi" className="patient-detail-section mf-section p-6 md:p-8">
                 <div className="mb-5">
-                    <p className="section-kicker">Contesti locali</p>
+                    <p className="section-kicker">Sedi</p>
                     <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Sedi configurate</h2>
                     <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                         La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.

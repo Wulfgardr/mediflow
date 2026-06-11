@@ -109,7 +109,7 @@ export default function SettingsAiModelsPage() {
                         <div className="min-w-0">
                             <p className="section-kicker">Ruoli del team AI</p>
                             <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Modelli per superficie clinica</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni ruolo usa un modello dedicato. I file vengono scaricati e tenuti in locale.</p>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni ruolo usa un modello dedicato.</p>
                         </div>
                     </div>
 
@@ -191,14 +191,14 @@ export default function SettingsAiModelsPage() {
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Connessione locale</p>
-                            <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Provider locale</h3>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Solo Ollama in locale: nessun dato esce dal computer.</p>
+                            <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Provider</h3>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ollama è l&apos;unico provider supportato.</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="flex items-center rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                            Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama (locale)</span>
+                            Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama</span>
                         </div>
                         <input
                             type="text"

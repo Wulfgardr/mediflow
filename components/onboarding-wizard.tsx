@@ -118,7 +118,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                             <div className="text-center">
                                 <p className="mf-eyebrow">Passo 2 di 4</p>
                                 <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Ruolo</h2>
-                                <p className="mt-2" style={{ color: 'var(--mf-muted)' }}>Definisci i tuoi privilegi di accesso.</p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <button
@@ -133,7 +132,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                 <button type="button" disabled className="mf-option-card" aria-disabled="true">
                                     <User className="w-7 h-7" style={{ color: 'var(--mf-muted)' }} />
                                     <div className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Utente Standard</div>
-                                    <div className="text-xs" style={{ color: 'var(--mf-muted)' }}>Solo visualizzazione e inserimento dati. (Disabilitato)</div>
+                                    <div className="text-xs" style={{ color: 'var(--mf-muted)' }}>Solo visualizzazione e inserimento dati. Non ancora disponibile.</div>
                                 </button>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3 mt-6">
@@ -148,7 +147,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                             <div className="text-center">
                                 <p className="mf-eyebrow">Passo 3 di 4</p>
                                 <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Credenziali di Accesso</h2>
-                                <p className="mt-2" style={{ color: 'var(--mf-muted)' }}>Username e password per il login (anche da altri device).</p>
+                                <p className="mt-2" style={{ color: 'var(--mf-muted)' }}>Username e password per il login, anche da altri dispositivi.</p>
                             </div>
                             <div className="space-y-4">
                                 <div>
@@ -190,8 +189,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                             <div className="text-center">
                                 <p className="mf-eyebrow">Passo 4 di 4</p>
-                                <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Sicurezza Locale</h2>
-                                <p className="mt-2" style={{ color: 'var(--mf-muted)' }}>Il PIN serve a <b>cifrare</b> i dati locali. Non dimenticarlo.</p>
+                                <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Sicurezza</h2>
+                                <p className="mt-2" style={{ color: 'var(--mf-muted)' }}>Il PIN serve a <b>cifrare</b> i dati. Non dimenticarlo.</p>
                             </div>
                             <div className="space-y-4">
                                 <div>

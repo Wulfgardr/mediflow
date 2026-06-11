@@ -206,10 +206,10 @@ export default function NewPatientPage() {
     };
 
     const statusLabel = pendingImportReview
-        ? 'Documento pronto: scegli cosa portare nella scheda.'
+        ? 'Documento letto: controllo in corso.'
         : importedData
             ? 'Dati applicati alla scheda: controlla i campi e conferma.'
-            : 'Nessun dato è stato salvato: la scheda viene creata solo quando confermi.';
+            : 'La scheda viene creata solo quando salvi.';
 
     const navItems = [
         { href: '#documento', label: 'Documento', meta: 'opzionale' },
@@ -225,7 +225,7 @@ export default function NewPatientPage() {
         <Kree8WorkspaceShell
             eyebrow="Paziente"
             title="Nuova scheda"
-            subtitle="Crea una scheda partendo da un documento clinico oppure inserendo i dati manualmente. Ogni dato importato passa da un controllo prima del salvataggio."
+            subtitle="Da documento clinico o con inserimento manuale."
             backHref="/"
             backLabel="Torna alla lista"
             statusLabel={statusLabel}
@@ -243,8 +243,7 @@ export default function NewPatientPage() {
                                 Usa un documento quando è utile
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
-                                PDF e immagini vengono letti localmente. MediFlow propone dati anagrafici,
-                                diagnosi e terapie, ma non scrive nulla finché non confermi cosa usare.
+                                MediFlow propone anagrafica, diagnosi e terapie dal documento: confermi tu cosa usare.
                             </p>
                         </div>
                     </div>
@@ -286,9 +285,9 @@ export default function NewPatientPage() {
                                 </h3>
                                 <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                                     {importMeta.diagnosisCount > 0
-                                        ? `Ho trovato ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}. Controlla cosa tenere prima di compilare la scheda.`
+                                        ? `Trovate ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
                                         : importMeta.medicationCount > 0
-                                            ? `Ho trovato ${importMeta.medicationCount} terapie da valutare. Conferma, correggi o escludi le terapie prima di portarle nella scheda.`
+                                            ? `Trovate ${importMeta.medicationCount} terapie da valutare: conferma, correggi o escludi prima di portarle nella scheda.`
                                             : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
                                 {importMeta.quality?.reason && (

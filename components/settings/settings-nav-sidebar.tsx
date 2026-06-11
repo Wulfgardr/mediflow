@@ -44,12 +44,12 @@ function NavGroups({ pathname, testIdPrefix }: { pathname: string; testIdPrefix:
                                         data-testid={`${testIdPrefix}${item.id}`}
                                         className={cn(
                                             'block rounded-[14px] border px-3 py-2 transition-colors',
-                                            !isActive && 'border-transparent hover:border-[color:rgba(15,23,42,0.1)]',
+                                            !isActive && 'border-transparent hover:border-[color:var(--glass-border)]',
                                         )}
                                         style={isActive
                                             ? isDanger
                                                 ? { borderColor: 'rgba(192, 57, 43, 0.3)', background: 'rgba(192, 57, 43, 0.08)' }
-                                                : { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.92)' }
+                                                : { borderColor: 'var(--glass-border)', background: 'var(--mf-bg-elevated)' }
                                             : undefined}
                                     >
                                         <span
@@ -96,8 +96,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                     data-testid="settings-nav-mobile-toggle"
                     className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[14px] border px-3 py-2 text-left transition-colors"
                     style={{
-                        borderColor: isDangerActive ? 'rgba(192, 57, 43, 0.3)' : 'rgba(15, 23, 42, 0.14)',
-                        background: isDangerActive ? 'rgba(192, 57, 43, 0.08)' : 'rgba(248, 250, 252, 0.85)',
+                        borderColor: isDangerActive ? 'rgba(192, 57, 43, 0.3)' : 'var(--glass-border)',
+                        background: isDangerActive ? 'rgba(192, 57, 43, 0.08)' : 'var(--mf-bg-elevated)',
                     }}
                 >
                     <span className="min-w-0">
@@ -125,8 +125,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         data-testid="settings-search-trigger-mobile"
                         className="flex w-11 shrink-0 items-center justify-center rounded-[14px] border transition-colors"
                         style={{
-                            borderColor: 'rgba(15, 23, 42, 0.14)',
-                            background: 'rgba(248, 250, 252, 0.85)',
+                            borderColor: 'var(--glass-border)',
+                            background: 'var(--mf-bg-elevated)',
                             color: 'var(--mf-muted)',
                         }}
                     >
@@ -139,8 +139,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                 hidden={!isMobileNavOpen}
                 className="mt-2 space-y-5 rounded-[18px] border p-3 lg:hidden"
                 style={{
-                    borderColor: 'rgba(15, 23, 42, 0.1)',
-                    background: 'rgba(248, 250, 252, 0.85)',
+                    borderColor: 'var(--glass-border)',
+                    background: 'var(--mf-bg-elevated)',
                 }}
             >
                 <NavGroups pathname={pathname} testIdPrefix="settings-nav-mobile-" />
@@ -155,8 +155,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         data-testid="settings-search-trigger"
                         className="flex w-full items-center justify-between gap-2 rounded-[14px] border px-3 py-2 text-left text-xs font-medium transition-colors"
                         style={{
-                            borderColor: 'rgba(15, 23, 42, 0.1)',
-                            background: 'rgba(248, 250, 252, 0.85)',
+                            borderColor: 'var(--glass-border)',
+                            background: 'var(--mf-bg-elevated)',
                             color: 'var(--mf-muted)',
                         }}
                     >
@@ -166,7 +166,7 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         </span>
                         <kbd
                             className="rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-                            style={{ borderColor: 'rgba(15, 23, 42, 0.12)', color: 'var(--mf-muted)' }}
+                            style={{ borderColor: 'var(--glass-border)', color: 'var(--mf-muted)' }}
                         >
                             ⌘K
                         </kbd>

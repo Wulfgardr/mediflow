@@ -110,7 +110,7 @@ export function ClinicalRiverTimeline({
     if (items.length === 0) {
         return (
             <div className="rounded-[26px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-5 py-8 text-sm text-[color:var(--mf-muted)]">
-                Nessun evento recente: la river timeline comparirà qui appena il caso accumula visite, documenti o controlli.
+                Nessun evento recente: visite, documenti e controlli compariranno qui.
             </div>
         );
     }

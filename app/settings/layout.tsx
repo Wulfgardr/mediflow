@@ -15,7 +15,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         <Kree8WorkspaceShell
             eyebrow="Sistema"
             title="Impostazioni"
-            subtitle="Accesso, AI locale, backup, repertori e servizi del Mac che ospita MediFlow."
+            subtitle="Configurazione del Mac che ospita MediFlow."
             backHref="/"
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."

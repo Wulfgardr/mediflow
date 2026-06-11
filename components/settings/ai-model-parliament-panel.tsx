@@ -80,7 +80,7 @@ export default function AiModelParliamentPanel() {
                 setState({
                     status: 'missing',
                     payload: null,
-                    message: 'Nessun report del parlamento disponibile. Esegui il benchmark da CLI per popolare l’artifact locale.',
+                    message: 'Nessun report disponibile: genera il benchmark con il comando indicato sotto.',
                 });
                 return;
             }
@@ -121,7 +121,7 @@ export default function AiModelParliamentPanel() {
                     <div>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Confronto modelli AI</h3>
                         <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                            Report in sola lettura su modello base, alternative, modelli protetti e candidati da rimuovere. La UI non modifica i modelli.
+                            Report in sola lettura su modello base, alternative, modelli protetti e candidati da rimuovere.
                         </p>
                     </div>
                 </div>
@@ -191,9 +191,6 @@ export default function AiModelParliamentPanel() {
                         <div className="space-y-3">
                             <div>
                                 <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Qualità, costo e copertura</h4>
-                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                                    Pannello informativo: aiuta a leggere valore, latenza e copertura delle aree AI senza cambiare i modelli dalla UI.
-                                </p>
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -290,8 +287,6 @@ export default function AiModelParliamentPanel() {
 
                     <div className="rounded-[18px] border border-slate-200/70 bg-white/72 p-3 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                         <p>Aggiornato: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.updatedAt || 'n/d'}</span></p>
-                        <p className="mt-1">JSON: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.jsonPath || 'n/d'}</span></p>
-                        <p className="mt-1">Markdown: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.markdownPath || 'n/d'}</span></p>
                     </div>
                 </div>
             ) : null}

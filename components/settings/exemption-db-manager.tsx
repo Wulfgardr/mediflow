@@ -107,7 +107,7 @@ export default function ExemptionDbManager() {
                 <div>
                     <p className="section-kicker">Repertorio amministrativo</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Codifiche Esenzioni</h2>
-                    <p className="text-xs text-gray-500">Repertorio locale per ricerca rapida in anagrafica paziente.</p>
+                    <p className="text-xs text-gray-500">Repertorio per la ricerca rapida in anagrafica paziente.</p>
                 </div>
             </div>
 
@@ -153,7 +153,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Drag & drop file esenzioni</p>
-                            <p className="text-xs text-gray-500 mt-1">Supporta file in formato `|` (es. `Esenzioni.txt`, `Invalidita.txt`).</p>
+                            <p className="text-xs text-gray-500 mt-1">File delimitati da | (es. Esenzioni.txt, Invalidita.txt).</p>
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}

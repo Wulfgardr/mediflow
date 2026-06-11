@@ -453,7 +453,8 @@ const AI_QUEUE: Kree8DecisionCard[] = [
       'Paziente AB-2026-014 · ultima visita 14 mesi fa, profilo cronicità incompleto.',
     pill: 'AI',
     pillVariant: 'violet',
-    action: 'Apri scheda',
+    action: 'Apri quadro',
+    target: 'scheda',
   },
   {
     title: 'Codifica mancante',
@@ -677,10 +678,10 @@ function formatKnownMonitoringProfile(value: string | null | undefined): string 
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
   if (normalized === 'taken_in_charge') {
-    return 'Presa in carico attiva. Apri la scheda per diario, terapie e documenti.';
+    return 'Presa in carico attiva. Nessuna sintesi clinica disponibile.';
   }
   if (normalized === 'extemporaneous' || normalized === 'episodic') {
-    return 'Accesso estemporaneo. Apri la scheda per completare contesto e prossimo passaggio.';
+    return 'Accesso estemporaneo, contesto da completare.';
   }
   return null;
 }
@@ -788,7 +789,7 @@ function buildPatientPreviewSummary(
 
   if (isArchived) return 'Percorso clinico chiuso. Consultabile in sola lettura.';
   if (isAdi) return 'Percorso territoriale attivo con continuità domiciliare.';
-  return 'Apri la scheda per leggere diario, terapie e documenti del paziente.';
+  return 'Nessuna sintesi clinica disponibile.';
 }
 
 /* @Codex */
@@ -888,7 +889,7 @@ function mapCheckupsForKree8(
         title: checkup.title || 'Appuntamento clinico',
         sub: patient
           ? `${patient.name} · ${patient.code}`
-          : 'Paziente locale non risolto nella lista corrente',
+          : 'Paziente non presente nell’elenco pazienti',
         ...pill,
       };
     });
@@ -965,7 +966,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
     },
     {
       id: 'exemptions',
-      name: 'Esenzioni · codifiche locali',
+      name: 'Codifiche esenzioni',
       sub: exemptionCount > 0
         ? 'Catalogo esenzioni disponibile per ricerca anagrafica.'
         : 'Nessuna esenzione indicizzata: importa TXT/CSV dalle impostazioni.',
@@ -1212,7 +1213,6 @@ function Toolbar({
         type="button"
         className={styles.search}
         onClick={onSearchRequest}
-        aria-label="Apri la ricerca nella lista pazienti"
       >
         <Search size={14} />
         <span>Cerca nella lista pazienti</span>
@@ -1436,7 +1436,7 @@ function TurnoArea({
   const documentCountLabel = isReview ? '24' : '–';
   const documentSubLabel = isReview
     ? '7 con suggerimento AI'
-    : 'apri revisione documentale';
+    : 'dettaglio nella sezione Documenti';
   const decisionCountLabel = isReview ? '7' : '–';
   const decisionSubLabel = isReview
     ? '2 oltre SLA'
@@ -1447,7 +1447,7 @@ function TurnoArea({
       {
         title: 'Pazienti in carico',
         body: patientState.status === 'ready'
-          ? `${patientState.patients.length} schede disponibili per triage, diario e follow-up.`
+          ? `${patientState.patients.length} schede pronte nell’archivio locale.`
           : 'Preparazione della lista pazienti.',
         pill: patientState.status === 'error' ? 'Errore' : 'In carico',
         pillVariant: patientState.status === 'error' ? 'coral' : 'green',
@@ -1457,7 +1457,7 @@ function TurnoArea({
       {
         title: 'Agenda clinica',
         body: agendaState.status === 'ready'
-          ? `${agendaState.rows.length} passaggi pianificati collegati alla giornata.`
+          ? 'Passaggi locali e candidati esterni della giornata, da rivedere prima delle visite.'
           : agendaState.status === 'error'
             ? 'Agenda non disponibile: resta visibile la lista pazienti.'
             : 'Preparazione degli appuntamenti.',
@@ -1480,13 +1480,13 @@ function TurnoArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Agenda locale</p>
+          <p className={styles.areaCaption}>Oggi</p>
           <h1 className={styles.areaTitle}>
-            Agenda di oggi <em>{agendaState.rows.length} appuntamenti locali.</em>
+            Agenda di oggi <em>{agendaState.rows.length} appuntamenti</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
-              ? `${patientState.patients.length} pazienti in carico · agenda, documenti e priorità della giornata.`
+              ? 'Rivedi i passaggi della giornata: i filtri in alto ordinano l’agenda per urgenze, suggerimenti AI e passaggi manuali.'
               : 'Preparazione della giornata dopo sblocco PIN.'}
           </p>
         </div>
@@ -1554,7 +1554,7 @@ function TurnoArea({
               </div>
             ))}
             {visibleAgenda.length === 0 && (
-              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+              <p className={styles.emptyState}>
                 {agendaState.status === 'ready'
                   ? 'Nessun appuntamento per il filtro selezionato.'
                   : agendaState.status === 'error'
@@ -1571,9 +1571,7 @@ function TurnoArea({
             <h2 className={styles.panelTitle}>
               {isReview ? 'Documenti da revisionare' : 'Da fare oggi'}
             </h2>
-            <PillBadge variant="violet">
-              {isReview ? '7 casi' : 'oggi'}
-            </PillBadge>
+            {isReview ? <PillBadge variant="violet">7 casi</PillBadge> : null}
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
             {decisionCards.map((card) => (
@@ -1660,13 +1658,13 @@ function IncaricoArea({
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Pazienti</p>
+          <p className={styles.areaCaption}>Ambulatorio e rete locale</p>
           <h1 className={styles.areaTitle}>
-            Pazienti in carico <em>priorità e prossimo passo</em>
+            Pazienti in carico <em>· stato, diagnosi e ultimo aggiornamento</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Seleziona un caso, apri il quadro e prepara il prossimo passaggio.'
+              ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -1754,7 +1752,6 @@ function IncaricoArea({
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
             <PillBadge variant="muted">{visible.length} risultati</PillBadge>
-            {normalizedQuery ? <PillBadge variant="blue">ricerca attiva</PillBadge> : null}
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
@@ -1765,17 +1762,17 @@ function IncaricoArea({
 
           <div style={{ marginTop: 8 }}>
             {patientStatus === 'loading' && (
-              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+              <p className={styles.emptyState}>
                 Caricamento pazienti…
               </p>
             )}
             {patientStatus === 'error' && (
-              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+              <p className={styles.emptyState}>
                 Lista pazienti non disponibile. Verifica sessione e servizi locali.
               </p>
             )}
             {visible.length === 0 && (
-              <p className={styles.rowSub} style={{ padding: '24px 0' }}>
+              <p className={styles.emptyState}>
                 {patientStatus === 'ready' && normalizedQuery
                   ? `Nessun risultato per “${query.trim()}”. Modifica la ricerca o cambia ambito.`
                   : patientStatus === 'ready'
@@ -1792,35 +1789,44 @@ function IncaricoArea({
                     ? styles.patientDotBlue
                     : styles.patientDotMuted;
               return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={classNames(
-                    styles.patientRow,
-                    isSelected && styles.patientRowSelected,
-                  )}
-                  onClick={() => onSelectPatient(p.id)}
-                  aria-pressed={isSelected}
-                >
-                  <span className={classNames(styles.patientDot, dotClass)} />
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span className={styles.patientName}>{p.name}</span>
-                    <span className={styles.patientCode}>{p.code} · {p.pathway}</span>
-                  </span>
-                  <span className={styles.patientMeta}>
-                    {p.diagnoses.map((d) => (
-                      <PillBadge key={d} variant="muted">{d}</PillBadge>
-                    ))}
-                  </span>
-                  <span className={styles.rowSub}>{p.lastTouch}</span>
-                  <span style={{ display: 'inline-flex', justifyContent: 'flex-end' }}>
-                    <PillBadge
-                      variant={p.status === 'muted' ? 'muted' : p.status === 'blue' ? 'blue' : 'green'}
-                    >
-                      {p.statusLabel}
-                    </PillBadge>
-                  </span>
-                </button>
+                <div key={p.id} className={styles.patientRowWrap}>
+                  <button
+                    type="button"
+                    className={classNames(
+                      styles.patientRow,
+                      isSelected && styles.patientRowSelected,
+                    )}
+                    onClick={() => onSelectPatient(p.id)}
+                    aria-pressed={isSelected}
+                  >
+                    <span className={classNames(styles.patientDot, dotClass)} />
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span className={styles.patientName}>{p.name}</span>
+                      <span className={styles.patientCode}>{p.code} · {p.pathway}</span>
+                    </span>
+                    <span className={styles.patientMeta}>
+                      {p.diagnoses.map((d) => (
+                        <PillBadge key={d} variant="muted">{d}</PillBadge>
+                      ))}
+                    </span>
+                    <span className={styles.rowSub}>{p.lastTouch}</span>
+                    <span style={{ display: 'inline-flex', justifyContent: 'flex-end' }}>
+                      <PillBadge
+                        variant={p.status === 'muted' ? 'muted' : p.status === 'blue' ? 'blue' : 'green'}
+                      >
+                        {p.statusLabel}
+                      </PillBadge>
+                    </span>
+                  </button>
+                  <Link
+                    href={p.modulesHref}
+                    className={styles.patientRowOpen}
+                    aria-label={`Apri la scheda di ${p.name}`}
+                    onClick={() => onSelectPatient(p.id)}
+                  >
+                    <ArrowUpRight size={14} />
+                  </Link>
+                </div>
               );
             })}
           </div>
@@ -1849,18 +1855,22 @@ function IncaricoArea({
             {selected.summary}
           </p>
           <div className={styles.caseLensActions}>
-            <Link href={selected.href} className={styles.primaryBtn}>
+            <Link href={selected.modulesHref} className={styles.primaryBtn}>
               <UserSquare2 size={13} />
-              {selected.list === 'archivio' ? 'Apri quadro archivio' : 'Apri quadro'}
+              Apri scheda paziente
             </Link>
-            <Link href={selected.modulesHref} className={styles.ghostBtnSm}>
-              <ArrowUpRight size={12} />
-              Apri scheda
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
+              <FileSearch size={12} />
+              Quadro
+            </button>
+            <Link href={`${selected.href}/entries/new`} className={styles.ghostBtnSm}>
+              <Plus size={12} />
+              Nuova voce
             </Link>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('revisione')}>
+            <Link href={`${selected.modulesHref}#documenti`} className={styles.ghostBtnSm}>
               <FileText size={12} />
               Documenti
-            </button>
+            </Link>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
               <Workflow size={12} />
               Prepara SISS
@@ -1873,7 +1883,7 @@ function IncaricoArea({
             <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
               {normalizedQuery
                 ? 'Nessun paziente corrisponde alla ricerca corrente.'
-                : 'Nessun paziente reale selezionabile in questa vista.'}
+                : 'Nessun paziente selezionabile in questa vista.'}
             </p>
           </aside>
         )}
@@ -1908,8 +1918,7 @@ function RealPatientArea({
             {patient.name} <em>· {patient.ageLabel}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Ultimo aggiornamento {patient.lastTouch}. Sintesi, segnali recenti
-            e prossime azioni del caso.
+            Ultimo aggiornamento {patient.lastTouch}.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -1920,7 +1929,7 @@ function RealPatientArea({
             <Edit3 size={12} /> Anagrafica
           </Link>
           <Link href={patient.modulesHref} className={styles.primaryBtn}>
-            <UserSquare2 size={13} /> Apri scheda
+            <UserSquare2 size={13} /> Apri scheda paziente
           </Link>
         </div>
       </header>
@@ -1936,12 +1945,6 @@ function RealPatientArea({
             </PillBadge>
             <PillBadge variant="muted">{patient.code}</PillBadge>
           </div>
-          <span style={{ marginLeft: 'auto' }}>
-            <PillBadge variant={patient.status === 'muted' ? 'muted' : 'green'}>
-              <ShieldCheck size={11} />
-              In carico
-            </PillBadge>
-          </span>
         </div>
 
         <div style={{ marginTop: 14 }}>
@@ -1978,7 +1981,7 @@ function RealPatientArea({
           <span className={styles.statLabel}>Documenti</span>
           <span className={styles.statValue}>{isWorkspaceLoading ? '…' : workspace?.attachmentsCount ?? 0}</span>
           <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
-            {isWorkspaceLoading ? 'caricamento archivio' : workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili` : 'archivio consultabile'}
+            {isWorkspaceLoading ? 'caricamento archivio' : workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili` : 'nessuna sintesi disponibile'}
           </span>
         </div>
       </div>
@@ -1987,7 +1990,6 @@ function RealPatientArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Cosa fare ora</h2>
-            <PillBadge variant="blue">priorità del caso</PillBadge>
           </header>
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             <div className={styles.compositeCard}>
@@ -2000,7 +2002,7 @@ function RealPatientArea({
                   ? 'Caricamento diario clinico.'
                   : latestEntry
                   ? `${latestEntry.title} · ${latestEntry.date}`
-                  : 'Apri una nuova voce o consulta la timeline completa.'}
+                  : 'Nessuna voce registrata.'}
               </p>
               <Link href={`${patient.href}/entries/new`} className={styles.ghostBtnSm} style={{ alignSelf: 'flex-start' }}>
                 <Plus size={12} />
@@ -2082,7 +2084,6 @@ function RealPatientArea({
                   {workspace.recentAttachmentNames.map((name) => (
                     <div key={name} className={styles.evidenceItem}>
                       <span className={styles.evidenceTitle}>{name}</span>
-                      <span className={styles.evidenceSnippet}>Apri documenti paziente per allegati, sintesi e review.</span>
                     </div>
                   ))}
                 </div>
@@ -2106,7 +2107,7 @@ function RealPatientArea({
               </Link>
               <Link href={patient.modulesHref} className={styles.ghostBtnSm}>
                 <ArrowUpRight size={12} />
-                Apri scheda
+                Apri scheda paziente
               </Link>
             </div>
           </div>
@@ -2140,10 +2141,10 @@ function SchedaArea({
           <div>
             <p className={styles.areaCaption}>Quadro paziente</p>
             <h1 className={styles.areaTitle}>
-              Nessun paziente selezionato <em>· seleziona un caso in carico</em>
+              Nessun paziente selezionato <em>· quadro in attesa</em>
             </h1>
             <p className={styles.areaSubtitle}>
-              Apri un paziente dalla lista in carico per vedere quadro paziente,
+              Apri un paziente dalla lista in carico per vedere sintesi,
               azioni, documenti e follow-up del caso.
             </p>
           </div>
@@ -2443,11 +2444,11 @@ function LiveDocumentReviewArea({
         <div>
           <p className={styles.areaCaption}>Revisione documenti</p>
           <h1 className={styles.areaTitle}>
-            Coda clinica <em>· codifiche, evidenze, allegati</em>
+            Documenti del paziente <em>· codifiche, evidenze, allegati</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patient
-              ? `Contesto aperto su ${patient.name}: rivedi documenti e suggerimenti prima di aggiornare la scheda.`
+              ? `Contesto aperto su ${patient.name}.`
               : 'Seleziona un paziente per vedere documenti, codifiche e suggerimenti collegati.'}
           </p>
         </div>
@@ -2483,7 +2484,7 @@ function LiveDocumentReviewArea({
         </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Repertori</span>
-          <span className={styles.statValue}>3</span>
+          <span className={styles.statValue}>locali</span>
           <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, esenzioni, ICD</span>
         </div>
       </div>
@@ -2504,9 +2505,6 @@ function LiveDocumentReviewArea({
                   <span className={styles.evidenceTitle}>{name}</span>
                   <PillBadge variant="blue">da leggere</PillBadge>
                 </header>
-                <p className={styles.rowSub} style={{ margin: 0 }}>
-                  Apri la scheda paziente per allegati, OCR e sintesi clinica.
-                </p>
               </div>
             )) : (
               <p className={styles.panelSubtitle}>Nessun documento recente agganciato al paziente selezionato.</p>
@@ -2529,7 +2527,6 @@ function LiveDocumentReviewArea({
                 <Sparkles size={14} color="var(--pill-violet-fg)" />
                 <span>
                   <span className={styles.evidenceTitle}>{hint}</span>
-                  <span className={styles.evidenceSnippet}>Conferma con evidenza prima di scrivere in scheda.</span>
                 </span>
               </div>
             )) : (
@@ -2543,7 +2540,7 @@ function LiveDocumentReviewArea({
             </button>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
               <UserSquare2 size={12} />
-              Torna alla scheda
+              Torna al quadro
             </button>
           </div>
         </section>
@@ -2691,7 +2688,7 @@ function LiveHandoffArea({
           </h1>
           <p className={styles.areaSubtitle}>
             {patient
-              ? `Contesto aperto su ${patient.name}: prepara consenso, azione regionale e nota di esito.`
+              ? `Contesto aperto su ${patient.name}.`
               : 'Seleziona un paziente prima di preparare un passaggio verso i portali regionali.'}
           </p>
         </div>
@@ -2721,7 +2718,7 @@ function LiveHandoffArea({
       <div className={styles.threeCol}>
         {[
           { title: 'Identità e consenso', sub: patient ? `${patient.code} · ${patient.ageLabel}` : 'paziente non selezionato', pill: fiscalCodeReady ? 'pronto' : 'attesa', variant: fiscalCodeReady ? 'green' as const : 'muted' as const },
-          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto locale', pill: 'assistita', variant: 'blue' as const },
+          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto paziente', pill: 'assistita', variant: 'blue' as const },
           { title: 'Esito', sub: 'registra risultato e prossima azione in diario', pill: 'diario', variant: 'violet' as const },
         ].map((item) => (
           <section key={item.title} className={styles.panel}>
@@ -2737,7 +2734,7 @@ function LiveHandoffArea({
       <section className={styles.panelInset}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Azioni rapide</h2>
-          <PillBadge variant="muted">portali ufficiali</PillBadge>
+          <PillBadge variant="muted">in MediFlow</PillBadge>
         </header>
         <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
           <Link href="/settings/repertori" className={styles.ghostBtnSm}>
@@ -2745,10 +2742,10 @@ function LiveHandoffArea({
             Gestisci repertori
           </Link>
           {patient ? (
-            <Link href={patient.href} className={styles.ghostBtnSm}>
+            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
               <UserSquare2 size={12} />
               Quadro paziente
-            </Link>
+            </button>
           ) : (
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
               <UserSquare2 size={12} />
@@ -2781,7 +2778,7 @@ function LiveHandoffArea({
                       : 'coral'
                 }
               >
-                /api/siss/context
+                esito SISS
               </PillBadge>
             </header>
             <p className={styles.rowSub} style={{ margin: 0 }}>
@@ -2812,7 +2809,7 @@ function LiveGovernanceArea({
     {
       href: '/settings',
       title: 'Stato postazione',
-      sub: 'stato sessione, servizi e dati locali',
+      sub: 'sessione, servizi e dati locali',
       icon: Activity,
       pill: 'operativo',
       variant: 'green',
@@ -2844,9 +2841,9 @@ function LiveGovernanceArea({
     {
       href: '/settings/repertori',
       title: 'Repertori clinici',
-      sub: 'AIFA, ICD ed esenzioni locali',
+      sub: 'AIFA, ICD ed esenzioni',
       icon: Database,
-      pill: 'dati locali',
+      pill: 'importazione manuale',
       variant: 'green',
     },
     {
@@ -2873,10 +2870,10 @@ function LiveGovernanceArea({
         <div>
           <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
-            Stato operativo <em>· sessione, audit, backup</em>
+            Stato operativo <em>· controlli della postazione</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Sessione, audit e backup gestiti in locale. I dati clinici non lasciano il dispositivo.
+            I dati clinici non lasciano il dispositivo.
           </p>
         </div>
       </header>
@@ -2907,15 +2904,8 @@ function LiveGovernanceArea({
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Apri una sezione precisa</h2>
-          <span className={styles.panelActions}>
-            <PillBadge variant="green">nessuna modifica diretta qui</PillBadge>
-          </span>
+          <h2 className={styles.panelTitle}>Accesso rapido alle impostazioni</h2>
         </header>
-        <p className={styles.panelSubtitle}>
-          Ogni voce apre direttamente la sezione di impostazioni dove si cambia
-          configurazione, si importano repertori o si avvia un controllo.
-        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginTop: 12 }}>
           {settingsLinks.map((item) => {
             const Icon = item.icon;
@@ -2947,9 +2937,11 @@ function LiveGovernanceArea({
 function DiarioArea({
   diaryState,
   onOpenArea,
+  onSelectPatient,
 }: {
   diaryState: Kree8DiaryClientState;
   onOpenArea: (area: AreaId) => void;
+  onSelectPatient: (patientId: string) => void;
 }) {
   const isLoading = diaryState.status === 'loading' || diaryState.status === 'idle';
   const visibleEntries = diaryState.entries;
@@ -2960,11 +2952,10 @@ function DiarioArea({
         <div>
           <p className={styles.areaCaption}>Diario clinico</p>
           <h1 className={styles.areaTitle}>
-            Ultime voci del lavoro clinico <em>· dati locali reali</em>
+            Ultime voci del lavoro clinico <em>· cronologia locale, tutti i pazienti</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Cronologia delle ultime 50 voci cliniche salvate in MediFlow, con
-            rientro immediato nel quadro del paziente.
+            Cronologia delle ultime 50 voci cliniche di tutti i pazienti.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -2992,7 +2983,7 @@ function DiarioArea({
 
         <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           {isLoading ? (
-            <p className={styles.panelSubtitle}>Caricamento diario clinico locale.</p>
+            <p className={styles.panelSubtitle}>Caricamento diario clinico.</p>
           ) : visibleEntries.length ? visibleEntries.map((entry) => (
             <article key={entry.id} className={styles.compositeCard}>
               <header className={styles.panelHeader}>
@@ -3015,10 +3006,17 @@ function DiarioArea({
                   </PillBadge>
                 ) : null}
                 <span className={styles.dockActions}>
-                  <Link href={entry.patientHref} className={styles.ghostBtnSm}>
+                  <button
+                    type="button"
+                    className={styles.ghostBtnSm}
+                    onClick={() => {
+                      onSelectPatient(entry.patientId);
+                      onOpenArea('scheda');
+                    }}
+                  >
                     <UserSquare2 size={12} />
                     Apri quadro
-                  </Link>
+                  </button>
                   <Link href={`${entry.patientHref}/entries/new`} className={styles.ghostBtnSm}>
                     <Plus size={12} />
                     Nuova voce
@@ -3323,13 +3321,12 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Repertori clinici · AIFA, esenzioni, ICD</p>
+          <p className={styles.areaCaption}>Repertori clinici</p>
           <h1 className={styles.areaTitle}>
             AIFA, esenzioni e ICD <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            Accesso rapido ai repertori che servono durante la cartella: farmaci AIFA,
-            codici esenzione e diagnostica ICD.
+            Consultazione rapida dei repertori durante la compilazione della cartella.
             Import e cancellazioni restano nelle impostazioni complete, con azione
             esplicita dell&apos;operatore.
           </p>
@@ -3349,29 +3346,23 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
             <span className={styles.freshnessTitle}>{freshnessTitle}</span>
             <span className={styles.freshnessSub}>
               {isLoading
-                ? 'lettura da API locali protette'
-                : `${availableCatalogs} di ${catalogs.length} pacchetti disponibili · nessun sync cloud`}
+                ? 'lettura in corso'
+                : `${availableCatalogs} di ${catalogs.length} pacchetti disponibili`}
             </span>
           </div>
           <span className={styles.freshnessNum}>{freshnessPct}%</span>
         </div>
 
-        <p className={styles.panelSubtitle}>
-          {catalogState?.status === 'error'
-            ? 'Impossibile leggere i conteggi locali in questa sessione.'
-            : selectedCatalog
-              ? `Repertorio selezionato: ${selectedCatalog.name}.`
-              : 'Caricamento stato repertori locali.'}
-        </p>
+        {catalogState?.status === 'error' ? (
+          <p className={styles.panelSubtitle}>Impossibile leggere i conteggi locali in questa sessione.</p>
+        ) : !selectedCatalog ? (
+          <p className={styles.panelSubtitle}>Caricamento stato repertori locali.</p>
+        ) : null}
       </section>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Repertori rapidi</h2>
-          <PillBadge variant="muted">AIFA · esenzioni · ICD</PillBadge>
-          <span className={styles.panelActions}>
-            <PillBadge variant="green">servizi locali</PillBadge>
-          </span>
         </header>
 
         <div style={{ marginTop: 8 }}>
@@ -3435,7 +3426,13 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
                   off: 'muted',
                 }[selectedCatalog.freshness] as PillVariant}
               >
-                selezionato
+                {{
+                  fresh: 'fresco',
+                  ok: 'da verificare',
+                  stale: 'invecchiato',
+                  broken: 'import manuale richiesto',
+                  off: 'disattivato',
+                }[selectedCatalog.freshness]}
               </PillBadge>
             </header>
             <p className={styles.rowSub} style={{ margin: 0 }}>
@@ -4170,6 +4167,7 @@ function AreaContent({
         <DiarioArea
           diaryState={diaryState}
           onOpenArea={onOpenArea}
+          onSelectPatient={onSelectPatient}
         />
       );
     case 'revisione':
@@ -4419,9 +4417,9 @@ export function Kree8ClinicalCockpit({
           </div>
           <span className={styles.railTag}>
             <span className={styles.railDot} />
-            Mac principale locale
+            Mac principale
           </span>
-          <span>{isReview ? 'Review design' : 'Dati in locale'}</span>
+          {isReview ? <span>Review design</span> : null}
         </div>
       </aside>
 

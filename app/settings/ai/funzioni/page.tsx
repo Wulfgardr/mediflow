@@ -102,7 +102,7 @@ export default function SettingsAiFunctionsPage() {
                             </span>
                         </div>
                         <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget AI locale</span>
+                            <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--mf-muted)' }}>Budget AI</span>
                             <span className="font-semibold" style={{ color: 'var(--mf-ink)' }}>{insightRuntimePreview}</span>
                         </div>
                     </div>
@@ -325,8 +325,8 @@ export default function SettingsAiFunctionsPage() {
                 <details open className="group rounded-[24px] border border-slate-200/70 bg-white/60 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
                         <div>
-                            <p className="section-kicker">Governance (sola lettura)</p>
-                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Parliament e readiness rollout</h3>
+                            <p className="section-kicker">Governance</p>
+                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Confronto modelli e prontezza al rilascio</h3>
                         </div>
                         <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
                     </summary>

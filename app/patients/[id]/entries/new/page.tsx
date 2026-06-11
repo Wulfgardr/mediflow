@@ -143,7 +143,7 @@ export default function NewEntryPage() {
             setUploadProgress('Aggiornamento riepilogo paziente...');
             await regeneratePatientSummary(id);
 
-            router.push(`/patients/${id}`);
+            router.push(`/patients/${id}/modules`);
         } catch (error) {
             console.error(error);
             alert('Errore durante il salvataggio. Riprova.');
@@ -169,11 +169,10 @@ export default function NewEntryPage() {
         <Kree8WorkspaceShell
             eyebrow="Diario clinico"
             title="Nuova voce clinica"
-            subtitle="Registra una visita, un contatto remoto o una nota breve senza uscire dal lavoro sul paziente."
-            backHref={`/patients/${id}`}
-            backLabel="Torna al quadro paziente"
+            subtitle="Registra una visita, un contatto remoto o una nota breve."
+            backHref={`/patients/${id}/modules`}
+            backLabel="Torna alla scheda paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
-            statusLabel="Scrittura locale: allegati e sintesi documento restano sul dispositivo."
             navItems={workspaceNavItems}
         >
             <div className={workspaceStyles.workspaceGrid}>
@@ -286,13 +285,6 @@ export default function NewEntryPage() {
                                         <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
                                             Scrivi la voce
                                         </h2>
-                                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                                            Titoli, punti elenco e formattazioni leggere per separare sintomi, obiettivi, assessment e piano.
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="apple-chip">SOAP-friendly</span>
-                                        <span className="apple-chip">Compatibile timeline</span>
                                     </div>
                                 </div>
 
@@ -394,16 +386,12 @@ export default function NewEntryPage() {
                         </div>
                         <div className="space-y-3 text-sm leading-6 text-[color:var(--mf-muted)]">
                             <p>Usa titoli per separare i blocchi clinici e bullet point per terapie, alert o passi successivi.</p>
-                            <p>Il contenuto resta leggibile anche in timeline, report PDF e contesto AI locale.</p>
                         </div>
                     </section>
 
                     <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Struttura suggerita</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                Struttura che si rilegge in fretta
-                            </h3>
                         </div>
                         <div className="space-y-3">
                             <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">

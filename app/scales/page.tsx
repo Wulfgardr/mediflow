@@ -105,7 +105,7 @@ export default function ScalesLibraryPage() {
         <Kree8WorkspaceShell
             eyebrow="Scale"
             title="Scale cliniche"
-            subtitle="Scegli una scala, poi indica la scheda paziente. Il punteggio viene registrato nella cartella del paziente."
+            subtitle="Il punteggio viene registrato nella cartella del paziente."
             backHref="/"
             backLabel="Torna ai pazienti"
             statusLabel={selectedScaleDefinition
@@ -120,10 +120,6 @@ export default function ScalesLibraryPage() {
                         <h2 className="text-xl font-semibold tracking-tight text-slate-950">
                             Scale pronte alla somministrazione
                         </h2>
-                        <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
-                            Ogni valutazione resta legata a un paziente: seleziona lo strumento
-                            e poi la scheda.
-                        </p>
                     </div>
                     <span className="apple-chip w-fit">{SCALE_CATALOG.length} scale attive</span>
                 </div>
@@ -182,7 +178,6 @@ export default function ScalesLibraryPage() {
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
                                 Hai scelto <strong className="font-semibold text-slate-950">{selectedScaleDefinition.title}</strong>.
-                                Indica la scheda paziente o creane una nuova per iniziare.
                             </p>
                         </div>
                         <button
