@@ -48,7 +48,7 @@ export default function SettingsAppearancePage() {
                             className={cn(
                                 "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
                                 reduceMotion
-                                    ? "border-[color:rgba(15,23,42,0.22)] bg-[color:rgba(248,250,252,0.9)]"
+                                    ? "border-[color:rgba(15,23,42,0.22)] bg-[color:rgba(248,250,252,0.9)] dark:border-[color:rgba(226,232,240,0.28)] dark:bg-white/12"
                                     : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
                             )}
                         >
@@ -68,7 +68,7 @@ export default function SettingsAppearancePage() {
                             className={cn(
                                 "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition-[border-color,background-color,color]",
                                 isPrivacyMode
-                                    ? "border-[color:rgba(15,23,42,0.22)] bg-[color:rgba(248,250,252,0.9)]"
+                                    ? "border-[color:rgba(15,23,42,0.22)] bg-[color:rgba(248,250,252,0.9)] dark:border-[color:rgba(226,232,240,0.28)] dark:bg-white/12"
                                     : "border-[color:rgba(112,106,100,0.12)] bg-white/78 dark:bg-white/6"
                             )}
                         >

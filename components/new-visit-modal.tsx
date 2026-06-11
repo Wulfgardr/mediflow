@@ -63,9 +63,6 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             <div className="flex justify-between items-center p-4 graphite-divider">
                 <div>
                     <h3 className="font-semibold text-lg" style={{ color: 'var(--mf-ink)' }}>Apri una scheda</h3>
-                    <p className="mt-1 text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
-                        Cerca per nome, codice fiscale o diagnosi. Se non esiste, crea una nuova scheda.
-                    </p>
                 </div>
                 <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi">
                     <X className="w-4 h-4" />
@@ -120,7 +117,6 @@ export function NewVisitModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </div>
                     <div className="min-w-0 flex-1 text-left">
                         <h4 className="font-semibold" style={{ color: 'var(--mf-ink)' }}>Crea nuova scheda</h4>
-                        <p className="text-sm" style={{ color: 'var(--mf-muted)' }}>Anagrafica, diagnosi, diario e allegati partono da una scheda vuota.</p>
                     </div>
                     <ArrowRight className="w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                 </button>

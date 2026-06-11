@@ -79,7 +79,7 @@ export default function PatientReviewQueueSummaryPanel({ summary }: PatientRevie
                         Cosa rivedere adesso
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                        Stato di insight, evidenze, Smart Import e archivio in una sola lettura: ogni riga apre il pannello già esistente, nulla viene scritto in automatico.
+                        Riepilogo in sola lettura: nulla viene scritto in automatico nella scheda, ogni modifica passa dal pannello dedicato.
                     </p>
                 </div>
                 <span className="apple-chip self-start md:self-auto">

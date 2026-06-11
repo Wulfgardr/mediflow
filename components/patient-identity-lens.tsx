@@ -124,7 +124,7 @@ export function PatientIdentityLens({
                                     In due righe
                                 </p>
                                 <p className="mt-2 text-[15px] leading-7 text-[color:var(--mf-ink)]">
-                                    {summary ?? 'Caso pronto per revisione clinica locale.'}
+                                    {summary ?? 'Nessuna sintesi clinica disponibile.'}
                                 </p>
                                 {nextStep ? (
                                     <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">

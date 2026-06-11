@@ -3,20 +3,28 @@
 
 .shell {
   --k8-surface: #ffffff;
-  --k8-soft: #f6f7f8;
-  --k8-canvas: #e9ecef;
+  --k8-soft: #f5f6f7;
+  --k8-canvas: #eef0f2;
   --k8-ink: #0f172a;
   --k8-muted: #475569;
   --k8-subtle: #52606d;
-  --k8-line: rgba(15, 23, 42, 0.07);
-  --k8-line-strong: rgba(15, 23, 42, 0.11);
+  --k8-line: rgba(15, 23, 42, 0.05);
+  --k8-line-strong: rgba(15, 23, 42, 0.08);
   --k8-chrome-bg: rgba(255, 255, 255, 0.92);
   --k8-control-bg: #ffffff;
   --k8-chip-bg: #eef2f7;
+  --k8-pill-success-bg: #dcfce7;
+  --k8-pill-success-fg: #166534;
+  --k8-pill-info-bg: #dbeafe;
+  --k8-pill-info-fg: #1e3a8a;
+  --k8-pill-warning-bg: #fef3c7;
+  --k8-pill-warning-fg: #92400e;
+  --k8-pill-critical-bg: #ffe2dd;
+  --k8-pill-critical-fg: #9a3412;
   --k8-primary-bg: #0f172a;
   --k8-primary-fg: #ffffff;
   --k8-focus: rgba(15, 23, 42, 0.32);
-  --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.04);
+  --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
   --mf-ink: var(--k8-ink);
   --mf-muted: var(--k8-muted);
   --mf-bg: var(--k8-canvas);
@@ -47,6 +55,14 @@
   --k8-chrome-bg: rgba(15, 23, 42, 0.82);
   --k8-control-bg: #0f172a;
   --k8-chip-bg: rgba(148, 163, 184, 0.14);
+  --k8-pill-success-bg: rgba(74, 222, 128, 0.16);
+  --k8-pill-success-fg: #bbf7d0;
+  --k8-pill-info-bg: rgba(96, 165, 250, 0.18);
+  --k8-pill-info-fg: #bfdbfe;
+  --k8-pill-warning-bg: rgba(251, 191, 36, 0.16);
+  --k8-pill-warning-fg: #fde68a;
+  --k8-pill-critical-bg: rgba(248, 113, 113, 0.16);
+  --k8-pill-critical-fg: #fecaca;
   --k8-primary-bg: #e2e8f0;
   --k8-primary-fg: #020617;
   --k8-focus: rgba(226, 232, 240, 0.42);
@@ -123,9 +139,9 @@
 .heroText { min-width: 0; flex: 1 1 auto; }
 .eyebrow {
   margin: 0;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--k8-subtle);
 }
@@ -137,7 +153,7 @@
   gap: 8px;
   font-size: clamp(18px, 1.6vw, 22px);
   line-height: 1.2;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -171,7 +187,7 @@
 
 .statusLine {
   color: var(--k8-subtle);
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .backButton,
@@ -194,8 +210,8 @@
   justify-content: flex-start;
   gap: 6px;
   padding: 6px 10px;
-  font-size: 11.5px;
-  font-weight: 650;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .backButtonLabel {
@@ -208,7 +224,7 @@
 .backButton:hover,
 .sectionLink:hover {
   border-color: var(--k8-line-strong);
-  background: #fff;
+  background: var(--k8-control-bg);
   color: var(--k8-ink);
 }
 
@@ -237,11 +253,11 @@
   min-height: 34px;
   padding: 7px 11px;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .sectionLink small {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--k8-subtle);
 }
@@ -273,11 +289,11 @@
 .loadingCard {
   border: 1px dashed var(--k8-line-strong);
   border-radius: 22px;
-  padding: 28px;
+  padding: 16px;
   background: var(--k8-soft);
   text-align: center;
   color: var(--k8-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .shell :global(.patient-detail-section),
@@ -342,10 +358,10 @@
   box-shadow: none !important;
 }
 
-.shell :global(.graphite-chip-tone-success) { background: var(--k8-chip-bg) !important; color: var(--k8-ink) !important; }
-.shell :global(.graphite-chip-tone-info) { background: var(--k8-chip-bg) !important; color: var(--k8-ink) !important; }
-.shell :global(.graphite-chip-tone-warning) { background: var(--k8-chip-bg) !important; color: var(--k8-muted) !important; }
-.shell :global(.graphite-chip-tone-critical) { background: #ffe2dd !important; color: #9a3412 !important; }
+.shell :global(.graphite-chip-tone-success) { background: var(--k8-pill-success-bg) !important; color: var(--k8-pill-success-fg) !important; }
+.shell :global(.graphite-chip-tone-info) { background: var(--k8-pill-info-bg) !important; color: var(--k8-pill-info-fg) !important; }
+.shell :global(.graphite-chip-tone-warning) { background: var(--k8-pill-warning-bg) !important; color: var(--k8-pill-warning-fg) !important; }
+.shell :global(.graphite-chip-tone-critical) { background: var(--k8-pill-critical-bg) !important; color: var(--k8-pill-critical-fg) !important; }
 
 /* @Codex */
 :global(html.dark) .shell :global([class*="text-slate-900"]),

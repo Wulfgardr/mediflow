@@ -186,7 +186,7 @@ export default function AiRolloutReadinessPanel() {
                                     Controlli locali
                                 </p>
                                 <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                                    Stato in sola lettura degli interruttori locali per le funzioni gia disponibili. Questo pannello non modifica le impostazioni.
+                                    Stato in sola lettura degli interruttori locali per le funzioni già disponibili.
                                 </p>
                             </div>
                             <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300" data-testid="ai-rollout-local-control-summary">

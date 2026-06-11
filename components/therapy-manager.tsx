@@ -194,9 +194,6 @@ export default function TherapyManager({ patientId }: { patientId: string }) {
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 {editingId ? 'Modifica terapia' : 'Nuova terapia'}
                             </h3>
-                            <p className="mt-1 text-sm leading-6 text-[color:var(--mf-muted)]">
-                                Salva farmaco, posologia e indicazione clinica nella cartella locale.
-                            </p>
                         </div>
                         <button
                             type="button"

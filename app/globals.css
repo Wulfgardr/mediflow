@@ -207,6 +207,13 @@ body {
     radial-gradient(circle at 72% 88%, rgba(148, 163, 184, 0.08), transparent 30%);
 }
 
+:root.dark .mediflow-ambient-plane {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(148, 163, 184, 0.10), transparent 34%),
+    radial-gradient(circle at 86% 14%, rgba(148, 163, 184, 0.07), transparent 32%),
+    radial-gradient(circle at 72% 88%, rgba(148, 163, 184, 0.09), transparent 30%);
+}
+
 .mediflow-flow-bloom {
   border-radius: 999px;
   filter: blur(70px);
@@ -299,6 +306,12 @@ body {
   background:
     radial-gradient(circle at 12% 8%, rgba(15, 23, 42, 0.05), transparent 32%),
     radial-gradient(circle at 84% 16%, rgba(71, 85, 105, 0.04), transparent 28%);
+}
+
+:root.dark[data-ui-style='redesign'] .mediflow-ambient-plane {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(148, 163, 184, 0.07), transparent 32%),
+    radial-gradient(circle at 84% 16%, rgba(148, 163, 184, 0.05), transparent 28%);
 }
 
 :root[data-ui-style='redesign'] .mediflow-flow-bloom {

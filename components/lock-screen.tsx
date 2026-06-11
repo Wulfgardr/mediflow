@@ -67,7 +67,7 @@ export function LockScreen() {
                         MEDI<b>FLOW</b>
                     </span>
                     <span className={styles.statusPill}>
-                        {requiresSetup ? 'setup locale' : 'PIN richiesto'}
+                        {requiresSetup ? 'primo avvio' : 'PIN richiesto'}
                     </span>
                 </div>
 
@@ -88,8 +88,8 @@ export function LockScreen() {
                     </h1>
                     <p className={styles.subtitle}>
                         {requiresSetup
-                            ? 'Crea un PIN per proteggere la sessione locale e la master key.'
-                            : 'Sessione bloccata · inserisci il PIN per riprendere il lavoro.'}
+                            ? 'Crea un PIN per proteggere la sessione e cifrare i dati.'
+                            : 'Inserisci il PIN per riprendere il lavoro.'}
                     </p>
                 </div>
 

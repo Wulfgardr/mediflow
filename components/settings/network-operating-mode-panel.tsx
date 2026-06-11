@@ -93,7 +93,7 @@ export default function NetworkOperatingModePanel() {
                         {viewModel?.currentState.title ?? 'Lettura stato nodo'}
                     </h3>
                     <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-500 dark:text-slate-400">
-                        {viewModel?.currentState.description ?? 'Rendiamo esplicita la differenza tra locale puro, home-base pronta e stati futuri ancora in anteprima.'}
+                        {viewModel?.currentState.description ?? 'Lettura dello stato del nodo in corso.'}
                     </p>
                 </div>
                 {isLoading ? (
@@ -279,7 +279,7 @@ export default function NetworkOperatingModePanel() {
                         {viewModel?.identityCredentialLabel ?? 'Credenziali nodo richieste'}
                     </Badge>
                 </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
                         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Operatore</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityOperatorLabel ?? 'Operatore non ancora legato al nodo'}</p>
@@ -293,10 +293,6 @@ export default function NetworkOperatingModePanel() {
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
                         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Audit</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityAuditLabel ?? 'Solo token di trasporto'}</p>
-                    </div>
-                    <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Boundary</p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityCredentialLabel ?? 'Credenziali nodo richieste'}</p>
                     </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">

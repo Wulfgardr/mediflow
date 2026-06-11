@@ -1,7 +1,17 @@
-# MediFlow v0.6.0
+<div align="center">
 
-> Cartella clinica local-first, progettata da un medico per il lavoro di tutti i giorni.
-> Dati locali, flusso rapido, cloud solo se scelto e documentato.
+# 🩺 MediFlow
+
+**Cartella clinica territoriale local-first, progettata da un medico per il lavoro di tutti i giorni.**
+
+Dati sul tuo Mac, flusso rapido in visita, AI locale sempre rivedibile.
+Il cloud non è un requisito: entra solo se scelto e documentato.
+
+`v0.6` · Web app locale · Home-base macOS · Client Apple paired · SQLite cifrato · MIT
+
+[Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) · [Manuale](./docs/MANUALE.md) · [Architettura](./ARCHITECTURE.md) · [Sicurezza](./SECURITY.md) · [Roadmap](./docs/ROADMAP.md)
+
+</div>
 
 ---
 
@@ -28,7 +38,7 @@ evidenza rivedibile, non come automatismo opaco.
 Su `main`, oggi, ci sono già queste cose:
 
 - **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso quotidiano più leggibile;
-- **Kree8 cockpit come root web live**: la home locale apre la nuova grammatica visuale, senza selector o preview profiles persistiti;
+- **Kree8 cockpit come root web live**: la home locale apre la nuova grammatica visuale, senza selector o preview profiles persistiti; la passata 2026-06 porta copy più asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
 - **contratto locale `/api/v1`** più esplicito, stabile e riusabile per client nativi e superfici locali;
 - **modalità `network home-base` paired**: pairing esplicito, capability discovery, lettura pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni;
 - **Mac packaged come home-base**: il bundle macOS può gestire backend web production e proxy TLS, con diagnostica read-only dei servizi locali opzionali;

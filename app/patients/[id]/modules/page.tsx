@@ -101,7 +101,7 @@ export default function PatientDetailPage() {
             <Kree8WorkspaceShell
                 eyebrow="Scheda clinica"
                 title="Scheda paziente"
-                subtitle="Caricamento della scheda paziente in corso."
+                subtitle="Recupero dei dati dalla cartella locale prima di aprire la scheda."
                 backHref="/"
                 backLabel="Pazienti"
             >
@@ -129,7 +129,7 @@ export default function PatientDetailPage() {
     const nextCheckup = (checkups ?? [])[0];
     const summaryText = leadDiagnosis
         ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
-        : 'Caso in carico locale, pronto per diario, documenti e follow-up contestuale.';
+        : 'Nessuna diagnosi codificata nella scheda.';
     const nextStepText = nextCheckup
         ? `Preparare "${nextCheckup.title}" e riallineare il diario prima del ${new Date(nextCheckup.date).toLocaleDateString('it-IT')}.`
         : documentInsights.length > 0
@@ -256,14 +256,6 @@ export default function PatientDetailPage() {
                     Report PDF
                 </button>
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-[color:var(--mf-muted)]">
-                <span>{nonScaleEntries.length} eventi</span>
-                <span aria-hidden>·</span>
-                <span>{(checkups ?? []).length} follow-up</span>
-                <span aria-hidden>·</span>
-                <span>{documentInsights.length} evidenze</span>
-            </div>
         </div>
     );
 
@@ -271,7 +263,7 @@ export default function PatientDetailPage() {
         <Kree8WorkspaceShell
             eyebrow="Scheda clinica"
             title="Scheda paziente"
-            subtitle="Dati, timeline, terapie, documenti e valutazioni del paziente in un'unica vista."
+            subtitle="La cartella di lavoro del paziente: da qui registri, aggiorni ed esporti la documentazione clinica."
             backHref={`/patients/${id}`}
             backLabel="Quadro paziente"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
@@ -305,7 +297,7 @@ export default function PatientDetailPage() {
                                     Timeline clinica
                                 </h2>
                                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                                    Visite, controlli e referti nello stesso asse di lettura del caso.
+                                    Visite, controlli e referti del caso riuniti in un&apos;unica sequenza cronologica.
                                 </p>
                             </div>
                             <span className="apple-chip self-start md:self-auto">
@@ -397,7 +389,7 @@ export default function PatientDetailPage() {
 
                     <section id="archivio" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Archivio documenti</p>
+                            <p className="section-kicker">Documenti</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Archivio documenti</h3>
                         </div>
                         <DocumentUpload patientId={id} />
@@ -436,12 +428,11 @@ export default function PatientDetailPage() {
 
                     <section id="follow-up" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Follow-up</p>
+                            <p className="section-kicker">Pianificazione</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 <Calendar className="h-5 w-5 text-[color:var(--mf-muted)]" />
                                 Follow-up
                             </h3>
-                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">Valutazioni, visite e controlli pianificati.</p>
                         </div>
 
                         {!checkups || checkups.length === 0 ? (

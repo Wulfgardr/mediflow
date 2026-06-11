@@ -195,10 +195,9 @@ export default function EditPatientPage() {
             <Kree8WorkspaceShell
                 eyebrow="Scheda paziente"
                 title="Modifica dati"
-                subtitle="Caricamento della scheda locale prima di mostrare il form."
+                subtitle="Caricamento della scheda in corso."
                 backHref={`/patients/${id}/modules`}
                 backLabel="Torna alla scheda paziente"
-                statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
                 <div className={workspaceStyles.loadingCard}>Caricamento scheda...</div>
@@ -210,11 +209,10 @@ export default function EditPatientPage() {
         <Kree8WorkspaceShell
             eyebrow="Scheda paziente"
             title="Modifica dati"
-            subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale senza uscire dalla scheda."
+            subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale."
             backHref={`/patients/${id}/modules`}
             backLabel="Torna alla scheda paziente"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
-            statusLabel="Scrittura locale: ogni modifica resta nella banca dati MediFlow."
             navItems={workspaceNavItems}
         >
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
@@ -260,13 +258,6 @@ export default function EditPatientPage() {
                     </div>
 
                     <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
-                        <div className="max-w-md">
-                            <h4 className="mb-2 text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Operazioni sulla scheda</h4>
-                            <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
-                                Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
-                            </p>
-                        </div>
-
                         <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                             <button
                                 type="button"

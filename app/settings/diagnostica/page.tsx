@@ -14,7 +14,7 @@ export default function SettingsDiagnosticsPage() {
             <SettingsSectionIntro
                 kicker="Avanzate"
                 title="Diagnostica"
-                description="Stato dei servizi locali, architettura della postazione e aggiornamenti software."
+                description="Stato dei servizi, architettura della postazione e aggiornamenti software."
             />
 
             <div className="space-y-6">

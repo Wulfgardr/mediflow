@@ -53,7 +53,7 @@ export default function SettingsAccessPage() {
             <SettingsSectionIntro
                 kicker="Sicurezza e Dati"
                 title="Accesso"
-                description="Rotazione del PIN di sblocco e controllo della sessione locale."
+                description="Rotazione del PIN di sblocco e controllo della sessione."
             />
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -153,7 +153,7 @@ export default function SettingsAccessPage() {
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Sessione</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Sessione locale</h2>
+                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Sessione corrente</h2>
                             <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>
                                 Una sola sessione attiva su questa postazione. Il blocco richiede il PIN al prossimo accesso.
                             </p>

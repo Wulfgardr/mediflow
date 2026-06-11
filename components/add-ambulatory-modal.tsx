@@ -80,7 +80,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold leading-tight" style={{ color: 'var(--mf-ink)' }}>Nuova sede o reparto</h2>
-                            <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>Aggiungi un contesto clinico locale</p>
+                            <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>Aggiungi una sede clinica o un reparto collegato a un contesto esistente</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" title="Chiudi" aria-label="Chiudi">

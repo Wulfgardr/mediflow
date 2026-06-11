@@ -46,7 +46,7 @@ export default function SettingsPage() {
                             Stato operativo
                         </h2>
                         <p className="mt-2 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
-                            Da qui si regolano accesso, modelli, archivi e servizi del computer. Nessun dato clinico viene inviato fuori dal dispositivo.
+                            Nessun dato clinico viene inviato fuori dal dispositivo.
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                             <div className="[&>div]:mx-0">
@@ -73,7 +73,7 @@ export default function SettingsPage() {
                 <SettingsSectionIntro
                     kicker="Sezioni"
                     title="Tutte le impostazioni"
-                    description="Le impostazioni sono organizzate per area. Usa la barra laterale o la ricerca rapida (⌘K) per saltare a una sezione."
+                    description="Premi ⌘K per cercare un'impostazione e aprire subito la sezione corrispondente."
                 />
 
                 <div className="space-y-6">

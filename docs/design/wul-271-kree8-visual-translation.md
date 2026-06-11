@@ -1,12 +1,12 @@
-# WUL-271/WUL-272/WUL-274 · Kree8 → MediFlow visual translation
+# Kree8 → MediFlow visual translation
 
-> Status: live root entry on `/` as of `WUL-272`; first real-patient
-> cockpit slice in progress under `WUL-273`.
-> PIN continuity: lock screen aligned to the live Kree8 grammar as of `WUL-274`.
-> Review alias: `/mockups/kree8`.
-> Scope: full-surface visual reset promoted to the local web entrypoint as the
-> new app interface direction; real clinical data wiring is being migrated in
-> small verified slices under WUL-273.
+| | |
+| --- | --- |
+| **Tracking** | WUL-271 (translation) · WUL-272 (live root) · WUL-273 (real-data slices) · WUL-274 (PIN continuity) |
+| **Status** | Live root entry on `/`; real-patient cockpit slices in progress under `WUL-273` |
+| **Review alias** | `/mockups/kree8` (synthetic data, design QA only) |
+| **Last visual pass** | 2026-06-11: meta-text purge, restrained semantic colour restoration, type/radius normalization, dark-token completion, one-click Scheda flow |
+| **Scope** | Full-surface visual reset promoted to the local web entrypoint as the new app interface direction; real clinical data wiring migrates in small verified slices |
 
 ## Why this doc exists
 
@@ -57,8 +57,8 @@ leaks into `:root` or other surfaces.
 | True white canvas card | `--surface` | 28px radius, soft shadow + 1px inset border. |
 | Raised white nav pill | `.navSelected` | White fill, 13px radius, soft shadow, chevron affordance. |
 | Oversized rounded glass toolbar | `.toolbar` | 18px radius, inset highlight, inner search pill + chips. |
-| AI gradient capsule | `.aiButton` | Pink → orange → violet, sparkle icon, soft drop shadow. **Only AI entry point uses gradient.** |
-| Status pills (yellow/blue/green/coral/muted/violet/ink) | `--pill-*-bg` / `--pill-*-fg` | Tight 4×10 px padding, tabular text. |
+| AI gradient capsule | `.aiButton` | Restrained ink → violet → plum gradient via `--accent-ai` (light and dark variants), sparkle icon, soft drop shadow. **Only AI entry point uses gradient.** |
+| Status pills (yellow/blue/green/coral/muted/violet/ink) | `--pill-*-bg` / `--pill-*-fg` | Tight 4×10 px padding, tabular text. Semantic hues are real but restrained (green/amber/blue/violet/coral) with matching dark-mode pairs; muted stays slate. |
 | Segmented toggle | `.segmented` + `.segItem`/`.segSelected` | Used for the AI / Source switch on the patient panel. |
 | Stepper minus/plus | `.stepper` + `.stepperBtn` | Disabled at the boundary; tabular number. |
 | Pricing-row gradient (green) | **dropped in v2** | Replaced by `.freshness` as a white control with a thin semantic left rail (`--rail-green/blue/yellow/coral`) so AIFA stops reading like a celebratory pricing card. |
@@ -106,7 +106,7 @@ clinician-facing MediFlow nomenclature.
 | Area pill | Demonstrates |
 | --- | --- |
 | Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
-| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows, sticky `Anteprima caso` preview with `Apri quadro` / `Apri scheda` / `Prepara SISS`. |
+| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows with a per-row direct `Apri scheda` action, sticky `Anteprima caso` preview with primary `Apri scheda paziente` plus `Quadro` (in-cockpit), `Nuova voce`, `Documenti`, `Prepara SISS`. |
 | Quadro paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
 | Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
 | Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
@@ -182,9 +182,13 @@ zone" wording.
 - Patient inbox scope (`Ambulatorio locale` / `Rete locale` / `Tutti`) and
   list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
   rows come from `/api/patients`; selecting a row animates an `Anteprima caso`
-  preview; `Apri quadro` jumps to the cockpit overview (`Quadro paziente`)
-  while `Apri scheda` opens the patient workspace route at
-  `/patients/[id]/modules`.
+  preview. One word, one concept: `Scheda paziente` is the only route
+  destination (`/patients/[id]/modules`) and the primary action everywhere
+  (row-level direct action plus `Apri scheda paziente` in the preview), while
+  `Quadro` is the in-cockpit overview reached without a route change. The
+  preview also offers `Nuova voce` and `Documenti` so the three most frequent
+  tasks stay within two clicks; `/patients/[id]` remains a deep-link to the
+  cockpit Quadro for back-navigation.
 - Quadro paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
 - Document field decision tri-state per row with evidence snippet, kind label
   (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
