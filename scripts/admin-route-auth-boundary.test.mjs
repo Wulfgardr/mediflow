@@ -13,7 +13,10 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/audit/route.ts', handlers: ['GET'] },
     { file: 'app/api/system/backup-restore/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/backup-scheduler/route.ts', handlers: ['GET', 'POST'] },
+    { file: 'app/api/system/fix-orphans/route.ts', handlers: ['GET', 'POST'] },
+    { file: 'app/api/system/purge-patient/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/repair-db/route.ts', handlers: ['POST'] },
+    { file: 'app/api/system/restore-patient/route.ts', handlers: ['GET', 'POST'] },
 ];
 
 /* @Codex */

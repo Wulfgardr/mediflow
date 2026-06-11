@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -176,4 +178,18 @@ test('network-scoped upsert inside a transaction leaves other memberships untouc
     });
 
     assert.deepEqual(listMemberships(db), ['amb-1', 'amb-2']);
+});
+
+test('legacy patient PUT route uses set-primary semantics instead of delete-all membership replacement', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'app/api/patients/[id]/route.ts'), 'utf8');
+    assert.match(
+        source,
+        /upsertPrimaryAmbulatoryMembership\(dbServer,\s*id,\s*normalized\.values\.ambulatoryId\)/,
+        'legacy route should share the same set-primary helper as the v1 route'
+    );
+    assert.doesNotMatch(
+        source,
+        /delete\(patientsToAmbulatories\)\.where\(eq\(patientsToAmbulatories\.patientId,\s*id\)\)/,
+        'legacy route must not delete all ambulatory memberships on profile PUT'
+    );
 });

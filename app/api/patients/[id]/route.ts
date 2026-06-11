@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { patients, patientsToAmbulatories } from '@/lib/schema';
+import { patients } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -10,6 +10,8 @@ import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/
 import { activePatients, buildPatientTombstoneValues } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
+/* @Codex */
+import { upsertPrimaryAmbulatoryMembership } from '@/lib/patient-ambulatory-membership';
 /* @Codex */
 import {
     auditContextFromSession,
@@ -113,15 +115,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }
 
         if (Object.prototype.hasOwnProperty.call(body, 'ambulatoryId')) {
-            await dbServer.delete(patientsToAmbulatories).where(eq(patientsToAmbulatories.patientId, id));
-            const normalizedAmbulatoryId = normalized.values.ambulatoryId;
-            if (typeof normalizedAmbulatoryId === 'string' && normalizedAmbulatoryId.trim().length > 0) {
-                await dbServer.insert(patientsToAmbulatories).values({
-                    patientId: id,
-                    ambulatoryId: normalizedAmbulatoryId,
-                    assignedAt: new Date()
-                }).onConflictDoNothing();
-            }
+            // WUL-334: match WUL-309 set-primary semantics used by /api/v1 and
+            // network writes. A profile edit must not rewrite other memberships.
+            upsertPrimaryAmbulatoryMembership(dbServer, id, normalized.values.ambulatoryId);
         }
 
         /* @Codex */

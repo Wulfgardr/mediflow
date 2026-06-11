@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 // WUL-306 (ADR 0066): historical orphan child rows (patient_id no longer resolves)
 import {
     countOrphanedClinicalRows,
@@ -20,7 +22,7 @@ export async function GET() {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const defaults = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         console.log("Fixing Orphans...");

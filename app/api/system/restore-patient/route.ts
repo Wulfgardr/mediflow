@@ -4,6 +4,8 @@ import { desc, eq, isNotNull } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 import { buildPatientRestoreValues } from '@/lib/patient-lifecycle';
 import { safeWriteAuditEventFromRequest } from '@/lib/audit';
 
@@ -13,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const softDeleted = await dbServer
@@ -39,7 +41,7 @@ export async function GET() {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const body = await request.json().catch(() => ({})) as Record<string, unknown>;

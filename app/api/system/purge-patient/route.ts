@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 import {
     countPatientCascadeRows,
     purgePatientCascade,
@@ -31,7 +33,7 @@ function selectPatientLifecycleRow(patientId: string) {
 export async function GET(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const { searchParams } = new URL(request.url);
@@ -63,7 +65,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const body = await request.json().catch(() => ({})) as Record<string, unknown>;
