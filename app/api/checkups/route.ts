@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -24,16 +24,24 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
     try {
-        let query = dbServer.select().from(checkups);
-
         if (patientId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(eq(checkups.patientId, patientId)) as any;
+            const whereClause = includeDeleted
+                ? eq(checkups.patientId, patientId)
+                : and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt));
+            const data = await dbServer.select().from(checkups).where(whereClause).orderBy(desc(checkups.date));
+            const normalizedData = data.map((checkup) => ({
+                ...checkup,
+                status: normalizeCheckupStatus(checkup.status),
+            }));
+            return NextResponse.json(normalizedData);
         }
 
-        const data = await query.orderBy(desc(checkups.date));
+        const data = includeDeleted
+            ? await dbServer.select().from(checkups).orderBy(desc(checkups.date))
+            : await dbServer.select().from(checkups).where(isNull(checkups.deletedAt)).orderBy(desc(checkups.date));
         const normalizedData = data.map((checkup) => ({
             ...checkup,
             status: normalizeCheckupStatus(checkup.status),

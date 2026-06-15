@@ -13,6 +13,10 @@ import {
 /* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
 /* @Codex */
+import type { EntryVersionConflictPayload } from './entry-concurrency';
+/* @Codex */
+import type { CheckupVersionConflictPayload } from './checkup-concurrency';
+/* @Codex */
 import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
@@ -26,6 +30,23 @@ import {
     isApiTableUnavailableStatus,
     notifyApiAuthUnavailable,
 } from './api-table-response';
+
+/* @Codex */
+export type ApiVersionConflictPayload =
+    | PatientVersionConflictPayload
+    | EntryVersionConflictPayload
+    | CheckupVersionConflictPayload;
+
+/* @Codex */
+function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflictPayload {
+    if (isPatientVersionConflictPayload(value)) return true;
+    if (!value || typeof value !== 'object') return false;
+
+    const payload = value as Record<string, unknown>;
+    return payload.code === 'VERSION_CONFLICT'
+        && (payload.entity === 'entry' || payload.entity === 'checkup')
+        && typeof payload.recordId === 'string';
+}
 // Document insight from OCR + AI synthesis
 /* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
@@ -126,6 +147,8 @@ export interface ClinicalEntry {
     updatedAt: Date;
     deletedAt?: Date | null;
     deletionReason?: string | null;
+    /* @Codex */
+    version?: number;
     metadata?: Record<string, unknown>;
     attachments?: string[];
     setting?: 'home' | 'hospital' | 'ambulatory';
@@ -209,17 +232,27 @@ class ApiTable<T> {
     private _filterFn?: (item: T) => boolean;
     private _limit?: number;
     private _reverse?: boolean;
+    /* @Codex */
+    private _includeDeleted?: boolean;
 
     private clone(): ApiTable<T> {
         const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey);
         copy._filterFn = this._filterFn;
         copy._limit = this._limit;
         copy._reverse = this._reverse;
+        copy._includeDeleted = this._includeDeleted;
         return copy;
     }
 
+    /* @Codex */
+    includeDeleted(): ApiTable<T> {
+        const clone = this.clone();
+        clone._includeDeleted = true;
+        return clone;
+    }
+
     async toArray(): Promise<T[]> {
-        const res = await fetch(this.endpoint, { cache: 'no-store' });
+        const res = await fetch(this.buildListEndpoint(), { cache: 'no-store' });
         /* @Codex */
         if (isApiTableAuthUnavailableStatus(res.status)) {
             notifyApiAuthUnavailable(res.status);
@@ -253,6 +286,13 @@ class ApiTable<T> {
         return (await this.toArray()).length;
     }
 
+    /* @Codex */
+    private buildListEndpoint(): string {
+        if (!this._includeDeleted) return this.endpoint;
+        const separator = this.endpoint.includes('?') ? '&' : '?';
+        return `${this.endpoint}${separator}includeDeleted=true`;
+    }
+
 
 
     // Deprecated orderBy shim (just returns self for chaining)
@@ -275,7 +315,7 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    private buildVersionConflictError(payload: PatientVersionConflictPayload): ApiConflictError {
+    private buildVersionConflictError(payload: ApiVersionConflictPayload): ApiConflictError {
         return new ApiConflictError(payload);
     }
 
@@ -311,8 +351,8 @@ class ApiTable<T> {
     async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
         /* @Codex */
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
-        if (this.tableName === 'patients' && typeof maybeVersion !== 'number') {
-            throw new Error('Missing required version for patient update');
+        if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
+            throw new Error(`Missing required version for ${this.versionedEntityLabel()} update`);
         }
 
         const encryptedChanges = await this.encryptItem(changes as T, true);
@@ -323,7 +363,7 @@ class ApiTable<T> {
         });
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
-            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+            if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
             throw new Error("Failed to update item");
@@ -332,21 +372,24 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    async delete(id: string, options?: { suppressNotify?: boolean; version?: number }): Promise<void> {
-        if (this.tableName === 'patients' && typeof options?.version !== 'number') {
-            throw new Error('Missing required version for patient delete');
+    async delete(id: string, options?: { suppressNotify?: boolean; version?: number; deletionReason?: string }): Promise<void> {
+        if (this.requiresVersionedWrite() && typeof options?.version !== 'number') {
+            throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
         }
 
         const init: RequestInit = { method: 'DELETE' };
-        if (typeof options?.version === 'number') {
+        if (typeof options?.version === 'number' || typeof options?.deletionReason === 'string') {
             init.headers = { 'Content-Type': 'application/json' };
-            init.body = JSON.stringify({ version: options.version });
+            init.body = JSON.stringify({
+                ...(typeof options?.version === 'number' ? { version: options.version } : {}),
+                ...(typeof options?.deletionReason === 'string' ? { deletionReason: options.deletionReason } : {}),
+            });
         }
 
         const res = await fetch(`${this.endpoint}/${id}`, init);
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
-            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+            if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
             throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
@@ -356,7 +399,13 @@ class ApiTable<T> {
 
     async bulkDelete(ids: string[]): Promise<void> {
         if (ids.length === 0) return;
-        await Promise.all(ids.map(id => this.delete(id, { suppressNotify: true })));
+        const versionsById = this.requiresVersionedWrite()
+            ? await this.getVersionsByIdForDelete(ids)
+            : new Map<string, number>();
+        await Promise.all(ids.map(id => this.delete(id, {
+            suppressNotify: true,
+            version: versionsById.get(id),
+        })));
         this.emitChange();
     }
 
@@ -411,8 +460,8 @@ class ApiTable<T> {
             if (!id) {
                 throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
             }
-            const version = this.tableName === 'patients'
-                ? this.getPatientVersion(item)
+            const version = this.requiresVersionedWrite()
+                ? this.getRecordVersion(item)
                 : undefined;
             return this.delete(id, { suppressNotify: true, version });
         }));
@@ -429,10 +478,48 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    private getPatientVersion(item: unknown): number | undefined {
-        if (this.tableName !== 'patients' || !item || typeof item !== 'object') return undefined;
+    private getRecordVersion(item: unknown): number | undefined {
+        if (!this.requiresVersionedWrite() || !item || typeof item !== 'object') return undefined;
         const record = item as Record<string, unknown>;
         return typeof record.version === 'number' ? record.version : undefined;
+    }
+
+    /* @Codex */
+    private requiresVersionedWrite(): boolean {
+        return this.tableName === 'patients' || this.tableName === 'entries' || this.tableName === 'checkups';
+    }
+
+    /* @Codex */
+    private versionedEntityLabel(): string {
+        if (this.tableName === 'patients') return 'patient';
+        if (this.tableName === 'entries') return 'entry';
+        if (this.tableName === 'checkups') return 'checkup';
+        return this.tableName;
+    }
+
+    /* @Codex */
+    private async getVersionsByIdForDelete(ids: string[]): Promise<Map<string, number>> {
+        const requestedIds = new Set(ids);
+        const versionsById = new Map<string, number>();
+        const items = await this.toArray();
+
+        for (const item of items) {
+            const id = this.getItemIdentifier(item);
+            if (!id || !requestedIds.has(id)) continue;
+
+            const version = this.getRecordVersion(item);
+            if (typeof version !== 'number') {
+                throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
+            }
+            versionsById.set(id, version);
+        }
+
+        const missingIds = ids.filter((id) => !versionsById.has(id));
+        if (missingIds.length > 0) {
+            throw new Error(`Missing required version for ${missingIds.length} ${this.versionedEntityLabel()} delete(s)`);
+        }
+
+        return versionsById;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -629,9 +716,9 @@ export const db = new MedicalApiClient();
 
 /* @Codex */
 export class ApiConflictError extends Error {
-    readonly payload: PatientVersionConflictPayload;
+    readonly payload: ApiVersionConflictPayload;
 
-    constructor(payload: PatientVersionConflictPayload) {
+    constructor(payload: ApiVersionConflictPayload) {
         super('Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova.');
         this.name = 'ApiConflictError';
         this.payload = payload;
