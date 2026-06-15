@@ -25,6 +25,7 @@ const TO_EXCLUDE_BY_NAME = [
     'Build',
     'certs',
     'oss-assets',
+    'prompt-exports',
     'brain',
     '.gemini',
     'Farmaci',
@@ -52,6 +53,8 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/clinical-facts-benchmark-observations.md',
     'docs/cloud-comparator-shadow-eval.md',
     'docs/codex-opus-dialogue.md',
+    'docs/agentic-development-operating-loop.md',
+    'docs/agentic-dual-thesis-run-ledger-template.md',
     'docs/dialogue',
     'docs/document-intelligence-lab.md',
     'docs/e2e-smoke.md',
@@ -68,6 +71,11 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/adr/0041-openmed-redaction-shadow-adapter.md',
     'docs/adr/0043-macos-oncology-backbone-prototype.md',
     'docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md',
+    'docs/adr/0067-agentic-development-operating-loop.md',
+    'docs/analysis',
+    'docs/analysis/2026-06-01-agentic-dynamics-test-run.md',
+    'docs/analysis/2026-06-01-agentic-parliament-repoprompt-export.md',
+    'docs/analysis/2026-06-01-agentic-parliament-run.md',
     'docs/private',
     'docs/linear-codex-playbook.md',
     'docs/linear-seed-issues.csv',
@@ -75,6 +83,8 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/linear-import-open.mf-core-q2.linear.csv',
     'docs/linear-import-open.mf-parity-q2.linear.csv',
     'docs/linear-import-open.mf-fse-q2.linear.csv',
+    'scripts/agentic-stack-readiness.mjs',
+    'scripts/agentic-stack-readiness.test.mjs',
     'scripts/cloud-comparator-shadow-eval.test.ts',
     'scripts/cloud-comparator-shadow-eval.ts',
     'scripts/check-apple-wide-qa-manifest.mjs',
@@ -121,6 +131,7 @@ const REPLACEMENTS = [
 const MARKDOWN_LINK_PATTERN = /(!?)\[([^\]]*)\]\(([^)]+)\)/g;
 const INLINE_DOC_REF_PATTERN = /`([^`\n]*?\.md(?:#[^`\n]+)?)`/g;
 const OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS = [
+    'agentic:readiness',
     'benchmark:cloud-comparator',
     'check:apple-wide-qa',
     'linear:import:all',
@@ -131,6 +142,7 @@ const OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS = [
     'mcp:siss-fse-corpus:test',
     'mcp:siss-fse-corpus:validate',
     'prepare:oss',
+    'test:agentic-readiness',
     'test:cloud-comparator'
 ];
 function escapeRegExp(value) {
@@ -142,6 +154,9 @@ const PRIVATE_MARKDOWN_LINE_PATTERNS = [
         .filter((excludedPath) => excludedPath.endsWith('.md'))
         .map((excludedPath) => new RegExp(escapeRegExp(path.basename(excludedPath)))),
     /docs\/private\//,
+    /\]\(\.\/analysis\//,
+    /\]\(\.\.\/analysis\//,
+    /docs\/analysis\//,
     /apple-wide-parity-qa/,
     /apple-wide-qa/,
     /check:apple-wide-qa/,
