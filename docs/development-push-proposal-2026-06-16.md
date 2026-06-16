@@ -250,9 +250,10 @@ queste superfici, in base a cio che sara davvero entrato su `main`:
   controllo manuale dei link Markdown toccati.
 - Check minimi per runtime: test mirati, guard repo-locali, e dichiarazione
   esplicita se `typecheck`, `build` o smoke non sono stati eseguiti.
-- Stato locale da non nascondere: il file untracked `-source.ts` e il blocco
-  Node `--experimental-strip-types` su alcune prove restano problemi separati,
-  non evidenza contro questa proposta docs-only.
+- Stato locale riconciliato: i due artefatti untracked della sessione sono
+  stati rimossi prima del push. Il blocco Node `--experimental-strip-types` su
+  alcune prove resta un problema separato, non evidenza contro questa proposta
+  docs-only.
 
 ## Prossimo push consigliato
 
