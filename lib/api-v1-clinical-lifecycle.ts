@@ -15,7 +15,10 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
 }
 
-export async function parseClinicalDeleteBody(request: Request): Promise<ClinicalDeleteBodyResult> {
+export async function parseClinicalDeleteBody(
+    request: Request,
+    defaultDeletionReason = 'api-v1-delete',
+): Promise<ClinicalDeleteBodyResult> {
     const text = await request.text();
     let body: Record<string, unknown> = {};
     if (text.trim().length > 0) {
@@ -34,7 +37,7 @@ export async function parseClinicalDeleteBody(request: Request): Promise<Clinica
         return { ok: false, error: 'Invalid deletedAt' };
     }
 
-    let deletionReason = 'api-v1-delete';
+    let deletionReason = defaultDeletionReason;
     if (hasOwn(body, 'deletionReason')) {
         if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) {
             return { ok: false, error: 'Invalid deletionReason' };

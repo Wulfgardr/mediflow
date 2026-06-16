@@ -48,7 +48,9 @@
     ".next-manual-browser/types/**/*.ts",
     ".next-manual-browser/dev/types/**/*.ts",
     ".next-api-v1-put-negative/types/**/*.ts",
-    ".next-api-v1-put-negative/dev/types/**/*.ts"
+    ".next-api-v1-put-negative/dev/types/**/*.ts",
+    ".next-legacy-clinical-writes/types/**/*.ts",
+    ".next-legacy-clinical-writes/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

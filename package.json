@@ -29,6 +29,7 @@
     "test:workflow-monitor": "node --test scripts/codex-workflow-monitor.test.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
+    "test:legacy-clinical-writes": "bash scripts/legacy-clinical-writes-test.sh",
     "test:document-input-normalization": "bash scripts/document-input-normalization-test.sh",
     "test:ocr-service:date": "bash scripts/ocr-service-date-test.sh",
     "test:ollama-pull-stream": "bash scripts/ollama-pull-stream-test.sh",

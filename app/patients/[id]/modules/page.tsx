@@ -41,7 +41,7 @@ export default function PatientDetailPage() {
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
         async () => {
-            const items = await db.entries.filter((entry: ClinicalEntry) => entry.patientId === id).toArray();
+            const items = await db.entries.includeDeleted().filter((entry: ClinicalEntry) => entry.patientId === id).toArray();
             return items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
         },
         [id],
