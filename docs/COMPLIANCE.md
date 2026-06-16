@@ -11,7 +11,7 @@ Riferimenti correlati:
 
 ---
 
-## 1. GDPR e privacy
+## ⚖️ 1. GDPR e privacy
 
 MediFlow segue il principio **Privacy by Design**.
 Nel contesto clinico, il medico resta il **Titolare del Trattamento**: il software è uno strumento, non un sostituto delle responsabilità.
@@ -29,12 +29,12 @@ Per supportare gli obblighi GDPR (Art. 32), MediFlow implementa:
 
 Il GDPR garantisce diritti specifici ai pazienti. In MediFlow:
 
-* **Diritto all'oblio (Art. 17)**: puoi eliminare un paziente con workflow controllato.
-* **Portabilità dei dati (Art. 20)**: puoi esportare la storia clinica in formato interoperabile.
+* **Diritto all'oblio (Art. 17)**: la cancellazione del paziente scrive un tombstone reversibile (`deletedAt` / `deletionReason`) con version guard, senza orfanare i figli clinici. L'erasure GDPR esplicita è l'azione admin `purge-patient`, con dry-run e audit `patient.purged`; il ripristino è `restore-patient`, con audit `patient.restored`.
+* **Portabilità dei dati (Art. 20)**: puoi esportare la storia clinica in formato interoperabile (vedi sotto).
 
 ---
 
-## 2. Interoperabilità (FHIR R4)
+## 🔌 2. Interoperabilità (FHIR R4)
 
 MediFlow adotta **HL7 FHIR R4** per evitare lock-in e facilitare integrazione/export.
 
@@ -42,19 +42,19 @@ MediFlow adotta **HL7 FHIR R4** per evitare lock-in e facilitare integrazione/ex
 
 Con l'export clinico viene generato un pacchetto JSON compatibile FHIR R4.
 
-**Cosa contiene il pacchetto?**
-
-* **Patient**: Anagrafica.
-* **Condition**: Le diagnosi (codificate ICD-11/ICD-9).
-* **Encounter**: Le visite effettuate.
-* **MedicationStatement**: Le terapie prescritte.
-* **Observation**: Note e parametri rilevati.
+| Risorsa FHIR | Contenuto |
+|---|---|
+| `Patient` | Anagrafica |
+| `Condition` | Diagnosi (codificate ICD-11/ICD-9) |
+| `Encounter` | Visite effettuate |
+| `MedicationStatement` | Terapie prescritte |
+| `Observation` | Note e parametri rilevati |
 
 Obiettivo: mantenere i dati riusabili anche fuori da MediFlow.
 
 ---
 
-## 3. Standard diagnostici (ICD-11)
+## 🩺 3. Standard diagnostici (ICD-11)
 
 Le diagnosi non restano solo testo libero: MediFlow integra ICD-11 via API OMS locale.
 

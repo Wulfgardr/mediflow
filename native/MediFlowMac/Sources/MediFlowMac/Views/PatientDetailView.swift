@@ -880,10 +880,15 @@ struct PatientDetailView: View {
             entriesErrorMessage = "Indica il motivo dell'archiviazione."
             return
         }
+        guard let version = entry.version else {
+            entriesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
             try await LocalAPIClient.shared.softDeleteEntry(
                 patientId: patientId,
                 entryId: entry.id,
+                expectedVersion: version,
                 deletedAt: Date(),
                 reason: trimmed
             )
@@ -896,8 +901,16 @@ struct PatientDetailView: View {
     @MainActor
     private func restoreEntry(_ entry: EntrySummary) async {
         pendingRestoreEntry = nil
+        guard let version = entry.version else {
+            entriesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.restoreEntry(patientId: patientId, entryId: entry.id)
+            try await LocalAPIClient.shared.restoreEntry(
+                patientId: patientId,
+                entryId: entry.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             entriesErrorMessage = message(for: error, fallback: "Impossibile ripristinare la voce clinica.")
@@ -908,8 +921,16 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteTherapy(_ therapy: TherapySummary) async {
         pendingDeleteTherapy = nil
+        guard let version = therapy.version else {
+            therapiesErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteTherapy(patientId: patientId, therapyId: therapy.id)
+            try await LocalAPIClient.shared.deleteTherapy(
+                patientId: patientId,
+                therapyId: therapy.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             therapiesErrorMessage = message(for: error, fallback: "Impossibile eliminare la terapia.")
@@ -920,8 +941,16 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteCheckup(_ checkup: CheckupSummary) async {
         pendingDeleteCheckup = nil
+        guard let version = checkup.version else {
+            checkupsErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteCheckup(patientId: patientId, checkupId: checkup.id)
+            try await LocalAPIClient.shared.deleteCheckup(
+                patientId: patientId,
+                checkupId: checkup.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             checkupsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'appuntamento.")
@@ -932,13 +961,24 @@ struct PatientDetailView: View {
     @MainActor
     private func deleteObservation(_ observation: ObservationSummary) async {
         pendingDeleteObservation = nil
+        guard let version = observation.version else {
+            observationsErrorMessage = Self.missingVersionMessage
+            return
+        }
         do {
-            try await LocalAPIClient.shared.deleteObservation(patientId: patientId, observationId: observation.id)
+            try await LocalAPIClient.shared.deleteObservation(
+                patientId: patientId,
+                observationId: observation.id,
+                expectedVersion: version
+            )
             await loadClinicalSections()
         } catch {
             observationsErrorMessage = message(for: error, fallback: "Impossibile eliminare l'osservazione.")
         }
     }
+
+    // WUL-308: mutations on the clinical sub-resources require the record version.
+    static let missingVersionMessage = "Versione del record non disponibile: ricarica la scheda e riprova."
 
     @MainActor
     private func runAI() async {
@@ -1753,6 +1793,36 @@ private struct TherapyRowView: View {
                 Text(therapy.dosage)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                if hasClinicalMetadata {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            if let activePrinciple = cleaned(therapy.activePrinciple) {
+                                TagView(text: activePrinciple, tone: .secondary)
+                            }
+                            if let atc = cleaned(therapy.atc) {
+                                TagView(text: "ATC \(atc)", tone: .accentColor)
+                            }
+                            if let aic = cleaned(therapy.aic) {
+                                Text("AIC \(aic)")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let indicationLine {
+                            Text(indicationLine)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        if let motivation = cleaned(therapy.motivation) {
+                            Text(motivation)
+                                .font(.caption)
+                                .italic()
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
                 Text(dateRange(for: therapy))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1783,6 +1853,30 @@ private struct TherapyRowView: View {
             return "\(start) -> \(dateFormatter.string(from: end))"
         }
         return "\(start) -> in corso"
+    }
+
+    /* @Codex */
+    private var hasClinicalMetadata: Bool {
+        cleaned(therapy.activePrinciple) != nil ||
+            cleaned(therapy.aic) != nil ||
+            cleaned(therapy.atc) != nil ||
+            indicationLine != nil ||
+            cleaned(therapy.motivation) != nil
+    }
+
+    /* @Codex */
+    private var indicationLine: String? {
+        guard let code = cleaned(therapy.diagnosisCode) else { return nil }
+        if let name = cleaned(therapy.diagnosisName) {
+            return "\(code) · \(name)"
+        }
+        return code
+    }
+
+    /* @Codex */
+    private func cleaned(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func tone(for status: String) -> Color {
@@ -1826,6 +1920,12 @@ private struct CheckupRowView: View {
                 Text(dateFormatter.string(from: checkup.date))
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                if let notes = cleaned(checkup.notes) {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
 
             /* @Codex */
@@ -1854,6 +1954,12 @@ private struct CheckupRowView: View {
         case "cancelled": return .red
         default: return .secondary
         }
+    }
+
+    /* @Codex */
+    private func cleaned(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var dateFormatter: DateFormatter {
@@ -2018,6 +2124,11 @@ private struct EditEntryView: View {
             return
         }
 
+        guard let version = entry.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
+            return
+        }
+
         do {
             guard let encryptedContent = try security.encryptString(trimmed) else {
                 errorMessage = "Impossibile cifrare il contenuto"
@@ -2025,6 +2136,7 @@ private struct EditEntryView: View {
             }
 
             let payload = UpdateEntryPayload(
+                version: version,
                 type: entryType,
                 date: date,
                 content: encryptedContent
@@ -2035,6 +2147,8 @@ private struct EditEntryView: View {
         } catch {
             if let cryptoError = error as? CryptoService.CryptoError {
                 errorMessage = cryptoError.message
+            } else if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
             } else {
                 errorMessage = "Aggiornamento fallito"
             }
@@ -2051,11 +2165,16 @@ private struct EditTherapyView: View {
     let onSaved: () -> Void
 
     @State private var drugName: String
+    @State private var activePrinciple: String
     @State private var dosage: String
+    @State private var motivation: String
     @State private var status: String
     @State private var startDate: Date
     @State private var includeEndDate: Bool
     @State private var endDate: Date
+    @State private var isManualDrug: Bool
+    @State private var selectedDrug: DrugSummary?
+    @State private var selectedICD: ICDResult?
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -2064,19 +2183,83 @@ private struct EditTherapyView: View {
         self.therapy = therapy
         self.onSaved = onSaved
         _drugName = State(initialValue: therapy.drugName)
+        _activePrinciple = State(initialValue: therapy.activePrinciple ?? "")
         _dosage = State(initialValue: therapy.dosage)
+        _motivation = State(initialValue: therapy.motivation ?? "")
         _status = State(initialValue: normalizedTherapyStatus(therapy.status))
         _startDate = State(initialValue: therapy.startDate)
         _includeEndDate = State(initialValue: therapy.endDate != nil)
         _endDate = State(initialValue: therapy.endDate ?? Date())
+        _isManualDrug = State(initialValue: therapy.aic == nil && therapy.atc == nil)
+        if let diagnosisCode = therapy.diagnosisCode {
+            _selectedICD = State(initialValue: ICDResult(
+                code: diagnosisCode,
+                description: therapy.diagnosisName ?? diagnosisCode,
+                system: "MediFlow"
+            ))
+        } else {
+            _selectedICD = State(initialValue: nil)
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Form {
                 Section("Farmaco") {
+                    Toggle("Farmaco manuale / galenico", isOn: $isManualDrug)
+                        .onChange(of: isManualDrug) { newValue in
+                            if newValue {
+                                selectedDrug = nil
+                            }
+                        }
                     TextField("Nome farmaco", text: $drugName)
+                    DrugSearchField(selection: $selectedDrug)
+                        .onChange(of: selectedDrug) { newValue in
+                            if let newValue {
+                                drugName = newValue.name
+                                activePrinciple = newValue.activePrinciple ?? ""
+                                isManualDrug = false
+                            }
+                        }
+                        .disabled(isManualDrug)
+                    TextField("Principio attivo", text: $activePrinciple)
+                        .disabled(!isManualDrug && (selectedDrug != nil || therapy.aic != nil || therapy.atc != nil))
+                    if let catalogLine {
+                        Text(catalogLine)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Posologia") {
                     TextField("Dosaggio", text: $dosage)
+                }
+
+                Section("Indicazione") {
+                    ICDSearchField(selection: $selectedICD)
+                    HStack {
+                        Button("Prevenzione") {
+                            selectedICD = ICDResult(code: "PREV", description: "Prevenzione", system: "MediFlow")
+                        }
+                        Button("Nessuna indicazione") {
+                            selectedICD = ICDResult(code: "NONE", description: "Nessuna indicazione", system: "MediFlow")
+                        }
+                        if selectedICD != nil {
+                            Button("Cancella") {
+                                selectedICD = nil
+                            }
+                        }
+                    }
+                    if let selectedICD {
+                        Text("\(selectedICD.code) · \(selectedICD.description)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Motivazione") {
+                    TextEditor(text: $motivation)
+                        .frame(minHeight: 80)
                 }
 
                 Section("Stato") {
@@ -2117,6 +2300,17 @@ private struct EditTherapyView: View {
         .frame(minWidth: 520, minHeight: 560)
     }
 
+    /* @Codex */
+    private var catalogLine: String? {
+        let aic = selectedDrug?.aic ?? therapy.aic
+        let atc = selectedDrug?.atc ?? therapy.atc
+        let parts = [
+            aic.map { "AIC \($0)" },
+            atc.map { "ATC \($0)" }
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private var statusOptions: [(label: String, value: String)] {
         [
             ("Attiva", "active"),
@@ -2133,19 +2327,39 @@ private struct EditTherapyView: View {
 
         let trimmedDrugName = drugName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedDosage = dosage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedActivePrinciple = activePrinciple.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMotivation = motivation.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedDrugName.isEmpty else {
             errorMessage = "Nome farmaco richiesto"
+            return
+        }
+        guard !trimmedDosage.isEmpty else {
+            errorMessage = "Dosaggio richiesto"
+            return
+        }
+
+        guard let version = therapy.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
             return
         }
 
         do {
             let payload = UpdateTherapyPayload(
+                version: version,
                 drugName: trimmedDrugName,
                 /* @Codex */
-                aic: therapy.aic.map(PatchValue.value) ?? .omit,
+                aic: aicPatchValue,
                 /* @Codex */
-                atc: therapy.atc.map(PatchValue.value) ?? .omit,
-                dosage: trimmedDosage.isEmpty ? "n/d" : trimmedDosage,
+                atc: atcPatchValue,
+                /* @Codex */
+                activePrinciple: trimmedActivePrinciple.isEmpty ? .null : .value(trimmedActivePrinciple),
+                dosage: trimmedDosage,
+                /* @Codex */
+                motivation: trimmedMotivation.isEmpty ? .null : .value(trimmedMotivation),
+                /* @Codex */
+                diagnosisCode: selectedICD.map { .value($0.code) } ?? .null,
+                /* @Codex */
+                diagnosisName: selectedICD.map { .value($0.description) } ?? .null,
                 status: status,
                 startDate: startDate,
                 endDate: includeEndDate ? .value(endDate) : .null
@@ -2154,8 +2368,28 @@ private struct EditTherapyView: View {
             onSaved()
             dismiss()
         } catch {
-            errorMessage = "Aggiornamento fallito"
+            if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = "Aggiornamento fallito"
+            }
         }
+    }
+
+    /* @Codex */
+    private var aicPatchValue: PatchValue<String> {
+        if isManualDrug { return .null }
+        if let value = selectedDrug?.aic { return .value(value) }
+        if let value = therapy.aic { return .value(value) }
+        return .omit
+    }
+
+    /* @Codex */
+    private var atcPatchValue: PatchValue<String> {
+        if isManualDrug { return .null }
+        if let value = selectedDrug?.atc { return .value(value) }
+        if let value = therapy.atc { return .value(value) }
+        return .omit
     }
 }
 
@@ -2168,6 +2402,7 @@ private struct EditCheckupView: View {
     let onSaved: () -> Void
 
     @State private var title: String
+    @State private var notes: String
     @State private var date: Date
     @State private var status: String
     @State private var isSaving = false
@@ -2178,6 +2413,7 @@ private struct EditCheckupView: View {
         self.checkup = checkup
         self.onSaved = onSaved
         _title = State(initialValue: checkup.title)
+        _notes = State(initialValue: checkup.notes ?? "")
         _date = State(initialValue: checkup.date)
         _status = State(initialValue: normalizedCheckupStatus(checkup.status))
     }
@@ -2194,6 +2430,8 @@ private struct EditCheckupView: View {
                         Text("Annullato").tag("cancelled")
                     }
                     .pickerStyle(.segmented)
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 90)
                 }
             }
 
@@ -2223,18 +2461,35 @@ private struct EditCheckupView: View {
         defer { isSaving = false }
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "Titolo richiesto"
             return
         }
 
+        guard let version = checkup.version else {
+            errorMessage = PatientDetailView.missingVersionMessage
+            return
+        }
+
         do {
-            let payload = UpdateCheckupPayload(date: date, title: trimmedTitle, status: status)
+            let payload = UpdateCheckupPayload(
+                version: version,
+                date: date,
+                title: trimmedTitle,
+                /* @Codex */
+                notes: trimmedNotes.isEmpty ? .null : .value(trimmedNotes),
+                status: status
+            )
             try await LocalAPIClient.shared.updateCheckup(patientId: patientId, checkupId: checkup.id, payload: payload)
             onSaved()
             dismiss()
         } catch {
-            errorMessage = "Aggiornamento fallito"
+            if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = "Aggiornamento fallito"
+            }
         }
     }
 }

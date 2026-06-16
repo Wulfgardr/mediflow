@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MediFlow Liquid Glass Dummy - WUL-229</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f2ea;
+      --ink: #211c19;
+      --muted: #706a64;
+      --line: rgba(105, 85, 72, 0.16);
+      --teal: #0f7b68;
+      --mint: #5ec7b1;
+      --amber: #b66a3c;
+      --plum: #5e355f;
+      --panel: rgba(255, 252, 247, 0.78);
+      --panel-solid: #fffaf3;
+      --specular: rgba(255, 252, 247, 0.72);
+      --vitreous: rgba(255, 252, 247, 0.86);
+      --shadow: 0 24px 64px rgba(35, 27, 22, 0.13);
+      --soft-shadow: 0 12px 30px rgba(35, 27, 22, 0.08);
+      --focus: 0 0 0 3px rgba(15, 123, 104, 0.22);
+    }
+
+    :root.dark {
+      color-scheme: dark;
+      --bg: #151315;
+      --ink: #fff7ef;
+      --muted: #b9aea6;
+      --line: rgba(255, 247, 240, 0.12);
+      --panel: rgba(28, 24, 27, 0.76);
+      --panel-solid: #211d21;
+      --specular: rgba(28, 24, 27, 0.78);
+      --vitreous: rgba(26, 22, 26, 0.88);
+      --shadow: 0 26px 70px rgba(0, 0, 0, 0.52);
+      --soft-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+      --focus: 0 0 0 3px rgba(94, 199, 177, 0.24);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(94, 199, 177, 0.26), transparent 28rem),
+        radial-gradient(circle at 92% 12%, rgba(182, 106, 60, 0.18), transparent 24rem),
+        linear-gradient(135deg, var(--bg), color-mix(in srgb, var(--bg) 78%, var(--plum)));
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    a {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 19rem minmax(0, 1fr);
+      min-height: 100vh;
+      gap: 1.5rem;
+      padding: 1.25rem;
+    }
+
+    .specular {
+      background: var(--specular);
+      border: 1px solid rgba(255, 255, 255, 0.44);
+      box-shadow:
+        var(--shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.66),
+        inset 1px 0 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+      -webkit-backdrop-filter: blur(24px) saturate(1.08);
+      backdrop-filter: blur(24px) saturate(1.08);
+    }
+
+    .vitreous {
+      background: var(--vitreous);
+      border: 1px solid var(--line);
+      box-shadow: var(--soft-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+      -webkit-backdrop-filter: blur(16px) saturate(1.03);
+      backdrop-filter: blur(16px) saturate(1.03);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 2.5rem);
+      border-radius: 28px;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.45rem 0.35rem 1rem;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 850;
+      letter-spacing: 0;
+    }
+
+    .brand-subtitle,
+    .eyebrow,
+    .muted {
+      color: var(--muted);
+    }
+
+    .brand-subtitle {
+      margin-top: 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .nav {
+      display: grid;
+      gap: 0.35rem;
+      margin-top: 0.3rem;
+    }
+
+    .nav button,
+    .ghost,
+    .primary {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .nav button {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      min-height: 2.55rem;
+      border-radius: 16px;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 0.7rem;
+      text-align: left;
+      transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      background: rgba(15, 123, 104, 0.11);
+      color: var(--teal);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    }
+
+    .nav button:active,
+    .primary:active,
+    .ghost:active {
+      transform: scale(0.98);
+    }
+
+    .nav-icon {
+      display: grid;
+      place-items: center;
+      width: 1.65rem;
+      height: 1.65rem;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.42);
+      color: currentColor;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .health {
+      border-radius: 20px;
+      padding: 0.9rem;
+    }
+
+    .main {
+      min-width: 0;
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-radius: 28px;
+      padding: 0.8rem;
+    }
+
+    .command {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      min-height: 3rem;
+      border-radius: 20px;
+      padding: 0 1rem;
+    }
+
+    .command input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 0.96rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .ghost {
+      min-height: 2.6rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.42);
+      color: var(--ink);
+      padding: 0 0.9rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    .primary {
+      min-height: 2.8rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--teal), #0d5c53);
+      color: white;
+      padding: 0 1.05rem;
+      font-weight: 760;
+      box-shadow: 0 14px 28px rgba(15, 123, 104, 0.24);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+      gap: 1rem;
+    }
+
+    .lens,
+    .side-panel,
+    .timeline,
+    .module {
+      border-radius: 28px;
+      padding: 1.2rem;
+    }
+
+    .lens {
+      min-height: 19rem;
+      display: grid;
+      gap: 1.2rem;
+      align-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .lens::after {
+      content: "";
+      position: absolute;
+      inset: auto -12% -42% 34%;
+      height: 14rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(94, 199, 177, 0.18), rgba(94, 53, 95, 0.16));
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h2 {
+      margin-bottom: 0.45rem;
+      max-width: 12ch;
+      font-size: clamp(2.3rem, 6vw, 5.8rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin-bottom: 0.55rem;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .patient-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.44);
+      color: var(--ink);
+      padding: 0 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 740;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    :root.dark .chip,
+    :root.dark .ghost,
+    :root.dark .nav-icon {
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .side-panel {
+      display: grid;
+      gap: 0.85rem;
+      align-content: start;
+    }
+
+    .signal {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 0.75rem;
+      align-items: center;
+      border-radius: 20px;
+      padding: 0.85rem;
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    :root.dark .signal {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .dot {
+      width: 0.62rem;
+      height: 0.62rem;
+      border-radius: 999px;
+      background: var(--teal);
+      box-shadow: 0 0 0 6px rgba(15, 123, 104, 0.12);
+    }
+
+    .dot.warn {
+      background: var(--amber);
+      box-shadow: 0 0 0 6px rgba(182, 106, 60, 0.14);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.38fr);
+      gap: 1rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 7rem 1fr auto;
+      gap: 0.85rem;
+      align-items: start;
+      border-radius: 22px;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    :root.dark .timeline-row {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .module-stack {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .module {
+      min-height: 9rem;
+    }
+
+    .mobile-nav {
+      display: none;
+    }
+
+    :focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .app {
+        grid-template-columns: 1fr;
+        padding-bottom: 6rem;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .mobile-nav {
+        position: fixed;
+        z-index: 20;
+        inset: auto 0 0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.4rem;
+        border-top: 1px solid var(--line);
+        padding: 0.7rem 0.8rem max(0.7rem, env(safe-area-inset-bottom));
+      }
+
+      .mobile-nav button {
+        min-height: 3.25rem;
+        border: 0;
+        border-radius: 18px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 720;
+      }
+
+      .mobile-nav button.active {
+        background: rgba(15, 123, 104, 0.12);
+        color: var(--teal);
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        padding: 0.75rem;
+        padding-bottom: 6.25rem;
+      }
+
+      .hero,
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+
+      .command {
+        min-height: 3.25rem;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        justify-content: stretch;
+      }
+
+      .controls .primary {
+        grid-column: 1 / -1;
+      }
+
+      .ghost,
+      .primary {
+        width: 100%;
+      }
+
+      .timeline-row {
+        grid-template-columns: 1fr;
+      }
+
+      h2 {
+        max-width: 9ch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar specular" aria-label="Navigazione MediFlow demo">
+      <div class="brand">
+        <div>
+          <h1 class="brand-title">MediFlow</h1>
+          <div class="brand-subtitle">Clinical Workbench</div>
+        </div>
+        <span class="chip">Demo</span>
+      </div>
+      <nav class="nav" aria-label="Sezioni demo">
+        <button class="active" type="button"><span class="nav-icon">P</span><span>Pazienti</span></button>
+        <button type="button"><span class="nav-icon">D</span><span>Diario Clinico</span></button>
+        <button type="button"><span class="nav-icon">S</span><span>Scale & Test</span></button>
+        <button type="button"><span class="nav-icon">A</span><span>Analytics</span></button>
+        <button type="button"><span class="nav-icon">I</span><span>Impostazioni</span></button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="health vitreous">
+          <p class="eyebrow">Nodo locale</p>
+          <strong>Home-base attiva</strong>
+          <p class="muted">SQLite cifrato, Ollama opzionale, SISS come handoff governato.</p>
+        </div>
+        <button class="primary" type="button">Nuova visita</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="topbar specular" aria-label="Comandi rapidi demo">
+        <label class="command vitreous">
+          <span aria-hidden="true">⌘</span>
+          <input value="Cerca paziente, flusso, documento o task" aria-label="Cerca" />
+        </label>
+        <div class="controls">
+          <button class="ghost" id="themeBtn" type="button">Tema scuro</button>
+          <button class="primary" type="button">Apri scheda</button>
+        </div>
+      </section>
+
+      <section class="hero">
+        <article class="lens vitreous">
+          <div>
+            <p class="eyebrow">Paziente sintetico</p>
+            <h2>Rossi Ada</h2>
+            <p class="muted">Donna, 74 anni. Scenario fittizio per review UI: nessun dato clinico reale.</p>
+          </div>
+          <div class="patient-meta">
+            <span class="chip">Attiva</span>
+            <span class="chip">Diabete tipo 2</span>
+            <span class="chip">Ipertensione</span>
+            <span class="chip">FSE: handoff pronto</span>
+          </div>
+        </article>
+
+        <aside class="side-panel vitreous">
+          <p class="eyebrow">Case lens</p>
+          <div class="signal">
+            <span class="dot"></span>
+            <div><strong>Insight locale</strong><br /><span class="muted">Sintesi da fonti citabili</span></div>
+            <span class="chip">3 fonti</span>
+          </div>
+          <div class="signal">
+            <span class="dot warn"></span>
+            <div><strong>Smart Import</strong><br /><span class="muted">2 elementi da confermare</span></div>
+            <span class="chip">Review</span>
+          </div>
+          <div class="signal">
+            <span class="dot"></span>
+            <div><strong>SISS / FSE</strong><br /><span class="muted">Boundary webapp-assisted</span></div>
+            <span class="chip">Handoff</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="workspace">
+        <article class="timeline vitreous">
+          <div>
+            <p class="eyebrow">Timeline operativa</p>
+            <h3>Segnali clinici in scansione rapida</h3>
+          </div>
+          <div class="timeline-row">
+            <span class="chip">Oggi</span>
+            <div><strong>Controllo pressorio</strong><br /><span class="muted">Valori stabili, nessuna modifica terapeutica proposta.</span></div>
+            <button class="ghost" type="button">Apri</button>
+          </div>
+          <div class="timeline-row">
+            <span class="chip">Ieri</span>
+            <div><strong>Documento allegato</strong><br /><span class="muted">Evidence artifact generato, citazioni pronte per Insight.</span></div>
+            <button class="ghost" type="button">Rivedi</button>
+          </div>
+          <div class="timeline-row">
+            <span class="chip">7 giorni</span>
+            <div><strong>Handoff protesica</strong><br /><span class="muted">Aperto nel portale regionale, diario locale aggiornabile.</span></div>
+            <button class="ghost" type="button">Dettagli</button>
+          </div>
+        </article>
+
+        <div class="module-stack">
+          <section class="module vitreous">
+            <p class="eyebrow">Azioni</p>
+            <h3>Review prima di apply</h3>
+            <p class="muted">Ogni suggerimento resta locale, spiegabile e confermato dall'operatore.</p>
+          </section>
+          <section class="module vitreous">
+            <p class="eyebrow">Design token</p>
+            <h3>Specular, vitreous, crystalline</h3>
+            <p class="muted">La grammatica puo sostituire progressivamente i pannelli reali senza selector runtime.</p>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav specular" aria-label="Navigazione mobile demo">
+    <button class="active" type="button">Pazienti</button>
+    <button type="button">Diario</button>
+    <button type="button">Scale</button>
+    <button type="button">Impostazioni</button>
+  </nav>
+
+  <script>
+    const root = document.documentElement;
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      root.classList.toggle('dark');
+      document.getElementById('themeBtn').textContent = root.classList.contains('dark') ? 'Tema chiaro' : 'Tema scuro';
+    });
+  </script>
+</body>
+</html>

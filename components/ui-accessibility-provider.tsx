@@ -21,9 +21,7 @@ interface UIAccessibilityProviderProps {
 /* @Codex */
 interface UIAccessibilityState {
     reduceMotion: boolean;
-    reduceTransparency: boolean;
     setReduceMotion: (enabled: boolean) => void;
-    setReduceTransparency: (enabled: boolean) => void;
 }
 
 /* @Codex */
@@ -48,7 +46,6 @@ function applyPreferenceToDocument(key: 'uiReduceMotion' | 'uiReduceTransparency
 /* @Codex */
 export function UIAccessibilityProvider({ children }: UIAccessibilityProviderProps) {
     const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStoredPreference(UI_REDUCE_MOTION_STORAGE_KEY));
-    const [reduceTransparency, setReduceTransparencyState] = useState<boolean>(() => readStoredPreference(UI_REDUCE_TRANSPARENCY_STORAGE_KEY));
 
     useEffect(() => {
         applyPreferenceToDocument('uiReduceMotion', reduceMotion);
@@ -60,43 +57,33 @@ export function UIAccessibilityProvider({ children }: UIAccessibilityProviderPro
     }, [reduceMotion]);
 
     useEffect(() => {
-        applyPreferenceToDocument('uiReduceTransparency', reduceTransparency);
+        applyPreferenceToDocument('uiReduceTransparency', false);
         try {
-            localStorage.setItem(UI_REDUCE_TRANSPARENCY_STORAGE_KEY, String(reduceTransparency));
+            localStorage.removeItem(UI_REDUCE_TRANSPARENCY_STORAGE_KEY);
         } catch {
-            // No-op: best effort persistence.
+            // No-op: best effort cleanup.
         }
-    }, [reduceTransparency]);
+        void db.settings.put({ key: UI_REDUCE_TRANSPARENCY_SETTING_KEY, value: false }, { suppressNotify: true }).catch(() => {
+            // No-op.
+        });
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
 
         const syncPersistedPreferences = async () => {
             try {
-                const [storedReduceMotion, storedReduceTransparency] = await Promise.all([
-                    db.settings.get(UI_REDUCE_MOTION_SETTING_KEY),
-                    db.settings.get(UI_REDUCE_TRANSPARENCY_SETTING_KEY),
-                ]);
+                const storedReduceMotion = await db.settings.get(UI_REDUCE_MOTION_SETTING_KEY);
 
                 const nextReduceMotion = normalizeAccessibilityPreference(storedReduceMotion?.value, reduceMotion);
-                const nextReduceTransparency = normalizeAccessibilityPreference(storedReduceTransparency?.value, reduceTransparency);
 
                 if (!cancelled && storedReduceMotion?.value !== undefined && nextReduceMotion !== reduceMotion) {
                     setReduceMotionState(nextReduceMotion);
                 }
 
-                if (!cancelled && storedReduceTransparency?.value !== undefined && nextReduceTransparency !== reduceTransparency) {
-                    setReduceTransparencyState(nextReduceTransparency);
+                if (storedReduceMotion?.value === undefined) {
+                    await db.settings.put({ key: UI_REDUCE_MOTION_SETTING_KEY, value: reduceMotion }, { suppressNotify: true });
                 }
-
-                await Promise.all([
-                    storedReduceMotion?.value === undefined
-                        ? db.settings.put({ key: UI_REDUCE_MOTION_SETTING_KEY, value: reduceMotion }, { suppressNotify: true })
-                        : Promise.resolve(),
-                    storedReduceTransparency?.value === undefined
-                        ? db.settings.put({ key: UI_REDUCE_TRANSPARENCY_SETTING_KEY, value: reduceTransparency }, { suppressNotify: true })
-                        : Promise.resolve(),
-                ]);
             } catch {
                 // No-op: rendering shouldn't block on settings availability.
             }
@@ -107,24 +94,17 @@ export function UIAccessibilityProvider({ children }: UIAccessibilityProviderPro
         return () => {
             cancelled = true;
         };
-    }, [reduceMotion, reduceTransparency]);
+    }, [reduceMotion]);
 
     const value = useMemo<UIAccessibilityState>(() => ({
         reduceMotion,
-        reduceTransparency,
         setReduceMotion: (enabled: boolean) => {
             setReduceMotionState(enabled);
             void db.settings.put({ key: UI_REDUCE_MOTION_SETTING_KEY, value: enabled }, { suppressNotify: true }).catch(() => {
                 // No-op.
             });
         },
-        setReduceTransparency: (enabled: boolean) => {
-            setReduceTransparencyState(enabled);
-            void db.settings.put({ key: UI_REDUCE_TRANSPARENCY_SETTING_KEY, value: enabled }, { suppressNotify: true }).catch(() => {
-                // No-op.
-            });
-        },
-    }), [reduceMotion, reduceTransparency]);
+    }), [reduceMotion]);
 
     return (
         <UIAccessibilityContext.Provider value={value}>

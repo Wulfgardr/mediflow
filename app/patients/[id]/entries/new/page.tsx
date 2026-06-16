@@ -1,14 +1,15 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { v4 as uuidv4 } from 'uuid';
-import { ArrowLeft, Calendar, Clock, FileText, Loader2, Paperclip, Save, Sparkles, Stethoscope, Upload, Video, X } from 'lucide-react';
+import { Building2, Calendar, Clock, FileText, Home, Loader2, Paperclip, Save, Sparkles, Stethoscope, Upload, Video, X } from 'lucide-react';
 
 /* @Codex */
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
+import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { db } from '@/lib/db';
 /* @Codex */
 import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
@@ -16,6 +17,7 @@ import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evi
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { useLiveQuery } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 
 export default function NewEntryPage() {
@@ -33,6 +35,8 @@ export default function NewEntryPage() {
     const [files, setFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
+    /* @Codex */
+    const patient = useLiveQuery(() => db.patients.get(id), [id]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         setFiles((prev) => [...prev, ...acceptedFiles]);
@@ -50,7 +54,7 @@ export default function NewEntryPage() {
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
-            alert('Inserisci un resoconto clinico prima di registrare la visita.');
+            alert('Inserisci un resoconto clinico prima di registrare la voce.');
             return;
         }
 
@@ -62,7 +66,7 @@ export default function NewEntryPage() {
             const aiModels = await getAiModelLabels();
 
             for (const file of files) {
-                let summary = 'Allegato alla visita';
+                let summary = 'Allegato alla voce clinica';
                 let parseEvidenceArtifactSnapshot: string | undefined;
                 const attachmentId = uuidv4();
 
@@ -118,9 +122,9 @@ export default function NewEntryPage() {
             setUploadProgress('Salvataggio voce diario...');
 
             const typeLabels: Record<string, string> = {
-                visit: 'Visita Ambulatoriale',
-                remote: 'Videoconsulto',
-                note: 'Nota Clinica',
+                visit: 'Visita ambulatoriale',
+                remote: 'Contatto remoto',
+                note: 'Nota clinica',
             };
 
             await db.entries.add({
@@ -136,10 +140,10 @@ export default function NewEntryPage() {
                 updatedAt: new Date(),
             });
 
-            setUploadProgress('Aggiornamento AI Patient Summary...');
+            setUploadProgress('Aggiornamento riepilogo paziente...');
             await regeneratePatientSummary(id);
 
-            router.push(`/patients/${id}`);
+            router.push(`/patients/${id}/modules`);
         } catch (error) {
             console.error(error);
             alert('Errore durante il salvataggio. Riprova.');
@@ -153,42 +157,29 @@ export default function NewEntryPage() {
         { id: 'remote', label: 'Remoto', icon: Video },
         { id: 'note', label: 'Nota', icon: FileText },
     ];
+    /* @Codex */
+    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
+        { href: '#dati', label: 'Dati', meta: setting === 'home' ? 'domicilio' : 'ambulatorio' },
+        { href: '#resoconto', label: 'Resoconto' },
+        { href: '#allegati', label: 'Allegati', meta: String(files.length) },
+        { href: '#guida', label: 'Guida' },
+    ];
 
     return (
-        <div className="mx-auto max-w-5xl space-y-6">
-            <section className="glass-panel overflow-hidden p-6 md:p-7">
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                    <div className="flex items-start gap-4">
-                        <Link
-                            href={`/patients/${id}`}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/78 text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(182,106,60,0.22)] hover:text-[color:var(--mf-accent)] dark:bg-white/6"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </Link>
-                        <div>
-                            <p className="section-kicker">Voce clinica</p>
-                            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[color:var(--mf-ink)]">
-                                Nuova visita o nota strutturata
-                            </h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                                Stesso linguaggio della shell Graphite, ma con un editor abbastanza ricco da stratificare il ragionamento clinico senza trasformarlo in un word processor.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 md:justify-end">
-                        <span className="apple-chip">Titoli e sezioni</span>
-                        <span className="apple-chip">Bullet e rientri</span>
-                        <span className="apple-chip">Bold · Italic · Underline</span>
-                    </div>
-                </div>
-            </section>
-
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_320px]">
-                <div className="space-y-6">
-                    <div className="glass-panel p-6 md:p-7">
+        <Kree8WorkspaceShell
+            eyebrow="Diario clinico"
+            title="Nuova voce clinica"
+            subtitle="Registra una visita, un contatto remoto o una nota breve."
+            backHref={`/patients/${id}/modules`}
+            backLabel="Torna alla scheda paziente"
+            patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
+            navItems={workspaceNavItems}
+        >
+            <div className={workspaceStyles.workspaceGrid}>
+                <div className={workspaceStyles.primaryStack}>
+                    <div className="patient-detail-section glass-panel border p-6 md:p-7">
                         <form onSubmit={handleSubmit} className="space-y-8">
-                            <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+                            <div id="dati" className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                                 <div className="space-y-2">
                                     <label className="section-kicker flex items-center gap-2">
                                         <Calendar className="h-3.5 w-3.5" />
@@ -201,17 +192,17 @@ export default function NewEntryPage() {
                                             value={entryDate}
                                             onChange={(e) => setEntryDate(e.target.value)}
                                             className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
-                                            aria-label="Data e ora della visita"
+                                            aria-label="Data e ora della voce clinica"
                                             required
                                         />
                                     </div>
                                     <p className="text-xs leading-5 text-[color:var(--mf-muted)]">
-                                        Puoi retrodatare l&apos;inserimento se stai ricostruendo il diario.
+                                        Puoi retrodatare la voce quando ricostruisci il diario.
                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="section-kicker">Setting operativo</label>
+                                    <label className="section-kicker">Luogo</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             type="button"
@@ -223,7 +214,7 @@ export default function NewEntryPage() {
                                                     : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
                                             )}
                                         >
-                                            <span className="text-lg">🏥</span>
+                                            <Building2 className="h-4 w-4" />
                                             <span>Ambulatorio</span>
                                         </button>
                                         <button
@@ -236,7 +227,7 @@ export default function NewEntryPage() {
                                                     : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
                                             )}
                                         >
-                                            <span className="text-lg">🏠</span>
+                                            <Home className="h-4 w-4" />
                                             <span>Domicilio</span>
                                         </button>
                                     </div>
@@ -244,7 +235,7 @@ export default function NewEntryPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="section-kicker">Tipo attività</label>
+                                <label className="section-kicker">Tipo di voce</label>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                     {types.map((currentType) => {
                                         const Icon = currentType.icon;
@@ -287,20 +278,13 @@ export default function NewEntryPage() {
                             </div>
 
                             {/* @Codex */}
-                            <section className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
+                            <section id="resoconto" className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
                                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p className="section-kicker">Resoconto clinico</p>
                                         <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
-                                            Campo visita strutturabile
+                                            Scrivi la voce
                                         </h2>
-                                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                                            Titoli, punti elenco e formattazioni leggere per separare sintomi, obiettivi, assessment e piano.
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="apple-chip">SOAP-friendly</span>
-                                        <span className="apple-chip">Compatibile timeline</span>
                                     </div>
                                 </div>
 
@@ -311,7 +295,7 @@ export default function NewEntryPage() {
                                 />
                             </section>
 
-                            <section className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
+                            <section id="allegati" className="rounded-[26px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] md:p-6">
                                 <div className="mb-4">
                                     <p className="section-kicker">Allegati</p>
                                     <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
@@ -322,7 +306,7 @@ export default function NewEntryPage() {
                                 <div className="space-y-3">
                                     <label className="flex items-center gap-2 text-sm font-medium text-[color:var(--mf-ink)]">
                                         <Paperclip className="h-4 w-4 text-[color:var(--mf-muted)]" />
-                                        Allegati della visita
+                                        Allegati della voce
                                     </label>
 
                                     <div
@@ -391,10 +375,10 @@ export default function NewEntryPage() {
                     </div>
                 </div>
 
-                <aside className="space-y-6">
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                <aside id="guida" className={workspaceStyles.secondaryStack}>
+                    <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
-                            <p className="section-kicker">Editor</p>
+                            <p className="section-kicker">Scrittura</p>
                             <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
                                 <Sparkles className="h-5 w-5 text-[color:var(--mf-primary)]" />
                                 Formattazione leggera
@@ -402,16 +386,12 @@ export default function NewEntryPage() {
                         </div>
                         <div className="space-y-3 text-sm leading-6 text-[color:var(--mf-muted)]">
                             <p>Usa titoli per separare i blocchi clinici e bullet point per terapie, alert o passi successivi.</p>
-                            <p>Il contenuto resta leggibile anche in timeline, report PDF e contesto AI locale.</p>
                         </div>
                     </section>
 
-                    <section className="patient-detail-side-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl">
+                    <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Struttura suggerita</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                Una visita che si lascia scansionare
-                            </h3>
                         </div>
                         <div className="space-y-3">
                             <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
@@ -430,6 +410,6 @@ export default function NewEntryPage() {
                     </section>
                 </aside>
             </div>
-        </div>
+        </Kree8WorkspaceShell>
     );
 }

@@ -276,13 +276,18 @@ final class LocalAPIClientAuthTests: XCTestCase {
         XCTAssertEqual(createdId, "obs-1")
     }
 
-    func testUpdateObservationUsesPutRouteAndNativeHeaders() async throws {
+    func testUpdateObservationUsesPutRouteAndEncodesVersion() async throws {
         let client = makeAuthenticatedClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
             XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations/obs-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 4)
+            XCTAssertEqual(json["value"] as? String, "135")
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url),
@@ -297,6 +302,7 @@ final class LocalAPIClientAuthTests: XCTestCase {
             patientId: "patient-1",
             observationId: "obs-1",
             payload: UpdateObservationPayload(
+                version: 4,
                 codeSystem: "LOINC",
                 code: "8480-6",
                 display: "Pressione sistolica",
@@ -310,11 +316,17 @@ final class LocalAPIClientAuthTests: XCTestCase {
         )
     }
 
-    func testDeleteObservationUsesDeleteRoute() async throws {
+    func testDeleteObservationSendsVersionBody() async throws {
         let client = makeAuthenticatedClient { request in
             XCTAssertEqual(request.httpMethod, "DELETE")
             XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/observations/obs-1")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 3)
+            XCTAssertEqual(json.count, 1)
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url),
@@ -325,7 +337,173 @@ final class LocalAPIClientAuthTests: XCTestCase {
             return (response, Data())
         }
 
-        try await client.deleteObservation(patientId: "patient-1", observationId: "obs-1")
+        try await client.deleteObservation(patientId: "patient-1", observationId: "obs-1", expectedVersion: 3)
+    }
+
+    func testSoftDeleteEntryEncodesVersionedTombstone() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/entries/entry-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 2)
+            XCTAssertEqual(json["deletedAt"] as? String, "1970-01-01T00:00:00Z")
+            XCTAssertEqual(json["deletionReason"] as? String, "voce duplicata")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"success":true}"#.data(using: .utf8)!)
+        }
+
+        try await client.softDeleteEntry(
+            patientId: "patient-1",
+            entryId: "entry-1",
+            expectedVersion: 2,
+            deletedAt: Date(timeIntervalSince1970: 0),
+            reason: "voce duplicata"
+        )
+    }
+
+    func testRestoreEntryEncodesVersionAndNullTombstoneFields() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/entries/entry-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 5)
+            XCTAssertTrue(json["deletedAt"] is NSNull)
+            XCTAssertTrue(json["deletionReason"] is NSNull)
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, #"{"success":true}"#.data(using: .utf8)!)
+        }
+
+        try await client.restoreEntry(patientId: "patient-1", entryId: "entry-1", expectedVersion: 5)
+    }
+
+    func testDeleteTherapySendsVersionBodyAndMapsVersionConflict() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "DELETE")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/therapies/therapy-1")
+
+            let body = try self.readRequestBody(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["version"] as? Int, 6)
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 409,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let payload = """
+            {
+              "error": "Conflict",
+              "code": "VERSION_CONFLICT",
+              "entity": "therapy",
+              "recordId": "therapy-1",
+              "expectedVersion": 6,
+              "currentVersion": 7,
+              "currentUpdatedAt": "2026-06-09T10:00:00.000Z",
+              "currentState": "present",
+              "currentSnapshot": {
+                "id": "therapy-1",
+                "patientId": "patient-1",
+                "version": 7,
+                "updatedAt": "2026-06-09T10:00:00.000Z",
+                "deletedAt": null
+              }
+            }
+            """.data(using: .utf8)!
+            return (response, payload)
+        }
+
+        do {
+            try await client.deleteTherapy(patientId: "patient-1", therapyId: "therapy-1", expectedVersion: 6)
+            XCTFail("Expected version conflict")
+        } catch let error as LocalAPIError {
+            XCTAssertEqual(
+                error,
+                .versionConflict(VersionConflictPayload(
+                    error: "Conflict",
+                    code: "VERSION_CONFLICT",
+                    entity: "therapy",
+                    recordId: "therapy-1",
+                    expectedVersion: 6,
+                    currentVersion: 7,
+                    currentUpdatedAt: "2026-06-09T10:00:00.000Z",
+                    currentState: "present",
+                    currentSnapshot: VersionConflictSnapshot(
+                        id: "therapy-1",
+                        patientId: "patient-1",
+                        version: 7,
+                        updatedAt: "2026-06-09T10:00:00.000Z",
+                        deletedAt: nil,
+                        isArchived: nil
+                    )
+                ))
+            )
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testUpdateCheckupMapsVersionConflictForStaleVersion() async throws {
+        let client = makeAuthenticatedClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/patients/patient-1/checkups/checkup-1")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 409,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let payload = """
+            {
+              "error": "Conflict",
+              "code": "VERSION_CONFLICT",
+              "entity": "checkup",
+              "recordId": "checkup-1",
+              "expectedVersion": 1,
+              "currentVersion": null,
+              "currentUpdatedAt": null,
+              "currentState": "missing",
+              "currentSnapshot": null
+            }
+            """.data(using: .utf8)!
+            return (response, payload)
+        }
+
+        do {
+            try await client.updateCheckup(
+                patientId: "patient-1",
+                checkupId: "checkup-1",
+                payload: UpdateCheckupPayload(version: 1, title: "Visita")
+            )
+            XCTFail("Expected version conflict")
+        } catch let error as LocalAPIError {
+            guard case .versionConflict(let payload) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+            XCTAssertEqual(payload.entity, "checkup")
+            XCTAssertEqual(payload.currentState, "missing")
+            XCTAssertNil(payload.currentSnapshot)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 
     func testCatalogCountUsesApiV1ForDrugsAndDecodesCount() async throws {

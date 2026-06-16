@@ -25,9 +25,23 @@ Il file di configurazione viene scritto in:
 
 Il client macOS lo legge automaticamente al primo avvio.
 
+Lo script scrive anche:
+
+```
+~/Library/Application Support/MediFlow/runtime-status.json
+```
+
+Il file contiene solo metadati PHI-free del runtime locale (`baseURL`, porta,
+modalita rete, fingerprint TLS e percorsi runtime). Il pannello `Runtime`
+dell'app lo usa per mostrare readiness e per avviare/arrestare il proxy TLS
+locale in modo esplicito.
+
 ## Variabili opzionali
 
 - `MEDIFLOW_LOCAL_API_TOKEN` (token per API locale)
+- `MEDIFLOW_ATTACHMENT_MAX_BYTES` (limite byte per payload allegato in `/api/attachments`, default 25 MiB)
+- `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS` (timeout in millisecondi per la singola generazione OCR locale; default 120000, la richiesta viene abortita allo scadere)
+- `MEDIFLOW_OCR_TIMEOUT_MS` (alias di fallback: letto solo se `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS` non e impostata)
 - `MEDIFLOW_TLS_CERT_DIR` / `MEDIFLOW_TLS_CERT_PATH` / `MEDIFLOW_TLS_KEY_PATH`
 - `MEDIFLOW_TLS_PORT` (default 3443)
 - `MEDIFLOW_HTTP_TARGET` (default http://127.0.0.1:3000)

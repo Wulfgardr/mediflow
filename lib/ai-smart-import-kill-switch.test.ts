@@ -9,10 +9,18 @@ import {
     serializeAiSmartImportKillSwitchState,
 } from './ai-smart-import-kill-switch.ts';
 
-test('resolveAiSmartImportKillSwitchState defaults to enabled', () => {
-    assert.equal(resolveAiSmartImportKillSwitchState(undefined), 'enabled');
-    assert.equal(resolveAiSmartImportKillSwitchState(null), 'enabled');
+test('resolveAiSmartImportKillSwitchState enables only explicit enabled values', () => {
     assert.equal(resolveAiSmartImportKillSwitchState('enabled'), 'enabled');
+    assert.equal(resolveAiSmartImportKillSwitchState(true), 'enabled');
+    assert.equal(resolveAiSmartImportKillSwitchState('true'), 'enabled');
+    assert.equal(resolveAiSmartImportKillSwitchState(1), 'enabled');
+    assert.equal(resolveAiSmartImportKillSwitchState('1'), 'enabled');
+});
+
+test('resolveAiSmartImportKillSwitchState fails closed when absent or malformed', () => {
+    assert.equal(resolveAiSmartImportKillSwitchState(undefined), 'disabled');
+    assert.equal(resolveAiSmartImportKillSwitchState(null), 'disabled');
+    assert.equal(resolveAiSmartImportKillSwitchState('unexpected'), 'disabled');
 });
 
 test('resolveAiSmartImportKillSwitchState treats explicit disabled values as disabled', () => {
@@ -32,6 +40,10 @@ test('assertAiSmartImportEnabledValue throws deterministic error when disabled',
     assert.equal(isAiSmartImportEnabledValue('enabled'), true);
     assert.throws(
         () => assertAiSmartImportEnabledValue('disabled'),
+        (error: unknown) => error instanceof AiSmartImportDisabledError,
+    );
+    assert.throws(
+        () => assertAiSmartImportEnabledValue(undefined),
         (error: unknown) => error instanceof AiSmartImportDisabledError,
     );
 });

@@ -8,9 +8,11 @@ import {
 } from '@/lib/audit';
 import {
     forbiddenResponse,
-    requireSessionOrLocalToken,
+    requireSession,
     unauthorizedResponse,
 } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 
 /* @Codex */
 function parseLimit(value: string | null, fallback: number, max: number): number {
@@ -29,9 +31,9 @@ function parseDays(value: string | null): number {
 }
 
 export async function GET(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const { searchParams } = new URL(request.url);

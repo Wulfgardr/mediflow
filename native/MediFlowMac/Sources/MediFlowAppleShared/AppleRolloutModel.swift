@@ -37,6 +37,7 @@ public enum AppleDeliveryPhase: String, CaseIterable, Codable, Sendable {
 
 public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable {
     case overview
+    case runtime
     case modules
     case milestones
 
@@ -46,6 +47,8 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
         switch self {
         case .overview:
             return "Panoramica"
+        case .runtime:
+            return "Runtime"
         case .modules:
             return "Pazienti"
         case .milestones:
@@ -57,6 +60,8 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
         switch self {
         case .overview:
             return "square.grid.2x2"
+        case .runtime:
+            return "server.rack"
         case .modules:
             return "person.text.rectangle"
         case .milestones:
@@ -151,7 +156,7 @@ public extension AppleFoundationSnapshot {
     static let live = AppleFoundationSnapshot(
         title: "Family Apple MediFlow",
         summary: "Mac come home-base autorevole, shell distinte per macOS e mobile, convergenza disciplinata tramite contratti condivisi.",
-        statusLine: "Questa build ha gia pairing harden, HTTPS LAN e smoke Bonjour sul shell mobile. Write remoto e runtime packaged restano nei slice successivi.",
+        statusLine: "Questa build porta il shell home-base Apple in primo piano e rende visibile lo stato runtime locale. La supervisione automatica dei processi resta nel prossimo slice WUL-192.",
         lanes: [
             AppleCapabilityLane(
                 id: "home-base",
@@ -186,9 +191,9 @@ public extension AppleFoundationSnapshot {
             AppleCapabilityLane(
                 id: "runtime",
                 title: "Runtime locale e AI plane",
-                summary: "La app macOS dovra bootstrapare backend, TLS, Ollama e componenti Docker. L'AI mobile resta separata dal data plane clinico.",
+                summary: "La app macOS espone ora il readiness del bootstrap locale senza ancora supervisionare backend, TLS, Ollama e componenti Docker. L'AI mobile resta separata dal data plane clinico.",
                 sourceOfTruth: "ADR 0037, ADR 0047",
-                macOS: ApplePlatformStatus(phase: .next, detail: "Packaged home-base da costruire"),
+                macOS: ApplePlatformStatus(phase: .foundation, detail: "Shell home-base primaria con osservabilita runtime read-only"),
                 iPhone: ApplePlatformStatus(phase: .blocked, detail: "Nessun comando AI remoto in questa wave"),
                 iPad: ApplePlatformStatus(phase: .blocked, detail: "Consultazione output solo dopo boundary esplicito"),
                 nextIssue: "WUL-192"
@@ -219,9 +224,9 @@ public extension AppleFoundationSnapshot {
             AppleMilestone(
                 id: "runtime",
                 title: "macOS packaged runtime host",
-                summary: "Avvio nativo di backend locale, TLS, Ollama e Docker senza passare dal terminale.",
+                summary: "Primo slice: shell home-base primaria e readiness runtime. Avvio/supervisione automatica di backend locale, TLS, Ollama e Docker resta da completare.",
                 issue: "WUL-192",
-                phase: .next
+                phase: .foundation
             ),
             AppleMilestone(
                 id: "parity",

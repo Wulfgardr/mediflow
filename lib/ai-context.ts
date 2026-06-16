@@ -17,6 +17,13 @@ import {
     projectDocumentInsightFromArtifact,
 } from '@/lib/document-parse-evidence-artifact';
 /* @Codex */
+import {
+    MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION,
+    buildEvidenceQueue,
+    getIncludedEvidenceQueueItems,
+    type EvidenceQueueCitation,
+} from '@/lib/evidence-queue-contract';
+/* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -32,6 +39,9 @@ export interface PatientInsightSourceRef {
     section: string;
     label: string;
     promptLine: string;
+    evidenceSourceId?: string;
+    evidenceSchemaVersion?: typeof MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION;
+    citation?: EvidenceQueueCitation;
 }
 
 /* @Codex */
@@ -134,6 +144,14 @@ interface DocumentContextCandidate {
     priorityScore: number;
     domainTags: string[];
     stableBackground: boolean;
+}
+
+/* @Codex */
+interface PatientInsightSourceLine {
+    promptLine: string;
+    evidenceSourceId?: string;
+    evidenceSchemaVersion?: typeof MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION;
+    citation?: EvidenceQueueCitation;
 }
 
 const DOCUMENT_DOMAIN_RULES = [
@@ -597,17 +615,22 @@ async function buildAttachmentContextCandidate(
 
 function createSourceRefs(
     section: string,
-    lines: string[],
+    lines: Array<string | PatientInsightSourceLine>,
     nextIndex: number,
 ): { refs: PatientInsightSourceRef[]; nextIndex: number } {
     const refs = lines
-        .map(normalizeEvidenceLine)
-        .filter((line) => line.length > 0)
-        .map((promptLine, offset) => ({
+        .map((line) => (typeof line === 'string'
+            ? { promptLine: normalizeEvidenceLine(line) }
+            : { ...line, promptLine: normalizeEvidenceLine(line.promptLine) }))
+        .filter((line) => line.promptLine.length > 0)
+        .map((line, offset) => ({
             id: `S${nextIndex + offset}`,
             section,
-            label: `${section}: ${compactText(promptLine, 160)}`,
-            promptLine,
+            label: `${section}: ${compactText(line.promptLine, 160)}`,
+            promptLine: line.promptLine,
+            evidenceSourceId: line.evidenceSourceId,
+            evidenceSchemaVersion: line.evidenceSchemaVersion,
+            citation: line.citation,
         }));
 
     return {
@@ -672,6 +695,31 @@ export async function buildPatientInsightContext(
         .filter((attachment: any) => attachment.patientId === patient.id)
         .toArray();
     attachments.sort((left, right) => compareDatesDesc(left.createdAt, right.createdAt));
+    const evidenceQueue = buildEvidenceQueue({
+        patientId: patient.id,
+        generatedAt: new Date(),
+        attachments: attachments.map((attachment) => ({
+            id: attachment.id,
+            patientId: attachment.patientId,
+            fileName: attachment.name,
+            createdAt: attachment.createdAt,
+            parseEvidenceArtifactSnapshot: attachment.parseEvidenceArtifactSnapshot,
+            summarySnapshot: attachment.summarySnapshot,
+            sourceVersion: attachment.createdAt instanceof Date
+                ? attachment.createdAt.toISOString()
+                : undefined,
+        })),
+        diaryEntries: activeEntries.map((entry) => ({
+            id: entry.id,
+            patientId: entry.patientId,
+            date: entry.date,
+            type: String(entry.type ?? ''),
+            title: typeof entry.title === 'string' ? entry.title : undefined,
+            content: clinicalRichTextToPlainText(entry.content),
+            deletedAt: entry.deletedAt,
+            version: (entry as { version?: string | number | null }).version,
+        })),
+    });
 
     const parsedArchiveInsights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
         .sort((left, right) => compareDatesDesc(left.date, right.date));
@@ -828,8 +876,29 @@ export async function buildPatientInsightContext(
             return `- ${formatDate(checkup.date)}: ${compactText(checkup.title, 120)}${note}`;
         });
 
-    const diaryLines = entries
-        .map((entry) => `- [${formatDate(entry.date)}] ${String(entry.type).toUpperCase()}: ${compactText(clinicalRichTextToPlainText(entry.content), 220)}`);
+    const entriesById = new Map(activeEntries.map((entry) => [entry.id, entry] as const));
+    const diaryLines: PatientInsightSourceLine[] = getIncludedEvidenceQueueItems(evidenceQueue)
+        .filter((item) => item.source.type === 'diary_entry')
+        .slice(0, MAX_ENTRIES)
+        .map((item) => {
+            const entryId = item.source.id.replace(/^diary:/, '');
+            const entry = entriesById.get(entryId);
+            const snippets = Array.from(new Set(
+                item.renderableClaims
+                    .map((claim) => compactText(claim.citation.snippet, 160))
+                    .filter(Boolean),
+            ));
+            const rendered = snippets.length > 0
+                ? snippets.join(' | ')
+                : compactText(clinicalRichTextToPlainText(entry?.content ?? ''), 220);
+
+            return {
+                promptLine: `- [${formatDate(entry?.date)}] ${String(entry?.type ?? 'note').toUpperCase()}: ${rendered}`,
+                evidenceSourceId: item.source.id,
+                evidenceSchemaVersion: evidenceQueue.schemaVersion,
+                citation: item.renderableClaims[0]?.citation,
+            };
+        });
 
     let nextIndex = 1;
     const profileRefs = createSourceRefs('Profilo strutturato', profileLines, nextIndex);

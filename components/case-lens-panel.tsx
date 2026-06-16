@@ -194,7 +194,7 @@ export function CaseLensPanel({ variant = 'atlas', patient, ambulatoryName }: Ca
 
                 <section className="mt-5 border-t border-[color:rgba(112,106,100,0.12)] pt-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                        In Due Righe
+                        In due righe
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[color:var(--mf-ink)]">
                         {summary}

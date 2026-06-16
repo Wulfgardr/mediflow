@@ -7,11 +7,14 @@ test('patient insight kill switch disables generation on patient detail', async 
 
   await bootstrapUnlockedSession(page, pin);
 
-  await page.getByRole('link', { name: 'Impostazioni' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
+  // WUL-297: kill switches now live on the dedicated AI sub-route.
+  await page.goto('/settings/ai/funzioni');
+  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 
-  const killSwitch = page.getByLabel('Disabilita Patient Insight localmente');
-  await killSwitch.check();
+  const killSwitch = page.getByRole('switch', { name: 'Patient Insight locale' });
+  await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
+  await killSwitch.click();
+  await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
   const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
   await saveButton.click();
   await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);

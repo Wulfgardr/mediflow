@@ -6,6 +6,8 @@ import { settings } from '@/lib/schema';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+/* @Codex */
+import { normalizeSettingValue } from '@/lib/settings-value';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -20,12 +22,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Key and value required" }, { status: 400 });
         }
 
+        /* @Codex */
+        const persistedValue = normalizeSettingValue(value);
+
         // Upsert (Insert or Update) logic
         // This allows db.settings.put({ key: '...', value: '...' }) to work via POST
         await dbServer
             .insert(settings)
-            .values({ key, value })
-            .onConflictDoUpdate({ target: settings.key, set: { value } });
+            .values({ key, value: persistedValue })
+            .onConflictDoUpdate({ target: settings.key, set: { value: persistedValue } });
 
         try {
             const context = auditContextFromRequest(request, session);
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
             console.error('Audit settings write failed:', error);
         }
 
-        return NextResponse.json({ success: true, key, value });
+        return NextResponse.json({ success: true, key, value: persistedValue });
     } catch (error) {
         console.error("POST Setting Error:", error);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

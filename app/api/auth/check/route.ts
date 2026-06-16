@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { users } from '@/lib/schema';
-import { count } from 'drizzle-orm';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
-import { requireSession } from '@/lib/server-auth';
+import { classifyAuthHealthError } from '@/lib/auth-health-classifier';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -32,6 +29,16 @@ function buildPublicDbState(
     return { state };
 }
 
+/* @Codex */
+async function safeRequireSession(): Promise<boolean> {
+    try {
+        const { requireSession } = await import('@/lib/server-auth');
+        return !!(await requireSession());
+    } catch {
+        return false;
+    }
+}
+
 export async function GET() {
     /* @Codex */
     let dbHealth: ReturnType<typeof getDbHealth> | null = null;
@@ -42,21 +49,50 @@ export async function GET() {
         dbHealthError = error instanceof Error ? error.message : 'Unknown error';
     }
     /* @Codex */
-    const hasSession = !!(await requireSession());
+    const hasSession = await safeRequireSession();
     /* @Codex */
     if (!dbHealth) {
         const response = NextResponse.json({
             status: 'error',
             isSetup: false,
             hasSession,
-            error: { code: 'DATA_DIR_UNAVAILABLE', message: dbHealthError || 'Data directory unavailable.' },
+            error: {
+                code: 'DATA_DIR_UNAVAILABLE',
+                category: 'data-dir-unavailable',
+                message: dbHealthError || 'Data directory unavailable.',
+                nextAction: 'Verify that the data directory exists and is writable, then retry.'
+            },
             db: buildPublicDbState('unavailable')
         });
         response.headers.set('Cache-Control', 'no-store');
         return response;
     }
+
+    /* @Codex */
+    if (!dbHealth.dbExists && !dbHealth.legacyExists) {
+        const response = NextResponse.json({
+            status: 'error',
+            isSetup: false,
+            hasSession,
+            error: {
+                code: 'DB_MISSING',
+                category: 'db-missing',
+                message: 'Database locale non trovato.',
+                nextAction: 'Verifica la cartella dati di MediFlow o ripristina un backup locale valido.'
+            },
+            db: buildPublicDbState('missing')
+        });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+    }
+
     try {
-        // Count users efficiently
+        /* @Codex */
+        const [{ dbServer }, { users }, { count }] = await Promise.all([
+            import('@/lib/db-server'),
+            import('@/lib/schema'),
+            import('drizzle-orm'),
+        ]);
         const result = await dbServer.select({ count: count() }).from(users);
         const userCount = result[0].count;
         const response = NextResponse.json({
@@ -71,15 +107,20 @@ export async function GET() {
         return response;
     } catch (error) {
         /* @Codex */
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        const code = message.includes('no such table') ? 'DB_SCHEMA_MISSING' : 'DB_QUERY_FAILED';
-        console.error("Auth check error:", error);
+        const classification = classifyAuthHealthError(error);
+        console.error('[auth-check]', classification.code, classification.message);
         const response = NextResponse.json({
             status: 'error',
             isSetup: false,
             hasSession,
-            error: { code, message },
-            db: buildPublicDbState(code === 'DB_SCHEMA_MISSING' ? 'schema-missing' : 'missing')
+            error: {
+                code: classification.code,
+                category: classification.category,
+                message: classification.message,
+                remediationCommand: classification.remediationCommand,
+                nextAction: classification.nextAction,
+            },
+            db: buildPublicDbState(classification.dbState)
         });
         response.headers.set('Cache-Control', 'no-store');
         return response;

@@ -1,4 +1,4 @@
-# Security Policy — MediFlow
+# Security Policy: MediFlow
 
 MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
 
@@ -6,7 +6,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Riferimenti correlati
+## 📚 Riferimenti correlati
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato corrente completo e boundary operativi)
@@ -17,7 +17,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Principi di sicurezza fondamentali
+## 🔒 Principi di sicurezza fondamentali
 
 - **Local-first di default**: nessuna uscita cloud se non esplicitamente implementata e documentata.
 - **Zero-knowledge a riposo**: il database deve restare illeggibile senza il PIN utente.
@@ -26,7 +26,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Threat model (alto livello)
+## ⚠️ Threat model (alto livello)
 
 Assumiamo che:
 
@@ -44,7 +44,7 @@ Non copriamo ancora:
 
 ---
 
-## Protezione dati
+## 🗄️ Protezione dati
 
 ### Dati a riposo (SQLite)
 
@@ -56,6 +56,26 @@ Non copriamo ancora:
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+### Decifratura fallita e conservazione del ciphertext
+
+- Se un campo `ENC:` non si decifra (chiave assente, dato corrotto), la UI
+  mostra il placeholder `[LOCKED DATA]`.
+- Il placeholder è un artefatto di sola presentazione: non deve mai essere
+  persistito.
+- Il ciphertext originale viene conservato e riscritto invariato a ogni save:
+  un salvataggio successivo non deve mai sovrascrivere il dato clinico cifrato
+  con il placeholder o con una sua ri-cifratura.
+
+### Cancellazione paziente ed erasure
+
+- Il DELETE operativo di un paziente è un soft-delete reversibile (tombstone
+  version-guarded), non una cancellazione fisica.
+- L'erasure GDPR passa da una purge amministrata dedicata (dry-run + execute,
+  solo sessione admin web) con audit `patient.purged`; il restore esplicito
+  emette `patient.restored`.
+- I pazienti soft-deleted viaggiano nei backup: una richiesta di erasure deve
+  considerare anche gli artefatti già esportati, che la purge non raggiunge.
+
 ### Chiavi e PIN
 
 - Il PIN **non viene mai salvato**.
@@ -66,9 +86,9 @@ ENC:<iv_b64>:<cipher_b64>
 
 ---
 
-## API locali
+## 🔌 API locali
 
-MediFlow espone due superfici API:
+MediFlow espone tre superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
@@ -79,6 +99,16 @@ MediFlow espone due superfici API:
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
 - Mantenere `/api/v1/*` stabile e retrocompatibile.
+- Il bearer token locale non equivale a una sessione amministrativa umana:
+  route di sistema distruttive o amministrative richiedono session cookie con
+  admin web. In particolare audit, backup export/restore, backup scheduler,
+  repair DB, purge e restore paziente e start/stop MLX non devono accettare
+  solo il token locale.
+- Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
+  supporto/bootstrap, non privilegi admin generali: cataloghi locali,
+  settings/native bootstrap, proxy AI/OCR locale, health/redaction locali,
+  network overview e stato MLX read-only. Ogni nuova eccezione deve documentare
+  perche non richiede una sessione admin web.
 
 ### Trasporto
 
@@ -90,6 +120,9 @@ Regole minime:
 Quando il nodo passa a `network-home-base`:
 
 - il default locale non cambia: la modalita rete resta un opt-in esplicito
+- disattivare la modalita non revoca i pairing salvati: ogni token paired
+  diventa inerte e le route del data plane rispondono
+  `403 NETWORK_MODE_DISABLED` finché la modalita non viene riattivata
 - `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
   paired
 - il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre
@@ -126,7 +159,7 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
 
 ---
 
-## Proxy verso servizi locali (sicurezza SSRF)
+## 🧱 Proxy verso servizi locali (sicurezza SSRF)
 
 Alcuni endpoint inoltrano richieste a servizi locali (es. Ollama).
 Regole minime:
@@ -135,22 +168,42 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
-## AI locale e import clinico guidato
+## 🤖 AI locale e import clinico guidato
 
 I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
 devono rispettare queste regole aggiuntive:
 
 - usare solo servizi locali allowlisted (`localhost`, `127.0.0.1`)
-- trattare l'output del modello come **non fidato** finche un operatore non lo conferma
+- trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
 - trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
   come artifact clinici locali, non come payload innocui di debug
 
-L'autofill automatico resta ammesso solo nei casi gia documentati e prudenti
+L'autofill automatico resta ammesso solo nei casi già documentati e prudenti
 (es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
 
-## Logging e redazione
+> [!IMPORTANT]
+> I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
+> smart-import, document-synthesis) e model governance delle decisioni
+> documentali. Restano AI locale review-first: nessuna scrittura clinica
+> autonoma.
+
+## ⚠️ Comparator cloud opt-in
+
+non cambia il default `local-first`.
+
+Regole minime:
+
+- e ammesso solo come lane interna di engineering, mai come runtime clinico
+- usa solo case pack privati, redatti/minimizzati e fuori Git
+- richiede approvazione umana esplicita prima di qualunque export
+- non puo scrivere dati paziente, generare apply automatici o essere committato
+  nel repository
+
+---
+
+## 🔒 Logging e redazione
 
 I dati sanitari non devono trapelare dai log.
 
@@ -199,7 +252,7 @@ Se aggiungi log:
 
 ---
 
-## Gestione segreti
+## 🔑 Gestione segreti
 
 - Non committare `.env` con valori reali.
 - Se introduci variabili ambiente:
@@ -208,7 +261,7 @@ Se aggiungi log:
 
 ---
 
-## Dependency e security checks
+## 🧪 Dependency e security checks
 
 Controlli consigliati prima di release o merge rilevanti:
 
@@ -226,7 +279,7 @@ Opzionali (se usati nella toolchain):
 
 ---
 
-## Segnalazione vulnerabilità
+## ⚠️ Segnalazione vulnerabilità
 
 Se ritieni di aver trovato una vulnerabilità:
 

@@ -1,9 +1,11 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { observations, patients, therapies } from '@/lib/schema';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): soft-deleted patients are not addressable for FSE validation
+import { activePatients } from '@/lib/patient-lifecycle';
 import {
     PROFILE_OBSERVATION_VITALS,
     PROFILE_THERAPY_MEDICATION,
@@ -63,7 +65,7 @@ export async function GET(request: Request) {
         const patient = await dbServer
             .select({ id: patients.id })
             .from(patients)
-            .where(eq(patients.id, patientId))
+            .where(and(eq(patients.id, patientId), activePatients()))
             .get();
         if (!patient) {
             return NextResponse.json({ error: 'Patient not found' }, { status: 404 });

@@ -1145,7 +1145,7 @@ private func severityTint(_ severity: AlertSeverity) -> Color {
 }
 
 private func shortDate(_ date: Date?) -> String {
-    guard let date else { return "—" }
+    guard let date else { return "–" }
     return date.formatted(date: .abbreviated, time: .omitted)
 }
 

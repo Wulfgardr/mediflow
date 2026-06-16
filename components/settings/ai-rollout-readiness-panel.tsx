@@ -50,19 +50,19 @@ type RolloutArtifactPayload = {
 const LANE_META: Record<RolloutLane, { label: string; description: string }> = {
     patient_insight: {
         label: 'Patient Insight',
-        description: 'Controlla se la lane insight puo restare in hold, entrare in shadow o richiedere rollback.',
+        description: 'Controlla se Patient Insight puo restare in attesa, entrare in osservazione o richiedere blocco.',
     },
     smart_import: {
         label: 'Smart Import',
-        description: 'Mostra la readiness del review/apply documentale senza trasformarlo in autofill implicito.',
+        description: 'Mostra se revisione e applicazione documentale sono pronte senza automatizzare il salvataggio.',
     },
     redaction: {
         label: 'Redaction',
-        description: 'Riporta il verdetto della lane privacy-first e i blocker che impediscono shadow mode.',
+        description: 'Riporta esito privacy-first e ostacoli che impediscono la modalita osservazione.',
     },
     clinical_entities: {
         label: 'Clinical Entities',
-        description: 'Tiene visibile il gate della lane NER benchmark-only e i motivi di promozione mancata.',
+        description: 'Tiene visibile il controllo del riconoscimento entita cliniche e i motivi di promozione mancata.',
     },
     generative_challenger: {
         label: 'Generative Challenger',
@@ -125,9 +125,9 @@ export default function AiRolloutReadinessPanel() {
                         <ShieldAlert className="h-5 w-5" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">AI rollout readiness</h3>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Stato rilascio AI locale</h3>
                         <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                            Vista read-only dei verdict lane-aware persistiti dal validator locale. Nessun controllo di promozione o rollback parte dalla UI.
+                            Mostra gli esiti salvati dal validator locale. Da qui non si promuovono modelli e non si avviano blocchi.
                         </p>
                     </div>
                 </div>
@@ -155,7 +155,7 @@ export default function AiRolloutReadinessPanel() {
                 <div className="rounded-[20px] border border-red-200/70 bg-red-50/80 p-4 text-xs leading-6 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200">
                     <div className="flex items-center gap-2 font-semibold">
                         <AlertTriangle className="h-4 w-4" />
-                        Artifact non disponibili
+                        Report locali non disponibili
                     </div>
                     <p className="mt-2">{state.message}</p>
                 </div>
@@ -165,7 +165,7 @@ export default function AiRolloutReadinessPanel() {
                 <div className="space-y-4">
                     {missingCount === lanes.length ? (
                         <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/60 p-4 text-xs leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                            <p>Nessun verdict locale disponibile al momento. La governance AI resta comunque osservabile: tutte le lane note sono elencate qui sotto come `artifact missing`.</p>
+                            <p>Nessun esito locale disponibile al momento. La governance AI resta comunque osservabile: tutte le aree note sono elencate qui sotto come report mancanti.</p>
                             <p className="mt-2 font-mono text-[11px] text-slate-700 dark:text-slate-200">
                                 npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
                             </p>
@@ -173,20 +173,20 @@ export default function AiRolloutReadinessPanel() {
                     ) : null}
 
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <MetricCard label="Shadow-ready" value={String(readyCount)} tone="ready" />
-                        <MetricCard label="Hold" value={String(holdCount)} tone="hold" />
-                        <MetricCard label="Rollback richiesto" value={String(rollbackCount)} tone="rollback" />
-                        <MetricCard label="Artifact mancanti" value={String(missingCount)} tone="missing" />
+                        <MetricCard label="Pronte in osservazione" value={String(readyCount)} tone="ready" />
+                        <MetricCard label="In attesa" value={String(holdCount)} tone="hold" />
+                        <MetricCard label="Blocco richiesto" value={String(rollbackCount)} tone="rollback" />
+                        <MetricCard label="Report mancanti" value={String(missingCount)} tone="missing" />
                     </div>
 
                     <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                                    Local controls
+                                    Controlli locali
                                 </p>
                                 <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                                    Stato read-only dei kill switch locali per le lane gia productized. Il pannello readiness non modifica questi toggle.
+                                    Stato in sola lettura degli interruttori locali per le funzioni già disponibili.
                                 </p>
                             </div>
                             <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300" data-testid="ai-rollout-local-control-summary">
@@ -362,7 +362,7 @@ function LaneCard({
                     className="mt-4 rounded-[18px] border border-dashed border-slate-200/80 bg-slate-50/70 p-4 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
                     data-testid={`ai-rollout-missing-${entry.lane}`}
                 >
-                    <p>Artifact locale mancante per questa lane. Nessun verdict persistito da mostrare.</p>
+                    <p>Report locale mancante per questa area AI. Nessun esito salvato da mostrare.</p>
                     <p className="mt-2 font-mono text-[10px] text-slate-700 dark:text-slate-200">
                         npm run validate:ai-rollout-readiness -- --lane {entry.lane} --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
                     </p>

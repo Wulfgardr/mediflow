@@ -1,11 +1,11 @@
 'use client';
 
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+import { db, type Diagnosis, type Patient } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
-import { db } from '@/lib/db';
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Activity, Clock, Filter, ShieldCheck, Users } from 'lucide-react';
-import Link from 'next/link';
 import { differenceInYears } from 'date-fns';
+import { Activity, AlertTriangle, ClipboardList, Clock, Filter, ShieldCheck, Stethoscope, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 /* @Codex */
 type AuditSummary = {
@@ -18,20 +18,177 @@ type AuditSummary = {
     isTruncated: boolean;
 };
 
+type AgeBucket = '0-18' | '19-64' | '65-80' | '80+';
+
+type DiagnosisStat = {
+    key: string;
+    description: string;
+    system: string;
+    code: string;
+    count: number;
+};
+
+type AnalyticsStats = {
+    totalInRange: number;
+    withBirthDate: number;
+    withoutBirthDate: number;
+    adiCount: number;
+    withDiagnoses: number;
+    ageDist: Record<AgeBucket, number>;
+    topDiagnoses: DiagnosisStat[];
+};
+
+const ANALYTICS_NAV_ITEMS = [
+    { href: '#popolazione', label: 'Popolazione', meta: 'filtri' },
+    { href: '#indicatori', label: 'Indicatori', meta: 'schede' },
+    { href: '#audit', label: 'Audit', meta: 'tracciato' },
+    { href: '#eta', label: 'Età', meta: 'fasce' },
+    { href: '#diagnosi', label: 'Diagnosi', meta: 'top 10' },
+];
+
+const EMPTY_AGE_DIST: Record<AgeBucket, number> = {
+    '0-18': 0,
+    '19-64': 0,
+    '65-80': 0,
+    '80+': 0,
+};
+
+type ToneKey = 'info' | 'success' | 'warning' | 'critical';
+
+const K8_TONES: Record<ToneKey, { accent: string; soft: string; line: string }> = {
+    info: {
+        accent: '#1d4ed8',
+        soft: '#dbeafe',
+        line: 'rgba(29, 78, 216, 0.24)',
+    },
+    success: {
+        accent: '#15803d',
+        soft: '#dcfce7',
+        line: 'rgba(21, 128, 61, 0.24)',
+    },
+    warning: {
+        accent: '#92400e',
+        soft: '#fef3c7',
+        line: 'rgba(146, 64, 14, 0.24)',
+    },
+    critical: {
+        accent: '#9a3412',
+        soft: '#ffe2dd',
+        line: 'rgba(154, 52, 18, 0.24)',
+    },
+};
+
+function normalizeAgeRange(range: [number, number]) {
+    return range[0] <= range[1] ? range : [range[1], range[0]];
+}
+
+function toDate(value: Patient['birthDate']) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getAgeBucket(age: number): AgeBucket {
+    if (age <= 18) return '0-18';
+    if (age <= 64) return '19-64';
+    if (age <= 80) return '65-80';
+    return '80+';
+}
+
+function diagnosisKey(diagnosis: Diagnosis) {
+    const system = diagnosis.system?.trim() || 'ICD';
+    const code = diagnosis.code?.trim() || 'senza-codice';
+    const description = diagnosis.description?.trim() || code;
+    return `${system}:${code}:${description.toLocaleLowerCase('it-IT')}`;
+}
+
+function buildAnalyticsStats(patients: Patient[], ageRange: [number, number]): AnalyticsStats {
+    const now = new Date();
+    const [minAge, maxAge] = normalizeAgeRange(ageRange);
+    const ageDist: Record<AgeBucket, number> = { ...EMPTY_AGE_DIST };
+    const diagnosisCounts = new Map<string, DiagnosisStat>();
+    let totalInRange = 0;
+    let withBirthDate = 0;
+    let withoutBirthDate = 0;
+    let adiCount = 0;
+    let withDiagnoses = 0;
+
+    for (const patient of patients) {
+        const birthDate = toDate(patient.birthDate);
+        if (!birthDate) {
+            withoutBirthDate += 1;
+            continue;
+        }
+
+        withBirthDate += 1;
+        const age = differenceInYears(now, birthDate);
+        if (age < minAge || age > maxAge) continue;
+
+        totalInRange += 1;
+        if (patient.isAdi) adiCount += 1;
+        ageDist[getAgeBucket(age)] += 1;
+
+        if (patient.diagnoses?.length) {
+            withDiagnoses += 1;
+            for (const diagnosis of patient.diagnoses) {
+                const key = diagnosisKey(diagnosis);
+                const current = diagnosisCounts.get(key);
+                if (current) {
+                    current.count += 1;
+                } else {
+                    diagnosisCounts.set(key, {
+                        key,
+                        description: diagnosis.description?.trim() || diagnosis.code || 'Diagnosi senza descrizione',
+                        system: diagnosis.system?.trim() || 'ICD',
+                        code: diagnosis.code?.trim() || 'n/d',
+                        count: 1,
+                    });
+                }
+            }
+        }
+    }
+
+    return {
+        totalInRange,
+        withBirthDate,
+        withoutBirthDate,
+        adiCount,
+        withDiagnoses,
+        ageDist,
+        topDiagnoses: Array.from(diagnosisCounts.values())
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10),
+    };
+}
+
+function percent(part: number, total: number) {
+    if (!total) return 0;
+    return Math.round((part / total) * 100);
+}
+
+function ProgressLine({ value, total, tone }: { value: number; total: number; tone: ToneKey }) {
+    return (
+        <div className="mt-4 h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--k8-line)' }}>
+            <div
+                className="h-full rounded-full transition-[width] duration-700"
+                style={{ width: `${percent(value, total)}%`, background: K8_TONES[tone].accent }}
+            />
+        </div>
+    );
+}
+
 export default function AnalyticsPage() {
     const patients = useLiveQuery(async () => {
         return await db.patients
-            .filter(p => !p.isArchived)
+            .filter((patient) => !patient.isArchived)
             .toArray();
     });
 
-    // Filters
     const [ageRange, setAgeRange] = useState<[number, number]>([0, 120]);
     const [auditDays, setAuditDays] = useState(30);
     const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
     const [auditLoading, setAuditLoading] = useState(true);
     const [auditError, setAuditError] = useState<string | null>(null);
-    // Gender filter removed as unused for now
 
     useEffect(() => {
         const controller = new AbortController();
@@ -47,8 +204,8 @@ export default function AnalyticsPage() {
                 });
                 if (!response.ok) {
                     throw new Error(response.status === 403
-                        ? 'Solo gli admin possono consultare il cruscotto audit.'
-                        : 'Impossibile caricare il riepilogo audit.');
+                        ? 'Serve un account admin per vedere l’audit locale.'
+                        : 'Non riesco a leggere l’audit locale.');
                 }
 
                 const payload = await response.json() as AuditSummary;
@@ -56,7 +213,7 @@ export default function AnalyticsPage() {
                 setAuditSummary(payload);
             } catch (error) {
                 if (controller.signal.aborted || !active) return;
-                setAuditError(error instanceof Error ? error.message : 'Impossibile caricare il riepilogo audit.');
+                setAuditError(error instanceof Error ? error.message : 'Non riesco a leggere l’audit locale.');
                 setAuditSummary(null);
             } finally {
                 if (active) setAuditLoading(false);
@@ -71,302 +228,323 @@ export default function AnalyticsPage() {
         };
     }, [auditDays]);
 
-    // Derived Stats
+    const normalizedAgeRange = normalizeAgeRange(ageRange);
     const stats = useMemo(() => {
         if (!patients) return null;
-
-        const filtered = patients.filter(p => {
-            if (!p.birthDate) return false;
-            const age = differenceInYears(new Date(), new Date(p.birthDate));
-            return age >= ageRange[0] && age <= ageRange[1];
-        });
-
-        // 1. Total & Distribution
-        const total = filtered.length;
-        // Fields not yet in schema
-        const takenInCharge = 0; // filtered.filter(p => p.monitoringProfile === 'taken_in_charge').length;
-        const extemp = 0; // filtered.filter(p => p.monitoringProfile === 'extemporaneous').length;
-
-        // 2. Pathologies
-        const pathCodes: Record<string, { count: number, desc: string }> = {};
-        /*
-        filtered.forEach(p => {
-            p.diagnoses?.forEach(d => {
-                const k = d.code;
-                if (!pathCodes[k]) pathCodes[k] = { count: 0, desc: d.description };
-                pathCodes[k].count++;
-            });
-        });
-        */
-        const topPathologies = Object.values(pathCodes)
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 10);
-
-        // 3. Age Distribution
-        const ageDist = {
-            '0-18': 0,
-            '19-64': 0,
-            '65-80': 0,
-            '80+': 0
-        };
-        filtered.forEach(p => {
-            if (!p.birthDate) return;
-            const age = differenceInYears(new Date(), new Date(p.birthDate));
-            if (age <= 18) ageDist['0-18']++;
-            else if (age <= 64) ageDist['19-64']++;
-            else if (age <= 80) ageDist['65-80']++;
-            else ageDist['80+']++;
-        });
-
-        return {
-            total,
-            takenInCharge,
-            extemp,
-            topPathologies,
-            ageDist
-        };
+        return buildAnalyticsStats(patients, ageRange);
     }, [patients, ageRange]);
 
-    if (!patients) return <div className="p-10 text-center">Caricamento Analisi...</div>;
+    if (!patients || !stats) {
+        return (
+            <Kree8WorkspaceShell
+                eyebrow="Analisi"
+                title="Cruscotto locale"
+                subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
+                backHref="/"
+                backLabel="Torna ai pazienti"
+                statusLabel="Sto leggendo dal Mac..."
+                navItems={ANALYTICS_NAV_ITEMS}
+            >
+                <div className="patient-detail-section p-6 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                    Sto preparando il cruscotto locale.
+                </div>
+            </Kree8WorkspaceShell>
+        );
+    }
+
+    const topDiagnosis = stats.topDiagnoses[0];
 
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <Link href="/" className="p-2 hover:bg-white rounded-full transition-colors">
-                    <ArrowLeft className="w-6 h-6 text-gray-600" />
-                </Link>
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Cruscotto Clinico</h1>
-                    <p className="text-gray-500">Analisi avanzata popolazione e patologie</p>
-                </div>
-            </div>
-
-            {/* Filters Bar */}
-            <div className="glass-panel p-6 flex flex-col md:flex-row gap-8 items-center">
-                <div className="flex items-center gap-2 text-gray-700 font-bold">
-                    <Filter className="w-5 h-5 text-blue-600" />
-                    Filtri Popolazione
-                </div>
-
-                <div className="flex-1 w-full md:w-auto">
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Filtra per Età: {ageRange[0]} - {ageRange[1]} anni</label>
-                    <div className="flex gap-4 items-center">
-                        <input
-                            type="range"
-                            min="0"
-                            max="120"
-                            aria-label="Età minima"
-                            value={ageRange[0]}
-                            onChange={(e) => setAgeRange([parseInt(e.target.value), ageRange[1]])}
-                            className="w-full accent-blue-600"
-                        />
-                        <input
-                            type="range"
-                            min="0"
-                            max="120"
-                            aria-label="Età massima"
-                            value={ageRange[1]}
-                            onChange={(e) => setAgeRange([ageRange[0], parseInt(e.target.value)])}
-                            className="w-full accent-blue-600"
-                        />
+        <Kree8WorkspaceShell
+            eyebrow="Analisi"
+            title="Cruscotto locale"
+            subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
+            backHref="/"
+            backLabel="Torna ai pazienti"
+            statusLabel={`${stats.totalInRange} schede in ${normalizedAgeRange[0]}-${normalizedAgeRange[1]} anni · ${stats.withoutBirthDate} senza data nascita`}
+            navItems={ANALYTICS_NAV_ITEMS}
+        >
+            <section id="popolazione" className="patient-detail-section space-y-5 p-5 scroll-mt-32">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="min-w-0">
+                        <p className="section-kicker">Popolazione</p>
+                        <h2 className="mt-1 text-xl font-semibold" style={{ color: 'var(--k8-ink)' }}>Filtro età</h2>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                            Il filtro considera le schede attive con data di nascita compilata.
+                        </p>
                     </div>
-                </div>
-
-                <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-mono text-sm">
-                    {stats?.total} Pazienti Selezionati
-                </div>
-
-                <div className="w-full md:w-auto">
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Finestra Audit</label>
-                    <select
-                        aria-label="Finestra audit"
-                        value={auditDays}
-                        onChange={(event) => setAuditDays(Number(event.target.value))}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
+                    <div
+                        className="inline-flex w-fit items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                        style={{
+                            background: K8_TONES.info.soft,
+                            color: K8_TONES.info.accent,
+                            border: `1px solid ${K8_TONES.info.line}`,
+                        }}
                     >
-                        <option value={7}>Ultimi 7 giorni</option>
-                        <option value={30}>Ultimi 30 giorni</option>
-                        <option value={90}>Ultimi 90 giorni</option>
-                    </select>
+                        <Filter className="h-4 w-4" />
+                        {normalizedAgeRange[0]}-{normalizedAgeRange[1]} anni
+                    </div>
                 </div>
-            </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-panel p-6 border-l-4 border-l-blue-500">
-                    <div className="flex justify-between items-start">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px] lg:items-end">
+                    <div className="grid min-w-0 gap-4">
+                        <label className="min-w-0">
+                            <span className="mf-eyebrow mb-2 flex items-center justify-between gap-3">
+                                <span>Età minima</span>
+                                <strong>{ageRange[0]} anni</strong>
+                            </span>
+                            <input
+                                type="range"
+                                min="0"
+                                max="120"
+                                aria-label="Età minima"
+                                value={ageRange[0]}
+                                onChange={(event) => setAgeRange([Number(event.target.value), ageRange[1]])}
+                                className="w-full"
+                                style={{ accentColor: K8_TONES.info.accent }}
+                            />
+                        </label>
+                        <label className="min-w-0">
+                            <span className="mf-eyebrow mb-2 flex items-center justify-between gap-3">
+                                <span>Età massima</span>
+                                <strong>{ageRange[1]} anni</strong>
+                            </span>
+                            <input
+                                type="range"
+                                min="0"
+                                max="120"
+                                aria-label="Età massima"
+                                value={ageRange[1]}
+                                onChange={(event) => setAgeRange([ageRange[0], Number(event.target.value)])}
+                                className="w-full"
+                                style={{ accentColor: K8_TONES.info.accent }}
+                            />
+                        </label>
+                    </div>
+                    <label>
+                        <span className="mf-eyebrow mb-2 block">Finestra audit</span>
+                        <select
+                            aria-label="Finestra audit"
+                            value={auditDays}
+                            onChange={(event) => setAuditDays(Number(event.target.value))}
+                            className="mf-input mf-input-sm w-full cursor-pointer appearance-none"
+                        >
+                            <option value={7}>Ultimi 7 giorni</option>
+                            <option value={30}>Ultimi 30 giorni</option>
+                            <option value={90}>Ultimi 90 giorni</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
+
+            <section id="indicatori" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 scroll-mt-32">
+                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.info.accent}` }}>
+                    <div className="flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Presa in Carico</p>
-                            <h3 className="text-3xl font-bold text-gray-800 mt-1">{stats?.takenInCharge}</h3>
+                            <p className="mf-eyebrow">Schede nel filtro</p>
+                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.totalInRange}</p>
                         </div>
-                        <Users className="w-8 h-8 text-blue-200" />
+                        <Users className="h-7 w-7" style={{ color: K8_TONES.info.accent }} />
                     </div>
-                    <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div
-                            className="bg-blue-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
-                            style={{ '--prog-width': `${(stats?.takenInCharge || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
-                        ></div>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-2 font-medium">
-                        {Math.round(((stats?.takenInCharge || 0) / (stats?.total || 1)) * 100)}% del totale
+                    <ProgressLine value={stats.totalInRange} total={Math.max(stats.withBirthDate, 1)} tone="info" />
+                    <p className="mt-2 text-xs font-medium" style={{ color: K8_TONES.info.accent }}>
+                        {percent(stats.totalInRange, stats.withBirthDate)}% delle schede con età nota
                     </p>
                 </div>
 
-                <div className="glass-panel p-6 border-l-4 border-l-orange-500">
-                    <div className="flex justify-between items-start">
+                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.warning.accent}` }}>
+                    <div className="flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Estemporanei</p>
-                            <h3 className="text-3xl font-bold text-gray-800 mt-1">{stats?.extemp}</h3>
+                            <p className="mf-eyebrow">ADI attive</p>
+                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.adiCount}</p>
                         </div>
-                        <Activity className="w-8 h-8 text-orange-200" />
+                        <Stethoscope className="h-7 w-7" style={{ color: K8_TONES.warning.accent }} />
                     </div>
-                    <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div
-                            className="bg-orange-500 h-full transition-all duration-1000 w-[var(--prog-width)]"
-                            style={{ '--prog-width': `${(stats?.extemp || 0) / (stats?.total || 1) * 100}%` } as React.CSSProperties}
-                        ></div>
-                    </div>
-                </div>
-
-                <div className="glass-panel p-6 border-l-4 border-l-purple-500">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-sm font-bold text-gray-400 uppercase">Top Patologia</p>
-                            <h3 className="text-xl font-bold text-gray-800 mt-1 truncate max-w-[200px]" title={stats?.topPathologies[0]?.desc}>
-                                {stats?.topPathologies[0]?.desc || 'N/A'}
-                            </h3>
-                        </div>
-                        <Activity className="w-8 h-8 text-purple-200" />
-                    </div>
-                    <p className="text-xs text-purple-600 mt-2 font-medium">
-                        {stats?.topPathologies[0]?.count || 0} casi registrati
+                    <ProgressLine value={stats.adiCount} total={stats.totalInRange} tone="warning" />
+                    <p className="mt-2 text-xs font-medium" style={{ color: K8_TONES.warning.accent }}>
+                        {percent(stats.adiCount, stats.totalInRange)}% delle schede filtrate
                     </p>
                 </div>
-            </div>
 
-            <div className="glass-panel p-6 space-y-6">
+                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.success.accent}` }}>
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="mf-eyebrow">Con diagnosi</p>
+                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.withDiagnoses}</p>
+                        </div>
+                        <ClipboardList className="h-7 w-7" style={{ color: K8_TONES.success.accent }} />
+                    </div>
+                    <ProgressLine value={stats.withDiagnoses} total={stats.totalInRange} tone="success" />
+                    <p className="mt-2 text-xs font-medium" style={{ color: K8_TONES.success.accent }}>
+                        {percent(stats.withDiagnoses, stats.totalInRange)}% delle schede filtrate
+                    </p>
+                </div>
+
+                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.critical.accent}` }}>
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="mf-eyebrow">Diagnosi più ricorrente</p>
+                            <p className="mt-2 truncate text-base font-semibold" title={topDiagnosis?.description} style={{ color: 'var(--k8-ink)' }}>
+                                {topDiagnosis?.description ?? 'Non disponibile'}
+                            </p>
+                        </div>
+                        <Activity className="h-7 w-7 shrink-0" style={{ color: K8_TONES.critical.accent }} />
+                    </div>
+                    <p className="mt-4 text-xs font-medium" style={{ color: K8_TONES.critical.accent }}>
+                        {topDiagnosis ? `${topDiagnosis.count} schede · ${topDiagnosis.system} ${topDiagnosis.code}` : 'Nessuna diagnosi codificata nel filtro'}
+                    </p>
+                </div>
+            </section>
+
+            <section id="audit" className="patient-detail-section space-y-5 p-5 scroll-mt-32">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                            Audit Operativo
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                            KPI PHI-safe sugli ultimi {auditDays} giorni da `audit_events`.
+                        <p className="section-kicker">Audit</p>
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold" style={{ color: 'var(--k8-ink)' }}>
+                            <ShieldCheck className="h-5 w-5" style={{ color: K8_TONES.success.accent }} />
+                            Attività locale
+                        </h2>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                            Log operativo degli ultimi {auditDays} giorni, senza contenuti clinici.
                         </p>
                     </div>
                 </div>
 
                 {auditLoading ? (
-                    <div className="rounded-xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500">Caricamento riepilogo audit...</div>
+                    <div className="patient-detail-side-section p-4 text-sm" style={{ color: 'var(--k8-muted)' }}>Sto leggendo il tracciato locale...</div>
                 ) : auditError ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 flex items-start gap-2">
+                    <div
+                        className="flex gap-2 rounded-[18px] border p-4 text-sm"
+                        style={{
+                            background: K8_TONES.warning.soft,
+                            borderColor: K8_TONES.warning.line,
+                            color: K8_TONES.warning.accent,
+                        }}
+                    >
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{auditError}</span>
                     </div>
                 ) : auditSummary ? (
                     <>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Eventi Totali</p>
-                                <p className="mt-2 text-3xl font-bold text-emerald-950">{auditSummary.totalEvents}</p>
-                            </div>
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Failure + Denied</p>
-                                <p className="mt-2 text-3xl font-bold text-amber-950">
-                                    {auditSummary.outcomes.failure + auditSummary.outcomes.denied}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Attori Distinti</p>
-                                <p className="mt-2 text-3xl font-bold text-sky-950">{auditSummary.distinctActors}</p>
-                            </div>
-                            <div className="rounded-2xl border border-violet-100 bg-violet-50/80 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Evento Top</p>
-                                <p className="mt-2 text-sm font-semibold text-violet-950">
-                                    {auditSummary.topEventTypes[0]?.eventType ?? 'Nessuno'}
-                                </p>
-                                <p className="mt-1 text-xs text-violet-700">
-                                    {auditSummary.topEventTypes[0]?.count ?? 0} occorrenze
-                                </p>
-                            </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <AuditCard label="Eventi" value={auditSummary.totalEvents} tone="info" />
+                            <AuditCard label="Completati" value={auditSummary.outcomes.success} tone="success" />
+                            <AuditCard label="Attori" value={auditSummary.distinctActors} tone="info" />
+                            <AuditCard
+                                label="Evento più frequente"
+                                value={auditSummary.topEventTypes[0]?.eventType ?? 'Nessuno'}
+                                note={`${auditSummary.topEventTypes[0]?.count ?? 0} occorrenze`}
+                                tone="critical"
+                            />
                         </div>
 
-                        <div className="rounded-2xl border border-gray-200 bg-white/80 p-4 text-sm text-gray-600">
-                            <p className="font-semibold text-gray-800">Distribuzione</p>
+                        <div className="patient-detail-side-section p-4 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                            <p className="font-semibold" style={{ color: 'var(--k8-ink)' }}>Esiti e origine</p>
                             <div className="mt-3 flex flex-wrap gap-4">
-                                <span>Success: <strong>{auditSummary.outcomes.success}</strong></span>
-                                <span>Failure: <strong>{auditSummary.outcomes.failure}</strong></span>
-                                <span>Denied: <strong>{auditSummary.outcomes.denied}</strong></span>
+                                <span>Completati: <strong>{auditSummary.outcomes.success}</strong></span>
+                                <span>Errori: <strong>{auditSummary.outcomes.failure}</strong></span>
+                                <span>Negati: <strong>{auditSummary.outcomes.denied}</strong></span>
                                 <span>Web/API/Native: <strong>{auditSummary.sourceSurfaces.web}/{auditSummary.sourceSurfaces.api}/{auditSummary.sourceSurfaces.native}</strong></span>
                             </div>
                             {auditSummary.isTruncated && (
-                                <p className="mt-3 text-xs text-amber-700">
-                                    Riepilogo basato su un campione locale limitato agli ultimi 500 eventi filtrati.
+                                <p className="mt-3 text-xs" style={{ color: K8_TONES.warning.accent }}>
+                                    Riepilogo calcolato sui primi 500 eventi nel filtro.
                                 </p>
                             )}
                         </div>
                     </>
                 ) : null}
-            </div>
+            </section>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section id="eta" className="patient-detail-section p-5 scroll-mt-32">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--k8-ink)' }}>
+                        <Clock className="h-5 w-5" style={{ color: 'var(--k8-subtle)' }} />
+                        Fasce d’età
+                    </h2>
 
-                {/* Age Distribution */}
-                <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-gray-400" />
-                        Distribuzione Età
-                    </h3>
-
-                    <div className="space-y-4">
-                        {Object.entries(stats?.ageDist || {}).map(([range, count]) => (
+                    <div className="mt-5 space-y-4">
+                        {Object.entries(stats.ageDist).map(([range, count]) => (
                             <div key={range}>
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="font-medium text-gray-600">{range} anni</span>
-                                    <span className="font-bold text-gray-800">{count}</span>
+                                <div className="mb-1 flex justify-between gap-4 text-sm">
+                                    <span className="font-medium" style={{ color: 'var(--k8-muted)' }}>{range} anni</span>
+                                    <span className="font-semibold" style={{ color: 'var(--k8-ink)' }}>{count}</span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3">
-                                    <div
-                                        className="bg-indigo-500 h-full rounded-full opacity-80 w-[var(--prog-width)]"
-                                        style={{ '--prog-width': `${(count / (stats?.total || 1)) * 100}%` } as React.CSSProperties}
-                                    ></div>
-                                </div>
+                                <ProgressLine value={count} total={stats.totalInRange} tone="info" />
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
 
-                {/* Pathologies Ranking */}
-                <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-red-500" />
-                        Prevalenza Patologie (ICD-9/10)
-                    </h3>
+                <section id="diagnosi" className="patient-detail-section p-5 scroll-mt-32">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--k8-ink)' }}>
+                        <Activity className="h-5 w-5" style={{ color: K8_TONES.critical.accent }} />
+                        Diagnosi registrate
+                    </h2>
 
-                    <div className="space-y-3 h-64 overflow-y-auto pr-2">
-                        {stats?.topPathologies.map((path, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-50 last:border-0">
-                                <div className="w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-xs font-bold shrink-0">
-                                    {idx + 1}
+                    <div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-2">
+                        {stats.topDiagnoses.map((diagnosis, index) => (
+                            <div
+                                key={diagnosis.key}
+                                className="flex items-center gap-3 rounded-[14px] border p-3"
+                                style={{
+                                    background: 'var(--k8-soft)',
+                                    borderColor: 'var(--k8-line)',
+                                }}
+                            >
+                                <div
+                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                                    style={{ background: K8_TONES.critical.soft, color: K8_TONES.critical.accent }}
+                                >
+                                    {index + 1}
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-800 truncate">{path.desc}</p>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium" style={{ color: 'var(--k8-ink)' }}>{diagnosis.description}</p>
+                                    <p className="text-xs" style={{ color: 'var(--k8-muted)' }}>{diagnosis.system} {diagnosis.code}</p>
                                 </div>
-                                <div className="text-sm font-bold text-gray-600">
-                                    {path.count} <span className="text-[10px] text-gray-400 font-normal">casi</span>
+                                <div className="text-sm font-semibold" style={{ color: 'var(--k8-muted)' }}>
+                                    {diagnosis.count} <span className="text-[10px] font-normal">schede</span>
                                 </div>
                             </div>
                         ))}
-                        {stats?.topPathologies.length === 0 && (
-                            <p className="text-center text-gray-400 italic mt-10">Nessuna patologia codificata registrata.</p>
+                        {stats.topDiagnoses.length === 0 && (
+                            <p className="mt-10 text-center text-sm italic" style={{ color: 'var(--k8-muted)' }}>
+                                Nessuna diagnosi codificata nel filtro corrente.
+                            </p>
                         )}
                     </div>
-                </div>
-
+                </section>
             </div>
+        </Kree8WorkspaceShell>
+    );
+}
+
+function AuditCard({
+    label,
+    value,
+    note,
+    tone,
+}: {
+    label: string;
+    value: number | string;
+    note?: string;
+    tone: ToneKey;
+}) {
+    const palette = K8_TONES[tone];
+
+    return (
+        <div
+            className="rounded-[18px] p-4"
+            style={{
+                background: 'var(--k8-surface)',
+                border: '1px solid var(--k8-line)',
+                borderLeft: `3px solid ${palette.accent}`,
+                boxShadow: 'var(--k8-shadow)',
+            }}
+        >
+            <p className="mf-eyebrow" style={{ color: palette.accent }}>{label}</p>
+            <p className="mt-2 truncate text-2xl font-semibold" title={String(value)} style={{ color: 'var(--k8-ink)' }}>{value}</p>
+            {note ? <p className="mt-1 text-xs" style={{ color: palette.accent }}>{note}</p> : null}
         </div>
     );
 }

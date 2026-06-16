@@ -5,22 +5,9 @@ import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 
+import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
+
 const SETTINGS_KEY = 'backupScheduler';
-const BACKUP_COLLECTIONS = [
-  'ambulatories',
-  'attachments',
-  'conversations',
-  'drugs',
-  'entries',
-  'exemptions',
-  'messages',
-  'observations',
-  'patients',
-  'prostheticPrescriptions',
-  'sissHandoffs',
-  'checkups',
-  'therapies',
-];
 
 /* @Codex */
 const BACKUP_TABLES = {
@@ -34,6 +21,9 @@ const BACKUP_TABLES = {
   observations: 'observations',
   patients: 'patients',
   prostheticPrescriptions: 'prosthetic_prescriptions',
+  serviceCatalogEntries: 'service_catalog_entries',
+  servicePrescriptionItems: 'service_prescription_items',
+  servicePrescriptions: 'service_prescriptions',
   sissHandoffs: 'siss_handoff_events',
   checkups: 'checkups',
   therapies: 'therapies',
@@ -126,12 +116,12 @@ function filterRowsByReference(rows, foreignKey, validRefs) {
   return rows.filter((row) => typeof row?.[foreignKey] === 'string' && validRefs.has(row[foreignKey]));
 }
 
-function buildDataset(db) {
+function buildDataset(db, backupCollections) {
   const dataset = Object.fromEntries(
-    BACKUP_COLLECTIONS.map((collection) => [
+    backupCollections.map((collection) => [
       collection,
       hasTable(db, BACKUP_TABLES[collection])
-        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map(normalizeRowKeys)
+        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
         : [],
     ]),
   );
@@ -154,7 +144,7 @@ function buildDataset(db) {
 async function main() {
   const artifactModule = await import(new URL('../lib/backup-artifact.ts', import.meta.url));
   const schedulerModule = await import(new URL('../lib/backup-scheduler.ts', import.meta.url));
-  const { serializeBackupArtifact } = artifactModule;
+  const { BACKUP_COLLECTIONS, serializeBackupArtifact } = artifactModule;
   const { applyBackupRetention, applyRetentionResultToState } = schedulerModule;
 
   const dataDir = getDefaultDataDir();
@@ -177,7 +167,7 @@ async function main() {
     fs.mkdirSync(destinationDir, { recursive: true });
 
     const createdAt = new Date();
-    const payload = buildDataset(db);
+    const payload = buildDataset(db, BACKUP_COLLECTIONS);
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);

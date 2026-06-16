@@ -229,7 +229,7 @@ export default function BackupSchedulerUI() {
     const lastRun = status?.state.run;
 
     return (
-        <div className="glass-panel p-6 md:p-7 space-y-5">
+        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="section-kicker">Continuità operativa</p>

@@ -7,31 +7,31 @@ struct MediFlowMacApp: App {
 
     var body: some Scene {
         WindowGroup {
-            OncologyPrototypeRootView()
-                .environmentObject(store)
-                .frame(minWidth: 1280, minHeight: 840)
+            AppleFoundationMobileRootView(snapshot: .live)
+                .frame(minWidth: 1120, minHeight: 760)
         }
         .commands {
-            CommandMenu("Prototype") {
-                Button("Reset demo") {
+            CommandMenu("Prototype oncologico") {
+                Button("Reset demo oncologico") {
                     store.resetDemo()
                 }
-                Button("Riapri onboarding") {
+                Button("Riapri onboarding oncologico") {
                     store.reopenOnboarding()
                 }
             }
         }
 
         // @Codex
-        Window("Apple Rollout", id: "apple-rollout") {
-            AppleFoundationWindowContent(snapshot: .live)
-                .frame(minWidth: 960, minHeight: 760)
+        Window("Prototype oncologico", id: "oncology-prototype") {
+            OncologyPrototypeRootView()
+                .environmentObject(store)
+                .frame(minWidth: 1280, minHeight: 840)
         }
 
         Settings {
-            PrototypeSettingsView()
-                .environmentObject(store)
-                .frame(width: 520, height: 520)
+            HomeBaseRuntimeStatusView()
+                .padding(20)
+                .frame(width: 720, height: 520)
         }
     }
 }

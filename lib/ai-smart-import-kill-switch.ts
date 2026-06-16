@@ -11,11 +11,11 @@ export class AiSmartImportDisabledError extends Error {
 }
 
 export function resolveAiSmartImportKillSwitchState(value: unknown): AiSmartImportKillSwitchState {
-    if (value === 'disabled' || value === false || value === 'false' || value === 0 || value === '0') {
-        return 'disabled';
+    if (value === 'enabled' || value === true || value === 'true' || value === 1 || value === '1') {
+        return 'enabled';
     }
 
-    return 'enabled';
+    return 'disabled';
 }
 
 export function isAiSmartImportEnabledValue(value: unknown): boolean {

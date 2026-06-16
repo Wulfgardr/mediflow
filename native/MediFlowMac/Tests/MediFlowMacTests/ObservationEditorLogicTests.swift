@@ -59,10 +59,12 @@ final class ObservationEditorLogicTests: XCTestCase {
         )
 
         let payload = try draft.makeUpdatePayload(
+            version: 4,
             loincOptions: loincOptions,
             ucumOptions: ucumOptions
         )
 
+        XCTAssertEqual(payload.version, 4)
         XCTAssertEqual(payload.codeSystem, "LOINC")
         XCTAssertEqual(payload.code, "8480-6")
         XCTAssertEqual(payload.unitCode, "mm[Hg]")
@@ -128,7 +130,7 @@ final class ObservationEditorLogicTests: XCTestCase {
         )
 
         XCTAssertThrowsError(
-            try draft.makeUpdatePayload(loincOptions: loincOptions, ucumOptions: ucumOptions)
+            try draft.makeUpdatePayload(version: 1, loincOptions: loincOptions, ucumOptions: ucumOptions)
         ) { error in
             XCTAssertEqual(error as? ObservationEditorValidationError, .invalidLoinc)
         }

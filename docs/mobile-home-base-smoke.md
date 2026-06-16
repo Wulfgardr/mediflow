@@ -9,7 +9,7 @@ Ultimo aggiornamento: 2026-04-18
 
 Eseguire uno smoke rapido del client Apple mobile contro un `home-base` reale
 MediFlow, verificando il boundary paired definito da
-docs/adr/0047-apple-shared-client-architecture-and-home-base-runtime.md (private)
+[docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md)
 e i vincoli di sicurezza di [SECURITY.md](../SECURITY.md).
 
 Script:

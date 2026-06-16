@@ -305,6 +305,24 @@ export function resolveRolloutReadinessOutputPaths(
     };
 }
 
+function toKebabCase(value: string) {
+    return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+function readFiniteMetric(metrics: Record<string, unknown>, key: string, blockers: Blocker[]) {
+    const value = metrics[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    blockers.push({
+        scope: 'metric',
+        id: `${toKebabCase(key)}-invalid`,
+        message: `${key} is missing or not a finite number.`,
+    });
+    return null;
+}
+
 function pickModel<T extends { model: string }>(
     reports: T[] | undefined,
     requestedModel: string | null | undefined,
@@ -386,61 +404,70 @@ function evaluatePatientInsight(report: PatientInsightBenchmarkReport, requested
         };
     }
 
-    const metrics = selection.model.metrics;
-    if (metrics.contractValidRate < PATIENT_INSIGHT_THRESHOLDS.minContractRate) {
+    const metrics = selection.model.metrics as unknown as Record<string, unknown>;
+    const contractValidRate = readFiniteMetric(metrics, 'contractValidRate', blockers);
+    const focusRecall = readFiniteMetric(metrics, 'focusRecall', blockers);
+    const citationCoverageRate = readFiniteMetric(metrics, 'citationCoverageRate', blockers);
+    const preferredSourceCoverage = readFiniteMetric(metrics, 'preferredSourceCoverage', blockers);
+    const forbiddenLeakRate = readFiniteMetric(metrics, 'forbiddenLeakRate', blockers);
+    const forbiddenSourceLeakRate = readFiniteMetric(metrics, 'forbiddenSourceLeakRate', blockers);
+    const moralizingLeakRate = readFiniteMetric(metrics, 'moralizingLeakRate', blockers);
+    const incompleteClaimRate = readFiniteMetric(metrics, 'incompleteClaimRate', blockers);
+
+    if (contractValidRate !== null && contractValidRate < PATIENT_INSIGHT_THRESHOLDS.minContractRate) {
         blockers.push({
             scope: 'metric',
             id: 'contract-valid-rate',
-            message: `contractValidRate=${metrics.contractValidRate} < ${PATIENT_INSIGHT_THRESHOLDS.minContractRate}`,
+            message: `contractValidRate=${contractValidRate} < ${PATIENT_INSIGHT_THRESHOLDS.minContractRate}`,
         });
     }
-    if (metrics.focusRecall < PATIENT_INSIGHT_THRESHOLDS.minFocusRecall) {
+    if (focusRecall !== null && focusRecall < PATIENT_INSIGHT_THRESHOLDS.minFocusRecall) {
         blockers.push({
             scope: 'metric',
             id: 'focus-recall',
-            message: `focusRecall=${metrics.focusRecall} < ${PATIENT_INSIGHT_THRESHOLDS.minFocusRecall}`,
+            message: `focusRecall=${focusRecall} < ${PATIENT_INSIGHT_THRESHOLDS.minFocusRecall}`,
         });
     }
-    if (metrics.citationCoverageRate < PATIENT_INSIGHT_THRESHOLDS.minCitationRate) {
+    if (citationCoverageRate !== null && citationCoverageRate < PATIENT_INSIGHT_THRESHOLDS.minCitationRate) {
         blockers.push({
             scope: 'metric',
             id: 'citation-coverage-rate',
-            message: `citationCoverageRate=${metrics.citationCoverageRate} < ${PATIENT_INSIGHT_THRESHOLDS.minCitationRate}`,
+            message: `citationCoverageRate=${citationCoverageRate} < ${PATIENT_INSIGHT_THRESHOLDS.minCitationRate}`,
         });
     }
-    if (metrics.preferredSourceCoverage < PATIENT_INSIGHT_THRESHOLDS.minPreferredSourceCoverage) {
+    if (preferredSourceCoverage !== null && preferredSourceCoverage < PATIENT_INSIGHT_THRESHOLDS.minPreferredSourceCoverage) {
         blockers.push({
             scope: 'metric',
             id: 'preferred-source-coverage',
-            message: `preferredSourceCoverage=${metrics.preferredSourceCoverage} < ${PATIENT_INSIGHT_THRESHOLDS.minPreferredSourceCoverage}`,
+            message: `preferredSourceCoverage=${preferredSourceCoverage} < ${PATIENT_INSIGHT_THRESHOLDS.minPreferredSourceCoverage}`,
         });
     }
-    if (metrics.forbiddenLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxForbiddenLeakRate) {
+    if (forbiddenLeakRate !== null && forbiddenLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxForbiddenLeakRate) {
         blockers.push({
             scope: 'metric',
             id: 'forbidden-leak-rate',
-            message: `forbiddenLeakRate=${metrics.forbiddenLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxForbiddenLeakRate}`,
+            message: `forbiddenLeakRate=${forbiddenLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxForbiddenLeakRate}`,
         });
     }
-    if (metrics.forbiddenSourceLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxForbiddenSourceLeakRate) {
+    if (forbiddenSourceLeakRate !== null && forbiddenSourceLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxForbiddenSourceLeakRate) {
         blockers.push({
             scope: 'metric',
             id: 'forbidden-source-leak-rate',
-            message: `forbiddenSourceLeakRate=${metrics.forbiddenSourceLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxForbiddenSourceLeakRate}`,
+            message: `forbiddenSourceLeakRate=${forbiddenSourceLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxForbiddenSourceLeakRate}`,
         });
     }
-    if (metrics.moralizingLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxMoralizingRate) {
+    if (moralizingLeakRate !== null && moralizingLeakRate > PATIENT_INSIGHT_THRESHOLDS.maxMoralizingRate) {
         blockers.push({
             scope: 'metric',
             id: 'moralizing-leak-rate',
-            message: `moralizingLeakRate=${metrics.moralizingLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxMoralizingRate}`,
+            message: `moralizingLeakRate=${moralizingLeakRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxMoralizingRate}`,
         });
     }
-    if (metrics.incompleteClaimRate > PATIENT_INSIGHT_THRESHOLDS.maxIncompleteClaimRate) {
+    if (incompleteClaimRate !== null && incompleteClaimRate > PATIENT_INSIGHT_THRESHOLDS.maxIncompleteClaimRate) {
         blockers.push({
             scope: 'metric',
             id: 'incomplete-claim-rate',
-            message: `incompleteClaimRate=${metrics.incompleteClaimRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxIncompleteClaimRate}`,
+            message: `incompleteClaimRate=${incompleteClaimRate} > ${PATIENT_INSIGHT_THRESHOLDS.maxIncompleteClaimRate}`,
         });
     }
 
@@ -481,74 +508,95 @@ function evaluateSmartImport(report: SmartImportBenchmarkReport, requestedModel:
         };
     }
 
-    const metrics = selection.model.metrics;
-    if (metrics.contractValidRate < SMART_IMPORT_MIN_RATE) {
+    const metrics = selection.model.metrics as unknown as Record<string, unknown>;
+    const contractValidRate = readFiniteMetric(metrics, 'contractValidRate', blockers);
+    const jsonValidRate = readFiniteMetric(metrics, 'jsonValidRate', blockers);
+    const diagnosisRecall = readFiniteMetric(metrics, 'diagnosisRecall', blockers);
+    const diagnosisQueryRecall = readFiniteMetric(metrics, 'diagnosisQueryRecall', blockers);
+    const therapyRecall = readFiniteMetric(metrics, 'therapyRecall', blockers);
+    const dosageRecall = readFiniteMetric(metrics, 'dosageRecall', blockers);
+    const therapyStateRecall = readFiniteMetric(metrics, 'therapyStateRecall', blockers);
+    const sourceIdRate = readFiniteMetric(metrics, 'sourceIdRate', blockers);
+    const forbiddenLeakRate = readFiniteMetric(metrics, 'forbiddenLeakRate', blockers);
+    let alreadyPresentLeakRate = 0;
+    if (metrics.alreadyPresentLeakRate != null) {
+        if (typeof metrics.alreadyPresentLeakRate === 'number' && Number.isFinite(metrics.alreadyPresentLeakRate)) {
+            alreadyPresentLeakRate = metrics.alreadyPresentLeakRate;
+        } else {
+            warnings.push({
+                id: 'already-present-leak-rate-invalid',
+                message: 'alreadyPresentLeakRate is not a finite number; ignoring optional warning metric.',
+            });
+        }
+    }
+
+    if (contractValidRate !== null && contractValidRate < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'contract-valid-rate',
-            message: `contractValidRate=${metrics.contractValidRate} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `contractValidRate=${contractValidRate} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.jsonValidRate < SMART_IMPORT_MIN_RATE) {
+    if (jsonValidRate !== null && jsonValidRate < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'json-valid-rate',
-            message: `jsonValidRate=${metrics.jsonValidRate} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `jsonValidRate=${jsonValidRate} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.diagnosisRecall < SMART_IMPORT_MIN_RATE) {
+    if (diagnosisRecall !== null && diagnosisRecall < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'diagnosis-recall',
-            message: `diagnosisRecall=${metrics.diagnosisRecall} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `diagnosisRecall=${diagnosisRecall} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.diagnosisQueryRecall < SMART_IMPORT_MIN_RATE) {
+    if (diagnosisQueryRecall !== null && diagnosisQueryRecall < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'diagnosis-query-recall',
-            message: `diagnosisQueryRecall=${metrics.diagnosisQueryRecall} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `diagnosisQueryRecall=${diagnosisQueryRecall} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.therapyRecall < SMART_IMPORT_MIN_RATE) {
+    if (therapyRecall !== null && therapyRecall < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'therapy-recall',
-            message: `therapyRecall=${metrics.therapyRecall} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `therapyRecall=${therapyRecall} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.dosageRecall < SMART_IMPORT_MIN_RATE) {
+    if (dosageRecall !== null && dosageRecall < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'dosage-recall',
-            message: `dosageRecall=${metrics.dosageRecall} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `dosageRecall=${dosageRecall} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.therapyStateRecall < SMART_IMPORT_MIN_RATE) {
+    if (therapyStateRecall !== null && therapyStateRecall < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'therapy-state-recall',
-            message: `therapyStateRecall=${metrics.therapyStateRecall} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `therapyStateRecall=${therapyStateRecall} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.sourceIdRate < SMART_IMPORT_MIN_RATE) {
+    if (sourceIdRate !== null && sourceIdRate < SMART_IMPORT_MIN_RATE) {
         blockers.push({
             scope: 'metric',
             id: 'source-id-rate',
-            message: `sourceIdRate=${metrics.sourceIdRate} < ${SMART_IMPORT_MIN_RATE}`,
+            message: `sourceIdRate=${sourceIdRate} < ${SMART_IMPORT_MIN_RATE}`,
         });
     }
-    if (metrics.forbiddenLeakRate > 0) {
+    if (forbiddenLeakRate !== null && forbiddenLeakRate > 0) {
         blockers.push({
             scope: 'metric',
             id: 'forbidden-leak-rate',
-            message: `forbiddenLeakRate=${metrics.forbiddenLeakRate} > 0`,
+            message: `forbiddenLeakRate=${forbiddenLeakRate} > 0`,
         });
     }
-    if ((metrics.alreadyPresentLeakRate || 0) > 0) {
+    if (alreadyPresentLeakRate !== null && alreadyPresentLeakRate > 0) {
         warnings.push({
             id: 'already-present-leak-rate',
-            message: `alreadyPresentLeakRate=${metrics.alreadyPresentLeakRate} > 0 (non-blocking warning in this first thin slice)`,
+            message: `alreadyPresentLeakRate=${alreadyPresentLeakRate} > 0 (non-blocking warning in this first thin slice)`,
         });
     }
 
@@ -753,6 +801,12 @@ export function evaluateRolloutReadiness(options: EvaluateOptions): RolloutReadi
             scope: 'report',
             id: 'generated-at-missing',
             message: 'Report privo di `generatedAt`, quindi la freshness non e verificabile.',
+        });
+    } else if (evidence.benchmarkAgeDays !== null && evidence.benchmarkAgeDays < 0) {
+        blockers.push({
+            scope: 'report',
+            id: 'generated-at-future',
+            message: `Report generatedAt is in the future (${evidence.benchmarkAgeDays} days).`,
         });
     } else if (!evidence.benchmarkFresh) {
         blockers.push({

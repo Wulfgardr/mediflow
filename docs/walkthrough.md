@@ -1,3 +1,10 @@
+---
+summary: "Canonical end-to-end MediFlow walkthrough for web, native clients, local services, data flow, OCR, home-base, and security."
+read_when:
+  - "Needing an operational walkthrough of MediFlow before implementation or verification."
+  - "Changing flows across web, native, local services, document intelligence, home-base, or security/session boundaries."
+---
+
 # Walkthrough MediFlow (Web + Native)
 
 > [!IMPORTANT]
@@ -8,13 +15,13 @@ Questo documento offre la vista end-to-end del progetto: web app Next.js, backen
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
 > [!IMPORTANT]
-> Dopo `v0.6.0` il client macOS da estendere e il bundle Apple/home-base.
+> Dopo `v0.7.0` il client macOS da estendere e il bundle Apple/home-base.
 > La vecchia shell clinica resta snapshot/parity; le sezioni native qui sotto
 > descrivono il contratto da preservare (`/api/v1`, TLS locale,
 > security/sessione) e la direzione home-base packaged.
 
 > [!IMPORTANT]
-> Su `main` esistono gia slice `v0.6.0` che cambiano il quadro operativo:
+> Su `main` esistono gia slice `v0.7.0` che cambiano il quadro operativo:
 > `network home-base` paired su `/api/v1/network/*` con read pazienti e write
 > limitati su profilo/status, diario, terapie, checkup e osservazioni, il bundle
 > macOS home-base packaged, client iPhone/iPad paired non-AI, e il primo artifact
@@ -22,7 +29,7 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 
 ---
 
-## Scopo e obiettivi
+## 🎯 Scopo e obiettivi
 
 - Dare una mappa unica dell'architettura e dei flussi principali.
 - Chiarire file chiave e responsabilità dei moduli.
@@ -39,7 +46,7 @@ Se serve il dettaglio di singoli moduli, consulta anche:
 
 ---
 
-## Topologia del sistema
+## 🧱 Topologia del sistema
 
 ```mermaid
 graph TB
@@ -93,19 +100,20 @@ graph TB
 
 ---
 
-## Porte e servizi locali
+## ⚙️ Porte e servizi locali
 
 | Servizio | Porta | Scopo |
 | --- | --- | --- |
 | Next.js | `3000` | UI web + API locali |
 | TLS Proxy | `3443` | HTTPS locale per il client macOS |
-| Ollama | `11434` | AI clinica + OCR |
+| Ollama | `11434` | AI clinica + OCR primario |
+| Apple Vision OCR | n/a | Fallback OCR locale solo su macOS quando l'OCR primario produce output low-signal |
 | ICD-11 (Docker) | `8888` | Diagnosi ICD-11 |
 | OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
 
 ---
 
-## Stack web (Next.js)
+## 🖥️ Stack web (Next.js)
 
 - **Frontend**: Next.js App Router, React, Tailwind.
 - **API**: Route handlers in `app/api/*`.
@@ -123,15 +131,16 @@ graph TB
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
 
-## Shell ufficiale e superfici integrate
+## 🖥️ Shell ufficiale e superfici integrate
 
-Nel checkout web esiste oggi una sola shell ufficiale del prodotto:
-
-1. `Clinical Workbench / Graphite`: runtime stabile del checkout corrente.
+Nel checkout web esiste oggi una sola shell ufficiale del prodotto: la root web
+`/` apre direttamente il `Kree8 cockpit` (ADR 0060), senza selector di shell ne
+preview profile persistiti. Kree8 e accreditato come ispirazione visuale esterna
+e grammatica di riferimento, non come implementazione o prodotto MediFlow.
 
 Le superfici AI, Smart Import e contesto paziente SISS non vivono piu dietro un
-selector locale di preview: quando sono considerate mature per `main`, vengono
-integrate direttamente nel workbench ufficiale.
+selector locale di preview (ADR 0050): quando sono considerate mature per
+`main`, vengono integrate direttamente nel runtime ufficiale.
 
 In pratica:
 
@@ -144,16 +153,52 @@ In pratica:
 
 Implementazione principale:
 
+- `app/page.tsx`
+- `components/kree8/kree8-clinical-cockpit.tsx`
 - `app/patients/[id]/page.tsx`
 - `components/siss-patient-context-panel.tsx`
 - `components/prosthetic-prescription-manager.tsx`
 - `app/settings/page.tsx`
 
-Questo non cambia i boundary canonici: AI, import e contesto SISS sono integrati
+Questo non cambia i boundary canonici: AI, import e contesto SISS sono presenti
 nel runtime ufficiale, ma non dichiarano scorciatoie architetturali oltre quelle
 gia formalizzate nelle ADR e nei documenti SISS. Il diario protesico resta un
 registro locale document-backed: non invia prescrizioni al sistema regionale e
 non dichiara un canale certificato.
+
+### Navigazione un-clic e Impostazioni
+
+La passata UI 2026-06 porta verso la Scheda paziente con un solo clic: azione
+primaria `Apri scheda paziente`, riga lista con azione diretta, `Quadro` come
+vista in-cockpit senza rimontare la rotta, e ritorni che convergono su
+`/patients/[id]/modules`. Le Impostazioni (WUL-297) sono ridisegnate a sezioni
+in sidebar (Generale, Sicurezza e Dati, Intelligenza Artificiale, Avanzate), con
+`/settings` come dashboard Stato sistema, ricerca CMD+K, toggle Privacy Mode in
+header e conferme digitate (`RIPRISTINA` / `RESET`).
+
+### Filiera OCR locale e boundary piattaforma
+
+La lettura documentale usa una catena locale e review-first:
+
+1. input normalizzato localmente;
+2. OCR primario via Ollama/DeepSeek OCR quando disponibile;
+3. rilevamento di output vuoto o degenerato;
+4. fallback Apple Vision **solo su macOS**;
+5. parsing/sintesi locale e review operatore prima di qualunque scrittura
+   clinica strutturata.
+
+I documenti che non producono testo sufficiente finiscono nella `Coda OCR`
+(pannello dedicato con stati e motivi in italiano, riprocesso idempotente): nessuna
+proposta clinica viene generata finche il testo estratto non basta.
+
+Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
+certificato in MediFlow. Su quelle piattaforme il flusso supportato resta OCR
+primario locale via Ollama/DeepSeek OCR, testo gia presente nel documento, o
+failure esplicito se non viene estratto testo utile.
+
+Questo boundary e formalizzato in
+[ADR 0059](./adr/0059-macos-apple-vision-ocr-fallback.md). Non introduce cloud
+OCR, non cambia i vincoli PHI-safe e non rende Smart Import automatico.
 
 ### Diario protesico da documenti Assistente RL
 
@@ -195,7 +240,7 @@ revisione operatore.
 
 ---
 
-## Data layer e cifratura
+## 🔒 Data layer e cifratura
 
 ### DB locale
 
@@ -205,6 +250,10 @@ revisione operatore.
 - `patients.documentInsights` resta la projection compatibile dei documenti analizzati
 - `attachments.summarySnapshot` e `attachments.parseEvidenceArtifactSnapshot`
   sono snapshot clinici cifrati associati al singolo allegato
+- la cancellazione paziente e un soft-delete reversibile (ADR 0066): scrive un
+  tombstone (`deletedAt` / `deletionReason`) con version guard, non orfana i
+  figli clinici e lascia invariato il contratto API. L'erasure GDPR esplicita
+  resta un'azione admin separata (`purge-patient` con dry-run, `restore-patient`)
 
 ### Cifratura lato client (web)
 
@@ -231,7 +280,7 @@ Implementazioni:
 
 ---
 
-## Autenticazione e sessione
+## 🔑 Autenticazione e sessione
 
 ### Web (setup e login)
 
@@ -261,7 +310,7 @@ sequenceDiagram
 
 ---
 
-## API layer: Web vs Native
+## 🔌 API layer: Web vs Native
 
 ### API per web UI
 
@@ -374,7 +423,7 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 
 ---
 
-## AI e OCR
+## 🤖 AI e OCR
 
 ### Servizi
 
@@ -388,6 +437,13 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
   fact `page/section/snippet` e conflitti reviewable
 - `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
   locale shadow-only per la lane `redaction.v1`
+
+> [!NOTE]
+> L'AI resta locale di default e review-first. I safety gate (WUL-358)
+> espongono un kill-switch per `patient-insight`, `smart-import` e
+> `document-synthesis`, piu model governance delle decisioni documentali. La
+> lane comparator cloud (`gpt-5.4`) e OpenMed `redaction.v1` restano opt-in /
+> shadow / benchmark-only, separate dal runtime clinico.
 
 ### Flusso OCR + Sintesi
 
@@ -479,7 +535,7 @@ Comportamento:
 
 ---
 
-## Integrazione nativa macOS
+## 🍎 Integrazione nativa macOS
 
 ### TLS Proxy locale
 
@@ -494,7 +550,7 @@ Flusso:
    `baseURL`, fingerprint TLS, modalita rete e metadati proxy PHI-free
 
 La app macOS usa TLS pinning in `LocalAPIClient`. La finestra primaria del
-bundle compilato e ora il shell Apple/home-base: il pannello `Runtime` legge
+bundle compilato e ora la shell Apple/home-base: il pannello `Runtime` legge
 `native-config.json` e `runtime-status.json` per mostrare readiness locale senza
 esporre token, certificati, chiavi o dati paziente. Il pannello puo avviare e
 arrestare esplicitamente il backend web production standalone e il proxy TLS
@@ -529,7 +585,7 @@ nativi.
 
 ---
 
-## Flusso dati cifrati (native)
+## 🗄️ Flusso dati cifrati (native)
 
 ```mermaid
 sequenceDiagram
@@ -564,7 +620,7 @@ sequenceDiagram
 
 ---
 
-## Mappa file (rapida)
+## 📚 Mappa file (rapida)
 
 | Area | File chiave |
 | --- | --- |
@@ -583,7 +639,7 @@ sequenceDiagram
 
 ---
 
-## Checklist operativa
+## 🧪 Checklist operativa
 
 1) Avvia `npm run dev` (o `Start_MediFlow.command`)  
 2) Avvia ICD-11 Docker (`docker compose up -d icd-api`)  
@@ -593,7 +649,7 @@ sequenceDiagram
 
 ---
 
-## Limitazioni attuali
+## ⚠️ Limitazioni attuali
 
 - `home-base` e ancora read-only-first: esistono solo i primi write versionati
   per profilo/status paziente, diario clinico, terapie, checkup e osservazioni; hard delete
@@ -604,10 +660,10 @@ sequenceDiagram
   layer completi restano incrementali.
 - Il vecchio shell macOS resta congelato e non va rilanciato come base di
   delivery: i thin slice parity legacy sono code-satisfied, mentre il bundle
-  `MediFlowMac` compilato ora apre il shell Apple/home-base come entrypoint.
+  `MediFlowMac` compilato ora apre la shell Apple/home-base come entrypoint.
   Il prototipo oncologico resta separato e non va confuso con MediFlow prodotto
   o con OncoBackboneMac.
-- Il closeout parity legacy documenta: strict
+- `WUL-26` chiude la track parity legacy come closeout documentale: strict
   smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
   di UI parity piena della vecchia shell clinica. La prossima click-map
   capability-by-capability appartiene al filone Apple-native/home-base.
@@ -615,7 +671,7 @@ sequenceDiagram
 
 ---
 
-## Prossimi passi suggeriti
+## 🧭 Prossimi passi suggeriti
 
 1) Estendere la UX `home-base`: pairing guidato, replica governata e fallback
    dichiarato senza rompere il local-first

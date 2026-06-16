@@ -55,6 +55,18 @@ test('parseSystemRedactionRequest rejects invalid payloads and accepts minimal e
     assert.equal(parsed.value.confidenceThreshold, 0.4);
 });
 
+test('parseSystemRedactionRequest preserves leading whitespace for upstream offsets', () => {
+    /* @Codex */
+    const parsed = parseSystemRedactionRequest({
+        action: 'extract',
+        text: '  Mario Rossi',
+    });
+
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.value.text, '  Mario Rossi');
+});
+
 test('normalizeOpenMedLabel compresses mixed upstream taxonomy to MediFlow types', () => {
     assert.equal(normalizeOpenMedLabel('FIRSTNAME'), 'person_name');
     assert.equal(normalizeOpenMedLabel('national_id'), 'national_id');
@@ -113,4 +125,27 @@ test('buildOpenMedUpstreamCall and normalizeOpenMedResponse keep a stable redact
         { text: 'RSSMRA84A15H501Z', type: 'national_id', critical: true },
         { text: 'Roma', type: 'city', critical: false },
     ]);
+});
+
+test('normalizeOpenMedResponse preserves padded redacted text and original-space offsets', () => {
+    /* @Codex */
+    const config = resolveOpenMedRedactionConfig({});
+    const request = {
+        action: 'deidentify' as const,
+        text: '  Mario Rossi',
+    };
+
+    const upstream = buildOpenMedUpstreamCall(request, config);
+    assert.equal(upstream.payload.text, '  Mario Rossi');
+
+    const response = normalizeOpenMedResponse(request, config, {
+        deidentified_text: '  [FIRSTNAME] [LASTNAME]',
+        pii_entities: [
+            { text: 'Mario', label: 'FIRSTNAME', start: 2, end: 7, confidence: 0.98 },
+        ],
+    });
+
+    assert.equal(response.redactedText, '  [FIRSTNAME] [LASTNAME]');
+    assert.equal(response.entities[0]?.start, 2);
+    assert.equal(response.entities[0]?.end, 7);
 });

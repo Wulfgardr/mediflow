@@ -9,6 +9,7 @@ import type {
     NetworkAiRuntimeSummary,
     NetworkIdentitySummary,
     NetworkNodeSummary,
+    NetworkOperatingMode,
     NetworkPairingConfirmationResponse,
     NetworkPairingIntentResponse,
     NetworkSessionSummary,
@@ -209,6 +210,10 @@ export async function confirmNetworkPairingIntent(intentId: string): Promise<{
         status: result.status,
         value: result.value,
     };
+}
+
+export async function getNetworkOperatingMode(): Promise<NetworkOperatingMode> {
+    return normalizeNetworkOperatingMode(await loadSettingValue(NETWORK_MODE_KEY));
 }
 
 /* @Codex */

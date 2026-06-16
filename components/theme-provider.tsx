@@ -30,7 +30,7 @@ function readStoredTheme(storageKey: string, defaultTheme: Theme): Theme {
             return stored;
         }
     } catch {
-        // localStorage may be unavailable (private mode, SSR fallback) — fall through
+        // localStorage may be unavailable (private mode, SSR fallback); fall through
     }
     return defaultTheme;
 }
@@ -56,7 +56,7 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
     /* @Codex: lazy initializer keeps the React state aligned with the inline
        theme bootstrap script in app/layout.tsx so the first render matches
-       the painted html.dark/.light class — no FOUC, no class flicker. */
+       the painted html.dark/.light class: no FOUC, no class flicker. */
     const [theme, setTheme] = useState<Theme>(() => readStoredTheme(storageKey, defaultTheme));
 
     useEffect(() => {
@@ -77,7 +77,7 @@ export function ThemeProvider({
             try {
                 window.localStorage.setItem(storageKey, next);
             } catch {
-                // ignore quota / privacy errors — theme still applies for the session
+                // ignore quota / privacy errors: theme still applies for the session
             }
             setTheme(next);
         },

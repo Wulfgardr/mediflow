@@ -130,6 +130,7 @@ struct TherapySummary: Identifiable, Decodable {
     let status: String
     let startDate: Date
     let endDate: Date?
+    let version: Int?
     let createdAt: Date?
 }
 
@@ -138,8 +139,20 @@ struct CheckupSummary: Identifiable, Decodable {
     let patientId: String
     let date: Date
     let title: String
+    /* @Codex */
+    let notes: String?
     let status: String
+    /* @Codex */
+    let source: String?
+    /* @Codex */
+    let version: Int?
     let createdAt: Date?
+    /* @Codex */
+    let updatedAt: Date?
+    /* @Codex */
+    let deletedAt: Date?
+    /* @Codex */
+    let deletionReason: String?
 }
 
 /* @Codex */

@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { Trash2, Archive, AlertTriangle, Check, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
 
 type ActionType = 'delete' | 'archive' | 'export';
 type ArchiveReason = 'assigned_mmg' | 'deceased' | 'other';
@@ -50,36 +48,52 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
     const isDelete = actionType === 'delete';
     const isExport = actionType === 'export';
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+    const accentVar = isDelete ? 'var(--mf-critical)' : isExport ? 'var(--mf-primary)' : 'var(--mf-warning)';
+    const accentTint = isDelete ? 'rgba(192, 57, 43, 0.12)' : isExport ? 'rgba(15, 123, 104, 0.12)' : 'rgba(202, 138, 4, 0.16)';
 
-            <div className={cn(
-                "relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border-t-8",
-                isDelete ? "border-red-500" : isExport ? "border-blue-500" : "border-amber-500"
-            )}>
+    return (
+        // @Codex WUL-229: patient action modal aligned with specular tier
+        <div className="mf-modal-backdrop animate-in fade-in duration-200">
+            <button
+                type="button"
+                aria-label="Chiudi sfondo"
+                className="absolute inset-0 cursor-default"
+                onClick={onClose}
+            />
+
+            <div className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                <div
+                    aria-hidden="true"
+                    className="h-1.5 w-full"
+                    style={{ background: accentVar }}
+                />
                 <div className="p-6">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className={cn(
-                            "p-3 rounded-full flex items-center justify-center shrink-0",
-                            isDelete ? "bg-red-100 text-red-600" : isExport ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-600"
-                        )}>
-                            {isDelete ? <Trash2 className="w-6 h-6" /> : isExport ? <Check className="w-6 h-6" /> : <Archive className="w-6 h-6" />}
+                    <div className="flex items-center justify-between gap-4 mb-5">
+                        <div className="flex items-center gap-3">
+                            <div
+                                className="p-3 rounded-2xl flex items-center justify-center shrink-0"
+                                style={{ background: accentTint, color: accentVar }}
+                            >
+                                {isDelete ? <Trash2 className="w-5 h-5" /> : isExport ? <Check className="w-5 h-5" /> : <Archive className="w-5 h-5" />}
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                                    {isDelete ? 'Elimina scheda' : isExport ? 'Esporta FHIR con controllo FSE' : 'Archivia scheda'}
+                                </h3>
+                                <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
+                                    {patientName}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800">
-                                {isDelete ? 'Elimina Paziente' : isExport ? 'Export FHIR (pre-check FSE)' : 'Archivia Paziente'}
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                                {patientName}
-                            </p>
-                        </div>
+                        <button onClick={onClose} className="mf-btn-secondary !p-2 !rounded-full" title="Chiudi" aria-label="Chiudi">
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {isDelete ? (
                             <div className="space-y-3">
-                                <div className="p-3 bg-red-50 text-red-800 text-sm rounded-lg flex items-start gap-2 border border-red-100">
+                                <div className="mf-alert mf-alert-critical">
                                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                                     <p>
                                         Il paziente verrà spostato nel <strong>Cestino</strong>.
@@ -87,12 +101,12 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Motivazione Eliminazione <span className="text-red-500">*</span></label>
+                                    <label className="mf-field-label">Motivazione eliminazione <span style={{ color: 'var(--mf-critical)' }}>*</span></label>
                                     <textarea
                                         required
                                         value={deletionReason}
                                         onChange={(e) => setDeletionReason(e.target.value)}
-                                        className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none"
+                                        className="mf-input"
                                         rows={3}
                                         placeholder="Es. Errore di inserimento, duplicato..."
                                     />
@@ -100,22 +114,22 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                             </div>
                         ) : isExport ? (
                             <div className="space-y-3">
-                                <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-start gap-2 border border-blue-100">
+                                <div className="mf-alert mf-alert-info">
                                     <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                                    <p>
-                                        Verrà generato un file <strong>FHIR JSON</strong> con pre-check FSE (errori bloccanti, warning confermabili), contenente:
+                                    <div>
+                                        <p>Verrà generato un file <strong>FHIR JSON</strong> dopo il controllo FSE. Gli errori bloccanti fermano il download; i warning chiedono una conferma.</p>
                                         <ul className="list-disc ml-4 mt-1 opacity-80">
-                                            <li>Anagrafica Paziente</li>
-                                            <li>Storia Diagnostica</li>
-                                            <li>Note e Visite</li>
-                                            <li>Terapie e Valutazioni</li>
+                                            <li>Anagrafica paziente</li>
+                                            <li>Diagnosi registrate</li>
+                                            <li>Note e visite</li>
+                                            <li>Terapie e valutazioni</li>
                                         </ul>
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div className="p-3 bg-amber-50 text-amber-800 text-sm rounded-lg flex items-start gap-2 border border-amber-100">
+                                <div className="mf-alert mf-alert-warning">
                                     <Archive className="w-4 h-4 mt-0.5 shrink-0" />
                                     <p>
                                         Il paziente verrà rimosso dalla lista attiva e spostato in archivio. Potrai trovarlo tramite ricerca.
@@ -123,11 +137,11 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Motivo Archiviazione</label>
+                                    <label className="mf-field-label">Motivo archiviazione</label>
                                     <select
                                         value={archiveReason}
                                         onChange={(e) => setArchiveReason(e.target.value as ArchiveReason)}
-                                        className="w-full p-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                                        className="mf-input mf-input-sm appearance-none cursor-pointer"
                                         aria-label="Seleziona motivazione archiviazione"
                                     >
                                         <option value="assigned_mmg">Assegnato a MMG</option>
@@ -138,12 +152,12 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
 
                                 {archiveReason === 'other' && (
                                     <div className="animate-in slide-in-from-top-1 fade-in">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Specifica Altro <span className="text-amber-600">*</span></label>
+                                        <label className="mf-field-label">Specifica altro <span style={{ color: 'var(--mf-warning)' }}>*</span></label>
                                         <textarea
                                             required
                                             value={archiveNote}
                                             onChange={(e) => setArchiveNote(e.target.value)}
-                                            className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-amber-500 transition-all outline-none"
+                                            className="mf-input"
                                             rows={2}
                                             placeholder="Specifica il motivo..."
                                         />
@@ -152,29 +166,24 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                             </div>
                         )}
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+                        <div className="flex justify-end gap-3 pt-5 graphite-divider mt-6">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                                className="mf-btn-secondary"
                             >
                                 Annulla
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className={cn(
-                                    "px-6 py-2 text-white font-bold rounded-lg shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2",
-                                    isDelete
-                                        ? "bg-red-600 hover:bg-red-700 shadow-red-500/30"
-                                        : isExport ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/30"
-                                            : "bg-amber-500 hover:bg-amber-600 shadow-amber-500/30"
-                                )}
+                                className="ui-btn-primary px-5 py-2.5 disabled:opacity-50 inline-flex items-center gap-2"
+                                style={{ background: accentVar }}
                             >
                                 {isSubmitting ? 'Elaborazione...' : (
                                     <>
                                         {isDelete ? <Trash2 className="w-4 h-4" /> : isExport ? <Check className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                                        {isDelete ? 'Sposta nel Cestino' : isExport ? 'Scarica FHIR JSON' : 'Archivia'}
+                                        {isDelete ? 'Sposta nel cestino' : isExport ? 'Scarica FHIR JSON' : 'Archivia'}
                                     </>
                                 )}
                             </button>

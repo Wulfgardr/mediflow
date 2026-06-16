@@ -112,6 +112,82 @@ func requireIdentifier(_ identifierName: String, in window: AXUIElement, report:
     report.pass("Identifier \(identifierName)")
 }
 
+func requireIdentifierOrLabel(
+    identifierName: String,
+    label: String,
+    in element: AXUIElement,
+    report: inout ProbeReport
+) throws {
+    let match = findElement(in: element) { candidate in
+        identifier(of: candidate) == identifierName
+            || descriptionValue(of: candidate) == label
+            || value(of: candidate) == label
+            || title(of: candidate) == label
+    }
+
+    guard match != nil else {
+        report.fail("Missing identifier \(identifierName) or AX label \(label)")
+        throw ProbeFailure(message: "Missing identifier \(identifierName) or AX label \(label)")
+    }
+
+    report.pass("Identifier/label \(identifierName)")
+}
+
+func windowContainsHomeBaseShell(_ window: AXUIElement) -> Bool {
+    findElement(in: window, where: { identifier(of: $0) == "homebase-runtime-status-card" }) != nil
+}
+
+func runHomeBaseShellProbe(app: NSRunningApplication, window: AXUIElement, report: inout ProbeReport) throws {
+    try requireIdentifier("apple-foundation-overview-view", in: window, report: &report)
+    try requireIdentifier("homebase-runtime-status-card", in: window, report: &report)
+    try requireIdentifierOrLabel(
+        identifierName: "homebase-runtime-refresh-button",
+        label: "Aggiorna",
+        in: window,
+        report: &report
+    )
+    try requireIdentifierOrLabel(identifierName: "homebase-runtime-component-native-config", label: "Configurazione nativa", in: window, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-runtime-component-local-token", label: "Token locale", in: window, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-runtime-component-tls-proxy", label: "Proxy TLS", in: window, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-runtime-component-web-backend", label: "Backend web", in: window, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-runtime-optional-section", label: "Servizi opzionali", in: window, report: &report)
+
+    guard let modulesButton = findElement(in: window, where: {
+        identifier(of: $0) == "apple-foundation-section-modules-button"
+            || descriptionValue(of: $0) == "Pazienti"
+            || value(of: $0) == "Pazienti"
+            || title(of: $0) == "Pazienti"
+    }),
+          press(modulesButton) else {
+        report.fail("Unable to open home-base modules section")
+        throw ProbeFailure(message: "Unable to open home-base modules section")
+    }
+    report.pass("Opened home-base modules section")
+
+    let didOpenModules = waitFor {
+        guard let moduleWindow = try? appWindow(for: app) else { return false }
+        return findElement(in: moduleWindow, where: { identifier(of: $0) == "homebase-server-url-field" }) != nil
+    }
+    guard didOpenModules, let moduleWindow = try? appWindow(for: app) else {
+        report.fail("Home-base modules section did not expose paired workspace")
+        throw ProbeFailure(message: "Home-base modules section did not expose paired workspace")
+    }
+
+    try requireIdentifier("apple-foundation-modules-view", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-server-url-field", label: "Server home-base", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-tls-pin-field", label: "TLS pin", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-discover-button", label: "Scopri home-base", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-paired-client-id-field", label: "Paired client ID", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-paired-client-token-field", label: "Paired client token", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-username-field", label: "Utente", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-password-field", label: "PIN", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-ambulatory-field", label: "Ambulatorio", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-login-button", label: "Login operatore", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-load-patients-button", label: "Carica pazienti", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-save-pairing-button", label: "Salva pairing", in: moduleWindow, report: &report)
+    try requireIdentifierOrLabel(identifierName: "homebase-clear-pairing-button", label: "Pulisci pairing", in: moduleWindow, report: &report)
+}
+
 func firstPatientRow(in window: AXUIElement) throws -> AXUIElement {
     var matches: [AXUIElement] = []
     collectElements(in: window, where: { identifier(of: $0).hasPrefix("patient-row-") }, into: &matches)
@@ -196,6 +272,15 @@ func main() throws {
 
     let window = try appWindow(for: app)
     report.pass("Attached to window \(title(of: window))")
+
+    if windowContainsHomeBaseShell(window) {
+        try runHomeBaseShellProbe(app: app, window: window, report: &report)
+        print("Native click-map probe passed.")
+        for line in report.checks {
+            print(line)
+        }
+        return
+    }
 
     try requireIdentifier("patients-ambulatory-picker", in: window, report: &report)
     try requireIdentifier("patients-status-filter", in: window, report: &report)

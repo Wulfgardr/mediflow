@@ -25,10 +25,21 @@ Il client nativo documentato qui non e piu la base per nuova delivery incrementa
 * **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
 * **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
 * **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
+* **Entrypoint compilato corrente**: `MediFlowMacApp` apre la shell
+  Apple/home-base come finestra primaria. Il prototipo oncologico resta
+  apribile come finestra separata e non va confuso con MediFlow prodotto o con
+  OncoBackboneMac, che e un'applicazione distinta usabile solo come riferimento
+  visuale esterno.
 
 Lo snapshot corrente supporta comunque:
 
 * **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
+  Le terapie native usano lo stesso contratto `/api/v1` della web UI per
+  farmaco AIFA/manuale, AIC/ATC, principio attivo, posologia, motivazione,
+  indicazione ICD/sentinella, date e stato.
+  I controlli/appuntamenti nativi mantengono parita sul contratto condiviso
+  per data, titolo, note operative, stato, source manuale e metadata di
+  versione restituita dal backend.
 * **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
 * **Sicurezza**: lock screen con PIN, cifratura in memoria e certificate pinning.
 
@@ -51,6 +62,9 @@ Lo snapshot corrente supporta comunque:
 * configura TLS locale
 * compila il client nativo
 * apre la app macOS
+* registra `runtime-status.json` accanto a `native-config.json`, cosi il
+  pannello runtime nella app puo mostrare lo stato del bootstrap senza esporre
+  token o contenuti sensibili
 
 **Opzione B: setup sviluppatore**
 
@@ -85,9 +99,57 @@ npm run test:native:xcode
 npm run test:parity:smoke
 ```
 
+Nel percorso mobile paired corrente, il target condiviso include anche una cache
+locale derivata della lista pazienti: lo snapshot e cifrato con chiave locale da
+Portachiavi, e valido solo per il medesimo `home-base` / ambulatorio entro una
+soglia breve. Quando il Mac non e raggiungibile, l'app mobile puo mostrare lo
+stato `offline degradato` in sola consultazione; non esistono ancora scritture
+offline o coda di merge mobile.
+
+Le prime scritture mobile paired esposte nella shell condivisa coprono diario
+clinico, terapie, controlli e osservazioni. Dalla scheda paziente iPhone/iPad si
+possono leggere le ultime voci diario, inviare una nuova voce online
+all'home-base, modificarla e annullarla con soft-delete reviewable. Le terapie
+espongono list/create/update e annullamento online per campi manuali non-AI
+essenziali: farmaco, principio attivo opzionale, posologia, stato, date e
+motivazione. I controlli espongono titolo, data, stato e note manuali; le
+osservazioni espongono parametro/codice LOINC, valore, unita UCUM, data di
+rilevazione e note. Ogni create diario usa un identificativo client-side stabile
+per evitare duplicati se la rete cade dopo il commit; update e annullamento
+usano la `version` del record e mostrano il conflitto come richiesta di
+ricarica/confronto. Non esistono prescrizione SISS nativa, catalogo farmaci
+mobile, AI/OCR remoto, scritture offline o coda di merge.
+
 ---
 
 ## Funzionalità principali
+
+### 0. Shell Apple/home-base e runtime locale
+
+La finestra primaria della app macOS e il shell Apple/home-base condiviso con
+la family architecture. In questa slice il bundle **osserva** il runtime locale:
+
+* legge `~/Library/Application Support/MediFlow/native-config.json`;
+* legge `runtime-status.json` prodotto da `scripts/native-setup.sh`;
+* mostra server, modalita rete, presenza token, PID proxy e coerenza del
+  fingerprint TLS;
+* include nel bundle il runtime Next standalone validato da
+  `check:standalone-runtime-bundle`;
+* puo avviare e arrestare esplicitamente il backend web production locale;
+* puo avviare e arrestare esplicitamente il solo proxy TLS locale usando lo
+  script `local-api-tls-proxy.mjs` incluso nel bundle;
+* arresta backend/proxy con timeout esplicito e escalation locale quando il
+  processo non termina in modo ordinato;
+* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e
+  Docker/ICD (`127.0.0.1:8888`) quando sono gia attivi;
+* non mostra mai token, certificati, chiavi o dati paziente;
+* non installa, avvia, arresta o supervisiona Ollama o container Docker.
+
+`scripts/build-native-app.sh` produce un bundle locale non firmato per default,
+ma puo firmarlo con `MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID
+per distribuzione) e puo inviare un archivio a notarizzazione con
+`MEDIFLOW_NOTARY_PROFILE`. I servizi opzionali sono visibili come health
+diagnostico, non come processi app-managed.
 
 ### 1. Lock Screen & Sicurezza
 

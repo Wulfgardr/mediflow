@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
-import { forbiddenResponse, requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
@@ -32,10 +34,10 @@ async function saveSchedulerSettingValue(value: string): Promise<void> {
         .onConflictDoUpdate({ target: settings.key, set: { value } });
 }
 
-export async function GET(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+export async function GET() {
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const value = await loadSchedulerSettingValue();
@@ -47,9 +49,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const body = await request.json();

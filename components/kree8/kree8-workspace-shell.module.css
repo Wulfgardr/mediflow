@@ -1,0 +1,472 @@
+/* @Codex */
+/* Scoped Kree8 shell for dense patient workspaces. */
+
+.shell {
+  --k8-surface: #ffffff;
+  --k8-soft: #f5f6f7;
+  --k8-canvas: #eef0f2;
+  --k8-ink: #0f172a;
+  --k8-muted: #475569;
+  --k8-subtle: #52606d;
+  --k8-line: rgba(15, 23, 42, 0.05);
+  --k8-line-strong: rgba(15, 23, 42, 0.08);
+  --k8-chrome-bg: rgba(255, 255, 255, 0.92);
+  --k8-control-bg: #ffffff;
+  --k8-chip-bg: #eef2f7;
+  --k8-pill-success-bg: #dcfce7;
+  --k8-pill-success-fg: #166534;
+  --k8-pill-info-bg: #dbeafe;
+  --k8-pill-info-fg: #1e3a8a;
+  --k8-pill-warning-bg: #fef3c7;
+  --k8-pill-warning-fg: #92400e;
+  --k8-pill-critical-bg: #ffe2dd;
+  --k8-pill-critical-fg: #9a3412;
+  --k8-primary-bg: #0f172a;
+  --k8-primary-fg: #ffffff;
+  --k8-accent: #2563eb;
+  --k8-accent-soft: #dbeafe;
+  --k8-accent-line: rgba(37, 99, 235, 0.18);
+  --k8-focus: rgba(37, 99, 235, 0.34);
+  --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --mf-ink: var(--k8-ink);
+  --mf-muted: var(--k8-muted);
+  --mf-bg: var(--k8-canvas);
+  --mf-bg-elevated: var(--k8-soft);
+  --mf-card: var(--k8-surface);
+  --glass-bg: var(--k8-soft);
+  --glass-border: var(--k8-line);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  padding: 14px;
+  background: var(--k8-canvas);
+  color: var(--k8-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:global(html.dark) .shell {
+  --k8-surface: #0f172a;
+  --k8-soft: #111827;
+  --k8-canvas: #020617;
+  --k8-ink: #f8fafc;
+  --k8-muted: #cbd5e1;
+  --k8-subtle: #b6c2d0;
+  --k8-line: rgba(226, 232, 240, 0.10);
+  --k8-line-strong: rgba(226, 232, 240, 0.16);
+  --k8-chrome-bg: rgba(15, 23, 42, 0.82);
+  --k8-control-bg: #0f172a;
+  --k8-chip-bg: rgba(148, 163, 184, 0.14);
+  --k8-pill-success-bg: rgba(74, 222, 128, 0.16);
+  --k8-pill-success-fg: #bbf7d0;
+  --k8-pill-info-bg: rgba(96, 165, 250, 0.18);
+  --k8-pill-info-fg: #bfdbfe;
+  --k8-pill-warning-bg: rgba(251, 191, 36, 0.16);
+  --k8-pill-warning-fg: #fde68a;
+  --k8-pill-critical-bg: rgba(248, 113, 113, 0.16);
+  --k8-pill-critical-fg: #fecaca;
+  --k8-primary-bg: #e2e8f0;
+  --k8-primary-fg: #020617;
+  --k8-accent: #93c5fd;
+  --k8-accent-soft: rgba(59, 130, 246, 0.18);
+  --k8-accent-line: rgba(147, 197, 253, 0.28);
+  --k8-focus: rgba(147, 197, 253, 0.42);
+  --k8-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
+}
+
+.canvas {
+  --k8-canvas-pad: 18px;
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--k8-canvas-pad);
+  border-radius: 28px;
+  background: var(--k8-surface);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+.canvas::-webkit-scrollbar { width: 10px; }
+.canvas::-webkit-scrollbar-track { background: transparent; }
+.canvas::-webkit-scrollbar-thumb {
+  border: 3px solid var(--k8-surface);
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.36);
+}
+
+.chrome {
+  flex: 0 0 auto;
+  position: sticky;
+  top: calc(-1 * var(--k8-canvas-pad));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--k8-line);
+  border-radius: 18px;
+  background: var(--k8-chrome-bg);
+  box-shadow: var(--k8-shadow);
+  backdrop-filter: blur(18px);
+}
+
+/* WUL-297: back button + persistent privacy toggle share the chrome top row. */
+.chromeTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hero {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.brandMark {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--k8-accent-soft);
+  border: 1px solid var(--k8-accent-line);
+  color: var(--k8-accent);
+  box-shadow: none;
+}
+
+.heroText { min-width: 0; flex: 1 1 auto; }
+.eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--k8-subtle);
+}
+
+.title {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: clamp(18px, 1.6vw, 22px);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.titleMain {
+  display: inline-block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patientLabel {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--k8-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtitle,
+.statusLine {
+  margin: 4px 0 0;
+  max-width: 760px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--k8-muted);
+}
+
+.statusLine {
+  color: var(--k8-subtle);
+  font-size: 11px;
+}
+
+.backButton,
+.sectionLink {
+  border: 1px solid var(--k8-line);
+  border-radius: 12px;
+  background: var(--k8-soft);
+  color: var(--k8-muted);
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+
+.backButton {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  max-width: 240px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.backButtonLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backButton:hover,
+.sectionLink:hover {
+  border-color: var(--k8-accent-line);
+  background: var(--k8-control-bg);
+  color: var(--k8-ink);
+}
+
+.backButton:active,
+.sectionLink:active { transform: scale(0.985); }
+
+.sectionRail {
+  flex: 0 0 auto;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 1px 4px;
+  scroll-snap-type: x mandatory;
+}
+
+.sectionRail::-webkit-scrollbar { display: none; }
+
+.sectionLink {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sectionLink small {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--k8-subtle);
+}
+
+.workspaceBody,
+.primaryStack,
+.secondaryStack,
+.anchorStack {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.workspaceBody { flex: 0 0 auto; }
+.anchorStack { scroll-margin-top: 132px; }
+
+.workspaceBody :global(section[id]) {
+  scroll-margin-top: 164px;
+}
+
+.workspaceGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.64fr) minmax(320px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.loadingCard {
+  border: 1px dashed var(--k8-line-strong);
+  border-radius: 22px;
+  padding: 16px;
+  background: var(--k8-soft);
+  text-align: center;
+  color: var(--k8-muted);
+  font-size: 13px;
+}
+
+.shell :global(.patient-detail-section),
+.shell :global(.patient-detail-side-section),
+.shell :global(.patient-actions-dock),
+.shell :global(.patient-identity-lens),
+.shell :global(.mf-section),
+.shell :global(.apple-subsection) {
+  border-color: var(--k8-line) !important;
+  border-radius: 22px !important;
+  background: var(--k8-surface) !important;
+  color: var(--k8-ink) !important;
+  box-shadow: var(--k8-shadow) !important;
+}
+
+.shell :global(.patient-detail-side-section),
+.shell :global(.patient-actions-dock) { border-radius: 18px !important; }
+.shell :global(.glass-panel) { backdrop-filter: none !important; }
+
+.shell :global(.patient-identity-lens) {
+  min-height: 0 !important;
+  padding: 28px !important;
+}
+
+.shell :global(.patient-identity-lens::after) {
+  display: none !important;
+}
+
+.shell :global(.patient-quick-context-card),
+.shell :global(.patient-diagnosis-card),
+.shell :global(.identity-lens-pane),
+.shell :global(.graphite-block),
+.shell :global(.apple-list-row),
+.shell :global(.graphite-row) {
+  border-color: var(--k8-line) !important;
+  border-radius: 14px !important;
+  background: var(--k8-soft) !important;
+  color: var(--k8-ink) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(.section-kicker) {
+  color: var(--k8-subtle) !important;
+  letter-spacing: 0.12em !important;
+}
+
+.shell :global(.ui-btn-primary) {
+  border-radius: 14px !important;
+  background: var(--k8-primary-bg) !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18) !important;
+  color: var(--k8-primary-fg) !important;
+}
+
+.shell :global(.ui-btn-primary:hover) { filter: brightness(1.08); }
+
+.shell :global(.apple-chip),
+.shell :global(.graphite-chip) {
+  border-color: var(--k8-line) !important;
+  border-radius: 999px !important;
+  background: var(--k8-chip-bg) !important;
+  color: var(--k8-muted) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(.graphite-chip-tone-success) { background: var(--k8-pill-success-bg) !important; color: var(--k8-pill-success-fg) !important; }
+.shell :global(.graphite-chip-tone-info) { background: var(--k8-pill-info-bg) !important; color: var(--k8-pill-info-fg) !important; }
+.shell :global(.graphite-chip-tone-warning) { background: var(--k8-pill-warning-bg) !important; color: var(--k8-pill-warning-fg) !important; }
+.shell :global(.graphite-chip-tone-critical) { background: var(--k8-pill-critical-bg) !important; color: var(--k8-pill-critical-fg) !important; }
+
+/* @Codex */
+:global(html.dark) .shell :global([class*="text-slate-900"]),
+:global(html.dark) .shell :global([class*="text-slate-800"]),
+:global(html.dark) .shell :global([class*="text-slate-700"]) {
+  color: var(--k8-ink) !important;
+}
+
+:global(html.dark) .shell :global([class*="text-slate-600"]),
+:global(html.dark) .shell :global([class*="text-slate-500"]) {
+  color: var(--k8-muted) !important;
+}
+
+:global(html.dark) .shell :global([class*="text-slate-400"]),
+:global(html.dark) .shell :global([class*="text-gray-500"]),
+:global(html.dark) .shell :global([class*="text-gray-400"]) {
+  color: var(--k8-subtle) !important;
+}
+
+:global(html.dark) .shell :global([class*="bg-white"]),
+:global(html.dark) .shell :global([class*="bg-slate-50"]),
+:global(html.dark) .shell :global([class*="bg-slate-100"]) {
+  background-color: var(--k8-soft) !important;
+}
+
+:global(html.dark) .shell :global([class*="border-white"]),
+:global(html.dark) .shell :global([class*="border-slate-200"]),
+:global(html.dark) .shell :global([class*="border-slate-300"]) {
+  border-color: var(--k8-line) !important;
+}
+
+.shell :global(.graphite-mini-btn) {
+  border-radius: 12px !important;
+  border-color: var(--k8-line) !important;
+  background: var(--k8-control-bg) !important;
+  color: var(--k8-muted) !important;
+}
+
+/* @Codex */
+.shell :global(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
+.shell :global(select),
+.shell :global(textarea) {
+  border: 1px solid var(--k8-line) !important;
+  border-radius: 12px !important;
+  background: var(--k8-control-bg) !important;
+  color: var(--k8-ink) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(input:focus-visible),
+.shell :global(select:focus-visible),
+.shell :global(textarea:focus-visible) {
+  outline: 2px solid var(--k8-focus) !important;
+  outline-offset: 1px;
+}
+
+/* @Codex */
+.shell :global(.siss-action-btn) {
+  border-color: var(--k8-line) !important;
+  background: var(--k8-surface) !important;
+  color: var(--k8-ink) !important;
+  box-shadow: none !important;
+}
+
+.shell :global(.siss-action-btn:hover:not(:disabled)) {
+  border-color: var(--k8-line-strong) !important;
+  background: var(--k8-soft) !important;
+}
+
+.shell :global(.patient-ai-insight-panel) {
+  border: 1px solid var(--k8-line) !important;
+  border-radius: 18px !important;
+  background: var(--k8-surface) !important;
+  box-shadow: var(--k8-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+.shell :global(.patient-ai-insight-panel .bg-slate-50) {
+  background: var(--k8-soft) !important;
+}
+
+/* @Codex */
+.shell :global(.ui-btn-primary:disabled),
+.shell :global(.ui-btn-primary[disabled]) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1180px) {
+  .workspaceGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .shell { padding: 8px; }
+  .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
+  .chrome { border-radius: 14px; padding: 12px; }
+  .workspaceBody :global(section[id]) { scroll-margin-top: 196px; }
+  /* WUL-297: keep room for the privacy toggle on the same row. */
+  .backButton { max-width: 100%; flex: 1 1 auto; justify-content: center; }
+  .title { font-size: 18px; }
+  .patientLabel { font-size: 12px; }
+}

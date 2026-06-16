@@ -14,6 +14,8 @@
     ".next/dev/**/*",
     ".next-e2e/**/*",
     ".next-e2e-smart-import/**/*",
-    "tmp-*/**/*"
+    "tmp-*/**/*",
+    "native/**/Build/**/*",
+    "native/**/.build/**/*"
   ]
 }

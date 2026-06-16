@@ -1,5 +1,6 @@
 /* @Codex */
 import { patients } from '@/lib/schema';
+import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
 
 type PatientInsertValues = typeof patients.$inferInsert;
 type PatientUpdateValues = Partial<PatientInsertValues>;
@@ -65,6 +66,15 @@ function normalizeBirthDateForUpdate(value: unknown): ValueResult<Date | null | 
     return { ok: true, value: parsed };
 }
 
+/* @Codex */
+// Nullable string columns (per PatientMutationRequest in the OpenAPI contract): a
+// string sets the value, an explicit `null` clears it, anything else is a no-op.
+function normalizeNullableStringField(value: unknown): string | null | undefined {
+    if (typeof value === 'string') return value;
+    if (value === null) return null;
+    return undefined;
+}
+
 function hasPatientUpdatableField(values: PatientUpdateValues): boolean {
     return Object.entries(values).some(
         ([key, value]) => key !== 'updatedAt' && key !== 'version' && value !== undefined
@@ -125,29 +135,19 @@ export function normalizePatientUpdateInput(
         firstName: typeof body.firstName === 'string' ? body.firstName : undefined,
         lastName: typeof body.lastName === 'string' ? body.lastName : undefined,
         taxCode: typeof body.taxCode === 'string' ? body.taxCode : undefined,
-        address: typeof body.address === 'string' ? body.address : undefined,
-        phone: typeof body.phone === 'string' ? body.phone : undefined,
-        caregiver: typeof body.caregiver === 'string' ? body.caregiver : undefined,
-        notes: typeof body.notes === 'string' ? body.notes : undefined,
-        monitoringProfile: typeof body.monitoringProfile === 'string'
-            ? body.monitoringProfile
-            : body.monitoringProfile === null
-                ? null
-                : undefined,
-        statusReason: typeof body.statusReason === 'string'
-            ? body.statusReason
-            : body.statusReason === null
-                ? null
-                : undefined,
-        aiSummary: typeof body.aiSummary === 'string' ? body.aiSummary : undefined,
-        documentInsights: typeof body.documentInsights === 'string' ? body.documentInsights : undefined,
+        address: normalizeNullableStringField(body.address),
+        phone: normalizeNullableStringField(body.phone),
+        caregiver: normalizeNullableStringField(body.caregiver),
+        notes: normalizeNullableStringField(body.notes),
+        monitoringProfile: normalizeNullableStringField(body.monitoringProfile),
+        statusReason: normalizeNullableStringField(body.statusReason),
+        aiSummary: normalizeNullableStringField(body.aiSummary),
+        documentInsights: normalizeNullableStringField(body.documentInsights),
         isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
         isArchived: typeof body.isArchived === 'boolean' ? body.isArchived : undefined,
-        ambulatoryId: typeof body.ambulatoryId === 'string'
-            ? body.ambulatoryId
-            : body.ambulatoryId === null
-                ? null
-                : undefined,
+        // WUL-309: set-primary semantics: blank/non-string ids are ignored so the
+        // denormalized column stays consistent with patients_to_ambulatories.
+        ambulatoryId: normalizePrimaryAmbulatoryIdInput(body.ambulatoryId),
         version: options.expectedVersion + 1,
         birthDate: birthDate.value,
         updatedAt: options.now ?? new Date(),

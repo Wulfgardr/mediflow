@@ -18,14 +18,14 @@ interface PatientFormProps {
     isEditMode?: boolean;
 }
 
+/* @Codex WUL-229: patient form sections now inherit the vitreous tier directly */
+const FORM_SECTION_CLASS = 'patient-detail-section mf-section p-7 md:p-9 space-y-7 relative overflow-hidden';
 /* @Codex */
-const FORM_SECTION_CLASS = 'glass-panel p-8 md:p-10 rounded-[32px] space-y-8 relative overflow-hidden transition-all hover:shadow-2xl hover:shadow-blue-500/5';
+const FORM_TITLE_CLASS = 'text-lg md:text-xl font-semibold tracking-tight flex items-center gap-3';
 /* @Codex */
-const FORM_TITLE_CLASS = 'text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3';
+const FORM_LABEL_CLASS = 'mf-field-label';
 /* @Codex */
-const FORM_LABEL_CLASS = 'text-[13px] font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-1.5 block';
-/* @Codex */
-const FORM_INPUT_CLASS = 'w-full rounded-2xl border border-slate-200/60 bg-white px-4 py-3.5 text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-blue-500/40';
+const FORM_INPUT_CLASS = 'mf-input';
 
 function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues>, setValue: UseFormSetValue<PatientFormValues>, watch: UseFormWatch<PatientFormValues> }) {
     const { fields, append, remove } = useFieldArray({
@@ -36,37 +36,32 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
     return (
         <div className="space-y-4">
             {fields.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-10 px-6 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/2">
-                    <Activity className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="text-sm text-slate-400 font-medium">Nessuna diagnosi registrata.</p>
+                <div className="mf-section mf-section-tight flex flex-col items-center justify-center py-8 px-6 border-dashed text-center">
+                    <Activity className="w-7 h-7 mb-2" style={{ color: 'var(--mf-muted)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessuna diagnosi registrata.</p>
                 </div>
             )}
 
             <div className="grid grid-cols-1 gap-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="apple-subsection relative group transition-all hover:border-blue-200 dark:hover:border-blue-500/30">
-                        {/* Delete Button */}
+                    <div key={field.id} className="diagnosis-form-card mf-section mf-section-tight relative group">
                         <button
                             type="button"
                             onClick={() => remove(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all rounded-full bg-white dark:bg-slate-800 p-2 shadow-lg border border-slate-100 dark:border-white/10 text-slate-400 hover:text-red-500 hover:scale-110 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi diagnosi"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
 
-                        <div className="flex flex-col md:flex-row gap-5 items-end">
-                            <div className="w-full md:w-24 shrink-0">
-                                <label className="section-kicker mb-1.5 block">Sistema</label>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[7rem_9rem_minmax(0,1fr)] md:items-start">
+                            <div className="w-full min-w-0">
+                                <label className="mf-field-label">Sistema</label>
                                 {(() => {
                                     const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                     const isV11 = sys === 'ICD-11';
                                     return (
-                                        <div className={`w-full py-2.5 px-3 text-xs font-bold text-center rounded-xl border transition-colors ${
-                                            isV11 
-                                                ? 'border-blue-100 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:border-blue-500/30 dark:text-blue-400' 
-                                                : 'border-purple-100 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:border-purple-500/30 dark:text-purple-400'
-                                        }`}>
+                                        <div className={`diagnosis-system-pill patient-code-pill ${isV11 ? 'patient-code-pill-primary' : 'patient-code-pill-plum'} w-full justify-center text-xs font-bold`}>
                                             {sys}
                                         </div>
                                     );
@@ -74,21 +69,18 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                 <input type="hidden" {...register(`diagnoses.${index}.system`)} />
                             </div>
 
-                            <div className="w-full md:w-28 shrink-0">
-                                <label className="section-kicker mb-1.5 block">Codice</label>
+                            <div className="w-full min-w-0">
+                                <label className="mf-field-label">Codice</label>
                                 <input
                                     {...register(`diagnoses.${index}.code`)}
                                     placeholder="Es. 8A80.0"
-                                    className={`w-full rounded-xl border p-2.5 text-sm font-mono font-bold outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white ${
-                                        errors.diagnoses?.[index]?.code 
-                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40' 
-                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
-                                    }`}
+                                    className="mf-input mf-input-sm font-mono font-bold"
+                                    aria-invalid={!!errors.diagnoses?.[index]?.code}
                                 />
                             </div>
 
                             <div className="flex-1 w-full min-w-0">
-                                <label className="section-kicker mb-1.5 block">Patologia / Ricerca Clinica</label>
+                                <label className="mf-field-label">Diagnosi o ricerca clinica</label>
                                 <div className="relative">
                                     <ICDAutocomplete
                                         value={{
@@ -107,7 +99,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                     <input type="hidden" {...register(`diagnoses.${index}.description`)} />
                                 </div>
                                 {errors.diagnoses?.[index]?.description && (
-                                    <span className="text-[10px] font-semibold text-red-500 mt-1 block">Campo obbligatorio</span>
+                                    <span className="mf-field-error block">Campo obbligatorio</span>
                                 )}
                             </div>
                         </div>
@@ -120,10 +112,10 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
             <button
                 type="button"
                 onClick={() => append({ code: '', description: '', system: 'ICD-11', date: new Date() })}
-                className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all hover:bg-slate-50 dark:hover:bg-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95 shadow-sm"
+                className="mf-btn-secondary w-full md:w-auto"
             >
                 <Plus className="w-4 h-4" />
-                Aggiungi Diagnosi
+                Aggiungi diagnosi
             </button>
         </div>
     );
@@ -138,21 +130,20 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
     return (
         <div className="space-y-4">
             {fields.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-10 px-6 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/2">
-                    <Calendar className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="text-sm text-slate-400 font-medium">Nessun lavoro pianificato.</p>
-                    <p className="mt-1 text-xs text-slate-400">Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
+                <div className="mf-section mf-section-tight flex flex-col items-center justify-center py-8 px-6 border-dashed text-center">
+                    <Calendar className="w-7 h-7 mb-2" style={{ color: 'var(--mf-muted)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessun passaggio programmato.</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
                 </div>
             )}
 
             <div className="grid grid-cols-1 gap-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="apple-subsection relative group transition-all hover:border-blue-200 dark:hover:border-blue-500/30">
-                        {/* Delete Button */}
+                    <div key={field.id} className="mf-section mf-section-tight relative group">
                         <button
                             type="button"
                             onClick={() => removeField(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all rounded-full bg-white dark:bg-slate-800 p-2 shadow-lg border border-slate-100 dark:border-white/10 text-slate-400 hover:text-red-500 hover:scale-110 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi pianificazione"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -160,38 +151,32 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 
                         <div className="flex flex-col md:flex-row gap-5 items-end">
                             <div className="w-full md:w-40 shrink-0">
-                                <label className="section-kicker mb-1.5 block">Data prevista</label>
+                                <label className="mf-field-label">Data prevista</label>
                                 <input
                                     type="date"
                                     {...register(`checkups.${index}.date`)}
-                                    className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white dark:[color-scheme:dark] ${
-                                        errors.checkups?.[index]?.date
-                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40'
-                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
-                                    }`}
+                                    className="mf-input mf-input-sm dark:[color-scheme:dark]"
+                                    aria-invalid={!!errors.checkups?.[index]?.date}
                                 />
                             </div>
 
                             <div className="flex-1 w-full">
-                                <label className="section-kicker mb-1.5 block">Lavoro pianificato</label>
+                                <label className="mf-field-label">Prossimo passaggio</label>
                                 <input
                                     {...register(`checkups.${index}.title`)}
                                     placeholder="Es. PRIAMO, valutazione ADL, visita programmata, ECG..."
-                                    className={`w-full rounded-xl border p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:text-white ${
-                                        errors.checkups?.[index]?.title
-                                            ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-500/40'
-                                            : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
-                                    }`}
+                                    className="mf-input mf-input-sm"
+                                    aria-invalid={!!errors.checkups?.[index]?.title}
                                 />
                             </div>
                         </div>
                         <div className="mt-4">
-                            <label className="section-kicker mb-1.5 block">Note operative</label>
+                            <label className="mf-field-label">Note operative</label>
                             <textarea
                                 {...register(`checkups.${index}.notes`)}
                                 placeholder="Materiali, scale da somministrare, contesto utile per il prossimo passaggio..."
                                 rows={2}
-                                className="w-full resize-y rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                                className="mf-input resize-y leading-relaxed"
                             />
                         </div>
                         <input type="hidden" {...register(`checkups.${index}.status`)} />
@@ -203,10 +188,10 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
             <button
                 type="button"
                 onClick={() => append({ date: new Date(), title: '', notes: '', status: 'pending', source: 'manual' })}
-                className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all hover:bg-slate-50 dark:hover:bg-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95 shadow-sm"
+                className="mf-btn-secondary w-full md:w-auto"
             >
                 <Plus className="w-4 h-4" />
-                Aggiungi pianificazione
+                Aggiungi passaggio
             </button>
         </div>
     );
@@ -256,14 +241,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Personal Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 graphite-divider pb-5 mb-2">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                            <User className="w-6 h-6 text-blue-500" />
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(15, 123, 104, 0.1)' }}>
+                            <User className="w-5 h-5" style={{ color: 'var(--mf-primary)' }} />
                         </div>
                         <div>
-                            <p className="section-kicker">Dati anagrafici</p>
-                            <h3 className={FORM_TITLE_CLASS}>Profilo Paziente</h3>
+                            <p className="mf-eyebrow">Dati anagrafici</p>
+                            <h3 className={FORM_TITLE_CLASS}>Profilo paziente</h3>
                         </div>
                     </div>
                 </div>
@@ -276,7 +261,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             className={FORM_INPUT_CLASS}
                             placeholder="Es. Mario"
                         />
-                        {errors.firstName && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.firstName.message}</p>}
+                        {errors.firstName && <p className="mf-field-error">{errors.firstName.message}</p>}
                     </div>
 
                     <div className="space-y-1">
@@ -286,27 +271,25 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             className={FORM_INPUT_CLASS}
                             placeholder="Es. Rossi"
                         />
-                        {errors.lastName && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.lastName.message}</p>}
+                        {errors.lastName && <p className="mf-field-error">{errors.lastName.message}</p>}
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Codice Fiscale <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS}>Codice fiscale <span className="text-red-500">*</span></label>
                         <input
                             {...register('taxCode')}
                             className={`${FORM_INPUT_CLASS} uppercase font-mono font-bold tracking-wider`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />
-                        {errors.taxCode && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.taxCode.message}</p>}
+                        {errors.taxCode && <p className="mf-field-error">{errors.taxCode.message}</p>}
                     </div>
 
                     <div className="space-y-1">
                         <div className="flex justify-between items-center mb-1.5">
-                            <label className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 ml-1">Data di Nascita</label>
+                            <label className="mf-field-label mb-0">Data di nascita</label>
                             {estimatedAge !== null && (
-                                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-600 dark:border-blue-500/20 dark:bg-blue-900/30 dark:text-blue-300">
-                                    Stima eta ~{estimatedAge} anni ({estimatedYear})
-                                </span>
+                                <span className="apple-chip">Stima età ~{estimatedAge} anni ({estimatedYear})</span>
                             )}
                         </div>
                         <input
@@ -314,26 +297,26 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             {...register('birthDate')}
                             className={`${FORM_INPUT_CLASS} dark:[color-scheme:dark]`}
                         />
-                        {errors.birthDate && <p className="text-[11px] font-semibold text-red-500 mt-1.5 ml-1">{errors.birthDate.message}</p>}
+                        {errors.birthDate && <p className="mf-field-error">{errors.birthDate.message}</p>}
                     </div>
                 </div>
             </div>
 
             {/* Contact Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                        <MapPin className="w-6 h-6 text-emerald-500" />
+                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(63, 122, 76, 0.12)' }}>
+                        <MapPin className="w-5 h-5" style={{ color: 'var(--mf-success)' }} />
                     </div>
                     <div>
-                        <p className="section-kicker">Reperibilità</p>
-                        <h3 className={FORM_TITLE_CLASS}>Contatti & Recapiti</h3>
+                        <p className="mf-eyebrow">Reperibilità</p>
+                        <h3 className={FORM_TITLE_CLASS}>Contatti e recapiti</h3>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Indirizzo di Residenza</label>
+                        <label className={FORM_LABEL_CLASS}>Indirizzo di residenza</label>
                         <input
                             {...register('address')}
                             className={FORM_INPUT_CLASS}
@@ -344,7 +327,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS}>Cellulare / Telefono</label>
                         <div className="relative">
-                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                             <input
                                 {...register('phone')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
@@ -354,13 +337,13 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="col-span-full space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Caregiver / Riferimento Familiare</label>
+                        <label className={FORM_LABEL_CLASS}>Caregiver o riferimento</label>
                         <div className="relative">
-                            <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pink-400" />
+                            <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-plum)' }} />
                             <input
                                 {...register('caregiver')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
-                                placeholder="Es. Nome Cognome (figlio/a) - Tel..."
+                                placeholder="Es. Maria Rossi, figlia, +39..."
                             />
                         </div>
                     </div>
@@ -368,14 +351,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Diagnosi & Patologie */}
-            <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
-                        <Activity className="w-6 h-6 text-red-500" />
+            <div className={`${FORM_SECTION_CLASS} diagnosis-section-card`}>
+                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(163, 58, 47, 0.1)' }}>
+                        <Activity className="w-5 h-5" style={{ color: 'var(--mf-critical)' }} />
                     </div>
                     <div>
-                        <p className="section-kicker">Codifica clinica</p>
-                        <h3 className={FORM_TITLE_CLASS}>Patologie e Diagnosi (ICD-11)</h3>
+                        <p className="mf-eyebrow">Codifica clinica</p>
+                        <h3 className={FORM_TITLE_CLASS}>Diagnosi e problemi attivi</h3>
                     </div>
                 </div>
 
@@ -384,14 +367,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Pianificazione operativa */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-indigo-500" />
+                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(94, 53, 95, 0.12)' }}>
+                        <Calendar className="w-5 h-5" style={{ color: 'var(--mf-plum)' }} />
                     </div>
                     <div>
-                        <p className="section-kicker">Agenda clinica</p>
-                        <h3 className={FORM_TITLE_CLASS}>Lavoro pianificato</h3>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">PRIAMO, valutazioni, visite programmate, follow-up.</p>
+                        <p className="mf-eyebrow">Agenda clinica</p>
+                        <h3 className={FORM_TITLE_CLASS}>Prossimi passaggi</h3>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>PRIAMO, valutazioni, visite programmate, follow-up.</p>
                     </div>
                 </div>
                 <CheckupsFieldArray register={register} control={control} errors={errors} />
@@ -399,17 +382,17 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* @Codex */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-                        <Ticket className="w-6 h-6 text-amber-500" />
+                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(197, 138, 47, 0.14)' }}>
+                        <Ticket className="w-5 h-5" style={{ color: 'var(--mf-warning)' }} />
                     </div>
                     <div>
-                        <p className="section-kicker">Assetto amministrativo</p>
-                        <h3 className={FORM_TITLE_CLASS}>Codici Esenzione</h3>
+                        <p className="mf-eyebrow">Assetto amministrativo</p>
+                        <h3 className={FORM_TITLE_CLASS}>Esenzioni</h3>
                     </div>
                 </div>
-                
-                <div className="apple-subsection bg-slate-50/50 dark:bg-white/2 border-dashed">
+
+                <div className="mf-section mf-section-tight border-dashed">
                     <Controller
                         name="exemptions"
                         control={control}
@@ -420,73 +403,69 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             />
                         )}
                     />
-                    <div className="mt-4 flex items-start gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                        I codici selezionati verranno salvati in modo cifrato nella scheda del paziente.
+                    <div className="mt-3 mf-alert mf-alert-warning text-[11px]" role="note">
+                        <span className="inline-flex items-start gap-2">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            I codici selezionati verranno salvati in modo cifrato nella scheda del paziente.
+                        </span>
                     </div>
                 </div>
             </div>
 
             {/* Clinical Profile Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-white/10 pb-6 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-purple-500" />
+                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(15, 123, 104, 0.1)' }}>
+                        <FileText className="w-5 h-5" style={{ color: 'var(--mf-primary)' }} />
                     </div>
                     <div>
-                        <p className="section-kicker">Profilo assistenziale</p>
-                        <h3 className={FORM_TITLE_CLASS}>Inquadramento Clinico</h3>
+                        <p className="mf-eyebrow">Profilo assistenziale</p>
+                        <h3 className={FORM_TITLE_CLASS}>Inquadramento clinico</h3>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-8">
-                    <div className="apple-subsection flex flex-col md:flex-row gap-8">
+                    <div className="mf-section mf-section-tight flex flex-col md:flex-row gap-8">
                         <div className="flex items-center gap-4 px-2">
-                            <div className="relative flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="adi"
-                                    {...register('isAdi')}
-                                    className="peer h-6 w-6 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-white/10 dark:bg-white/5 transition-all cursor-pointer"
-                                />
-                            </div>
-                            <label htmlFor="adi" className="font-bold text-slate-800 dark:text-white cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                id="adi"
+                                {...register('isAdi')}
+                                className="peer h-5 w-5 rounded-md cursor-pointer"
+                                style={{ accentColor: 'var(--mf-primary)' }}
+                            />
+                            <label htmlFor="adi" className="font-semibold cursor-pointer select-none" style={{ color: 'var(--mf-ink)' }}>
                                 Paziente in ADI
-                                <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">Assistenza Domiciliare Integrata</span>
+                                <span className="block text-[11px] font-normal" style={{ color: 'var(--mf-muted)' }}>Assistenza Domiciliare Integrata</span>
                             </label>
                         </div>
 
                         <div className="flex-1 space-y-2">
-                            <label className={FORM_LABEL_CLASS}>Profilo Monitoraggio</label>
+                            <label className={FORM_LABEL_CLASS}>Tipo di presa in carico</label>
                             <div className="relative">
                                 <select
                                     {...register('monitoringProfile')}
-                                    className={`w-full appearance-none rounded-2xl border px-4 py-3.5 text-sm font-bold outline-none transition-all focus:ring-4 focus:ring-blue-500/10 cursor-pointer ${
-                                        currentStatus === 'taken_in_charge'
-                                            ? 'border-emerald-200 bg-emerald-50/50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-400'
-                                            : 'border-orange-200 bg-orange-50/50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-400'
-                                    }`}
+                                    className={`mf-input appearance-none cursor-pointer pr-10 font-semibold ${currentStatus === 'taken_in_charge' ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}
                                 >
-                                    <option value="taken_in_charge">Presa in Carico (Continua)</option>
-                                    <option value="extemporaneous">Estemporanea (One Shot)</option>
+                                    <option value="taken_in_charge">Continuativa</option>
+                                    <option value="extemporaneous">Episodica</option>
                                 </select>
                                 <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
-                                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                                    <ChevronDown className="h-4 w-4" style={{ color: 'var(--mf-muted)' }} />
                                 </div>
                             </div>
 
-                            {/* Conditional Reason Field */}
                             {hasStatusChanged && isEditMode && (
                                 <div className="animate-in fade-in slide-in-from-top-2 pt-2">
-                                    <label className="text-[11px] font-bold text-orange-600 dark:text-orange-400 mb-1.5 flex items-center gap-1.5 ml-1">
-                                        <AlertTriangle className="w-3.5 h-3.5" />
-                                        MOTIVO CAMBIO STATO (OBBLIGATORIO)
+                                    <label className="mf-field-label flex items-center gap-1.5">
+                                        <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--mf-warning)' }} />
+                                        Motivo cambio stato (obbligatorio)
                                     </label>
                                     <textarea
                                         {...register('statusReason')}
                                         required
-                                        className="w-full rounded-2xl border border-orange-200 bg-orange-50/50 p-4 text-sm font-medium outline-none transition-all focus:ring-4 focus:ring-orange-500/10 dark:border-orange-500/30 dark:bg-orange-900/10 dark:text-orange-100 placeholder:text-orange-300 dark:placeholder:text-orange-900/40"
-                                        placeholder="Specificare il motivo del cambio di profilo (es. Trasferimento, fine cure...)"
+                                        className="mf-input resize-y leading-relaxed"
+                                        placeholder="Specificare il motivo del cambio di profilo (es. trasferimento, fine cure…)"
                                         rows={2}
                                     />
                                 </div>
@@ -495,27 +474,27 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Note Globali & Anamnesi Sociale</label>
+                        <label className={FORM_LABEL_CLASS}>Note cliniche e contesto</label>
                         <textarea
                             {...register('notes')}
                             className={`${FORM_INPUT_CLASS} min-h-[140px] leading-relaxed`}
-                            placeholder="Informazioni aggiuntive, contesto familiare, codici accesso, preferenze del paziente..."
+                            placeholder="Informazioni utili, contesto familiare, accessi, preferenze del paziente..."
                         />
                     </div>
                 </div>
             </div>
 
-            <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-200 dark:border-white/10">
-                <p className="text-xs text-slate-400 font-medium">
-                    I campi contrassegnati con <span className="text-red-500">*</span> sono obbligatori per la corretta gestione clinica.
+            <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6 graphite-divider">
+                <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
+                    Campi obbligatori per creare la scheda: <span style={{ color: 'var(--mf-critical)' }}>*</span>.
                 </p>
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full md:w-auto inline-flex items-center justify-center gap-3 rounded-[24px] bg-blue-600 px-10 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700 hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 shadow-xl shadow-blue-500/20"
+                    className="ui-btn-primary w-full md:w-auto px-8 py-3.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Save className="w-5 h-5" />
-                    {isSubmitting ? 'Salvataggio in corso...' : (isEditMode ? 'Aggiorna Scheda Paziente' : 'Crea Nuova Scheda')}
+                    {isSubmitting ? 'Salvataggio in corso…' : (isEditMode ? 'Aggiorna scheda' : 'Crea scheda')}
                 </button>
             </div>
         </form>

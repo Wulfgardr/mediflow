@@ -7,6 +7,7 @@ import {
     buildNetworkReplicaSummary,
     buildNetworkSessionSummary,
     createPairingIntentDraft,
+    evaluateNetworkDataPlaneModeGate,
     NETWORK_MODE_KEY,
 } from './network-contract.ts';
 
@@ -157,6 +158,20 @@ test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as e
     });
     assert.equal(conflict.state, 'conflict-review');
     assert.equal(conflict.pendingAction, 'manual-review');
+});
+
+test('evaluateNetworkDataPlaneModeGate rejects paired-client requests while home-base mode is off', () => {
+    const gate = evaluateNetworkDataPlaneModeGate('local-only');
+
+    assert.equal(gate.allowed, false);
+    if (gate.allowed) return;
+    assert.equal(gate.status, 403);
+    assert.equal(gate.value.error, 'Forbidden');
+    assert.equal(gate.value.code, 'NETWORK_MODE_DISABLED');
+});
+
+test('evaluateNetworkDataPlaneModeGate passes paired-client requests while home-base mode is on', () => {
+    assert.deepEqual(evaluateNetworkDataPlaneModeGate('network-home-base'), { allowed: true });
 });
 
 test('createPairingIntentDraft rejects requests while home-base mode is disabled', () => {

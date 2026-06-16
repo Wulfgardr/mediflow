@@ -25,7 +25,7 @@ import { entries, patientsToAmbulatories } from './schema';
 export const NETWORK_ENTRY_WRITE_CAPABILITY = 'network.replica.write-clinical-diary';
 
 type NetworkEntryMutationResponse =
-    | { status: 200; value: { success: true } }
+    | { status: 200; value: { success: true } | { id: string; version: number; idempotent: true } }
     | { status: 201; value: { id: string; version: number } }
     | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
 
@@ -35,6 +35,16 @@ type NetworkEntryMutationContext = NetworkWriteContext & {
 
 type NetworkEntryUpdateContext = NetworkEntryMutationContext & {
     entryId: string;
+};
+
+type NormalizedNetworkEntryCreateValues = {
+    type: string;
+    title: string;
+    date: Date;
+    content: string;
+    setting: string | null;
+    metadata: string | null;
+    attachments: string | null;
 };
 
 const NETWORK_FORBIDDEN_ENTRY_WRITE_FIELDS = new Set([
@@ -128,6 +138,20 @@ function entryIsInScope(
     return row?.entry ?? null;
 }
 
+function isSameEntryCreatePayload(
+    existing: typeof entries.$inferSelect,
+    values: NormalizedNetworkEntryCreateValues
+): boolean {
+    return existing.type === values.type
+        && existing.title === values.title
+        && existing.date.getTime() === values.date.getTime()
+        && existing.content === values.content
+        && existing.setting === values.setting
+        && existing.metadata === values.metadata
+        && existing.attachments === values.attachments
+        && existing.deletedAt === null;
+}
+
 function selectEntryConflictSnapshot(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
     context: NetworkEntryUpdateContext
@@ -196,6 +220,26 @@ export async function createNetworkScopedEntry(
     const commit = dbServer.transaction((tx): NetworkEntryMutationResponse => {
         if (!patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) {
             return { status: 404, value: { error: 'Not found' } };
+        }
+
+        if (typeof body.id === 'string' && body.id.trim().length > 0) {
+            const existing = tx
+                .select()
+                .from(entries)
+                .where(and(eq(entries.id, newId), eq(entries.patientId, context.patientId)))
+                .get();
+            if (existing) {
+                if (!isSameEntryCreatePayload(existing, normalized.values)) {
+                    return {
+                        status: 409,
+                        value: {
+                            error: 'Network diary create id already exists with different content',
+                        },
+                    };
+                }
+
+                return { status: 200, value: { id: existing.id, version: existing.version, idempotent: true } };
+            }
         }
 
         tx.insert(entries).values(normalized.values).run();

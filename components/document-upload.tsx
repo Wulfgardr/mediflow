@@ -2,18 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, X, Eye, Loader2 } from 'lucide-react';
+import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQuery, notifyDbChange } from '@/lib/live-query';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     AiDocumentSynthesisDisabledError,
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
 /* @Codex */
-import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
+import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput, DocumentTextUnavailableError } from '@/lib/pdf-service';
+import {
+    canTransitionDocumentOcrQueueState,
+    describeDocumentOcrQueueEntry,
+    evaluateDocumentOcrQueueCandidate,
+    type DocumentOcrQueueReason,
+    type DocumentOcrQueueState,
+} from '@/lib/document-ocr-queue';
 /* @Codex */
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
@@ -26,9 +33,15 @@ interface DocumentUploadProps {
     patientId: string;
 }
 
+async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+    const [replayingId, setReplayingId] = useState<string | null>(null);
     /* @Codex */
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
@@ -68,8 +81,9 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         for (const file of acceptedFiles) {
             try {
                 // Auto-extract analysis on upload
-                let summary = "Nessuna informazione rilevante trovata.";
+                let summary: string | undefined = "Nessuna informazione rilevante trovata.";
                 let parseEvidenceArtifactSnapshot: string | undefined;
+                let ocrQueue: { state: DocumentOcrQueueState; reason: DocumentOcrQueueReason } | undefined;
                 const attachmentId = uuidv4();
                 const isPdf = isPdfDocumentInput(file);
                 const isImage = isImageDocumentInput(file);
@@ -85,7 +99,21 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             rawText = await extractDocumentTextForSummary(file);
                         }
 
-                        if (rawText && documentSynthesisEnabled) {
+                        const queueCandidate = evaluateDocumentOcrQueueCandidate({
+                            inputKind: isPdf ? 'pdf' : 'image',
+                            extractedText: rawText || '',
+                        });
+                        if (queueCandidate.queued) {
+                            // Documento muto: niente classificazione debole né summarySnapshot
+                            // (la review queue lo legge come "serve testo") finché l'OCR non produce testo.
+                            ocrQueue = { state: queueCandidate.state, reason: queueCandidate.reason };
+                            summary = undefined;
+                            console.info('[DocumentUpload] Documento in coda OCR-needed', {
+                                attachmentId,
+                                state: queueCandidate.state,
+                                reason: queueCandidate.reason,
+                            });
+                        } else if (rawText && documentSynthesisEnabled) {
                             setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                             try {
                                 const result = await synthesizeDocument(rawText, file.name, patientId, { attachmentId });
@@ -108,7 +136,24 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             summary = "Analisi completata (nessuna diagnosi esplicita rilevata)";
                         }
                     } catch (err) {
-                        console.warn('[DocumentUpload] OCR/Sintesi fallita', err);
+                        if (err instanceof DocumentTextUnavailableError) {
+                            const queueCandidate = evaluateDocumentOcrQueueCandidate({
+                                inputKind: isPdf ? 'pdf' : 'image',
+                                extractedText: '',
+                                extractionFailure: err.textLayerFailure,
+                            });
+                            if (queueCandidate.queued) {
+                                ocrQueue = { state: queueCandidate.state, reason: queueCandidate.reason };
+                                summary = undefined;
+                                console.info('[DocumentUpload] Documento in coda OCR-needed', {
+                                    attachmentId,
+                                    state: queueCandidate.state,
+                                    reason: queueCandidate.reason,
+                                });
+                            }
+                        } else {
+                            console.warn('[DocumentUpload] OCR/Sintesi fallita', err);
+                        }
                     }
                 }
 
@@ -129,6 +174,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     data: base64Data,
                     summarySnapshot: summary,
                     parseEvidenceArtifactSnapshot,
+                    ocrQueueState: ocrQueue?.state,
+                    ocrQueueReason: ocrQueue?.reason,
                     createdAt: new Date()
                 });
 
@@ -162,6 +209,83 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         }
     };
 
+    // Replay documentale post-OCR: aggiorna l'allegato in-place (mai duplicato),
+    // idempotente per hash documento lato server.
+    const handleOcrReplay = async (file: Attachment) => {
+        if (!file.data || replayingId) return;
+        setReplayingId(file.id);
+        try {
+            await db.attachments.update(file.id, { ocrQueueState: 'processing' });
+            let ocrText = '';
+            try {
+                const blob = await (await fetch(file.data)).blob();
+                const replayFile = new File([blob], file.name, { type: file.type || blob.type });
+                ocrText = await extractDocumentTextForSummary(replayFile);
+            } catch (ocrError) {
+                console.warn('[DocumentUpload] Replay OCR: estrazione fallita', ocrError);
+            }
+
+            const documentSha256 = await sha256Hex(file.data);
+            const response = await fetch(`/api/attachments/${file.id}/ocr-replay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ocrText, documentSha256 }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err?.error || 'Replay OCR fallito');
+            }
+            const replay = await response.json();
+            console.info('[DocumentUpload] Replay OCR', {
+                attachmentId: file.id,
+                outcome: replay.outcome,
+                state: replay.state,
+                reason: replay.reason,
+            });
+
+            // Niente proposta clinica finché il testo non è sufficiente.
+            if (replay.outcome === 'applied' && replay.state === 'ocr_done' && replay.sufficientText) {
+                if (documentSynthesisEnabled) {
+                    try {
+                        const result = await synthesizeDocument(ocrText, file.name, patientId, { attachmentId: file.id });
+                        await db.attachments.update(file.id, {
+                            summarySnapshot: result.insight.summary,
+                            parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),
+                        });
+                        await regeneratePatientSummary(patientId);
+                    } catch (synthesisError) {
+                        if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
+                            await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
+                        } else {
+                            console.warn('[DocumentUpload] Replay OCR: sintesi fallita', synthesisError);
+                        }
+                    }
+                } else {
+                    await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
+                }
+            }
+        } catch (err) {
+            console.warn('[DocumentUpload] Replay OCR fallito', err);
+            await db.attachments.update(file.id, { ocrQueueState: 'ocr_failed' }).catch(() => undefined);
+        } finally {
+            setReplayingId(null);
+            notifyDbChange();
+        }
+    };
+
+    const handleOcrManualReview = async (file: Attachment) => {
+        if (!file.ocrQueueState || !canTransitionDocumentOcrQueueState(file.ocrQueueState, 'manual_review')) return;
+        try {
+            await db.attachments.update(file.id, { ocrQueueState: 'manual_review' });
+        } catch (err) {
+            console.warn('[DocumentUpload] Passaggio a revisione manuale fallito', err);
+        }
+    };
+
+    const ocrQueueEntries = (attachments ?? []).filter(
+        (file) => file.ocrQueueState && file.ocrQueueState !== 'ocr_done'
+    );
+
     return (
         <div className="space-y-6">
 
@@ -173,13 +297,13 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 className={cn(
                     "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all",
                     isDragActive
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10"
-                        : "border-gray-300 dark:border-white/10 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
+                        ? "border-slate-400 bg-slate-50 dark:bg-white/10"
+                        : "border-gray-300 dark:border-white/10 hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
                 )}
             >
                 <input {...getInputProps()} />
-                <div className="p-3 bg-blue-100/50 rounded-full mb-3">
-                    {isProcessing ? <Loader2 className="w-6 h-6 text-blue-600 animate-spin" /> : <Upload className="w-6 h-6 text-blue-600" />}
+                <div className="mb-3 rounded-full bg-slate-100 p-3 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                    {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
                 <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
                 <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file).</p>
@@ -199,17 +323,36 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                     data-testid="document-upload-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.
                 </div>
             )}
 
+            {/* Coda OCR-needed: documenti bloccati con stato e motivo */}
+            {ocrQueueEntries.length > 0 && (
+                <div
+                    className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+                    data-testid="document-ocr-queue-panel"
+                >
+                    <p className="font-medium">
+                        Coda OCR: {ocrQueueEntries.length} {ocrQueueEntries.length === 1 ? 'documento bloccato' : 'documenti bloccati'} (nessuna proposta clinica finché manca testo utile)
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                        {ocrQueueEntries.map((file) => (
+                            <li key={file.id} className="truncate">
+                                {file.name} · {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="glass-card p-3 flex items-center gap-3 group hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors">
+                    <div key={file.id} className="glass-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
                         <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500 dark:text-red-400 border border-red-100 dark:border-white/5">
                             <FileText className="w-5 h-5" />
                         </div>
@@ -220,16 +363,44 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 {new Date(file.createdAt).toLocaleDateString()}
                             </p>
                             {file.summarySnapshot && (
-                                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">
+                                <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">
                                     AI: {file.summarySnapshot}
+                                </p>
+                            )}
+                            {file.ocrQueueState && (
+                                <p
+                                    className="mt-0.5 truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+                                    data-testid="document-ocr-queue-entry"
+                                >
+                                    OCR: {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
                                 </p>
                             )}
                         </div>
 
                         <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            {file.ocrQueueState && file.ocrQueueState !== 'ocr_done' && (
+                                <button
+                                    onClick={() => handleOcrReplay(file)}
+                                    disabled={replayingId !== null}
+                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    title="Riprova OCR"
+                                >
+                                    <RefreshCw className={cn("w-4 h-4", replayingId === file.id && "animate-spin")} />
+                                </button>
+                            )}
+                            {file.ocrQueueState && canTransitionDocumentOcrQueueState(file.ocrQueueState, 'manual_review') && file.ocrQueueState !== 'manual_review' && (
+                                <button
+                                    onClick={() => handleOcrManualReview(file)}
+                                    disabled={replayingId !== null}
+                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    title="Segna per revisione manuale"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                </button>
+                            )}
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
                                 title="Visualizza"
                             >
                                 <Eye className="w-4 h-4" />

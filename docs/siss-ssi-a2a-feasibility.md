@@ -220,20 +220,17 @@ Prima di dichiarare una vera integrazione nativa SISS/FSE, ci mancano ancora:
 
 Alla luce delle fonti ufficiali raccolte fin qui, la sequenza piu sensata e:
 
-1. [WUL-181](https://linear.app/wulfgardr/issue/WUL-181/modulo-prescrittivo-regionale-boundary-ufficiale-e-first-slice-oltre):
    `Modulo Prescrittivo Regionale`
    - e il target con il valore clinico piu diretto
    - ha gia una traccia pubblica documentale chiara nel portale SISS
    - e il candidato migliore per una first slice `webapp-assisted`
    - nota canonica dedicata:
      [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md)
-2. [WUL-182](https://linear.app/wulfgardr/issue/WUL-182/fse-consultazione-e-consenso-mappa-scenario-specific-per-integrazione):
    `FSE consultazione e consenso`
    - richiede un boundary piu delicato su consenso, ruoli e audit
    - va affrontato solo dopo aver chiarito meglio il prescrittivo
    - nota canonica dedicata:
      [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md)
-3. [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile):
    `SGDT/PAI`
    - resta un filone piu verticale e specifico
    - oggi non e il candidato migliore per la prima integrazione ampia dentro
@@ -253,9 +250,6 @@ futura slice `official-webapp handoff guard`; la nota dedicata e in
 2. `WUL-177` / `WUL-179`: trasformare i riferimenti pubblici in corpus
    sincronizzato e interrogabile
 3. aprire la prima capability target in ordine di priorita:
-   - [WUL-181](https://linear.app/wulfgardr/issue/WUL-181/modulo-prescrittivo-regionale-boundary-ufficiale-e-first-slice-oltre)
-   - poi [WUL-182](https://linear.app/wulfgardr/issue/WUL-182/fse-consultazione-e-consenso-mappa-scenario-specific-per-integrazione)
-   - poi [WUL-183](https://linear.app/wulfgardr/issue/WUL-183/sgdt-pai-per-mmgssi-verifica-del-perimetro-cooperativo-realmente-utile)
 4. solo dopo, aprire il workstream runtime che gestisca credenziali,
    qualifica, audit, fallback e UI
 

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
@@ -10,6 +10,8 @@ import type { EntrySummary } from '@/lib/api/v1/types';
 import { normalizeEntryUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { buildEntryVersionConflictPayload, parseEntryExpectedVersion } from '@/lib/entry-concurrency';
+import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -17,32 +19,19 @@ function toIsoString(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-/* @Codex */
-type OptionalJsonBodyResult =
-    | { ok: true; body: Record<string, unknown> }
-    | { ok: false; error: string };
-
-/* @Codex */
-async function parseOptionalJsonBody(request: Request): Promise<OptionalJsonBodyResult> {
-    const text = await request.text();
-    if (text.trim().length === 0) {
-        return { ok: true, body: {} };
-    }
-
-    try {
-        const body = JSON.parse(text);
-        if (!body || typeof body !== 'object' || Array.isArray(body)) {
-            return { ok: false, error: 'Invalid JSON body' };
-        }
-        return { ok: true, body: body as Record<string, unknown> };
-    } catch {
-        return { ok: false, error: 'Invalid JSON body' };
-    }
-}
-
-/* @Codex */
-function hasOwn(input: Record<string, unknown>, key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(input, key);
+// WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
+async function selectEntryConflictSnapshot(patientId: string, entryId: string) {
+    return await dbServer
+        .select({
+            id: entries.id,
+            patientId: entries.patientId,
+            version: entries.version,
+            updatedAt: entries.updatedAt,
+            deletedAt: entries.deletedAt,
+        })
+        .from(entries)
+        .where(and(eq(entries.id, entryId), eq(entries.patientId, patientId)))
+        .get() ?? null;
 }
 
 export async function GET(
@@ -99,9 +88,10 @@ export async function PUT(
         const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
         const body = await request.json() as Record<string, unknown>;
-        const normalized = normalizeEntryUpdateInput(body);
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
+        const expectedVersion = parseEntryExpectedVersion(body.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
         const existing = await dbServer.select({ id: entries.id }).from(entries)
@@ -111,23 +101,33 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
+        const normalized = normalizeEntryUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
         const updateResult = await dbServer.update(entries)
             .set({
                 ...normalized.values,
-                version: sql`${entries.version} + 1`,
+                version: expectedVersion + 1,
             })
-            .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
+            .where(and(
+                eq(entries.id, entryId),
+                eq(entries.patientId, id),
+                eq(entries.version, expectedVersion),
+            ))
             .run();
 
         if (updateResult.changes === 0) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+            return NextResponse.json(
+                buildEntryVersionConflictPayload(
+                    expectedVersion,
+                    entryId,
+                    await selectEntryConflictSnapshot(id, entryId),
+                ),
+                { status: 409 }
+            );
         }
-
-        const current = await dbServer
-            .select({ version: entries.version })
-            .from(entries)
-            .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
-            .get();
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -138,8 +138,8 @@ export async function PUT(
                 subjectType: 'entry',
                 subjectRef: entryId,
                 redactedMetadata: {
-                    changedFields: listChangedFields(body),
-                    resourceVersion: current?.version ?? undefined,
+                    changedFields: listChangedFields(body, ['version']),
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Entry audit write failed:',
@@ -164,29 +164,24 @@ export async function DELETE(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
-        const parsedBody = await parseOptionalJsonBody(request);
+        // WUL-308: DELETE keeps the soft-delete tombstone and gains the version guard.
+        const parsedBody = await parseClinicalDeleteBody(request);
         if (!parsedBody.ok) {
             return NextResponse.json({ error: parsedBody.error }, { status: 400 });
         }
-        const body = parsedBody.body;
-        if (hasOwn(body, 'deletedAt') && (body.deletedAt === null || body.deletedAt === '')) {
-            return NextResponse.json({ error: 'Invalid deletedAt' }, { status: 400 });
-        }
-        if (hasOwn(body, 'deletionReason')) {
-            if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) {
-                return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
-            }
-            body.deletionReason = body.deletionReason.trim();
+        const expectedVersion = parseEntryExpectedVersion(parsedBody.values.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
         const normalized = normalizeEntryUpdateInput({
-            deletedAt: hasOwn(body, 'deletedAt') ? body.deletedAt : new Date(),
-            deletionReason: hasOwn(body, 'deletionReason') ? body.deletionReason : 'api-v1-delete',
+            deletedAt: parsedBody.values.deletedAt,
+            deletionReason: parsedBody.values.deletionReason,
         });
         if (!normalized.ok) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: entries.id, version: entries.version }).from(entries)
+        const existing = await dbServer.select({ id: entries.id }).from(entries)
             .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
             .get();
         if (!existing) {
@@ -196,13 +191,24 @@ export async function DELETE(
         const updateResult = await dbServer.update(entries)
             .set({
                 ...normalized.values,
-                version: sql`${entries.version} + 1`,
+                version: expectedVersion + 1,
             })
-            .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
+            .where(and(
+                eq(entries.id, entryId),
+                eq(entries.patientId, id),
+                eq(entries.version, expectedVersion),
+            ))
             .run();
 
         if (updateResult.changes === 0) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+            return NextResponse.json(
+                buildEntryVersionConflictPayload(
+                    expectedVersion,
+                    entryId,
+                    await selectEntryConflictSnapshot(id, entryId),
+                ),
+                { status: 409 }
+            );
         }
 
         /* @Codex */
@@ -215,7 +221,7 @@ export async function DELETE(
                 subjectRef: entryId,
                 redactedMetadata: {
                     changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: existing.version + 1,
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Entry audit write failed:',

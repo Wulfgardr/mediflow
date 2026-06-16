@@ -29,23 +29,23 @@ const FILTER_OPTIONS: { value: AgendaFilter; label: string }[] = [
 const STATUS_BADGES: Record<CheckupAgendaStatus, { label: string; className: string }> = {
     overdue: {
         label: 'In ritardo',
-        className: 'bg-[color:rgba(193,68,68,0.12)] text-[color:rgb(159,42,42)]',
+        className: 'bg-[color:rgba(193,68,68,0.12)] text-[color:rgb(159,42,42)] dark:bg-[color:rgba(232,110,96,0.16)] dark:text-[color:rgb(244,170,158)]',
     },
     today: {
         label: 'Oggi',
-        className: 'bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)]',
+        className: 'bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] dark:bg-[color:rgba(94,199,177,0.16)] dark:text-[color:rgb(150,224,204)]',
     },
     upcoming: {
         label: 'In arrivo',
-        className: 'bg-[color:rgba(112,106,100,0.12)] text-[color:var(--mf-ink)]',
+        className: 'bg-[color:rgba(112,106,100,0.12)] text-[color:var(--mf-ink)] dark:bg-[color:rgba(255,255,255,0.06)]',
     },
     completed: {
         label: 'Completato',
-        className: 'bg-[color:rgba(112,106,100,0.08)] text-[color:var(--mf-muted)]',
+        className: 'bg-[color:rgba(112,106,100,0.08)] text-[color:var(--mf-muted)] dark:bg-[color:rgba(255,255,255,0.04)]',
     },
     cancelled: {
         label: 'Annullato',
-        className: 'bg-[color:rgba(112,106,100,0.08)] text-[color:var(--mf-muted)]',
+        className: 'bg-[color:rgba(112,106,100,0.08)] text-[color:var(--mf-muted)] dark:bg-[color:rgba(255,255,255,0.04)]',
     },
 };
 
@@ -100,7 +100,7 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
 
     return (
         <section
-            className="patient-agenda-worklist rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] p-4 shadow-[0_12px_24px_rgba(35,27,22,0.05)] backdrop-blur-xl"
+            className="patient-agenda-worklist rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] p-4 shadow-[0_12px_24px_rgba(35,27,22,0.05)] backdrop-blur-xl dark:border-[color:rgba(255,247,240,0.08)] dark:bg-[color:rgba(26,22,26,0.86)] dark:shadow-[0_16px_30px_rgba(6,5,7,0.42)]"
             data-testid="patient-agenda-panel"
         >
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -108,11 +108,11 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                     <p className="section-kicker">Agenda operativa</p>
                     <h2 className="flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)]">
                         <CalendarClock className="h-4 w-4 text-[color:var(--mf-accent)]" />
-                        Lavoro pianificato per i casi visibili
+                        Prossimi passaggi per i casi visibili
                     </h2>
                     <p className="text-[12px] text-[color:var(--mf-muted)]">
                         {overdueCount > 0 ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-[color:rgb(159,42,42)]">
+                            <span className="inline-flex items-center gap-1 font-semibold text-[color:rgb(159,42,42)] dark:text-[color:rgb(244,170,158)]">
                                 <AlertTriangle className="h-3.5 w-3.5" />
                                 {overdueCount} in ritardo
                             </span>
@@ -140,8 +140,8 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                                 onClick={() => setFilter(option.value)}
                                 className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                                     isActive
-                                        ? 'border-[color:rgba(15,123,104,0.32)] bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)]'
-                                        : 'border-[color:rgba(112,106,100,0.16)] bg-white/72 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] dark:bg-white/6'
+                                        ? 'border-[color:rgba(15,123,104,0.32)] bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] dark:border-[color:rgba(94,199,177,0.36)] dark:bg-[color:rgba(94,199,177,0.14)] dark:text-[color:rgb(150,224,204)]'
+                                        : 'border-[color:rgba(112,106,100,0.16)] bg-white/72 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:bg-[color:rgba(255,255,255,0.04)] dark:hover:bg-[color:rgba(255,255,255,0.07)]'
                                 }`}
                             >
                                 {option.label}
@@ -152,11 +152,11 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
             </div>
 
             {visibleItems.length === 0 ? (
-                <p className="mt-3 rounded-[14px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-3 py-3 text-center text-[12px] text-[color:var(--mf-muted)]">
+                <p className="mt-3 rounded-[14px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-3 py-3 text-center text-[12px] text-[color:var(--mf-muted)] dark:border-[color:rgba(255,247,240,0.14)]">
                     Nessuna voce in questo filtro.
                 </p>
             ) : (
-                <ul className="mt-3 divide-y divide-[color:rgba(112,106,100,0.1)] overflow-hidden rounded-[14px] border border-[color:rgba(112,106,100,0.1)] bg-white/68 dark:bg-white/4">
+                <ul className="mt-3 divide-y divide-[color:rgba(112,106,100,0.1)] overflow-hidden rounded-[14px] border border-[color:rgba(112,106,100,0.1)] bg-white/68 dark:divide-[color:rgba(255,247,240,0.06)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-[color:rgba(255,255,255,0.03)]">
                     {visibleItems.map((checkup) => {
                         const status = classifyCheckupAgendaStatus(checkup, now);
                         const badge = STATUS_BADGES[status];
@@ -169,7 +169,7 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                                 <Link
                                     href={`/patients/${checkup.patientId}`}
                                     data-testid="patient-agenda-open-patient"
-                                    className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[color:rgba(15,123,104,0.05)]"
+                                    className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[color:rgba(15,123,104,0.05)] dark:hover:bg-[color:rgba(94,199,177,0.08)]"
                                 >
                                     <span className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
                                         {formatItalianDate(checkup.date)}
@@ -179,14 +179,14 @@ export function PatientAgendaWorklist({ patients }: PatientAgendaWorklistProps) 
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-[13px] font-semibold text-[color:var(--mf-ink)]">
-                                            {checkup.title || 'Lavoro pianificato'}
+                                            {checkup.title || 'Prossimo passaggio'}
                                         </p>
                                         <p className="truncate text-[11px] text-[color:var(--mf-muted)]">
                                             {patientLabel}
-                                            {checkup.notes ? <span className="text-[color:rgba(112,106,100,0.6)]"> · {checkup.notes}</span> : null}
+                                            {checkup.notes ? <span className="text-[color:rgba(112,106,100,0.6)] dark:text-[color:rgba(255,247,240,0.5)]"> · {checkup.notes}</span> : null}
                                         </p>
                                     </div>
-                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[color:rgba(112,106,100,0.4)] transition-colors group-hover:text-[color:var(--mf-primary)]" />
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[color:rgba(112,106,100,0.4)] transition-colors group-hover:text-[color:var(--mf-primary)] dark:text-[color:rgba(255,247,240,0.34)] dark:group-hover:text-[color:rgb(150,224,204)]" />
                                 </Link>
                             </li>
                         );

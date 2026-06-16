@@ -5,6 +5,9 @@ import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-
 import { BackupRestorePreflightError, exportRawDatabase, importRawDatabase } from '@/lib/db';
 import { useSecurity } from './security-provider';
 
+// WUL-297: parola chiave richiesta per confermare il restore.
+const RESTORE_CONFIRM_KEYWORD = 'RIPRISTINA';
+
 export default function BackupRestoreUI() {
     const { isAuthenticated, lock } = useSecurity();
     const [isLoading, setIsLoading] = useState(false);
@@ -13,6 +16,8 @@ export default function BackupRestoreUI() {
         message: string;
         preflight?: BackupRestorePreflightError['preflight'];
     } | null>(null);
+    const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
+    const [restoreConfirmText, setRestoreConfirmText] = useState('');
 
     const handleExport = async () => {
         setIsLoading(true);
@@ -39,20 +44,33 @@ export default function BackupRestoreUI() {
         }
     };
 
-    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // WUL-297: il ripristino è un'operazione critica: la conferma richiede
+    // di digitare una parola chiave invece del vecchio confirm() del browser.
+    const handleRestoreFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = ''; // Reset input
         if (!file) return;
 
-        if (!confirm("ATTENZIONE: Questa operazione cancellerà TUTTI i dati attuali e li sostituirà con quelli del backup. Sei sicuro di voler procedere?")) {
-            e.target.value = ''; // Reset input
-            return;
-        }
+        setStatus(null);
+        setRestoreConfirmText('');
+        setPendingRestoreFile(file);
+    };
+
+    const cancelRestore = () => {
+        setPendingRestoreFile(null);
+        setRestoreConfirmText('');
+    };
+
+    const restoreConfirmed = restoreConfirmText.trim().toUpperCase() === RESTORE_CONFIRM_KEYWORD;
+
+    const confirmRestore = async () => {
+        if (!pendingRestoreFile || !restoreConfirmed || isLoading) return;
 
         setIsLoading(true);
         setStatus({ type: 'info', message: 'Ripristino in corso...' });
 
         try {
-            const text = await file.text();
+            const text = await pendingRestoreFile.text();
             await importRawDatabase(text);
             setStatus({ type: 'success', message: 'Ripristino completato! L\'applicazione verrà bloccata per ricaricare le chiavi.' });
 
@@ -71,7 +89,8 @@ export default function BackupRestoreUI() {
             setStatus({ type: 'error', message, preflight });
         } finally {
             setIsLoading(false);
-            e.target.value = '';
+            setPendingRestoreFile(null);
+            setRestoreConfirmText('');
         }
     };
 
@@ -79,7 +98,7 @@ export default function BackupRestoreUI() {
 
     return (
         <div className="grid gap-6 xl:grid-cols-2">
-            <div className="glass-panel p-6 md:p-7">
+            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Download className="w-5 h-5 text-blue-500" />
@@ -100,7 +119,7 @@ export default function BackupRestoreUI() {
                 </button>
             </div>
 
-            <div className="glass-panel p-6 md:p-7">
+            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
                 <p className="section-kicker">Ripristino controllato</p>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Upload className="w-5 h-5 text-amber-500" />
@@ -109,7 +128,7 @@ export default function BackupRestoreUI() {
                 <div className="mt-2 mb-4 rounded-[20px] p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 flex gap-3 text-sm text-amber-800 dark:text-amber-200">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
-                        Caricare un backup <strong>sovrascriverà i dati supportati dal restore</strong>.
+                        Caricare un backup <strong>cancellerà TUTTI i dati attuali</strong> e li sostituirà con il contenuto del backup.
                         Il file viene verificato prima della scrittura e rifiutato se il manifest non coincide.
                     </p>
                 </div>
@@ -120,11 +139,64 @@ export default function BackupRestoreUI() {
                     <input
                         type="file"
                         accept=".mediflow,.json"
-                        onChange={handleImport}
-                        disabled={isLoading}
+                        onChange={handleRestoreFileSelected}
+                        disabled={isLoading || pendingRestoreFile !== null}
                         className="hidden"
                     />
                 </label>
+
+                {pendingRestoreFile && (
+                    // WUL-297: superficie di conferma esplicita per il restore.
+                    <div
+                        data-testid="restore-confirmation-panel"
+                        className="mt-4 space-y-3 rounded-[20px] border border-red-200/70 bg-red-50/70 p-4 dark:border-red-500/25 dark:bg-red-900/15"
+                    >
+                        <div className="flex items-start gap-2 text-sm font-semibold text-red-700 dark:text-red-200">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p>
+                                ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
+                                quelli del backup. L&apos;operazione non è reversibile.
+                            </p>
+                        </div>
+                        <p className="text-xs text-red-800/80 dark:text-red-200/80">
+                            File selezionato: <code>{pendingRestoreFile.name}</code>{' '}
+                            ({Math.max(1, Math.round(pendingRestoreFile.size / 1024)).toLocaleString()} KB)
+                        </p>
+                        <label className="block text-xs font-medium text-red-800 dark:text-red-200">
+                            Scrivi <strong>{RESTORE_CONFIRM_KEYWORD}</strong> per procedere
+                            <input
+                                type="text"
+                                value={restoreConfirmText}
+                                onChange={(e) => setRestoreConfirmText(e.target.value)}
+                                placeholder={RESTORE_CONFIRM_KEYWORD}
+                                autoComplete="off"
+                                spellCheck={false}
+                                data-testid="restore-confirmation-input"
+                                className="mt-1 w-full rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100"
+                            />
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={confirmRestore}
+                                disabled={!restoreConfirmed || isLoading}
+                                data-testid="restore-confirmation-submit"
+                                className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40"
+                            >
+                                {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                                Ripristina adesso
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelRestore}
+                                disabled={isLoading}
+                                className="inline-flex items-center rounded-full border border-red-200 bg-white/80 px-4 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:bg-transparent dark:text-red-200"
+                            >
+                                Annulla
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {status && (

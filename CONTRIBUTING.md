@@ -5,7 +5,7 @@ Qui si lavora su **dati sanitari**: privacy e sicurezza non sono opzionali.
 
 ---
 
-## Regole base (non negoziabili)
+## ⚠️ Regole base (non negoziabili)
 
 - **Nessun PHI/PII nel repository.**
   Non committare dati reali di pazienti, screenshot, log, database esportati o campioni "anonimizzati ma reversibili".
@@ -13,20 +13,26 @@ Qui si lavora su **dati sanitari**: privacy e sicurezza non sono opzionali.
   Non introdurre egress cloud (telemetria, chiamate AI remote, sync) se non richiesto esplicitamente e documentato.
 - Preferisci **diff piccoli e revisionabili**. Evita refactor ampi "per pulizia".
 
-Se vuoi cambiare confini di sicurezza, scrivi prima un ADR (vedi sotto).
+> [!IMPORTANT]
+> Se vuoi cambiare confini di sicurezza, scrivi prima un ADR (vedi sotto).
 
 ---
 
-## Prerequisiti
+## ⚙️ Prerequisiti
 
 - Node.js **v20+** consigliato
 - npm (incluso con Node)
 - Docker Desktop (opzionale, per API ICD-11)
 - Ollama (opzionale, per AI/OCR locale)
 
+Nota OCR: Ollama resta il motore primario locale. Su macOS il runtime puo usare
+Apple Vision come fallback locale (ADR 0059) quando l'OCR primario produce
+output vuoto o degenerato. Windows e Linux non hanno oggi un fallback OCR
+platform-specific equivalente in MediFlow.
+
 ---
 
-## Getting started
+## 🧑‍💻 Getting started
 
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
@@ -92,6 +98,16 @@ Il guard fallisce se trova:
 - endpoint runtime non locali o telemetry default-on
 - rotture delle invarianti zero-knowledge minime
 
+### Claims guard
+
+Per bloccare claim di prodotto fuori scope (autonomia clinica AI, auto-apply senza
+review, integrazione regionale SISS/FSE certificata nativa, prescrizione regionale,
+cloud di default), ancorati all'ADR 0065:
+
+```bash
+npm run check:claims
+```
+
 ### Test concorrenza pazienti
 
 Per verificare i conflitti cross-client su `patients.version`:
@@ -129,13 +145,19 @@ Usalo quando tocchi:
 - `lib/document-synthesis-service.ts`
 - `lib/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
+- `lib/ocr-service.ts`
+- `app/api/ocr/extract/route.ts`
 - `components/document-upload.tsx`
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
 
+Se tocchi il fallback OCR macOS, documenta nella PR che Apple Vision e stato
+verificato solo su macOS e che Windows/Linux restano senza fallback
+platform-specific certificato.
+
 ---
 
-## Mappa progetto
+## 📚 Mappa progetto
 
 - Web app: `app/`, `components/`
 - API locali (web): `app/api/*`
@@ -157,7 +179,7 @@ Documentazione tecnica:
 
 ---
 
-## Modifiche database (Drizzle / SQLite)
+## 🗄️ Modifiche database (Drizzle / SQLite)
 
 Fonti autorevoli:
 - Schema: `lib/schema.ts`
@@ -175,7 +197,7 @@ Linee guida:
 
 ---
 
-## Modifiche API
+## 🔌 Modifiche API
 
 ### Regole di autenticazione
 
@@ -214,7 +236,7 @@ npm run test:network:home-base-diary-write
 
 ---
 
-## Processo ADR (obbligatorio per cambi non banali)
+## 🧱 Processo ADR (obbligatorio per cambi non banali)
 
 Gli ADR stanno in: `docs/adr/`
 
@@ -229,7 +251,7 @@ Template: `docs/adr/0000-template.md`
 
 ---
 
-## Definition of Done (per PR)
+## ✅ Definition of Done (per PR)
 
 Una PR è considerata conclusa quando:
 
@@ -237,6 +259,7 @@ Una PR è considerata conclusa quando:
 - `npm run build` passa
 - (consigliato) `npm run typecheck` passa
 - `npm run check:never-regress` passa
+- `npm run check:claims` passa
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
 - se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
@@ -253,7 +276,7 @@ Una PR è considerata conclusa quando:
 
 ---
 
-## Come contribuire (workflow)
+## 🧭 Come contribuire (workflow)
 
 - Apri una issue (bug / feature / discussione).
 - Proponi un piano piccolo (cosa cambia, file toccati, come verificare).

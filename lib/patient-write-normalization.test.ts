@@ -104,6 +104,54 @@ test('normalizePatientUpdateInput preserves omitted structured fields and string
     assert.equal(provided.values.diagnoses, JSON.stringify([{ code: 'B00' }]));
 });
 
+test('normalizePatientUpdateInput clears nullable string fields when null is sent', () => {
+    const result = normalizePatientUpdateInput({
+        version: 5,
+        address: null,
+        phone: null,
+        caregiver: null,
+        notes: null,
+        aiSummary: null,
+        documentInsights: null,
+        monitoringProfile: null,
+        statusReason: null,
+        ambulatoryId: null,
+    }, {
+        expectedVersion: 5,
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+
+    assert.equal(result.values.address, null);
+    assert.equal(result.values.phone, null);
+    assert.equal(result.values.caregiver, null);
+    assert.equal(result.values.notes, null);
+    assert.equal(result.values.aiSummary, null);
+    assert.equal(result.values.documentInsights, null);
+    assert.equal(result.values.monitoringProfile, null);
+    assert.equal(result.values.statusReason, null);
+    assert.equal(result.values.ambulatoryId, null);
+    assert.equal(result.values.version, 6);
+});
+
+test('normalizePatientUpdateInput leaves omitted nullable fields untouched', () => {
+    const result = normalizePatientUpdateInput({
+        version: 5,
+        address: 'Via Roma 1',
+    }, {
+        expectedVersion: 5,
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+
+    assert.equal(result.values.address, 'Via Roma 1');
+    assert.equal(result.values.phone, undefined);
+    assert.equal(result.values.caregiver, undefined);
+    assert.equal(result.values.notes, undefined);
+});
+
 test('normalizePatientUpdateInput rejects invalid birthDate and empty payloads', () => {
     const invalidBirthDate = normalizePatientUpdateInput({
         version: 4,

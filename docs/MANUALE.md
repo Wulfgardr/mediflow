@@ -9,7 +9,7 @@ Riferimenti utili:
 
 ---
 
-## 1. Installazione e avvio
+## ⚙️ 1. Installazione e avvio
 
 ### Requisiti
 
@@ -30,7 +30,7 @@ Riferimenti utili:
 
 ---
 
-## 2. Sicurezza e PIN
+## 🔑 2. Sicurezza e PIN
 
 Al primo avvio ti chiederò di creare un **Profilo Medico** e un **PIN**.
 
@@ -38,15 +38,14 @@ Al primo avvio ti chiederò di creare un **Profilo Medico** e un **PIN**.
 
 Il PIN è la chiave che protegge i dati.
 
-* **Se perdi il PIN, perdi i dati.**
-* Non c'è "recupero password" via email.
-* Non c'è un server centrale che può aiutarti.
+> [!WARNING]
+> **Se perdi il PIN, perdi i dati.** Non c'è "recupero password" via email, e non c'è un server centrale che può aiutarti.
 
 Questo è il prezzo di una privacy forte: controllo totale, ma nessuna backdoor.
 
 ---
 
-## 3. Ambulatori e pazienti
+## 🩺 3. Ambulatori e pazienti
 
 ### Ambulatori Multipli
 
@@ -57,18 +56,20 @@ Puoi creare più ambulatori (es. "Studio Roma", "Guardia Medica").
 
 ### Scheda Paziente
 
-È tutto in una pagina.
+Dalla lista, **Apri scheda paziente** porta in un clic alla scheda; il **Quadro** apre la stessa vista dentro il cockpit, senza rimontare la rotta.
 
 * **Anagrafica**: A sinistra.
-* **Diario Clinico**: Al centro. Scrivi le note visita per visita. Le voci eliminate restano recuperabili con motivo tracciato e possono essere ripristinate.
+* **Diario Clinico**: Al centro. Scrivi le note visita per visita. Le voci eliminate restano recuperabili con motivo tracciato e possono essere ripristinate; lo stesso vale per terapie, checkup e osservazioni.
 * **Storia**: A destra vedi i riassunti dei vecchi documenti.
+
+Il pannello **Cosa rivedere adesso** raccoglie quello che l'AI locale ti mette davanti da approvare: nessuna voce viene scritta in cartella senza la tua conferma.
 
 La lista pazienti mostra anche una piccola **agenda operativa** sui casi visibili:
 PRIAMO, valutazioni, visite e follow-up già pianificati nella sezione controlli.
 
 ---
 
-## 4. AI locale (senza internet)
+## 🤖 4. AI locale (senza internet)
 
 MediFlow può leggere documenti clinici e produrre sintesi direttamente in locale.
 
@@ -80,16 +81,17 @@ MediFlow può leggere documenti clinici e produrre sintesi direttamente in local
 
 ### Cosa succede?
 
-1. **OCR**: estrae testo da PDF o immagine.
-2. **Sintesi clinica**: produce un riassunto strutturato.
+1. **OCR**: estrae testo da PDF o immagine. I documenti senza testo finiscono nella **Coda OCR**, con stato e motivo in italiano e riprocesso possibile; finché il testo non basta, l'AI non avanza proposte cliniche.
+2. **Sintesi clinica**: produce un riassunto strutturato, da rivedere prima di tenerlo. Eventuali errori restano visibili invece di sparire in silenzio.
     * *Esempio*: Invece di leggere 10 pagine di referto ospedaliero, vedrai: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
 3. **Archiviazione**: documento e sintesi restano associati al paziente.
 
+> [!NOTE]
 > L'elaborazione avviene sul tuo computer. Nessun dato paziente viene inviato a servizi cloud di default.
 
 ---
 
-## 5. Terapie e ICD-11
+## 🩺 5. Terapie e ICD-11
 
 ### Terapie
 
@@ -104,7 +106,7 @@ Le diagnosi usano lo standard OMS ICD-11.
 
 ---
 
-## 6. App nativa (sperimentale)
+## 🍎 6. App nativa (sperimentale)
 
 Se lavori su Mac, puoi usare anche il client nativo.
 
@@ -114,7 +116,7 @@ Se lavori su Mac, puoi usare anche il client nativo.
 
 ---
 
-## FAQ
+## 📚 FAQ
 
 **Posso usarlo su iPad?**
 Stiamo lavorando ai client dedicati. Per ora il computer principale resta l'home base; iPadOS e iPhone sono in definizione sopra il contratto locale `/api/v1`, senza accesso diretto al database remoto.

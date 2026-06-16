@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
+import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
@@ -72,7 +74,7 @@ export async function GET() {
         })
             .from(patients)
             .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-            .where(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))
+            .where(and(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId), activePatients()))
             .orderBy(desc(patients.updatedAt));
 
         // Flatten result

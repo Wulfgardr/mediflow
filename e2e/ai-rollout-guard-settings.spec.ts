@@ -60,8 +60,9 @@ test('settings warns when selected AI model is still on hold in rollout readines
       body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'disabled' }),
     });
   });
-  await page.getByRole('link', { name: 'Impostazioni' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
+  // WUL-297: model selectors and the rollout guard live on the AI models sub-route.
+  await page.goto('/settings/ai/modelli');
+  await expect(page).toHaveURL(/\/settings\/ai\/modelli$/);
 
   const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();

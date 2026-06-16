@@ -3,7 +3,7 @@
 Date: 2026-03-16  
 Status: Accepted
 
-Update: la scelta del default text-only e stata aggiornata da `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`; la pipeline OCR-first e l'autofill prudente ICD restano validi.
+Update: la scelta del default text-only e stata aggiornata da `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`; la pipeline OCR-first e l'autofill prudente ICD restano validi. La filiera OCR e stata poi precisata da [ADR 0059](./0059-macos-apple-vision-ocr-fallback.md): DeepSeek/Ollama resta OCR primario locale, con fallback Apple Vision certificato solo su macOS quando l'output primario e blank/low-signal.
 
 ---
 
@@ -58,7 +58,10 @@ Adottiamo l'opzione 2.
 
 Regole operative:
 
-- ogni documento passa prima da `DeepSeek OCR`
+- ogni documento passa prima da `DeepSeek OCR`/Ollama come OCR primario locale
+- su macOS, output OCR blank/low-signal puo attivare fallback locale Apple
+  Vision; Windows/Linux non hanno oggi un fallback platform-specific equivalente
+  certificato in MediFlow
 - la post-elaborazione clinica text-only usa `qwen2.5:32b` come default
 - l'output documentale viene strutturato in `documentInsights` con:
   - summary

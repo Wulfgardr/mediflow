@@ -226,7 +226,7 @@ export function ClinicalStreamRow({
                             </div>
                             <div className="clinical-stream-row-cell rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/66 px-3 py-2 dark:bg-white/4">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                    Prossimo step
+                                    Prossimo passaggio
                                 </p>
                                 <p className="mt-1 text-sm text-[color:var(--mf-ink)]">
                                     {patient.isArchived

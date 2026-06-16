@@ -1,12 +1,14 @@
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
+// WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
+import { activePatients } from '@/lib/patient-lifecycle';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
         }
 
         // Fetch original patients
-        const originals = await dbServer.select().from(patients).where(inArray(patients.id, patientIds));
+        const originals = await dbServer.select().from(patients).where(and(inArray(patients.id, patientIds), activePatients()));
         const originalIds = new Set(originals.map((item) => item.id));
         const missingPatientIds = patientIds.filter((id) => !originalIds.has(id));
         if (missingPatientIds.length > 0) {

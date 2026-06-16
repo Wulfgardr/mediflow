@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -23,7 +23,10 @@ export async function GET(request: Request) {
 
         if (patientId) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(eq(therapies.patientId, patientId)) as any;
+            query = query.where(and(eq(therapies.patientId, patientId), isNull(therapies.deletedAt))) as any;
+        } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            query = query.where(isNull(therapies.deletedAt)) as any;
         }
 
         const data = await query.orderBy(desc(therapies.startDate));

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-document-decision-review-card-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "jsx": "react-jsx",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "components/document-decision-review-card.tsx",
+    "components/document-decision-review-card.test.ts",
+    "lib/document-decision.ts",
+    "lib/document-decision-review-view-model.ts"
+  ]
+}

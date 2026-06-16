@@ -10,6 +10,9 @@ import {
     buildAiRolloutReadinessArtifactsPayload,
     ensureAiRolloutReadinessArtifactDirectory,
 } from './ai-rollout-readiness-storage.ts';
+import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from './ai-document-synthesis-kill-switch.ts';
+import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY } from './ai-patient-insight-kill-switch.ts';
+import { AI_SMART_IMPORT_KILL_SWITCH_KEY } from './ai-smart-import-kill-switch.ts';
 
 test('rollout readiness contract helper keeps all known lanes visible and marks missing artifacts explicitly', () => {
     const previousDataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -50,6 +53,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         assert.equal(patientInsight?.markdown, '# Patient Insight verdict');
         assert.equal(patientInsight?.jsonPath, patientInsightPaths.jsonPath);
         assert.equal(patientInsight?.markdownPath, patientInsightPaths.markdownPath);
+        assert.equal(patientInsight?.error, null);
 
         const patientInsightControl = payload.localControls.find((control) => control.lane === 'patient_insight');
         assert.equal(patientInsightControl?.state, 'disabled');
@@ -67,6 +71,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         assert.equal(redaction?.markdownPath, null);
         assert.equal(redaction?.markdown, null);
         assert.equal(redaction?.report, null);
+        assert.equal(redaction?.error, null);
     } finally {
         if (previousDataDir) {
             process.env.MEDIFLOW_DATA_DIR = previousDataDir;
@@ -75,4 +80,72 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         }
         fs.rmSync(tempDir, { recursive: true, force: true });
     }
+});
+
+test('corrupt rollout readiness JSON degrades only the affected lane', () => {
+    const previousDataDir = process.env.MEDIFLOW_DATA_DIR;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-rollout-readiness-'));
+
+    process.env.MEDIFLOW_DATA_DIR = tempDir;
+
+    try {
+        const patientInsightPaths = ensureAiRolloutReadinessArtifactDirectory('patient_insight');
+        fs.writeFileSync(patientInsightPaths.jsonPath, JSON.stringify({
+            status: 'shadow-ready',
+            blockers: [],
+        }), 'utf8');
+
+        const smartImportPaths = ensureAiRolloutReadinessArtifactDirectory('smart_import');
+        fs.writeFileSync(smartImportPaths.jsonPath, '{not valid json', 'utf8');
+        fs.writeFileSync(smartImportPaths.markdownPath, '# Smart Import verdict', 'utf8');
+
+        const payload = buildAiRolloutReadinessArtifactsPayload();
+        const patientInsight = payload.lanes.find((lane) => lane.lane === 'patient_insight');
+        const smartImport = payload.lanes.find((lane) => lane.lane === 'smart_import');
+
+        assert.equal(patientInsight?.available, true);
+        assert.equal(patientInsight?.report?.status, 'shadow-ready');
+        assert.equal(patientInsight?.error, null);
+
+        assert.equal(smartImport?.available, false);
+        assert.equal(smartImport?.report, null);
+        assert.equal(smartImport?.markdown, '# Smart Import verdict');
+        assert.equal(smartImport?.jsonPath, smartImportPaths.jsonPath);
+        assert.equal(smartImport?.markdownPath, smartImportPaths.markdownPath);
+        assert.match(smartImport?.error || '', /JSON/);
+    } finally {
+        if (previousDataDir) {
+            process.env.MEDIFLOW_DATA_DIR = previousDataDir;
+        } else {
+            delete process.env.MEDIFLOW_DATA_DIR;
+        }
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('rollout readiness local controls fail closed when settings are absent or malformed', () => {
+    const absentControls = buildAiRolloutLocalControlsPayload({});
+    assert.deepEqual(absentControls.map((control) => control.state), ['disabled', 'disabled', 'disabled']);
+
+    const malformedControls = buildAiRolloutLocalControlsPayload({
+        patient_insight: 'unexpected',
+        smart_import: null,
+        document_synthesis: 'true-ish',
+    });
+    assert.deepEqual(malformedControls.map((control) => control.state), ['disabled', 'disabled', 'disabled']);
+});
+
+test('rollout readiness local controls also accept canonical setting keys', () => {
+    const controls = buildAiRolloutLocalControlsPayload({
+        [AI_PATIENT_INSIGHT_KILL_SWITCH_KEY]: 'enabled',
+        [AI_SMART_IMPORT_KILL_SWITCH_KEY]: true,
+        [AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY]: '1',
+    });
+    assert.deepEqual(controls.map((control) => control.state), ['enabled', 'enabled', 'enabled']);
+
+    const canonicalNullWinsOverLaneFallback = buildAiRolloutLocalControlsPayload({
+        [AI_PATIENT_INSIGHT_KILL_SWITCH_KEY]: null,
+        patient_insight: 'enabled',
+    });
+    assert.equal(canonicalNullWinsOverLaneFallback.find((control) => control.lane === 'patient_insight')?.state, 'disabled');
 });

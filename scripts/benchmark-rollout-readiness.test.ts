@@ -44,6 +44,72 @@ test('patient insight can become shadow-ready when prerequisites and metrics pas
     assert.equal(result.selectedModel, 'qwen3.5:35b-a3b');
 });
 
+test('patient insight stays on hold when a required metric is missing', () => {
+    const result = evaluateRolloutReadiness({
+        lane: 'patient_insight',
+        reportPath: '/tmp/patient-insight.json',
+        report: {
+            generatedAt: NOW,
+            decision: { recommendedModel: 'qwen3.5:35b-a3b' },
+            models: [{
+                model: 'qwen3.5:35b-a3b',
+                status: 'completed',
+                metrics: {
+                    contractValidRate: 0.99,
+                    focusRecall: 0.9,
+                    preferredSourceCoverage: 0.9,
+                    forbiddenLeakRate: 0,
+                    forbiddenSourceLeakRate: 0,
+                    moralizingLeakRate: 0,
+                    incompleteClaimRate: 0.1,
+                },
+            }],
+        },
+        currentState: 'hold',
+        fallbackWritten: true,
+        owner: 'leonardo',
+        licenseClear: true,
+        maxAgeDays: 30,
+    });
+
+    assert.equal(result.status, 'hold');
+    assert.match(result.blockers.map((entry) => entry.id).join(','), /citation-coverage-rate-invalid/);
+});
+
+test('smart import stays on hold when a required metric is malformed', () => {
+    const result = evaluateRolloutReadiness({
+        lane: 'smart_import',
+        reportPath: '/tmp/smart-import.json',
+        report: {
+            generatedAt: NOW,
+            decision: { recommendedModel: 'qwen3.5:35b-a3b' },
+            models: [{
+                model: 'qwen3.5:35b-a3b',
+                status: 'completed',
+                metrics: {
+                    contractValidRate: 1,
+                    jsonValidRate: 1,
+                    diagnosisRecall: 1,
+                    diagnosisQueryRecall: 1,
+                    therapyRecall: 1,
+                    dosageRecall: 1,
+                    therapyStateRecall: '1',
+                    sourceIdRate: 1,
+                    forbiddenLeakRate: 0,
+                },
+            }],
+        },
+        currentState: 'hold',
+        fallbackWritten: true,
+        owner: 'leonardo',
+        licenseClear: true,
+        maxAgeDays: 30,
+    });
+
+    assert.equal(result.status, 'hold');
+    assert.match(result.blockers.map((entry) => entry.id).join(','), /therapy-state-recall-invalid/);
+});
+
 test('missing fallback keeps a lane on hold even when metrics pass', () => {
     const result = evaluateRolloutReadiness({
         lane: 'patient_insight',
@@ -75,6 +141,26 @@ test('missing fallback keeps a lane on hold even when metrics pass', () => {
 
     assert.equal(result.status, 'hold');
     assert.match(result.blockers.map((entry) => entry.id).join(','), /fallback-written/);
+});
+
+test('future benchmark timestamp is a blocker instead of fresh evidence', () => {
+    const futureGeneratedAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const result = evaluateRolloutReadiness({
+        lane: 'redaction',
+        reportPath: '/tmp/redaction.json',
+        report: {
+            generatedAt: futureGeneratedAt,
+            shadowReady: true,
+        },
+        currentState: 'hold',
+        fallbackWritten: true,
+        owner: 'leonardo',
+        licenseClear: true,
+        maxAgeDays: 30,
+    });
+
+    assert.equal(result.status, 'hold');
+    assert.match(result.blockers.map((entry) => entry.id).join(','), /generated-at-future/);
 });
 
 test('smart import regression becomes rollback-required when lane is already active-ish', () => {

@@ -55,6 +55,9 @@ export const patients = sqliteTable('patients', {
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
+    // WUL-306 (ADR 0066): soft-delete tombstone, same lifecycle as entries/therapies/checkups
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    deletionReason: text('deletion_reason'),
     /* @Codex */
     version: integer('version').notNull().default(1),
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
@@ -176,6 +179,72 @@ export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
 });
 
 /* @Codex */
+export const servicePrescriptions = sqliteTable('service_prescriptions', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category').notNull().default('other'),
+    priority: text('priority'),
+    codeSystem: text('code_system'),
+    serviceCode: text('service_code'),
+    serviceName: text('service_name').notNull(),
+    clinicalQuestion: text('clinical_question'),
+    provider: text('provider'),
+    scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
+    performedAt: integer('performed_at', { mode: 'timestamp' }),
+    reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
+    outcomeNote: text('outcome_note'),
+    requestReference: text('request_reference'),
+    source: text('source').notNull().default('manual'),
+    documentRefs: text('document_refs'),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const servicePrescriptionItems = sqliteTable('service_prescription_items', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    prescriptionId: text('prescription_id').references(() => servicePrescriptions.id).notNull(),
+    ordinal: integer('ordinal').notNull().default(0),
+    status: text('status').notNull().default('prescribed'),
+    category: text('category'),
+    codeSystem: text('code_system'),
+    serviceCode: text('service_code'),
+    serviceName: text('service_name').notNull(),
+    catalogEntryId: text('catalog_entry_id'),
+    catalogDisplayName: text('catalog_display_name'),
+    matchStatus: text('match_status').notNull().default('unmatched'),
+    confidence: text('confidence'),
+    evidence: text('evidence'),
+    notes: text('notes'),
+    scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
+    performedAt: integer('performed_at', { mode: 'timestamp' }),
+    reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
+    outcomeNote: text('outcome_note'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const serviceCatalogEntries = sqliteTable('service_catalog_entries', {
+    id: text('id').primaryKey(),
+    codeSystem: text('code_system').notNull(),
+    serviceCode: text('service_code').notNull(),
+    displayName: text('display_name').notNull(),
+    category: text('category').notNull().default('other'),
+    branchCode: text('branch_code'),
+    synonyms: text('synonyms'),
+    source: text('source').notNull().default('manual'),
+    version: text('version'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    importedAt: integer('imported_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
 export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -273,6 +342,10 @@ export const attachments = sqliteTable('attachments', {
     summarySnapshot: text('summary_snapshot'),
     /* @Codex */
     parseEvidenceArtifactSnapshot: text('parse_evidence_artifact_snapshot'),
+    ocrQueueState: text('ocr_queue_state'),
+    ocrQueueReason: text('ocr_queue_reason'),
+    ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
+    ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

@@ -17,6 +17,8 @@
     "lib/document-parse-evidence-artifact.ts",
     "lib/document-evidence-backfill.ts",
     "lib/document-evidence-backfill.test.ts",
+    "lib/document-source-provenance-audit.ts",
+    "lib/document-source-provenance-audit.test.ts",
     "lib/document-synthesis-service.test.ts",
     "lib/document-synthesis-parser.ts",
     "lib/ai-task-contracts.ts"

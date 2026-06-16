@@ -83,8 +83,7 @@ export default function UpdateAwarenessPanel() {
                             {status.availableVersion ? <> - disponibile <b className="font-mono text-slate-900 dark:text-white">{status.availableVersion}</b></> : null}
                         </p>
                         <p>
-                            Canale {status.channel} - sorgente {sourceLabel(status.source)} - branch{' '}
-                            <span className="font-mono">{status.branch || 'n/d'}</span>@<span className="font-mono">{status.revision || 'n/d'}</span>
+                            Canale {status.channel}
                         </p>
                         {isDismissed ? <p className="text-[11px] font-medium text-slate-500">Avviso rimandato per questa versione.</p> : null}
                         {status.notes[0] ? <p><b className="text-slate-800 dark:text-white">{status.changelogTitle || 'Changelog'}:</b> {status.notes[0]}</p> : null}

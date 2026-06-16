@@ -33,7 +33,7 @@ export default function SystemStatus() {
             )}
 
             <span className="hidden sm:inline">
-                ICD-11: {isOnline ? 'Online' : 'Locale (Legacy)'}
+                ICD-11: {isOnline ? 'Online' : 'Archivio locale'}
             </span>
 
             {!isOnline && !loading && (

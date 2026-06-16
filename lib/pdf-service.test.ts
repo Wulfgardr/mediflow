@@ -1,6 +1,15 @@
+// Pin a timezone ahead of UTC before importing so date parsing is exercised under the
+// conditions where local-time parsing would shift birth dates to the previous day.
+process.env.TZ = 'Europe/Rome';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOcrFallbackResult, extractUsableOcrText, parsePatientData } from './pdf-service';
+import {
+    buildOcrFallbackResult,
+    extractUsableOcrText,
+    mergeExtractedPatientDataWithTextFallback,
+    parsePatientData,
+} from './pdf-service';
 
 test('extractUsableOcrText keeps markdown-like OCR text and ignores structured JSON payloads', () => {
     assert.equal(
@@ -19,6 +28,13 @@ test('extractUsableOcrText normalizes noisy OCR-like headings before downstream 
             rawMarkdown: 'ANAMNESI remota: ipertensione arteriosa.  TERAPIA domiciliare: Paracetamolo 1000 mg al bisogno.',
         }),
         'ANAMNESI remota:\nipertensione arteriosa.\n\nTERAPIA domiciliare:\nParacetamolo 1000 mg al bisogno.'
+    );
+});
+
+test('extractUsableOcrText rejects degenerate OCR loops', () => {
+    assert.equal(
+        extractUsableOcrText({ rawMarkdown: '1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.' }),
+        ''
     );
 });
 
@@ -49,4 +65,57 @@ test('parsePatientData extracts name and birth date from signature-style dischar
     assert.equal(parsed.firstName, 'Pasquale');
     assert.equal(parsed.lastName, 'Milone');
     assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1932-02-23');
+});
+
+test('parsePatientData handles surname-first Piano Terapeutico patient labels and address', () => {
+    const parsed = parsePatientData([
+        'Piano Terapeutico',
+        'Paziente: ROSSI MARIA',
+        'Data di nascita: 17.12.1994',
+        'Codice Fiscale: RSSMRA94T57A271J',
+        'Indirizzo: VIA TEST 25 MILANO',
+        'Diagnosi e motivazione clinica della scelta del farmaco',
+        'Trapianto di polmone',
+        'Farmaco prescritto',
+        'CELLCEPT',
+        'Posologia',
+        '500 mg x2',
+    ].join('\n'));
+
+    assert.equal(parsed.firstName, 'MARIA');
+    assert.equal(parsed.lastName, 'ROSSI');
+    assert.equal(parsed.taxCode, 'RSSMRA94T57A271J');
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1994-12-17');
+    assert.equal(parsed.address, 'VIA TEST 25 MILANO');
+    assert.match(parsed.notes || '', /Trapianto di polmone/i);
+    assert.doesNotMatch(parsed.notes || '', /CELLCEPT/i);
+});
+
+test('parsePatientData preserves name-first patient labels when casing is not surname-first', () => {
+    const parsed = parsePatientData('Paziente: Mario Rossi\nData di nascita: 01/02/1970');
+
+    assert.equal(parsed.firstName, 'Mario');
+    assert.equal(parsed.lastName, 'Rossi');
+});
+
+test('parsePatientData leaves birth date empty instead of promoting unanchored document dates', () => {
+    const parsed = parsePatientData('Referto ambulatoriale del 05/03/2024\nPaziente: Mario Rossi\nDiagnosi: controllo di routine');
+
+    assert.equal(parsed.birthDate, undefined);
+});
+
+test('parsePatientData parses single-digit birth dates as UTC without timezone day shift', () => {
+    const parsed = parsePatientData('Sig. Mario Rossi, nato il 1/2/1970.\nLettera di dimissione');
+
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1970-02-01');
+});
+
+test('mergeExtractedPatientDataWithTextFallback keeps AI omocodia tax codes instead of overwriting from text', () => {
+    const merged = mergeExtractedPatientDataWithTextFallback(
+        // Fake omocodia CF: trailing digit replaced by its substitution letter (1 -> M).
+        { rawText: '', source: 'ai', confidence: 0.9, taxCode: 'rssmra94t57a27mj' },
+        'Medico curante Dott. Luigi Verdi, Codice Fiscale VRDLGU70A01F205Z.\nPiano terapeutico.',
+    );
+
+    assert.equal(merged.taxCode, 'RSSMRA94T57A27MJ');
 });

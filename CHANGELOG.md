@@ -5,14 +5,56 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-06-16
+
+> ⚠️ Nota di compatibilità: l'unificazione del ciclo di vita delle sotto-risorse cliniche su `/api/v1` (`WUL-308`) è una breaking change per il client nativo macOS storico. L'adeguamento resta tracciato in `WUL-333`; la release `0.7.0` pubblica il mainline web/home-base, documentazione e facciata OSS aggiornate, mantenendo il limite nativo esplicito.
+
+### 🔒 Sicurezza dati
+
+- **Dati cifrati mai sovrascritti dal placeholder (`WUL-323`)**: se la decifratura di un campo fallisce, il valore cifrato originale viene preservato; la dicitura `[LOCKED DATA]` è solo di presentazione e non può più essere salvata al posto del dato reale.
+- **Date dei backup pianificati coerenti (`WUL-319`)**: gli artifact di backup serializzano le date come stringhe ISO e il ripristino riconosce anche i valori numerici legacy, evitando date corrotte dopo un restore.
+- **Soft-delete paziente (ADR 0066, `WUL-306`)**: l'eliminazione di un paziente scrive un tombstone reversibile (`deletedAt`/`deletionReason`) con version guard invece di cancellare la riga, senza orfanare i dati clinici figli e con contratto API invariato; nuovi strumenti admin `purge-patient` (erasure GDPR esplicita con dry-run, audit `patient.purged`) e `restore-patient` (audit `patient.restored`), più bonifica degli orfani storici in `fix-orphans` dietro flag esplicito. Rollback sicuro: il codice precedente ignora le nuove colonne.
+- **Token di rete inerti a modalità spenta (`WUL-307`)**: con la modalità `network-home-base` disattivata i token dei client paired non possono più leggere o scrivere dati (`403 NETWORK_MODE_DISABLED`); i pairing restano conservati e tornano operativi alla riattivazione.
+- **Scritture cliniche legacy più robuste (`WUL-345`)**: le scritture legacy su diario e profilo passano da version guard coerente, allineate al ciclo di vita `/api/v1`, riducendo i conflitti silenziosi.
+
+### 🔌 API v1
+
+- ⚠️ **Ciclo di vita unificato delle sotto-risorse cliniche (`WUL-308`)**: diario, terapie, checkup e osservazioni su `/api/v1` condividono ora version guard con `409` sulle scritture, liste che escludono i record soft-deleted (opt-in `includeDeleted`), soft delete su tutte le `DELETE` e audit che distingue eliminazione da aggiornamento. Breaking per il client nativo macOS, adeguamento tracciato in `WUL-333`.
+- **Ambulatorio principale senza perdita di appartenenze (`WUL-309`)**: impostare l'ambulatorio dal profilo paziente aggiorna solo l'ambulatorio principale e non cancella più le altre appartenenze multi-ambulatorio, sia sul percorso `/api/v1` sia su quello di rete.
+- **Hardening allegati, checkup e impostazioni (`WUL-326`)**: limite di dimensione sugli allegati (configurabile, default 25 MiB, risposta `413`), accettazione degli envelope cifrati lato client, verifica dell'esistenza del paziente, validazione input sulla creazione checkup (`400`), normalizzazione condivisa dei valori impostazioni, errori generici da `fix-orphans` e `update-awareness` protetto da sessione, mantenendo minimale il probe di revisione usato da launcher e lock screen.
+
+### 🤖 AI/Documenti
+
+- **Coda OCR per documenti senza testo (`WUL-237`)**: i documenti senza testo leggibile entrano in una coda visibile (pannello `Coda OCR`) con stati e motivi in italiano; dopo l'OCR il documento viene rielaborato in modo idempotente e nessuna proposta clinica viene generata finché il testo non è sufficiente.
+- **Estrazione identità documentale più prudente (`WUL-324`)**: la data di nascita non viene più dedotta da una data qualsiasi del documento (meglio assente che sbagliata), le date non slittano più di un giorno per fuso orario e il riconoscimento del codice fiscale gestisce le omocodie.
+- **Errori AI visibili e OCR con timeout (`WUL-325`)**: gli errori durante il download dei modelli Ollama vengono mostrati invece di apparire come successi, la generazione OCR ha ora un timeout configurabile e la redazione OpenMed non altera più il testo in ingresso, mantenendo corretti gli offset delle entità.
+- **Safety gate AI più solidi (`WUL-358`)**: kill-switch induriti per Patient Insight, Smart Import e document synthesis, con model governance delle decisioni documentali; quando una lane è disattivata non può essere aggirata.
+- **Readiness rollout AI consolidata (`WUL-355`)**: artifact e storage di readiness delle lane AI più robusti e verificabili prima di qualunque promozione prudente.
+
+### 🖥️ Interfaccia
+
+- **Meta-testo ripulito su tutta la superficie**: oltre cento stringhe di contorno rimosse o riscritte su cockpit, workspace, impostazioni, onboarding e modali (qualificatori `locale` ridondanti, istruzioni di navigazione dentro slot clinici, caption autoevidenti, duplicazioni come `Mac principale locale` + `Dati in locale` nel rail); gli stati vuoti dichiarano ora l'assenza del dato invece di suggerire dove cliccare.
+- **Flusso paziente a un clic verso la Scheda**: `Apri scheda paziente` è l'azione primaria ovunque, la riga della lista ha un'azione diretta alla scheda, `Quadro` resta come vista in-cockpit senza rimontare la rotta, l'anteprima caso offre anche `Nuova voce` e `Documenti` (due clic per i task più frequenti) e i ritorni da diario, anagrafica e scale convergono tutti su `/patients/[id]/modules`.
+- **Armonia visiva e dark mode completa**: palette semantica sobria con coppie dark dedicate (verde, ambra, blu, violetto e corallo reali al posto dello slate uniforme), scala tipografica normalizzata da 15 a 8 corpi, raggi e densità su token condivisi tra cockpit e workspace shell, gradiente AI sancito dal contratto ripristinato in forma desaturata; risolti i resti light in dark mode su nav impostazioni, righe agenda, toggle, sweep SISS e sfondo ambientale.
+- **Accento blu sobrio (`WUL-232`)**: brand mark di cockpit, workspace e lock screen in blu, con focus ring, tinta del marchio e hover hairline accent nel workspace shell; le azioni primarie restano ink e il gradiente resta confinato al bottone AI.
+- **Impostazioni riorganizzate (`WUL-297`)**: da pagina monolitica a sezioni con sidebar (Generale, Sicurezza e Dati, Intelligenza Artificiale, Avanzate), `/settings` come dashboard `Stato sistema` con redirect dei vecchi anchor, ricerca rapida CMD+K, toggle Privacy Mode sempre disponibile nell'header e conferme digitate (`RIPRISTINA`/`RESET`) per le azioni distruttive.
+- **`Cosa rivedere adesso` in scheda paziente (`WUL-262`)**: riepilogo unico di ciò che attende revisione (insight, evidenze, smart import, archivio) con link diretti e motivi di blocco visibili, senza alcuna scrittura automatica.
+- **Motivo dello stato non più perso (`WUL-310`)**: il form di modifica paziente salva di nuovo il campo `statusReason`.
+- **Autocomplete ICD senza risultati obsoleti (`WUL-311`)**: i suggerimenti diagnostici scartano le risposte arrivate fuori ordine e usano un debounce, evitando liste incoerenti durante la digitazione.
+- **Autocomplete ICD più leggibile (`WUL-339`)**: i suggerimenti diagnostici restano visibili e coerenti durante la digitazione (complementare al debounce/ordine di `WUL-311`).
+- **Rifiniture impostazioni e cockpit (`WUL-340`)**: overview impostazioni e righe del cockpit più pulite e coerenti con la palette semantica.
+
+### 🧰 Manutenzione
+
+- **Riparazione database a prova di crash (`WUL-321`)**: `repair-db` usa il backup online di SQLite con checkpoint WAL, sostituzione atomica per rinomina, lock per percorso (una seconda riparazione concorrente riceve `409`) e recupero automatico al riavvio dei file residui, con fallback legacy `VACUUM INTO` al boot.
+- **Svuota contenitore test più sicuro (`WUL-322`)**: la pulizia seleziona i pazienti per appartenenza effettiva al contenitore test, esclude chi ha appartenenze attive altrove e applica un soft delete dedicato (motivo `test-container-clear`) in un'unica transazione, con audit per paziente.
+- **Contesto di build Docker più stretto (`WUL-320`)**: `.dockerignore` e igiene dei test rich-text riducono il contesto inviato al build.
 
 ## [0.6.0] - 2026-05-02
 
 > Nota release: `v0.6.0` formalizza il ciclo post-`v0.5.0`: MediFlow non e piu
 > soltanto web app locale + AI governata, ma un sistema local-first con Mac
 > `home-base`, primi client Apple paired, document intelligence artifact-first,
-> boundary SISS/FSE piu maturi e coda operativa MediFlow azzerata. Restano fuori
 > scope sync completo, hard delete remoto, attachment remoti, cataloghi remoti,
 > runtime AI remoto di default e integrazione regionale nativa certificata.
 
@@ -52,7 +94,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Lettura completa dello stato sistema**: aggiunto `docs/STATE_OF_THE_SYSTEM.md` come punto canonico unico per prodotto, runtime, dati, sicurezza, AI/document intelligence, home-base, SISS/FSE, Apple clients e split private/OSS.
 - **Repo/GitHub riallineati al runtime reale**: README, piani, walkthrough, topologia dati, roadmap e sintesi architetturale descrivono ora `home-base` read-only, artifact `parse/evidence`, comparator/shadow lane e guard di revisione della shell locale.
 - **Narrativa `v0.6` piu chiara**: README, FAQ, roadmap, architettura e mappe documentali raccontano lo stato corrente senza confronti interni, con Clinical Workbench unico, boundary SISS attuale, `home-base` packaged e client Apple paired.
-- **Sweep documentale**: riferimento, supporto e overview docs riallineati allo stato corrente di `main`, con rimozione dei residui che presentavano i preview profiles come runtime disponibile.
+- **Sweep WUL-203**: riferimento, supporto e overview docs riallineati allo stato corrente di `main`, con rimozione dei residui che presentavano i preview profiles come runtime disponibile.
 - **Copy pubblico piu armonico**: le superfici GitHub privilegiano prodotto, architettura e uso reale, senza rimandi a processi interni o screenshot non piu rappresentativi.
 - **Release narrative `v0.6.0`**: documentazione privata e OSS riallineata per presentare home-base, Apple paired, document intelligence artifact-first e governance chiusa come release corrente.
 

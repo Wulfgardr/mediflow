@@ -1,3 +1,10 @@
+---
+summary: "Canonical MediFlow data-flow topology covering data origin, encryption, persistence, trust boundaries, and protected digital paths."
+read_when:
+  - "Reviewing data flow, encryption, trust boundaries, or PHI-safe routing."
+  - "Changing APIs, document artifacts, local services, network home-base, or security-sensitive workflows."
+---
+
 # Topologia Dati e Flussi - MediFlow
 
 > [!IMPORTANT]
@@ -20,7 +27,7 @@ Riferimenti rapidi:
 
 ---
 
-## 1. Topologia end-to-end (componenti + confini)
+## 🧱 1. Topologia end-to-end (componenti + confini)
 
 ```mermaid
 flowchart TB
@@ -86,7 +93,7 @@ osservazioni.
 
 ---
 
-## 2. Topologia del dato a riposo
+## 🔒 2. Topologia del dato a riposo
 
 ```mermaid
 flowchart LR
@@ -105,7 +112,7 @@ Note operative: il PIN non viene salvato, la master key resta in RAM di sessione
 
 ---
 
-## 3. Topologia relazionale del database (schema principale)
+## 🗄️ 3. Topologia relazionale del database (schema principale)
 
 ```mermaid
 erDiagram
@@ -203,9 +210,18 @@ erDiagram
 Nota operativa: stati `network.mode`, pairing intents, paired client trusted,
 backup scheduler e alcuni guardrail AI vivono in `settings` JSON versionati.
 
+Nota soft-delete (ADR 0066, WUL-306): la cancellazione paziente scrive un
+tombstone reversibile (`deletedAt` / `deletionReason`) con version guard, non
+orfana i figli clinici e lascia il contratto API invariato. Le sotto-risorse
+cliniche (diario, terapie, checkup, osservazioni) seguono lo stesso ciclo
+soft-delete (WUL-308); le liste escludono i record soft-deleted salvo
+`includeDeleted`. L'erasure GDPR esplicita resta una azione admin separata
+(`purge-patient` con dry-run e audit `patient.purged`, `restore-patient` con
+audit `patient.restored`).
+
 ---
 
-## 4. Flussi operativi principali
+## ⚙️ 4. Flussi operativi principali
 
 ### 4.1 Setup/login e attivazione chiavi (web)
 
@@ -274,14 +290,21 @@ sequenceDiagram
     participant UI as Web UI
     participant API as Next.js API
     participant OCR as ocr-service
-    participant LLM as Ollama
+    participant LLM as Ollama/DeepSeek OCR
+    participant Vision as Apple Vision (macOS-only)
     participant Synth as document-synthesis-service
     participant DB as SQLite
     Clinician->>UI: Carica PDF/immagine
     UI->>API: Upload documento
     API->>OCR: Estrai testo
-    OCR->>LLM: Richiesta OCR multimodale
-    LLM-->>OCR: Testo estratto
+    OCR->>LLM: Richiesta OCR multimodale primaria
+    LLM-->>OCR: Testo estratto o output low-signal
+    alt macOS + output OCR low-signal
+        OCR->>Vision: Fallback locale Apple Vision
+        Vision-->>OCR: Testo estratto
+    else Windows/Linux o fallback non disponibile
+        OCR-->>API: Failure esplicito se non c'e testo utile
+    end
     OCR-->>API: OCR markdown
     API->>Synth: Analisi clinica strutturata
     Synth->>LLM: Prompt Qwen text-only
@@ -290,6 +313,21 @@ sequenceDiagram
     API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights e diagnosi
     API-->>UI: Esito + dati
 ```
+
+La filiera OCR certificata corrente e platform-aware:
+
+- `Ollama/DeepSeek OCR` resta il motore OCR primario locale.
+- `Apple Vision` e un fallback locale **solo macOS**, attivato quando l'output
+  primario e vuoto o degenerato.
+- Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
+  in MediFlow; senza testo utile dal primario o dal documento, il flusso deve
+  fallire in modo esplicito.
+- Il fallback OCR cambia solo la recognition: Smart Import, nuova anagrafica da
+  documento e Patient Insight restano reviewable e non scrivono dati clinici
+  strutturati senza conferma.
+- I documenti senza testo finiscono nella `Coda OCR` (WUL-237) con stati e motivi
+  in italiano e riprocesso idempotente; nessuna proposta clinica parte finche il
+  testo non basta.
 
 ### 4.5 Documento archiviato -> Patient Insight artifact-first
 
@@ -368,9 +406,14 @@ sequenceDiagram
     Observation-->>Client: success oppure 409 VERSION_CONFLICT
 ```
 
+Nota operativa (WUL-307): con `network-home-base` spenta i token paired non
+leggono ne scrivono e ricevono `403 NETWORK_MODE_DISABLED`, mentre i pairing gia
+registrati restano. Fuori scope su questo canale: hard delete remoto, sync
+completo, attachment remoti, cataloghi remoti, campi AI/documentali.
+
 ---
 
-## 5. Superfici API e protezione
+## 🔌 5. Superfici API e protezione
 
 | Superficie | Consumer | Auth | Trasporto | Scopo |
 | --- | --- | --- | --- | --- |
@@ -381,9 +424,14 @@ sequenceDiagram
 | `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
+Nota auth: il token locale non porta privilegi admin web. Le route di sistema
+ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
+da `/api/v1/*` restano limitate a bootstrap/supporto locale e diagnostica
+read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
+
 ---
 
-## 6. Mappa file autorevoli per i flussi
+## 📚 6. Mappa file autorevoli per i flussi
 
 - Schema e topologia DB: `lib/schema.ts`
 - Accesso DB server: `lib/db-server.ts`
@@ -397,13 +445,21 @@ sequenceDiagram
 
 ---
 
-## 7. Invarianti operativi da non rompere
+## ⚠️ 7. Invarianti operativi da non rompere
 
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
 - `/api/v1/*` resta versionata e compatibile per client native.
 - `network-home-base` resta opt-in, paired e read-only-first, con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
 - Token locale e sessione devono restare separati (web cookie vs native bearer).
+- Token locale e sessione admin web non sono intercambiabili: un token valido
+  non deve autorizzare audit, backup/restore, scheduler, repair DB o lifecycle
+  MLX.
 - Proxy verso servizi locali sempre allowlist localhost.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.
+- Il placeholder `[LOCKED DATA]` resta solo di presentazione (WUL-323): non deve
+  mai sovrascrivere il dato cifrato a riposo.
+- La cancellazione clinica passa sempre per soft-delete con version guard
+  (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
+  esplicita.

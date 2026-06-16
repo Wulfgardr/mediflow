@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+/* @Codex */
+import { normalizeSettingValue } from '@/lib/settings-value';
 
 export async function GET(
     request: Request,
@@ -47,10 +49,13 @@ export async function PUT(
             return NextResponse.json({ error: "Value required" }, { status: 400 });
         }
 
+        /* @Codex */
+        const persistedValue = normalizeSettingValue(value);
+
         await dbServer
             .insert(settings)
-            .values({ key, value })
-            .onConflictDoUpdate({ target: settings.key, set: { value } });
+            .values({ key, value: persistedValue })
+            .onConflictDoUpdate({ target: settings.key, set: { value: persistedValue } });
 
         try {
             const context = auditContextFromRequest(request, session);
@@ -71,7 +76,7 @@ export async function PUT(
             console.error('Audit settings write failed:', error);
         }
 
-        return NextResponse.json({ success: true, key, value });
+        return NextResponse.json({ success: true, key, value: persistedValue });
     } catch (error) {
         console.error("PUT Setting Error:", error);
         return NextResponse.json({ error: "Failed to update setting" }, { status: 500 });

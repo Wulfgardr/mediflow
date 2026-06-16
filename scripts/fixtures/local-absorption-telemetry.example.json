@@ -1,0 +1,36 @@
+{
+  "inputs": [
+    {
+      "patientId": "synthetic-patient",
+      "generatedAt": "2026-05-03T00:00:00.000Z",
+      "attachments": [
+        {
+          "id": "attachment-current",
+          "patientId": "synthetic-patient",
+          "fileName": "synthetic-current.pdf",
+          "createdAt": "2026-04-20T00:00:00.000Z",
+          "summarySnapshot": "Synthetic reviewable summary with enough signal."
+        },
+        {
+          "id": "attachment-invalid",
+          "patientId": "synthetic-patient",
+          "fileName": "synthetic-invalid.pdf",
+          "createdAt": "2026-04-01T00:00:00.000Z",
+          "summarySnapshot": "Synthetic invalidated summary.",
+          "sourceVersion": "2",
+          "artifactSourceVersion": "1"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "id": "entry-deleted",
+          "patientId": "synthetic-patient",
+          "date": "2026-04-10T00:00:00.000Z",
+          "content": "Synthetic deleted diary content that must not appear in the report.",
+          "deletedAt": "2026-04-11T00:00:00.000Z",
+          "version": 2
+        }
+      ]
+    }
+  ]
+}

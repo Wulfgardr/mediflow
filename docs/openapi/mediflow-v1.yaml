@@ -155,8 +155,11 @@ paths:
       summary: Delete patient
       description: |
         Deletes a patient using optimistic concurrency. Clients MUST send the last
-        observed `version`. The server returns `409` with PHI-safe metadata when
-        the record changed or disappeared before the delete could commit.
+        observed `version`. The server retires the record with a soft-delete
+        tombstone (ADR 0066): the patient disappears from reads while linked
+        clinical rows stay preserved for an explicit, audited admin purge. The
+        server returns `409` with PHI-safe metadata when the record changed or
+        disappeared before the delete could commit.
       security:
         - bearerAuth: []
       parameters:

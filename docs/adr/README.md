@@ -1,4 +1,4 @@
-# ADR — Architecture Decision Records
+# ADR: Architecture Decision Records
 
 Gli ADR (Architecture Decision Records) tengono traccia delle decisioni che influenzano architettura, confini di sicurezza e manutenibilità nel lungo periodo.
 

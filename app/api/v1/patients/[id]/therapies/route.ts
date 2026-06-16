@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
@@ -37,6 +37,11 @@ function parseDateParam(value: string | null): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// WUL-308: lists hide soft-deleted rows by default, like entries.
+function parseIncludeDeleted(value: string | null): boolean {
+    return value === 'true' || value === '1';
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -50,8 +55,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const statusFilterValues = status ? therapyStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
+        const includeDeleted = parseIncludeDeleted(searchParams.get('includeDeleted'));
 
         const filters = [eq(therapies.patientId, id)];
+        if (!includeDeleted) filters.push(isNull(therapies.deletedAt));
         /* @Codex */
         if (statusFilterValues) filters.push(inArray(therapies.status, statusFilterValues));
         if (dateFrom) filters.push(gte(therapies.startDate, dateFrom));

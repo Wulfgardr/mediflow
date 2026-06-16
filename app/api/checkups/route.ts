@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -10,6 +10,13 @@ import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normali
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 
+/* @Codex */
+function parseRequiredDate(value: unknown): Date | null {
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export async function GET(request: Request) {
     /* @Codex */
     const session = await requireSession();
@@ -17,16 +24,24 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
     try {
-        let query = dbServer.select().from(checkups);
-
         if (patientId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(eq(checkups.patientId, patientId)) as any;
+            const whereClause = includeDeleted
+                ? eq(checkups.patientId, patientId)
+                : and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt));
+            const data = await dbServer.select().from(checkups).where(whereClause).orderBy(desc(checkups.date));
+            const normalizedData = data.map((checkup) => ({
+                ...checkup,
+                status: normalizeCheckupStatus(checkup.status),
+            }));
+            return NextResponse.json(normalizedData);
         }
 
-        const data = await query.orderBy(desc(checkups.date));
+        const data = includeDeleted
+            ? await dbServer.select().from(checkups).orderBy(desc(checkups.date))
+            : await dbServer.select().from(checkups).where(isNull(checkups.deletedAt)).orderBy(desc(checkups.date));
         const normalizedData = data.map((checkup) => ({
             ...checkup,
             status: normalizeCheckupStatus(checkup.status),
@@ -51,6 +66,19 @@ export async function POST(request: Request) {
         if (body.status !== undefined && !normalizedStatus) {
             return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
         }
+        /* @Codex */
+        if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
+            return NextResponse.json({ error: 'patientId required' }, { status: 400 });
+        }
+        /* @Codex */
+        if (typeof body.title !== 'string' || body.title.trim().length === 0) {
+            return NextResponse.json({ error: 'title required' }, { status: 400 });
+        }
+        /* @Codex */
+        const checkupDate = parseRequiredDate(body.date);
+        if (!checkupDate) {
+            return NextResponse.json({ error: 'Valid checkup date required' }, { status: 400 });
+        }
 
         // Allow client to generate ID or generate it here. 
         // ApiTable shim might send an ID if it's "add" with specific ID, but usually it relies on return.
@@ -64,7 +92,7 @@ export async function POST(request: Request) {
         await dbServer.insert(checkups).values({
             id: newId,
             patientId: body.patientId,
-            date: new Date(body.date),
+            date: checkupDate,
             title: body.title,
             /* @Codex */
             notes: body.notes ?? null,

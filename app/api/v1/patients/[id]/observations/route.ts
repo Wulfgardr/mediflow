@@ -1,6 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
@@ -34,6 +34,11 @@ function parseLimit(value: string | null): number | null {
     return Math.min(parsed, 200);
 }
 
+// WUL-308: lists hide soft-deleted rows by default, like entries.
+function parseIncludeDeleted(value: string | null): boolean {
+    return value === 'true' || value === '1';
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -45,8 +50,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const code = searchParams.get('code')?.trim();
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
+        const includeDeleted = parseIncludeDeleted(searchParams.get('includeDeleted'));
 
         const filters = [eq(observations.patientId, id)];
+        if (!includeDeleted) filters.push(isNull(observations.deletedAt));
         if (code) filters.push(eq(observations.code, code));
         if (dateFrom) filters.push(gte(observations.observedAt, dateFrom));
         if (dateTo) filters.push(lte(observations.observedAt, dateTo));

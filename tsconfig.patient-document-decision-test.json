@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-patient-document-decision-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/pdfjs-worker.d.ts",
+    "lib/document-decision.ts",
+    "lib/document-decision-model-governance.ts",
+    "lib/patient-document-review.ts",
+    "lib/patient-import-decision.ts",
+    "lib/patient-document-decision.ts",
+    "lib/patient-document-decision.test.ts"
+  ]
+}

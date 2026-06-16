@@ -3,12 +3,13 @@
 import { Moon, Sun, Monitor } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const indicatorLayoutId = useId();
 
     useEffect(() => {
         setMounted(true);
@@ -19,13 +20,19 @@ export function ThemeToggle() {
     }
 
     const tabs = [
-        { id: 'light', icon: Sun, label: 'Light' },
-        { id: 'dark', icon: Moon, label: 'Dark' },
-        { id: 'system', icon: Monitor, label: 'System' },
+        { id: 'light', icon: Sun, label: 'Chiaro' },
+        { id: 'dark', icon: Moon, label: 'Scuro' },
+        { id: 'system', icon: Monitor, label: 'Sistema' },
     ] as const;
 
     return (
-        <div className="relative flex p-0.5 bg-system-gray-6 rounded-full border border-black/5 dark:border-white/5 w-fit mx-auto shadow-inner">
+        <div
+            className="relative mx-auto flex w-fit rounded-full border p-0.5 shadow-inner"
+            style={{
+                backgroundColor: 'var(--glass-bg)',
+                borderColor: 'var(--glass-border)',
+            }}
+        >
             {tabs.map((tab) => {
                 const isActive = theme === tab.id;
                 return (
@@ -33,18 +40,18 @@ export function ThemeToggle() {
                         key={tab.id}
                         onClick={() => setTheme(tab.id)}
                         className={cn(
-                            "relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 focus:outline-none",
+                            "relative z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/30",
                             isActive
-                                ? "text-foreground"
-                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                ? "text-[color:var(--mf-ink)]"
+                                : "text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]"
                         )}
                         title={tab.label}
-                        aria-label={tab.label}
+                        aria-label={`Tema ${tab.label}`}
                     >
                         {isActive && (
                             <motion.div
-                                layoutId="theme-indicator"
-                                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.2)] border border-black/5 dark:border-white/5"
+                                layoutId={`theme-indicator-${indicatorLayoutId}`}
+                                className="absolute inset-0 rounded-full border border-[color:var(--glass-border)] bg-[color:var(--mf-bg-elevated)] shadow-[0_2px_4px_rgba(15,23,42,0.08)]"
                                 transition={{
                                     type: "spring",
                                     stiffness: 500,

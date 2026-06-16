@@ -46,12 +46,14 @@ struct ObservationEditorDraft {
     }
 
     func makeUpdatePayload(
+        version: Int,
         loincOptions: [TerminologySearchItem],
         ucumOptions: [TerminologySearchItem]
     ) throws -> UpdateObservationPayload {
         let resolved = try resolvedCoding(loincOptions: loincOptions, ucumOptions: ucumOptions)
 
         return UpdateObservationPayload(
+            version: version,
             codeSystem: resolved.loinc.system,
             code: resolved.loinc.code,
             display: resolved.loinc.display,

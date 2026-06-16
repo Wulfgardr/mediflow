@@ -95,8 +95,9 @@ export function parseSystemRedactionRequest(input: unknown): { ok: true; value: 
         return { ok: false, error: 'Invalid action. Use extract or deidentify.' };
     }
 
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text) {
+    /* @Codex */
+    const text = typeof body.text === 'string' ? body.text : '';
+    if (!text.trim()) {
         return { ok: false, error: 'Text is required.' };
     }
 
@@ -167,7 +168,7 @@ export function normalizeOpenMedResponse(
         entityCount: entities.length,
         entities,
         redactedText: request.action === 'deidentify'
-            ? (normalizeString(payload.deidentified_text) ?? null)
+            ? normalizePossiblyPaddedString(payload.deidentified_text)
             : null,
     };
 }
@@ -243,6 +244,12 @@ function normalizeString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
+}
+
+/* @Codex */
+function normalizePossiblyPaddedString(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    return value.trim().length > 0 ? value : null;
 }
 
 function normalizeLabel(value: string | null | undefined): string {
