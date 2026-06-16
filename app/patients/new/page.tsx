@@ -1,14 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { db } from '@/lib/db';
+import {
+    db,
+    type ServicePrescriptionCategory,
+    type ServicePrescriptionPriority,
+} from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import Link from 'next/link';
+import { AlertTriangle, CheckCircle2, FileSearch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
+/* @Codex */
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 /* @Codex */
 import PatientDocumentImportReview from '@/components/patient-document-import-review';
 /* @Codex */
@@ -17,6 +22,9 @@ import {
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/patient-document-review';
+
+/* @Codex */
+type ImportedServicePrescriptionDraft = NonNullable<ReviewedPatientImportDefaults['servicePrescriptions']>[number];
 
 /* @Codex */
 type ImportedPatientDraft = {
@@ -41,7 +49,50 @@ type ImportedPatientDraft = {
         aic?: string;
         atc?: string;
     }>;
+    servicePrescriptions?: ImportedServicePrescriptionDraft[];
 };
+
+/* @Codex */
+const SERVICE_PRESCRIPTION_CATEGORIES = new Set<ServicePrescriptionCategory>([
+    'lab',
+    'imaging',
+    'visit',
+    'rehab',
+    'screening',
+    'procedure',
+    'other',
+]);
+
+/* @Codex */
+const SERVICE_PRESCRIPTION_PRIORITIES = new Set<ServicePrescriptionPriority>([
+    'U',
+    'B',
+    'D',
+    'P',
+    'routine',
+    'unknown',
+]);
+
+/* @Codex */
+function normalizeServicePrescriptionCategory(
+    value: ImportedServicePrescriptionDraft['category'],
+): ServicePrescriptionCategory {
+    return value && SERVICE_PRESCRIPTION_CATEGORIES.has(value) ? value : 'other';
+}
+
+/* @Codex */
+function normalizeServicePrescriptionPriority(value: string | undefined): ServicePrescriptionPriority {
+    return value && SERVICE_PRESCRIPTION_PRIORITIES.has(value as ServicePrescriptionPriority)
+        ? value as ServicePrescriptionPriority
+        : 'unknown';
+}
+
+/* @Codex */
+function parseImportedServicePrescriptionDate(value: string | undefined, fallback: Date): Date {
+    if (!value) return fallback;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
 
 export default function NewPatientPage() {
     const router = useRouter();
@@ -66,7 +117,7 @@ export default function NewPatientPage() {
             if (data.taxCode) {
                 const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode).toArray())[0];
                 if (existing) {
-                    const confirmMsg = `Attenzione: Esiste già un paziente con questo Codice Fiscale.\n\n${existing.lastName} ${existing.firstName}\nID: ${existing.id}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
+                    const confirmMsg = `Esiste già una scheda con questo codice fiscale.\n\n${existing.lastName} ${existing.firstName}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
                     if (confirm(confirmMsg)) {
                         router.push(`/patients/${existing.id}`);
                         return;
@@ -122,6 +173,31 @@ export default function NewPatientPage() {
                 await db.therapies.bulkPut(therapyItems);
             }
 
+            if (Array.isArray(importedData?.servicePrescriptions) && importedData.servicePrescriptions.length > 0) {
+                const now = new Date();
+                const servicePrescriptionItems = importedData.servicePrescriptions
+                    .filter((item) => item.serviceName.trim().length > 0)
+                    .map((item) => ({
+                        id: uuidv4(),
+                        patientId,
+                        prescribedAt: parseImportedServicePrescriptionDate(item.prescribedAt, now),
+                        status: 'prescribed' as const,
+                        category: normalizeServicePrescriptionCategory(item.category),
+                        priority: normalizeServicePrescriptionPriority(item.priority),
+                        codeSystem: item.codeSystem,
+                        serviceCode: item.serviceCode,
+                        serviceName: item.serviceName.trim(),
+                        clinicalQuestion: item.clinicalQuestion,
+                        provider: item.provider,
+                        requestReference: item.requestReference,
+                        source: 'document_review' as const,
+                        notes: item.evidence ? `Evidenza documento: ${item.evidence}` : undefined,
+                        createdAt: now,
+                        updatedAt: now,
+                    }));
+                await db.servicePrescriptions.bulkPut(servicePrescriptionItems);
+            }
+
             router.push('/');
         } catch (error) {
             console.error("Failed to save patient", error);
@@ -129,24 +205,49 @@ export default function NewPatientPage() {
         }
     };
 
+    const statusLabel = pendingImportReview
+        ? 'Documento letto: controllo in corso.'
+        : importedData
+            ? 'Dati applicati alla scheda: controlla i campi e conferma.'
+            : 'La scheda viene creata solo quando salvi.';
+
+    const navItems = [
+        { href: '#documento', label: 'Documento', meta: 'opzionale' },
+        ...(importMeta ? [{
+            href: '#controllo',
+            label: 'Controllo',
+            meta: pendingImportReview ? 'pre-compilazione' : 'completato',
+        }] : []),
+        { href: '#dati', label: 'Dati', meta: 'scheda' },
+    ];
+
     return (
-        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
-                <div className="flex items-center gap-5">
-                    <Link href="/" className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
-                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
-                    </Link>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pazienti</p>
+        <Kree8WorkspaceShell
+            eyebrow="Paziente"
+            title="Nuova scheda"
+            subtitle="Da documento clinico o con inserimento manuale."
+            backHref="/"
+            backLabel="Torna alla lista"
+            statusLabel={statusLabel}
+            navItems={navItems}
+        >
+            <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                            <FileSearch className="h-5 w-5" />
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Nuova Anagrafica</h1>
+                        <div className="space-y-1">
+                            <p className="mf-eyebrow">Documento clinico</p>
+                            <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                                Usa un documento quando è utile
+                            </h2>
+                            <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
+                                MediFlow propone anagrafica, diagnosi e terapie dal documento: confermi tu cosa usare.
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="mb-10">
                 <PdfImporter onDataExtracted={(data) => {
                     const imported = data as ExtractedPatientData;
                     /* @Codex */
@@ -158,82 +259,83 @@ export default function NewPatientPage() {
                         reviewPending: true,
                     });
                 }} />
-            </div>
+            </section>
 
             {/* @Codex */}
             {importMeta && (
-                <div className={`mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 p-6 shadow-xl ${
-                    importMeta.quality?.level === 'red'
-                        ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20 shadow-red-500/5'
-                        : importMeta.quality?.level === 'green'
-                            ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20 shadow-emerald-500/5'
-                            : 'border-blue-200 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 shadow-blue-500/5'
-                    }`}>
-                    <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-2xl ${
-                            importMeta.quality?.level === 'red' ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 
-                            importMeta.quality?.level === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600' : 
-                            'bg-blue-100 dark:bg-blue-900/40 text-blue-600'
+                <section id="controllo" className="space-y-4 scroll-mt-40">
+                    <div className={`mf-alert animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
+                        importMeta.quality?.level === 'red'
+                            ? 'mf-alert-critical'
+                            : importMeta.quality?.level === 'green'
+                                ? 'mf-alert-success'
+                                : 'mf-alert-info'
                         }`}>
-                            {importMeta.quality?.level === 'red' ? (
-                                <AlertTriangle className="h-6 w-6 shrink-0" />
-                            ) : (
-                                <CheckCircle2 className="h-6 w-6 shrink-0" />
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                                {importMeta.reviewPending ? 'Importazione assistita pronta per review' : 'Importazione assistita applicata al form'}
-                            </h3>
-                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
-                                {importMeta.diagnosisCount > 0
-                                    ? `Sono stati estratti ${importMeta.diagnosisCount} quesiti diagnostici${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie candidate` : ''}. Verificare i contenuti nel passaggio intermedio prima della conferma finale.`
-                                    : importMeta.medicationCount > 0
-                                        ? `Sono state estratte ${importMeta.medicationCount} terapie candidate. Conferma o correggi i gruppi proposti prima di applicarli al form.`
-                                        : 'Il documento è stato analizzato correttamente, ma non sono stati individuati campi clinici strutturabili automaticamente.'}
-                            </p>
-                            {importMeta.quality?.reason && (
-                                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">
-                                    Qualita documento: {importMeta.quality.reason}
+                        <div className="flex items-start gap-4">
+                            <div className="mf-icon-disc h-12 w-12 shrink-0">
+                                {importMeta.quality?.level === 'red' ? (
+                                    <AlertTriangle className="h-6 w-6 shrink-0" />
+                                ) : (
+                                    <CheckCircle2 className="h-6 w-6 shrink-0" />
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                                    {importMeta.reviewPending ? 'Documento pronto: scegli cosa portare nella scheda' : 'Dati importati nella scheda'}
+                                </h3>
+                                <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                    {importMeta.diagnosisCount > 0
+                                        ? `Trovate ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
+                                        : importMeta.medicationCount > 0
+                                            ? `Trovate ${importMeta.medicationCount} terapie da valutare: conferma, correggi o escludi prima di portarle nella scheda.`
+                                            : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
-                            )}
+                                {importMeta.quality?.reason && (
+                                    <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--mf-muted)' }}>
+                                        Qualità documento: {importMeta.quality.reason}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    {/* @Codex */}
+                    {pendingImportReview && (
+                        <PatientDocumentImportReview
+                            draft={pendingImportReview}
+                            onDismiss={() => {
+                                setPendingImportReview(null);
+                                setImportMeta(null);
+                            }}
+                            onApply={(reviewedDefaults: ReviewedPatientImportDefaults) => {
+                                setImportedData({
+                                    firstName: reviewedDefaults.firstName,
+                                    lastName: reviewedDefaults.lastName,
+                                    taxCode: reviewedDefaults.taxCode,
+                                    birthDate: reviewedDefaults.birthDate,
+                                    address: reviewedDefaults.address,
+                                    phone: reviewedDefaults.phone,
+                                    notes: reviewedDefaults.notes,
+                                    diagnoses: reviewedDefaults.diagnoses,
+                                    therapies: reviewedDefaults.therapies,
+                                    servicePrescriptions: reviewedDefaults.servicePrescriptions,
+                                });
+                                setPendingImportReview(null);
+                                setImportMeta((current) => current ? { ...current, reviewPending: false } : current);
+                                setFormSeed((current) => current + 1);
+                            }}
+                        />
+                    )}
+                </section>
             )}
 
-            {/* @Codex */}
-            {pendingImportReview && (
-                <PatientDocumentImportReview
-                    draft={pendingImportReview}
-                    onDismiss={() => {
-                        setPendingImportReview(null);
-                        setImportMeta(null);
-                    }}
-                    onApply={(reviewedDefaults: ReviewedPatientImportDefaults) => {
-                        setImportedData({
-                            firstName: reviewedDefaults.firstName,
-                            lastName: reviewedDefaults.lastName,
-                            taxCode: reviewedDefaults.taxCode,
-                            birthDate: reviewedDefaults.birthDate,
-                            address: reviewedDefaults.address,
-                            phone: reviewedDefaults.phone,
-                            notes: reviewedDefaults.notes,
-                            diagnoses: reviewedDefaults.diagnoses,
-                            therapies: reviewedDefaults.therapies,
-                        });
-                        setPendingImportReview(null);
-                        setImportMeta((current) => current ? { ...current, reviewPending: false } : current);
-                        setFormSeed((current) => current + 1);
-                    }}
+            <div id="dati" className="scroll-mt-40">
+                <PatientForm
+                    onSubmit={onSubmit}
+                    defaultValues={importedData || undefined}
+                    key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
                 />
-            )}
-
-            <PatientForm
-                onSubmit={onSubmit}
-                defaultValues={importedData || undefined}
-                key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
-            />
-        </div>
+            </div>
+        </Kree8WorkspaceShell>
     );
 }

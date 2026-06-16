@@ -1,11 +1,24 @@
 /* @Codex */
+export type AuthHealthErrorCategory =
+    | 'native-dependency-invalid'
+    | 'native-dependency-missing'
+    | 'db-missing'
+    | 'data-dir-unavailable'
+    | 'schema-missing'
+    | 'query-failed'
+    | 'unknown';
+
+/* @Codex */
 export type AuthHealthPayload = {
     status: 'ok' | 'error';
     isSetup?: boolean;
     hasSession?: boolean;
     error?: {
         code?: string;
+        category?: AuthHealthErrorCategory;
         message?: string;
+        remediationCommand?: string;
+        nextAction?: string;
     };
     db?: {
         state?: 'ready' | 'missing' | 'schema-missing' | 'unavailable';

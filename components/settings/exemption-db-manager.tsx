@@ -85,29 +85,29 @@ export default function ExemptionDbManager() {
     };
 
     const handleClear = async () => {
-        if (!confirm('Vuoi davvero svuotare l\'intero catalogo esenzioni?')) return;
+        if (!confirm('Vuoi davvero svuotare l\'intero repertorio esenzioni?')) return;
         try {
             await clearExemptionDatabase();
             await refreshStats();
-            setMessage({ type: 'success', text: 'Catalogo esenzioni svuotato.' });
+            setMessage({ type: 'success', text: 'Repertorio esenzioni svuotato.' });
         } catch (error) {
             console.error('Failed to clear exemptions', error);
-            setMessage({ type: 'error', text: 'Impossibile svuotare il catalogo esenzioni.' });
+            setMessage({ type: 'error', text: 'Impossibile svuotare il repertorio esenzioni.' });
         }
     };
 
     const percent = total > 0 ? Math.round((progress / total) * 100) : 0;
 
     return (
-        <div className="glass-panel p-6 md:p-7 space-y-5">
+        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                     <Database className="w-6 h-6" />
                 </div>
                 <div>
-                    <p className="section-kicker">Catalogo amministrativo</p>
+                    <p className="section-kicker">Repertorio amministrativo</p>
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Codifiche Esenzioni</h2>
-                    <p className="text-xs text-gray-500">Catalogo locale per ricerca rapida in anagrafica paziente.</p>
+                    <p className="text-xs text-gray-500">Repertorio per la ricerca rapida in anagrafica paziente.</p>
                 </div>
             </div>
 
@@ -153,7 +153,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Drag & drop file esenzioni</p>
-                            <p className="text-xs text-gray-500 mt-1">Supporta file in formato `|` (es. `Esenzioni.txt`, `Invalidita.txt`).</p>
+                            <p className="text-xs text-gray-500 mt-1">File delimitati da | (es. Esenzioni.txt, Invalidita.txt).</p>
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
@@ -204,7 +204,7 @@ export default function ExemptionDbManager() {
                     className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs text-red-500 hover:text-red-700 dark:bg-red-900/10"
                 >
                     <Trash2 className="w-3 h-3" />
-                    Svuota catalogo
+                    Svuota repertorio
                 </button>
             </div>
         </div>

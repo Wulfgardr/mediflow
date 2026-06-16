@@ -1,4 +1,7 @@
 /* @Codex */
+import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
+
+/* @Codex */
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 
 /* @Codex */
@@ -82,9 +85,41 @@ export interface SmartImportTherapyExtraction {
 }
 
 /* @Codex */
+export type SmartImportServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
+
+/* @Codex */
+export interface SmartImportServicePrescriptionItemExtraction {
+    serviceName: string;
+    category?: SmartImportServicePrescriptionCategory;
+    codeSystem?: string;
+    serviceCode?: string;
+    confidence: SmartImportConfidence;
+    evidence: string;
+    sourceId?: string;
+}
+
+/* @Codex */
+export interface SmartImportServicePrescriptionExtraction {
+    serviceName: string;
+    category?: SmartImportServicePrescriptionCategory;
+    priority?: string;
+    codeSystem?: string;
+    serviceCode?: string;
+    clinicalQuestion?: string;
+    provider?: string;
+    prescribedAt?: string;
+    requestReference?: string;
+    confidence: SmartImportConfidence;
+    evidence: string;
+    sourceId?: string;
+    items?: SmartImportServicePrescriptionItemExtraction[];
+}
+
+/* @Codex */
 export interface SmartImportExtractionData {
     diagnoses: SmartImportDiagnosisExtraction[];
     therapies: SmartImportTherapyExtraction[];
+    servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 }
 
 /* @Codex */
@@ -98,6 +133,7 @@ export interface DocumentSynthesisExtractionData {
     diagnoses: DocumentDiagnosisSuggestionContract[];
     problemStatements: SmartImportDiagnosisExtraction[];
     therapyCandidates: SmartImportTherapyExtraction[];
+    servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 }
 
 /* @Codex */
@@ -192,6 +228,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     diagnoses: DocumentDiagnosisSuggestionContract[];
     problemStatements: SmartImportDiagnosisExtraction[];
     therapyCandidates: SmartImportTherapyExtraction[];
+    servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 } | null {
     const rawJson = extractJsonObject(response);
     if (!rawJson) return null;
@@ -223,6 +260,11 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
                 .map(normalizeSmartImportTherapy)
                 .filter((item): item is SmartImportTherapyExtraction => Boolean(item))
             : [];
+        const servicePrescriptions = Array.isArray(parsed.servicePrescriptions)
+            ? parsed.servicePrescriptions
+                .map(normalizeServicePrescription)
+                .filter((item): item is SmartImportServicePrescriptionExtraction => Boolean(item))
+            : [];
 
         return {
             rawJson,
@@ -234,6 +276,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             diagnoses,
             problemStatements,
             therapyCandidates,
+            servicePrescriptions,
         };
     } catch {
         return {
@@ -246,6 +289,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             diagnoses: [],
             problemStatements: [],
             therapyCandidates: [],
+            servicePrescriptions: [],
         };
     }
 }
@@ -356,6 +400,127 @@ function normalizeSmartImportDiagnosis(value: unknown): SmartImportDiagnosisExtr
     };
 }
 
+function normalizeServicePrescriptionCategory(value: unknown): SmartImportServicePrescriptionCategory | undefined {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === 'lab' || normalized === 'laboratorio') return 'lab';
+    if (normalized === 'imaging' || normalized === 'radiologia' || normalized === 'diagnostica') return 'imaging';
+    if (normalized === 'visit' || normalized === 'visita') return 'visit';
+    if (normalized === 'rehab' || normalized === 'riabilitazione' || normalized === 'fisioterapia') return 'rehab';
+    if (normalized === 'screening') return 'screening';
+    if (normalized === 'procedure' || normalized === 'procedura') return 'procedure';
+    if (normalized === 'other' || normalized === 'altro') return 'other';
+    return undefined;
+}
+
+/* @Codex */
+function normalizeServicePrescriptionItem(value: unknown, parent: { category?: SmartImportServicePrescriptionCategory; evidence: string; sourceId?: string }): SmartImportServicePrescriptionItemExtraction | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+    const record = value as Record<string, unknown>;
+    const serviceName = normalizeCompactText(
+        record.serviceName ?? record.name ?? record.display ?? record.label,
+        MAX_SMART_IMPORT_TEXT_CHARS,
+    );
+    const evidence = normalizeCompactText(record.evidence, MAX_SMART_IMPORT_TEXT_CHARS) || parent.evidence;
+    if (!serviceName || !evidence) return null;
+
+    return {
+        serviceName,
+        category: normalizeServicePrescriptionCategory(record.category) ?? parent.category ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
+        codeSystem: normalizeCompactText(record.codeSystem, 80) || undefined,
+        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, 80) || undefined,
+        confidence: normalizeConfidence(record.confidence),
+        evidence,
+        sourceId: normalizeCompactText(record.sourceId, 80) || parent.sourceId,
+    };
+}
+
+function inferServicePrescriptionCategory(text: string): SmartImportServicePrescriptionCategory {
+    const normalized = text
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    if (/\b(?:emocromo|creatinina|glicemia|hba1c|urine|colesterolo|pcr|proteina c reattiva|prelievo|laboratorio)\b/.test(normalized)) return 'lab';
+    if (/\b(?:ecografia|ecocolordoppler|eco|rx|radiografia|tac|tc|rm|risonanza|ecg|elettrocardiogramma|spirometria)\b/.test(normalized)) return 'imaging';
+    if (/\b(?:fisioterapia|riabilitazione|riabilitativa|fkt)\b/.test(normalized)) return 'rehab';
+    if (/\b(?:screening)\b/.test(normalized)) return 'screening';
+    if (/\b(?:visita|consulto|consulenza|controllo specialistico)\b/.test(normalized)) return 'visit';
+    if (/\b(?:procedura|prestazione)\b/.test(normalized)) return 'procedure';
+    return 'other';
+}
+
+function normalizeServicePrescription(value: unknown): SmartImportServicePrescriptionExtraction | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+    const record = value as Record<string, unknown>;
+    const serviceName = normalizeCompactText(
+        record.serviceName ?? record.name ?? record.display ?? record.drugMention,
+        MAX_SMART_IMPORT_TEXT_CHARS,
+    );
+    const evidence = normalizeCompactText(record.evidence, MAX_SMART_IMPORT_TEXT_CHARS)
+        || normalizeCompactText(record.clinicalQuestion ?? record.motivation, MAX_SMART_IMPORT_TEXT_CHARS);
+
+    if (!serviceName || !evidence) return null;
+
+    const normalized: SmartImportServicePrescriptionExtraction = {
+        serviceName,
+        category: normalizeServicePrescriptionCategory(record.category) ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
+        priority: normalizeCompactText(record.priority, 16).toUpperCase() || undefined,
+        codeSystem: normalizeCompactText(record.codeSystem, 80) || undefined,
+        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, 80) || undefined,
+        clinicalQuestion: normalizeCompactText(record.clinicalQuestion ?? record.motivation, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        provider: normalizeCompactText(record.provider, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        prescribedAt: normalizeCompactText(record.prescribedAt, 32) || undefined,
+        requestReference: normalizeCompactText(record.requestReference, 80) || undefined,
+        confidence: normalizeConfidence(record.confidence),
+        evidence,
+        sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
+    };
+    const rawItems = Array.isArray(record.items) ? record.items : [];
+    const items = rawItems
+        .map((item) => normalizeServicePrescriptionItem(item, normalized))
+        .filter((item): item is SmartImportServicePrescriptionItemExtraction => Boolean(item));
+    if (items.length > 0) normalized.items = items.slice(0, 20);
+    return normalized;
+}
+
+function normalizeServicePrescriptionFromTherapyLike(value: unknown): SmartImportServicePrescriptionExtraction | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = value as Record<string, unknown>;
+    const candidate = {
+        drugMention: normalizeCompactText(record.drugMention, MAX_SMART_IMPORT_TEXT_CHARS),
+        drugQuery: normalizeCompactText(record.drugQuery, MAX_SMART_IMPORT_TEXT_CHARS),
+        activePrinciple: normalizeCompactText(record.activePrinciple, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        dosage: normalizeCompactText(record.dosage, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        motivation: normalizeCompactText(record.motivation, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        reviewNote: normalizeCompactText(record.reviewNote, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
+        evidence: normalizeCompactText(record.evidence, MAX_SMART_IMPORT_TEXT_CHARS),
+    };
+    if (!isServicePrescriptionLikeTherapy(candidate)) return null;
+
+    return normalizeServicePrescription({
+        serviceName: candidate.drugMention || candidate.drugQuery,
+        category: inferServicePrescriptionCategory([candidate.drugMention, candidate.drugQuery, candidate.evidence].join(' ')),
+        clinicalQuestion: candidate.motivation || candidate.reviewNote,
+        confidence: record.confidence,
+        evidence: candidate.evidence || candidate.motivation || candidate.reviewNote,
+        sourceId: record.sourceId,
+    });
+}
+
+function servicePrescriptionDedupeKey(item: Pick<SmartImportServicePrescriptionExtraction, 'serviceName' | 'serviceCode'>): string {
+    const code = normalizeCompactText(item.serviceCode, 80).toLowerCase();
+    if (code) return `code:${code}`;
+    return normalizeCompactText(item.serviceName, MAX_SMART_IMPORT_TEXT_CHARS)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\b(?:di controllo|con formula(?: leucocitaria)?|completo con formula|completo)\b/g, '')
+        .replace(/\b\d+\s+sedut[ae]\b/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
 function normalizeTherapyKey(therapy: Pick<SmartImportTherapyExtraction, 'drugMention' | 'activePrinciple' | 'dosage' | 'therapyState'>): string {
     return [
         normalizeCompactText(therapy.drugMention, MAX_SMART_IMPORT_TEXT_CHARS).toLowerCase(),
@@ -382,7 +547,7 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
 
     if (!drugMention || !evidence) return null;
 
-    return {
+    const therapy = {
         drugMention,
         drugQuery: normalizeCompactText(record.drugQuery, MAX_SMART_IMPORT_TEXT_CHARS) || drugMention,
         activePrinciple: normalizeCompactText(record.activePrinciple, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
@@ -394,6 +559,8 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
         evidence,
         sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
     };
+
+    return isServicePrescriptionLikeTherapy(therapy) ? null : therapy;
 }
 
 export function extractJsonObject(response: string): string | null {
@@ -519,8 +686,15 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
 
     const seenTherapies = new Set<string>();
     const therapies: SmartImportTherapyExtraction[] = [];
+    const servicePrescriptions: SmartImportServicePrescriptionExtraction[] = [];
     if (Array.isArray(envelope.data.therapies)) {
         for (const value of envelope.data.therapies) {
+            const servicePrescription = normalizeServicePrescriptionFromTherapyLike(value);
+            if (servicePrescription) {
+                servicePrescriptions.push(servicePrescription);
+                continue;
+            }
+
             const normalized = normalizeSmartImportTherapy(value);
             if (!normalized) continue;
 
@@ -530,6 +704,15 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             therapies.push(normalized);
 
             if (therapies.length >= 10) break;
+        }
+    }
+    if (Array.isArray(envelope.data.servicePrescriptions)) {
+        for (const value of envelope.data.servicePrescriptions) {
+            const normalized = normalizeServicePrescription(value);
+            if (!normalized) continue;
+            if (servicePrescriptions.findIndex((item) => servicePrescriptionDedupeKey(item) === servicePrescriptionDedupeKey(normalized)) >= 0) continue;
+            servicePrescriptions.push(normalized);
+            if (servicePrescriptions.length >= 10) break;
         }
     }
 
@@ -544,6 +727,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             data: {
                 diagnoses,
                 therapies,
+                servicePrescriptions: servicePrescriptions.slice(0, 10),
             },
         },
     };
@@ -569,6 +753,11 @@ export function parseDocumentSynthesisExtractionResponse(
                 ),
             )
             : [];
+    const filteredMedications = medications.filter((medication) => !isServicePrescriptionLikeTherapy({
+        drugMention: medication,
+        drugQuery: medication,
+        evidence: medication,
+    }));
 
     const diagnoses = legacyPayload
         ? legacyPayload.diagnoses
@@ -591,13 +780,39 @@ export function parseDocumentSynthesisExtractionResponse(
                 .map(normalizeSmartImportTherapy)
                 .filter((item): item is SmartImportTherapyExtraction => Boolean(item))
             : [];
+    const filteredTherapyCandidates = filterServicePrescriptionTherapyCandidates(therapyCandidates);
+    const explicitServicePrescriptions = legacyPayload
+        ? legacyPayload.servicePrescriptions
+        : Array.isArray(envelope.data.servicePrescriptions)
+            ? envelope.data.servicePrescriptions
+                .map(normalizeServicePrescription)
+                .filter((item): item is SmartImportServicePrescriptionExtraction => Boolean(item))
+            : [];
+    const medicationServicePrescriptions = medications
+        .map((medication) => normalizeServicePrescriptionFromTherapyLike({
+            drugMention: medication,
+            drugQuery: medication,
+            evidence: medication,
+            confidence: 'medium',
+        }))
+        .filter((item): item is SmartImportServicePrescriptionExtraction => Boolean(item));
+    const therapyServicePrescriptions = Array.isArray(envelope.data.therapyCandidates)
+        ? envelope.data.therapyCandidates
+            .map(normalizeServicePrescriptionFromTherapyLike)
+            .filter((item): item is SmartImportServicePrescriptionExtraction => Boolean(item))
+        : [];
+    const servicePrescriptions = [...explicitServicePrescriptions, ...medicationServicePrescriptions, ...therapyServicePrescriptions]
+        .filter((item, index, list) => (
+            list.findIndex((candidate) => servicePrescriptionDedupeKey(candidate) === servicePrescriptionDedupeKey(item)) === index
+        ))
+        .slice(0, 10);
 
     const summary = (legacyPayload?.summary || envelope.summary) || buildDocumentFallbackSummary(rawText);
     const qualityLevel = legacyPayload?.qualityLevel ?? normalizeQualityLevel(envelope.data.qualityLevel);
     const qualityReason = legacyPayload?.qualityReason
         || normalizeCompactText(envelope.data.qualityReason, MAX_SHARED_SUMMARY_CHARS)
         || ((legacyPayload?.validJson || envelope.validJson)
-            ? (diagnoses.length > 0 || medications.length > 0
+            ? (diagnoses.length > 0 || filteredMedications.length > 0
                 ? 'Dati clinici strutturati estratti'
                 : 'Analisi completata con dati parziali')
             : 'JSON del modello non valido');
@@ -613,10 +828,11 @@ export function parseDocumentSynthesisExtractionResponse(
             data: {
                 qualityLevel,
                 qualityReason,
-                medications,
+                medications: filteredMedications,
                 diagnoses,
                 problemStatements,
-                therapyCandidates,
+                therapyCandidates: filteredTherapyCandidates,
+                servicePrescriptions,
             },
         },
     };
@@ -742,6 +958,30 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
         "evidence": "breve evidenza testuale locale",
         "sourceId": "id della fonte usata"
       }
+    ],
+    "servicePrescriptions": [
+      {
+        "serviceName": "contenitore prescrittivo non farmacologico",
+        "category": "lab|imaging|visit|rehab|screening|procedure|other",
+        "priority": "priorita se esplicita",
+        "codeSystem": "sistema di codifica se esplicito",
+        "serviceCode": "codice contenitore se esplicito",
+        "clinicalQuestion": "quesito o motivazione se esplicita",
+        "requestReference": "riferimento impegnativa se esplicito",
+        "confidence": "high|medium|low",
+        "evidence": "breve evidenza testuale locale",
+        "sourceId": "id della fonte usata",
+        "items": [
+          {
+            "serviceName": "singola prestazione o analita esplicito",
+            "category": "lab|imaging|visit|rehab|screening|procedure|other",
+            "codeSystem": "sistema di codifica se esplicito",
+            "serviceCode": "codice se esplicito",
+            "confidence": "high|medium|low",
+            "evidence": "evidenza atomica del singolo atto"
+          }
+        ]
+      }
     ]
   }`,
         [
@@ -755,6 +995,9 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
             'sourceId deve coincidere esattamente con un id presente nelle fonti fornite',
             'massimo 5 diagnosi e 10 terapie',
             'ogni terapia deve rappresentare un singolo farmaco distinto',
+            'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',
+            'se una ricetta/impegnativa prescrive una prestazione specialistica, usa servicePrescriptions e non therapies anche se usa parole come prescritta o richiesta',
+            'se una richiesta non farmacologica contiene piu atti, conserva il contenitore in serviceName e spacchetta i singoli atti in items',
             'per le terapie usa drugQuery come chiave breve per ricerca catalogo AIFA, preferendo brand o principio attivo con strength se esplicita ma senza frequenza, orari o note accessorie',
             'drugMention e activePrinciple devono essere il piu possibile aderenti al testo sorgente; se il principio attivo e ovvio usa una forma compatibile con il catalogo locale AIFA',
             'in therapies includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
@@ -813,6 +1056,31 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
         "confidence": "high|medium|low",
         "evidence": "breve evidenza testuale locale"
       }
+    ],
+    "servicePrescriptions": [
+      {
+        "serviceName": "visita, esame, imaging, riabilitazione, screening o procedura prescritta",
+        "category": "lab|imaging|visit|rehab|screening|procedure|other",
+        "priority": "priorita se esplicita",
+        "codeSystem": "sistema di codifica se esplicito",
+        "serviceCode": "codice prestazione se esplicito",
+        "clinicalQuestion": "quesito o motivazione se esplicita",
+        "provider": "struttura o specialita se esplicita",
+        "prescribedAt": "data prescrizione se esplicita",
+        "requestReference": "riferimento impegnativa se esplicito",
+        "confidence": "high|medium|low",
+        "evidence": "breve evidenza testuale locale",
+        "items": [
+          {
+            "serviceName": "singolo atto richiesto, es. EMOCROMO o AST",
+            "category": "lab|imaging|visit|rehab|screening|procedure|other",
+            "codeSystem": "sistema di codifica se esplicito",
+            "serviceCode": "codice del singolo atto se esplicito",
+            "confidence": "high|medium|low",
+            "evidence": "evidenza atomica del singolo atto"
+          }
+        ]
+      }
     ]
   }`,
         [
@@ -820,6 +1088,11 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
             'summary deve essere un riassunto clinico conciso in plain text, senza markdown',
             'summary massimo 2 frasi brevi e non oltre 220 caratteri circa',
             'in medications includi solo terapie esplicite e correnti nel testo OCR, senza duplicati e senza presidi, detergenti o indicazioni non farmacologiche',
+            'non inserire in medications o therapyCandidates visite specialistiche, prestazioni, esami, controlli, consulenze, impegnative o referral: sono prescrizioni di prestazione, non farmaci',
+            'se il documento e una ricetta/impegnativa per prestazione specialistica, usa servicePrescriptions e lascia medications e therapyCandidates vuoti salvo farmaci espliciti separati',
+            'in servicePrescriptions includi visite specialistiche, laboratorio, imaging, riabilitazione, screening o procedure prescritte; non copiarle in medications o therapyCandidates',
+            'se una richiesta contiene un pannello o piu prestazioni, mantieni il contenitore in serviceName e spacchetta i singoli atti in items, uno per riga clinicamente distinta',
+            'per esami ematochimici esplicita items separati come EMOCROMO, D-DIMERO, LDH, AST, ALT, VITAMINA D quando presenti nel testo; non inventare atti non citati',
             'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR; se il documento non riporta codici espliciti restituisci diagnoses come array vuoto e non inventare placeholder o code vuoti',
             'in problemStatements includi solo patologie attuali, attive o clinicamente rilevanti per la gestione corrente anche se prive di codice esplicito',
             'problemStatements deve usare label in italiano clinico sintetico e icdQuery breve in inglese',
@@ -830,7 +1103,7 @@ export function buildDocumentSynthesisExtractionPrompt(rawText: string): string 
             'non marcare active antibiotici, profilassi, nutrizione enterale o terapie di degenza se non ricompaiono nella terapia alla dimissione o domiciliare',
             'se una terapia domiciliare pre-ricovero sembra sostituita da una nuova terapia alla dimissione nello stesso ambito terapeutico, usa transition o uncertain per la terapia precedente',
             'se una terapia ha durata breve, data di stop, oppure testo come fino al, poi stop, sospendere, usa transition o inactive invece di active',
-            'massimo 6 medications, massimo 4 problemStatements e massimo 6 therapyCandidates; se il documento contiene piu elementi tieni solo quelli piu correnti e clinicamente utili',
+            'massimo 6 medications, massimo 4 problemStatements, massimo 6 therapyCandidates e massimo 10 servicePrescriptions; se il documento contiene piu elementi tieni solo quelli piu correnti e clinicamente utili',
             'se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain invece di active',
             'evidence deve restare atomica e riferita al singolo problema o farmaco',
             'non inventare posologie, farmaci o codici mancanti',

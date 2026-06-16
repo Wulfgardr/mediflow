@@ -20,7 +20,7 @@ Riferimenti correlati:
     Esegui questo comando nel terminale. Al primo avvio scarica circa 500MB+ di dati.
 
     ```bash
-    docker run -d --name icd-api -p 8888:80 --restart unless-stopped whoicd/icd-api
+    docker run -d --name icd-api -p 127.0.0.1:8888:80 --restart unless-stopped whoicd/icd-api
     ```
 
     *Nota: verifica che la porta `8888` sia libera.*

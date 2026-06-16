@@ -82,24 +82,51 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         });
         assert.equal(missingSession.response.status, 401);
 
+        const createBody = {
+            id: `network-diary-${crypto.randomUUID()}`,
+            type: 'note',
+            title: 'Diario rete',
+            date: '2026-05-02T09:00:00.000Z',
+            content: 'prima nota',
+            setting: 'ambulatory',
+            metadata: { lane: 'network-diary-write-smoke' },
+        };
         const create = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
                 Cookie: sessionCookie,
             },
-            body: {
-                type: 'note',
-                title: 'Diario rete',
-                date: '2026-05-02T09:00:00.000Z',
-                content: 'prima nota',
-                setting: 'ambulatory',
-                metadata: { lane: 'network-diary-write-smoke' },
-            },
+            body: createBody,
         });
         assert.equal(create.response.status, 201);
         const entryId = create.json?.id;
         assert.ok(typeof entryId === 'string' && entryId.length > 0);
+        assert.equal(entryId, createBody.id);
         assert.equal(create.json?.version, 1);
+
+        const idempotentCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: createBody,
+        });
+        assert.equal(idempotentCreate.response.status, 200);
+        assert.equal(idempotentCreate.json?.id, entryId);
+        assert.equal(idempotentCreate.json?.version, 1);
+        assert.equal(idempotentCreate.json?.idempotent, true);
+
+        const conflictingCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                ...createBody,
+                content: 'payload diverso',
+            },
+        });
+        assert.equal(conflictingCreate.response.status, 409);
 
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
@@ -201,7 +228,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(deletedDetail.json?.version, 3);
         assert.equal(deletedDetail.json?.deletedAt, '2026-05-02T10:00:00.000Z');
 
-        const createdAudit = await findAuditEvent('entry.created', entryId);
+        const createdAudit = await findAuditEvent('entry.created', entryId, sessionCookie);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -209,11 +236,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['type', 'title', 'date', 'content', 'setting', 'metadata']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('entry.updated', entryId);
+        const updatedAudit = await findAuditEvent('entry.updated', entryId, sessionCookie);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['content']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('entry.deleted', entryId);
+        const deletedAudit = await findAuditEvent('entry.deleted', entryId, sessionCookie);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -225,6 +252,8 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             readOnlyForbiddenStatus: readOnlyCreate.response.status,
             missingSessionStatus: missingSession.response.status,
             createStatus: create.response.status,
+            idempotentCreateStatus: idempotentCreate.response.status,
+            conflictingCreateStatus: conflictingCreate.response.status,
             updateStatus: update.response.status,
             conflictStatus: conflict.response.status,
             attachmentStatus: attachmentWrite.response.status,
@@ -237,9 +266,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
     }
 });
 
-async function findAuditEvent(eventType, subjectRef) {
+async function findAuditEvent(eventType, subjectRef, sessionCookie) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=entry&limit=20`, {
-        headers: localApiHeaders(),
+        headers: {
+            Cookie: sessionCookie,
+        },
     });
     assert.equal(audit.response.status, 200);
     assert.ok(Array.isArray(audit.json));
@@ -335,7 +366,8 @@ async function cleanupPatient(patientId) {
             if (!entry?.id || entry.deletedAt) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
                 headers: localApiHeaders(),
-                body: { deletionReason: 'network-home-base-diary-write-cleanup' },
+                // WUL-308: child DELETEs require optimistic concurrency.
+                body: { version: entry.version, deletionReason: 'network-home-base-diary-write-cleanup' },
             });
             assert.equal(deletion.response.status, 200);
         }

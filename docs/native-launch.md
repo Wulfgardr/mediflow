@@ -28,6 +28,36 @@ Questo script:
 - compila il client nativo
 - apre l'app macOS
 
+Dentro l'app, il pannello `Runtime` puo avviare/arrestare esplicitamente il
+backend web production standalone e il proxy TLS inclusi nel bundle. I servizi
+opzionali Ollama e Docker/ICD sono mostrati come health diagnostico read-only
+quando gia attivi su `127.0.0.1:11434` e `127.0.0.1:8888`, ma restano fuori
+dalla supervisione app-managed e continuano a richiedere gestione separata.
+Gli stop di backend/proxy usano una finestra ordinata breve e poi escalation
+locale, cosi i PID stale non bloccano il ciclo successivo.
+
+Prima di impacchettare il backend standalone nel bundle, eseguire:
+
+```bash
+npm run build
+npm run check:standalone-runtime-bundle
+```
+
+Il guard fallisce se `.next/standalone` contiene database locali, directory
+temporanee o documentazione privata/non-runtime.
+
+Firma e notarizzazione restano esplicite:
+
+```bash
+MEDIFLOW_CODESIGN_IDENTITY="-" bash scripts/build-native-app.sh
+MEDIFLOW_CODESIGN_IDENTITY="Developer ID Application: ..." \
+MEDIFLOW_NOTARY_PROFILE="mediflow-notary" \
+bash scripts/build-native-app.sh
+```
+
+Senza queste variabili lo script produce un bundle locale non firmato. La
+notarizzazione richiede una Developer ID reale, non firma ad-hoc.
+
 ## Avvio manuale
 
 ```bash

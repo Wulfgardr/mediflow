@@ -85,8 +85,9 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
     });
   });
 
-  await page.getByRole('link', { name: 'Impostazioni' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
+  // WUL-297: governance/readiness now lives on the AI functions sub-route.
+  await page.goto('/settings/ai/funzioni');
+  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');
   await expect(panel.getByRole('heading', { name: 'AI rollout readiness' })).toBeVisible();

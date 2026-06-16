@@ -21,5 +21,5 @@ export function getDataDir(): string {
 }
 
 export function resolveDataPath(...segments: string[]): string {
-    return path.join(getDataDir(), ...segments);
+    return path.join(/* turbopackIgnore: true */ getDataDir(), ...segments);
 }

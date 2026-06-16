@@ -33,6 +33,7 @@ PIN=$(openssl x509 -in "$CERT_PATH" -outform der | shasum -a 256 | awk '{print $
 
 CONFIG_DIR="$DATA_DIR"
 CONFIG_PATH="$CONFIG_DIR/native-config.json"
+RUNTIME_STATUS_PATH="$CONFIG_DIR/runtime-status.json"
 
 mkdir -p "$CONFIG_DIR"
 
@@ -69,8 +70,40 @@ cat > "$CONFIG_PATH" <<JSON
 }
 JSON
 
+write_runtime_status() {
+  MEDIFLOW_RUNTIME_STATUS_PATH="$RUNTIME_STATUS_PATH" \
+  MEDIFLOW_RUNTIME_BASE_URL="https://localhost:${PORT}/api/v1" \
+  MEDIFLOW_RUNTIME_TLS_PIN="$PIN" \
+  MEDIFLOW_RUNTIME_NETWORK_MODE="$NETWORK_MODE" \
+  MEDIFLOW_RUNTIME_PORT="$PORT" \
+  MEDIFLOW_RUNTIME_BIND_HOST="$BIND_HOST" \
+  MEDIFLOW_RUNTIME_HTTP_TARGET="$HTTP_TARGET" \
+  MEDIFLOW_RUNTIME_CERT_PATH="$CERT_PATH" \
+  MEDIFLOW_RUNTIME_KEY_PATH="$KEY_PATH" \
+  MEDIFLOW_RUNTIME_PROXY_PID_PATH="$CONFIG_DIR/local-api-tls-proxy.pid" \
+  node <<'NODE'
+const fs = require('fs');
+
+const status = {
+  generatedAt: new Date().toISOString(),
+  baseURL: process.env.MEDIFLOW_RUNTIME_BASE_URL,
+  tlsPin: process.env.MEDIFLOW_RUNTIME_TLS_PIN,
+  networkMode: process.env.MEDIFLOW_RUNTIME_NETWORK_MODE,
+  port: Number(process.env.MEDIFLOW_RUNTIME_PORT),
+  bindHost: process.env.MEDIFLOW_RUNTIME_BIND_HOST,
+  httpTarget: process.env.MEDIFLOW_RUNTIME_HTTP_TARGET,
+  certPath: process.env.MEDIFLOW_RUNTIME_CERT_PATH,
+  keyPath: process.env.MEDIFLOW_RUNTIME_KEY_PATH,
+  proxyPidPath: process.env.MEDIFLOW_RUNTIME_PROXY_PID_PATH
+};
+
+fs.writeFileSync(process.env.MEDIFLOW_RUNTIME_STATUS_PATH, `${JSON.stringify(status, null, 2)}\n`, { mode: 0o600 });
+NODE
+}
+
 if lsof -n -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "TLS proxy already running on port ${PORT}."
+  write_runtime_status
 else
   echo "Starting TLS proxy on https://${BIND_HOST}:${PORT} ..."
   MEDIFLOW_TLS_CERT_PATH="$CERT_PATH" \
@@ -81,8 +114,10 @@ else
   MEDIFLOW_TLS_NETWORK_MODE="$NETWORK_MODE" \
   node "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" &
   echo $! > "$CONFIG_DIR/local-api-tls-proxy.pid"
+  write_runtime_status
 fi
 
 echo "\nSetup complete."
 echo "Config: $CONFIG_PATH"
+echo "Runtime status: $RUNTIME_STATUS_PATH"
 echo "TLS pin: $PIN"

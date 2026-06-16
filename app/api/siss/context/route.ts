@@ -1,13 +1,15 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import { dbServer } from '@/lib/db-server';
 /* @Codex */
 import { patients } from '@/lib/schema';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): soft-deleted patients are not addressable for SISS handoffs
+import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { safeWriteAuditEventFromRequest } from '@/lib/audit';
 /* @Codex */
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
         const patient = await dbServer
             .select({ id: patients.id, taxCode: patients.taxCode })
             .from(patients)
-            .where(eq(patients.id, patientId))
+            .where(and(eq(patients.id, patientId), activePatients()))
             .get();
         if (!patient) {
             return NextResponse.json({ error: 'Patient not found' }, { status: 404 });

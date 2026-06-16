@@ -225,7 +225,12 @@ private struct ObservationEditorView: View {
 
         do {
             if let observation {
+                guard let version = observation.version else {
+                    errorMessage = PatientDetailView.missingVersionMessage
+                    return
+                }
                 let payload = try draft.makeUpdatePayload(
+                    version: version,
                     loincOptions: loincOptions,
                     ucumOptions: ucumOptions
                 )
@@ -250,9 +255,13 @@ private struct ObservationEditorView: View {
         } catch let error as ObservationEditorValidationError {
             errorMessage = error.errorDescription
         } catch {
-            errorMessage = observation == nil
-                ? "Creazione osservazione fallita"
-                : "Aggiornamento osservazione fallito"
+            if let apiError = error as? LocalAPIError, case .versionConflict = apiError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = observation == nil
+                    ? "Creazione osservazione fallita"
+                    : "Aggiornamento osservazione fallito"
+            }
         }
     }
 

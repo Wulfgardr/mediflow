@@ -82,6 +82,7 @@ export function GlassCommandCapsule({
                                 <button
                                     key={mode}
                                     type="button"
+                                    data-testid={`patients-view-mode-${mode}`}
                                     onClick={() => onViewModeChange(mode)}
                                     className={cn(
                                         'min-w-0 flex-1 px-3 py-2 text-[12px] font-semibold transition-[background-color,color,box-shadow]',

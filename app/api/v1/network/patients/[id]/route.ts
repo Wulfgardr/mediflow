@@ -14,6 +14,7 @@ import {
     NETWORK_PATIENT_WRITE_CAPABILITY,
     updateNetworkScopedPatient,
 } from '@/lib/network-patient-write';
+import { getNetworkModeGateResponse } from '@/lib/network-write-context';
 /* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
 
@@ -35,6 +36,11 @@ async function requireNetworkPatientWriteContext(
 > {
     const pairedClient = await authenticateNetworkPairedClient(request);
     if (!pairedClient) return { ok: false, response: unauthorizedResponse() };
+
+    // WUL-307: paired-client tokens are inert while home-base mode is off.
+    const modeGateResponse = await getNetworkModeGateResponse();
+    if (modeGateResponse) return { ok: false, response: modeGateResponse };
+
     if (!pairedClient.grantedCapabilities.includes(NETWORK_PATIENT_WRITE_CAPABILITY)) {
         return { ok: false, response: forbiddenResponse() };
     }
@@ -66,6 +72,11 @@ async function requireNetworkPatientWriteContext(
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const pairedClient = await authenticateNetworkPairedClient(request);
     if (!pairedClient) return unauthorizedResponse();
+
+    // WUL-307: paired-client tokens are inert while home-base mode is off.
+    const modeGateResponse = await getNetworkModeGateResponse();
+    if (modeGateResponse) return modeGateResponse;
+
     if (!pairedClient.grantedCapabilities.includes('network.replica.readonly-patients')) {
         return forbiddenResponse();
     }

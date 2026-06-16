@@ -2,15 +2,30 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Building2, Copy, RotateCcw, Scissors, Search, UserPlus } from 'lucide-react';
+import {
+    Activity,
+    ArrowUpRight,
+    Building2,
+    CalendarClock,
+    Copy,
+    FileSearch,
+    HeartPulse,
+    RotateCcw,
+    Scissors,
+    Search,
+    ShieldCheck,
+    UserPlus,
+} from 'lucide-react';
 
 import { CaseLensPanel } from '@/components/case-lens-panel';
 import { ClinicalStreamRow } from '@/components/clinical-stream-row';
 import { GlassCommandCapsule } from '@/components/glass-command-capsule';
 import { PatientAgendaWorklist } from '@/components/patient-agenda-worklist';
+import PrivacyBlur from '@/components/privacy-blur';
 import { db, type Ambulatory, type Patient } from '@/lib/db';
 import { usePatientClipboard } from '@/hooks/use-patient-clipboard';
 import { useLiveQuery, notifyDbChange } from '@/lib/live-query';
+import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 function readCookie(name: string) {
     if (typeof document === 'undefined') return null;
@@ -36,6 +51,35 @@ function getAmbulatoryColor(id: string): typeof AMBULATORY_COLORS[0] {
         hash |= 0;
     }
     return AMBULATORY_COLORS[Math.abs(hash) % AMBULATORY_COLORS.length];
+}
+
+/* @Codex */
+function getPatientAgeLabel(patient: Patient): string {
+    const birthYear = patient.birthDate
+        ? new Date(patient.birthDate).getFullYear()
+        : estimateBirthYearFromTaxCode(patient.taxCode);
+
+    return birthYear ? `${calculateAge(birthYear)} anni` : 'Età n/d';
+}
+
+/* @Codex */
+function getPatientLeadDiagnosis(patient: Patient): string {
+    const diagnosis = Array.isArray(patient.diagnoses) ? patient.diagnoses[0] : null;
+    if (diagnosis) return `${diagnosis.code} · ${diagnosis.description}`;
+    if (patient.isArchived) return 'Percorso chiuso, consultabile come storico clinico.';
+    if (patient.isAdi) return 'Percorso territoriale attivo con continuità domiciliare.';
+    return 'Scheda pronta per diario, documenti e revisione clinica.';
+}
+
+/* @Codex */
+function formatTouchedLabel(patient?: Patient | null): string {
+    if (!patient) return 'Nessun caso';
+    const rawDate = patient.updatedAt || patient.createdAt;
+    if (!rawDate) return 'Nessun aggiornamento';
+    return new Intl.DateTimeFormat('it-IT', {
+        day: '2-digit',
+        month: 'short',
+    }).format(new Date(rawDate));
 }
 
 interface PatientGroup {
@@ -175,6 +219,21 @@ export default function PatientList() {
         ? ambulatories?.find((ambulatory) => ambulatory.id === currentAmbulatoryId)
         : null;
 
+    /* @Codex */
+    const activeAmbulatoryCount = patientGroups.length || (currentAmbulatory ? 1 : 0);
+
+    /* @Codex */
+    const workbenchScopeLabel = isGlobalView
+        ? `${activeAmbulatoryCount} contenitori`
+        : currentAmbulatory?.name || 'Ambulatorio locale';
+
+    /* @Codex */
+    const heroStatusLabel = focusedPatient?.isArchived
+        ? 'Archiviato'
+        : focusedPatient?.isAdi
+            ? 'Territorio attivo'
+            : 'Follow-up';
+
     useEffect(() => {
         if (!patients || patients.length === 0) {
             setFocusedPatientId(null);
@@ -285,7 +344,7 @@ export default function PatientList() {
     };
 
     const renderStream = (items: Patient[], ambulatoryName?: string) => (
-        <div className="space-y-0">
+        <div className="patient-liquid-stream grid gap-3">
             {items.map((patient) => (
                 <ClinicalStreamRow
                     key={patient.id}
@@ -354,42 +413,8 @@ export default function PatientList() {
     ) : null;
 
     const workbenchContent = (
-        <div className="patient-workbench-shell grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_390px] xl:items-start">
-            <section className="patient-inbox-pane rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.86)] p-4 shadow-[0_18px_36px_rgba(35,27,22,0.06)] backdrop-blur-xl">
-                <div className="patient-workbench-header mb-4 flex flex-col gap-3 border-b border-[color:rgba(112,106,100,0.12)] pb-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="space-y-1.5">
-                        <p className="section-kicker">
-                            {isGlobalView ? 'Patient Inbox' : 'Inbox locale'}
-                        </p>
-                        <h1 className="text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)]">
-                            {currentAmbulatory?.name || 'Inbox pazienti'}
-                        </h1>
-                        <p className="max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                            {isGlobalView
-                                ? `${patients?.length || 0} casi distribuiti in ${patientGroups.length} contenitori clinici. Lista a sinistra, lettura del caso a destra.`
-                                : 'Filtro, selezione e lettura del caso nella stessa superficie, senza dashboard centrale.'}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            href="/analytics"
-                            className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/76 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
-                        >
-                            <Activity className="h-4 w-4" />
-                            Board operativa
-                        </Link>
-                        <button
-                            type="button"
-                            onClick={() => notifyDbChange()}
-                            className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/76 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)] dark:bg-white/6"
-                        >
-                            <RotateCcw className="h-4 w-4" />
-                            Aggiorna
-                        </button>
-                    </div>
-                </div>
-
+        <div className="patient-liquid-workbench space-y-5">
+            <section className="patient-liquid-commandbar glass-command-capsule border p-3">
                 <GlassCommandCapsule
                     variant="workbench"
                     search={search}
@@ -400,7 +425,128 @@ export default function PatientList() {
                     onSortModeChange={setSortMode}
                     density={isGlobalView ? density : undefined}
                     onDensityChange={isGlobalView ? setDensity : undefined}
+                    className="border-0 bg-transparent p-0 shadow-none"
                 />
+            </section>
+
+            <section className="patient-liquid-hero grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
+                <article className="patient-liquid-lens mediflow-vitreous-panel relative overflow-hidden rounded-[32px] border p-6 md:p-8">
+                    <div className="relative z-10 max-w-3xl">
+                        <p className="section-kicker">
+                            {isGlobalView ? 'Tutte le schede' : 'Questo ambulatorio'}
+                        </p>
+                        <h1 className="patient-liquid-name mt-4 text-[clamp(2.65rem,7vw,6rem)] font-semibold leading-[0.9] text-[color:var(--mf-ink)]">
+                            {focusedPatient ? (
+                                <PrivacyBlur>{focusedPatient.lastName} {focusedPatient.firstName}</PrivacyBlur>
+                            ) : (
+                                'Inbox pazienti'
+                            )}
+                        </h1>
+                        <p className="mt-5 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)] md:text-base">
+                            {focusedPatient
+                                ? getPatientLeadDiagnosis(focusedPatient)
+                                : `${patients?.length || 0} casi visibili. Seleziona un paziente per aprire la lente clinica.`}
+                        </p>
+                    </div>
+
+                    <div className="patient-liquid-chip-row relative z-10 mt-8 flex flex-wrap gap-2">
+                        <span className="graphite-chip rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/56 px-3 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] dark:bg-white/6">
+                            {heroStatusLabel}
+                        </span>
+                        <span className="graphite-chip rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/56 px-3 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] dark:bg-white/6">
+                            {focusedPatient ? getPatientAgeLabel(focusedPatient) : workbenchScopeLabel}
+                        </span>
+                        <span className="graphite-chip rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/56 px-3 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] dark:bg-white/6">
+                            {patients?.length || 0} casi visibili
+                        </span>
+                        <span className="graphite-chip rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/56 px-3 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] dark:bg-white/6">
+                            Nessun egress cloud
+                        </span>
+                    </div>
+                </article>
+
+                <aside className="patient-liquid-signals mediflow-vitreous-side-panel rounded-[32px] border p-4 md:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="section-kicker">Segnali</p>
+                            <h2 className="mt-2 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                Nodo operativo
+                            </h2>
+                        </div>
+                        <ShieldCheck className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                    </div>
+
+                    <div className="mt-5 grid gap-2">
+                        <div className="patient-liquid-signal">
+                            <FileSearch className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                            <div>
+                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Caso in lente</p>
+                                <p className="text-xs text-[color:var(--mf-muted)]">
+                                    {focusedPatient ? formatTouchedLabel(focusedPatient) : 'Nessuna selezione'}
+                                </p>
+                            </div>
+                            <span>{focusedPatient ? 'live' : 'idle'}</span>
+                        </div>
+
+                        <div className="patient-liquid-signal">
+                            <CalendarClock className="h-4 w-4 text-[color:var(--mf-accent)]" />
+                            <div>
+                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Ambito</p>
+                                <p className="text-xs text-[color:var(--mf-muted)]">{workbenchScopeLabel}</p>
+                            </div>
+                            <span>{viewMode === 'active' ? 'attivi' : 'storico'}</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                        <Link
+                            href={focusedPatient ? `/patients/${focusedPatient.id}` : '/patients/new'}
+                            className="ui-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold"
+                        >
+                            {focusedPatient ? 'Apri scheda' : 'Nuovo caso'}
+                            <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                        <Link
+                            href={focusedPatient ? `/patients/${focusedPatient.id}/entries/new` : '/analytics'}
+                            className="inline-flex items-center justify-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/68 px-4 py-2.5 text-sm font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                        >
+                            {focusedPatient ? 'Nuova voce clinica' : 'Board operativa'}
+                            <HeartPulse className="h-4 w-4" />
+                        </Link>
+                    </div>
+                </aside>
+            </section>
+
+            <div className="patient-workbench-shell grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_390px] xl:items-start">
+                <section className="patient-inbox-pane rounded-[24px] border p-4">
+                    <div className="patient-workbench-header mb-4 flex flex-col gap-3 border-b border-[color:rgba(112,106,100,0.12)] pb-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="space-y-1.5">
+                            <p className="section-kicker">
+                                Timeline pazienti
+                            </p>
+                            <h2 className="text-xl font-semibold tracking-tight text-[color:var(--mf-ink)]">
+                                {currentAmbulatory?.name || 'Flusso clinico'}
+                            </h2>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                                href="/analytics"
+                                className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/76 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.24)] hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                            >
+                                <Activity className="h-4 w-4" />
+                                Board operativa
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={() => notifyDbChange()}
+                                className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(112,106,100,0.14)] bg-white/76 px-3.5 py-2 text-[12px] font-semibold text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-primary)] dark:bg-white/6"
+                            >
+                                <RotateCcw className="h-4 w-4" />
+                                Aggiorna
+                            </button>
+                        </div>
+                    </div>
 
                 {patients && patients.length > 0 ? (
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1">
@@ -439,7 +585,7 @@ export default function PatientList() {
                                             {group.patients.length} casi
                                         </span>
                                     </div>
-                                    <div className="overflow-hidden rounded-[18px] border border-[color:rgba(112,106,100,0.1)] bg-[color:rgba(255,255,255,0.58)] dark:bg-white/4">
+                                    <div className="patient-liquid-stream-shell overflow-hidden rounded-[26px] border border-[color:rgba(112,106,100,0.1)] bg-[color:rgba(255,255,255,0.58)] p-2 dark:bg-white/4">
                                         {renderStream(
                                             group.patients,
                                             density === 'wide' ? group.ambulatory?.name ?? undefined : undefined,
@@ -489,7 +635,7 @@ export default function PatientList() {
                                     {patients.length} casi
                                 </span>
                             </div>
-                            <div className="overflow-hidden rounded-[18px] border border-[color:rgba(112,106,100,0.1)] bg-[color:rgba(255,255,255,0.58)] dark:bg-white/4">
+                            <div className="patient-liquid-stream-shell overflow-hidden rounded-[26px] border border-[color:rgba(112,106,100,0.1)] bg-[color:rgba(255,255,255,0.58)] p-2 dark:bg-white/4">
                                 {renderStream(patients, currentAmbulatory?.name)}
                             </div>
                         </section>
@@ -526,9 +672,10 @@ export default function PatientList() {
                         </div>
                     )}
                 </div>
-            </section>
+                </section>
 
-            <CaseLensPanel variant="reader" patient={focusedPatient} ambulatoryName={focusedAmbulatoryName} />
+                <CaseLensPanel variant="reader" patient={focusedPatient} ambulatoryName={focusedAmbulatoryName} />
+            </div>
         </div>
     );
 

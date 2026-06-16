@@ -126,7 +126,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
             setForm(emptyForm());
             setIsFormOpen(false);
         } catch (submitError) {
-            setError(submitError instanceof Error ? submitError.message : 'Salvataggio handoff SISS non riuscito.');
+            setError(submitError instanceof Error ? submitError.message : 'Salvataggio passaggio SISS non riuscito.');
         } finally {
             setIsSaving(false);
         }
@@ -148,7 +148,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
             setClosureNextAction('');
             setClosureOutcome('completed');
         } catch (submitError) {
-            setError(submitError instanceof Error ? submitError.message : 'Chiusura handoff SISS non riuscita.');
+            setError(submitError instanceof Error ? submitError.message : 'Chiusura passaggio SISS non riuscita.');
         } finally {
             setIsSaving(false);
         }
@@ -161,20 +161,20 @@ export default function SissHandoffDiary({ patientId }: Props) {
     };
 
     return (
-        <section className="patient-detail-section rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.88)] p-5 shadow-[0_16px_30px_rgba(35,27,22,0.06)] backdrop-blur-xl md:p-6">
+        <section className="patient-detail-section rounded-[20px] border p-5 md:p-6">
             <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                     <p className="section-kicker">SISS</p>
                     <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
                         <ClipboardCheck className="h-5 w-5 text-[color:var(--mf-primary)]" />
-                        Diario handoff regionali
+                        Diario portali regionali
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
                         Registra il motivo dell&apos;apertura del portale, l&apos;esito e il prossimo passo. Il dato resta locale: l&apos;atto regionale avviene nel portale ufficiale.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <span className="apple-chip">{handoffs?.length ?? 0} handoff</span>
+                    <span className="apple-chip">{handoffs?.length ?? 0} passaggi</span>
                     <span className="apple-chip">{handoffs?.filter((item) => item.outcome === 'started').length ?? 0} aperti</span>
                     <button
                         type="button"
@@ -226,7 +226,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
                         className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--mf-ink)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--mf-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                        Chiudi handoff
+                        Chiudi passaggio
                     </button>
                 </div>
             ) : null}
@@ -274,7 +274,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
             {!handoffs || handoffs.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
                     <p className="text-sm text-[color:var(--mf-muted)]">
-                        Nessun handoff SISS registrato per questo paziente.
+                        Nessun passaggio SISS registrato per questo paziente.
                     </p>
                 </div>
             ) : (
@@ -292,7 +292,7 @@ export default function SissHandoffDiary({ patientId }: Props) {
                                     type="button"
                                     onClick={() => void deleteItem(item)}
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:rgba(112,106,100,0.12)] text-[color:var(--mf-muted)] transition-colors hover:border-rose-200 hover:text-rose-700"
-                                    aria-label="Elimina handoff SISS"
+                                    aria-label="Elimina passaggio SISS"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </button>

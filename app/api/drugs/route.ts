@@ -16,8 +16,19 @@ export async function GET(request: Request) {
     // Basic search implementation or fetch all
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q')?.trim();
+    /* @Codex */
+    const countOnly = searchParams.get('count') === '1';
 
     try {
+        /* @Codex */
+        if (countOnly) {
+            const row = await dbServer
+                .select({ total: sql<number>`count(*)` })
+                .from(drugs)
+                .get();
+            return NextResponse.json({ count: Number(row?.total || 0) });
+        }
+
         if (query) {
             const results = await dbServer.select().from(drugs)
                 .where(sql`

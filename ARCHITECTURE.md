@@ -1,4 +1,4 @@
-# ARCHITECTURE — MediFlow
+# ARCHITECTURE: MediFlow
 
 Questo documento descrive l'**architettura stabile ad alto livello** di MediFlow.
 Deve cambiare raramente: qui ci sono i confini, non i dettagli di implementazione.
@@ -13,14 +13,14 @@ Per il resto:
 
 ---
 
-## Obiettivi
+## 🎯 Obiettivi
 
 - **Local-first / offline-first** di default.
 - **Privacy-by-design**: nessuna uscita verso cloud (telemetria, sync, chiamate AI) se non esplicitamente implementata e documentata.
 - **Zero-knowledge a riposo**: il database SQLite deve essere illeggibile senza il PIN utente.
 - **Manutenibilità**: diff minimi, codice chiaro, contratti espliciti.
 
-## Non-obiettivi (per ora)
+## ⚠️ Non-obiettivi (per ora)
 
 - Sync completa via internet.
 - Modalità server multi-tenant.
@@ -28,7 +28,7 @@ Per il resto:
 
 ---
 
-## Panoramica del sistema
+## 🧱 Panoramica del sistema
 
 MediFlow è un **sistema ibrido locale**:
 
@@ -40,6 +40,8 @@ MediFlow è un **sistema ibrido locale**:
   - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti, write profilo/status e primi read/write diario clinico, terapie, checkup e osservazioni
 - Servizi locali opzionali:
   - Ollama per AI/OCR (localhost)
+  - Apple Vision OCR come fallback locale solo macOS quando l'OCR primario
+    produce output vuoto/degenerato
   - ICD-11 Docker API per ricerca diagnosi (localhost)
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
@@ -62,12 +64,13 @@ profilo/status paziente, diario clinico, terapie, checkup e osservazioni per cli
 | Next.js (UI + API) | `http://127.0.0.1:3000` | solo locale |
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | inoltra verso :3000 |
 | Ollama (AI/OCR) | `http://127.0.0.1:11434` | opzionale |
+| Apple Vision OCR | n/a | fallback OCR locale solo macOS; nessun fallback equivalente certificato Windows/Linux |
 | ICD-11 (Docker) | `http://127.0.0.1:8888` | opzionale |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
 ---
 
-## Confini di fiducia e modello di sicurezza
+## 🔒 Confini di fiducia e modello di sicurezza
 
 ### Dati a riposo
 
@@ -97,6 +100,9 @@ MediFlow espone due superfici API:
   - si attiva solo in modalita `network-home-base`
   - resta read-only-first, con write limitati a profilo/status paziente, diario clinico, terapie, checkup e osservazioni versionati
   - esclude hard delete remoto, attachment remoti, cataloghi, sync, cache offline e campi AI/documentali
+  - disattivare la modalita non revoca i pairing: i token dei client paired
+    diventano inerti e il data plane risponde `403 NETWORK_MODE_DISABLED`
+    finche la modalita non viene riattivata
   - richiede pairing esplicito del device + sessione operatore valida
 
 > Obiettivo: i client native non devono dipendere da scraping HTML o dettagli interni React/Next.
@@ -110,7 +116,7 @@ Ogni endpoint proxy verso servizi locali deve:
 
 ---
 
-## Flusso dati (alto livello)
+## 🗄️ Flusso dati (alto livello)
 
 ```mermaid
 flowchart TB
@@ -145,7 +151,7 @@ flowchart TB
 
 ---
 
-## Struttura repository (mappa mentale)
+## 📚 Struttura repository (mappa mentale)
 
 | Path | Responsabilità |
 | --- | --- |
@@ -158,7 +164,7 @@ flowchart TB
 
 ---
 
-## Contratti che devono restare stabili
+## 🔌 Contratti che devono restare stabili
 
 - Formato di cifratura e mapping dei campi cifrati (lato client).
 - Contratto **native API** (`/api/v1/*`):
@@ -166,17 +172,25 @@ flowchart TB
   - documentato
   - retrocompatibile all'interno della stessa major
 - `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
+- Cancellazione clinica reversibile: il DELETE di pazienti e delle
+  sotto-risorse cliniche e un tombstone soft-delete version-guarded; la
+  cancellazione fisica passa solo da strumenti amministrativi espliciti e
+  audited (vedi [ADR 0066](./docs/adr/0066-patient-soft-delete-lifecycle.md)).
 - `patients.documentInsights` puo convivere con artifact documentali piu ricchi, ma gli artifact persistiti restano locali e cifrati.
-- `Clinical Workbench / Graphite` resta l'unica shell web ufficiale su `main`;
-  nuove sperimentazioni non diventano selector runtime persistiti senza
-  workstream e decisione espliciti.
+- La root web `/` apre direttamente il cockpit Kree8 come unica shell ufficiale su
+  `main` (vedi [ADR 0060](./docs/adr/0060-kree8-cockpit-live-root-entry.md)); Graphite resta
+  riferimento storico per il principio no-selector e nuove sperimentazioni non
+  diventano selector runtime persistiti senza workstream e decisione espliciti.
 - Principio local-only: nessuna dipendenza cloud di default.
 - Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
+- Boundary OCR platform-specific: DeepSeek/Ollama resta OCR primario locale;
+  Apple Vision e fallback certificato solo su macOS; Windows/Linux non hanno
+  oggi un fallback OCR platform-specific equivalente dichiarato.
 
 ---
 
-## Come si cambiano le scelte architetturali
+## 🧭 Come si cambiano le scelte architetturali
 
 - Per ogni modifica non banale, scrivi un ADR in `docs/adr/`.
 - Mantieni gli ADR brevi e concreti (problema -> opzioni -> trade-off -> decisione -> thin slice).

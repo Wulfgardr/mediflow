@@ -5,9 +5,11 @@ import Link from 'next/link';
 /* @Codex */
 import { usePathname } from 'next/navigation';
 /* @Codex */
-import { Activity, BarChart3, LayoutDashboard, Settings, Sparkles, Users } from 'lucide-react';
+import { Activity, BarChart3, LayoutDashboard, Settings, Users } from 'lucide-react';
 /* @Codex */
 import { ThemeToggle } from '@/components/theme-toggle';
+// WUL-297: persistent privacy affordance in the app header.
+import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 /* @Codex */
 import { useSecurity } from '@/components/security-provider';
 /* @Codex */
@@ -23,8 +25,7 @@ const MOBILE_LINKS: Array<{ href: string; name: string; icon: typeof Users; matc
 
 /* @Codex */
 const MOBILE_SECONDARY_LINKS: Array<{ href: string; label: string; icon: typeof Users }> = [
-    { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/assistant', label: 'Assistant', icon: Sparkles },
+    { href: '/analytics', label: 'Analisi', icon: BarChart3 },
 ];
 
 /* @Codex */
@@ -43,7 +44,7 @@ export function MobileShellChrome() {
                             </span>
                         </Link>
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
-                            {user?.displayName || 'Clinical Flow'}
+                            {user?.displayName || 'Sessione locale'}
                         </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -65,6 +66,8 @@ export function MobileShellChrome() {
                                 </Link>
                             );
                         })}
+                        {/* WUL-297: persistent privacy affordance in the app header */}
+                        <PrivacyModeToggle />
                         <ThemeToggle />
                     </div>
                 </div>

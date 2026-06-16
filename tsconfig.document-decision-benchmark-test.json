@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-document-decision-benchmark-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/document-decision.ts",
+    "lib/document-decision-benchmark.ts",
+    "lib/document-decision-benchmark.test.ts"
+  ]
+}

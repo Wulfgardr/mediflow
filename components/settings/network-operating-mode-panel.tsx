@@ -21,9 +21,9 @@ function Badge({
 }) {
     const toneClass = {
         neutral: 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300',
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200',
-        warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200',
-        preview: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200',
+        success: 'border-slate-200/80 bg-white/76 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
+        warning: 'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
+        preview: 'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
     }[tone];
 
     return (
@@ -78,7 +78,7 @@ export default function NetworkOperatingModePanel() {
             await loadOverview();
         } catch (saveError) {
             console.error(saveError);
-            setError('Impossibile aggiornare la modalita operativa.');
+            setError('Impossibile aggiornare la modalità operativa.');
         } finally {
             setIsSavingMode(false);
         }
@@ -88,12 +88,12 @@ export default function NetworkOperatingModePanel() {
         <div className="apple-subsection min-w-[260px] sm:col-span-2">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="section-kicker">Modalita operativa</p>
+                    <p className="section-kicker">Modalità operativa</p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
                         {viewModel?.currentState.title ?? 'Lettura stato nodo'}
                     </h3>
                     <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-500 dark:text-slate-400">
-                        {viewModel?.currentState.description ?? 'Rendiamo esplicita la differenza tra locale puro, home-base pronta e stati futuri ancora in anteprima.'}
+                        {viewModel?.currentState.description ?? 'Lettura dello stato del nodo in corso.'}
                     </p>
                 </div>
                 {isLoading ? (
@@ -117,7 +117,7 @@ export default function NetworkOperatingModePanel() {
                     className={cn(
                         INPUT_SEGMENT_CLASS,
                         overview?.session.operatingMode === 'local-only'
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/10 dark:text-emerald-200'
+                            ? 'border-slate-300 bg-slate-50 text-slate-900 dark:border-white/20 dark:bg-white/10 dark:text-slate-100'
                             : 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
                     )}
                 >
@@ -131,7 +131,7 @@ export default function NetworkOperatingModePanel() {
                     className={cn(
                         INPUT_SEGMENT_CLASS,
                         overview?.session.operatingMode === 'network-home-base'
-                            ? 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-900/10 dark:text-sky-200'
+                            ? 'border-slate-300 bg-slate-50 text-slate-900 dark:border-white/20 dark:bg-white/10 dark:text-slate-100'
                             : 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
                     )}
                 >
@@ -183,7 +183,7 @@ export default function NetworkOperatingModePanel() {
                         className={cn(
                             'rounded-[18px] border p-4 transition-colors',
                             state.code === viewModel.currentState.code
-                                ? 'border-sky-300/80 bg-sky-50/70 dark:border-sky-500/20 dark:bg-sky-900/10'
+                                ? 'border-slate-300 bg-slate-50/80 dark:border-white/20 dark:bg-white/10'
                                 : 'border-white/70 bg-white/68 dark:border-white/10 dark:bg-white/5'
                         )}
                     >
@@ -199,9 +199,9 @@ export default function NetworkOperatingModePanel() {
             <div className="mt-5 rounded-[20px] border border-white/70 bg-white/66 p-4 dark:border-white/10 dark:bg-white/5">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">AI plane opzionale</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">AI locale opzionale</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {viewModel?.aiRuntimeDescription ?? 'Capability opzionale separata dal data plane clinico.'}
+                            {viewModel?.aiRuntimeDescription ?? 'Funzione opzionale separata dai dati clinici.'}
                         </p>
                     </div>
                     <Badge tone={
@@ -216,7 +216,7 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Runtime locale</p>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Motore locale</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiLocalRuntimeLabel ?? 'Ollama locale del nodo'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
@@ -244,7 +244,7 @@ export default function NetworkOperatingModePanel() {
                     <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">Replica snapshot governata</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {viewModel?.backupBoundaryLabel ?? 'Il backup artifact v1 resta separato dal mirror di rete'}
+                            {viewModel?.backupBoundaryLabel ?? 'Il backup v1 resta separato dal mirror di rete'}
                         </p>
                     </div>
                     <Badge tone={viewModel?.currentReplicaState.preview ? 'preview' : 'success'}>
@@ -279,7 +279,7 @@ export default function NetworkOperatingModePanel() {
                         {viewModel?.identityCredentialLabel ?? 'Credenziali nodo richieste'}
                     </Badge>
                 </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
                         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Operatore</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityOperatorLabel ?? 'Operatore non ancora legato al nodo'}</p>
@@ -293,10 +293,6 @@ export default function NetworkOperatingModePanel() {
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
                         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Audit</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityAuditLabel ?? 'Solo token di trasporto'}</p>
-                    </div>
-                    <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Boundary</p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityCredentialLabel ?? 'Credenziali nodo richieste'}</p>
                     </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -313,7 +309,7 @@ export default function NetworkOperatingModePanel() {
                         className={cn(
                             'rounded-[18px] border p-4 transition-colors',
                             state.code === viewModel.currentReplicaState.code
-                                ? 'border-emerald-300/80 bg-emerald-50/60 dark:border-emerald-500/20 dark:bg-emerald-900/10'
+                                ? 'border-slate-300 bg-slate-50/80 dark:border-white/20 dark:bg-white/10'
                                 : 'border-white/70 bg-white/68 dark:border-white/10 dark:bg-white/5'
                         )}
                     >
@@ -328,7 +324,7 @@ export default function NetworkOperatingModePanel() {
             </div>
 
             {error ? (
-                <div className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
+                <div className="mt-4 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                     {error}
                 </div>
             ) : null}

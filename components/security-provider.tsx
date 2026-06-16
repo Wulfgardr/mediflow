@@ -40,6 +40,8 @@ import {
     type AuthHealthPayload,
     type LoginFailurePayload,
 } from '@/lib/client-auth-api';
+/* @Codex */
+import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
 
 export interface User {
     id: string;
@@ -140,6 +142,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         enabled: isAuthenticated && !isLocked,
         onTimeout: lock,
     });
+
+    /* @Codex */
+    useEffect(() => {
+        const handleApiAuthUnavailable = () => {
+            clearSecuritySession();
+            setActiveMasterKey(null);
+            setIsAuthenticated(false);
+            setIsLocked(true);
+            setAuthErrorMessage('Sessione scaduta. Inserisci il PIN per continuare.');
+        };
+
+        window.addEventListener(MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT, handleApiAuthUnavailable);
+        return () => {
+            window.removeEventListener(MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT, handleApiAuthUnavailable);
+        };
+    }, []);
 
     // Initial check
     useEffect(() => {
@@ -441,6 +459,26 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         );
     }
 
+    /* @Codex */
+    if (isLocked || !isAuthenticated) {
+        return (
+            <SecurityContext.Provider value={{
+                isAuthenticated,
+                isLocked: true,
+                requiresSetup: false,
+                user,
+                authErrorMessage,
+                login,
+                setupPin,
+                changePin,
+                lock,
+                updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
+            }}>
+                <LockScreen />
+            </SecurityContext.Provider>
+        );
+    }
+
     // Normal flow with Lock Screen Overlay
     return (
         <SecurityContext.Provider value={{
@@ -457,11 +495,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }}>
             <div className="relative min-h-screen">
                 {children}
-                {isLocked && (
-                    <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-md">
-                        <LockScreen />
-                    </div>
-                )}
             </div>
         </SecurityContext.Provider>
     );

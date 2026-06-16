@@ -1,41 +1,50 @@
+---
+summary: "Complete tracked Markdown index for MediFlow with quick purpose and consultation hints."
+read_when:
+  - "Finding where a MediFlow topic is documented."
+  - "Adding, removing, or renaming Markdown files in the repo."
+---
+
 # Indice Completo Markdown (Repo)
 
 > [!NOTE]
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-05-02
+Ultimo aggiornamento: 2026-06-16
 
-## Come usare questo indice
+## 📚 Come usare questo indice
 
 - Se devi capire **quali file sono canonici**, parti da [docs/README.md](./README.md).
 - Se devi trovare **dove sta un tema specifico**, usa le tabelle qui sotto.
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
 
-## Orientamento e governance
+## ⚙️ Orchestrazione e governance (consultazione sempre)
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [README.md](../README.md) | Onboarding generale progetto e punti di accesso documentazione. | Sempre, in fase di avvio. |
 | [docs/README.md](./README.md) | Mappa canonica della documentazione (fonte autorevole per tema). | Sempre, per decidere precedenze. |
-| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa dello stato corrente: prodotto, runtime, dati, AI/document intelligence, home-base, SISS/FSE, Apple clients e split private/OSS. | Sempre, quando serve una vista unica e aggiornata senza ricostruire il quadro da piu documenti. |
+| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa dello stato corrente: prodotto, runtime, dati, AI/document intelligence, OCR macOS-only fallback, home-base, SISS/FSE, Apple clients e split private/OSS. | Sempre, quando serve una vista unica e aggiornata senza ricostruire il quadro da piu documenti. |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | Visione architetturale stabile, confini e non-obiettivi. | Sempre, per cambi tecnici non banali. |
 | [SECURITY.md](../SECURITY.md) | Policy sicurezza, threat model e regole redazione/logging. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
+| [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Intended purpose e guard `check:claims` contro overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. | Quando si tocca copy prodotto, UI/help, README, materiale pubblico o confini AI/SISS/FSE. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 
-## Architettura, flussi e parity
+## 🧱 Architettura, flussi e parity
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali), con stato reale di `home-base`, document intelligence e shell locale. | Per capire flussi completi e integrazione moduli. |
+| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end (web + native + servizi locali), con stato reale di `home-base`, document intelligence, fallback OCR macOS-only e shell locale. | Per capire flussi completi e integrazione moduli. |
 | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Stato canonico complessivo del sistema, pensato come lettura unica per onboarding profondo e review trasversale. | Quando devi capire cosa esiste davvero oggi, cosa e direzione e quali confini non vanno superati. |
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
+| [docs/repository-topology.md](./repository-topology.md) | Mappa concisa delle aree top-level del repo: runtime clinico vs publication/site (`whitepaper/`) vs tooling. | Quando devi capire dove collocare codice/asset o se una cartella è clinical runtime. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato parity web/macOS su moduli core e gap operativi. | Per steering parity e release readiness. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
-| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
+| [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, OCR platform boundary, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
 
-## Native, setup e testing
+## 🍎 Native, setup e testing
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -47,13 +56,13 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | Runbook smoke iPhone/iPad contro `home-base` reale con pairing temporaneo e sessione operatore. | Per verifiche mobili `home-base` paired su simulatori Apple. |
 | [docs/icd-local-setup.md](./icd-local-setup.md) | Setup locale container ICD-11. | Quando si lavora su diagnostica ICD. |
 
-## Prodotto, compliance e contesto clinico
+## 🩺 Prodotto, compliance e contesto clinico
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
-| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato `v0.6.0` del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
+| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
 | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | Matrice di allineamento tra baseline ufficiale GTW/FSE e stato MediFlow. | Per gap analysis ministeriale, priorità FSE e anti-drift tecnico. |
@@ -65,16 +74,18 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md) | Nota canonica su SGDT/PAI e COT per MMG/SSI: restringe SGDT ai casi PAI/CE-MMG e COT/transizioni documentati e separa quel perimetro da launcher generici, feed PAI o dispatch COT non dimostrati. | Quando si valuta SGDT oltre il boundary SISS/FSE attuale. |
 | [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md) | Nota canonica sui Certificati di malattia: separa Web Application / handoff governato da UI custom o backend-first non ancora dimostrati. | Quando si valuta il dominio certificati oltre il boundary SISS attuale. |
 | [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md) | Runbook canonico del corpus documentale locale SISS/FSE: manifest sorgenti, fetch/sync fuori Git, placeholder `manual-import` e report di freshness. | Quando si lavora su `WUL-176`, `WUL-179` o sulla base documentale delle integrazioni regionali. |
+| [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | Matrice operativa `WUL-165` che rende MLX benchmark-visible e diagnosticabile senza promuoverlo a runtime clinico. | Quando serve distinguere parity di visibilita/guardrail MLX da promozione runtime o dal boundary OCR primario Ollama/DeepSeek con fallback Apple Vision solo macOS. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
-## Indici e contratti tecnici
+## 🧑‍💻 Tracciabilità agent e metadoc
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
+| [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Quando si rivede la nuova linea visuale Kree8, si verifica la root live con dati reali o si pianifica la migrazione delle superfici legacy. |
 
-## ADR (decisioni architetturali)
+## 🧱 ADR (decisioni architetturali)
 
 | File | Tema |
 | --- | --- |
@@ -107,7 +118,13 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0025-siss-local-adapter-contract-and-error-taxonomy.md](./adr/0025-siss-local-adapter-contract-and-error-taxonomy.md) | Introduce il foundation layer locale SISS con azioni tipizzate, error taxonomy stabile, retry sui transienti e metadata audit PHI-safe. |
 | [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md) | Fissa il boundary ufficiale del filone `WUL-180`: oltre il `portal-handoff`, la vera integrazione nativa SISS/FSE richiede scenari approvati e un percorso coerente con `SSI` qualificata/provisioning ARIA. |
 | [docs/adr/0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md](./adr/0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md) | Fissa la decisione `WUL-181`: il primo step credibile sul prescrittivo regionale oltre l'handoff e `webapp-assisted`, non la riscrittura della UI prescrittiva dentro MediFlow. |
-| [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md) | Fissa `WUL-196`: la shell web Graphite/Clinical Workbench diventa il solo runtime UI supportato su `main`, senza shell concorrenti o chooser visuali persistiti. |
+| [docs/adr/0047-graphite-workbench-single-official-web-shell.md](./adr/0047-graphite-workbench-single-official-web-shell.md) | Decisione storica `WUL-196`: Graphite come shell unica; superata per la root entry da ADR 0060, ma conserva il principio no-selector. |
+| [docs/adr/0060-kree8-cockpit-live-root-entry.md](./adr/0060-kree8-cockpit-live-root-entry.md) | Fissa `WUL-272`: la root web `/` mostra il cockpit Kree8 direttamente da `Start_MediFlow.command`, mantenendo sicurezza runtime e nessun selector visuale. |
+| [docs/adr/0061-clinical-agenda-bridge-zimbra-icloud.md](./adr/0061-clinical-agenda-bridge-zimbra-icloud.md) | Fissa `WUL-275`: lettura locale read-only delle cache evento Zimbra/iCloud come candidati clinici/FBF reviewable nella cockpit Kree8, senza import cieco o scritture cliniche. |
+| [docs/adr/0062-service-prescriptions-domain.md](./adr/0062-service-prescriptions-domain.md) | Fissa `WUL-277`: prescrizioni di visite, esami, imaging, riabilitazione e screening in dominio dedicato, distinto da terapia farmacologica e protesica. |
+| [docs/adr/0064-service-prescription-itemization-and-catalog-matching.md](./adr/0064-service-prescription-itemization-and-catalog-matching.md) | Fissa `WUL-278`: contenitore prescrizione + item figli codificabili per esami/prestazioni e scaffold repertorio locale matchabile. |
+| [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Fissa `WUL-279`: intended purpose, claim consentiti/esclusi e guard repo-local `check:claims` contro overclaim clinico/regolatorio. |
+| [docs/adr/0066-patient-soft-delete-lifecycle.md](./adr/0066-patient-soft-delete-lifecycle.md) | Fissa `WUL-306`: DELETE paziente come tombstone soft-delete version-guarded, cascade canonica `PATIENT_CHILD_TABLES` con guardia anti-drift, purge admin audited (`patient.purged`) e clear test-container per membership (WUL-322). |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |
@@ -123,8 +140,11 @@ Ultimo aggiornamento: 2026-05-02
 | [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md) | Formalizza la slice write paired delle terapie: read/create/update/soft-delete su `/api/v1/network/patients/{id}/therapies*` con `therapies.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | Formalizza la slice write paired dei checkup: read/create/update/soft-delete su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | Formalizza la slice write paired delle osservazioni: read/create/update/soft-delete su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
+| [docs/adr/0057-local-evidence-absorption-layer.md](./adr/0057-local-evidence-absorption-layer.md) | Proposed ADR `WUL-213`: local evidence absorption layer per rendere allegati e diario fonti citabili/retrieval sopra un contract versionato, senza training, cloud runtime o auto-write clinici. |
+| [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | Proposed ADR `WUL-220`: futura affordance manuale e auditabile per riassorbire una fonte evidence invalidated/superseded, con stati espliciti, motivi PHI-safe e nessuna scrittura clinica strutturata. |
+| [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md) | Formalizza il fallback OCR Apple Vision solo macOS: DeepSeek/Ollama resta OCR primario locale, Windows/Linux non hanno fallback platform-specific equivalente dichiarato, Smart Import resta reviewable. |
 
-## Checklist manutenzione indice
+## ✅ Checklist manutenzione indice
 
 1. Verifica inventario file: `rg --files -g '*.md' | sort`.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.

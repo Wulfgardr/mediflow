@@ -6,6 +6,7 @@
  */
 
 import { AIService, ChatMessageContent } from './ai-service';
+import { parseItalianDate } from './italian-date';
 
 // Structured extraction result
 export interface ExtractedDocumentData {
@@ -32,6 +33,86 @@ export interface ExtractedDocumentData {
     // Raw extraction
     rawMarkdown: string;
     confidence: number; // 0-1 extraction confidence
+    fallbackEngine?: 'apple_vision';
+}
+
+/* @Codex */
+export interface ExtractDocumentWithAIOptions {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+}
+
+/* @Codex */
+const DEFAULT_OCR_GENERATION_TIMEOUT_MS = 120_000;
+
+/* @Codex */
+export function resolveOcrGenerationTimeoutMs(timeoutMs?: number, envValue = process.env.MEDIFLOW_OCR_GENERATION_TIMEOUT_MS ?? process.env.MEDIFLOW_OCR_TIMEOUT_MS): number {
+    const candidate = timeoutMs ?? (envValue ? Number(envValue) : DEFAULT_OCR_GENERATION_TIMEOUT_MS);
+    return Number.isFinite(candidate) && candidate > 0
+        ? Math.max(1, Math.round(candidate))
+        : DEFAULT_OCR_GENERATION_TIMEOUT_MS;
+}
+
+/* @Codex */
+function createAbortReason(message: string): Error {
+    const error = new Error(message);
+    error.name = 'AbortError';
+    return error;
+}
+
+/* @Codex */
+function createOcrAbortSignal(options?: ExtractDocumentWithAIOptions): { signal: AbortSignal; cleanup: () => void } {
+    const timeoutMs = resolveOcrGenerationTimeoutMs(options?.timeoutMs);
+    const controller = new AbortController();
+    const abortFromCaller = () => {
+        controller.abort(options?.signal?.reason ?? createAbortReason('OCR generation aborted by caller.'));
+    };
+    const timeoutId = setTimeout(() => {
+        controller.abort(createAbortReason(`OCR generation timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+
+    if (options?.signal?.aborted) {
+        abortFromCaller();
+    } else {
+        options?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    }
+
+    return {
+        signal: controller.signal,
+        cleanup: () => {
+            clearTimeout(timeoutId);
+            options?.signal?.removeEventListener('abort', abortFromCaller);
+        },
+    };
+}
+
+/* @Codex */
+function getOcrGenerationErrorMessage(error: unknown, signal: AbortSignal): string {
+    const reason = signal.reason;
+    if (reason instanceof Error && reason.message) return reason.message;
+    if (error instanceof Error && error.name === 'AbortError') return 'OCR generation aborted.';
+    if (error instanceof Error) return error.message;
+    return 'Unknown error';
+}
+
+/* @Codex */
+export function isLowSignalOcrText(value: string | null | undefined): boolean {
+    const compact = (value || '').replace(/\s+/g, ' ').trim();
+    if (!compact) return true;
+    if (/^OCR extraction failed:/i.test(compact)) return true;
+    if (/^(nessuna informazione rilevante|nessun dato rilevante|analisi non disponibile|documento non leggibile)\b/i.test(compact)) {
+        return true;
+    }
+
+    const alphaChars = compact.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)?.length || 0;
+    if (compact.length >= 24 && alphaChars < 12) return true;
+    if (/^(?:\d+\.){10,}\d*$/u.test(compact.replace(/\s+/g, ''))) return true;
+
+    const tokens = compact.split(/\s+/).filter(Boolean);
+    const uniqueTokens = new Set(tokens.map((token) => token.toLowerCase()));
+    if (tokens.length >= 12 && uniqueTokens.size <= 2) return true;
+
+    return false;
 }
 
 // Prompts for different extraction modes
@@ -60,7 +141,8 @@ Extract ONLY what is clearly written. Do not invent data.`,
 export async function extractDocumentWithAI(
     imageBase64: string,
     mode: 'full' | 'patient' | 'labs' = 'patient',
-    aiService?: AIService
+    aiService?: AIService,
+    options?: ExtractDocumentWithAIOptions,
 ): Promise<ExtractedDocumentData> {
 
     const ai = aiService ?? await AIService.create('ocr');
@@ -82,15 +164,17 @@ export async function extractDocumentWithAI(
 
     const messages = [{ role: 'user', content }];
 
+    const abortSignal = createOcrAbortSignal(options);
+
     try {
-        const result = await ai.chat(messages, undefined, 4096);
+        const result = await ai.chat(messages, abortSignal.signal, 4096);
         const rawResponse = result.content;
 
         // Parse based on mode
         if (mode === 'full') {
             return {
                 rawMarkdown: rawResponse,
-                confidence: 0.9
+                confidence: isLowSignalOcrText(rawResponse) ? 0.15 : 0.9
             };
         }
 
@@ -103,8 +187,10 @@ export async function extractDocumentWithAI(
         return {
             rawMarkdown: '',
             confidence: 0,
-            notes: `OCR extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            notes: `OCR extraction failed: ${getOcrGenerationErrorMessage(error, abortSignal.signal)}`
         };
+    } finally {
+        abortSignal.cleanup();
     }
 }
 
@@ -173,23 +259,6 @@ function parseAIResponse(response: string, mode: string): ExtractedDocumentData 
             notes: response.slice(0, 500)
         };
     }
-}
-
-/**
- * Parse Italian date formats (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)
- */
-function parseItalianDate(dateStr: string): Date | undefined {
-    if (!dateStr) return undefined;
-
-    const match = dateStr.match(/(\d{1,2})[\\/\\-\\.](\d{1,2})[\\/\\-\\.](\d{4})/);
-    if (match) {
-        const [, day, month, year] = match;
-        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-    }
-
-    // Try ISO format
-    const isoDate = new Date(dateStr);
-    return isNaN(isoDate.getTime()) ? undefined : isoDate;
 }
 
 /**

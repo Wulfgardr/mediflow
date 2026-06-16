@@ -37,23 +37,23 @@ export const AI_INSIGHT_MODE_OPTIONS: Array<{
 }> = [
     {
         value: 'full_auto',
-        title: 'Full auto',
-        description: 'Adatta i budget in base a complessita del caso e profilo macchina.',
+        title: 'Automatica',
+        description: 'Sceglie quante fonti leggere in base al caso e alla postazione.',
     },
     {
         value: 'balanced',
-        title: 'Bilanciata',
-        description: 'Mantiene il comportamento standard, rapido e stabile.',
+        title: 'Rapida',
+        description: 'Usa un contesto essenziale per risposte veloci e stabili.',
     },
     {
         value: 'complete',
-        title: 'Completa',
-        description: 'Allarga il contesto documentale quando serve piu copertura.',
+        title: 'Approfondita',
+        description: 'Legge piu documenti quando serve una sintesi piu coperta.',
     },
     {
         value: 'manual',
-        title: 'Manuale Pro',
-        description: 'Espone i budget principali dell insight per un tuning esplicito.',
+        title: 'Personalizzata',
+        description: 'Lascia impostare manualmente limiti e lunghezza della sintesi.',
     },
 ];
 

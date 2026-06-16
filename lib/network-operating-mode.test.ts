@@ -124,7 +124,7 @@ test('deriveNetworkOperatingModeViewModel maps local-only into the real local st
     assert.equal(viewModel.aiFallbackLabel, 'Fallback: runtime locale del client se presente, altrimenti AI non disponibile');
     assert.equal(viewModel.currentReplicaState.code, 'local-only');
     assert.equal(viewModel.replicaPendingActionLabel, 'Nessuna');
-    assert.equal(viewModel.backupBoundaryLabel, 'Il backup artifact v1 resta separato dal mirror di rete');
+    assert.equal(viewModel.backupBoundaryLabel, 'Il backup v1 resta separato dal mirror di rete');
     assert.equal(viewModel.identityCredentialLabel, 'Credenziali nodo richieste');
     assert.equal(viewModel.identityLoginModeLabel, 'PIN-only se esiste un solo account locale');
     assert.equal(viewModel.identityOperatorLabel, 'Dr. Rossi');
@@ -300,7 +300,7 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
     assert.equal(viewModel.aiRuntimeLabel, 'AI centralizzata non disponibile');
     assert.equal(viewModel.aiCapabilityStatus, 'unavailable');
     assert.equal(viewModel.aiLocalRuntimeLabel, 'Ollama locale non valido, profilo custom');
-    assert.equal(viewModel.aiRolloutGateLabel, 'Benchmark lane-specific + rollout governance prima dell attivazione reale');
+    assert.equal(viewModel.aiRolloutGateLabel, 'Benchmark per area AI e governance prima dell attivazione reale');
 });
 
 test('deriveNetworkOperatingModeViewModel treats paired-online as a real active state', () => {

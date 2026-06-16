@@ -2,9 +2,11 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, patientsToAmbulatories } from '@/lib/schema';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
+import { activePatients } from '@/lib/patient-lifecycle';
 import { v4 as uuidv4 } from 'uuid';
 import type { PatientSummary } from '@/lib/api/v1/types';
 /* @Codex */
@@ -64,11 +66,11 @@ export async function GET(request: Request) {
             const rows = await dbServer.select({ patient: patients })
                 .from(patients)
                 .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-                .where(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))
+                .where(and(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId), activePatients()))
                 .orderBy(desc(patients.updatedAt));
             normalizedPatients = rows.map((row) => row.patient);
         } else {
-            normalizedPatients = await dbServer.select().from(patients).orderBy(desc(patients.updatedAt));
+            normalizedPatients = await dbServer.select().from(patients).where(activePatients()).orderBy(desc(patients.updatedAt));
         }
 
         const result: PatientSummary[] = normalizedPatients.map((patient) => ({

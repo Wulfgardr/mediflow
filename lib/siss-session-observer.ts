@@ -31,8 +31,8 @@ type AtlasHistorySource = {
 };
 
 const ATLAS_HISTORY_ROOTS = [
-    path.join(os.homedir(), 'Library', 'Application Support', 'com.openai.atlas', 'browser-data', 'host'),
-    path.join(os.homedir(), 'Library', 'Application Support', 'com.openai.atlas.beta', 'browser-data', 'host'),
+    path.join(/* turbopackIgnore: true */ os.homedir(), 'Library', 'Application Support', 'com.openai.atlas', 'browser-data', 'host'),
+    path.join(/* turbopackIgnore: true */ os.homedir(), 'Library', 'Application Support', 'com.openai.atlas.beta', 'browser-data', 'host'),
 ] as const;
 
 const SISS_SESSION_RECENT_WINDOW_MS = 1000 * 60 * 60 * 8;
@@ -144,17 +144,17 @@ function resolveAtlasHistoryCandidates(): Array<{ profile: string; historyPath: 
     const candidates: Array<{ profile: string; historyPath: string; updatedAtMs: number }> = [];
 
     for (const root of ATLAS_HISTORY_ROOTS) {
-        if (!fs.existsSync(root)) continue;
+        if (!fs.existsSync(/* turbopackIgnore: true */ root)) continue;
 
-        for (const profile of fs.readdirSync(root, { withFileTypes: true })) {
+        for (const profile of fs.readdirSync(/* turbopackIgnore: true */ root, { withFileTypes: true })) {
             if (!profile.isDirectory()) continue;
 
             const historyPath = path.join(root, profile.name, 'History');
-            if (!fs.existsSync(historyPath)) continue;
+            if (!fs.existsSync(/* turbopackIgnore: true */ historyPath)) continue;
 
             let updatedAtMs = 0;
             try {
-                updatedAtMs = fs.statSync(historyPath).mtimeMs;
+                updatedAtMs = fs.statSync(/* turbopackIgnore: true */ historyPath).mtimeMs;
             } catch {
                 updatedAtMs = 0;
             }
@@ -171,9 +171,9 @@ function resolveAtlasHistoryCandidates(): Array<{ profile: string; historyPath: 
 }
 
 function copySqliteDb(sourcePath: string): { tempDir: string; tempPath: string } {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-siss-atlas-history-'));
+    const tempDir = fs.mkdtempSync(path.join(/* turbopackIgnore: true */ os.tmpdir(), 'mediflow-siss-atlas-history-'));
     const tempPath = path.join(tempDir, 'History');
-    fs.copyFileSync(sourcePath, tempPath);
+    fs.copyFileSync(/* turbopackIgnore: true */ sourcePath, tempPath);
     return { tempDir, tempPath };
 }
 
@@ -239,7 +239,7 @@ function readRelevantAtlasHistoryRows(): AtlasHistorySource {
                 : 'Impossibile leggere la cronologia Atlas.',
         };
     } finally {
-        fs.rmSync(tempDir, { recursive: true, force: true });
+        fs.rmSync(/* turbopackIgnore: true */ tempDir, { recursive: true, force: true });
     }
 }
 

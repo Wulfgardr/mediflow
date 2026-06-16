@@ -1,6 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/local-api-auth';
@@ -10,12 +10,29 @@ import type { ObservationSummary } from '@/lib/api/v1/types';
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 /* @Codex */
 import { normalizeObservationUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from '@/lib/observation-concurrency';
+import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+// WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
+async function selectObservationConflictSnapshot(patientId: string, observationId: string) {
+    return await dbServer
+        .select({
+            id: observations.id,
+            patientId: observations.patientId,
+            version: observations.version,
+            updatedAt: observations.updatedAt,
+            deletedAt: observations.deletedAt,
+        })
+        .from(observations)
+        .where(and(eq(observations.id, observationId), eq(observations.patientId, patientId)))
+        .get() ?? null;
 }
 
 export async function GET(
@@ -75,6 +92,11 @@ export async function PUT(
         const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
         const body = await request.json() as Record<string, unknown>;
+        // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
+        const expectedVersion = parseObservationExpectedVersion(body.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
 
         const existing = await dbServer
             .select({ id: observations.id })
@@ -90,30 +112,42 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer
+        const updateResult = await dbServer
             .update(observations)
             .set({
                 ...normalized.values,
-                version: sql`${observations.version} + 1`,
+                version: expectedVersion + 1,
             })
-            .where(and(eq(observations.id, observationId), eq(observations.patientId, id)));
-        const current = await dbServer
-            .select({ version: observations.version })
-            .from(observations)
-            .where(and(eq(observations.id, observationId), eq(observations.patientId, id)))
-            .get();
+            .where(and(
+                eq(observations.id, observationId),
+                eq(observations.patientId, id),
+                eq(observations.version, expectedVersion),
+            ))
+            .run();
+
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildObservationVersionConflictPayload(
+                    expectedVersion,
+                    observationId,
+                    await selectObservationConflictSnapshot(id, observationId),
+                ),
+                { status: 409 }
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
             request,
             auditSession,
             {
-                eventType: 'observation.updated',
+                // WUL-308: a soft-delete via PUT is audited as a deletion, not an update.
+                eventType: normalized.values.deletedAt ? 'observation.deleted' : 'observation.updated',
                 subjectType: 'observation',
                 subjectRef: observationId,
                 redactedMetadata: {
                     changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: current?.version ?? undefined,
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Observation audit write failed:',
@@ -137,8 +171,25 @@ export async function DELETE(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
+        // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
+        const parsedBody = await parseClinicalDeleteBody(request);
+        if (!parsedBody.ok) {
+            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+        }
+        const expectedVersion = parseObservationExpectedVersion(parsedBody.values.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
+        const normalized = normalizeObservationUpdateInput({
+            deletedAt: parsedBody.values.deletedAt,
+            deletionReason: parsedBody.values.deletionReason,
+        });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
         const existing = await dbServer
-            .select({ id: observations.id, version: observations.version })
+            .select({ id: observations.id })
             .from(observations)
             .where(and(eq(observations.id, observationId), eq(observations.patientId, id)))
             .get();
@@ -146,9 +197,29 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        await dbServer
-            .delete(observations)
-            .where(and(eq(observations.id, observationId), eq(observations.patientId, id)));
+        const updateResult = await dbServer
+            .update(observations)
+            .set({
+                ...normalized.values,
+                version: expectedVersion + 1,
+            })
+            .where(and(
+                eq(observations.id, observationId),
+                eq(observations.patientId, id),
+                eq(observations.version, expectedVersion),
+            ))
+            .run();
+
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildObservationVersionConflictPayload(
+                    expectedVersion,
+                    observationId,
+                    await selectObservationConflictSnapshot(id, observationId),
+                ),
+                { status: 409 }
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -159,8 +230,8 @@ export async function DELETE(
                 subjectType: 'observation',
                 subjectRef: observationId,
                 redactedMetadata: {
-                    changedFields: ['deleted'],
-                    resourceVersion: existing.version,
+                    changedFields: ['deletedAt', 'deletionReason'],
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Observation audit write failed:',

@@ -3,14 +3,50 @@
 
 import { encryptData, decryptData } from './security';
 import { notifyDbChange } from './live-query';
+import {
+    LOCKED_DATA_PLACEHOLDER,
+    isLockedDataPlaceholder,
+    isEncryptedFieldValue,
+    rememberLockedCiphertext,
+    takeLockedCiphertext,
+} from './locked-field-guard';
 /* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
+/* @Codex */
+import type { EntryVersionConflictPayload } from './entry-concurrency';
+/* @Codex */
+import type { CheckupVersionConflictPayload } from './checkup-concurrency';
 /* @Codex */
 import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 /* @Codex */
 import type { DocumentEvidencePack } from './document-evidence-pack';
+import type { DocumentOcrQueueReason, DocumentOcrQueueState } from './document-ocr-queue';
+/* @Codex */
+import {
+    buildApiTableFetchErrorMessage,
+    isApiTableAuthUnavailableStatus,
+    isApiTableUnavailableStatus,
+    notifyApiAuthUnavailable,
+} from './api-table-response';
+
+/* @Codex */
+export type ApiVersionConflictPayload =
+    | PatientVersionConflictPayload
+    | EntryVersionConflictPayload
+    | CheckupVersionConflictPayload;
+
+/* @Codex */
+function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflictPayload {
+    if (isPatientVersionConflictPayload(value)) return true;
+    if (!value || typeof value !== 'object') return false;
+
+    const payload = value as Record<string, unknown>;
+    return payload.code === 'VERSION_CONFLICT'
+        && (payload.entity === 'entry' || payload.entity === 'checkup')
+        && typeof payload.recordId === 'string';
+}
 // Document insight from OCR + AI synthesis
 /* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
@@ -111,6 +147,8 @@ export interface ClinicalEntry {
     updatedAt: Date;
     deletedAt?: Date | null;
     deletionReason?: string | null;
+    /* @Codex */
+    version?: number;
     metadata?: Record<string, unknown>;
     attachments?: string[];
     setting?: 'home' | 'hospital' | 'ambulatory';
@@ -147,6 +185,10 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     observations: ['notes'],
     /* @Codex */
     prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
+    /* @Codex */
+    service_prescriptions: ['serviceName', 'clinicalQuestion', 'provider', 'outcomeNote', 'requestReference', 'documentRefs', 'notes'],
+    /* @Codex */
+    service_prescription_items: ['serviceName', 'catalogDisplayName', 'evidence', 'notes', 'outcomeNote'],
     /* @Codex */
     siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
@@ -190,19 +232,32 @@ class ApiTable<T> {
     private _filterFn?: (item: T) => boolean;
     private _limit?: number;
     private _reverse?: boolean;
+    /* @Codex */
+    private _includeDeleted?: boolean;
 
     private clone(): ApiTable<T> {
         const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey);
         copy._filterFn = this._filterFn;
         copy._limit = this._limit;
         copy._reverse = this._reverse;
+        copy._includeDeleted = this._includeDeleted;
         return copy;
     }
 
+    /* @Codex */
+    includeDeleted(): ApiTable<T> {
+        const clone = this.clone();
+        clone._includeDeleted = true;
+        return clone;
+    }
+
     async toArray(): Promise<T[]> {
-        const res = await fetch(this.endpoint, { cache: 'no-store' });
+        const res = await fetch(this.buildListEndpoint(), { cache: 'no-store' });
         /* @Codex */
-        if (res.status === 401 || res.status === 403) return [];
+        if (isApiTableAuthUnavailableStatus(res.status)) {
+            notifyApiAuthUnavailable(res.status);
+            return [];
+        }
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
         const rawJson = await res.json();
 
@@ -231,6 +286,13 @@ class ApiTable<T> {
         return (await this.toArray()).length;
     }
 
+    /* @Codex */
+    private buildListEndpoint(): string {
+        if (!this._includeDeleted) return this.endpoint;
+        const separator = this.endpoint.includes('?') ? '&' : '?';
+        return `${this.endpoint}${separator}includeDeleted=true`;
+    }
+
 
 
     // Deprecated orderBy shim (just returns self for chaining)
@@ -241,14 +303,19 @@ class ApiTable<T> {
 
     async get(id: string): Promise<T | undefined> {
         const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store' });
-        if (res.status === 404) return undefined;
-        if (!res.ok) throw new Error(`Failed to fetch item ${id}`);
+        /* @Codex */
+        if (isApiTableAuthUnavailableStatus(res.status)) {
+            notifyApiAuthUnavailable(res.status);
+            return undefined;
+        }
+        if (isApiTableUnavailableStatus(res.status)) return undefined;
+        if (!res.ok) throw new Error(buildApiTableFetchErrorMessage(this.endpoint, id, res.status, res.statusText));
         const item = this.reviveDates(await res.json());
         return await this.decryptItem(item);
     }
 
     /* @Codex */
-    private buildVersionConflictError(payload: PatientVersionConflictPayload): ApiConflictError {
+    private buildVersionConflictError(payload: ApiVersionConflictPayload): ApiConflictError {
         return new ApiConflictError(payload);
     }
 
@@ -284,8 +351,8 @@ class ApiTable<T> {
     async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
         /* @Codex */
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
-        if (this.tableName === 'patients' && typeof maybeVersion !== 'number') {
-            throw new Error('Missing required version for patient update');
+        if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
+            throw new Error(`Missing required version for ${this.versionedEntityLabel()} update`);
         }
 
         const encryptedChanges = await this.encryptItem(changes as T, true);
@@ -296,7 +363,7 @@ class ApiTable<T> {
         });
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
-            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+            if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
             throw new Error("Failed to update item");
@@ -305,21 +372,24 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    async delete(id: string, options?: { suppressNotify?: boolean; version?: number }): Promise<void> {
-        if (this.tableName === 'patients' && typeof options?.version !== 'number') {
-            throw new Error('Missing required version for patient delete');
+    async delete(id: string, options?: { suppressNotify?: boolean; version?: number; deletionReason?: string }): Promise<void> {
+        if (this.requiresVersionedWrite() && typeof options?.version !== 'number') {
+            throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
         }
 
         const init: RequestInit = { method: 'DELETE' };
-        if (typeof options?.version === 'number') {
+        if (typeof options?.version === 'number' || typeof options?.deletionReason === 'string') {
             init.headers = { 'Content-Type': 'application/json' };
-            init.body = JSON.stringify({ version: options.version });
+            init.body = JSON.stringify({
+                ...(typeof options?.version === 'number' ? { version: options.version } : {}),
+                ...(typeof options?.deletionReason === 'string' ? { deletionReason: options.deletionReason } : {}),
+            });
         }
 
         const res = await fetch(`${this.endpoint}/${id}`, init);
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
-            if (res.status === 409 && isPatientVersionConflictPayload(payload)) {
+            if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
             throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
@@ -329,7 +399,13 @@ class ApiTable<T> {
 
     async bulkDelete(ids: string[]): Promise<void> {
         if (ids.length === 0) return;
-        await Promise.all(ids.map(id => this.delete(id, { suppressNotify: true })));
+        const versionsById = this.requiresVersionedWrite()
+            ? await this.getVersionsByIdForDelete(ids)
+            : new Map<string, number>();
+        await Promise.all(ids.map(id => this.delete(id, {
+            suppressNotify: true,
+            version: versionsById.get(id),
+        })));
         this.emitChange();
     }
 
@@ -384,8 +460,8 @@ class ApiTable<T> {
             if (!id) {
                 throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
             }
-            const version = this.tableName === 'patients'
-                ? this.getPatientVersion(item)
+            const version = this.requiresVersionedWrite()
+                ? this.getRecordVersion(item)
                 : undefined;
             return this.delete(id, { suppressNotify: true, version });
         }));
@@ -402,10 +478,48 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    private getPatientVersion(item: unknown): number | undefined {
-        if (this.tableName !== 'patients' || !item || typeof item !== 'object') return undefined;
+    private getRecordVersion(item: unknown): number | undefined {
+        if (!this.requiresVersionedWrite() || !item || typeof item !== 'object') return undefined;
         const record = item as Record<string, unknown>;
         return typeof record.version === 'number' ? record.version : undefined;
+    }
+
+    /* @Codex */
+    private requiresVersionedWrite(): boolean {
+        return this.tableName === 'patients' || this.tableName === 'entries' || this.tableName === 'checkups';
+    }
+
+    /* @Codex */
+    private versionedEntityLabel(): string {
+        if (this.tableName === 'patients') return 'patient';
+        if (this.tableName === 'entries') return 'entry';
+        if (this.tableName === 'checkups') return 'checkup';
+        return this.tableName;
+    }
+
+    /* @Codex */
+    private async getVersionsByIdForDelete(ids: string[]): Promise<Map<string, number>> {
+        const requestedIds = new Set(ids);
+        const versionsById = new Map<string, number>();
+        const items = await this.toArray();
+
+        for (const item of items) {
+            const id = this.getItemIdentifier(item);
+            if (!id || !requestedIds.has(id)) continue;
+
+            const version = this.getRecordVersion(item);
+            if (typeof version !== 'number') {
+                throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
+            }
+            versionsById.set(id, version);
+        }
+
+        const missingIds = ids.filter((id) => !versionsById.has(id));
+        if (missingIds.length > 0) {
+            throw new Error(`Missing required version for ${missingIds.length} ${this.versionedEntityLabel()} delete(s)`);
+        }
+
+        return versionsById;
     }
 
     // Helper to fix JSON date strings back to Date objects
@@ -432,22 +546,47 @@ class ApiTable<T> {
         if (obj.startedAt) obj.startedAt = new Date(obj.startedAt);
         /* @Codex */
         if (obj.completedAt) obj.completedAt = new Date(obj.completedAt);
+        /* @Codex */
+        if (obj.scheduledAt) obj.scheduledAt = new Date(obj.scheduledAt);
+        /* @Codex */
+        if (obj.performedAt) obj.performedAt = new Date(obj.performedAt);
+        /* @Codex */
+        if (obj.reportReceivedAt) obj.reportReceivedAt = new Date(obj.reportReceivedAt);
+        /* @Codex */
+        if (obj.importedAt) obj.importedAt = new Date(obj.importedAt);
         return obj;
     }
 
     // --- Encryption Helpers ---
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async encryptItem(item: any, isPartial = false): Promise<any> {
-        const key = this.getMasterKey();
-        if (!key || !item) return item;
+        if (!item) return item;
 
         const fields = ENCRYPTED_FIELDS[this.tableName];
         if (!fields) return item;
 
+        const key = this.getMasterKey();
         const copy = { ...item };
+        // WUL-323: the side-channel with ciphertext preserved by a failed decrypt
+        // is not user data: strip it from the payload and use it to restore
+        // locked fields instead of re-encrypting the placeholder over them.
+        const lockedCiphertext = takeLockedCiphertext(copy);
 
         for (const field of fields) {
+            if (isLockedDataPlaceholder(copy[field])) {
+                const original = lockedCiphertext?.[field];
+                if (isEncryptedFieldValue(original)) {
+                    copy[field] = original;
+                } else if (isPartial) {
+                    console.warn(`Dropping locked field ${this.tableName}.${field} from update: original ciphertext unavailable`);
+                    delete copy[field];
+                } else {
+                    throw new Error(`Refusing to persist '${LOCKED_DATA_PLACEHOLDER}' for ${this.tableName}.${field}: the original encrypted value is unavailable`);
+                }
+                continue;
+            }
+            if (!key) continue;
             if (copy[field]) {
                 try {
                     const { iv, data } = await encryptData(copy[field], key);
@@ -475,11 +614,22 @@ class ApiTable<T> {
                     if (parts.length === 3) {
                         const iv = parts[1];
                         const ciphertext = parts[2];
-                        item[field] = await decryptData(ciphertext, iv, key);
+                        const decrypted = await decryptData(ciphertext, iv, key);
+                        // decryptData returns null on failure (wrong/stale key):
+                        // treat it like a thrown error, never expose null as data.
+                        if (decrypted === null) {
+                            rememberLockedCiphertext(item, field, item[field]);
+                            item[field] = LOCKED_DATA_PLACEHOLDER;
+                        } else {
+                            item[field] = decrypted;
+                        }
                     }
                 } catch (e) {
                     console.error(`Decryption failed for ${this.tableName}.${field}`, e);
-                    item[field] = '[LOCKED DATA]';
+                    // WUL-323: keep the original ciphertext aside so a later save
+                    // restores it; the placeholder is presentation-only.
+                    rememberLockedCiphertext(item, field, item[field]);
+                    item[field] = LOCKED_DATA_PLACEHOLDER;
                 }
             }
         }
@@ -502,6 +652,12 @@ class MedicalApiClient {
     observations: ApiTable<Observation>;
     /* @Codex */
     prostheticPrescriptions: ApiTable<ProstheticPrescription>;
+    /* @Codex */
+    servicePrescriptions: ApiTable<ServicePrescription>;
+    /* @Codex */
+    servicePrescriptionItems: ApiTable<ServicePrescriptionItem>;
+    /* @Codex */
+    serviceCatalogEntries: ApiTable<ServiceCatalogEntry>;
     /* @Codex */
     sissHandoffs: ApiTable<SissHandoffEvent>;
     conversations: ApiTable<Conversation>;
@@ -526,6 +682,12 @@ class MedicalApiClient {
         this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
         /* @Codex */
         this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
+        /* @Codex */
+        this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey);
+        /* @Codex */
+        this.servicePrescriptionItems = new ApiTable<ServicePrescriptionItem>('/api/service-prescription-items', 'service_prescription_items', getKey);
+        /* @Codex */
+        this.serviceCatalogEntries = new ApiTable<ServiceCatalogEntry>('/api/service-catalog', 'service_catalog_entries', getKey);
         /* @Codex */
         this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
@@ -554,9 +716,9 @@ export const db = new MedicalApiClient();
 
 /* @Codex */
 export class ApiConflictError extends Error {
-    readonly payload: PatientVersionConflictPayload;
+    readonly payload: ApiVersionConflictPayload;
 
-    constructor(payload: PatientVersionConflictPayload) {
+    constructor(payload: ApiVersionConflictPayload) {
         super('Conflitto di modifica: il record e stato aggiornato altrove. Ricarica e riprova.');
         this.name = 'ApiConflictError';
         this.payload = payload;
@@ -678,6 +840,11 @@ export interface Attachment {
     summarySnapshot?: string;
     /* @Codex */
     parseEvidenceArtifactSnapshot?: string;
+    ocrQueueState?: DocumentOcrQueueState;
+    ocrQueueReason?: DocumentOcrQueueReason;
+    ocrQueueUpdatedAt?: Date;
+    // Artifact deterministico senza PHI (hash + enum), scritto lato server dal replay.
+    ocrReplayArtifactSnapshot?: string;
     createdAt: Date;
 }
 
@@ -706,6 +873,84 @@ export interface ProstheticPrescription {
     documentRefs?: string;
     notes?: string;
     createdAt: Date;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export type ServicePrescriptionStatus = 'prescribed' | 'booked' | 'performed' | 'report_received' | 'cancelled';
+
+/* @Codex */
+export type ServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
+
+/* @Codex */
+export type ServicePrescriptionPriority = 'U' | 'B' | 'D' | 'P' | 'routine' | 'unknown';
+
+/* @Codex */
+export interface ServicePrescription {
+    id: string;
+    patientId: string;
+    prescribedAt: Date;
+    status: ServicePrescriptionStatus;
+    category: ServicePrescriptionCategory;
+    priority?: ServicePrescriptionPriority;
+    codeSystem?: string;
+    serviceCode?: string;
+    serviceName: string;
+    clinicalQuestion?: string;
+    provider?: string;
+    scheduledAt?: Date;
+    performedAt?: Date;
+    reportReceivedAt?: Date;
+    outcomeNote?: string;
+    requestReference?: string;
+    source: 'manual' | 'document_review' | 'legacy_therapy_cleanup';
+    documentRefs?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export type ServicePrescriptionItemMatchStatus = 'unmatched' | 'candidate' | 'matched' | 'manual' | 'not_found';
+
+/* @Codex */
+export interface ServicePrescriptionItem {
+    id: string;
+    patientId: string;
+    prescriptionId: string;
+    ordinal: number;
+    status: ServicePrescriptionStatus;
+    category?: ServicePrescriptionCategory;
+    codeSystem?: string;
+    serviceCode?: string;
+    serviceName: string;
+    catalogEntryId?: string;
+    catalogDisplayName?: string;
+    matchStatus: ServicePrescriptionItemMatchStatus;
+    confidence?: 'high' | 'medium' | 'low';
+    evidence?: string;
+    notes?: string;
+    scheduledAt?: Date;
+    performedAt?: Date;
+    reportReceivedAt?: Date;
+    outcomeNote?: string;
+    createdAt: Date;
+    updatedAt?: Date;
+}
+
+/* @Codex */
+export interface ServiceCatalogEntry {
+    id: string;
+    codeSystem: string;
+    serviceCode: string;
+    displayName: string;
+    category: ServicePrescriptionCategory;
+    branchCode?: string;
+    synonyms?: string;
+    source: string;
+    version?: string;
+    active: boolean;
+    importedAt?: Date;
     updatedAt?: Date;
 }
 
@@ -754,4 +999,8 @@ export interface Therapy {
     endDate?: Date;
     createdAt: Date;
     updatedAt?: Date;
+    /* @Codex */
+    deletedAt?: Date | null;
+    /* @Codex */
+    deletionReason?: string | null;
 }

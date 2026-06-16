@@ -99,12 +99,48 @@ final class LocalAPIContractsTests: XCTestCase {
         XCTAssertNil(json["documentInsights"])
     }
 
-    func testUpdateTherapyPayloadEncodesNullForClearedEndDate() throws {
-        let payload = UpdateTherapyPayload(
+    /* @Codex */
+    func testCreateTherapyPayloadEncodesClinicalParityFields() throws {
+        let payload = CreateTherapyPayload(
             drugName: "Aspirina",
-            aic: .omit,
-            atc: .value("B01AC06"),
+            aic: "012345678",
+            atc: "B01AC06",
+            activePrinciple: "Acido acetilsalicilico",
             dosage: "1 cp",
+            motivation: "Prevenzione secondaria",
+            diagnosisCode: "PREV",
+            diagnosisName: "Prevenzione",
+            status: "active",
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: nil
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["drugName"] as? String, "Aspirina")
+        XCTAssertEqual(json["aic"] as? String, "012345678")
+        XCTAssertEqual(json["atc"] as? String, "B01AC06")
+        XCTAssertEqual(json["activePrinciple"] as? String, "Acido acetilsalicilico")
+        XCTAssertEqual(json["dosage"] as? String, "1 cp")
+        XCTAssertEqual(json["motivation"] as? String, "Prevenzione secondaria")
+        XCTAssertEqual(json["diagnosisCode"] as? String, "PREV")
+        XCTAssertEqual(json["diagnosisName"] as? String, "Prevenzione")
+        XCTAssertEqual(json["status"] as? String, "active")
+        XCTAssertEqual(json["startDate"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertNil(json["endDate"])
+    }
+
+    func testUpdateTherapyPayloadEncodesNullForClearedOptionalFields() throws {
+        let payload = UpdateTherapyPayload(
+            version: 5,
+            drugName: "Aspirina",
+            aic: .null,
+            atc: .value("B01AC06"),
+            activePrinciple: .value("Acido acetilsalicilico"),
+            dosage: "1 cp",
+            motivation: .null,
+            diagnosisCode: .null,
+            diagnosisName: .null,
             status: "active",
             startDate: Date(timeIntervalSince1970: 0),
             endDate: .null
@@ -112,12 +148,86 @@ final class LocalAPIContractsTests: XCTestCase {
 
         let json = try encodeJSONObject(payload)
 
+        XCTAssertEqual(json["version"] as? Int, 5)
         XCTAssertEqual(json["drugName"] as? String, "Aspirina")
         XCTAssertEqual(json["atc"] as? String, "B01AC06")
+        XCTAssertEqual(json["activePrinciple"] as? String, "Acido acetilsalicilico")
         XCTAssertEqual(json["dosage"] as? String, "1 cp")
         XCTAssertEqual(json["status"] as? String, "active")
+        XCTAssertTrue(json["aic"] is NSNull)
+        XCTAssertTrue(json["motivation"] is NSNull)
+        XCTAssertTrue(json["diagnosisCode"] is NSNull)
+        XCTAssertTrue(json["diagnosisName"] is NSNull)
         XCTAssertTrue(json["endDate"] is NSNull)
-        XCTAssertNil(json["aic"])
+    }
+
+    /* @Codex */
+    func testCheckupSummaryDecodesApiV1ParityFields() throws {
+        let payload = """
+        {
+          "id": "checkup-1",
+          "patientId": "patient-1",
+          "date": "1970-01-01T00:00:00Z",
+          "title": "Visita programmata",
+          "notes": "Portare esami ematici",
+          "status": "pending",
+          "source": "manual",
+          "version": 2,
+          "createdAt": "1970-01-01T00:00:00Z",
+          "updatedAt": "1970-01-02T00:00:00Z",
+          "deletedAt": null,
+          "deletionReason": null
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let checkup = try decoder.decode(CheckupSummary.self, from: payload)
+
+        XCTAssertEqual(checkup.notes, "Portare esami ematici")
+        XCTAssertEqual(checkup.source, "manual")
+        XCTAssertEqual(checkup.version, 2)
+        XCTAssertEqual(checkup.updatedAt, Date(timeIntervalSince1970: 86_400))
+        XCTAssertNil(checkup.deletedAt)
+        XCTAssertNil(checkup.deletionReason)
+    }
+
+    /* @Codex */
+    func testCreateCheckupPayloadEncodesNotesAndManualSource() throws {
+        let payload = CreateCheckupPayload(
+            date: Date(timeIntervalSince1970: 0),
+            title: "Visita programmata",
+            notes: "Portare esami ematici",
+            status: "pending",
+            source: "manual"
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["date"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertEqual(json["title"] as? String, "Visita programmata")
+        XCTAssertEqual(json["notes"] as? String, "Portare esami ematici")
+        XCTAssertEqual(json["status"] as? String, "pending")
+        XCTAssertEqual(json["source"] as? String, "manual")
+    }
+
+    /* @Codex */
+    func testUpdateCheckupPayloadEncodesNullForClearedNotes() throws {
+        let payload = UpdateCheckupPayload(
+            version: 2,
+            date: Date(timeIntervalSince1970: 0),
+            title: "Visita programmata",
+            notes: .null,
+            status: "completed"
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["version"] as? Int, 2)
+        XCTAssertEqual(json["date"] as? String, "1970-01-01T00:00:00Z")
+        XCTAssertEqual(json["title"] as? String, "Visita programmata")
+        XCTAssertTrue(json["notes"] is NSNull)
+        XCTAssertEqual(json["status"] as? String, "completed")
     }
 
     func testObservationSummaryDecodesLoincUcumObservationFromApiV1() throws {
@@ -181,6 +291,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
     func testUpdateObservationPayloadOmitsUnsetFieldsAndKeepsExplicitEdits() throws {
         let payload = UpdateObservationPayload(
+            version: 3,
             codeSystem: nil,
             code: nil,
             display: nil,
@@ -194,6 +305,7 @@ final class LocalAPIContractsTests: XCTestCase {
 
         let json = try encodeJSONObject(payload)
 
+        XCTAssertEqual(json["version"] as? Int, 3)
         XCTAssertNil(json["codeSystem"])
         XCTAssertNil(json["code"])
         XCTAssertNil(json["display"])

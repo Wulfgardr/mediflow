@@ -12,6 +12,8 @@
   "include": [
     "lib/api-v1-clinical-write-normalization.ts",
     "lib/api-v1-clinical-write-normalization.test.ts",
+    "lib/api-v1-clinical-lifecycle.ts",
+    "lib/api-v1-clinical-lifecycle.test.ts",
     "lib/status-normalization.ts"
   ]
 }
