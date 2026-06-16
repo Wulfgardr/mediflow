@@ -1,13 +1,32 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
-import { parseCheckupStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+/* @Codex */
+import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
+/* @Codex */
+import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+
+/* @Codex */
+async function selectCheckupConflictSnapshot(checkupId: string) {
+    return await dbServer
+        .select({
+            id: checkups.id,
+            patientId: checkups.patientId,
+            version: checkups.version,
+            updatedAt: checkups.updatedAt,
+            deletedAt: checkups.deletedAt,
+        })
+        .from(checkups)
+        .where(eq(checkups.id, checkupId))
+        .get() ?? null;
+}
 
 export async function PUT(
     request: Request,
@@ -19,90 +38,52 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json() as unknown;
-        /* @Codex */
-        const auditBody = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+        const body = await request.json() as Record<string, unknown>;
+        const expectedVersion = parseCheckupExpectedVersion(body.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
+
         const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
-        const updateData: {
-            date?: Date;
-            title?: string;
-            notes?: string | null;
-            status?: string;
-            source?: string | null;
-            updatedAt?: Date;
-        } = {};
 
-        if (body && typeof body === 'object') {
-            const payload = body as Record<string, unknown>;
-
-            if (payload.date !== undefined) {
-                const parsedDate = new Date(payload.date as string | number | Date);
-                if (Number.isNaN(parsedDate.getTime())) {
-                    return NextResponse.json({ error: 'Invalid checkup date' }, { status: 400 });
-                }
-                updateData.date = parsedDate;
-            }
-
-            if (typeof payload.title === 'string') {
-                updateData.title = payload.title;
-            }
-
-            if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
-                if (payload.notes === null || payload.notes === '') {
-                    updateData.notes = null;
-                } else if (typeof payload.notes === 'string') {
-                    updateData.notes = payload.notes;
-                }
-            }
-
-            if (typeof payload.status === 'string') {
-                const normalizedStatus = parseCheckupStatus(payload.status);
-                if (!normalizedStatus) {
-                    return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
-                }
-                updateData.status = normalizedStatus;
-            }
-
-            if (Object.prototype.hasOwnProperty.call(payload, 'source')) {
-                if (payload.source === null || payload.source === '') {
-                    updateData.source = null;
-                } else if (typeof payload.source === 'string') {
-                    updateData.source = payload.source;
-                }
-            }
+        const normalized = normalizeCheckupUpdateInput(body);
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        if (Object.keys(updateData).length === 0) {
-            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-        }
-
-        await dbServer.update(checkups)
+        const updateResult = await dbServer.update(checkups)
             .set({
-                ...updateData,
-                version: sql`${checkups.version} + 1`,
-                updatedAt: new Date(),
+                ...normalized.values,
+                version: expectedVersion + 1,
             })
-            .where(eq(checkups.id, id));
-        const current = await dbServer
-            .select({ version: checkups.version })
-            .from(checkups)
-            .where(eq(checkups.id, id))
-            .get();
+            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion)))
+            .run();
+
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildCheckupVersionConflictPayload(
+                    expectedVersion,
+                    id,
+                    await selectCheckupConflictSnapshot(id),
+                ),
+                { status: 409 },
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
             request,
             session,
             {
-                eventType: 'checkup.updated',
+                eventType: normalized.values.deletedAt ? 'checkup.deleted' : 'checkup.updated',
                 subjectType: 'checkup',
                 subjectRef: id,
                 redactedMetadata: {
-                    changedFields: listChangedFields(auditBody),
-                    resourceVersion: current?.version ?? undefined,
+                    changedFields: listChangedFields(body, ['version']),
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Checkup audit write failed:',
@@ -124,11 +105,45 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const existing = await dbServer.select({ id: checkups.id, version: checkups.version }).from(checkups).where(eq(checkups.id, id)).get();
+        const parsedBody = await parseClinicalDeleteBody(request, 'web-delete');
+        if (!parsedBody.ok) {
+            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+        }
+        const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
+        const normalized = normalizeCheckupUpdateInput({
+            deletedAt: parsedBody.values.deletedAt,
+            deletionReason: parsedBody.values.deletionReason,
+        });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
-        await dbServer.delete(checkups).where(eq(checkups.id, id));
+
+        const updateResult = await dbServer.update(checkups)
+            .set({
+                ...normalized.values,
+                version: expectedVersion + 1,
+            })
+            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion)))
+            .run();
+
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildCheckupVersionConflictPayload(
+                    expectedVersion,
+                    id,
+                    await selectCheckupConflictSnapshot(id),
+                ),
+                { status: 409 },
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -139,8 +154,8 @@ export async function DELETE(
                 subjectType: 'checkup',
                 subjectRef: id,
                 redactedMetadata: {
-                    changedFields: ['deleted'],
-                    resourceVersion: existing.version,
+                    changedFields: ['deletedAt', 'deletionReason'],
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Checkup audit write failed:',

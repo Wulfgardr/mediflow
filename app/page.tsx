@@ -1,9 +1,10 @@
-import PatientList from '@/components/patient-list';
+'use client';
+
+import { Kree8ClinicalCockpit } from '@/components/kree8/kree8-clinical-cockpit';
+import { useSecurity } from '@/components/security-provider';
 
 export default function Home() {
-  return (
-    <div className="min-h-[85vh] space-y-6">
-      <PatientList />
-    </div>
-  );
+  const { user } = useSecurity();
+
+  return <Kree8ClinicalCockpit surface="live" operatorName={user?.displayName} />;
 }

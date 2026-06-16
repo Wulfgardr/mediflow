@@ -133,7 +133,7 @@ export default function ServiceArchitecturePanel() {
     };
 
     return (
-        <div className="glass-panel p-6 md:p-7">
+        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white">

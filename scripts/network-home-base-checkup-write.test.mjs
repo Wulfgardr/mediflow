@@ -202,7 +202,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         });
         assert.equal(remoteHardDelete.response.status, 405);
 
-        const createdAudit = await findAuditEvent('checkup.created', checkupId);
+        const createdAudit = await findAuditEvent('checkup.created', checkupId, sessionCookie);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -210,11 +210,11 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['date', 'title', 'status', 'notes', 'source']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('checkup.updated', checkupId);
+        const updatedAudit = await findAuditEvent('checkup.updated', checkupId, sessionCookie);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['status']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('checkup.deleted', checkupId);
+        const deletedAudit = await findAuditEvent('checkup.deleted', checkupId, sessionCookie);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -238,9 +238,11 @@ test('paired checkup write requires capability, session, scope, version, and PHI
     }
 });
 
-async function findAuditEvent(eventType, subjectRef) {
+async function findAuditEvent(eventType, subjectRef, sessionCookie) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=checkup&limit=20`, {
-        headers: localApiHeaders(),
+        headers: {
+            Cookie: sessionCookie,
+        },
     });
     assert.equal(audit.response.status, 200);
     assert.ok(Array.isArray(audit.json));
@@ -336,6 +338,8 @@ async function cleanupPatient(patientId) {
             if (!checkup?.id) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/checkups/${checkup.id}`, {
                 headers: localApiHeaders(),
+                // WUL-308: child DELETEs require optimistic concurrency.
+                body: { version: checkup.version },
             });
             assert.equal(deletion.response.status, 200);
         }

@@ -3,11 +3,11 @@
 /* @Codex */
 import { useEffect, useState } from 'react';
 /* @Codex */
-import { Accessibility, ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
+import { Accessibility, ChevronDown, ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
 /* @Codex */
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 /* @Codex */
-import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
+import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
@@ -15,7 +15,6 @@ import { db } from '@/lib/db';
 /* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
-    type SissSessionCheckpoint,
     type SissSessionHealth,
     type SissSessionStatusResponse,
 } from '@/lib/siss-session-shared';
@@ -71,7 +70,7 @@ const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
         label: 'Modulo prescrittivo',
-        caption: 'Apri la webapp ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+        caption: 'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
@@ -105,24 +104,30 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
     {
         label: 'Prescrittivo nativo',
         caption: 'Compilazione e invio direttamente dentro MediFlow.',
-        reason: 'Richiede una SSI qualificata SISS e un canale A2A/certificato; il prototipo attuale si ferma all\'handoff browser.',
+        reason: 'Da aprire nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.',
     },
     {
         label: 'FSE embedded',
         caption: 'Consultazione del fascicolo dentro l\'interfaccia del gestionale.',
-        reason: 'Manca ancora uno stack regionale certificato per autenticazione, policy privacy e scambio documentale dentro l\'app.',
+        reason: 'Da aprire nel portale ufficiale: la consultazione dentro l\'app richiede un percorso regionale certificato.',
     },
     {
         label: 'SGDT',
         caption: 'Accesso contestuale ai percorsi territoriali regionali dal paziente aperto.',
-        reason: 'SGDT risulta un applicativo regionale centralizzato; nel prototipo non c\'e ancora un punto di integrazione paziente-scoped adottabile.',
+        reason: 'Da aprire nel portale regionale: non c\'e ancora un aggancio paziente-specifico utilizzabile in app.',
     },
     {
         label: 'Certificati di malattia',
         caption: 'Emissione contestuale del certificato partendo dal paziente MediFlow.',
-        reason: 'La documentazione SISS esiste, ma non abbiamo ancora modellato scenario, tracciato e vincoli operativi in un adapter dedicato.',
+        reason: 'Da aprire nel portale ufficiale: il percorso certificato per l\'emissione non e ancora collegato.',
     },
 ];
+
+/* @Codex */
+const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
+    'portal-handoff': 'Apertura portali assistita',
+    'certified-api': 'Integrazione regionale certificata',
+};
 
 function isHandoffResponse(value: unknown): value is HandoffResponse {
     return (
@@ -145,6 +150,25 @@ function isHandoffResponse(value: unknown): value is HandoffResponse {
         'mode' in value &&
         (value.mode === 'portal-handoff' || value.mode === 'certified-api')
     );
+}
+
+/* @Codex */
+function healthDotClassName(health: SissSessionHealth) {
+    switch (health) {
+        case 'recent':
+            return 'graphite-status-dot is-recent';
+        case 'stale':
+            return 'graphite-status-dot is-stale';
+        default:
+            return 'graphite-status-dot is-absent';
+    }
+}
+
+/* @Codex */
+function healthLabel(health: SissSessionHealth, recent: string, stale: string, absent: string) {
+    if (health === 'recent') return recent;
+    if (health === 'stale') return stale;
+    return absent;
 }
 
 export default function SissPatientContextPanel({ patientId, patientTaxCode }: Props) {
@@ -315,7 +339,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                     patientId,
                     action,
                     moduleLabel: actionConfig?.label ?? payload.title,
-                    reason: 'Handoff avviato dal pannello contesto paziente SISS.',
+                    reason: 'Portale regionale aperto dal pannello contesto paziente SISS.',
                     startedAt: now,
                     outcome: 'started',
                     correlationId: payload.correlationId,
@@ -337,14 +361,25 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
     };
 
     const validation = fseReadiness.validation;
-    const readinessTone = validation?.hasErrors
-        ? 'error'
+    const readinessTone: 'success' | 'warning' | 'critical' | 'muted' = validation?.hasErrors
+        ? 'critical'
         : validation?.hasWarnings
             ? 'warning'
             : validation
                 ? 'success'
-                : 'neutral';
+                : 'muted';
+    const readinessLabel = fseReadiness.loading
+        ? 'Controllo FSE…'
+        : validation?.hasErrors
+            ? 'FSE: blocchi'
+            : validation?.hasWarnings
+                ? 'FSE: attenzioni'
+                : validation
+                    ? 'FSE pronta'
+                    : 'Controllo FSE non disponibile';
     const sessionData = sessionStatus.status;
+    const transportLabel = TRANSPORT_MODE_LABEL[summary.transportMode as SissPatientContextTransportMode]
+        ?? 'Apertura portali assistita';
 
     const formatObservedAt = (value: string | null) => {
         if (!value) return 'Non osservato';
@@ -359,304 +394,254 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
         }).format(date);
     };
 
-    const sessionHealthClassName = (health: SissSessionHealth) => {
-        switch (health) {
-            case 'recent':
-                return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-            case 'stale':
-                return 'border-amber-200 bg-amber-50 text-amber-700';
-            default:
-                return 'border-slate-200 bg-white/70 text-slate-500';
-        }
-    };
-
     const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
     const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
-    const moduleCheckpoints = sessionData?.checkpoints.filter((checkpoint): checkpoint is SissSessionCheckpoint => (
-        checkpoint.key === 'menu'
-        || checkpoint.key === 'prescription'
-        || checkpoint.key === 'prosthetics'
-        || checkpoint.key === 'fse'
-        || checkpoint.key === 'registry'
-    )) ?? [];
-
     return (
-        <div className="rounded-[28px] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50 p-5 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-cyan-900">
-                        <ShieldCheck className="h-4 w-4" />
-                        Contesto paziente SISS
+        <section className="patient-detail-section border p-5 md:p-6">
+            <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                    <p className="section-kicker">SISS / FSE</p>
+                    <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)] md:text-[17px]">
+                        <ShieldCheck className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                        SISS e FSE
+                    </h2>
+                    <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
+                        Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="graphite-chip">{transportLabel}</span>
+                    <span className={`graphite-chip ${hasTaxCode ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}>
+                        {hasTaxCode ? 'CF pronto' : 'CF mancante'}
+                    </span>
+                    <span className={`graphite-chip graphite-chip-tone-${readinessTone}`}>
+                        {readinessLabel}
+                    </span>
+                </div>
+            </header>
+
+            {!hasTaxCode && (
+                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">
+                    Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS resta apribile.
+                </p>
+            )}
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="graphite-block">
+                    <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            Accesso regionale
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={() => void refreshSessionStatus()}
+                            disabled={sessionStatus.loading}
+                            className="graphite-mini-btn"
+                            aria-label="Aggiorna stato accesso regionale"
+                        >
+                            {sessionStatus.loading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                            Aggiorna
+                        </button>
                     </div>
-                    <p className="text-sm text-slate-700">
-                        Apri rapidamente i moduli regionali ufficiali dal gestionale con il codice fiscale del paziente pronto da incollare, dove disponibile.
-                    </p>
-                    <p className="text-xs leading-5 text-slate-600">
-                        Per il prescrittivo MediFlow richiama la webapp ufficiale del Modulo Prescrittivo Regionale; non sostituisce ancora l&apos;interfaccia regionale.
-                    </p>
-                    {!hasTaxCode && (
-                        <p className="text-xs font-medium text-amber-700">
-                            Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS puo comunque essere aperto.
-                        </p>
+
+                    {sessionStatus.error ? (
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Stato accesso non leggibile in locale.</p>
+                    ) : sessionData ? (
+                        <>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className={`graphite-chip ${
+                                    sessionData.sessionHealth === 'recent'
+                                        ? 'graphite-chip-tone-success'
+                                        : sessionData.sessionHealth === 'stale'
+                                            ? 'graphite-chip-tone-warning'
+                                            : 'graphite-chip-tone-muted'
+                                }`}>
+                                    <span className={healthDotClassName(sessionData.sessionHealth)} aria-hidden />
+                                    {healthLabel(sessionData.sessionHealth, 'Accesso attivo', 'Accesso recente', 'Accesso assente')}
+                                </span>
+                                {remoteSignatureCheckpoint && (
+                                    <span className={`graphite-chip ${
+                                        remoteSignatureCheckpoint.health === 'recent'
+                                            ? 'graphite-chip-tone-success'
+                                            : remoteSignatureCheckpoint.health === 'stale'
+                                                ? 'graphite-chip-tone-warning'
+                                                : 'graphite-chip-tone-muted'
+                                    }`}>
+                                        <span className={healthDotClassName(remoteSignatureCheckpoint.health)} aria-hidden />
+                                        {healthLabel(remoteSignatureCheckpoint.health, 'Firma remota', 'Firma vista', 'Firma assente')}
+                                    </span>
+                                )}
+                                {roleSelectionCheckpoint && (
+                                    <span className={`graphite-chip ${
+                                        roleSelectionCheckpoint.health === 'recent'
+                                            ? 'graphite-chip-tone-success'
+                                            : roleSelectionCheckpoint.health === 'stale'
+                                                ? 'graphite-chip-tone-warning'
+                                                : 'graphite-chip-tone-muted'
+                                    }`}>
+                                        <span className={healthDotClassName(roleSelectionCheckpoint.health)} aria-hidden />
+                                        {healthLabel(roleSelectionCheckpoint.health, 'Ruolo confermato', 'Ruolo visto', 'Ruolo assente')}
+                                    </span>
+                                )}
+                            </div>
+
+                            <dl className="mt-3 grid gap-1">
+                                <div className="graphite-row">
+                                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">Ultimo modulo</dt>
+                                    <dd className="flex items-center gap-2 text-right">
+                                        <span className="font-semibold text-[color:var(--mf-ink)]">
+                                            {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : '–'}
+                                        </span>
+                                        <span className="text-[11px] text-[color:var(--mf-muted)]">{formatObservedAt(sessionData.lastModuleAt)}</span>
+                                    </dd>
+                                </div>
+                            </dl>
+
+                            <p className="mt-2 text-[10.5px] uppercase tracking-wide text-[color:var(--mf-muted)]">
+                                Stato letto localmente
+                            </p>
+
+                            {sessionData.warning && (
+                                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">Stato accesso non aggiornato di recente.</p>
+                            )}
+                        </>
+                    ) : (
+                        <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Controllo locale dell&apos;accesso in corso…</p>
                     )}
                 </div>
 
-                <div className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    {summary.transportMode}
-                </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-slate-500">
-                    Sessione browser SISS richiesta
-                </span>
-                <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-slate-500">
-                    Prescrittivo: webapp ufficiale regionale
-                </span>
-                <span className={`inline-flex items-center rounded-full px-3 py-1 ${
-                    summary.patientFiscalCodeReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                }`}>
-                    {summary.patientFiscalCodeReady ? 'CF paziente valido' : 'CF paziente mancante o non valido'}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-slate-500">
-                    API certificate non disponibili
-                </span>
-                <span className={`inline-flex items-center rounded-full px-3 py-1 ${
-                    readinessTone === 'error'
-                        ? 'bg-rose-50 text-rose-700'
-                        : readinessTone === 'warning'
-                            ? 'bg-amber-50 text-amber-700'
-                            : readinessTone === 'success'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-white/70 text-slate-500'
-                }`}>
-                    {fseReadiness.loading
-                        ? 'Pre-check FSE in corso'
-                        : validation?.hasErrors
-                            ? 'FSE locale con blocchi'
-                            : validation?.hasWarnings
-                                ? 'FSE locale con warning'
-                                : validation
-                                    ? 'FSE locale pronta'
-                                    : 'Pre-check FSE non disponibile'}
-                </span>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-1">
-                        <div className="text-sm font-semibold text-slate-900">Stato sessione SISS</div>
-                        <p className="text-xs leading-5 text-slate-600">
-                            Lettura locale della cronologia Atlas su questa macchina. Mostra segnali osservati di sessione, firma remota e ultimo modulo raggiunto, senza dichiarare uno stato certificato del backend regionale.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => void refreshSessionStatus()}
-                        disabled={sessionStatus.loading}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                        {sessionStatus.loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                        Aggiorna stato
-                    </button>
-                </div>
-
-                {sessionStatus.error ? (
-                    <p className="mt-3 text-xs font-medium text-rose-700">{sessionStatus.error}</p>
-                ) : sessionData ? (
-                    <>
-                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                            <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(sessionData.sessionHealth)}`}>
-                                {sessionData.sessionHealth === 'recent'
-                                    ? 'Sessione SISS osservata'
-                                    : sessionData.sessionHealth === 'stale'
-                                        ? 'Sessione SISS osservata in passato'
-                                        : 'Sessione SISS non osservata'}
-                            </span>
-                            {remoteSignatureCheckpoint && (
-                                <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(remoteSignatureCheckpoint.health)}`}>
-                                    {remoteSignatureCheckpoint.health === 'recent'
-                                        ? 'Firma remota osservata'
-                                        : remoteSignatureCheckpoint.health === 'stale'
-                                            ? 'Firma remota osservata in passato'
-                                            : 'Firma remota non osservata'}
-                                </span>
-                            )}
-                            {roleSelectionCheckpoint && (
-                                <span className={`inline-flex items-center rounded-full border px-3 py-1 ${sessionHealthClassName(roleSelectionCheckpoint.health)}`}>
-                                    {roleSelectionCheckpoint.health === 'recent'
-                                        ? 'Ruolo operatore osservato'
-                                        : roleSelectionCheckpoint.health === 'stale'
-                                            ? 'Ruolo operatore osservato in passato'
-                                            : 'Ruolo operatore non osservato'}
-                                </span>
-                            )}
-                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-500">
-                                Fonte: {sessionData.browserProfile ? `Atlas ${sessionData.browserProfile}` : 'Atlas locale'}
-                            </span>
-                        </div>
-
-                        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            <div className={`rounded-xl border px-3 py-3 ${sessionHealthClassName(sessionData.sessionHealth)}`}>
-                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ultimo modulo osservato</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : 'Nessuno'}
-                                </div>
-                                <p className="mt-1 text-xs text-slate-600">
-                                    {formatObservedAt(sessionData.lastModuleAt)}
-                                </p>
-                            </div>
-                            {moduleCheckpoints.map((checkpoint) => (
-                                <div
-                                    key={checkpoint.key}
-                                    className={`rounded-xl border px-3 py-3 ${sessionHealthClassName(checkpoint.health)}`}
-                                >
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{checkpoint.label}</div>
-                                    <div className="mt-1 text-sm font-semibold text-slate-900">
-                                        {checkpoint.health === 'recent'
-                                            ? 'Osservato di recente'
-                                            : checkpoint.health === 'stale'
-                                                ? 'Osservato in passato'
-                                                : 'Non osservato'}
-                                    </div>
-                                    <p className="mt-1 text-xs text-slate-600">
-                                        {formatObservedAt(checkpoint.observedAt)}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-
-                        {sessionData.warning && (
-                            <p className="mt-3 text-xs font-medium text-amber-700">{sessionData.warning}</p>
-                        )}
-                    </>
-                ) : null}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/70 bg-white/75 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-1">
-                        <div className="text-sm font-semibold text-slate-900">Prontezza FSE locale</div>
-                        <p className="text-xs leading-5 text-slate-600">
-                            Questo controllo usa la validazione locale gia presente nel gestionale per stimare se il paziente e pronto per i profili FSE pilotati oggi.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => void refreshFseReadiness()}
-                        disabled={fseReadiness.loading}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                        {fseReadiness.loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                        Aggiorna
-                    </button>
-                </div>
-
-                {fseReadiness.error ? (
-                    <p className="mt-3 text-xs font-medium text-rose-700">{fseReadiness.error}</p>
-                ) : validation ? (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <div className={`rounded-xl border px-3 py-3 ${
-                            validation.therapyMedication.errorCount > 0
-                                ? 'border-rose-200 bg-rose-50'
-                                : validation.therapyMedication.warningCount > 0
-                                    ? 'border-amber-200 bg-amber-50'
-                                    : 'border-emerald-200 bg-emerald-50'
-                        }`}>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terapie</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-900">
-                                {validation.therapyMedication.total} record
-                            </div>
-                            <p className="mt-1 text-xs text-slate-600">
-                                {validation.therapyMedication.errorCount} errori, {validation.therapyMedication.warningCount} warning
-                            </p>
-                        </div>
-                        <div className={`rounded-xl border px-3 py-3 ${
-                            validation.observationVitals.errorCount > 0
-                                ? 'border-rose-200 bg-rose-50'
-                                : validation.observationVitals.warningCount > 0
-                                    ? 'border-amber-200 bg-amber-50'
-                                    : 'border-emerald-200 bg-emerald-50'
-                        }`}>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Osservazioni</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-900">
-                                {validation.observationVitals.total} record
-                            </div>
-                            <p className="mt-1 text-xs text-slate-600">
-                                {validation.observationVitals.errorCount} errori, {validation.observationVitals.warningCount} warning
-                            </p>
-                        </div>
-                    </div>
-                ) : null}
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {ACTIONS.map((item) => {
-                    const Icon = item.icon;
-                    const isLoading = activeAction === item.action;
-                    const state = summary.actionStates.find((actionState) => actionState.action === item.action);
-
-                    return (
+                <div className="graphite-block">
+                    <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            Controllo FSE locale
+                        </h3>
                         <button
-                            key={item.action}
                             type="button"
-                            onClick={() => void startFlow(item.action)}
-                            disabled={Boolean(activeAction) || !state?.available}
-                            className="flex min-h-28 flex-col items-start justify-between rounded-2xl border border-white/70 bg-white/80 p-4 text-left shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-100"
+                            onClick={() => void refreshFseReadiness()}
+                            disabled={fseReadiness.loading}
+                            className="graphite-mini-btn"
+                            aria-label="Aggiorna controllo FSE locale"
                         >
-                            <div className="flex w-full items-center justify-between gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800">
-                                    {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-                                </div>
-                                <ExternalLink className="h-4 w-4 text-slate-400" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-sm font-semibold text-slate-900">{item.label}</div>
-                                <p className="text-xs leading-5 text-slate-600">{item.caption}</p>
-                                {state?.reason && (
-                                    <p className="text-[11px] font-medium text-amber-700">{state.reason}</p>
-                                )}
-                            </div>
+                            {fseReadiness.loading ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                            Aggiorna
                         </button>
-                    );
-                })}
+                    </div>
+
+                    <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                        Verifica locale dei dati che servono prima di operare sul fascicolo regionale.
+                    </p>
+
+                    {fseReadiness.error ? (
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Controllo FSE non disponibile al momento.</p>
+                    ) : validation ? (
+                        <dl className="mt-2 grid gap-1">
+                            <div className="graphite-row">
+                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--mf-ink)]">
+                                    <span className={`graphite-status-dot ${
+                                        validation.therapyMedication.errorCount > 0
+                                            ? 'is-stale'
+                                            : validation.therapyMedication.warningCount > 0
+                                                ? 'is-stale'
+                                                : 'is-recent'
+                                    }`} aria-hidden />
+                                    Terapie
+                                </dt>
+                                <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
+                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.therapyMedication.total} record</span>
+                                    {' · '}
+                                    <span>{validation.therapyMedication.errorCount} blocchi</span>
+                                    {' · '}
+                                    <span>{validation.therapyMedication.warningCount} attenzioni</span>
+                                </dd>
+                            </div>
+                            <div className="graphite-row">
+                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--mf-ink)]">
+                                    <span className={`graphite-status-dot ${
+                                        validation.observationVitals.errorCount > 0
+                                            ? 'is-stale'
+                                            : validation.observationVitals.warningCount > 0
+                                                ? 'is-stale'
+                                                : 'is-recent'
+                                    }`} aria-hidden />
+                                    Parametri
+                                </dt>
+                                <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
+                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.observationVitals.total} record</span>
+                                    {' · '}
+                                    <span>{validation.observationVitals.errorCount} blocchi</span>
+                                    {' · '}
+                                    <span>{validation.observationVitals.warningCount} attenzioni</span>
+                                </dd>
+                            </div>
+                        </dl>
+                    ) : null}
+                </div>
             </div>
 
-            <div className="mt-5 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <ShieldAlert className="h-4 w-4 text-amber-600" />
-                    Non ancora integrabile oggi
+            <div className="mt-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                    Apri portale regionale
+                </h3>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    {ACTIONS.map((item) => {
+                        const Icon = item.icon;
+                        const isLoading = activeAction === item.action;
+                        const state = summary.actionStates.find((actionState) => actionState.action === item.action);
+                        const disabled = Boolean(activeAction) || !state?.available;
+
+                        return (
+                            <button
+                                key={item.action}
+                                type="button"
+                                onClick={() => void startFlow(item.action)}
+                                disabled={disabled}
+                                className="siss-action-btn"
+                                title={item.caption}
+                            >
+                                <div className="siss-action-btn-head">
+                                    {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                                    <span className="min-w-0 truncate">{item.label}</span>
+                                    <ExternalLink className="ml-auto h-3 w-3 text-[color:var(--mf-muted)]" />
+                                </div>
+                                <p className="siss-action-btn-caption line-clamp-1">{item.caption}</p>
+                            </button>
+                        );
+                    })}
                 </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            </div>
+
+            <details className="group mt-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
+                    <span className="flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-[color:var(--mf-warning)]" />
+                        Funzioni non automatiche
+                        <span className="graphite-chip graphite-chip-tone-muted">{BLOCKED_CAPABILITIES.length}</span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-[color:var(--mf-muted)] transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-2 siss-blocked-list">
                     {BLOCKED_CAPABILITIES.map((item) => (
-                        <div
-                            key={item.label}
-                            className="flex min-h-28 flex-col items-start justify-between rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-left"
-                        >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                                <ShieldAlert className="h-4 w-4" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-sm font-semibold text-slate-900">{item.label}</div>
-                                <p className="text-xs leading-5 text-slate-600">{item.caption}</p>
-                                <p className="text-[11px] font-medium text-amber-700">{item.reason}</p>
-                            </div>
+                        <div key={item.label} className="siss-blocked-item">
+                            <div className="siss-blocked-item-label">{item.label}</div>
+                            <p className="siss-blocked-item-caption">{item.caption}</p>
+                            <p className="siss-blocked-item-reason">{item.reason}</p>
                         </div>
                     ))}
                 </div>
-                <p className="text-xs leading-5 text-slate-600">
-                    Il salto da handoff assistito a integrazione nativa richiede un filone dedicato su qualifica SSI, canale A2A e requisiti regionali certificati.
+                <p className="mt-2 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                    Queste operazioni restano da svolgere nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.
                 </p>
-            </div>
+            </details>
 
             {feedback && (
                 <div
-                    className={`mt-4 rounded-2xl border px-3 py-2 text-sm ${
+                    className={`mt-4 siss-feedback ${
                         feedback.kind === 'success'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            ? 'siss-feedback-success'
                             : feedback.kind === 'warning'
-                                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                                : 'border-rose-200 bg-rose-50 text-rose-800'
+                                ? 'siss-feedback-warning'
+                                : 'siss-feedback-error'
                     }`}
                     aria-live="polite"
                 >
@@ -666,17 +651,18 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
                         ) : (
                             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                         )}
-                        <div className="space-y-1">
-                            <p>{feedback.message}</p>
+                        <div className="min-w-0 space-y-1">
+                            <p className="break-words">{feedback.message}</p>
                             {feedback.correlationId && (
-                                <p className="font-mono text-xs opacity-80">
-                                    Correlation ID: {feedback.correlationId}
-                                </p>
+                                <details className="text-[11px] opacity-70">
+                                    <summary className="cursor-pointer select-none">Dettagli tecnici</summary>
+                                    <p className="mt-1 break-all font-mono">Riferimento: {feedback.correlationId}</p>
+                                </details>
                             )}
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

@@ -13,12 +13,14 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
   await bootstrapUnlockedSession(page, pin);
 
   const disableSmartImport = async () => {
-    await page.goto('/settings');
-    await expect(page).toHaveURL(/\/settings$/);
+    // WUL-297: kill switches now live on the dedicated AI sub-route.
+    await page.goto('/settings/ai/funzioni');
+    await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 
-    const killSwitch = page.getByLabel('Disabilita Smart Import localmente');
-    await killSwitch.check();
-    await expect(page.getByTestId('smart-import-kill-switch-card')).toContainText('Disabled');
+    const killSwitch = page.getByRole('switch', { name: 'Smart Import locale' });
+    await killSwitch.click();
+    await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByTestId('smart-import-kill-switch-card')).toContainText('Spento');
     const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
     await saveButton.click();
     await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);

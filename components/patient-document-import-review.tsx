@@ -21,6 +21,10 @@ import {
 } from '@/lib/patient-document-review';
 /* @Codex */
 import { buildPatientImportDecision } from '@/lib/patient-import-decision';
+/* @Codex */
+import { buildPatientDocumentDecision } from '@/lib/patient-document-decision';
+/* @Codex */
+import DocumentDecisionReviewCard from '@/components/document-decision-review-card';
 
 interface PatientDocumentImportReviewProps {
     draft: PatientDocumentReviewDraft;
@@ -36,6 +40,7 @@ function cloneDraft(draft: PatientDocumentReviewDraft): PatientDocumentReviewDra
         fields: draft.fields.map((field) => ({ ...field })),
         diagnoses: draft.diagnoses.map((diagnosis) => ({ ...diagnosis })),
         medications: draft.medications.map((medication) => ({ ...medication })),
+        servicePrescriptions: (draft.servicePrescriptions ?? []).map((item) => ({ ...item })),
     };
 }
 
@@ -102,14 +107,17 @@ export default function PatientDocumentImportReview({
         fields: localDraft.fields.filter((field) => field.included).length,
         diagnoses: localDraft.diagnoses.filter((diagnosis) => diagnosis.included).length,
         medications: localDraft.medications.filter((medication) => medication.included).length,
+        servicePrescriptions: (localDraft.servicePrescriptions ?? []).filter((item) => item.included).length,
     }), [localDraft]);
     /* @Codex */
     const importDecision = useMemo(() => buildPatientImportDecision(localDraft), [localDraft]);
+    /* @Codex */
+    const documentDecision = useMemo(() => buildPatientDocumentDecision(localDraft), [localDraft]);
 
     const tone = qualityTone(localDraft.quality?.level);
 
     return (
-        <div className={`glass-panel mb-10 rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
+        <div className={`glass-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
             <div className="flex flex-col gap-5 border-b border-black/5 pb-6 dark:border-white/5 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone.icon}`}>
@@ -117,14 +125,14 @@ export default function PatientDocumentImportReview({
                     </div>
                     <div className="space-y-2">
                         <div>
-                            <p className="section-kicker">Review documento</p>
+                            <p className="section-kicker">Controllo documento</p>
                             <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                                Conferma cosa applicare al form
+                                Scegli cosa portare nella scheda
                             </h2>
                         </div>
                         <p className={`max-w-3xl text-sm leading-relaxed ${tone.text}`}>
-                            In questa slice i dati estratti non entrano piu direttamente nel create patient:
-                            puoi confermare, correggere o escludere ogni gruppo prima di applicarli al form.
+                            I dati estratti restano in bozza: puoi confermare, correggere o escludere
+                            ogni gruppo prima di applicarlo alla scheda.
                         </p>
                         <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
@@ -134,10 +142,10 @@ export default function PatientDocumentImportReview({
                                 Confidenza import {Math.round(localDraft.confidence * 100)}%
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie
+                                {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie · {counters.servicePrescriptions} prestazioni
                             </span>
                             <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {importDecision.summary.structuredDiagnosisCount} write diagnosi · {importDecision.summary.structuredTherapyCount} write terapie · {importDecision.summary.noteOnlyTherapyCount} note da riconciliare
+                                {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.servicePrescriptionProposalCount} prestazioni proposte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
                             </span>
                         </div>
                     </div>
@@ -149,7 +157,7 @@ export default function PatientDocumentImportReview({
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
                 >
                     <X className="h-4 w-4" />
-                    Scarta import
+                    Scarta documento
                 </button>
             </div>
 
@@ -164,7 +172,7 @@ export default function PatientDocumentImportReview({
                     </div>
                     <div className="space-y-1">
                         <p className="text-sm font-bold text-slate-900 dark:text-white">
-                            Qualita documento: {localDraft.quality.reason}
+                            Qualità documento: {localDraft.quality.reason}
                         </p>
                         {localDraft.sourceExcerpt && (
                             <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
@@ -174,6 +182,10 @@ export default function PatientDocumentImportReview({
                     </div>
                 </div>
             )}
+
+            <div className="mt-5">
+                <DocumentDecisionReviewCard decision={documentDecision} />
+            </div>
 
             <div className="mt-6 space-y-6">
                 {localDraft.fields.length > 0 && (
@@ -292,6 +304,98 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, description: event.target.value } : item),
                                             }))}
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {(localDraft.servicePrescriptions ?? []).length > 0 && (
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 px-1">
+                            <ClipboardCheck className="h-4 w-4 text-sky-500" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                                Prestazioni prescritte
+                            </h3>
+                        </div>
+
+                        <div className="rounded-[8px] border border-sky-200 bg-sky-50/70 p-4 text-xs leading-relaxed text-sky-800 dark:border-sky-500/20 dark:bg-sky-950/10 dark:text-sky-200">
+                            Queste voci sono visite, esami, imaging o riabilitazione: restano fuori dal piano farmacologico e vengono proposte per il dominio dedicato.
+                        </div>
+
+                        <div className="space-y-3">
+                            {(localDraft.servicePrescriptions ?? []).map((item) => (
+                                <div key={item.id} className="rounded-[8px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{item.serviceName}</p>
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    {item.category ?? 'other'}
+                                                </span>
+                                                {item.confidence && (
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                        {item.confidence}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.evidence && (
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    Evidenza: {item.evidence}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={item.included}
+                                            onChange={() => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => (
+                                                    candidate.id === item.id ? { ...candidate, included: !candidate.included } : candidate
+                                                )),
+                                            }))}
+                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <input
+                                            value={item.serviceName}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceName: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Nome prestazione"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.serviceCode || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceCode: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Codice prestazione"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.clinicalQuestion || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, clinicalQuestion: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Quesito clinico"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                        />
+                                        <input
+                                            value={item.provider || ''}
+                                            onChange={(event) => setLocalDraft((current) => ({
+                                                ...current,
+                                                servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, provider: event.target.value } : candidate),
+                                            }))}
+                                            placeholder="Struttura / specialita"
                                             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     </div>
@@ -422,7 +526,7 @@ export default function PatientDocumentImportReview({
             <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-6 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <FileSearch className="h-4 w-4" />
-                    L&apos;applicazione al form resta esplicita: nessun campo viene salvato in automatico.
+                    Il passaggio alla scheda resta esplicito: nessun campo viene salvato in automatico.
                 </div>
 
                 <button
@@ -431,7 +535,7 @@ export default function PatientDocumentImportReview({
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-6 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-500/20 transition-[background-color,opacity,transform] hover:bg-blue-700 active:scale-95"
                 >
                     <CheckCircle2 className="h-4 w-4" />
-                    Applica al form
+                    Porta nella scheda
                 </button>
             </div>
         </div>

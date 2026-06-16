@@ -61,7 +61,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
 
         setIsProcessing(true);
         /* @Codex */
-        setAiStage(`OCR in corso (${aiModels?.ocr ?? 'deepseek-ocr'})...`);
+        setAiStage('OCR locale in corso...');
         setSuccess(false);
         setError(null);
         setExtractionSource(null);
@@ -75,13 +75,14 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             if (!patientId && data.rawText && documentSynthesisEnabled) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Analisi clinica (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                setAiStage('Analisi clinica locale...');
                 try {
                     const analysis = await analyzeDocumentContent(data.rawText);
                     data.diagnoses = analysis.diagnoses;
                     data.medications = analysis.medications;
                     data.problemStatements = analysis.problemStatements;
                     data.therapyCandidates = analysis.therapyCandidates;
+                    data.servicePrescriptions = analysis.servicePrescriptions;
                     data.documentQuality = analysis.quality;
                     data.documentSummary = analysis.summary;
                     if (!data.notes && analysis.summary) {
@@ -98,7 +99,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
 
             if (!patientId && documentSynthesisEnabled) {
                 try {
-                    setAiStage(`Riconciliazione ICD/AIFA (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                    setAiStage('Riconciliazione codici e farmaci...');
                     Object.assign(data, await enrichExtractedPatientDataForReview(data));
                 } catch (reviewError) {
                     console.error('Document review enrichment error:', reviewError);
@@ -113,12 +114,12 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             if (saveToArchive && patientId && data.rawText && documentSynthesisEnabled) {
                 setIsSynthesizing(true);
                 /* @Codex */
-                setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
+                setAiStage('Sintesi del documento...');
                 try {
                     await synthesizeDocument(data.rawText, file.name, patientId);
                     setArchiveSaved(true);
                     /* @Codex */
-                    setAiStage("Aggiornamento AI Patient Summary...");
+                    setAiStage("Aggiornamento sintesi paziente...");
                     await regeneratePatientSummary(patientId);
                 } catch (synthErr) {
                     if (!(synthErr instanceof AiDocumentSynthesisDisabledError)) {
@@ -151,8 +152,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     const getSourceBadge = () => {
         if (!extractionSource) return null;
         const badges = {
-            ai: { icon: Sparkles, text: 'AI OCR', color: 'text-purple-600 bg-purple-100' },
-            hybrid: { icon: Sparkles, text: 'AI + Regex', color: 'text-blue-600 bg-blue-100' },
+            ai: { icon: Sparkles, text: 'OCR locale', color: 'text-purple-600 bg-purple-100' },
+            hybrid: { icon: Sparkles, text: 'AI + pattern', color: 'text-blue-600 bg-blue-100' },
             regex: { icon: FileText, text: 'Pattern', color: 'text-gray-600 bg-gray-100' }
         };
         const badge = badges[extractionSource];
@@ -180,10 +181,10 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 {isProcessing ? (
                     <div className="flex flex-col items-center justify-center py-4 text-blue-600">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                        <p className="font-medium animate-pulse">Analisi documento con AI...</p>
-                        <p className="text-xs text-blue-500 mt-1">{aiStage || "DeepSeek OCR 2 in elaborazione"}</p>
+                        <p className="font-medium animate-pulse">Lettura documento in corso...</p>
+                        <p className="text-xs text-blue-500 mt-1">{aiStage || "OCR locale in elaborazione"}</p>
                         {aiModels && (
-                            <p className="text-[10px] text-blue-400 mt-1">OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}</p>
+                            <p className="text-[10px] text-blue-400 mt-1">OCR: {aiModels.ocr} · Clinico: {aiModels.clinical}</p>
                         )}
                     </div>
                 ) : error ? (
@@ -196,13 +197,13 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     <div className="flex flex-col items-center justify-center py-4 text-green-600">
                         <CheckCircle className="w-8 h-8 mb-2" />
                         <div className="flex items-center gap-2">
-                            <p className="font-bold">Dati estratti con successo!</p>
+                            <p className="font-bold">Dati estratti</p>
                             {getSourceBadge()}
                         </div>
-                        <p className="text-xs text-green-700">Controlla i campi compilati qui sotto.</p>
+                        <p className="text-xs text-green-700">Controlla le proposte prima del salvataggio.</p>
                         {!patientId && (
                             <p className="text-xs text-green-700">
-                                Diagnosi e terapie candidate vengono prima riconciliate localmente e poi proposte in review prima del salvataggio.
+                                Diagnosi e terapie vengono riconciliate localmente e poi mostrate per il controllo.
                             </p>
                         )}
 
@@ -217,7 +218,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                                 ) : archiveSaved ? (
                                     <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                                         <Archive className="w-3 h-3" />
-                                        Salvato in Archivio Intelligente
+                                        Salvato nell&apos;archivio documenti
                                     </span>
                                 ) : null}
                             </div>
@@ -233,9 +234,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                         </div>
                         <div>
                             <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                                Importa da Documento
+                                Importa da documento
                                 <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                                    AI OCR
+                                    OCR locale
                                 </span>
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -259,7 +260,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
                     data-testid="document-synthesis-disabled-note"
                 >
-                    La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi reviewable, terapie candidate e Archivio Intelligente non vengono generati.
+                    La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi da controllare, terapie candidate e archivio documenti non vengono generati.
                 </div>
             )}
         </div>

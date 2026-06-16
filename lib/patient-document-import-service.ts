@@ -25,6 +25,8 @@ import {
     type SmartImportDiagnosisExtraction,
     type SmartImportTherapyExtraction,
 } from './ai-task-contracts';
+/* @Codex */
+import { isServicePrescriptionLikeTherapy } from './prescription-boundary';
 
 /* @Codex */
 const DOSAGE_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b(?:\s*[^\n,;]*)?/i;
@@ -337,6 +339,60 @@ function buildFallbackDrugQuery(value: string): string {
 }
 
 /* @Codex */
+const PIANO_TERAPEUTICO_FIELD_LABEL_REGEX = /^(?:farmaco prescritto|posologia|durata del trattamento|altri trattamenti|prima prescrizione|prosecuzione cura|data controllo|sospensione|motivo della sospensione)\b/i;
+
+/* @Codex */
+function extractPianoTerapeuticoFieldValue(lines: string[], labelPattern: RegExp): string | undefined {
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index].trim();
+        const match = line.match(labelPattern);
+        if (!match) continue;
+
+        const inlineValue = stripTherapyBulletPrefix(match[1] || '').trim();
+        if (inlineValue && !PIANO_TERAPEUTICO_FIELD_LABEL_REGEX.test(inlineValue)) {
+            return inlineValue;
+        }
+
+        for (let cursor = index + 1; cursor < Math.min(lines.length, index + 4); cursor += 1) {
+            const candidate = stripTherapyBulletPrefix(lines[cursor]).trim();
+            if (!candidate) continue;
+            if (PIANO_TERAPEUTICO_FIELD_LABEL_REGEX.test(candidate)) break;
+            return candidate;
+        }
+    }
+
+    return undefined;
+}
+
+/* @Codex */
+function extractPianoTerapeuticoTherapyCandidate(lines: string[]): SmartImportTherapyExtraction[] {
+    const hasTherapeuticPlanContext = lines.some((line) => /piano terapeutico|note aifa|farmaco prescritto/i.test(line));
+    if (!hasTherapeuticPlanContext) return [];
+
+    const drugValue = extractPianoTerapeuticoFieldValue(lines, /^farmaco prescritto\b[:.\-–]?\s*(.*)$/i);
+    if (!drugValue) return [];
+
+    const dosageValue = extractPianoTerapeuticoFieldValue(lines, /^posologia\b[:.\-–]?\s*(.*)$/i);
+    const segment = [drugValue, dosageValue].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const drugMention = buildFallbackDrugMention(drugValue);
+    const drugQuery = buildFallbackDrugQuery(segment);
+    if (!drugMention || !isPlausibleTherapyCandidate({ drugMention, drugQuery })) return [];
+
+    return [{
+        drugMention,
+        drugQuery,
+        dosage: dosageValue?.match(DOSAGE_REGEX)?.[0]?.trim() || segment.match(DOSAGE_REGEX)?.[0]?.trim(),
+        confidence: 'medium',
+        evidence: [
+            'Piano terapeutico AIFA',
+            `Farmaco prescritto: ${drugValue}`,
+            dosageValue ? `Posologia: ${dosageValue}` : undefined,
+        ].filter(Boolean).join(' - '),
+        therapyState: 'active',
+    }];
+}
+
+/* @Codex */
 function isSchedulingOnlyTherapyFragment(value: string): boolean {
     const mention = stripTherapyBulletPrefix(value);
     if (!mention) return true;
@@ -355,6 +411,7 @@ export function isPlausibleTherapyCandidate(candidate: Pick<SmartImportTherapyEx
     const mention = stripTherapyBulletPrefix(candidate.drugMention || candidate.drugQuery || '');
     if (!mention) return false;
     if (NON_THERAPY_MENTION_PREFIX_REGEX.test(mention)) return false;
+    if (isServicePrescriptionLikeTherapy(candidate)) return false;
     if (isSchedulingOnlyTherapyFragment(mention)) return false;
     return true;
 }
@@ -1083,7 +1140,9 @@ function toExplicitDiagnosisCandidates(data: ExtractedPatientData): ExtractedPat
 /* @Codex */
 function extractTherapyCandidatesFromRawSections(rawText: string): SmartImportTherapyExtraction[] {
     const lines = splitDocumentIntoLines(rawText);
-    const candidates: SmartImportTherapyExtraction[] = [];
+    const candidates: SmartImportTherapyExtraction[] = [
+        ...extractPianoTerapeuticoTherapyCandidate(lines),
+    ];
     let currentSection: TherapyDocumentSection = 'unknown';
     let currentHeading: string | undefined;
 
@@ -1269,62 +1328,65 @@ async function resolveTherapyCandidates(
         return searchCache.get(key)!;
     };
 
-    const resolved = await Promise.all(therapyCandidates.map(async (therapy) => {
-        const searchTerms = buildDrugSearchTerms(therapy).slice(0, 6);
-        const rankedByCandidate = new Map<string, { candidate: AifaDrug; score: number }>();
+    const resolved: Array<ExtractedPatientReviewTherapy | null> = await Promise.all(therapyCandidates.map(
+        async (therapy): Promise<ExtractedPatientReviewTherapy | null> => {
+            if (isServicePrescriptionLikeTherapy(therapy)) return null;
 
-        for (const term of searchTerms) {
-            const candidates = await search(term);
-            for (const candidate of candidates) {
-                const key = [
-                    normalizeText(candidate.aic),
-                    normalizeText(candidate.activePrinciple || ''),
-                    normalizeText(candidate.name),
-                    normalizeText(candidate.packaging || ''),
-                ].join('|');
-                const score = rankDrugMatch(candidate, therapy) + (hasDrugDosageConflict(candidate, therapy) ? -8 : 0);
-                const previous = rankedByCandidate.get(key);
-                if (!previous || score > previous.score) {
-                    rankedByCandidate.set(key, { candidate, score });
+            const searchTerms = buildDrugSearchTerms(therapy).slice(0, 6);
+            const rankedByCandidate = new Map<string, { candidate: AifaDrug; score: number }>();
+
+            for (const term of searchTerms) {
+                const candidates = await search(term);
+                for (const candidate of candidates) {
+                    const key = [
+                        normalizeText(candidate.aic),
+                        normalizeText(candidate.activePrinciple || ''),
+                        normalizeText(candidate.name),
+                        normalizeText(candidate.packaging || ''),
+                    ].join('|');
+                    const score = rankDrugMatch(candidate, therapy) + (hasDrugDosageConflict(candidate, therapy) ? -8 : 0);
+                    const previous = rankedByCandidate.get(key);
+                    if (!previous || score > previous.score) {
+                        rankedByCandidate.set(key, { candidate, score });
+                    }
                 }
             }
-        }
 
-        const ranked = Array.from(rankedByCandidate.values())
-            .sort((left, right) => right.score - left.score)
-            .map((item) => item.candidate);
-        const sanitizedTherapy = sanitizeResolvedTherapyExtraction(therapy, ranked);
-        const selectedCandidate = selectTherapyCatalogMatch(sanitizedTherapy, ranked);
-        const selected = selectedCandidate && candidateNameSupportsTherapyIdentity(selectedCandidate, sanitizedTherapy)
-            ? selectedCandidate
-            : undefined;
-        const drugName = selected?.name || sanitizedTherapy.drugMention;
-        const dosage = sanitizedTherapy.dosage || undefined;
-        const matchType = selected
-            ? 'catalog'
-            : (sanitizedTherapy.activePrinciple || sanitizedTherapy.drugMention ? 'manual' : 'none');
+            const ranked = Array.from(rankedByCandidate.values())
+                .sort((left, right) => right.score - left.score)
+                .map((item) => item.candidate);
+            const sanitizedTherapy = sanitizeResolvedTherapyExtraction(therapy, ranked);
+            const selectedCandidate = selectTherapyCatalogMatch(sanitizedTherapy, ranked);
+            const selected = selectedCandidate && candidateNameSupportsTherapyIdentity(selectedCandidate, sanitizedTherapy)
+                ? selectedCandidate
+                : undefined;
+            const drugName = selected?.name || sanitizedTherapy.drugMention;
+            const dosage = sanitizedTherapy.dosage || undefined;
+            const matchType = selected
+                ? 'catalog'
+                : (sanitizedTherapy.activePrinciple || sanitizedTherapy.drugMention ? 'manual' : 'none');
 
-        return {
-            drugName,
-            dosage,
-            activePrinciple: selected?.activePrinciple || sanitizedTherapy.activePrinciple,
-            motivation: sanitizedTherapy.motivation,
-            aic: selected?.aic,
-            atc: selected?.atc,
-            confidence: sanitizedTherapy.confidence,
-            therapyState: sanitizedTherapy.therapyState || 'active',
-            matchType,
-            evidence: sanitizedTherapy.evidence,
-            blockedReason: sanitizedTherapy.therapyState && sanitizedTherapy.therapyState !== 'active'
-                ? (sanitizedTherapy.reviewNote || 'Terapia da confermare o non attiva nelle fonti correnti')
-                : undefined,
-            sourceType: 'reviewable_local_match',
-        } satisfies ExtractedPatientReviewTherapy;
-    }));
+            return {
+                drugName,
+                dosage,
+                activePrinciple: selected?.activePrinciple || sanitizedTherapy.activePrinciple,
+                motivation: sanitizedTherapy.motivation,
+                aic: selected?.aic,
+                atc: selected?.atc,
+                confidence: sanitizedTherapy.confidence,
+                therapyState: sanitizedTherapy.therapyState || 'active',
+                matchType,
+                evidence: sanitizedTherapy.evidence,
+                blockedReason: sanitizedTherapy.therapyState && sanitizedTherapy.therapyState !== 'active'
+                    ? (sanitizedTherapy.reviewNote || 'Terapia da confermare o non attiva nelle fonti correnti')
+                    : undefined,
+                sourceType: 'reviewable_local_match',
+            } satisfies ExtractedPatientReviewTherapy;
+        }));
 
     return reconcileTherapyCandidatesWithDocumentContext(
         rawText,
-        resolved.filter((item) => Boolean(item.drugName)),
+        resolved.filter((item): item is ExtractedPatientReviewTherapy => Boolean(item?.drugName)),
     );
 }
 

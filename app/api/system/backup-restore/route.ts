@@ -14,14 +14,19 @@ import {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
+    servicePrescriptions,
     sissHandoffEvents,
     therapies,
 } from '@/lib/schema';
 import {
     forbiddenResponse,
-    requireSessionOrLocalToken,
+    requireSession,
     unauthorizedResponse,
 } from '@/lib/server-auth';
+/* @Codex */
+import { isWebAdminSession } from '@/lib/server-auth-policy';
 import {
     BACKUP_COLLECTIONS,
     type BackupArtifact,
@@ -39,6 +44,9 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'attachments',
     'observations',
     'prostheticPrescriptions',
+    'servicePrescriptionItems',
+    'servicePrescriptions',
+    'serviceCatalogEntries',
     'sissHandoffs',
     'checkups',
     'therapies',
@@ -61,6 +69,9 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'checkups',
     'observations',
     'prostheticPrescriptions',
+    'servicePrescriptions',
+    'servicePrescriptionItems',
+    'serviceCatalogEntries',
     'sissHandoffs',
     'attachments',
     'messages',
@@ -79,6 +90,9 @@ const TABLES = {
     patients,
     patientsToAmbulatories,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
+    servicePrescriptions,
     sissHandoffs: sissHandoffEvents,
     therapies,
 } as const;
@@ -95,6 +109,9 @@ const TABLE_LOOKUP = {
     observations,
     patients,
     prostheticPrescriptions,
+    serviceCatalogEntries,
+    servicePrescriptionItems,
+    servicePrescriptions,
     sissHandoffs: sissHandoffEvents,
     therapies,
 } as const;
@@ -113,6 +130,9 @@ type InsertableTable =
     | typeof patients
     | typeof patientsToAmbulatories
     | typeof prostheticPrescriptions
+    | typeof serviceCatalogEntries
+    | typeof servicePrescriptionItems
+    | typeof servicePrescriptions
     | typeof sissHandoffEvents
     | typeof therapies;
 
@@ -184,6 +204,9 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observationsRows,
         patientsRows,
         prostheticPrescriptionRows,
+        serviceCatalogRows,
+        servicePrescriptionItemRows,
+        servicePrescriptionRows,
         sissHandoffRows,
         checkupsRows,
         therapiesRows,
@@ -199,6 +222,9 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         dbServer.select().from(observations),
         dbServer.select().from(patients),
         dbServer.select().from(prostheticPrescriptions),
+        dbServer.select().from(serviceCatalogEntries),
+        dbServer.select().from(servicePrescriptionItems),
+        dbServer.select().from(servicePrescriptions),
         dbServer.select().from(sissHandoffEvents),
         dbServer.select().from(checkups),
         dbServer.select().from(therapies),
@@ -234,6 +260,9 @@ async function buildBackupDataset(): Promise<BackupDataset> {
         observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
         patients: sortBackupRows(enrichedPatients),
         prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
+        serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
+        servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
+        servicePrescriptions: sortBackupRows(filterRowsByReference(servicePrescriptionRows, 'patientId', patientIds)),
         sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
         checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
         therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
@@ -248,18 +277,33 @@ const DATE_FIELDS = new Set([
     'createdAt',
     'date',
     'endDate',
+    'importedAt',
     'observedAt',
+    'ocrQueueUpdatedAt',
+    'performedAt',
     'prescribedAt',
+    'reportReceivedAt',
+    'scheduledAt',
     'startDate',
     'startedAt',
     'completedAt',
+    'deletedAt',
     'updatedAt',
 ]);
 
 function normalizeDateValue(value: unknown): unknown {
     if (value === null || value === undefined || value === '') return null;
     if (value instanceof Date) return value;
-    if (typeof value === 'string' || typeof value === 'number') {
+    if (typeof value === 'number') {
+        // Scheduled-runner artifacts predating WUL-319 carry raw SQLite unix-seconds
+        // integers; unix-milliseconds for any contemporary date are >= 10^12.
+        const milliseconds = Number.isInteger(value) && Math.abs(value) < 1_000_000_000_000
+            ? value * 1000
+            : value;
+        const parsed = new Date(milliseconds);
+        return Number.isNaN(parsed.getTime()) ? value : parsed;
+    }
+    if (typeof value === 'string') {
         const parsed = new Date(value);
         return Number.isNaN(parsed.getTime()) ? value : parsed;
     }
@@ -319,10 +363,10 @@ function derivePatientLinks(patientsPayload: BackupArtifact['payload']['patients
 }
 
 /* @Codex */
-export async function GET(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+export async function GET() {
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const payload = await buildBackupDataset();
@@ -341,9 +385,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const session = await requireSessionOrLocalToken(request);
+    const session = await requireSession();
     if (!session) return unauthorizedResponse();
-    if (session.role !== 'admin') return forbiddenResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
         const body = await request.json();
@@ -410,6 +454,21 @@ export async function POST(request: Request) {
 
                 if (collection === 'prostheticPrescriptions') {
                     insertRows(tx, TABLE_LOOKUP.prostheticPrescriptions, artifact.payload.prostheticPrescriptions);
+                    continue;
+                }
+
+                if (collection === 'servicePrescriptions') {
+                    insertRows(tx, TABLE_LOOKUP.servicePrescriptions, artifact.payload.servicePrescriptions);
+                    continue;
+                }
+
+                if (collection === 'servicePrescriptionItems') {
+                    insertRows(tx, TABLE_LOOKUP.servicePrescriptionItems, artifact.payload.servicePrescriptionItems);
+                    continue;
+                }
+
+                if (collection === 'serviceCatalogEntries') {
+                    insertRows(tx, TABLE_LOOKUP.serviceCatalogEntries, artifact.payload.serviceCatalogEntries);
                     continue;
                 }
 

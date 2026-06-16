@@ -3,12 +3,14 @@
 import { ApiConflictError, db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
-import Link from 'next/link';
+import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
 import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
+/* @Codex */
+import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 /* @Codex */
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
@@ -41,7 +43,8 @@ export default function EditPatientPage() {
         }
 
         try {
-            const { statusReason, checkups, ...cleanData } = data;
+            /* @Codex */
+            const { checkups, ...cleanData } = data;
             const patientVersion = patient.version;
 
             await db.patients.update(id, {
@@ -54,7 +57,7 @@ export default function EditPatientPage() {
             // Handle Checkups (Diffing)
             // 1. Get current IDs to find deletions
             const existingCheckups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
-            const existingIds = new Set(existingCheckups.map(c => c.id));
+            const existingCheckupById = new Map(existingCheckups.map(c => [c.id, c]));
             const comingIds = new Set(checkups.filter((c: any) => c.id).map((c: any) => c.id));
 
             // Delete removed
@@ -65,19 +68,39 @@ export default function EditPatientPage() {
 
             // Upsert
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const toPut = checkups.map((c: any) => ({
-                id: c.id || uuidv4(),
-                patientId: id,
-                date: new Date(c.date),
-                title: c.title,
-                notes: c.notes,
-                status: c.status || 'pending',
-                source: c.source || 'manual',
-                createdAt: c.id ? existingCheckups.find(ex => ex.id === c.id)?.createdAt || new Date() : new Date()
-            }));
+            const checkupWrites = checkups.map((c: any) => {
+                const existingCheckup = c.id ? existingCheckupById.get(c.id) : undefined;
+                return {
+                    id: c.id || uuidv4(),
+                    patientId: id,
+                    date: new Date(c.date),
+                    title: c.title,
+                    notes: c.notes,
+                    status: c.status || 'pending',
+                    source: c.source || 'manual',
+                    createdAt: existingCheckup?.createdAt || new Date(),
+                    version: existingCheckup?.version,
+                };
+            });
 
-            if (toPut.length > 0) {
-                await db.checkups.bulkPut(toPut);
+            const toUpdate = checkupWrites.filter((c: typeof checkupWrites[number]) => existingCheckupById.has(c.id));
+            for (const checkup of toUpdate) {
+                if (typeof checkup.version !== 'number') {
+                    throw new Error('Versione controllo non disponibile. Ricarica la pagina e riprova.');
+                }
+                await db.checkups.update(checkup.id, {
+                    date: checkup.date,
+                    title: checkup.title,
+                    notes: checkup.notes,
+                    status: checkup.status,
+                    source: checkup.source,
+                    version: checkup.version,
+                });
+            }
+
+            const toCreate = checkupWrites.filter((c: typeof checkupWrites[number]) => !existingCheckupById.has(c.id));
+            if (toCreate.length > 0) {
+                await db.checkups.bulkPut(toCreate);
             }
 
             router.push(`/patients/${id}`);
@@ -182,128 +205,134 @@ export default function EditPatientPage() {
         // Stay on page but refresh UI (automatic via liveQuery)
     };
 
-    if (!patient) return <div className="p-8 text-center text-gray-500">Caricamento...</div>;
+    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
+        { href: '#dati', label: 'Dati' },
+        { href: '#azioni', label: 'Azioni' },
+    ];
+
+    if (!patient) {
+        return (
+            <Kree8WorkspaceShell
+                eyebrow="Scheda paziente"
+                title="Modifica dati"
+                subtitle="Caricamento della scheda in corso."
+                backHref={`/patients/${id}/modules`}
+                backLabel="Torna alla scheda paziente"
+                navItems={[]}
+            >
+                <div className={workspaceStyles.loadingCard}>Caricamento scheda...</div>
+            </Kree8WorkspaceShell>
+        );
+    }
 
     return (
-        <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
-                <div className="flex items-center gap-5">
-                    <Link href={`/patients/${id}`} className="group p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-sm">
-                        <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 group-hover:-translate-x-1 transition-all" />
-                    </Link>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Modalita modifica</p>
+        <Kree8WorkspaceShell
+            eyebrow="Scheda paziente"
+            title="Modifica dati"
+            subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale."
+            backHref={`/patients/${id}/modules`}
+            backLabel="Torna alla scheda paziente"
+            patientLabel={`${patient.lastName} ${patient.firstName}`}
+            navItems={workspaceNavItems}
+        >
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
+                {patient.isArchived && (
+                    <div className="mf-alert mf-alert-warning !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--mf-warning)]">
+                            <Archive className="w-6 h-6 shrink-0" />
                         </div>
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Modifica Paziente</h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Aggiornamento dati clinici e anagrafici</p>
-                    </div>
-                </div>
-            </div>
-
-            {patient.isArchived && (
-                <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500 rounded-[28px] border-2 border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/20 p-6 flex items-start gap-4 shadow-xl shadow-amber-500/5">
-                    <div className="p-3 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600">
-                        <Archive className="w-6 h-6 shrink-0" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-200">Paziente Archiviato</h3>
-                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
-                            Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
-                        </p>
-                        <button
-                            onClick={handleRestore}
-                            className="mt-4 text-xs font-black uppercase tracking-widest text-amber-800 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors flex items-center gap-1.5"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            Ripristina in elenco Attivi
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <PatientForm
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                defaultValues={patient as any}
-                onSubmit={onSubmit}
-                isEditMode={true}
-            />
-
-            {/* Danger Zone */}
-            <div className="mt-20 pt-10 border-t border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                        <ShieldAlert className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500/60">Azioni sensibili</p>
-                        <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Zona Pericolo</h3>
-                    </div>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[32px] border-red-100 dark:border-red-900/20 bg-red-50/30 dark:bg-red-950/5 flex flex-col lg:flex-row items-center justify-between gap-8">
-                    <div className="max-w-md">
-                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Manutenzione Scheda</h4>
-                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Queste operazioni sono irreversibili (Eliminazione) o cambiano lo stato di visibilità globale del paziente nel sistema MediFlow.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setActionType('export');
-                                setIsActionModalOpen(true);
-                            }}
-                            className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-blue-600 dark:text-blue-400 font-bold border border-slate-200 dark:border-white/10 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
-                        >
-                            <Download className="w-4 h-4" />
-                            Export FHIR
-                        </button>
-
-                        {!patient.isArchived ? (
-                            <button
-                                onClick={() => {
-                                    setActionType('archive');
-                                    setIsActionModalOpen(true);
-                                }}
-                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-amber-600 dark:text-amber-400 font-bold border border-amber-200 dark:border-amber-900/30 rounded-2xl hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
-                            >
-                                <Archive className="w-4 h-4" />
-                                Archivia
-                            </button>
-                        ) : (
+                        <div>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Paziente archiviato</h3>
+                            <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
+                            </p>
                             <button
                                 onClick={handleRestore}
-                                className="flex-1 lg:flex-none px-6 py-3 bg-white dark:bg-white/5 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-900/30 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                                className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"
                             >
-                                <RotateCcw className="w-4 h-4" />
-                                Ripristina
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Ripristina in elenco Attivi
                             </button>
-                        )}
-                        <button
-                            onClick={() => {
-                                setActionType('delete');
-                                setIsActionModalOpen(true);
-                            }}
-                            className="flex-1 lg:flex-none px-6 py-3 bg-red-600 text-white font-bold rounded-2xl shadow-xl shadow-red-500/20 hover:bg-red-700 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Elimina
-                        </button>
+                        </div>
+                    </div>
+                )}
+
+                <div id="dati" className={workspaceStyles.anchorStack}>
+                    <PatientForm
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        defaultValues={patient as any}
+                        onSubmit={onSubmit}
+                        isEditMode={true}
+                    />
+                </div>
+
+                <div id="azioni" className="border-t border-[color:rgba(112,106,100,0.12)] pt-6">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="mf-icon-disc h-10 w-10 !text-[color:var(--mf-critical)]">
+                            <ShieldAlert className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="mf-eyebrow !text-[color:var(--mf-critical)]">Azioni sensibili</p>
+                            <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Stato scheda ed export</h3>
+                        </div>
+                    </div>
+
+                    <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
+                        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActionType('export');
+                                    setIsActionModalOpen(true);
+                                }}
+                                className="mf-btn-secondary flex-1 lg:flex-none"
+                            >
+                                <Download className="w-4 h-4" />
+                                Export FHIR
+                            </button>
+
+                            {!patient.isArchived ? (
+                                <button
+                                    onClick={() => {
+                                        setActionType('archive');
+                                        setIsActionModalOpen(true);
+                                    }}
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-warning)] lg:flex-none"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                    Archivia
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleRestore}
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-success)] lg:flex-none"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Ripristina
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setActionType('delete');
+                                    setIsActionModalOpen(true);
+                                }}
+                                className="ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Elimina
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <PatientActionModal
-                isOpen={isActionModalOpen}
-                onClose={() => setIsActionModalOpen(false)}
-                onConfirm={handleAction}
-                patientName={`${patient.firstName} ${patient.lastName}`}
-                actionType={actionType}
-            />
-        </div>
+                <PatientActionModal
+                    isOpen={isActionModalOpen}
+                    onClose={() => setIsActionModalOpen(false)}
+                    onConfirm={handleAction}
+                    patientName={`${patient.firstName} ${patient.lastName}`}
+                    actionType={actionType}
+                />
+            </div>
+        </Kree8WorkspaceShell>
     );
 }

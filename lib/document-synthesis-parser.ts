@@ -2,6 +2,7 @@
 import {
     parseDocumentSynthesisExtractionResponse,
     type SmartImportDiagnosisExtraction,
+    type SmartImportServicePrescriptionExtraction,
     type SmartImportTherapyExtraction,
     type DocumentDiagnosisSuggestionContract,
     type DocumentQualityLevel,
@@ -24,6 +25,7 @@ export type DocumentStructuredAnalysis = {
     diagnoses: DocumentDiagnosisSuggestion[];
     problemStatements: SmartImportDiagnosisExtraction[];
     therapyCandidates: SmartImportTherapyExtraction[];
+    servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 };
 
 /* @Codex */
@@ -50,5 +52,6 @@ export function parseStructuredAnalysisResponse(response: string, rawMarkdown: s
         diagnoses: parsed.data.diagnoses,
         problemStatements: parsed.data.problemStatements,
         therapyCandidates: parsed.data.therapyCandidates,
+        servicePrescriptions: parsed.data.servicePrescriptions,
     };
 }

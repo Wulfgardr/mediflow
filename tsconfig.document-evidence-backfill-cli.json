@@ -13,7 +13,9 @@
   "include": [
     "scripts/document-evidence-backfill.ts",
     "scripts/document-evidence-backfill-live-db.ts",
+    "scripts/document-source-provenance-audit.ts",
     "lib/document-evidence-backfill.ts",
+    "lib/document-source-provenance-audit.ts",
     "lib/document-parse-evidence-artifact.ts",
     "lib/document-evidence-pack.ts"
   ],

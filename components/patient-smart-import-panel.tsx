@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
     AlertTriangle,
@@ -30,13 +30,17 @@ import {
     type TherapySmartImportSuggestion,
     type TherapySuggestionState,
 } from '@/lib/patient-smart-import-service';
+import type { SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 
 interface PatientSmartImportPanelProps {
     patient: Patient;
     entries?: ClinicalEntry[];
+    /* WUL-262: lets patient detail mirror reviewable/blocked/ready counts in the
+       review-queue summary without duplicating panel state or behavior. */
+    onReviewSnapshotChange?: (snapshot: SmartImportReviewSnapshot) => void;
 }
 
-function countUsableSources(
+export function countUsableSources(
     patient: Patient,
     entries: ClinicalEntry[] | undefined,
     attachmentSummaryCount: number
@@ -59,10 +63,10 @@ function therapyStateLabel(state: TherapySuggestionState): string {
 }
 
 function therapyStateBadgeClasses(state: TherapySuggestionState): string {
-    if (state === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    if (state === 'transition') return 'border-amber-200 bg-amber-50 text-amber-700';
-    if (state === 'uncertain') return 'border-orange-200 bg-orange-50 text-orange-700';
-    return 'border-gray-200 bg-gray-50 text-gray-600';
+    if (state === 'active') return 'border-slate-300 bg-white text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
+    if (state === 'transition') return 'border-slate-300 bg-slate-50 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
+    if (state === 'uncertain') return 'border-slate-300 bg-slate-100 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
+    return 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
 }
 
 function reviewStateLabel(state: SmartImportReviewState): string {
@@ -75,23 +79,20 @@ function reviewStateLabel(state: SmartImportReviewState): string {
 }
 
 function reviewStateBadgeClasses(state: SmartImportReviewState): string {
-    if (state === 'new') return 'border-sky-200 bg-sky-50 text-sky-700';
-    if (state === 'already-present') return 'border-slate-200 bg-slate-100 text-slate-700';
-    if (state === 'update') return 'border-amber-200 bg-amber-50 text-amber-700';
-    if (state === 'transition') return 'border-amber-300 bg-amber-100 text-amber-800';
-    if (state === 'inactive') return 'border-rose-200 bg-rose-50 text-rose-700';
-    return 'border-orange-200 bg-orange-50 text-orange-700';
+    if (state === 'already-present') return 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
+    if (state === 'inactive') return 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
+    return 'border-slate-300 bg-white text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
 }
 
 function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boolean): string {
     if (state === 'new') {
         return isSelected
-            ? 'border-sky-300 bg-sky-50/70 shadow-[0_0_0_1px_rgba(14,165,233,0.18)] dark:border-sky-400/40 dark:bg-sky-950/20'
-            : 'border-slate-100 bg-white hover:border-sky-200 dark:border-white/5 dark:bg-white/5';
+            ? 'border-slate-300 bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.12)] dark:border-white/20 dark:bg-white/10'
+            : 'border-slate-100 bg-white hover:border-slate-300 dark:border-white/5 dark:bg-white/5';
     }
 
     if (state === 'update') {
-        return 'border-amber-200/80 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-950/10';
+        return 'border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.04]';
     }
 
     if (state === 'already-present') {
@@ -99,14 +100,14 @@ function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boole
     }
 
     if (state === 'transition') {
-        return 'border-amber-300/80 bg-amber-100/70 dark:border-amber-400/30 dark:bg-amber-950/15';
+        return 'border-slate-300 bg-slate-50/85 dark:border-white/15 dark:bg-white/[0.05]';
     }
 
     if (state === 'inactive') {
-        return 'border-rose-200/80 bg-rose-50/60 dark:border-rose-400/20 dark:bg-rose-950/10';
+        return 'border-slate-200 bg-slate-50/60 dark:border-white/10 dark:bg-white/[0.03]';
     }
 
-    return 'border-orange-200/80 bg-orange-50/60 dark:border-orange-400/20 dark:bg-orange-950/10';
+    return 'border-slate-200 bg-slate-50/60 dark:border-white/10 dark:bg-white/[0.03]';
 }
 
 function sourceKindLabel(kind: DiagnosisSmartImportSuggestion['evidence']['sourceKind']): string {
@@ -168,6 +169,8 @@ function formatResolverScore(score: number): string {
     return `${Math.round(score)}`;
 }
 
+const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
+
 // @Codex: Smart Import often renders in a narrow patient side rail, so actions must not share a cramped title row.
 function ReviewActionButtons({
     isEditing,
@@ -183,7 +186,7 @@ function ReviewActionButtons({
             <button
                 type="button"
                 onClick={onToggleEditor}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-sky-400/30 dark:hover:bg-sky-950/20 dark:hover:text-sky-200"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white"
             >
                 <Edit3 className="h-3 w-3" />
                 {isEditing ? 'Chiudi modifica' : 'Modifica'}
@@ -219,10 +222,10 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
                             className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
                                     {candidate.code}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
                             </div>
@@ -257,13 +260,13 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
                             className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                                <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
                                     AIC {candidate.aic}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200' : 'bg-slate-200 text-slate-700 dark:bg-white/15 dark:text-slate-200'}`}>
                                     {candidate.dosageAligned ? 'dosaggio coerente' : 'dosaggio divergente'}
                                 </span>
                             </div>
@@ -284,7 +287,7 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
     );
 }
 
-export default function PatientSmartImportPanel({ patient, entries = [] }: PatientSmartImportPanelProps) {
+export default function PatientSmartImportPanel({ patient, entries = [], onReviewSnapshotChange }: PatientSmartImportPanelProps) {
     const [analysis, setAnalysis] = useState<PatientSmartImportAnalysis | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
@@ -306,9 +309,6 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
     const sourceCount = countUsableSources(patient, entries, attachments?.length || 0);
     const smartImportEnabled = isAiSmartImportEnabledValue(smartImportKillSwitch?.value);
-    if (sourceCount === 0) {
-        return null;
-    }
 
     const reviewableCount = analysis
         ? analysis.diagnoses.filter((diagnosis) => diagnosis.canApply && !selectedDiagnosisIds.includes(diagnosis.id)).length
@@ -319,6 +319,22 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
         + analysis.therapies.filter((therapy) => !therapy.canApply).length
         : 0;
     const selectedCount = countSelectedReviewItems(selectedDiagnosisIds, selectedTherapyIds);
+
+    /* WUL-262: report-only mirror of the review state already shown by this
+       panel; the effect must run before any early return (rules of hooks). */
+    const hasAnalysis = Boolean(analysis);
+    useEffect(() => {
+        onReviewSnapshotChange?.({
+            hasAnalysis,
+            reviewable: reviewableCount,
+            blocked: blockedCount,
+            ready: selectedCount,
+        });
+    }, [onReviewSnapshotChange, hasAnalysis, reviewableCount, blockedCount, selectedCount]);
+
+    if (sourceCount === 0) {
+        return null;
+    }
 
     const updateDiagnosisSuggestion = (
         id: string,
@@ -491,15 +507,15 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         <AlertTriangle className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Kill switch locale</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Funzione AI disattivata</p>
                         <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Smart Import disabilitato</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                            La lane è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né apply finché il toggle non viene riattivato in Impostazioni.
+                            La funzione è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né applicazioni finché l&apos;interruttore non viene riattivato in Impostazioni.
                         </p>
                     </div>
 
                     <Link
-                        href="/settings#ai"
+                        href="/settings/ai/funzioni"
                         className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         Apri Impostazioni AI
@@ -510,17 +526,17 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
     }
 
     return (
-        <div className="glass-panel overflow-hidden rounded-[28px] border-sky-100/50 bg-sky-50/10 p-0 backdrop-blur-2xl dark:border-sky-500/20 dark:bg-sky-950/10">
-            <div className="border-b border-sky-200/30 p-5 dark:border-white/5">
+        <div className="patient-detail-section glass-panel overflow-hidden rounded-[28px] border p-0">
+            <div className="border-b border-slate-200/60 p-5 dark:border-white/5">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-sky-600 text-white shadow-lg shadow-sky-500/20">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-900">
                             <Brain className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">Smart Import</h3>
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="inline-flex items-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-slate-600 dark:bg-white/10 dark:text-slate-300">
                                     {sourceCount} fonti
                                 </span>
                                 {analysis && (
@@ -535,7 +551,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                     <button
                         onClick={generateSuggestions}
                         disabled={isGenerating || isApplying || !smartImportEnabled}
-                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-lg shadow-sky-500/20 transition-[background-color,opacity,transform] hover:bg-sky-700 active:scale-95 disabled:opacity-50"
+                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-5 text-xs font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,opacity,transform] hover:bg-slate-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         {analysis ? (smartImportEnabled ? 'Aggiorna' : 'Disabilitata') : (smartImportEnabled ? 'Analizza fonti' : 'Disabilitata')}
@@ -552,7 +568,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                 )}
 
                 {statusMessage && (
-                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                         <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>{statusMessage}</span>
                     </div>
@@ -566,13 +582,13 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
                             <p className="font-semibold">Smart Import disabilitato localmente</p>
-                            <p className="mt-1">Puoi consultare gli ultimi suggerimenti già generati, ma analisi e apply restano bloccati finché non riattivi il toggle in Impostazioni.</p>
+                            <p className="mt-1">Puoi consultare gli ultimi suggerimenti già generati, ma analisi e applicazione restano bloccate finché non riattivi l&apos;interruttore in Impostazioni.</p>
                         </div>
                     </div>
                 )}
 
                 {!analysis && !isGenerating && (
-                    <div className="rounded-[24px] border border-sky-100 bg-sky-50/30 p-4 text-sm leading-relaxed text-sky-900 dark:border-sky-500/10 dark:text-sky-200">
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 text-sm leading-relaxed text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                         Analisi automatica di note, diario e documenti per suggerire diagnosi ICD-11 e terapie farmacologiche da importare in scheda.
                     </div>
                 )}
@@ -580,12 +596,12 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                 {isGenerating && (
                     <div className="space-y-4 py-10 text-center">
                         <div className="relative mx-auto h-12 w-12">
-                            <Brain className="h-12 w-12 animate-pulse text-sky-500/20" />
+                            <Brain className="h-12 w-12 animate-pulse text-slate-300 dark:text-white/15" />
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <RefreshCw className="h-5 w-5 animate-spin text-sky-600" />
+                                <RefreshCw className="h-5 w-5 animate-spin text-slate-700 dark:text-slate-200" />
                             </div>
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-sky-600">Elaborazione fonti cliniche...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Elaborazione fonti cliniche...</p>
                     </div>
                 )}
 
@@ -594,15 +610,15 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-slate-100 bg-white/70 p-4 dark:border-white/5 dark:bg-white/[0.03] lg:grid-cols-3">
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Selezionati</span>
-                                <span className="text-sm font-bold text-emerald-600">{selectedCount} pronti</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedCount} pronti</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Reviewabili</span>
-                                <span className="text-sm font-bold text-sky-600">{reviewableCount} da confermare</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{reviewableCount} da confermare</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Bloccati</span>
-                                <span className="text-sm font-bold text-amber-600">{blockedCount} da correggere o scartare</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{blockedCount} da correggere o scartare</span>
                             </div>
                         </div>
 
@@ -612,7 +628,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
-                                    <Stethoscope className="h-3.5 w-3.5 text-rose-500" />
+                                    <Stethoscope className="h-3.5 w-3.5 text-slate-500" />
                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Diagnosi Candidate</h4>
                                 </div>
 
@@ -640,7 +656,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                             checked={isSelected}
                                                             disabled={!diagnosis.canApply || isApplying}
                                                             onChange={() => toggleDiagnosis(diagnosis.id)}
-                                                            className={`h-4 w-4 rounded-full border-slate-300 text-sky-600 focus:ring-sky-500 ${diagnosis.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                                            className={`h-4 w-4 rounded-full border-slate-300 text-slate-900 focus:ring-slate-400 ${diagnosis.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
                                                         />
                                                     </div>
 
@@ -663,7 +679,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
-                                                                    <p className="break-words font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                                                    <p className="break-words font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
                                                                         ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
                                                                     </p>
                                                                 )}
@@ -713,7 +729,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                             ...current,
                                                                             reviewedLabel: event.target.value,
                                                                         }))}
-                                                                        className="h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                                                        className={smartImportInputClassName}
                                                                     />
                                                                 </label>
                                                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -731,7 +747,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
 
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
-                                    <Pill className="h-3.5 w-3.5 text-sky-500" />
+                                    <Pill className="h-3.5 w-3.5 text-slate-500" />
                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Terapie Candidate</h4>
                                 </div>
 
@@ -761,7 +777,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                             checked={isSelected}
                                                             disabled={!therapy.canApply || isApplying}
                                                             onChange={() => toggleTherapy(therapy.id)}
-                                                            className={`h-4 w-4 rounded-full border-slate-300 text-sky-600 focus:ring-sky-500 ${therapy.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                                            className={`h-4 w-4 rounded-full border-slate-300 text-slate-900 focus:ring-slate-400 ${therapy.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
                                                         />
                                                     </div>
 
@@ -786,7 +802,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                         {therapy.matchType}
                                                                     </span>
                                                                 </div>
-                                                                <p className="break-words text-[10px] font-bold text-sky-700 dark:text-sky-400">
+                                                                <p className="break-words text-[10px] font-bold text-slate-700 dark:text-slate-200">
                                                                     {[displayPrinciple, displayDosage].filter(Boolean).join(' · ')}
                                                                 </p>
                                                                 {therapy.match?.aic && (
@@ -841,7 +857,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                                 ...current,
                                                                                 reviewedDrugName: event.target.value,
                                                                             }))}
-                                                                            className="h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                                                            className={smartImportInputClassName}
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
@@ -854,7 +870,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                                 ...current,
                                                                                 reviewedActivePrinciple: event.target.value,
                                                                             }))}
-                                                                            className="h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                                                            className={smartImportInputClassName}
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
@@ -867,7 +883,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                                 ...current,
                                                                                 reviewedDosage: event.target.value,
                                                                             }))}
-                                                                            className="h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                                                            className={smartImportInputClassName}
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
@@ -880,7 +896,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                                                                                 ...current,
                                                                                 reviewedMotivation: event.target.value,
                                                                             }))}
-                                                                            className="h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                                                            className={smartImportInputClassName}
                                                                         />
                                                                     </label>
                                                                 </div>
@@ -903,7 +919,7 @@ export default function PatientSmartImportPanel({ patient, entries = [] }: Patie
                             <button
                                 onClick={applySelection}
                                 disabled={isApplying || selectedCount === 0 || !smartImportEnabled}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-emerald-600 px-8 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-[background-color,opacity,transform] hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-900 px-8 text-xs font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,opacity,transform] hover:bg-slate-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                             >
                                 {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                 {smartImportEnabled ? 'Applica selezionati' : 'Disabilitata'}

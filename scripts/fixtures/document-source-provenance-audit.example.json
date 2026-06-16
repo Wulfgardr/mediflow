@@ -1,0 +1,51 @@
+[
+  {
+    "id": "attachment-stored-binary",
+    "patientId": "patient-alpha",
+    "fileName": "referto_stored.pdf",
+    "mimeType": "application/pdf",
+    "storedBinaryBytes": 120000,
+    "summarySnapshotChars": 0
+  },
+  {
+    "id": "attachment-summary-only",
+    "patientId": "patient-alpha",
+    "fileName": "relazione_summary.pdf",
+    "mimeType": "application/pdf",
+    "summarySnapshotChars": 240
+  },
+  {
+    "id": "attachment-archive-candidate",
+    "patientId": "patient-beta",
+    "fileName": "dimissione_archive.pdf",
+    "mimeType": "application/pdf",
+    "archiveCandidates": [
+      {
+        "matchKind": "filename",
+        "patientScoped": true,
+        "collisionCount": 1,
+        "bytes": 220000
+      }
+    ]
+  },
+  {
+    "id": "attachment-ambiguous",
+    "patientId": "patient-beta",
+    "fileName": "referto_ambiguous.pdf",
+    "mimeType": "application/pdf",
+    "archiveCandidates": [
+      {
+        "matchKind": "filename",
+        "patientScoped": true,
+        "collisionCount": 2
+      }
+    ]
+  },
+  {
+    "id": "attachment-unrecoverable",
+    "patientId": "patient-gamma",
+    "fileName": "empty_scan.jpg",
+    "mimeType": "image/jpeg",
+    "summarySnapshotChars": 0
+  }
+]

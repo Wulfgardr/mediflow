@@ -1,0 +1,1285 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>MediFlow · White paper</title>
+<meta name="description" content="MediFlow: cartella clinica locale, cifrata, con AI sul dispositivo. Cosa è, come funziona, dove va." />
+<meta name="theme-color" content="#0a1018" />
+<style>
+/* =====================================================================
+   MEDIFLOW · WHITE PAPER
+   Liquid glass, asciutto, italiano semplice.
+   ===================================================================== */
+
+:root{
+  --bg-0:#070b11;
+  --bg-1:#0a1018;
+  --bg-2:#0f1722;
+  --ink-0:#f4f7fb;
+  --ink-1:#cdd6e2;
+  --ink-2:#92a0b3;
+  --ink-3:#5d6b80;
+  --line:rgba(255,255,255,.08);
+  --line-strong:rgba(255,255,255,.18);
+
+  --teal:#5fe3c7;
+  --teal-deep:#1aa089;
+  --azure:#7cc7ff;
+  --violet:#b59bff;
+  --amber:#ffc674;
+  --rose:#ff8aa8;
+
+  --glass:rgba(255,255,255,.045);
+  --glass-strong:rgba(255,255,255,.085);
+  --glass-edge:rgba(255,255,255,.14);
+
+  --r-1:10px;
+  --r-2:18px;
+  --r-3:28px;
+
+  --shadow-1:0 1px 0 rgba(255,255,255,.05) inset, 0 20px 50px -20px rgba(0,0,0,.55);
+  --shadow-2:0 1px 0 rgba(255,255,255,.07) inset, 0 30px 80px -30px rgba(0,0,0,.7);
+
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  color:var(--ink-1);
+  background:var(--bg-0);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  line-height:1.55;
+  font-size:16.5px;
+  overflow-x:hidden;
+}
+
+::selection{background:rgba(95,227,199,.28);color:#fff}
+
+/* === Background scenico ============================================ */
+.scene{
+  position:fixed; inset:0; z-index:-1; overflow:hidden;
+  background:
+    radial-gradient(1200px 800px at 12% -10%, rgba(124,199,255,.18), transparent 60%),
+    radial-gradient(900px 700px at 90% 10%, rgba(181,155,255,.18), transparent 60%),
+    radial-gradient(1100px 900px at 50% 110%, rgba(95,227,199,.16), transparent 65%),
+    linear-gradient(180deg, #060a10 0%, #080d15 50%, #060a10 100%);
+}
+.scene::before{
+  content:""; position:absolute; inset:-20%;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,.05) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 70%, rgba(255,255,255,.04) 0 1px, transparent 1.5px);
+  background-size: 3px 3px, 4px 4px;
+  opacity:.5;
+  mix-blend-mode:screen;
+  animation:drift 60s linear infinite;
+}
+.orb{
+  position:absolute; border-radius:50%; filter:blur(60px); opacity:.55;
+  mix-blend-mode:screen; pointer-events:none;
+  animation:float 18s ease-in-out infinite;
+}
+.orb.a{ width:520px; height:520px; left:-120px; top:-120px;
+  background:radial-gradient(circle, rgba(124,199,255,.55), transparent 60%); }
+.orb.b{ width:600px; height:600px; right:-160px; top:160px;
+  background:radial-gradient(circle, rgba(181,155,255,.5), transparent 60%);
+  animation-delay:-6s; }
+.orb.c{ width:680px; height:680px; left:30%; bottom:-260px;
+  background:radial-gradient(circle, rgba(95,227,199,.45), transparent 60%);
+  animation-delay:-12s; }
+
+@keyframes float{
+  0%,100%{ transform:translate3d(0,0,0) scale(1) }
+  50%{ transform:translate3d(20px,-30px,0) scale(1.05) }
+}
+@keyframes drift{
+  0%{ transform:translate3d(0,0,0) }
+  100%{ transform:translate3d(40px,40px,0) }
+}
+
+/* === Glass primitives ============================================== */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(28px) saturate(160%);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  border:1px solid var(--glass-edge);
+  border-radius:var(--r-2);
+  box-shadow:var(--shadow-1);
+}
+.glass-strong{
+  background:var(--glass-strong);
+  backdrop-filter:blur(36px) saturate(180%);
+  -webkit-backdrop-filter:blur(36px) saturate(180%);
+  border:1px solid var(--glass-edge);
+  box-shadow:var(--shadow-2);
+}
+
+/* === Layout ======================================================== */
+.wrap{ max-width:1180px; margin:0 auto; padding:0 22px; }
+
+/* === Top nav ======================================================= */
+.topbar{
+  position:sticky; top:14px; z-index:50;
+  margin:14px auto 0; max-width:1180px; padding:0 14px;
+}
+.nav{
+  display:flex; align-items:center; gap:14px;
+  padding:10px 14px; border-radius:999px;
+  background:rgba(10,15,22,.5);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid var(--glass-edge);
+  box-shadow:var(--shadow-1);
+}
+.brand{
+  display:flex; align-items:center; gap:10px; color:var(--ink-0);
+  font-weight:600; letter-spacing:.2px;
+}
+.brand-mark{
+  width:28px; height:28px; border-radius:8px; position:relative;
+  background:conic-gradient(from 220deg at 50% 50%, #5fe3c7, #7cc7ff, #b59bff, #5fe3c7);
+  box-shadow:0 0 24px rgba(124,199,255,.4) inset, 0 0 0 1px rgba(255,255,255,.2);
+}
+.brand-mark::after{
+  content:""; position:absolute; inset:6px; border-radius:5px;
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.7), transparent 50%), #0a1018;
+}
+.nav .links{
+  display:flex; gap:4px; margin-left:auto; flex-wrap:wrap;
+}
+.nav .links a{
+  color:var(--ink-2); text-decoration:none;
+  padding:7px 11px; border-radius:999px; font-size:13.5px;
+  transition:.25s ease; white-space:nowrap;
+}
+.nav .links a:hover{ color:var(--ink-0); background:rgba(255,255,255,.06); }
+.nav .badge{
+  font-size:11.5px; color:var(--teal);
+  border:1px solid rgba(95,227,199,.4);
+  padding:3px 9px; border-radius:999px;
+  background:rgba(95,227,199,.08);
+  letter-spacing:.5px;
+}
+
+@media (max-width:780px){
+  .nav .links{ display:none }
+}
+
+/* === Hero ========================================================== */
+.hero{
+  padding:90px 0 60px;
+  position:relative;
+}
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:12.5px; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--ink-2); padding:6px 12px; border-radius:999px;
+  background:rgba(255,255,255,.04); border:1px solid var(--line);
+}
+.eyebrow .dot{
+  width:7px; height:7px; border-radius:50%;
+  background:var(--teal); box-shadow:0 0 10px var(--teal);
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{ opacity:.6; transform:scale(1) }
+  50%{ opacity:1; transform:scale(1.2) }
+}
+
+h1.title{
+  font-size:clamp(38px, 6.4vw, 76px);
+  line-height:1.02; letter-spacing:-.02em;
+  margin:18px 0 18px; color:var(--ink-0); font-weight:700;
+  background:linear-gradient(180deg, #fff 0%, #c8d2e0 100%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.lede{
+  font-size:clamp(17px, 1.8vw, 21px);
+  color:var(--ink-1); max-width:760px; line-height:1.55;
+}
+.hero-cta{ display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; }
+.btn{
+  display:inline-flex; align-items:center; gap:9px;
+  padding:12px 18px; border-radius:999px; font-size:14.5px;
+  text-decoration:none; transition:.25s ease;
+  border:1px solid var(--glass-edge);
+  color:var(--ink-0);
+}
+.btn.primary{
+  background:linear-gradient(135deg, rgba(95,227,199,.3), rgba(124,199,255,.25));
+  border-color:rgba(95,227,199,.45);
+}
+.btn.primary:hover{ transform:translateY(-1px); box-shadow:0 10px 30px -12px rgba(95,227,199,.4); }
+.btn.ghost{ background:rgba(255,255,255,.04); }
+.btn.ghost:hover{ background:rgba(255,255,255,.09); }
+
+.hero-meta{
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px;
+  margin-top:50px;
+}
+.hero-meta .cell{
+  padding:18px 18px; border-radius:var(--r-2);
+  background:var(--glass); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+}
+.hero-meta .k{ font-size:12.5px; color:var(--ink-3); text-transform:uppercase; letter-spacing:1.4px; }
+.hero-meta .v{ font-size:18px; color:var(--ink-0); margin-top:4px; font-weight:600; }
+@media (max-width:780px){
+  .hero-meta{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+}
+
+/* === Sections ====================================================== */
+section{ padding:80px 0; position:relative; }
+section + section{ border-top:1px solid var(--line); }
+.section-head{ max-width:780px; margin-bottom:36px; }
+.kicker{
+  font-size:12px; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--teal); margin-bottom:8px; font-weight:600;
+}
+h2{
+  font-size:clamp(28px, 3.4vw, 44px); line-height:1.1; margin:0 0 14px;
+  color:var(--ink-0); letter-spacing:-.01em; font-weight:700;
+}
+h3{
+  font-size:20px; color:var(--ink-0); margin:0 0 10px; font-weight:600;
+}
+p{ margin:0 0 14px; }
+p.lead{ font-size:18px; color:var(--ink-1); }
+
+.grid{ display:grid; gap:18px; }
+.grid.cols-2{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+.grid.cols-3{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+.grid.cols-4{ grid-template-columns:repeat(4, minmax(0,1fr)); }
+@media (max-width:880px){
+  .grid.cols-3,.grid.cols-4{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+}
+@media (max-width:600px){
+  .grid.cols-2,.grid.cols-3,.grid.cols-4{ grid-template-columns:1fr; }
+}
+
+.card{
+  padding:22px; border-radius:var(--r-2);
+  background:var(--glass); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
+  transition:.3s ease;
+}
+.card:hover{ transform:translateY(-2px); border-color:var(--line-strong); }
+.card .icon{
+  width:42px; height:42px; border-radius:12px;
+  display:grid; place-items:center; margin-bottom:14px;
+  background:linear-gradient(135deg, rgba(124,199,255,.18), rgba(181,155,255,.18));
+  border:1px solid rgba(255,255,255,.12);
+  color:var(--ink-0);
+}
+
+/* === Pillars ======================================================= */
+.pillar{ position:relative; }
+.pillar h3{ display:flex; align-items:center; gap:10px; }
+.pillar .tag{
+  font-size:11px; padding:3px 8px; border-radius:999px;
+  background:rgba(255,255,255,.06); color:var(--ink-2); letter-spacing:.5px;
+  border:1px solid var(--line);
+}
+
+/* === Audience tabs ================================================= */
+.tabs{
+  display:flex; gap:6px; padding:6px;
+  background:var(--glass); border:1px solid var(--glass-edge);
+  border-radius:999px; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  width:max-content; margin-bottom:22px;
+}
+.tabs button{
+  appearance:none; border:none; background:transparent;
+  padding:9px 16px; color:var(--ink-2); font-family:inherit; font-size:14px;
+  border-radius:999px; cursor:pointer; transition:.25s ease;
+}
+.tabs button.active{
+  color:var(--ink-0);
+  background:linear-gradient(135deg, rgba(95,227,199,.25), rgba(124,199,255,.2));
+  border:1px solid rgba(255,255,255,.16);
+}
+.panel{ display:none; animation:fade .35s ease; }
+.panel.active{ display:block; }
+@keyframes fade{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none} }
+
+/* === Topology diagram ============================================== */
+.topo{
+  position:relative; padding:28px;
+  border-radius:var(--r-3);
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  border:1px solid var(--glass-edge); overflow:hidden;
+}
+.topo svg{ width:100%; height:auto; display:block; }
+.legend{
+  display:flex; gap:16px; flex-wrap:wrap; margin-top:16px; font-size:13px; color:var(--ink-2);
+}
+.legend .swatch{ width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:middle; margin-right:6px; }
+
+/* === Flows (cards) ================================================= */
+.flow-list{ display:grid; gap:12px; }
+.flow{
+  display:grid; grid-template-columns:120px 1fr; gap:18px; align-items:start;
+  padding:18px 20px; border-radius:var(--r-2);
+  background:var(--glass); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  transition:.3s ease;
+}
+.flow:hover{ background:var(--glass-strong); }
+.flow .step{ font-family:var(--mono); font-size:13px; color:var(--teal); letter-spacing:.5px; }
+.flow .body h4{ margin:0 0 6px; color:var(--ink-0); font-size:16.5px; font-weight:600; }
+.flow .body p{ margin:0; color:var(--ink-1); font-size:14.5px; }
+@media (max-width:600px){
+  .flow{ grid-template-columns:1fr; }
+}
+
+/* === Roadmap ======================================================= */
+.timeline{ position:relative; padding-left:30px; }
+.timeline::before{
+  content:""; position:absolute; left:9px; top:0; bottom:0; width:2px;
+  background:linear-gradient(180deg, var(--teal), var(--violet), transparent);
+  opacity:.6;
+}
+.tl-item{
+  position:relative; margin-bottom:22px;
+  padding:18px 20px; border-radius:var(--r-2);
+  background:var(--glass); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+}
+.tl-item::before{
+  content:""; position:absolute; left:-26px; top:24px;
+  width:14px; height:14px; border-radius:50%;
+  background:var(--teal); box-shadow:0 0 0 4px rgba(95,227,199,.18);
+}
+.tl-item.future::before{ background:var(--violet); box-shadow:0 0 0 4px rgba(181,155,255,.2); }
+.tl-item .ver{
+  display:inline-flex; gap:8px; align-items:center;
+  font-family:var(--mono); font-size:12.5px;
+  color:var(--ink-2); margin-bottom:8px;
+}
+.tl-item .ver b{ color:var(--ink-0); }
+.tl-item h4{ margin:0 0 10px; color:var(--ink-0); font-size:18px; font-weight:600; }
+.tl-item ul{ margin:6px 0 0; padding-left:18px; color:var(--ink-1); font-size:14.5px; }
+.tl-item ul li{ margin-bottom:5px; }
+.tl-item .pill{
+  display:inline-block; font-size:11px; padding:3px 8px; border-radius:999px;
+  background:rgba(255,255,255,.06); color:var(--ink-2); letter-spacing:.5px;
+  border:1px solid var(--line); margin-left:6px;
+}
+.tl-item.future .pill{ background:rgba(181,155,255,.1); color:var(--violet); border-color:rgba(181,155,255,.3); }
+
+/* === Glossary ====================================================== */
+details.term{
+  padding:16px 18px; border-radius:14px;
+  background:var(--glass); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  margin-bottom:8px; cursor:pointer;
+  transition:.25s ease;
+}
+details.term[open]{ background:var(--glass-strong); }
+details.term summary{
+  list-style:none; display:flex; align-items:center; gap:10px;
+  color:var(--ink-0); font-weight:600;
+}
+details.term summary::-webkit-details-marker{ display:none; }
+details.term summary::before{
+  content:"+"; width:20px; height:20px; border-radius:6px; display:grid; place-items:center;
+  background:rgba(255,255,255,.07); color:var(--ink-1); font-size:14px; transition:.25s ease;
+}
+details.term[open] summary::before{ content:"−"; background:rgba(95,227,199,.18); color:var(--teal); }
+details.term p{ margin:10px 0 0 30px; color:var(--ink-1); font-size:14.5px; }
+
+/* === Quote / pull ================================================== */
+.pull{
+  padding:32px; border-radius:var(--r-3);
+  background:linear-gradient(135deg, rgba(95,227,199,.08), rgba(181,155,255,.06));
+  border:1px solid var(--glass-edge);
+  backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
+  font-size:clamp(18px, 2.2vw, 24px); line-height:1.4;
+  color:var(--ink-0); letter-spacing:-.005em;
+}
+.pull small{ display:block; font-size:13px; color:var(--ink-2); margin-top:14px; letter-spacing:.5px; text-transform:uppercase; }
+
+/* === Footer ======================================================== */
+footer{
+  margin-top:60px; padding:50px 0 30px; border-top:1px solid var(--line);
+  color:var(--ink-2); font-size:14px;
+}
+footer .cols{ display:grid; grid-template-columns:2fr 1fr 1fr; gap:30px; }
+@media (max-width:780px){ footer .cols{ grid-template-columns:1fr; } }
+footer h5{ color:var(--ink-0); font-size:13px; letter-spacing:1.4px; text-transform:uppercase; margin:0 0 12px; }
+footer a{ color:var(--ink-1); text-decoration:none; }
+footer a:hover{ color:var(--ink-0); }
+.bottom{
+  display:flex; justify-content:space-between; align-items:center; gap:14px;
+  margin-top:30px; padding-top:20px; border-top:1px solid var(--line); flex-wrap:wrap;
+}
+
+/* === Reveal on scroll ============================================= */
+.reveal{ opacity:0; transform:translateY(18px); transition:opacity .8s ease, transform .8s ease; }
+.reveal.in{ opacity:1; transform:none; }
+
+/* === Code blocks =================================================== */
+code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rgba(95,227,199,.08); padding:2px 6px; border-radius:6px; }
+
+/* === Accent text =================================================== */
+.accent{ color:var(--teal); }
+.accent-2{ color:var(--violet); }
+.muted{ color:var(--ink-2); }
+.divider{ height:1px; background:linear-gradient(90deg, transparent, var(--line), transparent); margin:30px 0; }
+
+/* === Marquee bar (principles strip) ================================ */
+.strip{
+  display:flex; gap:36px; padding:14px 18px; border-radius:999px;
+  border:1px solid var(--glass-edge); background:var(--glass);
+  backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  margin-top:40px; overflow:hidden; white-space:nowrap;
+}
+.strip span{ color:var(--ink-2); font-size:13.5px; letter-spacing:.4px; }
+.strip span b{ color:var(--ink-0); font-weight:600; }
+.strip .sep{ color:var(--ink-3); }
+</style>
+</head>
+<body>
+
+<div class="scene" aria-hidden="true">
+  <span class="orb a"></span>
+  <span class="orb b"></span>
+  <span class="orb c"></span>
+</div>
+
+<!-- ===================== TOP NAV ===================== -->
+<header class="topbar">
+  <div class="nav">
+    <a class="brand" href="#top">
+      <span class="brand-mark"></span>
+      <span>MediFlow</span>
+      <span class="badge">v0.6.0</span>
+    </a>
+    <nav class="links">
+      <a href="#cosa">Cos'è</a>
+      <a href="#perchi">Per chi</a>
+      <a href="#principi">Principi</a>
+      <a href="#topologia">Topologia</a>
+      <a href="#flussi">Flussi</a>
+      <a href="#sicurezza">Sicurezza</a>
+      <a href="#tappe">Tappe</a>
+      <a href="#glossario">Glossario</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<a id="top"></a>
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span> White paper · Maggio 2026</span>
+    <h1 class="title">Una cartella clinica<br/>che resta a casa tua.</h1>
+    <p class="lede">
+      MediFlow è una cartella clinica per il singolo professionista e per piccoli ambulatori.
+      I dati restano sul computer del medico, cifrati. L'intelligenza artificiale gira sullo stesso
+      dispositivo, senza chiamare servizi remoti. Lo standard clinico è quello internazionale:
+      ICD-11 per le diagnosi, FHIR per l'esportazione.
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#cosa">Inizia la lettura →</a>
+      <a class="btn ghost" href="#tappe">Dove stiamo andando</a>
+    </div>
+
+    <div class="hero-meta">
+      <div class="cell"><div class="k">Filosofia</div><div class="v">Locale prima di tutto</div></div>
+      <div class="cell"><div class="k">Privacy</div><div class="v">Zero conoscenza a riposo</div></div>
+      <div class="cell"><div class="k">AI</div><div class="v">Sul tuo computer</div></div>
+      <div class="cell"><div class="k">Standard</div><div class="v">ICD-11 · FHIR R4</div></div>
+    </div>
+
+    <div class="strip" aria-hidden="true">
+      <span><b>Local-first</b> · i dati non escono dal tuo Mac</span>
+      <span class="sep">◇</span>
+      <span><b>AES-256-GCM</b> a riposo</span>
+      <span class="sep">◇</span>
+      <span><b>Niente telemetria</b></span>
+      <span class="sep">◇</span>
+      <span><b>Open source</b></span>
+      <span class="sep">◇</span>
+      <span><b>Audit append-only</b></span>
+      <span class="sep">◇</span>
+      <span><b>FHIR R4</b> per la portabilità</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COSA È ===================== -->
+<section id="cosa">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Cos'è</div>
+      <h2>Una cartella clinica, niente di più. Niente di meno.</h2>
+      <p class="lead">
+        MediFlow gestisce anagrafica, diario clinico, terapie, controlli, osservazioni e documenti dei pazienti.
+        Lo fa senza chiedere al professionista di affidare i dati a un servizio remoto e senza promettere
+        miracoli che non può mantenere.
+      </p>
+    </div>
+
+    <div class="grid cols-3 reveal">
+      <div class="card">
+        <div class="icon">📋</div>
+        <h3>Una scheda paziente coerente</h3>
+        <p>Anagrafica, diagnosi codificate, terapie, esami, osservazioni, allegati. Tutto in un unico posto, tutto cifrato.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧠</div>
+        <h3>AI che lavora con te</h3>
+        <p>Riassunti documentali, suggerimenti di codifica ICD-11 a partire dai referti, lettura testuale dei PDF. Sempre revisionabile, mai automatica al buio.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔒</div>
+        <h3>Una serratura sola: il PIN</h3>
+        <p>Senza il tuo PIN il database non è leggibile. Nemmeno per chi ha scritto il software.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📦</div>
+        <h3>Salvataggi automatici</h3>
+        <p>Backup notturno governato, ritenzione configurabile, manifesto e controllo preliminare prima del ripristino.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🏥</div>
+        <h3>Multi-ambulatorio</h3>
+        <p>Più sedi e reparti distinguibili a colpo d'occhio. Permette al singolo medico di gestire più contesti senza confondere i pazienti.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔁</div>
+        <h3>Esci quando vuoi</h3>
+        <p>Esportazione FHIR R4 della storia clinica. Niente trappola: i tuoi dati restano riusabili anche fuori da MediFlow.</p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="pull reveal">
+      «MediFlow è uno strumento. Il titolare del trattamento resta il professionista.
+      Il software non sostituisce le sue responsabilità: gli dà solo gli attrezzi giusti per esercitarle.»
+      <small>Principio operativo</small>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PER CHI ===================== -->
+<section id="perchi">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Per chi è</div>
+      <h2>Tre punti di vista, una stessa cartella.</h2>
+      <p class="lead">Il prodotto cambia di significato a seconda di chi lo guarda. Ecco cosa cambia per ciascuno.</p>
+    </div>
+
+    <div class="reveal">
+      <div class="tabs" role="tablist" aria-label="Pubblico">
+        <button class="active" data-tab="medico" role="tab" aria-selected="true">Medico</button>
+        <button data-tab="paziente" role="tab" aria-selected="false">Paziente</button>
+        <button data-tab="amministrazione" role="tab" aria-selected="false">Amministrazione &amp; IT</button>
+      </div>
+
+      <div class="panel active" data-panel="medico">
+        <div class="grid cols-2">
+          <div class="card">
+            <h3>Cosa vede ogni giorno</h3>
+            <p>La scheda del paziente con la storia coerente: diagnosi codificate, terapie con principio attivo e ATC, controlli passati e in agenda, osservazioni con unità di misura standard, allegati con riassunto.</p>
+          </div>
+          <div class="card">
+            <h3>Cosa cambia rispetto al solito</h3>
+            <p>I dati non sono in un servizio remoto: sono nel suo computer. L'AI lo aiuta ma non scrive nulla in scheda senza una sua conferma esplicita, soprattutto su diagnosi e terapie.</p>
+          </div>
+          <div class="card">
+            <h3>Cosa non gli viene chiesto</h3>
+            <p>Niente account su servizi terzi, niente abbonamenti per usare l'AI, niente caricamento di referti sul cloud. Il PIN è l'unica credenziale che deve ricordare.</p>
+          </div>
+          <div class="card">
+            <h3>Cosa porta via se cambia idea</h3>
+            <p>Un pacchetto FHIR R4 con anagrafica, diagnosi, visite, terapie e osservazioni. Standard riconosciuto, leggibile da altri sistemi.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="paziente">
+        <div class="grid cols-2">
+          <div class="card">
+            <h3>Dove finiscono i suoi dati</h3>
+            <p>Sul computer del professionista che ha in cura il paziente, cifrati. Non vengono condivisi con servizi remoti né usati per addestrare modelli.</p>
+          </div>
+          <div class="card">
+            <h3>Quali diritti restano garantiti</h3>
+            <p>Diritto all'oblio (Art. 17 GDPR) con cancellazione governata. Portabilità dei dati (Art. 20) tramite esportazione in formato standard.</p>
+          </div>
+          <div class="card">
+            <h3>Cosa succede se il computer viene rubato</h3>
+            <p>Il database resta cifrato a riposo. Senza il PIN nessuno può leggerlo, nemmeno con il file in mano. La chiave non è sul disco.</p>
+          </div>
+          <div class="card">
+            <h3>Chi è responsabile</h3>
+            <p>Il professionista resta titolare del trattamento. MediFlow è lo strumento, non l'esecutore.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="amministrazione">
+        <div class="grid cols-2">
+          <div class="card">
+            <h3>Modello di dispiegamento</h3>
+            <p>Single-tenant locale. Un nodo per professionista. Niente server centrale da mantenere, niente perimetro multi-paziente da difendere a livello di rete.</p>
+          </div>
+          <div class="card">
+            <h3>Compatibilità con il SSR</h3>
+            <p>Boundary espliciti verso SISS/FSE: oggi MediFlow prepara il contesto e richiama i percorsi ufficiali in modalità assistita. Niente claim di integrazione regionale certificata fuori da quanto documentato.</p>
+          </div>
+          <div class="card">
+            <h3>Auditing</h3>
+            <p>Registro append-only con catalogo eventi limitato (chi, cosa, quando, esito). Niente PHI nei log applicativi, niente testi liberi clinici fuori dal record.</p>
+          </div>
+          <div class="card">
+            <h3>Costi nascosti</h3>
+            <p>Nessun canone per AI cloud. Nessun lock-in proprietario di formato dati: l'export FHIR R4 e la cifratura aperta tengono basso il costo di uscita.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PRINCIPI ===================== -->
+<section id="principi">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Principi</div>
+      <h2>Quattro promesse non negoziabili.</h2>
+      <p class="lead">
+        Sono quattro vincoli che pesano sulle scelte tecniche e di prodotto. Quando entrano in conflitto con
+        la velocità di sviluppo, vincono i vincoli.
+      </p>
+    </div>
+
+    <div class="grid cols-2 reveal">
+      <div class="card pillar">
+        <h3>① Locale prima di tutto <span class="tag">default</span></h3>
+        <p>I dati clinici non escono dal computer per impostazione predefinita. Niente telemetria, niente sincronizzazione automatica, niente chiamate AI verso servizi esterni. Se una funzione richiedesse un canale remoto, viene aggiunta in modo esplicito, documentata e disattivabile.</p>
+      </div>
+      <div class="card pillar">
+        <h3>② Zero conoscenza a riposo <span class="tag">cifratura</span></h3>
+        <p>I campi sensibili sono cifrati lato client con AES-256-GCM prima della scrittura. Il PIN non viene mai salvato. La chiave principale viene derivata dal PIN, custodita in memoria solo durante la sessione e mai sul disco. Nessun ripristino possibile in caso di smarrimento del PIN: è una garanzia, non un bug.</p>
+      </div>
+      <div class="card pillar">
+        <h3>③ Standard aperti <span class="tag">interoperabilità</span></h3>
+        <p>ICD-11 per le diagnosi, ATC e AIC per i farmaci, LOINC e UCUM per le osservazioni, FHIR R4 per l'esportazione. Niente formato proprietario quando esiste un formato condiviso a livello internazionale.</p>
+      </div>
+      <div class="card pillar">
+        <h3>④ AI revisionabile <span class="tag">no automatismi</span></h3>
+        <p>I modelli locali aiutano nella sintesi, nell'OCR e nei suggerimenti. Non scrivono mai diagnosi o terapie senza una conferma esplicita del professionista. L'unica eccezione documentata è l'autofill su codici ICD letteralmente presenti nel documento sorgente.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TOPOLOGIA ===================== -->
+<section id="topologia">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Topologia</div>
+      <h2>Dove vivono i dati. Chi parla con chi.</h2>
+      <p class="lead">
+        Il sistema gira sul Mac del professionista. Il browser e i client Apple parlano con un'unica
+        applicazione locale. I servizi opzionali (AI, ricerca diagnosi, redazione) sono sempre su localhost.
+      </p>
+    </div>
+
+    <div class="topo reveal">
+      <svg viewBox="0 0 1100 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Topologia MediFlow">
+        <defs>
+          <linearGradient id="g-client" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#7cc7ff" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#7cc7ff" stop-opacity=".05"/>
+          </linearGradient>
+          <linearGradient id="g-back" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#5fe3c7" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#5fe3c7" stop-opacity=".05"/>
+          </linearGradient>
+          <linearGradient id="g-svc" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#b59bff" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#b59bff" stop-opacity=".05"/>
+          </linearGradient>
+          <linearGradient id="g-fs" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#ffc674" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#ffc674" stop-opacity=".05"/>
+          </linearGradient>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#cdd6e2"/>
+          </marker>
+          <marker id="arr-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#7cc7ff"/>
+          </marker>
+        </defs>
+
+        <!-- LANES -->
+        <rect x="20" y="20" width="280" height="520" rx="20" fill="url(#g-client)" stroke="rgba(124,199,255,.35)"/>
+        <text x="36" y="50" fill="#7cc7ff" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">CLIENT</text>
+
+        <rect x="320" y="20" width="320" height="520" rx="20" fill="url(#g-back)" stroke="rgba(95,227,199,.35)"/>
+        <text x="336" y="50" fill="#5fe3c7" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">APPLICAZIONE LOCALE</text>
+
+        <rect x="660" y="20" width="220" height="260" rx="20" fill="url(#g-svc)" stroke="rgba(181,155,255,.35)"/>
+        <text x="676" y="50" fill="#b59bff" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">SERVIZI LOCALI</text>
+
+        <rect x="660" y="295" width="420" height="245" rx="20" fill="url(#g-fs)" stroke="rgba(255,198,116,.35)"/>
+        <text x="676" y="325" fill="#ffc674" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">FILESYSTEM LOCALE</text>
+
+        <rect x="900" y="20" width="180" height="260" rx="20" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4"/>
+        <text x="916" y="50" fill="#92a0b3" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">RETE LOCALE</text>
+        <text x="916" y="68" fill="#5d6b80" font-size="11" font-family="ui-monospace">opt-in</text>
+
+        <!-- CLIENT BOXES -->
+        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
+          <rect x="40" y="80" width="240" height="64" rx="12" fill="rgba(124,199,255,.18)" stroke="rgba(124,199,255,.45)"/>
+          <text x="160" y="108" text-anchor="middle" font-size="14" font-weight="600">Browser web</text>
+          <text x="160" y="128" text-anchor="middle" font-size="11" fill="#cdd6e2">UI clinica · cifratura lato client</text>
+
+          <rect x="40" y="170" width="240" height="64" rx="12" fill="rgba(124,199,255,.13)" stroke="rgba(124,199,255,.4)"/>
+          <text x="160" y="198" text-anchor="middle" font-size="14" font-weight="600">Client macOS</text>
+          <text x="160" y="218" text-anchor="middle" font-size="11" fill="#cdd6e2">SwiftUI · sessione sicurezza</text>
+
+          <rect x="40" y="260" width="240" height="64" rx="12" fill="rgba(124,199,255,.08)" stroke="rgba(124,199,255,.3)" stroke-dasharray="3 3"/>
+          <text x="160" y="288" text-anchor="middle" font-size="14" font-weight="600">iPhone / iPad</text>
+          <text x="160" y="308" text-anchor="middle" font-size="11" fill="#92a0b3">paired · scrittura limitata</text>
+
+          <rect x="40" y="380" width="240" height="130" rx="12" fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.14)" stroke-dasharray="2 4"/>
+          <text x="160" y="406" text-anchor="middle" font-size="12" fill="#92a0b3" font-family="ui-monospace" letter-spacing="1">CIFRATURA</text>
+          <text x="160" y="430" text-anchor="middle" font-size="13" fill="#cdd6e2">PIN → KEK</text>
+          <text x="160" y="452" text-anchor="middle" font-size="13" fill="#cdd6e2">KEK → master key in RAM</text>
+          <text x="160" y="474" text-anchor="middle" font-size="13" fill="#cdd6e2">AES-256-GCM</text>
+          <text x="160" y="496" text-anchor="middle" font-size="11" fill="#5d6b80">PIN mai persistito</text>
+        </g>
+
+        <!-- BACKEND BOXES -->
+        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
+          <rect x="340" y="80" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+          <text x="480" y="100" text-anchor="middle" font-size="13" font-weight="600">Proxy TLS locale</text>
+          <text x="480" y="118" text-anchor="middle" font-size="11" fill="#cdd6e2">https://127.0.0.1:3443</text>
+
+          <rect x="340" y="150" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+          <text x="480" y="170" text-anchor="middle" font-size="13" font-weight="600">Web API · /api/*</text>
+          <text x="480" y="188" text-anchor="middle" font-size="11" fill="#cdd6e2">sessione cookie</text>
+
+          <rect x="340" y="220" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+          <text x="480" y="240" text-anchor="middle" font-size="13" font-weight="600">Native API · /api/v1/*</text>
+          <text x="480" y="258" text-anchor="middle" font-size="11" fill="#cdd6e2">bearer token versionato</text>
+
+          <rect x="340" y="290" width="280" height="50" rx="10" fill="rgba(95,227,199,.10)" stroke="rgba(95,227,199,.3)" stroke-dasharray="3 3"/>
+          <text x="480" y="310" text-anchor="middle" font-size="13" font-weight="600">Network API · /api/v1/network/*</text>
+          <text x="480" y="328" text-anchor="middle" font-size="11" fill="#92a0b3">paired · read-only-first</text>
+
+          <rect x="340" y="370" width="280" height="60" rx="10" fill="rgba(95,227,199,.18)" stroke="rgba(95,227,199,.45)"/>
+          <text x="480" y="394" text-anchor="middle" font-size="13" font-weight="600">Auth · setup / login / lockout</text>
+          <text x="480" y="414" text-anchor="middle" font-size="11" fill="#cdd6e2">5 tentativi · 15 min</text>
+
+          <rect x="340" y="450" width="280" height="60" rx="10" fill="rgba(95,227,199,.12)" stroke="rgba(95,227,199,.35)"/>
+          <text x="480" y="474" text-anchor="middle" font-size="13" font-weight="600">Audit append-only</text>
+          <text x="480" y="494" text-anchor="middle" font-size="11" fill="#cdd6e2">catalogo eventi limitato</text>
+        </g>
+
+        <!-- SERVICES -->
+        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
+          <rect x="680" y="80" width="180" height="50" rx="10" fill="rgba(181,155,255,.16)" stroke="rgba(181,155,255,.4)"/>
+          <text x="770" y="102" text-anchor="middle" font-size="12.5" font-weight="600">Ollama</text>
+          <text x="770" y="119" text-anchor="middle" font-size="10.5" fill="#cdd6e2">AI · OCR · :11434</text>
+
+          <rect x="680" y="150" width="180" height="50" rx="10" fill="rgba(181,155,255,.16)" stroke="rgba(181,155,255,.4)"/>
+          <text x="770" y="172" text-anchor="middle" font-size="12.5" font-weight="600">ICD-11 OMS</text>
+          <text x="770" y="189" text-anchor="middle" font-size="10.5" fill="#cdd6e2">docker locale · :8888</text>
+
+          <rect x="680" y="220" width="180" height="50" rx="10" fill="rgba(181,155,255,.10)" stroke="rgba(181,155,255,.3)" stroke-dasharray="3 3"/>
+          <text x="770" y="242" text-anchor="middle" font-size="12.5" font-weight="600">OpenMed redaction</text>
+          <text x="770" y="259" text-anchor="middle" font-size="10.5" fill="#92a0b3">shadow · benchmark only</text>
+        </g>
+
+        <!-- FILESYSTEM -->
+        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
+          <rect x="680" y="340" width="180" height="60" rx="10" fill="rgba(255,198,116,.18)" stroke="rgba(255,198,116,.45)"/>
+          <text x="770" y="364" text-anchor="middle" font-size="13" font-weight="600">medical.db</text>
+          <text x="770" y="384" text-anchor="middle" font-size="11" fill="#cdd6e2">SQLite cifrato</text>
+
+          <rect x="880" y="340" width="180" height="60" rx="10" fill="rgba(255,198,116,.14)" stroke="rgba(255,198,116,.4)"/>
+          <text x="970" y="364" text-anchor="middle" font-size="13" font-weight="600">backup notturno</text>
+          <text x="970" y="384" text-anchor="middle" font-size="11" fill="#cdd6e2">retention configurabile</text>
+
+          <rect x="680" y="420" width="180" height="60" rx="10" fill="rgba(255,198,116,.12)" stroke="rgba(255,198,116,.35)"/>
+          <text x="770" y="444" text-anchor="middle" font-size="13" font-weight="600">token API locale</text>
+          <text x="770" y="464" text-anchor="middle" font-size="11" fill="#cdd6e2">permessi 0600</text>
+
+          <rect x="880" y="420" width="180" height="60" rx="10" fill="rgba(255,198,116,.12)" stroke="rgba(255,198,116,.35)"/>
+          <text x="970" y="444" text-anchor="middle" font-size="13" font-weight="600">certificati TLS</text>
+          <text x="970" y="464" text-anchor="middle" font-size="11" fill="#cdd6e2">cert.pem + key.pem</text>
+        </g>
+
+        <!-- LAN -->
+        <g font-family="-apple-system,Inter,sans-serif" fill="#cdd6e2">
+          <rect x="920" y="80" width="140" height="50" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 3"/>
+          <text x="990" y="102" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f4f7fb">Mac home-base</text>
+          <text x="990" y="119" text-anchor="middle" font-size="10.5">nodo autorevole</text>
+
+          <rect x="920" y="150" width="140" height="50" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3"/>
+          <text x="990" y="172" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f4f7fb">paired client</text>
+          <text x="990" y="189" text-anchor="middle" font-size="10.5">capability + version</text>
+        </g>
+
+        <!-- ARROWS -->
+        <g stroke="#cdd6e2" stroke-width="1.4" fill="none" opacity=".75" marker-end="url(#arr)">
+          <path d="M280 112 C 310 112 310 175 340 175"/>
+          <path d="M280 202 C 310 202 310 105 340 105"/>
+          <path d="M280 292 C 310 292 310 315 340 315"/>
+          <path d="M620 175 C 650 175 650 105 680 105"/>
+          <path d="M620 175 C 650 175 650 175 680 175"/>
+          <path d="M620 245 C 650 245 650 245 680 245"/>
+          <path d="M620 380 C 650 380 650 370 680 370"/>
+          <path d="M860 370 L 880 370"/>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i class="swatch" style="background:#7cc7ff"></i>Client</span>
+        <span><i class="swatch" style="background:#5fe3c7"></i>Applicazione locale</span>
+        <span><i class="swatch" style="background:#b59bff"></i>Servizi locali (opzionali)</span>
+        <span><i class="swatch" style="background:#ffc674"></i>Filesystem</span>
+        <span><i class="swatch" style="background:#92a0b3"></i>Rete locale (opt-in)</span>
+      </div>
+    </div>
+
+    <div class="grid cols-3 reveal" style="margin-top:30px">
+      <div class="card">
+        <h3>Un nodo, non un servizio</h3>
+        <p>Il Mac del professionista è il nodo autorevole: contiene il database, espone l'API e orchestra l'AI. Niente server centrale.</p>
+      </div>
+      <div class="card">
+        <h3>Tre superfici API distinte</h3>
+        <p>Web API per il browser (sessione), Native API versionata per i client Apple (token), Network API opzionale per i client paired in LAN fidata (capability + versione).</p>
+      </div>
+      <div class="card">
+        <h3>Servizi locali allowlisted</h3>
+        <p>I proxy verso AI e ICD-11 accettano solo destinazioni localhost. Nessun rischio di SSRF verso indirizzi remoti.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FLUSSI ===================== -->
+<section id="flussi">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Flussistica</div>
+      <h2>Cosa succede davvero quando lavori in scheda.</h2>
+      <p class="lead">Sei flussi essenziali, in ordine di vita di una giornata clinica. Ogni passo è verificabile dal codice e dagli ADR pubblici.</p>
+    </div>
+
+    <div class="flow-list reveal">
+      <div class="flow">
+        <div class="step">FLUSSO · 01</div>
+        <div class="body">
+          <h4>Sblocco e attivazione delle chiavi</h4>
+          <p>Il professionista inserisce il PIN. Dal PIN si deriva una chiave intermedia, che a sua volta sblocca la chiave principale, mantenuta in memoria solo per la sessione attiva. Nessuna delle due viene salvata sul disco.</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="step">FLUSSO · 02</div>
+        <div class="body">
+          <h4>Scrittura clinica dal browser</h4>
+          <p>I campi sensibili (note, allegati, riassunti AI) vengono cifrati nel browser prima di partire verso l'API. Sul disco arrivano solo stringhe nella forma <code>ENC:iv:cipher</code>. Il server non vede mai il testo in chiaro.</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="step">FLUSSO · 03</div>
+        <div class="body">
+          <h4>Lettura/scrittura dal client macOS nativo</h4>
+          <p>Il client Apple cifra in locale, parla in HTTPS verso il proxy TLS sulla porta 3443, presenta un token bearer su un'API versionata <code>/api/v1/*</code>. Niente scraping della UI, niente dipendenza dai dettagli interni del web.</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="step">FLUSSO · 04</div>
+        <div class="body">
+          <h4>Documento → OCR → sintesi → archivio</h4>
+          <p>Il referto caricato passa al servizio OCR locale (Ollama), che lo rende testo. Un secondo passaggio AI estrae sintesi, qualità del segnale e codici ICD esplicitamente presenti. Il risultato viene cifrato e attaccato al paziente come allegato + artefatto di evidenza.</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="step">FLUSSO · 05</div>
+        <div class="body">
+          <h4>Smart import revisionabile</h4>
+          <p>Dal profilo paziente l'AI propone diagnosi e terapie a partire dalle fonti già presenti (note, diario, allegati analizzati). Le proposte sono associate a evidenze e attendono conferma esplicita. Nessuna scrittura in scheda senza un click consapevole.</p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="step">FLUSSO · 06</div>
+        <div class="body">
+          <h4>Modalità Mac home-base con client paired</h4>
+          <p>Se attivata in modo esplicito, la modalità rete consente a un iPhone o iPad accoppiato di consultare e aggiornare in modo limitato profilo, diario, terapie, controlli e osservazioni. Ogni scrittura richiede capability dedicate, sessione operatore e numero di versione: in caso di conflitto il server risponde con un esplicito errore di versione.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SICUREZZA ===================== -->
+<section id="sicurezza">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Sicurezza &amp; Privacy</div>
+      <h2>Cosa proteggiamo. Da chi. Come.</h2>
+      <p class="lead">Il modello di minaccia è esplicito: descriviamo cosa copriamo e cosa non copriamo. La sicurezza non è una promessa, è un perimetro.</p>
+    </div>
+
+    <div class="grid cols-2 reveal">
+      <div class="card">
+        <h3>Cosa copriamo</h3>
+        <p style="margin-bottom:10px">Il modello assume che un attaccante possa:</p>
+        <ul style="color:var(--ink-1); font-size:14.5px; padding-left:18px">
+          <li>ottenere il file del database (furto del disco, leak di un backup)</li>
+          <li>leggere log applicativi, screenshot o crash report</li>
+          <li>annusare il traffico locale verso i client</li>
+        </ul>
+        <p style="margin-top:14px">Per ognuno dei tre, la cifratura a riposo, la redazione dei log e il proxy TLS locale forniscono una difesa esplicita.</p>
+      </div>
+      <div class="card">
+        <h3>Cosa non copriamo</h3>
+        <p>Un sistema operativo completamente compromesso (con keylogger e accesso alla memoria) e un attacco fisico a dispositivo già sbloccato sono fuori dal modello. In quei casi nessun software locale può proteggere efficacemente i dati.</p>
+      </div>
+      <div class="card">
+        <h3>Cifratura</h3>
+        <p>AES-256-GCM lato client. Formato di campo cifrato esplicito (<code>ENC:iv:cipher</code>). KDF: PBKDF2-SHA256 da PIN + salt utente. La chiave principale è cifrata sotto la KEK derivata dal PIN ed è leggibile solo durante una sessione attiva.</p>
+      </div>
+      <div class="card">
+        <h3>Lockout autenticazione</h3>
+        <p>Cinque tentativi falliti in quindici minuti attivano un blocco di pari durata. Risposte standard: <code>401</code> finché il blocco non scatta, <code>423</code> con header <code>Retry-After</code> durante il blocco. Il bearer token nativo non aggira la policy: il PIN è la barriera condivisa.</p>
+      </div>
+      <div class="card">
+        <h3>Logging e redazione</h3>
+        <p>I log applicativi non contengono mai campi paziente decifrati, OCR grezzo, prompt AI completi o allegati. L'audit clinico è separato dai log tecnici: è strutturato, versionato e append-only, con catalogo di eventi minimo.</p>
+      </div>
+      <div class="card">
+        <h3>Boundary verso servizi esterni</h3>
+        <p>I proxy locali accettano solo destinazioni su <code>127.0.0.1</code> e porte previste. Ogni risposta dei modelli AI è trattata come input non fidato. Niente import silenziosi da testo libero verso diagnosi o terapie.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== INTEROPERABILITÀ ===================== -->
+<section id="interop">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Interoperabilità</div>
+      <h2>Standard veri, non promesse.</h2>
+      <p class="lead">Ogni dato clinico ha un codice riconosciuto a livello internazionale. Niente vincoli proprietari sui formati di esportazione.</p>
+    </div>
+
+    <div class="grid cols-4 reveal">
+      <div class="card">
+        <h3>ICD-11</h3>
+        <p>Diagnosi codificate secondo il sistema OMS, via API locale. Niente più testo libero ambiguo.</p>
+      </div>
+      <div class="card">
+        <h3>FHIR R4</h3>
+        <p>Esportazione della cartella in pacchetto JSON HL7 FHIR R4: Patient, Condition, Encounter, MedicationStatement, Observation.</p>
+      </div>
+      <div class="card">
+        <h3>ATC · AIC</h3>
+        <p>Catalogo farmaci AIFA locale per terapie con principio attivo e codice di identificazione.</p>
+      </div>
+      <div class="card">
+        <h3>LOINC · UCUM</h3>
+        <p>Codifica delle osservazioni con unità di misura standardizzate.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAPPE / ROADMAP ===================== -->
+<section id="tappe">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Tappe del prodotto</div>
+      <h2>Da dove veniamo. Dove andiamo.</h2>
+      <p class="lead">Una linea del tempo onesta: distinguiamo ciò che è in produzione da ciò che è ancora in disegno.</p>
+    </div>
+
+    <div class="timeline reveal">
+
+      <div class="tl-item">
+        <div class="ver"><b>v0.3.0</b> · fondamenta</div>
+        <h4>Le radici tecniche</h4>
+        <ul>
+          <li>Migrazione a SQLite cifrato (addio storage browser)</li>
+          <li>Cifratura zero-knowledge attiva</li>
+          <li>AI locale: Qwen per testo, DeepSeek per OCR via Ollama</li>
+          <li>Diagnosi standardizzate ICD-11</li>
+          <li>Multi-ambulatorio con identificazione visiva</li>
+        </ul>
+      </div>
+
+      <div class="tl-item">
+        <div class="ver"><b>v0.4.0</b> · contratti più solidi</div>
+        <h4>Governance API e flussi documentali</h4>
+        <ul>
+          <li>API locale governata: baseline OpenAPI <code>/api/v1</code> e guardrail anti-deriva</li>
+          <li>Pipeline OCR-first con import revisionabile</li>
+          <li>Archivio intelligente operabile (pulizia, persistenza farmaci, allineamento insight)</li>
+          <li>Audit append-only, lockout autenticazione, cambio PIN zero-knowledge</li>
+          <li>Backup automatico, scheduler notturno, retention</li>
+        </ul>
+      </div>
+
+      <div class="tl-item">
+        <div class="ver"><b>v0.5.0</b> · interfaccia e governance AI</div>
+        <h4>Stabilizzazione web e onestà narrativa</h4>
+        <ul>
+          <li>Scheda paziente, lista, form e impostazioni con gerarchia visiva più leggibile</li>
+          <li>Task contract AI condiviso e benchmark headless</li>
+          <li>Separazione netta tra runtime operativo e lane "solo benchmark"</li>
+          <li>Boundary SISS/FSE raccontati per quello che sono</li>
+        </ul>
+      </div>
+
+      <div class="tl-item">
+        <div class="ver"><b>v0.6.0</b> · release corrente · Maggio 2026</div>
+        <h4>Mac home-base e famiglia Apple</h4>
+        <ul>
+          <li>Mac come nodo autorevole: pairing, capability discovery, primi write versionati</li>
+          <li>iPhone/iPad paired non-AI, cache cifrata degradabile, workflow online limitati</li>
+          <li>Document intelligence artifact-first: parse/evidence cifrato sugli allegati</li>
+          <li>SISS/FSE più maturo ma onesto: corpus locale, scenari, boundary <i>webapp-assisted</i></li>
+          <li>Backlog operativo azzerato: governance di sviluppo riallineata</li>
+        </ul>
+      </div>
+
+      <div class="tl-item future">
+        <div class="ver"><b>post-v0.6</b> <span class="pill">in corso</span></div>
+        <h4>Network home-base più ampia, nuova shell macOS, vocale</h4>
+        <ul>
+          <li>Replica e fallback offline tra dispositivi con riconciliazione esplicita</li>
+          <li>Runtime AI centralizzabile per client meno potenti, senza egress</li>
+          <li>Decision layer documentale separato (governance, recency, esclusioni)</li>
+          <li>Nuova shell macOS home-base, packaged, indipendente dal terminale</li>
+          <li>Dettatura locale (Whisper) e chat conversazionale con la cartella</li>
+        </ul>
+      </div>
+
+      <div class="tl-item future">
+        <div class="ver"><b>v1.0.0</b> <span class="pill">visione</span></div>
+        <h4>Un ecosistema clinico locale, aperto, installabile</h4>
+        <ul>
+          <li>Esperienza nativa multi-dispositivo coerente sotto un unico contratto</li>
+          <li>Integrazione SISS/FSE con qualifica <code>SSI/A2A</code> sostenibile</li>
+          <li>Contratti di esportazione e migrazione formalizzati</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COSA NON FACCIAMO ===================== -->
+<section id="boundary">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Boundary espliciti</div>
+      <h2>Cosa MediFlow non fa, e non vuole fare adesso.</h2>
+      <p class="lead">Un white paper onesto descrive anche i limiti scelti. Sono confini, non difetti.</p>
+    </div>
+
+    <div class="grid cols-2 reveal">
+      <div class="card">
+        <h3>Niente sincronizzazione cloud completa</h3>
+        <p>Non sincronizziamo le cartelle attraverso Internet con un servizio centrale. La modalità Mac home-base copre solo la rete locale fidata, in opt-in, con scrittura limitata e versionata.</p>
+      </div>
+      <div class="card">
+        <h3>Niente multi-tenant centralizzato</h3>
+        <p>MediFlow non è un servizio condiviso fra strutture. È un'app per il singolo professionista o per piccoli ambulatori che operano sotto la sua responsabilità.</p>
+      </div>
+      <div class="card">
+        <h3>Niente AI cloud di default</h3>
+        <p>L'unica eccezione documentata è una lane interna di valutazione comparativa, opt-in, mai usata come runtime clinico, mai con dati paziente non redatti.</p>
+      </div>
+      <div class="card">
+        <h3>Niente integrazione regionale fuori boundary</h3>
+        <p>Verso SISS/FSE oggi MediFlow prepara il contesto e richiama i percorsi ufficiali in modalità assistita. Niente UI regionale custom dentro il prodotto fino a una qualifica documentata.</p>
+      </div>
+      <div class="card">
+        <h3>Niente automatismi clinici al buio</h3>
+        <p>L'AI non scrive diagnosi e terapie senza conferma. L'unico autofill ammesso è su codici ICD letteralmente presenti nel documento sorgente.</p>
+      </div>
+      <div class="card">
+        <h3>Niente telemetria silenziosa</h3>
+        <p>Nessun ping a servizi remoti per uso. Nessun analytics. Nessun beacon. Niente.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== GLOSSARIO ===================== -->
+<section id="glossario">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Glossario</div>
+      <h2>I termini, spiegati a chi non scrive software.</h2>
+      <p class="lead">Apri il termine che ti interessa. Niente acronimi senza traduzione.</p>
+    </div>
+
+    <div class="reveal">
+      <details class="term">
+        <summary>Local-first / Locale prima di tutto</summary>
+        <p>Il software funziona prima di tutto sul dispositivo del professionista. La rete è opzionale e governata. Il contrario è "cloud-first": app che hanno bisogno di un server centrale per funzionare e mandano lì i dati.</p>
+      </details>
+      <details class="term">
+        <summary>Zero-knowledge a riposo</summary>
+        <p>I dati clinici sul disco sono illeggibili senza il PIN. Nemmeno chi ha scritto il software o gestisce il computer può leggerli senza inserire il PIN. Niente backdoor di recupero: questa è la garanzia, ma anche la responsabilità del professionista.</p>
+      </details>
+      <details class="term">
+        <summary>AES-256-GCM</summary>
+        <p>L'algoritmo di cifratura usato. È uno standard internazionale considerato robusto. Il numero 256 si riferisce alla lunghezza della chiave in bit; più alto, più difficile da forzare.</p>
+      </details>
+      <details class="term">
+        <summary>PIN, KEK, master key</summary>
+        <p>Il PIN è quello che il professionista inserisce. Da lì si deriva una "chiave intermedia" (KEK) che serve a proteggere la "chiave principale" (master key). La master key è quella che cifra davvero i dati clinici e vive solo in memoria durante la sessione.</p>
+      </details>
+      <details class="term">
+        <summary>FHIR R4</summary>
+        <p>Standard internazionale (HL7 FHIR, versione R4) per scambiare dati sanitari tra sistemi. MediFlow lo usa per esportare la storia clinica in un formato che altri sistemi sono in grado di leggere.</p>
+      </details>
+      <details class="term">
+        <summary>ICD-11</summary>
+        <p>Classificazione internazionale delle malattie, undicesima edizione, curata dall'OMS. Permette di codificare una diagnosi con un identificativo univoco (ad esempio <code>5A10</code>), invece che con un testo libero soggetto a interpretazione.</p>
+      </details>
+      <details class="term">
+        <summary>ATC, AIC</summary>
+        <p>Codici per i farmaci. ATC è la classificazione anatomico-terapeutica (a cosa serve il principio attivo); AIC è il codice che identifica un singolo medicinale autorizzato in Italia.</p>
+      </details>
+      <details class="term">
+        <summary>LOINC, UCUM</summary>
+        <p>LOINC è un vocabolario standard per identificare osservazioni di laboratorio e cliniche. UCUM è uno standard per le unità di misura. Insieme rendono confrontabili i parametri tra sistemi diversi.</p>
+      </details>
+      <details class="term">
+        <summary>SQLite</summary>
+        <p>Un database che vive in un singolo file sul disco, senza bisogno di un server. Per MediFlow è il file <code>medical.db</code>, sempre cifrato.</p>
+      </details>
+      <details class="term">
+        <summary>Ollama</summary>
+        <p>Un programma che permette di eseguire modelli di intelligenza artificiale direttamente sul computer del professionista, senza chiamare servizi remoti.</p>
+      </details>
+      <details class="term">
+        <summary>Audit append-only</summary>
+        <p>Un registro di eventi (chi ha fatto cosa, quando, con che esito) a cui si può solo aggiungere, mai modificare o cancellare. Serve per ricostruire le azioni in caso di necessità clinica o normativa.</p>
+      </details>
+      <details class="term">
+        <summary>SISS / FSE</summary>
+        <p>SISS è il Sistema Informativo Socio-Sanitario; FSE è il Fascicolo Sanitario Elettronico. MediFlow oggi non li sostituisce: prepara i dati per i percorsi ufficiali e richiama i flussi assistiti, restando dentro un confine dichiarato.</p>
+      </details>
+      <details class="term">
+        <summary>Mac home-base</summary>
+        <p>La modalità in cui il computer del professionista fa da nodo locale: gli altri dispositivi Apple (iPhone, iPad) si accoppiano in modo esplicito e possono leggere e scrivere in modo limitato attraverso una rete locale fidata.</p>
+      </details>
+      <details class="term">
+        <summary>Paired client</summary>
+        <p>Un dispositivo accoppiato in modo esplicito al Mac home-base. Senza accoppiamento e senza una sessione attiva del professionista, non può accedere ai dati.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CHIUSURA ===================== -->
+<section id="chiusura">
+  <div class="wrap">
+    <div class="pull reveal" style="text-align:center">
+      «Un software clinico utile è uno che il professionista può capire, controllare e abbandonare quando vuole.
+      MediFlow è scritto per essere usato così, non per trattenere chi lo usa.»
+      <small>Visione di prodotto</small>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="brand" style="margin-bottom:14px">
+          <span class="brand-mark"></span>
+          <span style="color:var(--ink-0); font-weight:600">MediFlow</span>
+        </div>
+        <p style="max-width:480px">
+          Una cartella clinica locale, cifrata, con AI sul dispositivo. Codice aperto, contratti stabili,
+          niente promesse che non possiamo mantenere.
+        </p>
+      </div>
+      <div>
+        <h5>Documenti</h5>
+        <p><a href="../docs/ROADMAP.md">Roadmap</a></p>
+        <p><a href="../ARCHITECTURE.md">Architettura</a></p>
+        <p><a href="../SECURITY.md">Sicurezza</a></p>
+        <p><a href="../docs/COMPLIANCE.md">Compliance</a></p>
+      </div>
+      <div>
+        <h5>Standard</h5>
+        <p>HL7 FHIR R4</p>
+        <p>ICD-11 OMS</p>
+        <p>ATC · AIC AIFA</p>
+        <p>LOINC · UCUM</p>
+      </div>
+    </div>
+    <div class="bottom">
+      <span class="muted">White paper · v0.6.0 · Maggio 2026</span>
+      <span class="muted">© MediFlow · distribuito come progetto open source</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ===================== TABS ===================== */
+const tabs = document.querySelectorAll('.tabs button');
+tabs.forEach(b => b.addEventListener('click', () => {
+  const target = b.dataset.tab;
+  const group = b.closest('.tabs').parentElement;
+  group.querySelectorAll('.tabs button').forEach(x => {
+    x.classList.toggle('active', x === b);
+    x.setAttribute('aria-selected', x === b ? 'true' : 'false');
+  });
+  group.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.dataset.panel === target);
+  });
+}));
+
+/* ===================== SCROLL REVEAL ===================== */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+}, { threshold: .12, rootMargin: "0px 0px -40px 0px" });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* ===================== SMOOTH NAV ACTIVE STATE ===================== */
+const navLinks = document.querySelectorAll('.nav .links a');
+const ids = [...navLinks].map(a => a.getAttribute('href'));
+const sections = ids.map(id => document.querySelector(id)).filter(Boolean);
+function setActive(){
+  const y = window.scrollY + 140;
+  let active = null;
+  sections.forEach(s => { if (s.offsetTop <= y) active = s.id; });
+  navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + active));
+}
+window.addEventListener('scroll', setActive, { passive:true });
+setActive();
+</script>
+</body>
+</html>

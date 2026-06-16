@@ -1,9 +1,11 @@
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
-import { desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+// WUL-306 (ADR 0066): only active patients block ambulatory deletion
+import { activePatients } from '@/lib/patient-lifecycle';
 
 /* @Codex */
 function normalizeType(value: unknown): 'live' | 'test' | '__invalid__' | undefined {
@@ -151,7 +153,7 @@ export async function DELETE(
         const linkedPrimaryPatient = await dbServer
             .select({ id: patients.id })
             .from(patients)
-            .where(eq(patients.ambulatoryId, id))
+            .where(and(eq(patients.ambulatoryId, id), activePatients()))
             .get();
         const linkedPatientAssignment = await dbServer
             .select({ patientId: patientsToAmbulatories.patientId })

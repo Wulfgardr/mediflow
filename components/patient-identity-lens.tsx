@@ -87,15 +87,15 @@ export function PatientIdentityLens({
 
     if (variant === 'reader') {
         return (
-            <section className="patient-identity-lens patient-identity-lens-reader relative overflow-hidden rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.9)] p-5 shadow-[0_18px_36px_rgba(35,27,22,0.08)] backdrop-blur-xl md:p-6">
-                <div className="relative z-10 grid gap-4 xl:grid-cols-[minmax(0,1.38fr)_340px] xl:items-start">
-                    <div className="min-w-0 space-y-4">
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start">
-                            <div className="min-w-0 rounded-[18px] border border-[color:rgba(112,106,100,0.1)] bg-[color:rgba(255,255,255,0.46)] p-5">
+            <section className="patient-identity-lens patient-identity-lens-reader relative overflow-hidden border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
+                <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
+                    <div className="min-w-0 space-y-5">
+                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
+                            <div className="min-w-0 lg:pr-5">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
                                     Scheda paziente
                                 </p>
-                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-3xl">
+                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-[28px]">
                                     <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                                 </h1>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--mf-muted)]">
@@ -109,7 +109,7 @@ export function PatientIdentityLens({
                                     </span>
                                 </div>
 
-                                <div className="mt-4 flex flex-wrap gap-2">
+                                <div className="mt-3 flex flex-wrap gap-2">
                                     <StatusGlyph
                                         kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                                         label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
@@ -119,19 +119,19 @@ export function PatientIdentityLens({
                                 </div>
                             </div>
 
-                            <div className="identity-lens-pane rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-5 dark:bg-white/4">
+                            <div className="lg:pl-5">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                    In Due Righe
+                                    In due righe
                                 </p>
-                                <p className="mt-3 text-[15px] leading-7 text-[color:var(--mf-ink)]">
-                                    {summary ?? 'Caso pronto per revisione clinica locale.'}
+                                <p className="mt-2 text-[15px] leading-7 text-[color:var(--mf-ink)]">
+                                    {summary ?? 'Nessuna sintesi clinica disponibile.'}
                                 </p>
                                 {nextStep ? (
-                                    <div className="mt-4 border-t border-[color:rgba(112,106,100,0.12)] pt-4">
+                                    <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
                                         <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                            Prossimo step
+                                            Prossimo passaggio
                                         </p>
-                                        <p className="mt-2 text-sm leading-6 text-[color:var(--mf-ink)]">
+                                        <p className="mt-1.5 text-sm leading-6 text-[color:var(--mf-ink)]">
                                             {nextStep}
                                         </p>
                                     </div>
@@ -139,57 +139,50 @@ export function PatientIdentityLens({
                             </div>
                         </div>
 
-                        <div className="identity-lens-pane rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/76 p-5 dark:bg-white/4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                        Quadro clinico
-                                    </p>
-                                    <h2 className="mt-1 text-base font-semibold text-[color:var(--mf-ink)]">
-                                        Diagnosi attive ed esenzioni
-                                    </h2>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="apple-chip">{icd11DiagnosisCount} ICD-11</span>
-                                    <span className="apple-chip">{exemptions.length} esenzioni</span>
+                        <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-5">
+                            <div className="flex flex-wrap items-baseline justify-between gap-3">
+                                <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    Quadro clinico
+                                </h2>
+                                <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--mf-muted)]">
+                                    <span>{icd11DiagnosisCount} ICD-11</span>
+                                    <span aria-hidden>·</span>
+                                    <span>{exemptions.length} esenzioni</span>
                                 </div>
                             </div>
 
-                            <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
+                            <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
                                 <div className="min-w-0">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                         Diagnosi ICD-11
                                     </p>
                                     {leadDiagnosis ? (
-                                        <div className="mt-3 rounded-[16px] border border-[color:rgba(94,53,95,0.12)] bg-[linear-gradient(180deg,rgba(94,53,95,0.07),rgba(94,53,95,0.03))] p-4">
+                                        <div className="patient-diagnosis-card mt-2 rounded-[12px] border border-[color:rgba(94,53,95,0.16)] bg-white/70 p-3">
                                             <div className="flex flex-wrap items-start gap-3">
-                                                <span className="inline-flex items-center rounded-full border border-[color:rgba(94,53,95,0.14)] bg-white/84 px-3 py-1 text-sm font-semibold text-[color:var(--mf-ink)]">
+                                                <span className="patient-code-pill patient-code-pill-plum">
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-sm font-medium leading-6 text-[color:var(--mf-ink)]">
                                                         {leadDiagnosis.description}
                                                     </p>
-                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
-                                                        Prima diagnosi da tenere in primo piano nella scheda clinica.
-                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="mt-3 rounded-[16px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-4 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">
                                             {diagnoses.length > 0
                                                 ? 'Sono presenti diagnosi codificate, ma nessuna ICD-11 in primo piano.'
                                                 : 'Nessuna diagnosi ICD-11 strutturata in primo piano.'}
-                                        </div>
+                                        </p>
                                     )}
 
                                     {secondaryDiagnoses.length > 0 ? (
-                                        <div className="mt-3 flex flex-wrap gap-2">
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
                                             {secondaryDiagnoses.map((diagnosis) => (
                                                 <span
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-[color:rgba(94,53,95,0.12)] bg-[color:rgba(94,53,95,0.05)] px-3 py-1.5 text-xs text-[color:var(--mf-ink)]"
+                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--mf-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--mf-ink)]"
                                                 >
                                                     <span className="font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
@@ -199,7 +192,7 @@ export function PatientIdentityLens({
                                     ) : null}
 
                                     {remainingIcd11Count > 0 ? (
-                                        <p className="mt-3 text-xs text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-xs text-[color:var(--mf-muted)]">
                                             +{remainingIcd11Count} altre diagnosi ICD-11 presenti in scheda.
                                         </p>
                                     ) : null}
@@ -210,31 +203,29 @@ export function PatientIdentityLens({
                                         Esenzioni
                                     </p>
                                     {featuredExemptions.length > 0 ? (
-                                        <div className="mt-3 space-y-2">
+                                        <ul className="mt-2 space-y-1.5">
                                             {featuredExemptions.map((exemption) => (
-                                                <div
+                                                <li
                                                     key={exemption.code}
-                                                    className="rounded-[14px] border border-[color:rgba(15,123,104,0.12)] bg-[color:rgba(15,123,104,0.05)] px-3 py-3"
+                                                    className="flex flex-wrap items-baseline gap-2 text-sm leading-6 text-[color:var(--mf-ink)]"
                                                 >
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="inline-flex items-center rounded-full border border-[color:rgba(15,123,104,0.12)] bg-white/84 px-2.5 py-1 text-xs font-semibold text-[color:var(--mf-ink)]">
-                                                            {exemption.code}
-                                                        </span>
-                                                        <p className="text-sm leading-6 text-[color:var(--mf-ink)]">
-                                                            {exemption.description || 'Esenzione registrata nel profilo paziente.'}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                                    <span className="patient-code-pill patient-code-pill-primary">
+                                                        {exemption.code}
+                                                    </span>
+                                                    <span className="min-w-0 flex-1">
+                                                        {exemption.description || 'Esenzione registrata nel profilo paziente.'}
+                                                    </span>
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     ) : (
-                                        <div className="mt-3 rounded-[16px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-4 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">
                                             Nessuna esenzione strutturata registrata.
-                                        </div>
+                                        </p>
                                     )}
 
                                     {remainingExemptionCount > 0 ? (
-                                        <p className="mt-3 text-xs text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-xs text-[color:var(--mf-muted)]">
                                             +{remainingExemptionCount} altre esenzioni registrate in scheda.
                                         </p>
                                     ) : null}
@@ -244,11 +235,11 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="identity-lens-pane rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-5 dark:bg-white/4">
+                        <div className="patient-quick-context-card rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>
-                            <div className="mt-3 space-y-3 text-sm text-[color:var(--mf-ink)]">
+                            <div className="mt-2 space-y-1.5 text-sm text-[color:var(--mf-ink)]">
                                 <p className="inline-flex items-center gap-1.5">
                                     <Phone className="h-3.5 w-3.5 text-[color:var(--mf-muted)]" />
                                     <PrivacyBlur intensity="sm">{patient.phone || 'Telefono non disponibile'}</PrivacyBlur>

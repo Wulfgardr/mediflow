@@ -309,6 +309,11 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.match(snapshot.limitations.join('\n'), /documenti ai sovrapposti sullo stesso episodio sono stati consolidati/i);
         assert.match(prompt, /\[TERAPIE ATTIVE\][\s\S]*Ramipril 5 mg\/die/i);
         assert.match(prompt, /sezione TERAPIE ATTIVE come fonte primaria della terapia corrente/i);
+        const diaryRef = snapshot.sourceRefs.find((ref) => ref.section === 'Diario clinico recente');
+        assert.equal(diaryRef?.evidenceSourceId, 'diary:entry-1');
+        assert.equal(diaryRef?.evidenceSchemaVersion, 'mediflow.evidence_queue.v1');
+        assert.equal(diaryRef?.citation?.sourceId, 'diary:entry-1');
+        assert.match(diaryRef?.promptLine ?? '', /Dolore toracico riferito in riduzione/i);
     } finally {
         restore();
     }

@@ -80,7 +80,7 @@ export default function AiModelParliamentPanel() {
                 setState({
                     status: 'missing',
                     payload: null,
-                    message: 'Nessun report del parlamento disponibile. Esegui il benchmark da CLI per popolare l’artifact locale.',
+                    message: 'Nessun report disponibile: genera il benchmark con il comando indicato sotto.',
                 });
                 return;
             }
@@ -119,9 +119,9 @@ export default function AiModelParliamentPanel() {
                         <Scale className="h-5 w-5" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Parlamento AI</h3>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Confronto modelli AI</h3>
                         <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                            Report read-only di baseline, challenger, modelli protetti e prune candidate. Nessun pruning parte dalla UI.
+                            Report in sola lettura su modello base, alternative, modelli protetti e candidati da rimuovere.
                         </p>
                     </div>
                 </div>
@@ -171,7 +171,7 @@ export default function AiModelParliamentPanel() {
                             )}
                             <div>
                                 <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                                    Stato parlamento: {readiness === 'prune_ready' ? 'prune-ready' : 'hold'}
+                                    Stato confronto: {readiness === 'prune_ready' ? 'pronto per revisione' : 'in attesa'}
                                 </p>
                                 <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
                                     {parliament.rationale || 'Nessuna razionale disponibile.'}
@@ -184,16 +184,13 @@ export default function AiModelParliamentPanel() {
                         <MetricCard label="Baseline" value={parliament.baselineModel || 'n/d'} />
                         <MetricCard label="Challenger" value={(parliament.challengerModels || []).length > 0 ? (parliament.challengerModels || []).join(', ') : 'nessuno'} />
                         <MetricCard label="Protetti" value={String((parliament.protectedModels || []).length)} />
-                        <MetricCard label="Prune candidate" value={String((parliament.recommendedPruneModels || []).length)} />
+                        <MetricCard label="Candidati da rimuovere" value={String((parliament.recommendedPruneModels || []).length)} />
                     </div>
 
                     {scorecard?.summary ? (
                         <div className="space-y-3">
                             <div>
-                                <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Scorecard capability / economics</h4>
-                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                                    Advisory only: aiuta a leggere valore, latenza e copertura delle lane senza cambiare baseline o pruning dalla UI.
-                                </p>
+                                <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Qualità, costo e copertura</h4>
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -213,9 +210,9 @@ export default function AiModelParliamentPanel() {
                                     meta={typeof scorecard.summary.fastestAvgLatencyMs === 'number' ? `fastest ${scorecard.summary.fastestAvgLatencyMs.toFixed(1)} ms` : null}
                                 />
                                 <MetricCard
-                                    label="Lane"
+                                    label="Aree AI"
                                     value={`${scorecard.summary.competitiveLaneCount || 0} competitive`}
-                                    meta={`${scorecard.summary.advisoryLaneCount || 0} advisory`}
+                                    meta={`${scorecard.summary.advisoryLaneCount || 0} consultive`}
                                 />
                             </div>
                         </div>
@@ -227,14 +224,14 @@ export default function AiModelParliamentPanel() {
                         values={parliament.protectedModels || []}
                     />
                     <ListCard
-                        title="Prune candidate"
-                        emptyLabel="Nessun prune candidate."
+                        title="Candidati da rimuovere"
+                        emptyLabel="Nessun candidato da rimuovere."
                         values={parliament.recommendedPruneModels || []}
                     />
 
                     {scorecard?.lanes && scorecard.lanes.length > 0 ? (
                         <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5">
-                            <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Lane capabilities</h4>
+                            <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Copertura per area AI</h4>
                             <div className="mt-3 space-y-3">
                                 {scorecard.lanes.map((lane) => (
                                     <div
@@ -260,8 +257,8 @@ export default function AiModelParliamentPanel() {
 
                                         <div className="mt-3 grid gap-2 md:grid-cols-3">
                                             <InlineMetric label="Focus" value={lane.focusCandidateLabel || lane.focusCandidateModel || 'n/d'} />
-                                            <InlineMetric label="Runnable" value={`${lane.runnableCandidates}/${lane.totalCandidates}`} />
-                                            <InlineMetric label="Benchmarked" value={`${lane.benchmarkedCandidates}/${lane.totalCandidates}`} />
+                                            <InlineMetric label="Eseguibili" value={`${lane.runnableCandidates}/${lane.totalCandidates}`} />
+                                            <InlineMetric label="Valutati" value={`${lane.benchmarkedCandidates}/${lane.totalCandidates}`} />
                                         </div>
 
                                         {lane.focusNote ? (
@@ -290,8 +287,6 @@ export default function AiModelParliamentPanel() {
 
                     <div className="rounded-[18px] border border-slate-200/70 bg-white/72 p-3 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                         <p>Aggiornato: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.updatedAt || 'n/d'}</span></p>
-                        <p className="mt-1">JSON: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.jsonPath || 'n/d'}</span></p>
-                        <p className="mt-1">Markdown: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.markdownPath || 'n/d'}</span></p>
                     </div>
                 </div>
             ) : null}
