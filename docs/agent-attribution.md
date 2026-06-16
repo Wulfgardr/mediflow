@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-06-16 Codex
+- Opened `WUL-358` with a fail-closed AI safety gate slice: Patient Insight, Smart Import and Document Synthesis kill switches now require explicit enabled values, rollout-readiness local controls reuse canonical key/resolver logic, and document-decision governance rejects generative/hybrid direct patient identity resolution while preserving attach-without-patient review flow: `lib/ai-*-kill-switch.ts`, `lib/ai-rollout-readiness-storage.ts`, `lib/document-decision-model-governance.ts`, focused tests, `docs/agent-attribution.md`
+
 ## 2026-06-15 Codex
 - Rehomed the conflicted `WUL-295`/`WUL-296` agentic-stack work onto current `main` as a fresh narrow branch: restored only the internal operating loop ADR/runbook, dual-thesis ledger template, redacted analysis digests and readiness harness, added npm wiring, kept the docs indexed, and excluded the internal agentic material from OSS export without touching clinical runtime, database, schema, patient UI, API contracts or private data: `docs/adr/0067-agentic-development-operating-loop.md`, `docs/agentic-development-operating-loop.md`, `docs/agentic-dual-thesis-run-ledger-template.md`, `docs/analysis/2026-06-01-agentic-*.md`, `scripts/agentic-stack-readiness.mjs`, `scripts/agentic-stack-readiness.test.mjs`, `package.json`, `.gitignore`, `scripts/prepare-oss.js`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 

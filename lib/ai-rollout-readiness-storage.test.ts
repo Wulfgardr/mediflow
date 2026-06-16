@@ -10,6 +10,9 @@ import {
     buildAiRolloutReadinessArtifactsPayload,
     ensureAiRolloutReadinessArtifactDirectory,
 } from './ai-rollout-readiness-storage.ts';
+import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from './ai-document-synthesis-kill-switch.ts';
+import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY } from './ai-patient-insight-kill-switch.ts';
+import { AI_SMART_IMPORT_KILL_SWITCH_KEY } from './ai-smart-import-kill-switch.ts';
 
 test('rollout readiness contract helper keeps all known lanes visible and marks missing artifacts explicitly', () => {
     const previousDataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -118,4 +121,31 @@ test('corrupt rollout readiness JSON degrades only the affected lane', () => {
         }
         fs.rmSync(tempDir, { recursive: true, force: true });
     }
+});
+
+test('rollout readiness local controls fail closed when settings are absent or malformed', () => {
+    const absentControls = buildAiRolloutLocalControlsPayload({});
+    assert.deepEqual(absentControls.map((control) => control.state), ['disabled', 'disabled', 'disabled']);
+
+    const malformedControls = buildAiRolloutLocalControlsPayload({
+        patient_insight: 'unexpected',
+        smart_import: null,
+        document_synthesis: 'true-ish',
+    });
+    assert.deepEqual(malformedControls.map((control) => control.state), ['disabled', 'disabled', 'disabled']);
+});
+
+test('rollout readiness local controls also accept canonical setting keys', () => {
+    const controls = buildAiRolloutLocalControlsPayload({
+        [AI_PATIENT_INSIGHT_KILL_SWITCH_KEY]: 'enabled',
+        [AI_SMART_IMPORT_KILL_SWITCH_KEY]: true,
+        [AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY]: '1',
+    });
+    assert.deepEqual(controls.map((control) => control.state), ['enabled', 'enabled', 'enabled']);
+
+    const canonicalNullWinsOverLaneFallback = buildAiRolloutLocalControlsPayload({
+        [AI_PATIENT_INSIGHT_KILL_SWITCH_KEY]: null,
+        patient_insight: 'enabled',
+    });
+    assert.equal(canonicalNullWinsOverLaneFallback.find((control) => control.lane === 'patient_insight')?.state, 'disabled');
 });

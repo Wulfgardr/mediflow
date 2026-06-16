@@ -2,10 +2,18 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-const AI_PATIENT_INSIGHT_KILL_SWITCH_KEY = 'aiPatientInsightKillSwitch';
-const AI_SMART_IMPORT_KILL_SWITCH_KEY = 'aiSmartImportKillSwitch';
-const AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY = 'aiDocumentSynthesisKillSwitch';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    isAiDocumentSynthesisEnabledValue,
+} from './ai-document-synthesis-kill-switch';
+import {
+    AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    isAiPatientInsightEnabledValue,
+} from './ai-patient-insight-kill-switch';
+import {
+    AI_SMART_IMPORT_KILL_SWITCH_KEY,
+    isAiSmartImportEnabledValue,
+} from './ai-smart-import-kill-switch';
 
 export type RolloutReadinessArtifactLane =
     | 'patient_insight'
@@ -41,17 +49,17 @@ const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
     patient_insight: {
         label: 'Patient Insight',
         key: AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
-        resolveEnabled: isAiRolloutLocalControlEnabledValue,
+        resolveEnabled: isAiPatientInsightEnabledValue,
     },
     smart_import: {
         label: 'Smart Import',
         key: AI_SMART_IMPORT_KILL_SWITCH_KEY,
-        resolveEnabled: isAiRolloutLocalControlEnabledValue,
+        resolveEnabled: isAiSmartImportEnabledValue,
     },
     document_synthesis: {
         label: 'Document Synthesis',
         key: AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
-        resolveEnabled: isAiRolloutLocalControlEnabledValue,
+        resolveEnabled: isAiDocumentSynthesisEnabledValue,
     },
 };
 
@@ -75,15 +83,13 @@ export type AiRolloutReadinessArtifactsPayload = {
     }>;
 };
 
+export type AiRolloutLocalControlRawValues = Partial<Record<RolloutReadinessLocalControlLane, unknown>> & Record<string, unknown>;
+
 function getDefaultDataDir() {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
             ? path.join(/* turbopackIgnore: true */ os.homedir(), 'Library', 'Application Support', 'MediFlow')
             : path.join(/* turbopackIgnore: true */ os.homedir(), '.mediflow'));
-}
-
-function isAiRolloutLocalControlEnabledValue(value: unknown): boolean {
-    return !(value === 'disabled' || value === false || value === 'false' || value === 0 || value === '0');
 }
 
 export function getAiRolloutReadinessArtifactPaths(lane: RolloutReadinessArtifactLane) {
@@ -149,11 +155,13 @@ export function readAiRolloutReadinessArtifacts() {
 }
 
 export function buildAiRolloutLocalControlsPayload(
-    rawValues: Partial<Record<RolloutReadinessLocalControlLane, unknown>>
+    rawValues: AiRolloutLocalControlRawValues
 ): AiRolloutReadinessArtifactsPayload['localControls'] {
     return AI_ROLLOUT_LOCAL_CONTROL_LANES.map((lane) => {
         const meta = AI_ROLLOUT_LOCAL_CONTROL_META[lane];
-        const state: 'enabled' | 'disabled' = meta.resolveEnabled(rawValues[lane]) ? 'enabled' : 'disabled';
+        const hasCanonicalKey = Object.prototype.hasOwnProperty.call(rawValues, meta.key);
+        const rawValue = hasCanonicalKey ? rawValues[meta.key] : rawValues[lane];
+        const state: 'enabled' | 'disabled' = meta.resolveEnabled(rawValue) ? 'enabled' : 'disabled';
         return {
             lane,
             label: meta.label,
