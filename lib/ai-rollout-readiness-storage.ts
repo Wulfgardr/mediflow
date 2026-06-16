@@ -72,6 +72,7 @@ export type AiRolloutReadinessArtifactsPayload = {
         markdownPath: string | null;
         markdown: string | null;
         report: Record<string, unknown> | null;
+        error: string | null;
     }>;
     localControls: Array<{
         lane: RolloutReadinessLocalControlLane;
@@ -119,15 +120,27 @@ export function readAiRolloutReadinessArtifact(lane: RolloutReadinessArtifactLan
 
     const raw = fs.readFileSync(/* turbopackIgnore: true */ paths.jsonPath, 'utf8');
     const stats = fs.statSync(/* turbopackIgnore: true */ paths.jsonPath);
+    const markdown = fs.existsSync(/* turbopackIgnore: true */ paths.markdownPath)
+        ? fs.readFileSync(/* turbopackIgnore: true */ paths.markdownPath, 'utf8')
+        : null;
 
-    return {
-        paths,
-        updatedAt: stats.mtime.toISOString(),
-        markdown: fs.existsSync(/* turbopackIgnore: true */ paths.markdownPath)
-            ? fs.readFileSync(/* turbopackIgnore: true */ paths.markdownPath, 'utf8')
-            : null,
-        report: JSON.parse(raw) as Record<string, unknown>,
-    };
+    try {
+        return {
+            paths,
+            updatedAt: stats.mtime.toISOString(),
+            markdown,
+            report: JSON.parse(raw) as Record<string, unknown>,
+            error: null,
+        };
+    } catch (error) {
+        return {
+            paths,
+            updatedAt: stats.mtime.toISOString(),
+            markdown,
+            report: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 export function readAiRolloutReadinessArtifacts() {
@@ -135,7 +148,7 @@ export function readAiRolloutReadinessArtifacts() {
         const artifact = readAiRolloutReadinessArtifact(lane);
         return {
             lane,
-            available: Boolean(artifact),
+            available: Boolean(artifact?.report),
             artifact,
         };
     });
@@ -172,6 +185,7 @@ export function buildAiRolloutReadinessArtifactsPayload(options?: {
             markdownPath: artifact.artifact?.paths.markdownPath || null,
             markdown: artifact.artifact?.markdown || null,
             report: artifact.artifact?.report || null,
+            error: artifact.artifact?.error || null,
         })),
         localControls: options?.localControls || buildAiRolloutLocalControlsPayload({}),
     };

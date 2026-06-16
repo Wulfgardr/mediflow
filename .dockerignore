@@ -1,0 +1,22 @@
+# Build context hygiene: keep PHI, secrets, and build artifacts out of Docker layers
+medical.db
+medical.db-*
+*.db
+*.db-wal
+*.db-shm
+certs/
+.env
+.env.*
+node_modules/
+.next/
+.git/
+.claude/
+tmp-*/
+test-results/
+playwright-report/
+native/
+oss-assets/
+whitepaper/
+docs/
+e2e/
+Farmaci/

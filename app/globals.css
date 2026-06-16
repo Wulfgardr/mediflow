@@ -1550,6 +1550,30 @@ body {
   border-radius: 12px;
 }
 
+/* @Codex WUL-339: ICD autocomplete uses inset icons, so compact input padding
+   must not place the typed diagnosis under the search glyph. */
+.icd-autocomplete-input.mf-input-sm {
+  padding-left: 2.35rem;
+  padding-right: 2.75rem;
+  text-transform: uppercase;
+}
+
+.diagnosis-section-card.mf-section,
+.diagnosis-form-card.mf-section {
+  overflow: visible;
+}
+
+.diagnosis-form-card .mf-input-sm,
+.diagnosis-form-card .icd-autocomplete-input.mf-input-sm,
+.diagnosis-system-pill {
+  min-height: 2.55rem;
+}
+
+.diagnosis-system-pill {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .mf-textarea {
   width: 100%;
   border-radius: 16px;
