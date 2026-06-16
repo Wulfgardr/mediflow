@@ -3,13 +3,14 @@
 > **Dove siamo e dove vogliamo andare.**
 > v0.6.0 (release corrente), Maggio 2026
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
+> Nota 2026-06-16: i claim zero-knowledge forti restano sotto riallineamento `WUL-342`/`WUL-354`; per il prossimo push operativo vedi [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md).
 
 ## Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.
 
 * **Database solido**: migrazione completa a SQLite cifrato.
-* **Privacy Totale**: Cifratura Zero-Knowledge attiva. Nemmeno io leggo i tuoi dati.
+* **Privacy locale**: cifratura locale dei dati clinici sensibili e modello senza cloud di default; i claim zero-knowledge forti restano in riallineamento `WUL-342`/`WUL-354`.
 * **AI Locale**: Integrazione di Qwen text-only (sintesi/insight) e DeepSeek OCR via Ollama.
 * **ICD-11**: Diagnosi standardizzate OMS.
 * **Multi-ambulatorio**: gestione sedi con identificazione visiva rapida.
@@ -69,9 +70,9 @@ boundary espliciti.
 * **AI governance piu netta**: MLX e benchmark-visible e diagnosticabile, ma
   non runtime clinico; le lane OpenMed/NER/TurboQuant/comparator restano
   benchmark-only o shadow.
-* **Governance operativa chiusa**: la coda Linear MediFlow e stata azzerata;
-  tracker macro e backlog storico sono stati rolluppati, chiusi o cancellati
-  quando obsoleti.
+* **Governance operativa v0.6 chiusa**: la coda Linear MediFlow v0.6 e stata
+  azzerata in quel closeout; dal 2026-06-13/16 la coda post-review e di nuovo
+  attiva tramite `WUL-341`, `WUL-356` e la proposta `WUL-373`.
 
 > Nota: `v0.6.0` non dichiara sync completo, multi-master, attachment remoti,
 > cataloghi remoti, prescribing SISS nativo o AI cloud di default. Questi restano
@@ -105,7 +106,7 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Shell ufficiale e sperimentazioni controllate
 
-* **Shell web ufficiale**: `Clinical Workbench / Graphite` e la grammatica unica supportata su `main`.
+* **Shell web ufficiale**: il cockpit Kree8 e la root live `/` supportata su `main` (ADR 0060); Graphite resta storico solo per il principio di shell unica/no selector.
 * **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
 * **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
 * **Guardrail locali**: revision fingerprint, `/api/system/revision` e reset `.next` source-aware riducono il rischio di testare una shell stale.

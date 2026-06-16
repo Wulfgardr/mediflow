@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-06-10
+Ultimo aggiornamento: 2026-06-16
 
 ## Come usare questo indice
 
@@ -33,6 +33,7 @@ Ultimo aggiornamento: 2026-06-10
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Intended purpose e guard `check:claims` contro overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. | Quando si tocca copy prodotto, UI/help, README, materiale pubblico o confini AI/SISS/FSE. |
 | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | Playbook operativo per orchestrare Linear, Codex e GitHub con tracciabilita end-to-end. | Quando imposti processi, naming issue/branch/PR e audit trail. |
+| [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md) | Proposta operativa `WUL-373` per il prossimo push post-bug-hunt: exit package, PR merge/hold, fix selezionate da `WUL-356`, roadmap post-v0.6 e watchlist sito pubblico. | Quando serve decidere ordine di push, issue da riusare, claim freeze, patch notes future o separazione tra MediFlow e `leonardopegollo.dev`. |
 | [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md) | Runbook del monitor locale WUL-283 per branch/scope/privacy/check drift, con LaunchAgent opzionale e digest Ollama redatto. | Quando vuoi controllare automaticamente che il lavoro Codex resti sul branch/issue corretti senza leggere PHI o contenuti privati. |
 | [PLANS.md](../PLANS.md) | Piano engineering operativo (2-6 settimane). | Sempre, per allineare priorità correnti. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |

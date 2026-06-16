@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-05-24
+Ultimo aggiornamento: 2026-06-16
 
 > [!NOTE]
 > La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
@@ -35,6 +35,7 @@ Documenti da consultare **al bisogno**:
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Playbook orchestrazione lavoro con Linear/Codex: [docs/linear-codex-playbook.md](./linear-codex-playbook.md)
+- Proposta stabilizzazione/push post-bug-hunt: [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md)
 - Monitor locale workflow Codex: [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity web/macOS: [docs/parity-matrix.md](./parity-matrix.md)
@@ -89,6 +90,7 @@ Documenti da consultare **al bisogno**:
 | Intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: claim consentiti/esclusi su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione, con guard `check:claims`. |
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |
 | Orchestrazione delivery Linear + Codex | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | `CANONICAL` | Workflow operativo planning -> coding -> audit trail con issue linking e convenzioni branch/PR. |
+| Proposta stabilizzazione/push post-bug-hunt | [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md) | `SECONDARY` | Punto fermo operativo `WUL-373`: definisce exit package, PR merge/hold, fix selezionate, claim freeze e watchlist `leonardopegollo.dev`; non e release note e non prevale su `PLANS.md` o ADR. |
 | Monitor locale workflow Codex | [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md), [docs/adr/0063-local-workflow-monitor-control-plane.md](./adr/0063-local-workflow-monitor-control-plane.md) | `SECONDARY` | Tooling locale WUL-283 per controllare branch, scope, privacy e verifiche tramite soli metadati Git/check, con LaunchAgent opzionale e digest locale redatto. |
 | Decisioni architetturali | [docs/adr/*.md](./adr/README.md) | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Contratto API locale `/api/v1` | [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml) | `CANONICAL` | Spec OpenAPI client-facing; processo/versioning governati da ADR 0010. |
@@ -98,7 +100,7 @@ Documenti da consultare **al bisogno**:
 | Write paired checkup | [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete checkup su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Write paired osservazioni | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete osservazioni su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Runbook manutenzione OpenAPI | [docs/openapi/README.md](./openapi/README.md) | `SECONDARY` | Workflow operativo per mantenere aggiornata la spec durante lo sviluppo. |
-| Piano engineering a breve termine | [PLANS.md](../PLANS.md) | `CANONICAL` | 2-6 settimane, operativo. Dopo `v0.6.0` governa validazione sul campo, verify loop `0.6.x`, hardening bounded di `home-base`, document intelligence artifact-first e Apple clients paired. |
+| Piano engineering a breve termine | [PLANS.md](../PLANS.md) | `CANONICAL` | 2-6 settimane, operativo. Dopo `v0.6.0` governa validazione sul campo, nuova coda post-review `WUL-341`/`WUL-356`, verify loop `0.6.x`, hardening bounded di `home-base`, document intelligence artifact-first e Apple clients paired. |
 | Matrice parity web/macOS | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Gate capability-by-capability (funzioni/campi/flessibilita/autonomia). |
 | QA parity Apple-wide | [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md), [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) | `CANONICAL` | Matrice capability-by-capability per WUL-194: evidenza ripetibile, gap WUL-193/WUL-194 e guard `check:apple-wide-qa`. |
 | Roadmap prodotto | [docs/ROADMAP.md](./ROADMAP.md) | `CANONICAL` | Direzione prodotto/versioni, separata da `PLANS.md`. `v0.6.0` e la release corrente; il ciclo prodotto attivo e `post-v0.6`, senza preview profiles runtime su `main`. |
