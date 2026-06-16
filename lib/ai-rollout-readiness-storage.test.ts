@@ -50,6 +50,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         assert.equal(patientInsight?.markdown, '# Patient Insight verdict');
         assert.equal(patientInsight?.jsonPath, patientInsightPaths.jsonPath);
         assert.equal(patientInsight?.markdownPath, patientInsightPaths.markdownPath);
+        assert.equal(patientInsight?.error, null);
 
         const patientInsightControl = payload.localControls.find((control) => control.lane === 'patient_insight');
         assert.equal(patientInsightControl?.state, 'disabled');
@@ -67,6 +68,48 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         assert.equal(redaction?.markdownPath, null);
         assert.equal(redaction?.markdown, null);
         assert.equal(redaction?.report, null);
+        assert.equal(redaction?.error, null);
+    } finally {
+        if (previousDataDir) {
+            process.env.MEDIFLOW_DATA_DIR = previousDataDir;
+        } else {
+            delete process.env.MEDIFLOW_DATA_DIR;
+        }
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('corrupt rollout readiness JSON degrades only the affected lane', () => {
+    const previousDataDir = process.env.MEDIFLOW_DATA_DIR;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-rollout-readiness-'));
+
+    process.env.MEDIFLOW_DATA_DIR = tempDir;
+
+    try {
+        const patientInsightPaths = ensureAiRolloutReadinessArtifactDirectory('patient_insight');
+        fs.writeFileSync(patientInsightPaths.jsonPath, JSON.stringify({
+            status: 'shadow-ready',
+            blockers: [],
+        }), 'utf8');
+
+        const smartImportPaths = ensureAiRolloutReadinessArtifactDirectory('smart_import');
+        fs.writeFileSync(smartImportPaths.jsonPath, '{not valid json', 'utf8');
+        fs.writeFileSync(smartImportPaths.markdownPath, '# Smart Import verdict', 'utf8');
+
+        const payload = buildAiRolloutReadinessArtifactsPayload();
+        const patientInsight = payload.lanes.find((lane) => lane.lane === 'patient_insight');
+        const smartImport = payload.lanes.find((lane) => lane.lane === 'smart_import');
+
+        assert.equal(patientInsight?.available, true);
+        assert.equal(patientInsight?.report?.status, 'shadow-ready');
+        assert.equal(patientInsight?.error, null);
+
+        assert.equal(smartImport?.available, false);
+        assert.equal(smartImport?.report, null);
+        assert.equal(smartImport?.markdown, '# Smart Import verdict');
+        assert.equal(smartImport?.jsonPath, smartImportPaths.jsonPath);
+        assert.equal(smartImport?.markdownPath, smartImportPaths.markdownPath);
+        assert.match(smartImport?.error || '', /JSON/);
     } finally {
         if (previousDataDir) {
             process.env.MEDIFLOW_DATA_DIR = previousDataDir;
