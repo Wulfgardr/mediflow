@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-05-24
+Ultimo aggiornamento: 2026-06-15
 
 > [!NOTE]
 > La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
@@ -36,6 +36,8 @@ Documenti da consultare **al bisogno**:
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Playbook orchestrazione lavoro con Linear/Codex: [docs/linear-codex-playbook.md](./linear-codex-playbook.md)
 - Monitor locale workflow Codex: [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md)
+- Operating loop agentico interno: [docs/agentic-development-operating-loop.md](./agentic-development-operating-loop.md), [docs/adr/0067-agentic-development-operating-loop.md](./adr/0067-agentic-development-operating-loop.md)
+- Template ledger dual-thesis: [docs/agentic-dual-thesis-run-ledger-template.md](./agentic-dual-thesis-run-ledger-template.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity web/macOS: [docs/parity-matrix.md](./parity-matrix.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md), [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md)
@@ -90,6 +92,8 @@ Documenti da consultare **al bisogno**:
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |
 | Orchestrazione delivery Linear + Codex | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | `CANONICAL` | Workflow operativo planning -> coding -> audit trail con issue linking e convenzioni branch/PR. |
 | Monitor locale workflow Codex | [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md), [docs/adr/0063-local-workflow-monitor-control-plane.md](./adr/0063-local-workflow-monitor-control-plane.md) | `SECONDARY` | Tooling locale WUL-283 per controllare branch, scope, privacy e verifiche tramite soli metadati Git/check, con LaunchAgent opzionale e digest locale redatto. |
+| Operating loop agentico | [docs/agentic-development-operating-loop.md](./agentic-development-operating-loop.md), [docs/adr/0067-agentic-development-operating-loop.md](./adr/0067-agentic-development-operating-loop.md) | `SECONDARY / INTERNAL` | Protocollo WUL-295 per usare Codex, RepoPrompt, Linear, `/goal`, Claude/Gemini, ChatGPT web research e workflow monitor come pool bounded con Codex controller-of-record. |
+| Ledger dual-thesis agentico | [docs/agentic-dual-thesis-run-ledger-template.md](./agentic-dual-thesis-run-ledger-template.md) | `SECONDARY / INTERNAL` | Template WUL-296 per registrare packet, tesi Claude, tesi Codex/ChatGPT, cross-exam Gemini, artifact registry e decisione Codex senza raw transcript o dati sensibili. |
 | Decisioni architetturali | [docs/adr/*.md](./adr/README.md) | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Contratto API locale `/api/v1` | [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml) | `CANONICAL` | Spec OpenAPI client-facing; processo/versioning governati da ADR 0010. |
 | Primo write paired profilo paziente | [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md) | `CANONICAL` | Slice per `PUT /api/v1/network/patients/{id}` con paired client, sessione operatore, scope ambulatoriale e `version`; esclude delete remoto, child CRUD, sync e campi AI/documentali. |
