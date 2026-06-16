@@ -44,7 +44,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
 
             <div className="grid grid-cols-1 gap-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="mf-section mf-section-tight relative group">
+                    <div key={field.id} className="diagnosis-form-card mf-section mf-section-tight relative group">
                         <button
                             type="button"
                             onClick={() => remove(index)}
@@ -54,14 +54,14 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             <Trash2 className="w-4 h-4" />
                         </button>
 
-                        <div className="flex flex-col md:flex-row gap-5 items-end">
-                            <div className="w-full md:w-24 shrink-0">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[7rem_9rem_minmax(0,1fr)] md:items-start">
+                            <div className="w-full min-w-0">
                                 <label className="mf-field-label">Sistema</label>
                                 {(() => {
                                     const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                     const isV11 = sys === 'ICD-11';
                                     return (
-                                        <div className={`patient-code-pill ${isV11 ? 'patient-code-pill-primary' : 'patient-code-pill-plum'} w-full justify-center py-2 text-xs font-bold`}>
+                                        <div className={`diagnosis-system-pill patient-code-pill ${isV11 ? 'patient-code-pill-primary' : 'patient-code-pill-plum'} w-full justify-center text-xs font-bold`}>
                                             {sys}
                                         </div>
                                     );
@@ -69,7 +69,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                 <input type="hidden" {...register(`diagnoses.${index}.system`)} />
                             </div>
 
-                            <div className="w-full md:w-28 shrink-0">
+                            <div className="w-full min-w-0">
                                 <label className="mf-field-label">Codice</label>
                                 <input
                                     {...register(`diagnoses.${index}.code`)}
@@ -80,7 +80,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
 
                             <div className="flex-1 w-full min-w-0">
-                                <label className="section-kicker mb-1.5 block">Diagnosi o ricerca clinica</label>
+                                <label className="mf-field-label">Diagnosi o ricerca clinica</label>
                                 <div className="relative">
                                     <ICDAutocomplete
                                         value={{
@@ -351,7 +351,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Diagnosi & Patologie */}
-            <div className={FORM_SECTION_CLASS}>
+            <div className={`${FORM_SECTION_CLASS} diagnosis-section-card`}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(163, 58, 47, 0.1)' }}>
                         <Activity className="w-5 h-5" style={{ color: 'var(--mf-critical)' }} />

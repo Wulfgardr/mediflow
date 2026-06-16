@@ -17,6 +17,8 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<ICDSearchResult[]>([]);
     const [isOpen, setIsOpen] = useState(false);
+    /* @Codex */
+    const [searchError, setSearchError] = useState<string | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // @Codex
     const latestSearchRef = useRef(createLatestRequestGuard()); // @Codex
@@ -69,16 +71,19 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
         if (val.length > 1) {
             const requestId = latestSearchRef.current.issue(); // @Codex
+            setSearchError(null); // @Codex
             setIsLoading(true);
             debounceRef.current = setTimeout(() => { // @Codex
                 searchICDHybrid(val) // @Codex
                     .then((matches) => { // @Codex
                         if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
+                        setSearchError(null); // @Codex
                         setResults(matches); // @Codex
                         setIsOpen(true); // @Codex
                     }) // @Codex
                     .catch(() => { // @Codex
                         if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
+                        setSearchError('Servizio ICD-11 locale non raggiungibile. Verifica Docker e sessione attiva.'); // @Codex
                         setResults([]); // @Codex
                         setIsOpen(true); // @Codex
                     }) // @Codex
@@ -90,6 +95,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             }, 225); // @Codex
         } else {
             latestSearchRef.current.discard(); // @Codex
+            setSearchError(null); // @Codex
             setResults([]);
             setIsOpen(false);
             setIsLoading(false); // @Codex
@@ -129,13 +135,15 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         // @Codex WUL-229: ICD autocomplete shares mf-input + mf-popover language with drug picker
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} aria-hidden="true" />
                 <input
                     type="text"
                     value={query}
                     onChange={handleSearch}
                     placeholder="Cerca diagnosi (ICD-11 Official - English)"
-                    className="mf-input mf-input-sm pl-9 pr-9 uppercase"
+                    className="mf-input mf-input-sm icd-autocomplete-input"
+                    aria-expanded={isOpen}
+                    aria-invalid={!!searchError}
                 />
                 {isLoading && (
                     <div className="absolute right-9 top-1/2 -translate-y-1/2">
@@ -145,6 +153,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
                 {query && !isLoading && (
                     <button
+                        type="button"
                         onClick={() => {
                             latestSearchRef.current.discard(); // @Codex
                             if (debounceRef.current) { // @Codex
@@ -152,6 +161,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                                 debounceRef.current = null; // @Codex
                             }
                             setQuery("");
+                            setSearchError(null); // @Codex
                             setResults([]); // @Codex
                             setIsOpen(false); // @Codex
                             setIsLoading(false); // @Codex
@@ -188,7 +198,17 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 </div>
             )}
 
-            {isOpen && results.length === 0 && query.length > 1 && (
+            {isOpen && searchError && (
+                <div
+                    className="absolute z-[100] w-full mt-2 mf-popover p-3 text-left text-xs leading-5"
+                    style={{ color: 'var(--mf-warning)' }}
+                    role="status"
+                >
+                    {searchError}
+                </div>
+            )}
+
+            {isOpen && !searchError && results.length === 0 && query.length > 1 && (
                 <div className="absolute z-[100] w-full mt-2 mf-popover p-3 text-center text-xs italic" style={{ color: 'var(--mf-muted)' }}>
                     Nessuna corrispondenza. Prova a cercare in Inglese (es. &quot;Amyloid&quot;).
                 </div>
