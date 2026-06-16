@@ -77,12 +77,19 @@ Output richiesto:
    - `docs/README.md`;
    - `docs/markdown-index.md`;
    - `CHANGELOG.md` solo dopo merge reali, non in questo commit iniziale.
-5. Checkpoint di sistema/topologia: verificare se `docs/STATE_OF_THE_SYSTEM.md`,
+5. Credito Kree8 esplicito per la linea visuale:
+   - app/design system: credito diretto a Kree8 come ispirazione esterna e
+     grammatica visuale di riferimento;
+   - sito/pubblico: credito piu leggero ma presente quando si descrive il look
+     corrente di MediFlow;
+   - nessuna confusione tra ispirazione visiva e implementazione/prodotto
+     clinico MediFlow.
+6. Checkpoint di sistema/topologia: verificare se `docs/STATE_OF_THE_SYSTEM.md`,
    `docs/topologia-dati-flussi.md`, `docs/system_architecture.md`,
    `docs/walkthrough.md` e README devono essere riallineati dopo la merge
    train; se il riallineamento non e piccolo, aprire issue dedicata invece di
    allargare `WUL-373`.
-6. Nota di verifica finale con:
+7. Nota di verifica finale con:
    - evidenza CI usata;
    - check locali eseguiti;
    - blocker locali noti;
@@ -210,6 +217,9 @@ queste superfici, in base a cio che sara davvero entrato su `main`:
   coerente con la prossima versione.
 - `docs/STATE_OF_THE_SYSTEM.md`: stato reale di Kree8, safety floor AI,
   document intelligence e home-base dopo merge.
+- `docs/design/wul-271-kree8-visual-translation.md`: credito Kree8 mantenuto
+  come ispirazione esterna della grammatica visuale app, separando reference
+  estetico da prodotto/implementazione MediFlow.
 - `docs/topologia-dati-flussi.md`: caveat sugli identificatori a riposo,
   boundary AI/documenti e SISS/FSE se il contenuto risulta stale.
 - `docs/system_architecture.md` e `ARCHITECTURE.md`: solo se cambia la lettura
@@ -218,13 +228,15 @@ queste superfici, in base a cio che sara davvero entrato su `main`:
   entrati.
 - `README.md` e `oss-assets/README.md`: aggiornare in una passata pubblicabile,
   senza claim zero-knowledge forte finche `WUL-342`/`WUL-354` sono aperti.
-- `../leonardopegollo.dev`: passa da `WUL-374`, separatamente, dopo audit copy.
+- `../leonardopegollo.dev`: passa da `WUL-374`, separatamente, dopo audit copy;
+  la pagina pubblica deve includere un credito Kree8 leggero se usa o racconta
+  la linea visuale attuale.
 
 ## Issue formalizzate o da riusare
 
 - `WUL-373`: questa proposta di push e consolidamento documentale.
 - `WUL-374`: audit/aggiornamento copy pubblico `leonardopegollo.dev` rispetto
-  a zero-knowledge, claim sicurezza e post-v0.6.
+  a zero-knowledge, claim sicurezza, credito Kree8 e post-v0.6.
 - Riusare, non duplicare: `WUL-342`, `WUL-344`, `WUL-354`, `WUL-356`.
 - Riusare per direzione prodotto: `WUL-233`.
 - Riusare per operating loop: `WUL-295`.
