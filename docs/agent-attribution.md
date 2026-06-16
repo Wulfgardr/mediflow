@@ -4,6 +4,9 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-06-16 Codex
+- Opened `WUL-358` with a fail-closed AI safety gate slice: Patient Insight, Smart Import and Document Synthesis kill switches now require explicit enabled values, rollout-readiness local controls reuse canonical key/resolver logic, and document-decision governance rejects generative/hybrid direct patient identity resolution while preserving attach-without-patient review flow: `lib/ai-*-kill-switch.ts`, `lib/ai-rollout-readiness-storage.ts`, `lib/document-decision-model-governance.ts`, focused tests, `docs/agent-attribution.md`
+
 ## 2026-06-10 Codex
 - Opened `WUL-311` with a reusable latest-request guard for ICD autocomplete lookup sequencing, a small debounce on diagnosis search, and focused out-of-order coverage to prevent stale ICD proxy responses from replacing fresher results: `lib/latest-request-guard.ts`, `lib/latest-request-guard.test.ts`, `components/icd-autocomplete.tsx`, `scripts/latest-request-guard-test.sh`, `tsconfig.latest-request-guard-test.json`, `package.json`, `docs/agent-attribution.md`
 - Opened `WUL-326` with local route robustness fixes: bounded and validated base64 attachment payloads, rejected orphan attachment writes, returned 400s for invalid checkup create input, aligned settings `PUT` value normalization with `POST`, removed raw `fix-orphans` error details from responses, session-gated system revision/update-awareness metadata, and ensured MLX PM2 status reads disconnect on error: `app/api/attachments/route.ts`, `app/api/checkups/route.ts`, `app/api/settings/[key]/route.ts`, `app/api/system/fix-orphans/route.ts`, `app/api/system/revision/route.ts`, `app/api/system/update-awareness/route.ts`, `app/api/system/mlx/route.ts`, `scripts/admin-route-auth-boundary.test.mjs`, `docs/agent-attribution.md`

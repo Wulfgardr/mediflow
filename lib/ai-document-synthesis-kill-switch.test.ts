@@ -9,10 +9,18 @@ import {
     serializeAiDocumentSynthesisKillSwitchState,
 } from './ai-document-synthesis-kill-switch.ts';
 
-test('resolveAiDocumentSynthesisKillSwitchState defaults to enabled', () => {
-    assert.equal(resolveAiDocumentSynthesisKillSwitchState(undefined), 'enabled');
-    assert.equal(resolveAiDocumentSynthesisKillSwitchState(null), 'enabled');
+test('resolveAiDocumentSynthesisKillSwitchState enables only explicit enabled values', () => {
     assert.equal(resolveAiDocumentSynthesisKillSwitchState('enabled'), 'enabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState(true), 'enabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState('true'), 'enabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState(1), 'enabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState('1'), 'enabled');
+});
+
+test('resolveAiDocumentSynthesisKillSwitchState fails closed when absent or malformed', () => {
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState(undefined), 'disabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState(null), 'disabled');
+    assert.equal(resolveAiDocumentSynthesisKillSwitchState('unexpected'), 'disabled');
 });
 
 test('resolveAiDocumentSynthesisKillSwitchState treats explicit disabled values as disabled', () => {
@@ -32,6 +40,10 @@ test('assertAiDocumentSynthesisEnabledValue throws deterministic error when disa
     assert.equal(isAiDocumentSynthesisEnabledValue('enabled'), true);
     assert.throws(
         () => assertAiDocumentSynthesisEnabledValue('disabled'),
+        (error: unknown) => error instanceof AiDocumentSynthesisDisabledError,
+    );
+    assert.throws(
+        () => assertAiDocumentSynthesisEnabledValue(undefined),
         (error: unknown) => error instanceof AiDocumentSynthesisDisabledError,
     );
 });

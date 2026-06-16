@@ -102,6 +102,8 @@ export function validateDocumentDecisionModelGovernance(
 
     const modelCanBeGenerative = decision.model.recognitionMode === 'local_llm' || decision.model.recognitionMode === 'hybrid';
     const hasStructuredAllowedWrites = decision.writePlan.allowedActions.some((action) => STRUCTURED_WRITE_ACTIONS.has(action.kind));
+    const directlyResolvesPatientIdentity = decision.identity.action === 'link_existing_patient'
+        || decision.identity.action === 'create_patient_candidate';
 
     if (modelCanBeGenerative && decision.writePlan.mode === 'deterministic_apply_after_review') {
         errors.push('Generative or hybrid model output cannot directly enter deterministic apply mode.');
@@ -109,8 +111,8 @@ export function validateDocumentDecisionModelGovernance(
     if (modelCanBeGenerative && hasStructuredAllowedWrites && !decision.humanRequiredFor.includes('clinical_write')) {
         errors.push('Generative or hybrid structured proposals require explicit clinical_write review.');
     }
-    if (decision.model.recognitionMode === 'local_llm' && decision.identity.action !== 'review_identity' && decision.identity.taxCodes.length > 0) {
-        errors.push('LLM recognition cannot directly resolve patient identity actions.');
+    if (modelCanBeGenerative && directlyResolvesPatientIdentity) {
+        errors.push('Generative or hybrid recognition cannot directly resolve patient identity actions.');
     }
     if ((decision.source.ocrStatus === 'needed' || decision.source.ocrStatus === 'queued') && hasStructuredAllowedWrites) {
         errors.push('OCR-needed documents cannot expose structured allowed writes.');
