@@ -68,19 +68,39 @@ export default function EditPatientPage() {
 
             // Upsert
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const toPut = checkups.map((c: any) => ({
-                id: c.id || uuidv4(),
-                patientId: id,
-                date: new Date(c.date),
-                title: c.title,
-                notes: c.notes,
-                status: c.status || 'pending',
-                source: c.source || 'manual',
-                createdAt: c.id ? existingCheckupById.get(c.id)?.createdAt || new Date() : new Date()
-            }));
+            const checkupWrites = checkups.map((c: any) => {
+                const existingCheckup = c.id ? existingCheckupById.get(c.id) : undefined;
+                return {
+                    id: c.id || uuidv4(),
+                    patientId: id,
+                    date: new Date(c.date),
+                    title: c.title,
+                    notes: c.notes,
+                    status: c.status || 'pending',
+                    source: c.source || 'manual',
+                    createdAt: existingCheckup?.createdAt || new Date(),
+                    version: existingCheckup?.version,
+                };
+            });
 
-            if (toPut.length > 0) {
-                await db.checkups.bulkPut(toPut);
+            const toUpdate = checkupWrites.filter((c: typeof checkupWrites[number]) => existingCheckupById.has(c.id));
+            for (const checkup of toUpdate) {
+                if (typeof checkup.version !== 'number') {
+                    throw new Error('Versione controllo non disponibile. Ricarica la pagina e riprova.');
+                }
+                await db.checkups.update(checkup.id, {
+                    date: checkup.date,
+                    title: checkup.title,
+                    notes: checkup.notes,
+                    status: checkup.status,
+                    source: checkup.source,
+                    version: checkup.version,
+                });
+            }
+
+            const toCreate = checkupWrites.filter((c: typeof checkupWrites[number]) => !existingCheckupById.has(c.id));
+            if (toCreate.length > 0) {
+                await db.checkups.bulkPut(toCreate);
             }
 
             router.push(`/patients/${id}`);

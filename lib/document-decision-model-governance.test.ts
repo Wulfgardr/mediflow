@@ -133,3 +133,64 @@ test('model governance rejects LLM patient identity resolution', () => {
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /cannot directly resolve patient identity/i);
 });
+
+test('model governance rejects hybrid patient identity resolution', () => {
+    const decision = buildDocumentDecision({
+        source: baseSource,
+        classification: {
+            type: 'identity_document',
+            family: 'identity',
+            confidence: 'medium',
+            rationale: 'Documento identita sintetico.',
+            evidenceRefs: ['ev:1'],
+        },
+        evidenceRefs: [createDocumentDecisionEvidenceRef('ev:1', 'Paziente CF TSTTST00A00A000A')],
+        identity: {
+            action: 'link_existing_patient',
+            patientId: 'synthetic-patient-1',
+            taxCodes: [{
+                value: 'TSTTST00A00A000A',
+                role: 'patient_cf',
+                confidence: 'high',
+                evidenceRefs: ['ev:1'],
+            }],
+            humanRequired: false,
+        },
+        model: {
+            recognitionMode: 'hybrid',
+            generatedAt: '2026-05-08T12:00:00.000Z',
+        },
+    });
+
+    const result = validateDocumentDecisionModelGovernance(decision);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /cannot directly resolve patient identity/i);
+});
+
+test('model governance rejects hybrid patient identity resolution without tax codes', () => {
+    const decision = buildDocumentDecision({
+        source: baseSource,
+        classification: {
+            type: 'identity_document',
+            family: 'identity',
+            confidence: 'medium',
+            rationale: 'Documento identita sintetico.',
+            evidenceRefs: ['ev:1'],
+        },
+        evidenceRefs: [createDocumentDecisionEvidenceRef('ev:1', 'Identita paziente sintetica.')],
+        identity: {
+            action: 'link_existing_patient',
+            patientId: 'synthetic-patient-1',
+            taxCodes: [],
+            humanRequired: false,
+        },
+        model: {
+            recognitionMode: 'hybrid',
+            generatedAt: '2026-05-08T12:00:00.000Z',
+        },
+    });
+
+    const result = validateDocumentDecisionModelGovernance(decision);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /cannot directly resolve patient identity/i);
+});

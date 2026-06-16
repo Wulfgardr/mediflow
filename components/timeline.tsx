@@ -21,9 +21,13 @@ export default function Timeline({ entries }: TimelineProps) {
         }
 
         try {
-            await db.entries.update(entry.id, {
-                deletedAt: new Date(),
-                deletionReason: reason
+            if (typeof entry.version !== 'number') {
+                alert("Versione voce clinica non disponibile. Ricarica la pagina e riprova.");
+                return;
+            }
+            await db.entries.delete(entry.id, {
+                version: entry.version,
+                deletionReason: reason,
             });
         } catch (error) {
             console.error("Delete failed", error);
@@ -33,9 +37,14 @@ export default function Timeline({ entries }: TimelineProps) {
 
     const handleRestore = async (entry: TimelineEntryData) => {
         if (confirm("Ripristinare questa voce?")) {
+            if (typeof entry.version !== 'number') {
+                alert("Versione voce clinica non disponibile. Ricarica la pagina e riprova.");
+                return;
+            }
             await db.entries.update(entry.id, {
                 deletedAt: null,
-                deletionReason: null
+                deletionReason: null,
+                version: entry.version,
             });
         }
     };

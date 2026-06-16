@@ -34,6 +34,9 @@ e [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpo
   sembra la tranche WUL-295 corrente da trattare come candidata attiva.
 - `WUL-355` e `WUL-358` hanno gia PR draft in review e rappresentano la prima
   risposta locale al bug hunt, ma non chiudono la macro `WUL-356`.
+- Nota post-merge del 2026-06-16: la merge train ha portato in `main` `#251`,
+  `#252`, `#228`, `#253`, `#254`, `#255` e `#256`. Le vecchie PR `#218` e
+  `#219` restano escluse perche superseded dalla tranche pulita `#254`.
 - `PLANS.md` era fermo al 2026-06-10: da ora il piano operativo deve trattare
   `WUL-341`, `WUL-356` e questa proposta come nuova coda attiva.
 - `docs/ROADMAP.md` raccontava ancora la shell ufficiale come Graphite nella
@@ -45,7 +48,7 @@ e [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpo
 
 ## Non obiettivi
 
-- Non fondere tutte le PR aperte in un unico push.
+- Non fondere tutte le PR aperte dentro questa PR documentale.
 - Non cambiare runtime clinico, schema SQLite, API o dati.
 - Non modificare il sito pubblico dentro il branch MediFlow.
 - Non promuovere AI, SISS/FSE, cloud, diagnosi, triage o prescrizione oltre i
@@ -161,6 +164,16 @@ Merge train consigliata:
 4. Draft non essenziali: `#219` resta hold; `#218` si chiude solo dopo `#254`.
 5. Patch notes e documenti di sistema si aggiornano dopo gli esiti reali della
    merge train, non prima.
+
+Esito operativo del 2026-06-16:
+
+- Merge eseguite in `main`: `#251`, `#252`, `#228`, `#253`, `#254`, `#255`,
+  `#256`.
+- Hold/superseded: `#218` e `#219`, perche `#254` re-home la sostanza utile
+  WUL-295/WUL-296 su base corrente senza portarsi dietro la storia dirty.
+- Questa proposta resta il documento di coordinamento `WUL-373`; patch notes,
+  changelog e riallineamento completo dei documenti di sistema/topologia vanno
+  aggiornati nella passata successiva sugli esiti reali ormai entrati.
 
 ### 3. Safety floor prima del prodotto nuovo
 

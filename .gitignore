@@ -79,4 +79,5 @@ logs/
 
 # private alignment guides (never publish to OSS repo)
 docs/private/
+/prompt-exports/
 /tmp-locked-field-guard-test
