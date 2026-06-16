@@ -7,6 +7,7 @@
 | **Review alias** | `/mockups/kree8` (synthetic data, design QA only) |
 | **Last visual pass** | 2026-06-11: meta-text purge, restrained semantic colour restoration, type/radius normalization, dark-token completion, one-click Scheda flow |
 | **Scope** | Full-surface visual reset promoted to the local web entrypoint as the new app interface direction; real clinical data wiring migrates in small verified slices |
+| **Attribution** | Kree8 is credited as the external visual inspiration and reference grammar; MediFlow keeps an original clinical implementation and product-specific interaction model. |
 
 ## Why this doc exists
 
@@ -14,6 +15,12 @@ The supplied [Kree8](https://www.kree8.studio/) references redefine the whole
 visual line for MediFlow ("via il vecchio", per the brief on WUL-271). This is
 not an incremental Graphite refinement: it is a clean-room translation of
 Kree8's grammar onto a real clinical management surface.
+
+Kree8 must remain credited wherever this visual direction is documented or
+presented externally. The attribution is stronger for the app/design system,
+where the visual grammar is a primary influence; for site/public copy it can be
+lighter, but should still acknowledge Kree8 as look-and-feel inspiration when
+the public page references the current MediFlow visual line.
 
 The **v2 pass** sharpens the surface from "Kree8 with medical labels" into a
 "MediFlow-authored clinical cockpit": the area model now mirrors real MediFlow

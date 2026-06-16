@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-06-16 Codex
+- Opened `WUL-373` with a process/docs consolidation slice for the next MediFlow push after `WUL-341` and `WUL-356`, plus `WUL-374` as the separate public-copy follow-up for `leonardopegollo.dev` zero-knowledge/security claims and lighter Kree8 credit; added the proposal document with stabilization exit package, PR merge/hold table, selected-fix criteria and Kree8 attribution requirement, then refreshed the active plan, roadmap, documentation map and Markdown index without certifying all bug-hunt findings, touching runtime code or editing site files: `docs/development-push-proposal-2026-06-16.md`, `docs/design/wul-271-kree8-visual-translation.md`, `PLANS.md`, `docs/ROADMAP.md`, `docs/README.md`, `docs/markdown-index.md`, `docs/agent-attribution.md`
 - Opened `WUL-358` with a fail-closed AI safety gate slice: Patient Insight, Smart Import and Document Synthesis kill switches now require explicit enabled values, rollout-readiness local controls reuse canonical key/resolver logic, and document-decision governance rejects generative/hybrid direct patient identity resolution while preserving attach-without-patient review flow: `lib/ai-*-kill-switch.ts`, `lib/ai-rollout-readiness-storage.ts`, `lib/document-decision-model-governance.ts`, focused tests, `docs/agent-attribution.md`
 
 ## 2026-06-15 Codex

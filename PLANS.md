@@ -5,11 +5,20 @@ Per direzione prodotto e release narrative, usa [docs/ROADMAP.md](./docs/ROADMAP
 
 > Aggiorna questo file ogni volta che cambia una priorità o la sequenza di esecuzione.
 
-Ultimo aggiornamento: 2026-06-10
+Ultimo aggiornamento: 2026-06-16
 
 ---
 
 ## Focus corrente (prossime 2-6 settimane)
+
+### Punto fermo post-bug-hunt 2026-06-16
+- [ ] Usare [docs/development-push-proposal-2026-06-16.md](./docs/development-push-proposal-2026-06-16.md) come mappa operativa temporanea per il prossimo push: riconcilia `main`, PR aperte, `WUL-341`, `WUL-356`, roadmap post-v0.6 e segnali pubblici da `../leonardopegollo.dev`.
+- [ ] Chiudere la fase solo con uno stabilization exit package: merge/hold table PR aggiornata, fix selezionate dal bug hunt distinte dal backlog futuro, claim freeze dichiarato, evidenza CI/locale e piano patch notes/documenti sistema dopo merge reali.
+- [ ] Tenere `WUL-373` come issue di consolidamento process/docs e `WUL-374` come issue separata per il copy pubblico del sito; non modificare il sito dentro branch MediFlow.
+- [ ] Mantenere credito Kree8 esplicito: forte nel design/app come ispirazione visuale esterna, piu leggero ma presente nel sito quando si racconta il look corrente.
+- [ ] Trattare la coda `WUL-356` come nuova coda attiva post-review: le issue `WUL-357`..`WUL-361` sono il safety floor critical prima di nuove promozioni AI/document intelligence; le issue `WUL-362`..`WUL-372` restano slice high/medium da verificare una alla volta, non tutte da assorbire nel prossimo push.
+- [ ] Non usare claim pubblici zero-knowledge forti finche `WUL-342`/`WUL-354` non sono risolti o non viene registrata una decisione esplicita di copy freeze/attenuazione.
+- [ ] Considerare `WUL-344` e `WUL-335` moltiplicatori di rischio del push: finche restano aperti, ogni PR deve dichiarare quali check locali sono stati eseguiti e quali restano bloccati.
 
 ### Post-v0.6.0 (validazione sul campo + hardening bounded)
 - [ ] Eseguire validazione sul campo delle superfici UI/AI/home-base rilasciate in `v0.6.0` e riversare bug/regressioni in Linear con priorita esplicite.
@@ -276,7 +285,7 @@ Ordine di consegna consigliato (incrementale):
 Nota operativa per il filone UI web `v0.5.0` (`WUL-98`, label Linear legacy `bucket/post-0.4`):
 - la leadership autoriale di UI/UX puo essere delegata a Gemini quando il focus e strettamente di interfaccia
 - Codex mantiene i guardrail su scope, regressioni comportamentali, accessibilita, compliance repo e gestione Linear
-- direzione d'uso: intuitivita clinica, leggibilita alta e shell Graphite/Clinical Workbench come unica interfaccia ufficiale su `main`
+- direzione d'uso: intuitivita clinica, leggibilita alta e cockpit Kree8/root live come unica interfaccia ufficiale su `main`; Graphite/Clinical Workbench resta riferimento storico per il principio no-selector
 - tesi visiva esplicita: unire ricercatezza e immediatezza in una sola shell operativa, con chrome caldo, layering sobrio e orientamento rapido sul caso
 - la fase di confronto runtime `Clinico` / `Liquid` e chiusa: eventuali nuove esplorazioni visive non vivono come toggle persistiti sul prodotto reale
 - principi da rispettare nella lane UI:
