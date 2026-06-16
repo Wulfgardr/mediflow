@@ -13,14 +13,14 @@ read_when:
 
 Ultimo aggiornamento: 2026-06-16
 
-## Come usare questo indice
+## 📚 Come usare questo indice
 
 - Se devi capire **quali file sono canonici**, parti da [docs/README.md](./README.md).
 - Se devi trovare **dove sta un tema specifico**, usa le tabelle qui sotto.
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
 - Nella repo OSS alcuni file interni non sono presenti: orchestrazione agent, attribution, piano operativo a breve e workspace privati restano nel workspace privato.
 
-## Orchestrazione e governance (consultazione sempre)
+## ⚙️ Orchestrazione e governance (consultazione sempre)
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Ultimo aggiornamento: 2026-06-16
 | [PLANS.md](../PLANS.md) | Piano engineering operativo (2-6 settimane). | Sempre, per allineare priorità correnti. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 
-## Architettura, flussi e parity
+## 🧱 Architettura, flussi e parity
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -53,7 +53,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
 | [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, OCR platform boundary, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
 
-## Native, setup e testing
+## 🍎 Native, setup e testing
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -71,13 +71,13 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/apple-docs-mcp.md](./apple-docs-mcp.md) | Guida integrazione del tooling MCP per consultare docs Apple durante sviluppo native. | Quando servono riferimenti API ufficiali Apple in task SwiftUI/network/security/testing. |
 | [docs/icd-local-setup.md](./icd-local-setup.md) | Setup locale container ICD-11. | Quando si lavora su diagnostica ICD. |
 
-## Prodotto, compliance e contesto clinico
+## 🩺 Prodotto, compliance e contesto clinico
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
-| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: salto `v0.3 -> v0.6`, boundary dichiarati, shell ufficiale unica e stato Apple/SISS. | Per onboarding rapido o lettura pubblica del progetto. |
+| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: salto `v0.3 -> v0.7`, boundary dichiarati, shell ufficiale unica e stato Apple/SISS. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
 | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | Benchmark v1 per facts osservazionali `LOINC/UCUM`, corpus sintetico e decisione `hybrid` default / `rules` fallback. | Quando si toccano osservazioni, import documentale codificato o decisioni di interoperabilità sui clinical facts. |
@@ -112,7 +112,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 | [oss-assets/README.md](../oss-assets/README.md) | Presentazione OSS e posizionamento progetto. | Per contesto pubblico/comunicazione. |
 
-## Tracciabilità agent e metadoc
+## 🧑‍💻 Tracciabilità agent e metadoc
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -128,7 +128,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Quando si rivede la nuova linea visuale Kree8, si verifica la root live con dati reali o si pianifica la migrazione delle superfici legacy. |
 | [docs/private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md](./private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md) | Snapshot privato delle issue Linear legacy candidate ad archiviazione, creato prima della pulizia del backlog. | Quando si libera Linear da issue datate mantenendo una traccia locale riusabile. |
 
-## ADR (decisioni architetturali)
+## 🧱 ADR (decisioni architetturali)
 
 | File | Tema |
 | --- | --- |
@@ -202,7 +202,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | Proposed ADR `WUL-220`: futura affordance manuale e auditabile per riassorbire una fonte evidence invalidated/superseded, con stati espliciti, motivi PHI-safe e nessuna scrittura clinica strutturata. |
 | [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md) | Formalizza il fallback OCR Apple Vision solo macOS: DeepSeek/Ollama resta OCR primario locale, Windows/Linux non hanno fallback platform-specific equivalente dichiarato, Smart Import resta reviewable. |
 
-## Checklist manutenzione indice
+## ✅ Checklist manutenzione indice
 
 1. Verifica inventario file: `rg --files -g '*.md' | sort`.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.

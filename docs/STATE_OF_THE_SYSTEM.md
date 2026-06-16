@@ -17,11 +17,11 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-06-10 (`v0.6.0` + post-v0.6 mainline)
+Ultimo aggiornamento: 2026-06-16 (`v0.7.0` mainline)
 
 ---
 
-## 1. Lettura rapida
+## 🧭 1. Lettura rapida
 
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.
 Lo stato corrente non va letto come una semplice web app con AI aggiunta: e un
@@ -33,8 +33,9 @@ dentro boundary documentati.
 La fotografia corrente e questa:
 
 - **Superficie primaria**: web app Next.js locale, avviata sul Mac.
-- **Shell ufficiale**: cockpit Kree8 come root web live su `main`, senza
-  selector o preview profiles persistiti.
+- **Shell ufficiale**: il cockpit Kree8 e la root web live su `main`, senza
+  selector o preview profiles persistiti. Kree8 resta ispirazione visuale
+  esterna e grammatica di riferimento, non un prodotto MediFlow a se.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
   server via Drizzle e cifratura client-side dei campi clinici.
 - **Sicurezza di default**: local-only, zero-knowledge a riposo, nessun cloud o
@@ -73,7 +74,7 @@ La fotografia corrente e questa:
 
 ---
 
-## 2. Cosa e gia deciso
+## 🧱 2. Cosa e gia deciso
 
 ### 2.1 Local-first non e un dettaglio
 
@@ -96,10 +97,12 @@ Questo significa che non sono ammessi, senza ADR e documentazione esplicita:
 
 ### 2.2 La shell web ufficiale e una sola
 
-La root web locale renderizza oggi il cockpit Kree8 come direzione visuale live.
-ADR 0060 supera Graphite per il punto d'ingresso `/`, preservando pero la regola
-piu importante gia decisa: MediFlow non deve tornare a shell concorrenti o a un
-selector permanente.
+La root web locale renderizza oggi il cockpit Kree8 come grammatica visuale di
+riferimento, ispirazione esterna e non prodotto MediFlow a se. ADR 0060 supera
+Graphite per il punto d'ingresso `/`, preservando pero la regola piu importante
+gia decisa: MediFlow non deve tornare a shell concorrenti o a un selector
+permanente. Graphite resta solo riferimento storico/architetturale del principio
+no-selector.
 
 Conseguenze pratiche:
 
@@ -198,7 +201,7 @@ Documenti/ADR principali:
 
 ---
 
-## 3. Superfici runtime
+## 🖥️ 3. Superfici runtime
 
 | Superficie | Stato | Uso reale | Boundary |
 | --- | --- | --- | --- |
@@ -216,7 +219,7 @@ Documenti/ADR principali:
 
 ---
 
-## 4. Percorso dati clinici
+## 🗄️ 4. Percorso dati clinici
 
 ### 4.1 Scrittura web ordinaria
 
@@ -291,7 +294,7 @@ Documenti/ADR principali:
 
 ---
 
-## 5. AI stack e regole di promozione
+## 🤖 5. AI stack e regole di promozione
 
 ### 5.1 Runtime operativo
 
@@ -305,16 +308,24 @@ Le superfici operative includono:
 - sintesi documentale;
 - eventuali helper locali di normalizzazione/estrazione.
 
+Le superfici AI restano review-first e protette da safety gate (WUL-355,
+WUL-358): kill-switch dedicato per `patient-insight`, `smart-import` e
+`document-synthesis`, piu model governance delle decisioni documentali. Nessuna
+scrittura clinica autonoma: l'AI locale propone, il medico rivede.
+
 ### 5.2 Lane benchmark-only
 
-Le lane seguenti non vanno lette come runtime clinico disponibile solo perche
-sono documentate o benchmarkate:
+> [!WARNING]
+> Le lane benchmark/shadow sono strumenti interni, non claim di prodotto: una
+> lane documentata o benchmarkata non e per questo runtime clinico disponibile.
 
-- OpenMed redaction;
+Le lane seguenti restano separate dal runtime clinico:
+
+- OpenMed `redaction.v1` (shadow/benchmark);
 - HUMADEX / OpenMed NER;
 - challenger generativi non promossi;
 - TurboQuant / MLX runtime experiments;
-- comparator cloud opt-in.
+- comparator cloud opt-in (`gpt-5.4`).
 
 `WUL-165` rende MLX benchmark-visible e diagnosticabile in read-only nella
 home-base, ma non lo promuove a runtime clinico: Ollama resta il default
@@ -339,7 +350,7 @@ non scrive dati paziente e non cambia il default local-first.
 
 ---
 
-## 6. Documentazione: come leggere il repository
+## 📚 6. Documentazione: come leggere il repository
 
 ### 6.1 Percorso consigliato per capire tutto
 
@@ -388,7 +399,7 @@ La repo OSS non deve contenere:
 
 ---
 
-## 7. Stato per area funzionale
+## 🧩 7. Stato per area funzionale
 
 ### 7.1 Pazienti e cartella clinica
 
@@ -480,8 +491,9 @@ Disponibile:
 - prescrittivo `webapp-assisted`;
 - corpus locale SISS/FSE con sync/freshness;
 - diario locale protesico document-backed e handoff `Protesica-RL`;
-- dominio locale per prescrizioni di prestazione e item codificabili, separato
-  da terapie farmacologiche e protesica.
+- dominio locale per prescrizioni di prestazione (visite, esami, imaging,
+  riabilitazione, screening) con item codificabili e matching repertorio locale,
+  separato da terapie farmacologiche e protesica.
 
 Fuori scope:
 
@@ -537,7 +549,7 @@ Da preservare:
 
 ---
 
-## 8. Regole di manutenzione
+## ⚙️ 8. Regole di manutenzione
 
 Quando cambia una feature runtime:
 
@@ -567,7 +579,7 @@ Quando esporti OSS:
 
 ---
 
-## 9. Check rapidi
+## 🧪 9. Check rapidi
 
 ### 9.1 Verifica docs-only
 
@@ -604,7 +616,7 @@ In piu:
 
 ---
 
-## 10. Stop rules
+## ⚠️ 10. Stop rules
 
 Fermati e scrivi prima un ADR o una nota ADR-style se il lavoro propone:
 

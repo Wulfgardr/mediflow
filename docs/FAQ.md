@@ -5,15 +5,15 @@
 > Per una lettura completa parti da [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 > Per i confini canonici valgono sempre [ARCHITECTURE.md](../ARCHITECTURE.md), [SECURITY.md](../SECURITY.md), [docs/ROADMAP.md](./ROADMAP.md) e [docs/walkthrough.md](./walkthrough.md).
 
-## MediFlow è cloud?
+## 🔒 MediFlow è cloud?
 
 No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## Che cosa è cambiato in `v0.6`?
+## 🧭 Che cosa è cambiato in `v0.7`?
 
-`v0.6` rende MediFlow più concreto come sistema locale multi-superficie:
+`v0.7` rende MediFlow più concreto come sistema locale multi-superficie:
 
 - storage e sicurezza più solidi;
 - contratto locale `/api/v1` più chiaro;
@@ -22,17 +22,18 @@ Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se 
 - Mac `home-base` packaged e primi client Apple paired;
 - document intelligence `artifact-first` con fonti e conflitti più espliciti;
 - prescrizioni di prestazione separate dalle terapie farmacologiche;
-- root web Kree8 live, senza selector di shell su `main`;
+- root web sul cockpit Kree8 live, senza selector di shell su `main`;
 - boundary SISS/FSE raccontati senza scorciatoie narrative.
 
-`v0.4` resta una tappa tecnica importante e `v0.5` il consolidamento AI/UI;
-`v0.6` è la baseline più chiara per capire lo stato attuale del progetto.
+`v0.4` resta una tappa tecnica importante, `v0.5` il consolidamento AI/UI e
+`v0.6` il salto home-base; `v0.7` è la baseline più chiara per capire lo stato
+attuale del progetto.
 
 Per il quadro dettagliato, inclusi runtime reale, home-base, document
 intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
-## Posso usarlo su Mac, iPad o iPhone?
+## 🍎 Posso usarlo su Mac, iPad o iPhone?
 
 Oggi la superficie primaria resta la web app sul Mac.
 
@@ -45,7 +46,7 @@ cui continuare a stratificare feature. La direzione attiva è:
 - perimetro **read-only-first** nel disegno generale, con write remoti solo
   dove sono espliciti, versionati e documentati; non c'e ancora sync automatico.
 
-## Che cos'è `home-base`?
+## 🏠 Che cos'è `home-base`?
 
 È il modello in cui il Mac tiene il database autorevole e può esporre, quando l'operatore lo attiva, una superficie locale `/api/v1/network/*` verso client trusted sulla stessa rete.
 
@@ -57,7 +58,7 @@ Oggi questo perimetro è:
 - ancora `read-only-first`, con write limitati a profilo/status paziente,
   diario clinico, terapie, checkup e osservazioni versionati.
 
-## Ci sono ancora Preview Profiles?
+## 🖥️ Ci sono ancora Preview Profiles?
 
 No, non su `main`.
 
@@ -71,7 +72,7 @@ già mature vivono direttamente nel runtime ufficiale:
 
 Le sperimentazioni future devono arrivare in modo esplicito e verificabile, non come selector persistiti nelle `Impostazioni`.
 
-## Cosa vuol dire integrazione SISS in MediFlow, oggi?
+## 🏛️ Cosa vuol dire integrazione SISS in MediFlow, oggi?
 
 Vuol dire una cosa precisa: MediFlow può preparare il contesto paziente e richiamare i percorsi ufficiali già percorribili, mantenendo il boundary dichiarato.
 
@@ -91,7 +92,7 @@ Non vuol dire ancora:
 - generazione NRE, invio prescrittivo regionale o writeback FSE/SISS da
   MediFlow.
 
-## L'AI manda dati paziente fuori dal computer?
+## 🤖 L'AI manda dati paziente fuori dal computer?
 
 Non nel path di default.
 

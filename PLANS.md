@@ -12,7 +12,7 @@ Ultimo aggiornamento: 2026-06-16
 ## Focus corrente (prossime 2-6 settimane)
 
 ### Punto fermo post-bug-hunt 2026-06-16
-- [ ] Usare [docs/development-push-proposal-2026-06-16.md](./docs/development-push-proposal-2026-06-16.md) come mappa operativa temporanea per il prossimo push: riconcilia `main`, PR aperte, `WUL-341`, `WUL-356`, roadmap post-v0.6 e segnali pubblici da `../leonardopegollo.dev`.
+- [ ] Usare [docs/development-push-proposal-2026-06-16.md](./docs/development-push-proposal-2026-06-16.md) come mappa operativa temporanea per il prossimo push: riconcilia `main`, PR aperte, `WUL-341`, `WUL-356`, roadmap post-v0.7 e segnali pubblici da `../leonardopegollo.dev`.
 - [ ] Chiudere la fase solo con uno stabilization exit package: merge/hold table PR aggiornata, fix selezionate dal bug hunt distinte dal backlog futuro, claim freeze dichiarato, evidenza CI/locale e piano patch notes/documenti sistema dopo merge reali.
 - [ ] Tenere `WUL-373` come issue di consolidamento process/docs e `WUL-374` come issue separata per il copy pubblico del sito; non modificare il sito dentro branch MediFlow.
 - [ ] Mantenere credito Kree8 esplicito: forte nel design/app come ispirazione visuale esterna, piu leggero ma presente nel sito quando si racconta il look corrente.
@@ -20,11 +20,11 @@ Ultimo aggiornamento: 2026-06-16
 - [ ] Non usare claim pubblici zero-knowledge forti finche `WUL-342`/`WUL-354` non sono risolti o non viene registrata una decisione esplicita di copy freeze/attenuazione.
 - [ ] Considerare `WUL-344` e `WUL-335` moltiplicatori di rischio del push: finche restano aperti, ogni PR deve dichiarare quali check locali sono stati eseguiti e quali restano bloccati.
 
-### Post-v0.6.0 (validazione sul campo + hardening bounded)
-- [ ] Eseguire validazione sul campo delle superfici UI/AI/home-base rilasciate in `v0.6.0` e riversare bug/regressioni in Linear con priorita esplicite.
+### Post-v0.7.0 (validazione sul campo + hardening bounded)
+- [ ] Eseguire validazione sul campo delle superfici UI/AI/home-base rilasciate in `v0.7.0` e riversare bug/regressioni in Linear con priorita esplicite.
 - [x] Eseguire le wave di review trasversale `2026-06-09/10` (tracker `WUL-303`) e implementarne i fix sul branch di integrazione sprint, oggi in review: lifecycle soft-delete paziente con purge/restore amministrati (`WUL-306`, ADR 0066), lifecycle unificato delle sotto-risorse cliniche `/api/v1` (`WUL-308`), semantica SET-PRIMARY sulla membership multi-ambulatorio (`WUL-309`), token paired inerti quando la modalita `network home-base` e disattivata (`WUL-307`), repair-db crash-safe (`WUL-321`), date ISO negli artifact di backup schedulato con restore retro-compatibile (`WUL-319`), guard che preserva il ciphertext originale quando il decrypt fallisce (`WUL-323`), robustezza delle route locali su attachments/checkups/settings/system (`WUL-326`), estrazione identita documentale senza fallback data-di-nascita (`WUL-324`), errori dello stream pull Ollama visibili e timeout OCR abortabile (`WUL-325`), coda OCR-needed con replay idempotente post-OCR (`WUL-237`), sequencing dell'autocomplete ICD (`WUL-311`), `statusReason` preservato nel form paziente (`WUL-310`), clear del test-container basato su membership (`WUL-322`), riepilogo `Cosa rivedere adesso` nel dettaglio paziente (`WUL-262`) e Impostazioni ristrutturate in sidebar + sub-route con dashboard `Stato sistema` (`WUL-297`). Il pacchetto non e ancora release.
 - [ ] Smaltire la nuova coda follow-up post-review `WUL-329`..`WUL-337` come queue di breve termine. Due priorita esplicite: `WUL-333` resta release blocker perche il lifecycle unificato `/api/v1` e breaking per il client macOS nativo, da riallineare prima della prossima release packaged; `WUL-335` traccia lo smoke e2e rotto su `main`.
-- [ ] Mantenere affidabile il verify loop per le patch `0.6.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` / `test:network:home-base-write` / `test:network:home-base-diary-write` / `test:network:home-base-therapy-write` / `test:network:home-base-checkup-write` / `test:network:home-base-observation-write` quando si tocca il boundary paired.
+- [ ] Mantenere affidabile il verify loop per le patch `0.7.x`: `lint`, `typecheck`, `build` verdi, benchmark CLI generativi eseguibili su `main` e smoke `test:network:home-base-readonly` / `test:network:home-base-write` / `test:network:home-base-diary-write` / `test:network:home-base-therapy-write` / `test:network:home-base-checkup-write` / `test:network:home-base-observation-write` quando si tocca il boundary paired.
 - [ ] Fissare prima la mappa ufficiale `SSI/A2A` oltre il `portal-handoff` (`WUL-180`) prima di qualunque tentativo di prescrittivo nativo, `FSE` embedded o altri moduli SISS dentro MediFlow.
 - [x] Portare su `main` la first thin slice `home-base` read-only: modalita `network-home-base`, overview Settings, pairing esplicito e primo data plane `/api/v1/network/patients*` (`WUL-117` -> `WUL-122` -> `WUL-150`).
 - [ ] Hardening della slice `home-base` gia eseguibile: refinement UX, smoke regolari e chiarimento replica/fallback; primi write remoti limitati a profilo/status paziente, diario, terapie, checkup e osservazioni versionati sotto `WUL-190`, senza hard delete remoto, attachment remoti, cataloghi o sync.
@@ -43,7 +43,8 @@ Ultimo aggiornamento: 2026-06-16
 - [ ] Tenere fuori dal runtime operativo le lane ancora `benchmark-only` o di ricerca: `WUL-96`, `WUL-113`, `WUL-114`, `WUL-115` e `WUL-165`, salvo promozione esplicita sostenuta da benchmark, ADR e stop-rules. Slice `WUL-165` acquisita: MLX diventa benchmark-visible e diagnosticabile in read-only nella home-base, con guard `check:mlx-operational-parity`, ma `Ollama` resta runtime clinico generativo standard e motore OCR primario. Dal WUL-225/WUL-226 l'unico fallback OCR platform-specific certificato e Apple Vision su macOS; Windows/Linux restano senza fallback equivalente dichiarato.
 
 Nota operativa:
-- `v0.6.0` e la release corrente formalizzata su `main` il `2026-05-02`
+- `v0.7.0` e la release corrente formalizzata su `main` il `2026-06-16`
+- `v0.6.0` resta la release home-base/document-intelligence formalizzata su `main` il `2026-05-02`
 - `v0.5.0` resta la release storica di consolidamento AI/UI formalizzata su `main` il `2026-03-29`
 - `v0.4.0` resta la baseline storica taggata su `main` il `2026-03-19`
 - `WUL-95` resta la thin slice gia acquisita che ha disciplinato il task contract AI; il ciclo successivo sposta il focus su uso reale, rollout governance e architettura home-base
@@ -278,7 +279,7 @@ Ordine di consegna consigliato (incrementale):
 ## Next (dopo il focus corrente)
 
 - [x] Continuare il filone backup dopo la thin slice `WUL-30` con `WUL-31`: retention automatica limitata ai backup scheduler-owned (`keep-last-N` + dry-run/apply) nella cartella utente selezionata.
-- [ ] Estendere il ciclo `post-v0.6`: pairing UX/home-base, replica/fallback offline, runtime AI centralizzabile e hardening controllato del bundle Apple/home-base.
+- [ ] Estendere il ciclo `post-v0.7`: pairing UX/home-base, replica/fallback offline, runtime AI centralizzabile e hardening controllato del bundle Apple/home-base.
 - [ ] Miglioramenti export dati (FHIR + human-readable) e validazione.
 - [ ] CI: lint + build + controlli minimi su PR.
 

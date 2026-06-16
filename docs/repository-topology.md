@@ -1,6 +1,6 @@
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-06-10
+Ultimo aggiornamento: 2026-06-16
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
@@ -11,7 +11,7 @@ dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
 > clinico: non contengono PHI, non vengono caricate dal server Next.js e non
 > devono essere referenziate da codice di produzione.
 
-## Aree
+## 🧱 Aree
 
 | Path | Categoria | Note |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
 | `Farmaci/` | dati di riferimento | Dataset farmaceutici di riferimento. |
 | `certs/` | dev tooling | Certificati TLS locali per dev. |
 
-## Regole operative
+## ⚠️ Regole operative
 
 - Modifiche a `whitepaper/` **non** richiedono test del runtime clinico né
   rebuild dei moduli nativi: è un artefatto di pubblicazione.

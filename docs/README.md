@@ -14,7 +14,7 @@ Ultimo aggiornamento: 2026-06-16
 > [!NOTE]
 > La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
 
-## Policy di consultazione (agent)
+## 📚 Policy di consultazione (agent)
 
 Documenti da consultare **sempre**:
 
@@ -61,7 +61,7 @@ Documenti da consultare **al bisogno**:
 - Runbook `cloud comparator shadow eval`: [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md)
 - Protocollo dialogo design-time Codex/Opus: [docs/codex-opus-dialogue.md](./codex-opus-dialogue.md)
 
-## Ordine di lettura consigliato
+## 🧭 Ordine di lettura consigliato
 
 1. [README.md](../README.md)
 2. [AGENTS.md](../AGENTS.md)
@@ -74,13 +74,13 @@ Documenti da consultare **al bisogno**:
 9. [docs/walkthrough.md](./walkthrough.md)
 10. [docs/markdown-index.md](./markdown-index.md)
 
-## Convenzione stato documenti
+## 🧱 Convenzione stato documenti
 
 - `CANONICAL`: fonte di verità da aggiornare quando cambia un tema.
 - `SECONDARY`: approfondimento o sintesi; utile, ma non prevale se in conflitto.
 - `LEGACY`: materiale storico/visuale; consultabile, non decisionale.
 
-## Fonte autorevole per tema
+## 📚 Fonte autorevole per tema
 
 | Tema | File canonico | Stato | Note |
 | --- | --- | --- | --- |
@@ -104,11 +104,11 @@ Documenti da consultare **al bisogno**:
 | Write paired checkup | [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete checkup su `/api/v1/network/patients/{id}/checkups*` con `checkups.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Write paired osservazioni | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete osservazioni su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Runbook manutenzione OpenAPI | [docs/openapi/README.md](./openapi/README.md) | `SECONDARY` | Workflow operativo per mantenere aggiornata la spec durante lo sviluppo. |
-| Piano engineering a breve termine | [PLANS.md](../PLANS.md) | `CANONICAL` | 2-6 settimane, operativo. Dopo `v0.6.0` governa validazione sul campo, nuova coda post-review `WUL-341`/`WUL-356`, verify loop `0.6.x`, hardening bounded di `home-base`, document intelligence artifact-first e Apple clients paired. |
+| Piano engineering a breve termine | [PLANS.md](../PLANS.md) | `CANONICAL` | 2-6 settimane, operativo. Dopo `v0.7.0` governa validazione sul campo, nuova coda post-review `WUL-341`/`WUL-356`, verify loop `0.7.x`, hardening bounded di `home-base`, document intelligence artifact-first e Apple clients paired. |
 | Matrice parity web/macOS | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Gate capability-by-capability (funzioni/campi/flessibilita/autonomia). |
 | QA parity Apple-wide | [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md), [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) | `CANONICAL` | Matrice capability-by-capability per WUL-194: evidenza ripetibile, gap WUL-193/WUL-194 e guard `check:apple-wide-qa`. |
-| Roadmap prodotto | [docs/ROADMAP.md](./ROADMAP.md) | `CANONICAL` | Direzione prodotto/versioni, separata da `PLANS.md`. `v0.6.0` e la release corrente; il ciclo prodotto attivo e `post-v0.6`, senza preview profiles runtime su `main`. |
-| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per chi deve capire in poche righe cosa fa oggi MediFlow, cosa cambia tra `v0.3` e `v0.6`, quali sono i boundary dichiarati e perche alcune note restano private. |
+| Roadmap prodotto | [docs/ROADMAP.md](./ROADMAP.md) | `CANONICAL` | Direzione prodotto/versioni, separata da `PLANS.md`. `v0.7.0` e la release corrente; il ciclo prodotto attivo e `post-v0.7`, senza preview profiles runtime su `main`. |
+| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per chi deve capire in poche righe cosa fa oggi MediFlow, cosa cambia tra `v0.3` e `v0.7`, quali sono i boundary dichiarati e perche alcune note restano private. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Benchmark clinical facts osservazioni | [docs/clinical-facts-benchmark-observations.md](./clinical-facts-benchmark-observations.md) | `CANONICAL` | Decisione benchmark v1 per facts osservazionali `LOINC/UCUM`: `hybrid` default, `rules` fallback, `ai` non eseguito nella thin slice headless. |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
@@ -149,7 +149,7 @@ Documenti da consultare **al bisogno**:
 | Click-map parity macOS | [docs/parity-click-map-macos.md](./parity-click-map-macos.md) | `SECONDARY` | Checklist manuale dei click-path macOS durante i parity sweep. |
 | Deep dive tecnico architettura | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | [docs/system_architecture.md](./system_architecture.md) | `SECONDARY` | Versione compatta/rapida del sistema reale su `main`, con overview su Clinical Workbench, home-base, document intelligence, SISS/FSE e guardrail locali. |
-| Setup client macOS e TLS locale | [docs/NATIVE.md](./NATIVE.md), [docs/native-testing.md](./native-testing.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](./native-launch.md), [docs/local-api-tls.md](./local-api-tls.md) | `CANONICAL` | Materiale operativo nativo. Dopo `v0.6.0` descrive il bundle Apple/home-base packaged, lo snapshot storico e i vincoli da preservare. |
+| Setup client macOS e TLS locale | [docs/NATIVE.md](./NATIVE.md), [docs/native-testing.md](./native-testing.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](./native-launch.md), [docs/local-api-tls.md](./local-api-tls.md) | `CANONICAL` | Materiale operativo nativo. Dopo `v0.7.0` descrive il bundle Apple/home-base packaged, lo snapshot storico e i vincoli da preservare. |
 | Compliance/GDPR/FHIR | [docs/COMPLIANCE.md](./COMPLIANCE.md) | `CANONICAL` | Quadro compliance e interoperabilità. |
 | Manuale utente medico | [docs/MANUALE.md](./MANUALE.md) | `CANONICAL` | Uso prodotto lato clinico. |
 | ADR native token bootstrap secure-first | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | `CANONICAL` | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
@@ -198,7 +198,7 @@ Documenti da consultare **al bisogno**:
 | ADR local evidence absorption layer | [docs/adr/0057-local-evidence-absorption-layer.md](./adr/0057-local-evidence-absorption-layer.md) | `CANONICAL` | Proposed ADR per `WUL-213`: introduce il layer locale di assorbimento/retrieval sopra allegati e diario, senza training, cloud runtime, PHI in repo o auto-write clinici da testo libero. |
 | ADR manual evidence reabsorb affordance | [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | `CANONICAL` | Proposed ADR per `WUL-220`: definisce una futura affordance manuale e auditabile per riassorbire singole fonti invalidated/superseded senza job opachi, PHI nei log o scritture cliniche strutturate. |
 
-## File sovrapposti o secondari
+## 🗂️ File sovrapposti o secondari
 
 - [docs/product_roadmap.md](./product_roadmap.md): alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva è [docs/ROADMAP.md](./ROADMAP.md).
 - `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verità per decisioni architetturali.
@@ -207,7 +207,7 @@ Documenti da consultare **al bisogno**:
 - `docs/private/linear-backlog/*`: snapshot operativo privato per storicizzare issue Linear datate prima della pulizia backlog.
 - Alcuni documenti interni restano volutamente fuori dall'export OSS: playbook di orchestrazione, attribution agent, piano operativo di breve e workspace privati locali.
 
-## Regole rapide di mantenimento
+## ⚙️ Regole rapide di mantenimento
 
 1. Una decisione duratura deve finire in ADR.
 2. Un cambio di priorità a breve finisce in [PLANS.md](../PLANS.md).

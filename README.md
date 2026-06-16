@@ -7,7 +7,7 @@
 Dati sul tuo Mac, flusso rapido in visita, AI locale sempre rivedibile.
 Il cloud non è un requisito: entra solo se scelto e documentato.
 
-`v0.6` · Web app locale · Home-base macOS · Client Apple paired · SQLite cifrato · MIT
+`v0.7` · Web app locale · Home-base macOS · Client Apple paired · SQLite cifrato · MIT
 
 [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) · [Manuale](./docs/MANUALE.md) · [Architettura](./ARCHITECTURE.md) · [Sicurezza](./SECURITY.md) · [Roadmap](./docs/ROADMAP.md)
 
@@ -15,7 +15,7 @@ Il cloud non è un requisito: entra solo se scelto e documentato.
 
 ---
 
-## Perché esiste
+## 🩺 Perché esiste
 
 Sono **Leo**, medico di distretto.
 MediFlow nasce da un problema molto concreto: nel lavoro clinico quotidiano i
@@ -27,9 +27,9 @@ gestionale che chiede al medico di adattarsi alla macchina, ma una cartella
 clinica che prova a rispettare il modo reale in cui si lavora: visita, appunto,
 documento, terapia, dubbio, revisione, continuità.
 
-## Dove siamo adesso
+## ✅ Dove siamo adesso
 
-`v0.6` racconta MediFlow per quello che sta diventando: non solo una web app
+`v0.7` racconta MediFlow per quello che sta diventando: non solo una web app
 clinica con AI, ma un sistema locale ibrido. Il Mac resta il nodo autorevole,
 la web app resta la superficie più completa, il contratto `/api/v1` tiene aperta
 la strada ai client Apple paired e la document intelligence cresce come
@@ -54,7 +54,7 @@ pagina che unisce prodotto, architettura, sicurezza, runtime, boundary SISS/FSE,
 AI/document intelligence, Apple clients e split private/OSS senza costringere a
 ricostruire il quadro da dieci file separati.
 
-## Cosa cambia rispetto alla `v0.3`
+## 🧭 Cosa cambia rispetto alla `v0.3`
 
 Il salto, in breve, è questo:
 
@@ -65,7 +65,7 @@ Il salto, in breve, è questo:
 5. **Più concretezza multi-device**: il Mac diventa davvero nodo `home-base`, con client paired e write limitati/versionati già tracciati, pur senza dichiarare sync completo.
 6. **Più autorevolezza nella forma**: la presentazione pubblica deve essere sobria, clinica e verificabile; elegante nel linguaggio, ma senza vendere come fatto ciò che è ancora ricerca.
 
-## Confini dichiarati, senza ambiguità
+## ⚠️ Confini dichiarati, senza ambiguità
 
 - **Local-first di default**: nessuna dipendenza cloud obbligatoria.
 - **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
@@ -122,7 +122,7 @@ Inizia da qui:
 
 ---
 
-## 🍏 Direzione Apple: macOS, iPadOS, iOS
+## 🍎 Direzione Apple: macOS, iPadOS, iOS
 
 > [!IMPORTANT]
 > Il progetto non sta scegliendo tra web app e app Apple: sta costruendo uno stack unico.
@@ -145,7 +145,7 @@ Situazione attuale:
 
 ---
 
-## Installazione rapida (computer)
+## ⚙️ Installazione rapida (computer)
 
 ### Prerequisiti minimi
 
@@ -184,7 +184,7 @@ npm run build
 
 ---
 
-## Note legali e GDPR
+## ⚖️ Note legali e GDPR
 
 MediFlow è un progetto open source rilasciato con licenza MIT.
 

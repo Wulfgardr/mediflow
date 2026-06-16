@@ -28,6 +28,7 @@ const TO_EXCLUDE_BY_NAME = [
     'prompt-exports',
     'brain',
     '.gemini',
+    '.claude',
     'Farmaci',
     'medical.db',
     'next-env.d.ts',
@@ -53,6 +54,8 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/clinical-facts-benchmark-observations.md',
     'docs/cloud-comparator-shadow-eval.md',
     'docs/codex-opus-dialogue.md',
+    'docs/codex-workflow-monitor.md',
+    'docs/development-push-proposal-2026-06-16.md',
     'docs/agentic-development-operating-loop.md',
     'docs/agentic-dual-thesis-run-ledger-template.md',
     'docs/dialogue',
@@ -71,6 +74,7 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/adr/0041-openmed-redaction-shadow-adapter.md',
     'docs/adr/0043-macos-oncology-backbone-prototype.md',
     'docs/adr/0044-turboquant-feasibility-and-benchmark-only-runtime-prototype.md',
+    'docs/adr/0063-local-workflow-monitor-control-plane.md',
     'docs/adr/0067-agentic-development-operating-loop.md',
     'docs/analysis',
     'docs/analysis/2026-06-01-agentic-dynamics-test-run.md',
@@ -78,20 +82,25 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/analysis/2026-06-01-agentic-parliament-run.md',
     'docs/private',
     'docs/linear-codex-playbook.md',
+    'docs/linear-completed-issues-archive-2026-05-21.md',
     'docs/linear-seed-issues.csv',
     'docs/linear-import-open.linear.csv',
     'docs/linear-import-open.mf-core-q2.linear.csv',
     'docs/linear-import-open.mf-parity-q2.linear.csv',
     'docs/linear-import-open.mf-fse-q2.linear.csv',
+    'docs/linear-memory-workflow.md',
     'scripts/agentic-stack-readiness.mjs',
     'scripts/agentic-stack-readiness.test.mjs',
     'scripts/cloud-comparator-shadow-eval.test.ts',
     'scripts/cloud-comparator-shadow-eval.ts',
     'scripts/check-apple-wide-qa-manifest.mjs',
+    'scripts/codex-workflow-monitor.mjs',
+    'scripts/codex-workflow-monitor.test.mjs',
     'scripts/codex-mcp-apple-docs-validate.sh',
     'scripts/codex-mcp-siss-fse-corpus-validate.sh',
     'scripts/linear-import-all.sh',
     'scripts/linear-import-via-api.mjs',
+    'scripts/linear-memory-tool.mjs',
     'scripts/mcp-apple-docs-smoke.mjs',
     'scripts/siss-fse-corpus-mcp.mjs',
     'scripts/siss-fse-corpus-mcp-smoke.mjs',
@@ -134,16 +143,23 @@ const OSS_PACKAGE_JSON_SCRIPT_EXCLUSIONS = [
     'agentic:readiness',
     'benchmark:cloud-comparator',
     'check:apple-wide-qa',
+    'linear:archive-done',
+    'linear:archive-plan',
+    'linear:delete-done',
     'linear:import:all',
     'linear:import:api',
+    'linear:memory-check',
     'linear:prepare-import',
+    'linear:snapshot-done',
     'mcp:apple-docs:test',
     'mcp:apple-docs:validate',
     'mcp:siss-fse-corpus:test',
     'mcp:siss-fse-corpus:validate',
     'prepare:oss',
     'test:agentic-readiness',
-    'test:cloud-comparator'
+    'test:cloud-comparator',
+    'test:workflow-monitor',
+    'workflow-monitor'
 ];
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -160,6 +176,13 @@ const PRIVATE_MARKDOWN_LINE_PATTERNS = [
     /apple-wide-parity-qa/,
     /apple-wide-qa/,
     /check:apple-wide-qa/,
+    /codex-workflow-monitor/,
+    /development-push-proposal-2026-06-16/,
+    /linear-completed-issues-archive/,
+    /linear-memory-workflow/,
+    /linear\.app/,
+    /prepare:oss/,
+    /MEDIFLOW_OSS_TARGET_DIR/,
     /oss-assets\/README\.md/,
     /^<!-- Codex: created .* -->$/,
     /^<!-- @Codex created .* -->$/,
@@ -360,9 +383,9 @@ function sanitizeContributingForOss(targetDir) {
 
     const original = fs.readFileSync(contributingPath, 'utf8');
     const sanitized = original
-        .replace(/\n## Igiene workflow e tracciabilita[\s\S]*?\n---\n/m, '\n')
-        .replace(/\n## Attribution \(Codex \/ agent\)[\s\S]*?\n---\n/m, '\n')
-        .replace(/\n## Export OSS \(repo pubblica\)[\s\S]*$/m, '\n')
+        .replace(/\n## [^\n]*Igiene workflow e tracciabilita[\s\S]*?\n---\n/m, '\n')
+        .replace(/\n## [^\n]*Attribution \(Codex \/ agent\)[\s\S]*?\n---\n/m, '\n')
+        .replace(/\n## [^\n]*Export OSS \(repo pubblica\)[\s\S]*$/m, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/\s+$/g, '\n');
 
@@ -437,6 +460,24 @@ Approfondimenti utili:
             console.log('Sanitized docs/markdown-index.md public copy.');
         }
     }
+
+    const statePath = path.join(targetDir, 'docs', 'STATE_OF_THE_SYSTEM.md');
+    if (fs.existsSync(statePath)) {
+        const original = fs.readFileSync(statePath, 'utf8');
+        const content = original
+            .replace(
+                /\nQuando esporti OSS:\n\n- esegui `MEDIFLOW_OSS_TARGET_DIR=<target> npm run prepare:oss` su una\n  destinazione di prova;\n- verifica che non compaiano DB, runtime artifacts o documenti interni;\n- cerca termini interni e riferimenti privati;\n- aggiorna `oss-assets\/README\.md` se cambia la facciata pubblica\.\n/g,
+                '\n'
+            )
+            .replace(/\nMEDIFLOW_OSS_TARGET_DIR=\/tmp\/mediflow-oss-docs-check npm run prepare:oss\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/\s+$/g, '\n');
+
+        if (content !== original) {
+            fs.writeFileSync(statePath, content, 'utf8');
+            console.log('Sanitized docs/STATE_OF_THE_SYSTEM.md public copy.');
+        }
+    }
 }
 
 function sanitizeSecurityForOss(targetDir) {
@@ -455,6 +496,22 @@ function sanitizeSecurityForOss(targetDir) {
     if (sanitized !== original) {
         fs.writeFileSync(securityPath, sanitized, 'utf8');
         console.log('Sanitized SECURITY.md for OSS.');
+    }
+}
+
+function sanitizeClaimsGuardForOss(targetDir) {
+    const claimsGuardPath = path.join(targetDir, 'scripts', 'check-claims-guard.mjs');
+    if (!fs.existsSync(claimsGuardPath)) return;
+
+    const original = fs.readFileSync(claimsGuardPath, 'utf8');
+    const sanitized = original
+        .replace("'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md', 'PLANS.md',", "'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md',")
+        .replace("'docs/private', ", '')
+        .replace(/\nskipped\.push\(`\$\{path\.sep\}docs\$\{path\.sep\}linear-completed-issues-archive-2026-05-21\.md`\);\n/, '\n');
+
+    if (sanitized !== original) {
+        fs.writeFileSync(claimsGuardPath, sanitized, 'utf8');
+        console.log('Sanitized scripts/check-claims-guard.mjs for OSS.');
     }
 }
 
@@ -526,6 +583,7 @@ try {
     sanitizeContributingForOss(TARGET_DIR);
     sanitizePublicDocsCopyForOss(TARGET_DIR);
     sanitizeSecurityForOss(TARGET_DIR);
+    sanitizeClaimsGuardForOss(TARGET_DIR);
 
     console.log('Done! Open Source version ready at: ' + TARGET_DIR);
 } catch (e) {

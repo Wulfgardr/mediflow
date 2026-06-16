@@ -27,7 +27,7 @@ Riferimenti rapidi:
 
 ---
 
-## 1. Topologia end-to-end (componenti + confini)
+## 🧱 1. Topologia end-to-end (componenti + confini)
 
 ```mermaid
 flowchart TB
@@ -93,7 +93,7 @@ osservazioni.
 
 ---
 
-## 2. Topologia del dato a riposo
+## 🔒 2. Topologia del dato a riposo
 
 ```mermaid
 flowchart LR
@@ -112,7 +112,7 @@ Note operative: il PIN non viene salvato, la master key resta in RAM di sessione
 
 ---
 
-## 3. Topologia relazionale del database (schema principale)
+## 🗄️ 3. Topologia relazionale del database (schema principale)
 
 ```mermaid
 erDiagram
@@ -210,9 +210,18 @@ erDiagram
 Nota operativa: stati `network.mode`, pairing intents, paired client trusted,
 backup scheduler e alcuni guardrail AI vivono in `settings` JSON versionati.
 
+Nota soft-delete (ADR 0066, WUL-306): la cancellazione paziente scrive un
+tombstone reversibile (`deletedAt` / `deletionReason`) con version guard, non
+orfana i figli clinici e lascia il contratto API invariato. Le sotto-risorse
+cliniche (diario, terapie, checkup, osservazioni) seguono lo stesso ciclo
+soft-delete (WUL-308); le liste escludono i record soft-deleted salvo
+`includeDeleted`. L'erasure GDPR esplicita resta una azione admin separata
+(`purge-patient` con dry-run e audit `patient.purged`, `restore-patient` con
+audit `patient.restored`).
+
 ---
 
-## 4. Flussi operativi principali
+## ⚙️ 4. Flussi operativi principali
 
 ### 4.1 Setup/login e attivazione chiavi (web)
 
@@ -316,6 +325,9 @@ La filiera OCR certificata corrente e platform-aware:
 - Il fallback OCR cambia solo la recognition: Smart Import, nuova anagrafica da
   documento e Patient Insight restano reviewable e non scrivono dati clinici
   strutturati senza conferma.
+- I documenti senza testo finiscono nella `Coda OCR` (WUL-237) con stati e motivi
+  in italiano e riprocesso idempotente; nessuna proposta clinica parte finche il
+  testo non basta.
 
 ### 4.5 Documento archiviato -> Patient Insight artifact-first
 
@@ -394,9 +406,14 @@ sequenceDiagram
     Observation-->>Client: success oppure 409 VERSION_CONFLICT
 ```
 
+Nota operativa (WUL-307): con `network-home-base` spenta i token paired non
+leggono ne scrivono e ricevono `403 NETWORK_MODE_DISABLED`, mentre i pairing gia
+registrati restano. Fuori scope su questo canale: hard delete remoto, sync
+completo, attachment remoti, cataloghi remoti, campi AI/documentali.
+
 ---
 
-## 5. Superfici API e protezione
+## 🔌 5. Superfici API e protezione
 
 | Superficie | Consumer | Auth | Trasporto | Scopo |
 | --- | --- | --- | --- | --- |
@@ -414,7 +431,7 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 
 ---
 
-## 6. Mappa file autorevoli per i flussi
+## 📚 6. Mappa file autorevoli per i flussi
 
 - Schema e topologia DB: `lib/schema.ts`
 - Accesso DB server: `lib/db-server.ts`
@@ -428,7 +445,7 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 
 ---
 
-## 7. Invarianti operativi da non rompere
+## ⚠️ 7. Invarianti operativi da non rompere
 
 - Nessun egress cloud di default per dati clinici.
 - Nessun campo sensibile in chiaro su SQLite.
@@ -441,3 +458,8 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 - Proxy verso servizi locali sempre allowlist localhost.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.
+- Il placeholder `[LOCKED DATA]` resta solo di presentazione (WUL-323): non deve
+  mai sovrascrivere il dato cifrato a riposo.
+- La cancellazione clinica passa sempre per soft-delete con version guard
+  (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
+  esplicita.

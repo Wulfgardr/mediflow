@@ -2,11 +2,11 @@
 # Matrice Parity Web <-> macOS (Core)
 
 Stato documento: CANONICAL (parity operativa web/native)  
-Ultimo aggiornamento: 2026-05-02
+Ultimo aggiornamento: 2026-06-16
 
 ---
 
-## Obiettivo vincolante
+## 🎯 Obiettivo vincolante
 
 Nei moduli core, web app e app macOS devono avere:
 
@@ -24,21 +24,28 @@ Riferimenti:
 - [docs/parity-smoke.md](./parity-smoke.md)
 - [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
 
-## Cadenza operativa
+## ⚙️ Cadenza operativa
 
 - Modalita ordinaria: `web-first` (sviluppo principale sulla web app).
 - Modalita convergenza: `parity sweep` dedicati su macOS.
 - Regola: il gap puo esistere temporaneamente, ma deve essere tracciato qui e chiuso nelle wave di parity.
 
-## Legenda
+## 📚 Legenda
 
-- `FULL`: allineato
-- `PARTIAL`: parzialmente allineato
-- `MISSING`: assente
+| Stato | Significato |
+| --- | --- |
+| `FULL` | allineato |
+| `PARTIAL` | parzialmente allineato |
+| `MISSING` | assente |
 
 ---
 
-## Baseline corrente (frozen native snapshot)
+## 🧩 Baseline corrente (frozen native snapshot)
+
+> [!NOTE]
+> Snapshot legacy congelato: nessun modulo core e ancora `FULL` e la click-map
+> manuale `P6` non e stata eseguita. La promessa Apple-wide si verifica nella
+> matrice separata, non in questa tabella.
 
 Il run strict `WUL-21` del 2026-05-02 ha validato la lane automatizzata
 web+native (`web 2/2`, Xcode native `45/45`), ma non cambia gli stati modulo:
@@ -86,10 +93,10 @@ capability-by-capability Apple-wide parte da
 Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
 per la track Apple-wide successiva, non una nuova certificazione di parity UI.
 
-## QA Apple-wide (WUL-194)
+## 🧪 QA Apple-wide (WUL-194)
 
 La matrice legacy sopra resta la fonte per il vecchio confronto web/macOS core.
-Dal momento in cui il bundle macOS usa il shell Apple/home-base, la promessa
+Dal momento in cui il bundle macOS usa la shell Apple/home-base, la promessa
 Apple-wide si verifica invece con una matrice separata:
 
 - documento canonico: [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
@@ -101,15 +108,16 @@ comando/runbook ripetibile, gap `WUL-193` per CRUD UI mobile e cache/offline, e
 click-map `WUL-194` coperto sulle superfici oggi disponibili: macOS home-base
 shell, smoke mobile paired e write paired non-AI.
 
-Nessuna riga `covered` nella matrice Apple-wide equivale da sola a parity piena
-del prodotto.
+> [!IMPORTANT]
+> Nessuna riga `covered` nella matrice Apple-wide equivale da sola a parity
+> piena del prodotto.
 
-## Gap principali da chiudere
+## ⚠️ Gap principali da chiudere
 
 1. Nessun gap modulo-specifico legacy resta aperto nella track `WUL-75`: pazienti, esenzioni, osservazioni, diario, cataloghi, terapie e checkups sono code-satisfied sui rispettivi thin slice.
 2. La parity UI piena non va dichiarata sul bundle macOS corrente finche l'entrypoint compilato non torna a una shell clinica MediFlow. Questo lavoro passa alla track Apple-native/home-base (`WUL-187`/`WUL-194`).
 
-## Regole di uscita (parity gate)
+## ✅ Regole di uscita (parity gate)
 
 Un modulo core e considerato `FULL` solo se:
 

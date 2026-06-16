@@ -6,7 +6,7 @@
 
 Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 
-`v0.6` · Web app locale · AI locale rivedibile · SQLite cifrato · MIT
+`v0.7` · Web app locale · AI locale rivedibile · SQLite cifrato · MIT
 
 </div>
 
@@ -14,7 +14,7 @@ Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 
 _Render reale dell'interfaccia attuale, catturato sulla superficie di review con dati dimostrativi sintetici: nessun dato paziente reale._
 
-## Perché MediFlow
+## 🩺 Perché MediFlow
 
 MediFlow nasce dal lavoro reale con i pazienti, non da un esercizio teorico.
 
@@ -33,7 +33,7 @@ istituzionale.
 
 Non nasce per sostituire i canali istituzionali, né per promettere integrazioni che non sono ancora dimostrate. Nasce per dare ordine, continuità e controllo al lavoro clinico di tutti i giorni.
 
-## L'idea
+## 🔒 L'idea
 
 MediFlow è una web app locale per gestire dati clinici, terapie, note e documenti.
 
@@ -47,7 +47,7 @@ La direzione è quella di uno strumento:
 - rispettoso della privacy;
 - adatto a crescere senza diventare opaco.
 
-## Cosa trovi oggi
+## ✅ Cosa trovi oggi
 
 In questa versione MediFlow include:
 
@@ -67,7 +67,7 @@ In questa versione MediFlow include:
 - **boundary SISS/FSE realistico**: handoff contestuale e percorso prescrittivo `webapp-assisted`, non integrazione regionale nativa già risolta;
 - **cockpit Kree8 unico** come direzione visuale stabile su `main`.
 
-## Direzione attuale
+## 🧭 Direzione attuale
 
 La traiettoria di MediFlow è semplice da leggere:
 
@@ -78,7 +78,7 @@ La traiettoria di MediFlow è semplice da leggere:
   quando sono il perimetro reale, integrazione più profonda solo dopo canali e
   scenari qualificati.
 
-## Confini dichiarati
+## ⚠️ Confini dichiarati
 
 MediFlow non vuole raccontare più di quanto possa dimostrare.
 
@@ -87,7 +87,7 @@ MediFlow non vuole raccontare più di quanto possa dimostrare.
 - **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali; MediFlow non dichiara sincronizzazione FSE, writeback regionale o invio prescrittivo diretto.
 - **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
 
-## Perché open source
+## 🔓 Perché open source
 
 MediFlow nasce come progetto personale, ma ha senso solo se può diventare una base aperta, verificabile e migliorabile.
 
@@ -99,7 +99,7 @@ Open source, in questo caso, significa soprattutto:
 - nessuna promessa vaga;
 - possibilità di controllo da parte di chi usa lo strumento.
 
-## Documentazione
+## 📚 Documentazione
 
 - [FAQ](./docs/FAQ.md)
 - [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md)
@@ -107,7 +107,7 @@ Open source, in questo caso, significa soprattutto:
 - [Compliance](./docs/COMPLIANCE.md)
 - [Document map](./docs/README.md)
 
-## Avvio rapido
+## ⚙️ Avvio rapido
 
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
@@ -118,6 +118,6 @@ npm install
 
 Apri `http://localhost:3000`.
 
-## Licenza
+## ⚖️ Licenza
 
 MIT License.

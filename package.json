@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --hostname 127.0.0.1 --port 3000",

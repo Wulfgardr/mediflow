@@ -6,7 +6,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Riferimenti correlati
+## 📚 Riferimenti correlati
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato corrente completo e boundary operativi)
@@ -17,7 +17,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Principi di sicurezza fondamentali
+## 🔒 Principi di sicurezza fondamentali
 
 - **Local-first di default**: nessuna uscita cloud se non esplicitamente implementata e documentata.
 - **Zero-knowledge a riposo**: il database deve restare illeggibile senza il PIN utente.
@@ -26,7 +26,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ---
 
-## Threat model (alto livello)
+## ⚠️ Threat model (alto livello)
 
 Assumiamo che:
 
@@ -44,7 +44,7 @@ Non copriamo ancora:
 
 ---
 
-## Protezione dati
+## 🗄️ Protezione dati
 
 ### Dati a riposo (SQLite)
 
@@ -86,9 +86,9 @@ ENC:<iv_b64>:<cipher_b64>
 
 ---
 
-## API locali
+## 🔌 API locali
 
-MediFlow espone due superfici API:
+MediFlow espone tre superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
@@ -159,7 +159,7 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
 
 ---
 
-## Proxy verso servizi locali (sicurezza SSRF)
+## 🧱 Proxy verso servizi locali (sicurezza SSRF)
 
 Alcuni endpoint inoltrano richieste a servizi locali (es. Ollama).
 Regole minime:
@@ -168,7 +168,7 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
-## AI locale e import clinico guidato
+## 🤖 AI locale e import clinico guidato
 
 I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
 devono rispettare queste regole aggiuntive:
@@ -183,7 +183,13 @@ devono rispettare queste regole aggiuntive:
 L'autofill automatico resta ammesso solo nei casi già documentati e prudenti
 (es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
 
-## Comparator cloud opt-in
+> [!IMPORTANT]
+> I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
+> smart-import, document-synthesis) e model governance delle decisioni
+> documentali. Restano AI locale review-first: nessuna scrittura clinica
+> autonoma.
+
+## ⚠️ Comparator cloud opt-in
 
 Il comparator cloud documentato in [docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md](./docs/adr/0039-cloud-comparator-shadow-eval-private-case-pack-and-distillation.md)
 non cambia il default `local-first`.
@@ -198,7 +204,7 @@ Regole minime:
 
 ---
 
-## Logging e redazione
+## 🔒 Logging e redazione
 
 I dati sanitari non devono trapelare dai log.
 
@@ -248,7 +254,7 @@ Se aggiungi log:
 
 ---
 
-## Gestione segreti
+## 🔑 Gestione segreti
 
 - Non committare `.env` con valori reali.
 - Se introduci variabili ambiente:
@@ -257,7 +263,7 @@ Se aggiungi log:
 
 ---
 
-## Dependency e security checks
+## 🧪 Dependency e security checks
 
 Controlli consigliati prima di release o merge rilevanti:
 
@@ -275,7 +281,7 @@ Opzionali (se usati nella toolchain):
 
 ---
 
-## Segnalazione vulnerabilità
+## ⚠️ Segnalazione vulnerabilità
 
 Se ritieni di aver trovato una vulnerabilità:
 
