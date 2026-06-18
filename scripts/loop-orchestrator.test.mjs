@@ -83,6 +83,7 @@ test('LaunchAgent plist points to run-once and stable state paths', () => {
 
   assert.match(plist, /com\.mediflow\.loop-orchestrator/);
   assert.match(plist, /<string>run-once<\/string>/);
+  assert.match(plist, /<string>--attention-exit-zero<\/string>/);
   assert.match(plist, /<integer>900<\/integer>/);
   assert.match(plist, /launchd\.out\.log/);
 });

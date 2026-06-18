@@ -273,10 +273,24 @@ function parseTrailingJson(stdout) {
 
 function runShellCheck(command, repoRoot) {
   const startedAt = new Date();
+  const env = {
+    ...process.env,
+    PATH: [
+      path.dirname(process.execPath),
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+      process.env.PATH || ''
+    ].filter(Boolean).join(':')
+  };
   const result = spawnSync(command, {
     cwd: repoRoot,
     shell: true,
     encoding: 'utf8',
+    env,
     timeout: 10 * 60 * 1000,
     maxBuffer: 1024 * 1024
   });
@@ -457,6 +471,7 @@ export function buildLaunchAgentPlist(options) {
     options.stateDir,
     '--config',
     path.resolve(configPath),
+    '--attention-exit-zero',
     '--quiet'
   ];
 
@@ -558,6 +573,7 @@ function parseArgs(argv) {
   const json = argv.includes('--json');
   const quiet = argv.includes('--quiet');
   const force = argv.includes('--force');
+  const attentionExitZero = argv.includes('--attention-exit-zero');
   const configIndex = argv.indexOf('--config');
   const configPath = configIndex === -1 ? DEFAULT_CONFIG_PATH : path.resolve(argv[configIndex + 1]);
   const repoIndex = argv.indexOf('--repo');
@@ -566,11 +582,11 @@ function parseArgs(argv) {
   const stateDir = stateDirIndex === -1 ? defaultStateDir() : path.resolve(argv[stateDirIndex + 1]);
   const intervalIndex = argv.indexOf('--launch-interval-seconds');
   const launchIntervalSeconds = intervalIndex === -1 ? 900 : Math.max(300, Number.parseInt(argv[intervalIndex + 1], 10) || 900);
-  return { command, json, quiet, force, configPath, repo, stateDir, launchIntervalSeconds };
+  return { command, json, quiet, force, attentionExitZero, configPath, repo, stateDir, launchIntervalSeconds };
 }
 
 export function run(argv = process.argv, stdout = process.stdout, stderr = process.stderr) {
-  const { command, json, quiet, force, configPath, repo, stateDir, launchIntervalSeconds } = parseArgs(argv);
+  const { command, json, quiet, force, attentionExitZero, configPath, repo, stateDir, launchIntervalSeconds } = parseArgs(argv);
   const config = loadConfig(configPath);
   const errors = validateConfig(config);
 
@@ -605,7 +621,7 @@ export function run(argv = process.argv, stdout = process.stdout, stderr = proce
     }
     const summary = runScheduledOnce(config, { repo, stateDir, configPath, force });
     if (!quiet) stdout.write(json ? `${JSON.stringify(summary, null, 2)}\n` : renderRunDigest(summary));
-    return summary.status === 'needs_attention' ? 2 : 0;
+    return summary.status === 'needs_attention' && !attentionExitZero ? 2 : 0;
   }
 
   if (command === 'status') {
