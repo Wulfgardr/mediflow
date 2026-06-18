@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "linearIssue": "WUL-406",
+  "project": {
+    "id": "mediflow",
+    "defaultScope": "MediFlow private workspace first, reusable for other projects only after explicit opt-in.",
+    "sensitivity": "clinical-high",
+    "timezone": "Europe/Rome",
+    "privacyBoundary": [
+      "No PHI/PII in prompts, logs, GitHub, Linear, delegate packets, or preserved artifacts.",
+      "Use synthetic fixtures only for repository checks.",
+      "Do not read SQLite, Downloads, mail stores, clinical vaults, or private evidence packs unless the current task explicitly authorizes that boundary."
+    ]
+  },
+  "costPolicy": {
+    "mode": "deterministic-first",
+    "continuousModelCalls": false,
+    "defaultCadence": "nightly metadata scan plus scheduled strategic loops",
+    "expensiveReasoningAllowedFor": [
+      "forward-thinker",
+      "loop-auditor",
+      "risk-compliance"
+    ],
+    "expensiveReasoningRule": "Use RepoPrompt/context packets first; call Oracle, Claude, Gemini, or web research only when the packet has a concrete decision to improve."
+  },
+  "guardedAutomerge": {
+    "enabled": true,
+    "mergeMethod": "squash",
+    "branchCleanup": true,
+    "requires": [
+      "single-theme PR",
+      "linked Linear issue or explicitly tiny issue-less maintenance reason",
+      "green declared local checks",
+      "green GitHub checks when available",
+      "PR body lists verification evidence",
+      "No PHI/PII used",
+      "no sensitive hard-stop paths changed",
+      "no unresolved reviewer comments"
+    ],
+    "hardStopPaths": [
+      "database schema or migrations",
+      "authentication, PIN, encryption, key handling, audit logs",
+      "network home-base write paths",
+      "SISS/FSE/regional integration boundaries",
+      "AI runtime promotion, cloud comparator, external model routing",
+      "claims, intended purpose, public medical/regulatory positioning",
+      "native release, signing, notarization, packaging",
+      "real patient data, mail, calendar, private vaults, credentials"
+    ],
+    "hardStopAction": "Open/update PR and request human review instead of merging."
+  },
+  "loops": [
+    {
+      "id": "orchestrator",
+      "kind": "meta",
+      "cadence": {
+        "mode": "event-driven",
+        "frequency": "always-on-coordinator",
+        "tokenPolicy": "No polling model calls. Coordinate scheduled loop outputs, user commands, PR/CI state, and explicit Goal contracts."
+      },
+      "permissions": [
+        "spawn-loop",
+        "pause-loop",
+        "retire-loop",
+        "prioritize-loop",
+        "open-or-update-pr",
+        "guarded-automerge"
+      ],
+      "outputs": [
+        "loop plan",
+        "run ledger",
+        "branch/PR hygiene actions",
+        "blocked-state handoff"
+      ],
+      "hardStops": [
+        "PHI/PII boundary uncertainty",
+        "cross-project enablement without explicit opt-in",
+        "sensitive external side effect without current-turn confirmation"
+      ]
+    },
+    {
+      "id": "maintainer",
+      "kind": "core",
+      "cadence": {
+        "mode": "scheduled",
+        "frequency": "daily",
+        "timeLocal": "03:30",
+        "timezone": "Europe/Rome",
+        "fallback": "run on next available session if the machine was asleep"
+      },
+      "permissions": [
+        "scan-git-branches",
+        "scan-open-prs",
+        "scan-ci-status",
+        "run-local-checks",
+        "create-or-update-pr",
+        "guarded-automerge"
+      ],
+      "outputs": [
+        "daily maintenance digest",
+        "PR creation/update evidence",
+        "merge/hold decision",
+        "Linear comment when a tracked issue changes state"
+      ],
+      "checks": [
+        "npm run workflow-monitor -- --once --json",
+        "npm run check:claims",
+        "npm run check:never-regress"
+      ],
+      "hardStops": [
+        "guardedAutomerge.hardStopPaths",
+        "mixed-theme branch",
+        "missing verification evidence",
+        "dirty worktree with unrelated user changes"
+      ]
+    },
+    {
+      "id": "forward-thinker",
+      "kind": "core",
+      "cadence": {
+        "mode": "scheduled",
+        "frequency": "weekly",
+        "day": "Monday",
+        "timeLocal": "08:30",
+        "timezone": "Europe/Rome"
+      },
+      "permissions": [
+        "read-repo-docs",
+        "read-linear-roadmap",
+        "use-repoprompt-oracle",
+        "request-bounded-claude-review",
+        "request-bounded-gemini-review",
+        "draft-candidate-issues",
+        "draft-adr-style-notes"
+      ],
+      "outputs": [
+        "invest-now recommendations",
+        "watch-list",
+        "no-action decisions",
+        "candidate Linear issues",
+        "ADR/thin-slice proposals"
+      ],
+      "hardStops": [
+        "direct code changes without orchestrator promotion",
+        "PHI/PII or private clinical evidence in model packets",
+        "product claim strengthening without claims guard review"
+      ]
+    },
+    {
+      "id": "docs-claims",
+      "kind": "core",
+      "cadence": {
+        "mode": "scheduled-or-triggered",
+        "frequency": "weekly",
+        "day": "Tuesday",
+        "timeLocal": "07:30",
+        "timezone": "Europe/Rome",
+        "triggers": [
+          "post-merge documentation drift",
+          "public copy change",
+          "release note draft"
+        ]
+      },
+      "permissions": [
+        "scan-doc-index",
+        "scan-claim-language",
+        "open-or-update-doc-pr",
+        "guarded-automerge-doc-only"
+      ],
+      "outputs": [
+        "documentation drift report",
+        "claims guard result",
+        "doc-only PR or hold note"
+      ],
+      "checks": [
+        "npm run check:claims"
+      ],
+      "hardStops": [
+        "new or stronger clinical/regulatory claim",
+        "public/OSS boundary change",
+        "unclear intended-purpose impact"
+      ]
+    },
+    {
+      "id": "risk-compliance",
+      "kind": "core",
+      "cadence": {
+        "mode": "scheduled-or-triggered",
+        "frequency": "fortnightly",
+        "day": "Wednesday",
+        "timeLocal": "07:30",
+        "timezone": "Europe/Rome",
+        "triggers": [
+          "security-sensitive path changed",
+          "SISS/FSE boundary changed",
+          "AI runtime or cloud comparator boundary changed",
+          "network write path changed"
+        ]
+      },
+      "permissions": [
+        "read-security-docs",
+        "read-adr-boundaries",
+        "run-focused-risk-checks",
+        "open-risk-issue",
+        "block-automerge"
+      ],
+      "outputs": [
+        "risk delta",
+        "required checks",
+        "merge hold reason",
+        "candidate mitigation issue"
+      ],
+      "hardStops": [
+        "unreviewed data egress",
+        "unreviewed PHI/PII handling",
+        "credential, token, PIN, encryption, audit, or transport ambiguity"
+      ]
+    },
+    {
+      "id": "loop-auditor",
+      "kind": "meta",
+      "cadence": {
+        "mode": "scheduled",
+        "frequency": "weekly",
+        "day": "Friday",
+        "timeLocal": "08:00",
+        "timezone": "Europe/Rome"
+      },
+      "permissions": [
+        "review-loop-ledgers",
+        "measure-noise-and-value",
+        "recommend-cadence-change",
+        "recommend-stop-or-merge-loop"
+      ],
+      "outputs": [
+        "loop value/cost review",
+        "noise findings",
+        "cadence adjustment recommendations",
+        "retire/keep/modify recommendation"
+      ],
+      "hardStops": [
+        "directly changing product code",
+        "directly merging loop changes",
+        "using private data to justify process changes"
+      ]
+    },
+    {
+      "id": "loop-gardener",
+      "kind": "meta",
+      "cadence": {
+        "mode": "scheduled",
+        "frequency": "weekly",
+        "day": "Friday",
+        "timeLocal": "10:00",
+        "timezone": "Europe/Rome",
+        "after": "loop-auditor"
+      },
+      "permissions": [
+        "propose-new-loop",
+        "propose-loop-retirement",
+        "modify-loop-config-via-pr",
+        "open-process-improvement-issue"
+      ],
+      "outputs": [
+        "loop spawn/retire proposal",
+        "config PR",
+        "process improvement issue",
+        "no-action record"
+      ],
+      "hardStops": [
+        "enabling loops for another project without explicit opt-in",
+        "creating high-cost recurring loops without auditor evidence",
+        "granting new external side effects without ADR"
+      ]
+    }
+  ]
+}

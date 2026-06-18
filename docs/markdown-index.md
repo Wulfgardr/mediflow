@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-06-16
+Ultimo aggiornamento: 2026-06-18
 
 ## 📚 Come usare questo indice
 
@@ -35,7 +35,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | Playbook operativo per orchestrare Linear, Codex e GitHub con tracciabilita end-to-end. | Quando imposti processi, naming issue/branch/PR e audit trail. |
 | [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md) | Proposta operativa `WUL-373` per il prossimo push post-bug-hunt: exit package, PR merge/hold, fix selezionate da `WUL-356`, roadmap post-v0.6 e watchlist sito pubblico. | Quando serve decidere ordine di push, issue da riusare, claim freeze, patch notes future o separazione tra MediFlow e `leonardopegollo.dev`. |
 | [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md) | Runbook del monitor locale WUL-283 per branch/scope/privacy/check drift, con LaunchAgent opzionale e digest Ollama redatto. | Quando vuoi controllare automaticamente che il lavoro Codex resti sul branch/issue corretti senza leggere PHI o contenuti privati. |
-| [docs/agentic-development-operating-loop.md](./agentic-development-operating-loop.md) | Runbook interno WUL-295 per coordinare Codex, RepoPrompt, Linear, `/goal`, Claude/Gemini, ChatGPT web research e workflow monitor con Codex controller-of-record. | Quando avvii o rivedi un workstream agentico multi-step o il loop settimanale MediFlow. |
+| [docs/agentic-development-operating-loop.md](./agentic-development-operating-loop.md) | Runbook interno WUL-295/WUL-406 per coordinare Codex, RepoPrompt, Linear, `/goal`, Claude/Gemini, ChatGPT web research, workflow monitor e loop orchestrator con Codex controller-of-record. | Quando avvii o rivedi un workstream agentico multi-step, il loop settimanale MediFlow o la cadenza dei loop. |
 | [docs/agentic-dual-thesis-run-ledger-template.md](./agentic-dual-thesis-run-ledger-template.md) | Template interno WUL-296 per ledger dual-thesis, evidence pack e issue decision record. | Quando una run usa tesi Claude, tesi autonoma Codex/ChatGPT, cross-exam Gemini e artifact registry. |
 | [PLANS.md](../PLANS.md) | Piano engineering operativo (2-6 settimane). | Sempre, per allineare priorità correnti. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
@@ -170,6 +170,7 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Fissa `WUL-279`: intended purpose, claim consentiti/esclusi e guard repo-local `check:claims` contro overclaim clinico/regolatorio. |
 | [docs/adr/0066-patient-soft-delete-lifecycle.md](./adr/0066-patient-soft-delete-lifecycle.md) | Fissa `WUL-306`: DELETE paziente come tombstone soft-delete version-guarded, cascade canonica `PATIENT_CHILD_TABLES` con guardia anti-drift, purge admin audited (`patient.purged`) e clear test-container per membership (WUL-322). |
 | [docs/adr/0067-agentic-development-operating-loop.md](./adr/0067-agentic-development-operating-loop.md) | Propone `WUL-295`: operating loop agentico con Codex controller-of-record, RepoPrompt context spine, Linear, `/goal`, Claude/Gemini bounded, ChatGPT web research e workflow monitor. |
+| [docs/adr/0069-loop-orchestrator-baseline.md](./adr/0069-loop-orchestrator-baseline.md) | Propone `WUL-406`: baseline loop orchestrator con manifest validabile, cadenze maintainer/forward/docs/risk/meta-loop e guarded automerge PHI-safe. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |

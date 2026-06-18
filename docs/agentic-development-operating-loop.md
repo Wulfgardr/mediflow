@@ -11,6 +11,8 @@ private: true
 
 Stato documento: `INTERNAL / SECONDARY`<br>
 ADR: [ADR 0067](./adr/0067-agentic-development-operating-loop.md)<br>
+Loop orchestrator: [ADR 0069](./adr/0069-loop-orchestrator-baseline.md),
+`docs/loop-orchestrator.config.json`<br>
 Linear: `WUL-295`
 
 Questo runbook governa il pool agentico di sviluppo MediFlow. Non descrive una
@@ -33,6 +35,39 @@ stop rule.
 | ChatGPT Deep Search/Research | Reperimento fonti esterne e stato dell'arte source-heavy | No PHI/PII; heartbeat ogni 30 minuti; risultato preservato prima di diventare decisione |
 | OpenClaw | Sidecar locale di workflow per brief, preview sintetiche, pattern redatti e futuri review candidate | Non e runtime clinico; nessun accesso diretto a SQLite/API/apply/PHI; apply resta in MediFlow con conferma |
 | Workflow monitor | Branch/scope/privacy/check drift su metadati | Non legge diff content, DB, mail o docs private |
+
+## Loop Orchestrator Baseline
+
+<!-- Codex: WUL-406 -->
+Il loop orchestrator rende operativo questo runbook senza trasformarlo in un
+processo costoso o continuo. La fonte machine-readable e
+`docs/loop-orchestrator.config.json`; il controllo locale e:
+
+```bash
+npm run loop-orchestrator -- validate
+npm run loop-orchestrator -- plan
+npm run test:loop-orchestrator
+```
+
+Principio di costo: deterministic-first. L'orchestrator non effettua polling
+di modelli. Coordina eventi, Goal, branch, PR, CI/check e output dei loop. Le
+chiamate costose a Oracle, Claude, Gemini o web research restano riservate a
+packet redatti e decisioni ad alto valore.
+
+| Loop | Cadenza iniziale | Autorita | Stop rule principali |
+| --- | --- | --- | --- |
+| `orchestrator` | event-driven, sempre come coordinatore | Spawn/pause/retire loop, priorita, PR hygiene, guarded automerge | PHI/PII incerto, opt-in mancante per altri progetti, side effect sensibile |
+| `maintainer` | giornaliero/notturno, 03:30 Europe/Rome | Scan branch/PR/CI, check locali, crea/aggiorna PR, guarded automerge | Path sensibili, branch misto, evidenza mancante, worktree sporca |
+| `forward-thinker` | settimanale, lunedi 08:30 | Prospettiva prodotto/architettura, candidate issue, ADR note | Niente codice diretto senza promozione, niente dati privati nei packet |
+| `docs-claims` | settimanale o post-merge | Indici doc, claim posture, PR doc-only | Claim clinico/regolatorio nuovo o rafforzato senza review |
+| `risk-compliance` | quindicinale o trigger-based | Delta risk su security, SISS/FSE, AI runtime, data egress | Ambiguita su dati, credenziali, PIN, encryption, audit o transport |
+| `loop-auditor` | settimanale, venerdi 08:00 | Valuta valore/costo/noise dei loop | Non cambia codice prodotto e non mergea |
+| `loop-gardener` | settimanale, venerdi 10:00 dopo auditor | Propone spawn/modifica/retire loop via issue/PR | No loop per altri progetti senza opt-in; no loop ricorrenti costosi senza evidenza |
+
+Guarded automerge e ammesso solo per PR single-theme con issue collegata,
+verifiche verdi, GitHub checks verdi quando disponibili, nessun path sensibile,
+nessun commento unresolved e nota esplicita `No PHI/PII used`. In caso
+contrario il loop apre o aggiorna la PR e si ferma in review.
 
 ## Costituzione Di Proposta
 
