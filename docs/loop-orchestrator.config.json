@@ -84,7 +84,7 @@
       "cadence": {
         "mode": "scheduled",
         "frequency": "daily",
-        "timeLocal": "03:30",
+        "timeLocal": "02:00",
         "timezone": "Europe/Rome",
         "fallback": "run on next available session if the machine was asleep"
       },
@@ -121,7 +121,7 @@
         "mode": "scheduled",
         "frequency": "weekly",
         "day": "Monday",
-        "timeLocal": "08:30",
+        "timeLocal": "06:00",
         "timezone": "Europe/Rome"
       },
       "permissions": [
@@ -223,7 +223,7 @@
         "mode": "scheduled",
         "frequency": "weekly",
         "day": "Friday",
-        "timeLocal": "08:00",
+        "timeLocal": "05:30",
         "timezone": "Europe/Rome"
       },
       "permissions": [
@@ -251,7 +251,7 @@
         "mode": "scheduled",
         "frequency": "weekly",
         "day": "Friday",
-        "timeLocal": "10:00",
+        "timeLocal": "05:45",
         "timezone": "Europe/Rome",
         "after": "loop-auditor"
       },

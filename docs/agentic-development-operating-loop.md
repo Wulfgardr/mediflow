@@ -57,12 +57,12 @@ packet redatti e decisioni ad alto valore.
 | Loop | Cadenza iniziale | Autorita | Stop rule principali |
 | --- | --- | --- | --- |
 | `orchestrator` | event-driven, sempre come coordinatore | Spawn/pause/retire loop, priorita, PR hygiene, guarded automerge | PHI/PII incerto, opt-in mancante per altri progetti, side effect sensibile |
-| `maintainer` | giornaliero/notturno, 03:30 Europe/Rome | Scan branch/PR/CI, check locali, crea/aggiorna PR, guarded automerge | Path sensibili, branch misto, evidenza mancante, worktree sporca |
-| `forward-thinker` | settimanale, lunedi 08:30 | Prospettiva prodotto/architettura, candidate issue, ADR note | Niente codice diretto senza promozione, niente dati privati nei packet |
+| `maintainer` | giornaliero/notturno, 02:00 Europe/Rome | Scan branch/PR/CI, check locali, crea/aggiorna PR, guarded automerge | Path sensibili, branch misto, evidenza mancante, worktree sporca |
+| `forward-thinker` | settimanale, lunedi 06:00 | Prospettiva prodotto/architettura, candidate issue, ADR note | Niente codice diretto senza promozione, niente dati privati nei packet |
 | `docs-claims` | settimanale o post-merge | Indici doc, claim posture, PR doc-only | Claim clinico/regolatorio nuovo o rafforzato senza review |
 | `risk-compliance` | quindicinale o trigger-based | Delta risk su security, SISS/FSE, AI runtime, data egress | Ambiguita su dati, credenziali, PIN, encryption, audit o transport |
-| `loop-auditor` | settimanale, venerdi 08:00 | Valuta valore/costo/noise dei loop | Non cambia codice prodotto e non mergea |
-| `loop-gardener` | settimanale, venerdi 10:00 dopo auditor | Propone spawn/modifica/retire loop via issue/PR | No loop per altri progetti senza opt-in; no loop ricorrenti costosi senza evidenza |
+| `loop-auditor` | settimanale, venerdi 05:30 | Valuta valore/costo/noise dei loop | Non cambia codice prodotto e non mergea |
+| `loop-gardener` | settimanale, venerdi 05:45 dopo auditor | Propone spawn/modifica/retire loop via issue/PR | No loop per altri progetti senza opt-in; no loop ricorrenti costosi senza evidenza |
 
 Guarded automerge e ammesso solo per PR single-theme con issue collegata,
 verifiche verdi, GitHub checks verdi quando disponibili, nessun path sensibile,
