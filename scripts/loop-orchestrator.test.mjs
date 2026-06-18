@@ -1,8 +1,19 @@
 /* @Codex */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildPlan, loadConfig, validateConfig } from './loop-orchestrator.mjs';
+import {
+  buildLaunchAgentPlist,
+  buildPlan,
+  isLoopDue,
+  loadConfig,
+  readStatus,
+  runScheduledOnce,
+  validateConfig
+} from './loop-orchestrator.mjs';
 
 test('baseline loop orchestrator config validates', () => {
   const config = loadConfig();
@@ -49,4 +60,50 @@ test('plan output is redacted operational metadata', () => {
   assert.match(plan, /forward-thinker/);
   assert.doesNotMatch(plan, /medical\.db/);
   assert.doesNotMatch(plan, /patient_id/i);
+});
+
+test('due calculation runs maintainer daily after local target time', () => {
+  const config = loadConfig();
+  const maintainer = config.loops.find((loop) => loop.id === 'maintainer');
+  const now = new Date('2026-06-18T02:00:00.000Z');
+
+  assert.equal(isLoopDue(maintainer, { loops: {} }, now), true);
+  assert.equal(isLoopDue(maintainer, { loops: { maintainer: { lastRunAt: '2026-06-18T01:40:00.000Z' } } }, now), false);
+});
+
+test('LaunchAgent plist points to run-once and stable state paths', () => {
+  const plist = buildLaunchAgentPlist({
+    repo: '/tmp/mediflow',
+    stateDir: '/tmp/mediflow-loop-state',
+    configPath: '/tmp/mediflow/docs/loop-orchestrator.config.json',
+    launchIntervalSeconds: 900,
+    runnerPath: '/tmp/mediflow-loop-state/bin/loop-orchestrator.mjs'
+  });
+
+  assert.match(plist, /com\.mediflow\.loop-orchestrator/);
+  assert.match(plist, /<string>run-once<\/string>/);
+  assert.match(plist, /<integer>900<\/integer>/);
+  assert.match(plist, /launchd\.out\.log/);
+});
+
+test('forced scheduled run writes local state and digest without clinical data', () => {
+  const config = {
+    ...loadConfig(),
+    loops: loadConfig().loops.map((loop) => ({ ...loop, checks: [] }))
+  };
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-loop-orchestrator-test-'));
+  const summary = runScheduledOnce(config, {
+    repo: process.cwd(),
+    stateDir,
+    force: true
+  });
+  const status = readStatus(stateDir);
+
+  assert.equal(summary.status, 'ok');
+  assert.ok(summary.dueLoops.includes('orchestrator'));
+  assert.ok(summary.dueLoops.includes('maintainer'));
+  assert.equal(status.latestDigestExists, true);
+  const digest = fs.readFileSync(status.latestDigestPath, 'utf8');
+  assert.match(digest, /no PHI\/PII/);
+  assert.doesNotMatch(digest, /medical\.db/);
 });

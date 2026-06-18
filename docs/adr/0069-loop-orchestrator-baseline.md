@@ -69,6 +69,13 @@ The baseline is stored in `docs/loop-orchestrator.config.json` and validated by
 `npm run loop-orchestrator -- validate` plus
 `npm run test:loop-orchestrator`.
 
+`WUL-407` makes the baseline live through a local macOS LaunchAgent. The live
+runner wakes frequently, writes state under
+`~/Library/Application Support/MediFlow/loop-orchestrator/`, and executes only
+loops that are due according to the manifest. It is still deterministic-first:
+no continuous model calls, no clinical database reads, no mail/calendar reads,
+and no sensitive external side effects.
+
 Initial loops:
 
 - `orchestrator`: event-driven coordinator. It does not poll models
@@ -103,6 +110,7 @@ evidence. Sensitive changes always become PR + human review, not automerge.
 2. Document cadence and side-effect boundaries in the internal operating loop.
 3. Add focused tests that fail if required loops or safety guards disappear.
 4. Keep all new loop tooling excluded from OSS export.
+5. Add the local scheduled runner and install it as a user LaunchAgent.
 
 ## Consequences
 

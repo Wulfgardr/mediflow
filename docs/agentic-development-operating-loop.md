@@ -69,6 +69,36 @@ verifiche verdi, GitHub checks verdi quando disponibili, nessun path sensibile,
 nessun commento unresolved e nota esplicita `No PHI/PII used`. In caso
 contrario il loop apre o aggiorna la PR e si ferma in review.
 
+### Runner live locale
+
+<!-- Codex: WUL-407 -->
+La parte viva del loop e un LaunchAgent utente macOS che avvia il runner ogni
+15 minuti. Il wake-up e frequente, ma i loop si auto-limitano dalla cadenza del
+manifest: il maintainer resta giornaliero/notturno, i loop strategici restano
+settimanali o quindicinali, e non ci sono chiamate modello continue.
+
+Comandi operativi:
+
+```bash
+npm run loop-orchestrator -- run-once --json
+npm run loop-orchestrator -- status --json
+npm run loop-orchestrator -- install-global-runner
+npm run loop-orchestrator -- uninstall-launch-agent
+```
+
+L'installazione copia runner e manifest in una posizione stabile fuori repo:
+`~/Library/Application Support/MediFlow/loop-orchestrator/`, crea
+`~/Library/LaunchAgents/com.mediflow.loop-orchestrator.plist`, scrive
+`latest-digest.md`, `runs.jsonl`, `state.json` e log `launchd.*.log`.
+
+Boundary del runner live:
+
+- non legge `medical.db`, mail, calendari, Downloads o docs private;
+- non legge diff content: usa solo comandi dichiarati e metadati;
+- non invoca Oracle, Claude, Gemini o web research da solo;
+- non mergea se un hard stop e presente;
+- mantiene lock anti-overlap per evitare run concorrenti.
+
 ## Costituzione Di Proposta
 
 Ogni proposta non banale deve essere presentata come un piccolo dossier
