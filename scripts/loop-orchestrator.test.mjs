@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -106,4 +107,23 @@ test('forced scheduled run writes local state and digest without clinical data',
   const digest = fs.readFileSync(status.latestDigestPath, 'utf8');
   assert.match(digest, /no PHI\/PII/);
   assert.doesNotMatch(digest, /medical\.db/);
+});
+
+test('copied runner executes from paths with spaces', () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow loop runner test '));
+  const copiedRunner = path.join(stateDir, 'loop orchestrator copy.mjs');
+  fs.copyFileSync(path.join(process.cwd(), 'scripts/loop-orchestrator.mjs'), copiedRunner);
+
+  const result = spawnSync(process.execPath, [
+    copiedRunner,
+    'validate',
+    '--config',
+    path.join(process.cwd(), 'docs/loop-orchestrator.config.json')
+  ], {
+    cwd: process.cwd(),
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /Loop orchestrator config: ok/);
 });

@@ -635,6 +635,8 @@ export function run(argv = process.argv, stdout = process.stdout, stderr = proce
   return 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const currentModulePath = fs.realpathSync(path.resolve(fileURLToPath(import.meta.url)));
+const entrypointPath = process.argv[1] ? fs.realpathSync(path.resolve(process.argv[1])) : '';
+if (currentModulePath === entrypointPath) {
   process.exitCode = run();
 }
