@@ -288,6 +288,12 @@ function normalizeModelName(value: string | null | undefined) {
     return trimmed ? trimmed : null;
 }
 
+export function resolveProvisionalBaselineModel(activeRoleModels: ConfiguredRuntime['activeRoleModels']) {
+    return normalizeModelName(activeRoleModels.reasoning)
+        || normalizeModelName(activeRoleModels.clinical)
+        || CURRENT_BASELINE_MODEL;
+}
+
 function resolveDbPath(explicitDbPath: string | null, explicitDataDir: string | null) {
     if (explicitDbPath) return explicitDbPath;
     const dataDir = explicitDataDir || getDefaultDataDir();
@@ -893,12 +899,7 @@ export async function runModelParliament(options: {
         .filter((entry) => entry !== baselineEntry)
         .slice(0, keepChallengers);
     const provisionalBaselineModel = baselineEntry?.candidate.runtimeModel
-        || normalizeModelName(configuredRuntime.activeRoleModels.reasoning)
-        || normalizeModelName(configuredRuntime.activeRoleModels.clinical)
-        || (generative.decisions.generative.recommendedRuntime === 'ollama_chat'
-            ? generative.decisions.generative.recommendedModel
-            : null)
-        || null;
+        || resolveProvisionalBaselineModel(configuredRuntime.activeRoleModels);
 
     const retainedModels = new Set<string>([
         ...configuredRuntime.protectedModels,

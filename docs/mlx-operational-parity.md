@@ -49,6 +49,8 @@ mantenga i confini operativi dichiarati:
 - adapter benchmark simmetrici `ollama_chat` / `mlx_chat`;
 - diagnostica home-base read-only per MLX già attivo;
 - fallback native esplicito verso Ollama;
+- OCR resta Ollama-only per MLX: DeepSeek/Ollama resta primario e Apple Vision
+  resta l'unica eccezione macOS-only;
 - OCR primario Ollama/DeepSeek con sola eccezione Apple Vision macOS-only
   dichiarata da ADR 0059;
 - documentazione del boundary benchmark-only.

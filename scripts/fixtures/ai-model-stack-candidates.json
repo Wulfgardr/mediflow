@@ -32,6 +32,17 @@
       "notes": "Current default text-only model from ADR 0013."
     },
     {
+      "id": "qwen3_6_35b_a3b",
+      "label": "Qwen3.6 35B A3B",
+      "lane": "generative",
+      "origin": "report",
+      "runtime": "ollama_chat",
+      "runtimeModel": "qwen3.6:35b-a3b",
+      "executionStatus": "runnable",
+      "promotionStatus": "benchmark_only",
+      "notes": "Installed local challenger for WUL-392. Benchmark-only until it beats the protected qwen3.5 baseline on lane-specific gates."
+    },
+    {
       "id": "medgemma_1_5_4b_it",
       "label": "MedGemma 1.5 4B IT",
       "lane": "generative",
