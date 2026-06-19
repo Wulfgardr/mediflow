@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Trash2, Archive, AlertTriangle, Check, X } from 'lucide-react';
 
 type ActionType = 'delete' | 'archive' | 'export';
@@ -25,6 +25,59 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
     const [archiveReason, setArchiveReason] = useState<ArchiveReason>('assigned_mmg');
     const [archiveNote, setArchiveNote] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const titleId = useId();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previouslyFocused = useRef<HTMLElement | null>(null);
+    /* @Codex WUL-UIUX: onClose arriva come arrow inline dai parent, che si
+       ri-renderizzano a ogni scrittura Dexie (useLiveQuery): tenerlo in un ref
+       evita che l'effetto di focus si ri-esegua e rubi il focus mentre si scrive. */
+    const onCloseRef = useRef(onClose);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
+
+    /* @Codex WUL-UIUX: dialogo distruttivo accessibile: Escape per chiudere,
+       autofocus sul primo campo, focus trap sul Tab e ripristino del focus. */
+    useEffect(() => {
+        if (!isOpen) return;
+        previouslyFocused.current = document.activeElement as HTMLElement | null;
+        const dialog = dialogRef.current;
+        const focusables = () =>
+            dialog
+                ? Array.from(
+                      dialog.querySelectorAll<HTMLElement>(
+                          'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])',
+                      ),
+                  ).filter((el) => el.offsetParent !== null)
+                : [];
+        const initial = focusables().find((el) => el.tagName !== 'BUTTON') ?? focusables()[0] ?? dialog;
+        initial?.focus();
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                onCloseRef.current();
+                return;
+            }
+            if (event.key === 'Tab') {
+                const list = focusables();
+                if (list.length === 0) return;
+                const first = list[0];
+                const last = list[list.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            previouslyFocused.current?.focus?.();
+        };
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -61,7 +114,14 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                 onClick={onClose}
             />
 
-            <div className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                tabIndex={-1}
+                className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
+            >
                 <div
                     aria-hidden="true"
                     className="h-1.5 w-full"
@@ -77,7 +137,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                                 {isDelete ? <Trash2 className="w-5 h-5" /> : isExport ? <Check className="w-5 h-5" /> : <Archive className="w-5 h-5" />}
                             </div>
                             <div>
-                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                                <h3 id={titleId} className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
                                     {isDelete ? 'Elimina scheda' : isExport ? 'Esporta FHIR con controllo FSE' : 'Archivia scheda'}
                                 </h3>
                                 <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>

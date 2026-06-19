@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Activity, Calendar, Download, FileText, Pencil, Plus } from 'lucide-react';
+import { Activity, Calendar, Download, FileText, FlaskConical, HeartPulse, Pencil, Pill, Plus, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
+import { PatientClinicalSignals, type ClinicalSignal } from '@/components/patient-clinical-signals';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
 import { EvidenceStackTile } from '@/components/evidence-stack-tile';
@@ -58,6 +60,18 @@ export default function PatientDetailPage() {
     /* WUL-262: same data the archive and Smart Import panels already read. */
     const attachments = useLiveQuery(
         async () => db.attachments.filter((attachment: Attachment) => attachment.patientId === id).toArray(),
+        [id],
+    );
+    /* @Codex WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
+    const therapyCount = useLiveQuery(
+        async () =>
+            db.therapies
+                .filter((therapy) => therapy.patientId === id && therapy.status === 'active' && !therapy.deletedAt)
+                .count(),
+        [id],
+    );
+    const observationCount = useLiveQuery(
+        async () => db.observations.filter((observation) => observation.patientId === id).count(),
         [id],
     );
     const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
@@ -161,6 +175,30 @@ export default function PatientDetailPage() {
             missingTextCount: attachmentItems.length - attachmentsWithTextCount,
         },
     });
+    /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
+       complessi. Nessun "fuori range": senza range di riferimento clinici non si
+       inventano flag (resta onesto). */
+    const clinicalSignals: ClinicalSignal[] = [
+        {
+            label: 'Problemi attivi',
+            value: diagnosisItems.length,
+            icon: Stethoscope,
+            hint: leadDiagnosis?.description,
+        },
+        { label: 'Terapie attive', value: therapyCount ?? 0, icon: Pill },
+        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical },
+        { label: 'Referti', value: documentInsights.length, icon: FileText },
+        {
+            label: 'Prossimo follow-up',
+            value: nextCheckup
+                ? new Date(nextCheckup.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+                : 'Nessuno',
+            icon: Calendar,
+            tone: nextCheckup ? 'warning' : 'neutral',
+            hint: nextCheckup?.title,
+        },
+        { label: 'Esenzioni', value: exemptionCodes.length, icon: HeartPulse },
+    ];
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
@@ -284,6 +322,8 @@ export default function PatientDetailPage() {
                     nextStep={nextStepText}
                 />
 
+                <PatientClinicalSignals signals={clinicalSignals} />
+
                 <PatientReviewQueueSummaryPanel summary={reviewQueueSummary} />
             </div>
 
@@ -297,11 +337,11 @@ export default function PatientDetailPage() {
                                     Timeline clinica
                                 </h2>
                                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                                    Visite, controlli e referti del caso riuniti in un&apos;unica sequenza cronologica.
+                                    Anteprima cronologica degli ultimi eventi del caso: diario, controlli e referti.
                                 </p>
                             </div>
                             <span className="apple-chip self-start md:self-auto">
-                                {nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} elementi
+                                {nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} eventi in totale
                             </span>
                         </div>
                         <ClinicalRiverTimeline
@@ -387,22 +427,25 @@ export default function PatientDetailPage() {
                     ) : null}
                     <DocumentInsightsPanel patient={patient} />
 
-                    <section id="archivio" className="patient-detail-side-section border p-5">
-                        <div className="mb-4">
-                            <p className="section-kicker">Documenti</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Archivio documenti</h3>
-                        </div>
+                    <CollapsibleSection
+                        id="archivio"
+                        kicker="Documenti"
+                        title="Archivio documenti"
+                        surfaceClassName="patient-detail-side-section border"
+                        count={attachmentItems.length > 0 ? `${attachmentItems.length} file` : undefined}
+                        summary={attachmentItems.length > 0 ? undefined : 'Nessun documento ancora caricato.'}
+                    >
                         <DocumentUpload patientId={id} />
-                    </section>
+                    </CollapsibleSection>
 
-                    <section id="scale" className="patient-detail-side-section border p-5">
-                        <div className="mb-4">
-                            <p className="section-kicker">Scale</p>
-                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <Activity className="h-5 w-5 text-[color:var(--mf-muted)]" />
-                                Scale di valutazione
-                            </h3>
-                        </div>
+                    <CollapsibleSection
+                        id="scale"
+                        kicker="Scale"
+                        title="Scale di valutazione"
+                        icon={Activity}
+                        surfaceClassName="patient-detail-side-section border"
+                        summary="Tinetti, MMSE, ADL (Katz), GDS e libreria completa."
+                    >
                         <div className="space-y-3">
                             <Link href={`/patients/${id}/scales/tinetti`} className="apple-list-row">
                                 <span>Tinetti</span>
@@ -424,7 +467,7 @@ export default function PatientDetailPage() {
                                 Apri libreria scale
                             </Link>
                         </div>
-                    </section>
+                    </CollapsibleSection>
 
                     <section id="follow-up" className="patient-detail-side-section border p-5">
                         <div className="mb-4">

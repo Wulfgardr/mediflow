@@ -1,0 +1,89 @@
+'use client';
+
+/* @Codex WUL-UIUX: progressive disclosure per la Scheda. I gestori operativi
+   pesanti si aprono su richiesta, cosi su pazienti complessi la pagina si apre
+   corta e prioritizzata invece di una catena di pannelli sempre espansi.
+   Stile invariato (glass, radius, colori): cambia solo la disposizione. */
+
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
+
+interface CollapsibleSectionProps {
+    id?: string;
+    kicker?: string;
+    title: string;
+    icon?: LucideIcon;
+    /* Conteggio mostrato nel chip a destra (es. "3 attive"). */
+    count?: string | number;
+    /* Riga di sintesi mostrata quando la sezione e chiusa: deve essere onesta e
+       utile (cosa c'e dentro), non meta-testo. */
+    summary?: string;
+    defaultOpen?: boolean;
+    /* Classe della superficie glass, cosi la sezione si allinea alla colonna in
+       cui vive (es. patient-detail-side-section nella colonna stretta). */
+    surfaceClassName?: string;
+    children: ReactNode;
+}
+
+export function CollapsibleSection({
+    id,
+    kicker,
+    title,
+    icon: Icon,
+    count,
+    summary,
+    defaultOpen = false,
+    surfaceClassName = 'patient-detail-section border',
+    children,
+}: CollapsibleSectionProps) {
+    const [open, setOpen] = useState(defaultOpen);
+    const reactId = useId();
+    const regionId = `${reactId}-region`;
+
+    /* Se si naviga verso l'ancora della sezione, la si apre per non lasciare
+       l'utente davanti a un contenitore vuoto. */
+    useEffect(() => {
+        if (!id) return;
+        const openIfTargeted = () => {
+            if (window.location.hash === `#${id}`) {
+                setOpen(true);
+            }
+        };
+        openIfTargeted();
+        window.addEventListener('hashchange', openIfTargeted);
+        return () => window.removeEventListener('hashchange', openIfTargeted);
+    }, [id]);
+
+    return (
+        <section id={id} className={`${surfaceClassName} scroll-mt-28`}>
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                aria-expanded={open}
+                aria-controls={regionId}
+                className="flex w-full items-center gap-3 rounded-[inherit] p-5 text-left md:p-6"
+            >
+                <span className="min-w-0 flex-1">
+                    {kicker ? <span className="section-kicker">{kicker}</span> : null}
+                    <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
+                        {Icon ? <Icon className="h-5 w-5 text-[color:var(--mf-muted)]" /> : null}
+                        {title}
+                    </span>
+                    {!open && summary ? (
+                        <span className="mt-1 block truncate text-sm text-[color:var(--mf-muted)]">{summary}</span>
+                    ) : null}
+                </span>
+                {count !== undefined && count !== '' ? (
+                    <span className="apple-chip shrink-0">{count}</span>
+                ) : null}
+                <ChevronDown
+                    className={`h-5 w-5 shrink-0 text-[color:var(--mf-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    aria-hidden
+                />
+            </button>
+            <div id={regionId} hidden={!open} className="px-5 pb-5 md:px-6 md:pb-6">
+                {open ? children : null}
+            </div>
+        </section>
+    );
+}

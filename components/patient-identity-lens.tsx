@@ -92,7 +92,7 @@ export function PatientIdentityLens({
                     <div className="min-w-0 space-y-5">
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
                             <div className="min-w-0 lg:pr-5">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
                                     Scheda paziente
                                 </p>
                                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-[28px]">
@@ -120,7 +120,7 @@ export function PatientIdentityLens({
                             </div>
 
                             <div className="lg:pl-5">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                     In due righe
                                 </p>
                                 <p className="mt-2 text-[15px] leading-7 text-[color:var(--mf-ink)]">
@@ -128,7 +128,7 @@ export function PatientIdentityLens({
                                 </p>
                                 {nextStep ? (
                                     <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                             Prossimo passaggio
                                         </p>
                                         <p className="mt-1.5 text-sm leading-6 text-[color:var(--mf-ink)]">
@@ -141,7 +141,7 @@ export function PatientIdentityLens({
 
                         <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-5">
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
-                                <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                     Quadro clinico
                                 </h2>
                                 <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--mf-muted)]">
@@ -153,7 +153,7 @@ export function PatientIdentityLens({
 
                             <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
                                 <div className="min-w-0">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                         Diagnosi ICD-11
                                     </p>
                                     {leadDiagnosis ? (
@@ -163,7 +163,7 @@ export function PatientIdentityLens({
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-medium leading-6 text-[color:var(--mf-ink)]">
+                                                    <p className="text-[15px] font-semibold leading-6 text-[color:var(--mf-ink)]">
                                                         {leadDiagnosis.description}
                                                     </p>
                                                 </div>
@@ -199,7 +199,7 @@ export function PatientIdentityLens({
                                 </div>
 
                                 <div className="min-w-0 lg:border-l lg:border-[color:rgba(112,106,100,0.12)] lg:pl-6">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                         Esenzioni
                                     </p>
                                     {featuredExemptions.length > 0 ? (
@@ -236,7 +236,7 @@ export function PatientIdentityLens({
 
                     <div className="space-y-3">
                         <div className="patient-quick-context-card rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>
                             <div className="mt-2 space-y-1.5 text-sm text-[color:var(--mf-ink)]">
@@ -262,7 +262,7 @@ export function PatientIdentityLens({
             <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 space-y-4">
                     <div className="space-y-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
                             Identity Lens
                         </p>
                         <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-4xl">
@@ -293,7 +293,7 @@ export function PatientIdentityLens({
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                         <div className="identity-lens-pane rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 p-4 dark:bg-white/4">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Quadro clinico
                             </p>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -316,7 +316,7 @@ export function PatientIdentityLens({
                         </div>
 
                         <div className="identity-lens-pane rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 p-4 dark:bg-white/4">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>
                             <div className="mt-3 space-y-2 text-sm text-[color:var(--mf-ink)]">

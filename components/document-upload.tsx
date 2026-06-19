@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -72,7 +72,22 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
     // Logic to update Patient AI Summary REMOVED to avoid conflict with AIPatientInsight
 
+    /* @Codex WUL-UIUX: feedback inline sulle rejection (max 10 file, 25 MB)
+       invece del silenzio (la caption prometteva max 10 senza applicarlo). */
+    const [fileRejections, setFileRejections] = useState<string[]>([]);
+
+    const onDropRejected = useCallback((rejected: FileRejection[]) => {
+        const messages = rejected.map((entry) => {
+            const reason = entry.errors[0]?.code;
+            if (reason === 'too-many-files') return 'Puoi caricare al massimo 10 file per volta.';
+            if (reason === 'file-too-large') return `${entry.file.name}: supera il limite di 25 MB.`;
+            return `${entry.file.name}: file non accettato.`;
+        });
+        setFileRejections(Array.from(new Set(messages)));
+    }, []);
+
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        setFileRejections([]);
         setIsProcessing(true);
         /* @Codex */
         setAiStage("Inizializzazione AI...");
@@ -200,7 +215,12 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         setAiStage("");
     }, [patientId, aiModels, documentSynthesisEnabled]);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        onDropRejected,
+        maxFiles: 10,
+        maxSize: 25 * 1024 * 1024,
+    });
 
     const handleDelete = async (id: string) => {
         if (confirm("Sei sicuro di voler eliminare questo documento?")) {
@@ -306,8 +326,16 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
                 <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
-                <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file).</p>
+                <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file, 25 MB ciascuno).</p>
             </div>
+
+            {fileRejections.length > 0 && (
+                <ul className="mt-2 space-y-1 rounded-xl border border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.08)] px-3 py-2 text-xs text-[color:var(--mf-critical)]">
+                    {fileRejections.map((message) => (
+                        <li key={message}>{message}</li>
+                    ))}
+                </ul>
+            )}
 
             {/* @Codex */}
             {(isProcessing || aiStage) && (

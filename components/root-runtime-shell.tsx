@@ -15,7 +15,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider';
 import { UIStyleProvider } from '@/components/ui-style-provider';
 
-const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8']);
+const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8', '/mockups/scheda']);
 // @Codex Keep route additions aligned with docs/design/wul-271-kree8-visual-translation.md.
 const FULLSCREEN_LIVE_ROUTES = new Set(['/', '/diary', '/patients/new', '/scales', '/analytics']);
 

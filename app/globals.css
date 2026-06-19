@@ -808,7 +808,7 @@ body {
   }
 
   .section-kicker {
-    @apply text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
+    @apply text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500;
   }
 
   .ui-btn-primary {
@@ -823,6 +823,14 @@ body {
 
   .ui-btn-primary:hover {
     transform: translateY(-1px);
+  }
+
+  /* @Codex WUL-UIUX: la CTA primaria piu usata non aveva alcun anello di focus. */
+  .ui-btn-primary:focus-visible {
+    outline: none;
+    box-shadow:
+      var(--ui-btn-primary-shadow),
+      var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
   }
 
   /* @Codex */
@@ -1508,7 +1516,11 @@ body {
    modals, dropdowns, secondary buttons and semantic alert blocks so individual
    pages avoid hand-rolled bg-white/border-gray-* SaaS tokens. */
 
-.mf-input {
+/* @Codex WUL-UIUX: .input-field era usata in form prestazioni/protesica/SISS
+   ma non definita da nessuna parte (input nativi senza glass ne focus ring).
+   La si allinea a .mf-input cosi decine di campi rientrano nel sistema. */
+.mf-input,
+.input-field {
   width: 100%;
   border-radius: 16px;
   border: 1px solid rgba(112, 106, 100, 0.18);
@@ -1522,16 +1534,20 @@ body {
   transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
-.mf-input::placeholder {
+.mf-input::placeholder,
+.input-field::placeholder {
   color: var(--mf-muted);
 }
 
-.mf-input:hover:not(:disabled) {
+.mf-input:hover:not(:disabled),
+.input-field:hover:not(:disabled) {
   border-color: rgba(15, 23, 42, 0.22);
 }
 
 .mf-input:focus,
-.mf-input:focus-visible {
+.mf-input:focus-visible,
+.input-field:focus,
+.input-field:focus-visible {
   border-color: rgba(15, 23, 42, 0.34);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
@@ -1539,9 +1555,15 @@ body {
   background-color: rgba(255, 255, 255, 0.96);
 }
 
-.mf-input:disabled {
+.mf-input:disabled,
+.input-field:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* @Codex Le textarea che usano .input-field devono poter crescere verticalmente. */
+textarea.input-field {
+  resize: vertical;
 }
 
 .mf-input-sm {
@@ -1590,25 +1612,33 @@ body {
   resize: vertical;
 }
 
-:root.dark .mf-input {
+:root.dark .mf-input,
+:root.dark .input-field {
   border-color: rgba(255, 247, 240, 0.12);
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--mf-ink);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-:root.dark .mf-input:hover:not(:disabled) {
+:root.dark .mf-input:hover:not(:disabled),
+:root.dark .input-field:hover:not(:disabled) {
   border-color: rgba(203, 213, 225, 0.28);
 }
 
 :root.dark .mf-input:focus,
-:root.dark .mf-input:focus-visible {
+:root.dark .mf-input:focus-visible,
+:root.dark .input-field:focus,
+:root.dark .input-field:focus-visible {
   border-color: rgba(203, 213, 225, 0.42);
   background-color: rgba(255, 255, 255, 0.07);
 }
 
 /* Secondary button: calm chrome companion to .ui-btn-primary */
-.mf-btn-secondary {
+/* @Codex WUL-UIUX: '.ui-btn-secondary' era usata in service-/prosthetic-
+   prescription-manager ma non definita (bottoni nativi non stilizzati). Stesso
+   approccio di '.input-field': la si allinea a '.mf-btn-secondary'. */
+.mf-btn-secondary,
+.ui-btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1626,36 +1656,42 @@ body {
   cursor: pointer;
 }
 
-.mf-btn-secondary:hover:not(:disabled) {
+.mf-btn-secondary:hover:not(:disabled),
+.ui-btn-secondary:hover:not(:disabled) {
   border-color: rgba(15, 23, 42, 0.24);
   color: var(--mf-ink);
   background-color: rgba(255, 255, 255, 0.96);
 }
 
-.mf-btn-secondary:active:not(:disabled) {
+.mf-btn-secondary:active:not(:disabled),
+.ui-btn-secondary:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.mf-btn-secondary:focus-visible {
+.mf-btn-secondary:focus-visible,
+.ui-btn-secondary:focus-visible {
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.10));
 }
 
-.mf-btn-secondary:disabled {
+.mf-btn-secondary:disabled,
+.ui-btn-secondary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-:root.dark .mf-btn-secondary {
+:root.dark .mf-btn-secondary,
+:root.dark .ui-btn-secondary {
   border-color: rgba(255, 247, 240, 0.12);
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--mf-ink);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-:root.dark .mf-btn-secondary:hover:not(:disabled) {
+:root.dark .mf-btn-secondary:hover:not(:disabled),
+:root.dark .ui-btn-secondary:hover:not(:disabled) {
   border-color: rgba(203, 213, 225, 0.28);
   color: var(--mf-ink);
   background-color: rgba(255, 255, 255, 0.08);
@@ -1919,6 +1955,20 @@ body {
   box-shadow: 0 12px 22px rgba(15, 23, 42, 0.10);
 }
 
+/* @Codex WUL-UIUX: le option-card (scale da 30+ domande) erano operabili da
+   tastiera ma senza indicatore di focus visibile. */
+.mf-option-card:focus-visible {
+  outline: none;
+  border-color: rgba(15, 23, 42, 0.34);
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.12));
+}
+
+/* @Codex WUL-UIUX: in dark mode il bordo navy del focus e quasi invisibile;
+   l'anello resta dato dal box-shadow, ma riallineiamo anche il bordo. */
+:root.dark .mf-option-card:focus-visible {
+  border-color: rgba(203, 213, 225, 0.4);
+}
+
 :root.dark .mf-option-card {
   border-color: rgba(255, 247, 240, 0.1);
   background-color: rgba(255, 255, 255, 0.04);
@@ -1944,7 +1994,8 @@ body {
 .mf-eyebrow {
   margin: 0;
   font-size: 0.7rem;
-  font-weight: 800;
+  /* @Codex WUL-UIUX: 800 faceva pesare l'etichetta piu del valore che introduce. */
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--mf-muted);
@@ -1996,6 +2047,17 @@ body {
 
 :root.dark .ui-btn-primary.mf-tone-success {
   background: var(--ui-btn-primary-bg);
+}
+
+/* @Codex WUL-UIUX: le varianti di tono (.mf-tone-*) sono unlayered e il loro
+   box-shadow statico copriva l'anello :focus-visible definito nel layer. Questa
+   regola unlayered, dopo le varianti, garantisce l'anello di focus da tastiera su
+   tutti i primari, toni inclusi (es. la CTA distruttiva "elimina paziente"). */
+.ui-btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--ui-btn-primary-shadow),
+    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
 }
 
 /* @Codex WUL-229: make the real patient workbench unmistakably match the dummy.

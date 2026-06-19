@@ -464,6 +464,18 @@
 .aiButton:hover { transform: translateY(-1px); filter: brightness(1.04); }
 .aiButton:active { transform: scale(0.97); }
 
+/* @Codex WUL-UIUX: la chrome del cockpit (la superficie piu usata) era operabile
+   da tastiera ma senza indicatore di focus, una regressione WCAG 2.4.7 rispetto
+   alla Sidebar. Anello di focus condiviso, coerente con --mf-focus-ring. */
+.navItem:focus-visible,
+.search:focus-visible,
+.toolChip:focus-visible,
+.aiButton:focus-visible,
+.exit:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+}
+
 .avatarPill {
   display: inline-flex;
   align-items: center;

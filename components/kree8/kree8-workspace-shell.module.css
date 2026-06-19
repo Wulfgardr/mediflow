@@ -268,6 +268,19 @@
   color: var(--k8-subtle);
 }
 
+/* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
+   piu marcato, cosi su una Scheda lunga si vede dove si e. */
+.sectionLink[aria-current='location'] {
+  border-color: var(--k8-accent-line);
+  background: var(--k8-control-bg);
+  color: var(--k8-ink);
+  font-weight: 700;
+}
+
+.sectionLink[aria-current='location'] small {
+  color: var(--k8-ink);
+}
+
 .workspaceBody,
 .primaryStack,
 .secondaryStack,
