@@ -28,10 +28,11 @@ stop rule.
 | RepoPrompt | Binding progetto, file selection, export, oracle/agent context, context pack per confronti complessi | Non va bindato a home, Downloads, mail, database o vault privati senza richiesta esplicita; non assumere che esegua modelli web-only |
 | Linear | Issue, priorita, acceptance criteria, stato, evidenza | Non sostituisce ADR o verifica locale |
 | `/goal` | Contratto per workstream multi-step | Non si usa per micro-edit o domande brevi |
-| Claude/Opus | Chief design/product proposer, senior UI/UX reviewer, risk/test reviewer read-only | Porta una tesi originale; Codex/ChatGPT produce una valutazione autonoma e decide; no PHI/PII, no write access, no decisione finale |
-| Gemini | Adversarial scout, disagreement, architettura, alternative, sintesi | Di norma risponde a un packet Codex/Claude; lead da verificare, non source of truth |
+| Claude/Opus | Sub-agent manageriale: chief design/product proposer, senior UI/UX reviewer, risk/test reviewer read-only | Porta una tesi originale o classifica rischi; Codex decide; no PHI/PII, no write access, no merge authority |
+| Gemini | Sub-agent manageriale: adversarial scout, disagreement, architettura, alternative, sintesi | Attacca assunzioni e propone slice piu piccole; lead da verificare, non source of truth |
+| Oracle / ChatGPT 5.5 Pro | Controllore di ultima istanza per decisioni importanti, ambigue o ad alto impatto | Decision-support superiore; Codex resta controller operativo e verifica localmente prima di side effect |
 | RepoPrompt agents | Explore/engineer/pair/design bounded | Codex deve aspettare, riconciliare e verificare |
-| ChatGPT web 5.5 Pro / Extended Pro | Ragionamento puro, sintesi difficile e confronto prospettico su prompt costruiti da Codex | Superficie web via Chrome/Computer Use; no PHI/PII; risultato preservato se decision-shaping |
+| ChatGPT web 5.5 Pro / Extended Pro | Superficie Oracle quando serve ragionamento puro, sintesi difficile e confronto prospettico su prompt costruiti da Codex | Superficie web via Chrome/Computer Use; no PHI/PII; risultato preservato se decision-shaping |
 | ChatGPT Deep Search/Research | Reperimento fonti esterne e stato dell'arte source-heavy | No PHI/PII; heartbeat ogni 30 minuti; risultato preservato prima di diventare decisione |
 | OpenClaw | Sidecar locale di workflow per brief, preview sintetiche, pattern redatti e futuri review candidate | Non e runtime clinico; nessun accesso diretto a SQLite/API/apply/PHI; apply resta in MediFlow con conferma |
 | Workflow monitor | Branch/scope/privacy/check drift su metadati | Non legge diff content, DB, mail o docs private |
@@ -53,6 +54,14 @@ Principio di costo: deterministic-first. L'orchestrator non effettua polling
 di modelli. Coordina eventi, Goal, branch, PR, CI/check e output dei loop. Le
 chiamate costose a Oracle, Claude, Gemini o web research restano riservate a
 packet redatti e decisioni ad alto valore.
+
+Gerarchia operativa: Codex resta sempre il controller-of-record e il capo
+decisionale. Claude e Gemini sono sub-agent manageriali: aiutano a classificare,
+criticare, sintetizzare e proporre verifiche, ma non approvano merge, issue o
+side effect. Gli agent spawnati da Codex sono esecutori bounded. Oracle e la
+review di ultima istanza per decisioni importanti o ambigue, soprattutto se
+toccano hard stop o se Claude/Gemini sono in disaccordo. Se Claude o Gemini non
+sono disponibili, Codex procede autonomamente e registra il blocker.
 
 | Loop | Cadenza iniziale | Autorita | Stop rule principali |
 | --- | --- | --- | --- |
@@ -246,6 +255,24 @@ default riceve un packet costruito da Codex o da Claude e risponde con:
 Se Gemini scopre un tema indipendente, non lo allarga nella stessa branch:
 propone un candidate follow-up e Codex decide se aprire o no una issue.
 
+### Oracle Final-Instance Lane
+
+Oracle e la lane di ultima istanza, non un sostituto del controller operativo.
+Si usa quando il maintainer, il forward-thinker o il parlamento Claude/Gemini
+arrivano a una decisione ad alto impatto, ambigua o sensibile:
+
+- AI runtime promotion, cloud/local model routing o lane modello nuove;
+- auth, PIN, encryption, audit, network write path, SISS/FSE, claims, release
+  native/signing o cambi cross-platform runtime/scheduling;
+- PR grandi o multi-surface dove una verifica locale verde non basta a capire
+  rischio e strategia;
+- conflitto tra tesi Codex, Claude e Gemini.
+
+Il packet per Oracle deve essere redatto, sintetico e decision-oriented:
+contesto, opzioni, evidenza verificata, non verificato, rischi, proposta Codex e
+domanda esplicita. L'esito Oracle diventa decision-support; Codex deve comunque
+verificare localmente prima di merge, PR, Linear update o qualsiasi side effect.
+
 ### OpenClaw Sidecar Lane
 
 OpenClaw puo entrare nel Parlamento come sidecar di workflow, non come agente
@@ -397,6 +424,9 @@ Quando vuoi che una credenziale live sia un gate bloccante, aggiungi
      packet e bounded;
    - Gemini per cross-exam di dossier Claude/Codex, alternative, hidden
      assumptions, disagreement, smaller slice e candidate test/failure-mode;
+   - Oracle per decisioni di ultima istanza quando una merge/promotion e
+     importante, ambigua, in hard-stop class o non risolta dal parlamento
+     Claude/Gemini;
    - OpenClaw solo per sidecar brief/preview sintetici o redatti quando il gate
      del relativo workstream lo consente;
    - transcript salvati sotto `~/.codex/delegate-runs/*`, non committati.
@@ -430,6 +460,9 @@ Quando vuoi che una credenziale live sia un gate bloccante, aggiungi
   valore giustifica il costo.
 - Se la CLI e non autenticata o instabile: registra il blocker e continua con
   Codex/Gemini/RepoPrompt se la slice puo essere verificata localmente.
+- Se Claude e Gemini non sono disponibili o non producono output utile: Codex
+  procede come capo operativo, segnala che il parlamento e degradato e decide
+  solo sulla base di evidenza locale verificabile.
 - Se un delegate produce solo opinioni non verificabili: scarta o trasforma in
   check locale concreto.
 - Se emergono due temi indipendenti: apri nuova issue/branch invece di allargare
@@ -449,6 +482,8 @@ Default:
   adversarial; non come default settimanale;
 - Gemini come cross-exam economico di disaccordo/sintesi, di norma dopo packet
   Codex/Claude;
+- Oracle solo per decisioni ad alto impatto, hard-stop, conflitti tra delegate
+  o merge/promotion dove serve una overview tecnica superiore;
 - OpenClaw solo quando il contributo e preview/brief/candidate sidecar e non
   richiede accesso runtime o dati reali;
 - no full-repo prompt;

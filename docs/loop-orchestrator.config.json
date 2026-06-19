@@ -23,6 +23,44 @@
     ],
     "expensiveReasoningRule": "Use RepoPrompt/context packets first; call Oracle, Claude, Gemini, or web research only when the packet has a concrete decision to improve."
   },
+  "delegateHierarchy": {
+    "controllerOfRecord": "Codex",
+    "principles": [
+      "Codex owns the final decision, implementation, verification, GitHub/Linear side effects, and user-facing report.",
+      "Claude and Gemini behave as bounded middle-management sub-agents: they review, challenge, synthesize, and suggest, but do not approve merges or external side effects.",
+      "Spawned implementation agents are execution workers under Codex direction; their output must be verified before adoption.",
+      "If Claude or Gemini are unavailable, unauthenticated, too slow, or produce non-actionable output, Codex continues autonomously and records the blocker.",
+      "Oracle is the final-instance reviewer for high-impact, ambiguous, or hard-stop decisions before promotion or merge."
+    ],
+    "claude": {
+      "role": "senior UI/UX, product, risk, and test-gap reviewer",
+      "useWhen": [
+        "UI/UX or clinical workflow changes need taste/risk review",
+        "a branch appears mature but has meaningful user-facing blast radius",
+        "a stalled workstream needs classification or a smaller slice"
+      ],
+      "authority": "advice-only"
+    },
+    "gemini": {
+      "role": "adversarial scout and disagreement reviewer",
+      "useWhen": [
+        "Codex or Claude assumptions need attack",
+        "architecture or process alternatives need a smaller/safer option",
+        "a PR needs hidden-risk or verification-surface review"
+      ],
+      "authority": "advice-only"
+    },
+    "oracle": {
+      "role": "final-instance technical overview and high-impact decision reviewer",
+      "useWhen": [
+        "AI runtime promotion or cloud/local model routing",
+        "security, auth, encryption, audit, network write paths, SISS/FSE, claims, native release/signing",
+        "cross-platform runtime or scheduling changes with incomplete evidence",
+        "major merge/hold decisions where delegate opinions conflict"
+      ],
+      "authority": "decision-support; Codex still executes only after local verification"
+    }
+  },
   "guardedAutomerge": {
     "enabled": true,
     "mergeMethod": "squash",
