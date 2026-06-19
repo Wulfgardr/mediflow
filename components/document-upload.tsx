@@ -24,7 +24,7 @@ import {
 /* @Codex */
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
@@ -205,7 +205,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         if (shouldRefreshSummary) {
             try {
                 setAiStage("Aggiornamento AI Patient Summary...");
-                await regeneratePatientSummary(patientId);
+                await refreshPatientSummaryIfEnabled(patientId);
             } catch (err) {
                 console.warn('[DocumentUpload] Aggiornamento summary fallito', err);
             }
@@ -272,7 +272,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             summarySnapshot: result.insight.summary,
                             parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),
                         });
-                        await regeneratePatientSummary(patientId);
+                        await refreshPatientSummaryIfEnabled(patientId);
                     } catch (synthesisError) {
                         if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
                             await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });

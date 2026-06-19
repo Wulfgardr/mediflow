@@ -17,6 +17,7 @@ import {
 } from '@/lib/patient-insight';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
+    AiPatientInsightDisabledError,
     assertAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
 
@@ -32,6 +33,11 @@ interface SummaryOptions {
     signal?: AbortSignal;
     onStage?: (stage: SummaryStage, info?: SummaryModelInfo) => void;
 }
+
+/* @Codex */
+export type PatientSummaryRefreshResult =
+    | { status: 'updated'; modelInfo: SummaryModelInfo }
+    | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' };
 
 const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
 
@@ -179,5 +185,28 @@ export async function regeneratePatientSummary(
         return await task;
     } finally {
         inflight.delete(patientId);
+    }
+}
+
+/* @Codex */
+export async function refreshPatientSummaryIfEnabled(
+    patientId: string,
+    options: SummaryOptions = {}
+): Promise<PatientSummaryRefreshResult> {
+    if (!patientId) {
+        return { status: 'skipped', reason: 'missing-patient-id' };
+    }
+
+    try {
+        const modelInfo = await regeneratePatientSummary(patientId, options);
+        if (!modelInfo) {
+            return { status: 'skipped', reason: 'missing-patient-id' };
+        }
+        return { status: 'updated', modelInfo };
+    } catch (error) {
+        if (error instanceof AiPatientInsightDisabledError) {
+            return { status: 'skipped', reason: 'disabled' };
+        }
+        throw error;
     }
 }

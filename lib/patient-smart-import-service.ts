@@ -1,4 +1,4 @@
-import { regeneratePatientSummary } from './ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from './ai-summary-service';
 import { AIService } from './ai-service';
 import {
     buildSmartImportExtractionPrompt,
@@ -1048,7 +1048,7 @@ export async function applyPatientSmartImportSelection(
     }
 
     if (appliedDiagnosisIds.length > 0 || appliedTherapyIds.length > 0) {
-        await regeneratePatientSummary(patientId).catch(() => null);
+        await refreshPatientSummaryIfEnabled(patientId).catch(() => null);
     }
 
     return {
