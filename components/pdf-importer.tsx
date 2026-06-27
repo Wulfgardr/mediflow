@@ -9,7 +9,7 @@ import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, is
 import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
 import { enrichExtractedPatientDataForReview } from '@/lib/patient-document-import-service';
 import {
@@ -120,7 +120,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     setArchiveSaved(true);
                     /* @Codex */
                     setAiStage("Aggiornamento sintesi paziente...");
-                    await regeneratePatientSummary(patientId);
+                    await refreshPatientSummaryIfEnabled(patientId);
                 } catch (synthErr) {
                     if (!(synthErr instanceof AiDocumentSynthesisDisabledError)) {
                         console.error('Synthesis error:', synthErr);

@@ -5,7 +5,7 @@ import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Tr
 import { db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { regeneratePatientSummary } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 
 interface DocumentInsightsPanelProps {
@@ -52,7 +52,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             setExpandedId((current) => nextInsights.some((insight) => insight.id === current) ? current : null);
 
             try {
-                await regeneratePatientSummary(patient.id);
+                await refreshPatientSummaryIfEnabled(patient.id);
             } catch (refreshError) {
                 console.warn('[DocumentInsightsPanel] AI summary refresh failed', refreshError);
                 alert("Archivio aggiornato, ma non è stato possibile riallineare subito AI Patient Insight.");

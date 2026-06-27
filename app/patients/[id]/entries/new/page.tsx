@@ -16,7 +16,7 @@ import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/cli
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
 import { synthesizeDocument } from '@/lib/document-synthesis-service';
 import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 
@@ -141,7 +141,10 @@ export default function NewEntryPage() {
             });
 
             setUploadProgress('Aggiornamento riepilogo paziente...');
-            await regeneratePatientSummary(id);
+            const summaryRefresh = await refreshPatientSummaryIfEnabled(id);
+            if (summaryRefresh.status === 'skipped' && summaryRefresh.reason === 'disabled') {
+                console.info('[NewEntryPage] AI Patient Insight refresh skipped: kill switch disabled');
+            }
 
             router.push(`/patients/${id}/modules`);
         } catch (error) {
