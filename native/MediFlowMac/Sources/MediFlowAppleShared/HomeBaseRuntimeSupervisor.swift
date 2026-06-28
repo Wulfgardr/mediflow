@@ -271,7 +271,9 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         // Version managers (nvm, fnm) install node outside the standard paths, and
         // a GUI-launched app does not inherit the shell PATH. Probe their dirs and
         // pick the newest installed node, so the home-base works without manual
-        // MEDIFLOW_NODE_BINARY config.
+        // MEDIFLOW_NODE_BINARY config. macOS-only: homeDirectoryForCurrentUser is
+        // unavailable on iOS, and node supervision only runs on macOS anyway.
+        #if os(macOS)
         let home = fileManager.homeDirectoryForCurrentUser
         let versionDirs = [
             home.appendingPathComponent(".nvm/versions/node"),
@@ -280,6 +282,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         if let managed = Self.newestVersionManagerNode(in: versionDirs, fileManager: fileManager) {
             return managed
         }
+        #endif
 
         throw HomeBaseRuntimeSupervisorError.missingNode
     }
