@@ -5,7 +5,7 @@
 import SwiftUI
 
 /// Clinical tone for status surfaces. Maps to a single source-of-truth color.
-public enum VetroTone {
+public enum VetroTone: Equatable {
     case neutral
     case info
     case positive

@@ -591,6 +591,19 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
+    // Semantic status color (Vetro Clinico tone), or attention if soft-deleted.
+    // Kept as tinted text rather than a glass badge: Liquid Glass is for the
+    // control/navigation layer, not every content row.
+    private func therapyStatusColor(_ therapy: HomeBaseTherapySummary) -> Color {
+        if therapy.deletedAt != nil { return VetroPalette.tint(for: .attention) }
+        return VetroPalette.tint(for: PairedTherapyStatus(rawValue: therapy.status)?.tone ?? .neutral)
+    }
+
+    private func checkupStatusColor(_ checkup: HomeBaseCheckupSummary) -> Color {
+        if checkup.deletedAt != nil { return VetroPalette.tint(for: .attention) }
+        return VetroPalette.tint(for: PairedCheckupStatus(rawValue: checkup.status)?.tone ?? .neutral)
+    }
+
     /* @Codex */
     private func therapyRow(_ therapy: HomeBaseTherapySummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -600,7 +613,7 @@ struct PairedPatientsWorkspaceView: View {
                 Spacer(minLength: 8)
                 Text(PairedTherapyStatus(rawValue: therapy.status)?.title ?? therapy.status)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(therapy.deletedAt == nil ? Color.secondary : Color.orange)
+                    .foregroundStyle(therapyStatusColor(therapy))
             }
             Text(therapy.dosage)
                 .font(.caption)
@@ -874,7 +887,7 @@ struct PairedPatientsWorkspaceView: View {
                 Spacer(minLength: 8)
                 Text(PairedCheckupStatus(rawValue: checkup.status)?.title ?? checkup.status)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(checkup.deletedAt == nil ? Color.secondary : Color.orange)
+                    .foregroundStyle(checkupStatusColor(checkup))
             }
             Text(Self.entryDateFormatter.string(from: checkup.date))
                 .font(.caption2)

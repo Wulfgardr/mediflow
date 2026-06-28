@@ -45,6 +45,18 @@ enum PairedTherapyStatus: String, CaseIterable, Identifiable {
             return "Conclusa"
         }
     }
+
+    /// Vetro Clinico status tone for a therapy.
+    var tone: VetroTone {
+        switch self {
+        case .active:
+            return .positive
+        case .suspended:
+            return .attention
+        case .completed:
+            return .neutral
+        }
+    }
 }
 
 /* @Codex */
@@ -63,6 +75,18 @@ enum PairedCheckupStatus: String, CaseIterable, Identifiable {
             return "Completato"
         case .cancelled:
             return "Annullato"
+        }
+    }
+
+    /// Vetro Clinico status tone for a checkup.
+    var tone: VetroTone {
+        switch self {
+        case .pending:
+            return .info
+        case .completed:
+            return .positive
+        case .cancelled:
+            return .neutral
         }
     }
 }
