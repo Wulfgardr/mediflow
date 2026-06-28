@@ -268,7 +268,48 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
             }
         }
 
+        // Version managers (nvm, fnm) install node outside the standard paths, and
+        // a GUI-launched app does not inherit the shell PATH. Probe their dirs and
+        // pick the newest installed node, so the home-base works without manual
+        // MEDIFLOW_NODE_BINARY config.
+        let home = fileManager.homeDirectoryForCurrentUser
+        let versionDirs = [
+            home.appendingPathComponent(".nvm/versions/node"),
+            home.appendingPathComponent(".local/share/fnm/node-versions")
+        ]
+        if let managed = Self.newestVersionManagerNode(in: versionDirs, fileManager: fileManager) {
+            return managed
+        }
+
         throw HomeBaseRuntimeSupervisorError.missingNode
+    }
+
+    /// Returns the path to the highest-version `node` under nvm/fnm version dirs,
+    /// or nil if none. nonisolated + static so it is pure and unit-testable.
+    nonisolated static func newestVersionManagerNode(in versionDirs: [URL], fileManager: FileManager) -> String? {
+        var candidates: [(version: [Int], path: String)] = []
+        for dir in versionDirs {
+            guard let entries = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
+                continue
+            }
+            for entry in entries {
+                // nvm: <ver>/bin/node ; fnm: <ver>/installation/bin/node
+                for relative in ["bin/node", "installation/bin/node"] {
+                    let nodePath = entry.appendingPathComponent(relative).path
+                    if fileManager.isExecutableFile(atPath: nodePath) {
+                        candidates.append((semanticVersion(entry.lastPathComponent), nodePath))
+                    }
+                }
+            }
+        }
+        return candidates.max(by: { $0.version.lexicographicallyPrecedes($1.version) })?.path
+    }
+
+    /// Parses a "vX.Y.Z" directory name into [X, Y, Z] for numeric comparison.
+    nonisolated static func semanticVersion(_ name: String) -> [Int] {
+        name.drop(while: { !$0.isNumber })
+            .split(separator: ".")
+            .map { Int($0.prefix(while: { $0.isNumber })) ?? 0 }
     }
 
     private func runSupervisorAction(_ action: () async throws -> Void) async {

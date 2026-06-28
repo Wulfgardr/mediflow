@@ -123,11 +123,14 @@ FATTO e VERIFICATO (toolchain Xcode-beta 27.0, SDK iOS/macOS 27, Liquid Glass WW
    (build-native-app.sh, build-mobile-sim-app.sh) deprecati con puntatore al nuovo flusso.
 
 DIFFERITO (follow-up tracciati, non bloccanti per il build lane):
-- Packaging macOS: migrare il bundling WebRuntime (logica preservata in git history pre-Fase-0;
-  gli script build-native-app.sh / build-mobile-sim-app.sh sono ora stub deprecati) nelle build
-  phase del target MediFlowMacApp, piu entitlement App Sandbox per App Store (oggi l'app macOS
-  builda ma senza WebRuntime non avvia l'home-base a runtime: HomeBaseRuntimeStatusView mostra lo
-  stato "non pronto", non crasha). Catena launch/watchdog da rifare.
+- Packaging macOS WebRuntime: FATTO. scripts/build-apple-macos-app.sh costruisce l'app macOS
+  (scheme MediFlowMacApp) e inietta il WebRuntime Next.js standalone + local-api-tls-proxy.mjs nel
+  bundle. Verificato: il server.js bundlato gira con node e risponde HTTP 200 (Next.js 16.2.6).
+  Il supervisor ora risolve anche node da nvm/fnm (oltre ai path standard e MEDIFLOW_NODE_BINARY),
+  cosi l'app trova node su macchine senza node nei path di sistema. Resta per App Store: firma
+  Developer ID + notarizzazione (lo script supporta MEDIFLOW_CODESIGN_IDENTITY) e decisione App
+  Sandbox (l'app lancia un processo node figlio e bind una porta locale). Catena launch/watchdog
+  storica da rifare se serve.
 - CI nativa: workflow GitHub che esegua native-test.sh + xcodebuild iOS/macOS + le guardie.
 - Doc da allineare: native-launch.md, mobile-home-base-smoke.md, apple-wide-parity-qa.md e il
   manifest apple-wide-qa-manifest.json (declassare le capability con sola evidenza simulatore/SPM).

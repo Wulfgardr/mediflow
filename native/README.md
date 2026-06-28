@@ -51,12 +51,26 @@ CI runs the same in `.github/workflows/apple-native.yml` (path-filtered to
 `scripts/check-apple-network-entitlements.sh`) fail if the retired executables or
 dead roots reappear, or if the Bonjour / local-network keys are missing.
 
+## Runnable macOS app (with the home-base WebRuntime)
+
+The macOS app *is* the home-base: it supervises a bundled Next.js standalone
+server (`HomeBaseRuntimeSupervisor`). Plain `xcodebuild` does not bundle it (CI
+stays fast and npm-free); the runnable / release app comes from:
+
+    scripts/build-apple-macos-app.sh            # next build + xcodebuild + inject WebRuntime
+    MEDIFLOW_SKIP_WEB_BUILD=1 scripts/build-apple-macos-app.sh   # reuse existing .next/standalone
+    MEDIFLOW_CODESIGN_IDENTITY=- scripts/build-apple-macos-app.sh # ad-hoc sign incl. the runtime
+
+It assembles `Contents/Resources/WebRuntime/` (`server.js` + `.next/static` +
+`public`) and `local-api-tls-proxy.mjs`, exactly what the supervisor launches.
+Node is NOT bundled: the supervisor resolves system node, then nvm/fnm installs,
+or `MEDIFLOW_NODE_BINARY`.
+
 ## Known limitations (tracked follow-ups)
 
-- The macOS target builds but does not yet bundle the `WebRuntime` (Next.js), so
-  on macOS the home-base does not start at runtime (`HomeBaseRuntimeStatusView`
-  shows "not ready", it does not crash). Migrating the WebRuntime bundling (logic
-  in git history, pre Fase 0) into the `MediFlowMacApp` build phases is pending.
+- App Store distribution needs Developer ID signing + notarization (the script
+  supports `MEDIFLOW_CODESIGN_IDENTITY` / a notarization step) and an App Sandbox
+  decision, since the app spawns a node child process and binds a local port.
 - The `/api/v1/network` live-contract wiring of `PatchValue` / `VersionConflict`
   into `HomeBasePatientsClient` is Fase 1 work that needs the backend running to
   verify round-trips.
