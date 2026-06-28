@@ -46,6 +46,10 @@ auto-selects a full Xcode. Locally, export `DEVELOPER_DIR` if needed:
     xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
       -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
 
+    # XCUITest interaction tests (boots a simulator, drives the tab bar/sections)
+    xcodebuild test -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+      -scheme MediFlowMobileApp -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
+
 CI runs the same in `.github/workflows/apple-native.yml` (path-filtered to
 `native/**`). The guards (`scripts/check-apple-structure.sh`,
 `scripts/check-apple-network-entitlements.sh`) fail if the retired executables or

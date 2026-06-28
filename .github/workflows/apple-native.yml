@@ -53,3 +53,28 @@ jobs:
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' \
             build CODE_SIGNING_ALLOWED=NO
+
+  ui-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install xcodegen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Generate project
+        run: scripts/generate-apple-xcodeproj.sh
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          NAME=$(xcrun simctl list devices available --json | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next((x['name'] for rt in sorted(d) for x in d[rt] if x['name'].startswith('iPhone')), ''))")
+          [ -n "$NAME" ] || { echo "No iPhone simulator available" >&2; exit 1; }
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME"
+      - name: Run XCUITest interaction tests
+        run: |
+          xcodebuild test \
+            -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMobileApp \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            CODE_SIGNING_ALLOWED=NO
