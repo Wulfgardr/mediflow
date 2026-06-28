@@ -9,25 +9,15 @@ let package = Package(
         .iOS(.v17)
     ],
     products: [
-        .library(name: "MediFlowAppleShared", targets: ["MediFlowAppleShared"]),
-        .executable(name: "MediFlowMac", targets: ["MediFlowMac"]),
-        .executable(name: "MediFlowMobile", targets: ["MediFlowMobile"])
+        // Single shared library consumed by the universal Xcode app
+        // (MediFlowAppleApp). The retired SPM executables (MediFlowMac,
+        // MediFlowMobile) were duplicate app shells; the Xcode project is now the
+        // sole shippable artifact. See docs/analysis/2026-06-28-fase0-decisioni-apple-universale.md
+        .library(name: "MediFlowAppleShared", targets: ["MediFlowAppleShared"])
     ],
     targets: [
         .target(
             name: "MediFlowAppleShared"
-        ),
-        .executableTarget(
-            name: "MediFlowMac",
-            dependencies: ["MediFlowAppleShared"]
-        ),
-        .executableTarget(
-            name: "MediFlowMobile",
-            dependencies: ["MediFlowAppleShared"]
-        ),
-        .testTarget(
-            name: "MediFlowMacTests",
-            dependencies: ["MediFlowMac"]
         ),
         .testTarget(
             name: "MediFlowAppleSharedTests",

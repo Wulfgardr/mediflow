@@ -1,6 +1,6 @@
 // @Codex
 import XCTest
-@testable import MediFlowMac
+@testable import MediFlowAppleShared
 
 /* @Codex */
 final class ExemptionCodesCodecTests: XCTestCase {

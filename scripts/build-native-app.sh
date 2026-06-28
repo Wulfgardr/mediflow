@@ -1,6 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+# DEPRECATED (Fase 0): this builds the retired SPM MediFlowMac executable, which
+# no longer exists. The universal app now ships from the Xcode project
+# (native/MediFlowAppleApp). Build the macOS app with:
+#   scripts/generate-apple-xcodeproj.sh
+#   DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild \
+#     -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+#     -scheme MediFlowMacApp -destination 'platform=macOS' build
+# TODO(macOS packaging phase): migrate the WebRuntime bundling logic below into
+# the MediFlowMacApp target build phases (it is still the reference for that).
+# See docs/analysis/2026-06-28-fase0-decisioni-apple-universale.md
+echo "DEPRECATED: build-native-app.sh builds the retired SPM MediFlowMac executable." >&2
+echo "Use the Xcode MediFlowMacApp scheme; WebRuntime bundling migration is pending." >&2
+exit 2
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_DIR="$ROOT_DIR/native/MediFlowMac"
 BUILD_DIR="$PACKAGE_DIR/Build"
