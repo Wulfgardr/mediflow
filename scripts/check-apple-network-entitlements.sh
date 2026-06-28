@@ -28,7 +28,7 @@ for plist in "${PLISTS[@]}"; do
   plutil -lint "$plist" >/dev/null || fail "$plist is not a valid plist"
   require_key "$plist" "NSLocalNetworkUsageDescription"
   require_key "$plist" "NSBonjourServices"
-  if ! /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" "$plist" | grep -q "$BONJOUR_SERVICE_TYPE"; then
+  if ! /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" "$plist" | grep -qF "$BONJOUR_SERVICE_TYPE"; then
     fail "$plist NSBonjourServices does not advertise '$BONJOUR_SERVICE_TYPE'"
   fi
   echo "OK: $plist carries NSLocalNetworkUsageDescription + NSBonjourServices ($BONJOUR_SERVICE_TYPE)"

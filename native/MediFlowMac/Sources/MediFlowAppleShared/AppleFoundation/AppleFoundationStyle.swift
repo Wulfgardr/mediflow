@@ -5,12 +5,29 @@ import AppKit
 import UIKit
 #endif
 
-struct CardStyleModifier: ViewModifier {
+private struct CardStyleModifier: ViewModifier {
+    private let cornerRadius: CGFloat = 14
+
     func body(content: Content) -> some View {
-        // Vetro Clinico: Liquid Glass on iOS 26 / macOS 26, system material below.
-        content
-            .padding(16)
-            .vetroGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        if #available(iOS 26.0, macOS 26.0, *) {
+            // Vetro Clinico: real Liquid Glass.
+            content
+                .padding(16)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            // Older OS: opaque card with a subtle border. The translucent material
+            // alone washes out on grouped backgrounds, so keep the fill + stroke.
+            content
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(PlatformColors.cardBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                )
+        }
     }
 }
 

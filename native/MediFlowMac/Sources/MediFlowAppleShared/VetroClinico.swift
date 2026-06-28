@@ -31,35 +31,23 @@ public enum VetroPalette {
 /// material otherwise. Use via the `.vetroGlass(...)` View modifier below.
 struct VetroGlassModifier<S: Shape>: ViewModifier {
     let shape: S
-    let tone: VetroTone?
-    let interactive: Bool
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(resolvedGlass, in: shape)
+            content.glassEffect(.regular, in: shape)
         } else {
             content.background(.regularMaterial, in: shape)
         }
     }
-
-    @available(iOS 26.0, macOS 26.0, *)
-    private var resolvedGlass: Glass {
-        var glass = Glass.regular
-        if let tone { glass = glass.tint(VetroPalette.tint(for: tone)) }
-        if interactive { glass = glass.interactive() }
-        return glass
-    }
 }
 
 public extension View {
-    /// Apply Vetro Clinico Liquid Glass over `shape`. `tone` optionally tints the
-    /// glass; `interactive` enables the touch-reactive variant for controls.
-    func vetroGlass<S: Shape>(
-        in shape: S = Capsule(),
-        tone: VetroTone? = nil,
-        interactive: Bool = false
-    ) -> some View {
-        modifier(VetroGlassModifier(shape: shape, tone: tone, interactive: interactive))
+    /// Apply Vetro Clinico Liquid Glass over `shape`: real Liquid Glass on
+    /// iOS 26 / macOS 26, a system material on the deployment floor below.
+    /// Convey clinical status with foreground color (see StatusBadge/VetroPalette),
+    /// not by tinting the glass, so the signal survives the material fallback.
+    func vetroGlass<S: Shape>(in shape: S = Capsule()) -> some View {
+        modifier(VetroGlassModifier(shape: shape))
     }
 }
 
@@ -91,12 +79,14 @@ public struct StatusBadge: View {
     }
 
     public var body: some View {
+        // Status color lives on the text, over a neutral glass capsule, so it
+        // stays legible (no same-color text-on-tint) and survives the fallback.
         Text(text)
             .font(.caption.weight(.semibold))
             .foregroundStyle(VetroPalette.tint(for: tone))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .vetroGlass(in: Capsule(), tone: tone)
+            .vetroGlass(in: Capsule())
     }
 }
 
