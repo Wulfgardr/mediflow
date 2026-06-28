@@ -7,16 +7,10 @@ import UIKit
 
 struct CardStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
+        // Vetro Clinico: Liquid Glass on iOS 26 / macOS 26, system material below.
         content
             .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(PlatformColors.cardBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-            )
+            .vetroGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
