@@ -19,13 +19,7 @@ struct PairedPatientsWorkspaceView: View {
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                credentialsCard
-                patientsCard
-            }
-            .padding(20)
-        }
+        layoutBody
         .background(PlatformColors.groupedBackground)
         .task {
             await model.performAutomaticActionsIfNeeded()
@@ -86,6 +80,75 @@ struct PairedPatientsWorkspaceView: View {
         } message: {
             Text("L'osservazione resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
         }
+    }
+
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    private var usesSplitLayout: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return horizontalSizeClass == .regular
+        #endif
+    }
+
+    // Compact (iPhone): one column, list and selected-patient detail stacked.
+    // Regular (iPad/macOS): true master-detail, patient list beside the open patient.
+    @ViewBuilder
+    private var layoutBody: some View {
+        if usesSplitLayout {
+            HStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        credentialsCard
+                        patientsListCard
+                    }
+                    .padding(20)
+                }
+                .frame(width: 360)
+
+                Divider()
+
+                ScrollView {
+                    Group {
+                        if let detail = model.selectedPatient {
+                            patientDetailCard(detail)
+                        } else {
+                            emptyDetailState
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    credentialsCard
+                    patientsCard
+                }
+                .padding(20)
+            }
+        }
+    }
+
+    private var emptyDetailState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.text.rectangle")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("Seleziona un paziente")
+                .font(.headline)
+            Text("Scegli un paziente dall'elenco per vederne scheda, diario, terapie, controlli e osservazioni.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, minHeight: 320)
     }
 
     private var credentialsCard: some View {
@@ -184,30 +247,56 @@ struct PairedPatientsWorkspaceView: View {
 
     private var patientsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("Consultazione mobile")
-                    .font(.headline)
-                Spacer(minLength: 8)
-                Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(model.connectionState.tintColor)
-                    .accessibilityIdentifier("homebase-connection-state")
+            patientsListContent
+            if let detail = model.selectedPatient {
+                Divider()
+                selectedPatientSections(detail)
             }
-            Text(model.reconciliationLine)
-                .font(.caption)
+        }
+        .cardStyle()
+    }
+
+    // Master column (regular layout): patient list only.
+    private var patientsListCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            patientsListContent
+        }
+        .cardStyle()
+    }
+
+    // Detail column (regular layout): the open patient's sections.
+    private func patientDetailCard(_ detail: HomeBasePatientDetail) -> some View {
+        selectedPatientSections(detail)
+            .cardStyle()
+    }
+
+    @ViewBuilder
+    private var patientsListContent: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("Consultazione mobile")
+                .font(.headline)
+            Spacer(minLength: 8)
+            Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(model.connectionState.tintColor)
+                .accessibilityIdentifier("homebase-connection-state")
+        }
+        Text(model.reconciliationLine)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("homebase-reconciliation-state")
+        if model.isWorking && model.patients.isEmpty {
+            ProgressView()
+        } else if model.patients.isEmpty {
+            Text("Nessun paziente caricato.")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .accessibilityIdentifier("homebase-reconciliation-state")
-            if model.isWorking && model.patients.isEmpty {
-                ProgressView()
-            } else if model.patients.isEmpty {
-                Text("Nessun paziente caricato.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(model.patients) { patient in
-                    Button {
-                        Task { await model.loadPatient(patient) }
-                    } label: {
+        } else {
+            ForEach(model.patients) { patient in
+                Button {
+                    Task { await model.loadPatient(patient) }
+                } label: {
+                    HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(patient.lastName) \(patient.firstName)")
                                 .font(.subheadline.weight(.semibold))
@@ -215,23 +304,29 @@ struct PairedPatientsWorkspaceView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Spacer(minLength: 8)
+                        if model.selectedPatient?.id == patient.id {
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tint)
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
-            if let detail = model.selectedPatient {
-                Divider()
-                VStack(alignment: .leading, spacing: 10) {
-                    patientDetailSection(detail)
-                    diarySection
-                    therapiesSection
-                    checkupsSection
-                    observationsSection
-                }
+                .buttonStyle(.plain)
             }
         }
-        .cardStyle()
+    }
+
+    @ViewBuilder
+    private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            patientDetailSection(detail)
+            diarySection
+            therapiesSection
+            checkupsSection
+            observationsSection
+        }
     }
 
     private func patientDetailSection(_ detail: HomeBasePatientDetail) -> some View {
