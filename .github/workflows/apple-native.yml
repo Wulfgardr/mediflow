@@ -1,0 +1,55 @@
+name: Apple Native
+
+# Builds and tests the universal Apple app (iOS/iPadOS/macOS). The Liquid Glass
+# code uses .glassEffect under an iOS 26 / macOS 26 availability guard, so the
+# macOS job needs an Xcode with the 26 (or newer) SDK; it selects the latest
+# stable Xcode on the runner.
+
+on:
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'scripts/check-apple-*.sh'
+      - 'scripts/generate-apple-xcodeproj.sh'
+      - 'scripts/native-test.sh'
+      - '.github/workflows/apple-native.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/**'
+
+jobs:
+  structure-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Structure guard (no SPM app executables / dead roots)
+        run: scripts/check-apple-structure.sh
+
+  native-build-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Toolchain diagnostics
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -iE 'ios |macos ' || true
+      - name: Install xcodegen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Generate project + guards (structure + entitlements)
+        run: scripts/generate-apple-xcodeproj.sh
+      - name: SwiftPM tests
+        run: scripts/native-test.sh
+      - name: Build macOS app
+        run: |
+          xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMacApp -destination 'platform=macOS' \
+            build CODE_SIGNING_ALLOWED=NO
+      - name: Build iOS app
+        run: |
+          xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' \
+            build CODE_SIGNING_ALLOWED=NO
