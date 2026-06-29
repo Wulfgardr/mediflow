@@ -109,4 +109,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(sectionView("patient-detail-exemptions").waitForExistence(timeout: 10),
                       "Detail should show decoded exemption codes")
     }
+
+    func testTherapyStatusFilterNarrowsList() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        // Seeded therapies (one per status) render.
+        XCTAssertTrue(sectionView("therapy-row-therapy-active").waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("therapy-row-therapy-suspended").exists)
+        XCTAssertTrue(sectionView("therapy-row-therapy-completed").exists)
+
+        // Filter to "Sospese" via the menu; only the suspended therapy remains.
+        let filter = app.buttons["therapy-status-filter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5))
+        filter.tap()
+        app.buttons["Sospese"].tap()
+
+        XCTAssertTrue(sectionView("therapy-row-therapy-suspended").waitForExistence(timeout: 5))
+        XCTAssertFalse(sectionView("therapy-row-therapy-active").exists)
+        XCTAssertFalse(sectionView("therapy-row-therapy-completed").exists)
+    }
 }

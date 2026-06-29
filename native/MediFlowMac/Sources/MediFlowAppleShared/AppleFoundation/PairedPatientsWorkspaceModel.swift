@@ -181,6 +181,26 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
         )
     }
+
+    /// UI-test fixture therapies (one per status) so the therapy status filter can
+    /// be exercised without a paired home-base.
+    static func uiTestSeededTherapies(patientId: String) -> [HomeBaseTherapySummary] {
+        let base = Date(timeIntervalSince1970: 1_750_000_000)
+        func make(_ id: String, drug: String, status: String) -> HomeBaseTherapySummary {
+            HomeBaseTherapySummary(
+                id: id, patientId: patientId, drugName: drug, aic: nil, atc: nil,
+                activePrinciple: nil, dosage: "1 cp/die", motivation: nil,
+                diagnosisCode: nil, diagnosisName: nil, status: status,
+                startDate: base, endDate: nil, version: 1, createdAt: base, updatedAt: base,
+                deletedAt: nil, deletionReason: nil
+            )
+        }
+        return [
+            make("therapy-active", drug: "Ramipril", status: "active"),
+            make("therapy-suspended", drug: "Metformina", status: "suspended"),
+            make("therapy-completed", drug: "Amoxicillina", status: "completed")
+        ]
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -264,7 +284,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         if let detail = Self.uiTestSeededDetail(for: patient) {
             selectedPatient = detail
             entries = []
-            therapies = []
+            therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = []
             observations = []
             return

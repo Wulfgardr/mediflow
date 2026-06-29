@@ -19,6 +19,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var patientQuery = ""
     @State private var patientViewMode: PatientListViewMode = .active
     @State private var patientSortMode: PatientListSortMode = .recent
+    @State private var therapyStatusFilter: TherapyStatusFilter = .all
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -637,6 +638,18 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-therapies-button")
+
+                Menu {
+                    Picker("Stato terapie", selection: $therapyStatusFilter) {
+                        ForEach(TherapyStatusFilter.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                } label: {
+                    Label(therapyStatusFilter.title, systemImage: "line.3.horizontal.decrease.circle")
+                        .font(.caption)
+                }
+                .accessibilityIdentifier("therapy-status-filter")
             }
 
             if model.therapies.isEmpty {
@@ -644,8 +657,16 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(model.therapies), id: \.id) { therapy in
-                    therapyRow(therapy)
+                let filteredTherapies = TherapyFiltering.apply(model.therapies, filter: therapyStatusFilter)
+                if filteredTherapies.isEmpty {
+                    Text("Nessuna terapia per questo filtro.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredTherapies, id: \.id) { therapy in
+                        therapyRow(therapy)
+                            .accessibilityIdentifier("therapy-row-\(therapy.id)")
+                    }
                 }
             }
 
