@@ -186,13 +186,17 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let title: String?
     public let date: Date
     public let content: String
+    // A10: encrypted structured payload for scale entries (ENC: string), omitted
+    // when nil so ordinary diary entries are unchanged.
+    public let metadata: String?
 
-    public init(id: String, type: String, title: String? = nil, date: Date, content: String) {
+    public init(id: String, type: String, title: String? = nil, date: Date, content: String, metadata: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
         self.date = date
         self.content = content
+        self.metadata = metadata
     }
 }
 

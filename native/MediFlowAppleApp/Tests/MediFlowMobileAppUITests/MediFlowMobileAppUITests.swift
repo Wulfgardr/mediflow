@@ -378,6 +378,30 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "The pre-existing diagnosis must survive the round-trip")
     }
 
+    func testScaleFormSubmitsAndAppearsInDiary() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+
+        // Open the ADL scale form from the diary section header.
+        let scaleButton = app.buttons["new-scale-button"]
+        XCTAssertTrue(scrollDown(to: scaleButton), "The scale entry button should be available")
+        scaleButton.tap()
+
+        // The ADL form rendered: items + the live score (scoring is unit-tested).
+        XCTAssertTrue(app.switches["scale-question-bath"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["scale-score"].exists, "The live score should be shown")
+        app.switches["scale-question-bath"].tap()
+
+        app.buttons["submit-scale-button"].tap()
+
+        // The scale entry appears in the diary (seed short-circuit inserts it).
+        XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 5))
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

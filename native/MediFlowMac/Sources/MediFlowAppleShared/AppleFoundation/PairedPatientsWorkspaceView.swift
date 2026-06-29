@@ -22,6 +22,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var therapyStatusFilter: TherapyStatusFilter = .all
     @State private var checkupStatusFilter: CheckupStatusFilter = .all
     @State private var entryTypeFilter: EntryTypeFilter = .all
+    @State private var presentingScale: ClinicalScaleDefinition?
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -29,6 +30,16 @@ struct PairedPatientsWorkspaceView: View {
         .background(PlatformColors.groupedBackground)
         .task {
             await model.performAutomaticActionsIfNeeded()
+        }
+        .sheet(item: $presentingScale) { scale in
+            ClinicalScaleFormView(
+                definition: scale,
+                onSubmit: { answers in
+                    Task { await model.submitScale(scale, answers: answers) }
+                    presentingScale = nil
+                },
+                onCancel: { presentingScale = nil }
+            )
         }
         .confirmationDialog(
             "Annullare questa voce diario?",
@@ -660,6 +671,15 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-entries-button")
+
+                Button {
+                    presentingScale = ClinicalScales.adl
+                } label: {
+                    Label("Valutazione", systemImage: "checklist")
+                        .font(.caption)
+                }
+                .disabled(model.selectedPatient == nil)
+                .accessibilityIdentifier("new-scale-button")
 
                 Menu {
                     Picker("Tipo voce", selection: $entryTypeFilter) {

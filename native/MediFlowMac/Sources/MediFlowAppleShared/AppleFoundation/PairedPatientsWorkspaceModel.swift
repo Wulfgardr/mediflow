@@ -596,6 +596,55 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    /// A10: submit a completed clinical scale as a `type:"scale"` diary entry whose
+    /// encrypted metadata matches the web's shape, so the web reads it back.
+    func submitScale(_ definition: ClinicalScaleDefinition, answers: [String: Int]) async {
+        guard let patientId = selectedPatient?.id else { return }
+        let result = definition.result(from: answers)
+        let metadataJSON = ClinicalScales.metadataJSON(definition: definition, result: result)
+        let content = ClinicalScales.contentSummary(definition: definition, result: result)
+
+        #if DEBUG
+        if Self.isUITestSeeded {
+            let base = Date(timeIntervalSince1970: 1_750_000_000)
+            entries.insert(HomeBaseEntrySummary(
+                id: "scale-\(definition.id)-\(result.score)", patientId: patientId, type: "scale",
+                title: definition.title, date: base, content: content, setting: nil,
+                metadata: metadataJSON, attachments: nil, deletedAt: nil, deletionReason: nil,
+                version: 1, createdAt: base, updatedAt: base
+            ), at: 0)
+            statusMessage = "Valutazione \(definition.title) inviata: \(result.score)/\(definition.maxScore)."
+            return
+        }
+        #endif
+
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            _ = try await self.makeClient().createEntry(
+                patientId: patientId,
+                payload: HomeBaseEntryCreatePayload(
+                    id: UUID().uuidString,
+                    type: "scale",
+                    title: try self.sealField(definition.title),
+                    date: Date(),
+                    content: try self.sealField(content) ?? "",
+                    metadata: try self.sealStructuredField(metadataJSON)
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Valutazione \(definition.title) inviata: \(result.score)/\(definition.maxScore)."
+            self.entries = try await self.fetchDecryptedEntries(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+        }
+    }
+
     /* @Codex */
     func startEditingEntry(_ entry: HomeBaseEntrySummary) {
         guard canMutateEntry(entry) else { return }
@@ -733,6 +782,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         case .sealed(let sealed): return sealed
         case .failed: throw PairedCryptoError.sealFailed
         }
+    }
+
+    /// Seal an already-JSON structured field (metadata) for write: encrypt the JSON
+    /// directly (it is already JSON.stringify-d), no extra string-quoting.
+    private func sealStructuredField(_ json: String?) throws -> String? {
+        guard let masterKey else { throw PairedCryptoError.keyUnavailable }
+        guard let json else { return nil }
+        guard let enc = CryptoService.encryptField(json, masterKey: masterKey) else {
+            throw PairedCryptoError.sealFailed
+        }
+        return enc
     }
 
     /// Seal the edited diagnoses (lossless round-trip verified) and encrypt. An
