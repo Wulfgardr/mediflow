@@ -456,6 +456,19 @@ struct PairedPatientsWorkspaceView: View {
                 InfoRow("Esenzioni", exemptions.joined(separator: " · "))
                     .accessibilityIdentifier("patient-detail-exemptions")
             }
+            let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
+            if !diagnoses.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Diagnosi")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
+                        Text(diagnosis.displayText)
+                            .font(.callout)
+                    }
+                }
+                .accessibilityIdentifier("patient-detail-diagnoses")
+            }
             if let aiSummary = cleaned(detail.aiSummary) {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("Sintesi AI", systemImage: "sparkles")

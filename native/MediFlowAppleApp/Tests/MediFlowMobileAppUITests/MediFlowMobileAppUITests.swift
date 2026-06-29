@@ -108,6 +108,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "Selecting a patient should show the enriched detail")
         XCTAssertTrue(sectionView("patient-detail-exemptions").waitForExistence(timeout: 10),
                       "Detail should show decoded exemption codes")
+        XCTAssertTrue(sectionView("patient-detail-diagnoses").waitForExistence(timeout: 10),
+                      "Detail should show decoded diagnoses")
         XCTAssertTrue(sectionView("patient-detail-ai-summary").waitForExistence(timeout: 10),
                       "Detail should show the AI insight summary when present")
     }
