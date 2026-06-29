@@ -353,6 +353,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "The therapy plan export should be available")
     }
 
+    func testEditPatientFormAddsDiagnosis() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+
+        app.buttons["edit-patient-button"].tap()
+        let code = app.textFields["new-diagnosis-code"]
+        XCTAssertTrue(scrollDown(to: code), "The diagnosis editor should appear in the edit form")
+        code.tap()
+        code.typeText("J45")
+        let description = app.textFields["new-diagnosis-description"]
+        description.tap()
+        description.typeText("Asma")
+        app.buttons["add-diagnosis-button"].tap()
+        app.buttons["save-patient-button"].tap()
+
+        // The detail re-renders with the new diagnosis (existing one is preserved).
+        XCTAssertTrue(app.staticTexts["J45 - Asma"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["E11.9 - Diabete tipo 2"].waitForExistence(timeout: 5),
+                      "The pre-existing diagnosis must survive the round-trip")
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

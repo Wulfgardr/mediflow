@@ -239,6 +239,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     public let notes: PatchValue<String>
     public let monitoringProfile: PatchValue<String>
     public let statusReason: PatchValue<String>
+    // A14/A3: the diagnoses JSON-array string. The backend stores a string field
+    // verbatim (normalizeStructuredPatientField), so the encoded array round-trips.
+    public let diagnoses: PatchValue<String>
 
     public init(
         version: Int,
@@ -252,7 +255,8 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         caregiver: PatchValue<String> = .omit,
         notes: PatchValue<String> = .omit,
         monitoringProfile: PatchValue<String> = .omit,
-        statusReason: PatchValue<String> = .omit
+        statusReason: PatchValue<String> = .omit,
+        diagnoses: PatchValue<String> = .omit
     ) {
         self.version = version
         self.firstName = firstName
@@ -266,11 +270,12 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         self.notes = notes
         self.monitoringProfile = monitoringProfile
         self.statusReason = statusReason
+        self.diagnoses = diagnoses
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, firstName, lastName, taxCode, isAdi, isArchived
-        case address, phone, caregiver, notes, monitoringProfile, statusReason
+        case address, phone, caregiver, notes, monitoringProfile, statusReason, diagnoses
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -287,6 +292,7 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         try container.encodePatch(notes, forKey: .notes)
         try container.encodePatch(monitoringProfile, forKey: .monitoringProfile)
         try container.encodePatch(statusReason, forKey: .statusReason)
+        try container.encodePatch(diagnoses, forKey: .diagnoses)
     }
 }
 
@@ -582,14 +588,22 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
-    public func login(username: String?, password: String) async throws -> String {
+    public func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
         let url = try configuration.serverURL()
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
             .appendingPathComponent("login")
         let body = try JSONEncoder().encode(AuthLoginRequest(username: username, password: password))
-        let (_, response) = try await send(to: url, method: "POST", body: body)
-        return try Self.extractSessionCookie(from: response, url: url)
+        let (data, response) = try await send(to: url, method: "POST", body: body)
+        let sessionCookie = try Self.extractSessionCookie(from: response, url: url)
+        // The login body carries the wrapped master key + PBKDF2 salt (same as the
+        // web client). We keep them so the PIN can unwrap the field-crypto key.
+        let payload = try? JSONDecoder().decode(AuthLoginResponse.self, from: data)
+        return HomeBaseLoginResult(
+            sessionCookie: sessionCookie,
+            encryptedMasterKey: payload?.encryptedMasterKey,
+            salt: payload?.salt
+        )
     }
 
     public func fetchPatients(
@@ -1087,6 +1101,25 @@ private final class HomeBaseTLSSessionDelegate: NSObject, URLSessionDelegate {
 private struct AuthLoginRequest: Encodable {
     let username: String?
     let password: String
+}
+
+// The /api/auth/login body carries the operator's wrapped master key + PBKDF2
+// salt (base64), exactly as the web client consumes them.
+private struct AuthLoginResponse: Decodable {
+    let encryptedMasterKey: String?
+    let salt: String?
+}
+
+public struct HomeBaseLoginResult: Sendable {
+    public let sessionCookie: String
+    public let encryptedMasterKey: String?
+    public let salt: String?
+
+    public init(sessionCookie: String, encryptedMasterKey: String?, salt: String?) {
+        self.sessionCookie = sessionCookie
+        self.encryptedMasterKey = encryptedMasterKey
+        self.salt = salt
+    }
 }
 
 private struct APIErrorPayload: Decodable {

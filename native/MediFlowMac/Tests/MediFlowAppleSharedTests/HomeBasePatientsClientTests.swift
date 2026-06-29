@@ -31,12 +31,14 @@ final class HomeBasePatientsClientTests: XCTestCase {
                     "Set-Cookie": "mediflow_session=session-123; Path=/; HttpOnly; SameSite=Lax",
                 ]
             )!
-            return (response, Data(#"{"success":true}"#.utf8))
+            return (response, Data(#"{"success":true,"encryptedMasterKey":"d3JhcHBlZE1L","salt":"c2FsdA=="}"#.utf8))
         }
 
-        let cookie = try await client.login(username: "doctor", password: "1992")
+        let result = try await client.login(username: "doctor", password: "1992")
 
-        XCTAssertEqual(cookie, "mediflow_session=session-123")
+        XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
+        XCTAssertEqual(result.encryptedMasterKey, "d3JhcHBlZE1L", "login must surface the wrapped master key")
+        XCTAssertEqual(result.salt, "c2FsdA==", "login must surface the PBKDF2 salt for the field crypto")
     }
 
     func testFetchPatientsUsesPairedHeadersAndAmbulatoryCookie() async throws {
@@ -1088,6 +1090,11 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertNil(payload["caregiver"], "PatchValue .omit must be absent")
             XCTAssertEqual(payload["isArchived"] as? Bool, true, "a set isArchived flag must be sent")
             XCTAssertNil(payload["isAdi"], "an unset bool flag must be absent (encodeIfPresent)")
+            XCTAssertEqual(
+                payload["diagnoses"] as? String,
+                "[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]",
+                "diagnoses must be sent verbatim as the JSON-array string"
+            )
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
@@ -1098,7 +1105,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
         let ack = try await client.updatePatient(
             patientId: "patient-1",
             payload: HomeBasePatientUpdatePayload(
-                version: 5, firstName: "Mario", isArchived: true, address: .null, phone: .value("06 1234")
+                version: 5, firstName: "Mario", isArchived: true, address: .null, phone: .value("06 1234"),
+                diagnoses: .value("[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]")
             ),
             credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
             sessionCookie: "mediflow_session=session-123",

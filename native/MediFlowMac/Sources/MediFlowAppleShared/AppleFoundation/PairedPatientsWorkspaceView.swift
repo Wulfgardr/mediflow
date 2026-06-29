@@ -531,6 +531,39 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("edit-patient-notes")
             Toggle("Archiviato", isOn: $model.editPatientIsArchived)
                 .accessibilityIdentifier("edit-patient-archived")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Diagnosi")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(Array(model.editPatientDiagnoses.enumerated()), id: \.offset) { index, diagnosis in
+                    HStack {
+                        Text(diagnosis.displayText)
+                            .font(.callout)
+                        Spacer(minLength: 8)
+                        Button(role: .destructive) {
+                            model.removeDiagnosis(at: IndexSet(integer: index))
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .accessibilityIdentifier("remove-diagnosis-\(index)")
+                    }
+                }
+                HStack(spacing: 6) {
+                    TextField("Codice", text: $model.newDiagnosisCode)
+                        .accessibilityIdentifier("new-diagnosis-code")
+                        .frame(maxWidth: 120)
+                    TextField("Descrizione", text: $model.newDiagnosisDescription)
+                        .accessibilityIdentifier("new-diagnosis-description")
+                    Button {
+                        model.addDiagnosis()
+                    } label: {
+                        Image(systemName: "plus.circle")
+                    }
+                    .accessibilityIdentifier("add-diagnosis-button")
+                }
+            }
+
             HStack(spacing: 10) {
                 Button("Salva") {
                     Task { await model.savePatient() }

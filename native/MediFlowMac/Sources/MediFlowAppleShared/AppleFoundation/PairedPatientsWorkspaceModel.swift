@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 #if os(macOS)
 import AppKit
 #else
@@ -7,6 +8,10 @@ import UIKit
 
 @MainActor
 final class PairedPatientsWorkspaceModel: ObservableObject {
+    /// The operator field-crypto master key, derived from the PIN at login and
+    /// held only in memory (never @Published, never persisted in clear). nil until
+    /// a successful login delivers and unwraps it.
+    private var masterKey: SymmetricKey?
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL
     @Published var tlsPin = ""
     @Published var pairedClientId = ""
@@ -37,6 +42,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientCaregiver = ""
     @Published var editPatientNotes = ""
     @Published var editPatientIsArchived = false
+    @Published private(set) var editPatientDiagnoses: [ClinicalDiagnosis] = []
+    @Published var newDiagnosisCode = ""
+    @Published var newDiagnosisDescription = ""
     @Published private(set) var isEditingPatient = false
     @Published var newTherapyDrugName = ""
     @Published var newTherapyActivePrinciple = ""
@@ -333,12 +341,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.sessionCookie = try await self.makeClient().login(
+            let result = try await self.makeClient().login(
                 username: self.username.trimmedOrNil,
                 password: self.password
             )
-            self.statusMessage = "Sessione operatore attiva."
+            self.sessionCookie = result.sessionCookie
+            self.unlockFieldCrypto(with: result, pin: self.password)
+            self.statusMessage = self.masterKey == nil
+                ? "Sessione operatore attiva. Cifratura campi non disponibile."
+                : "Sessione operatore attiva."
         }
+    }
+
+    /// Derive the field-crypto master key from the operator PIN + the wrapped key
+    /// material returned by login (same as the web client). Kept only in memory.
+    private func unlockFieldCrypto(with result: HomeBaseLoginResult, pin: String) {
+        guard let wrapped = result.encryptedMasterKey,
+              let saltB64 = result.salt,
+              let salt = Data(base64Encoded: saltB64) else {
+            masterKey = nil
+            return
+        }
+        let kek = CryptoService.deriveKEK(pin: pin, salt: salt)
+        masterKey = CryptoService.unwrapMasterKey(wrappedBase64: wrapped, kek: kek)
     }
 
     func loadPatients() async {
@@ -411,12 +436,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
         await runTask {
-            self.selectedPatient = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
             self.entries = try await self.makeClient().fetchEntries(
                 patientId: patient.id,
                 credentials: credentials,
@@ -466,9 +492,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         let id = current.id
         await runTask {
-            self.selectedPatient = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
             self.entries = try await self.makeClient().fetchEntries(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
@@ -600,8 +627,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
         editPatientIsArchived = patient.isArchived ?? false
+        editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
+        newDiagnosisCode = ""
+        newDiagnosisDescription = ""
         isEditingPatient = true
         statusMessage = "Modifica anagrafica pronta."
+    }
+
+    func addDiagnosis() {
+        let code = newDiagnosisCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = newDiagnosisDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty || !description.isEmpty else { return }
+        // date == nil: encode stamps it with "now", so existing dates stay intact.
+        editPatientDiagnoses.append(ClinicalDiagnosis(code: code, description: description, system: nil, date: nil))
+        newDiagnosisCode = ""
+        newDiagnosisDescription = ""
+    }
+
+    func removeDiagnosis(at offsets: IndexSet) {
+        editPatientDiagnoses.remove(atOffsets: offsets)
     }
 
     func cancelEditingPatient() {
@@ -610,17 +654,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     func savePatient() async {
         guard let current = selectedPatient else { return }
-        let payload = HomeBasePatientUpdatePayload(
-            version: current.version,
-            firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
-            lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
-            isArchived: editPatientIsArchived,
-            address: patientPatchValue(editPatientAddress),
-            phone: patientPatchValue(editPatientPhone),
-            caregiver: patientPatchValue(editPatientCaregiver),
-            notes: patientPatchValue(editPatientNotes)
-        )
 
         #if DEBUG
         if Self.isUITestSeeded {
@@ -635,6 +668,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
+        // Encrypted clinical fields are sealed on-device before they leave: the
+        // home-base only ever stores ciphertext (zero-knowledge), like the web.
+        // Without the key we refuse the write rather than persist plaintext.
+        guard let masterKey else {
+            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di salvare."
+            return
+        }
+        let payload = HomeBasePatientUpdatePayload(
+            version: current.version,
+            firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
+            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            isArchived: editPatientIsArchived,
+            address: encryptedStringPatchValue(editPatientAddress, masterKey: masterKey),
+            phone: encryptedStringPatchValue(editPatientPhone, masterKey: masterKey),
+            caregiver: encryptedStringPatchValue(editPatientCaregiver, masterKey: masterKey),
+            notes: encryptedStringPatchValue(editPatientNotes, masterKey: masterKey),
+            diagnoses: encryptedDiagnosesPatchValue(masterKey: masterKey)
+        )
         let patientId = current.id
         await runTask {
             let acknowledgement = try await self.makeClient().updatePatient(
@@ -646,19 +698,47 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
             self.isEditingPatient = false
-            self.selectedPatient = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
         }
     }
 
-    private func patientPatchValue(_ text: String) -> PatchValue<String> {
+    /// Seal an encrypted string field for write: empty clears (null); otherwise
+    /// JSON-encode (matching JSON.stringify) and encrypt to ENC:. The caller holds
+    /// the key, so this never emits plaintext for an encrypted field (.omit on a
+    /// crypto failure leaves the stored value untouched rather than clobbering it).
+    private func encryptedStringPatchValue(_ text: String, masterKey: SymmetricKey) -> PatchValue<String> {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? .null : .value(trimmed)
+        guard !trimmed.isEmpty else { return .null }
+        guard let json = CryptoService.jsonEncode(trimmed),
+              let enc = CryptoService.encryptField(json, masterKey: masterKey) else {
+            return .omit
+        }
+        return .value(enc)
+    }
+
+    /// Seal the edited diagnoses (lossless round-trip verified) and encrypt. An
+    /// empty list clears the field.
+    private func encryptedDiagnosesPatchValue(masterKey: SymmetricKey) -> PatchValue<String> {
+        guard let plainJSON = DiagnosesCodec.encode(editPatientDiagnoses, defaultDate: Self.nowISODate()) else {
+            return .null
+        }
+        guard let enc = CryptoService.encryptField(plainJSON, masterKey: masterKey) else {
+            return .omit
+        }
+        return .value(enc)
+    }
+
+    static func nowISODate() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: Date())
     }
 
     #if DEBUG
@@ -677,7 +757,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             phone: editPatientPhone.trimmedOrNil,
             caregiver: editPatientCaregiver.trimmedOrNil,
             exemptions: current.exemptions,
-            diagnoses: current.diagnoses,
+            diagnoses: DiagnosesCodec.encode(editPatientDiagnoses, defaultDate: Self.nowISODate()),
             monitoringProfile: current.monitoringProfile,
             statusReason: current.statusReason,
             notes: editPatientNotes.trimmedOrNil,
@@ -1312,6 +1392,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             reconciliationLine = "Scritture online dopo accesso operatore. Nessuna coda offline."
             discoveryMessage = nil
             sessionCookie = nil
+            masterKey = nil
             try cacheStore.clear()
             statusMessage = "Configurazione paired rimossa da questo dispositivo."
         } catch {
@@ -1410,6 +1491,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                status == 401 {
                 connectionState = .sessionExpired
                 sessionCookie = nil
+                masterKey = nil
                 statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
