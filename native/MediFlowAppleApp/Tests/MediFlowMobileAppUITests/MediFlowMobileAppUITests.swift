@@ -251,4 +251,45 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // The form dismisses and the detail re-renders with the archived flag chip.
         XCTAssertTrue(app.staticTexts["Archiviato"].waitForExistence(timeout: 5))
     }
+
+    func testObservationTrendIndicatorShowsForRepeatReading() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+
+        // The observations section sits near the bottom of the detail scroll view,
+        // and SwiftUI only surfaces on-screen rows in the accessibility tree, so each
+        // assertion scrolls its target into view first.
+        let risingArrow = app.images["observation-trend-obs-weight-new"]
+        XCTAssertTrue(scrollDown(to: risingArrow),
+                      "The newer weight reading (82 after 80) should show a trend arrow")
+        // Assert the direction, not just the presence: 82 after 80 is rising.
+        XCTAssertEqual(risingArrow.label, "Valore in aumento rispetto alla rilevazione precedente")
+
+        // The heart-rate pair (72 after 80) trends the other way.
+        let fallingArrow = app.images["observation-trend-obs-hr-new"]
+        XCTAssertTrue(scrollDown(to: fallingArrow))
+        XCTAssertEqual(fallingArrow.label, "Valore in diminuzione rispetto alla rilevazione precedente")
+
+        // Anchor on the single-reading glucose row, then assert it shows no arrow
+        // (so the negative check can't pass merely because the row is off screen).
+        XCTAssertTrue(scrollDown(to: app.staticTexts["Glicemia"]))
+        XCTAssertFalse(app.images["observation-trend-obs-glucose"].exists,
+                       "A single-reading code should not render a trend arrow")
+    }
+
+    /// Swipes the detail scroll view up until `element` is in the accessibility
+    /// tree (or a swipe budget is exhausted). Returns whether it became present.
+    private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {
+        var attempts = 0
+        while !element.exists && attempts < maxSwipes {
+            app.swipeUp()
+            attempts += 1
+        }
+        return element.waitForExistence(timeout: 5)
+    }
 }

@@ -248,6 +248,30 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             make("entry-phone", type: "phone", title: "Contatto telefonico")
         ]
     }
+
+    static func uiTestSeededObservations(patientId: String) -> [HomeBaseObservationSummary] {
+        let base = Date(timeIntervalSince1970: 1_750_000_000)
+        func make(_ id: String, code: String, display: String, unit: String,
+                  value: String, daysAgo: Double) -> HomeBaseObservationSummary {
+            HomeBaseObservationSummary(
+                id: id, patientId: patientId, codeSystem: "http://loinc.org", code: code,
+                display: display, unitSystem: "http://unitsofmeasure.org", unitCode: unit,
+                value: value, notes: nil, observedAt: base.addingTimeInterval(-daysAgo * 86400),
+                source: "manual", version: 1, createdAt: nil, updatedAt: nil,
+                deletedAt: nil, deletionReason: nil
+            )
+        }
+        return [
+            // Two weight readings of the same code: the newer one trends "rising".
+            make("obs-weight-new", code: "29463-7", display: "Peso corporeo", unit: "kg", value: "82", daysAgo: 0),
+            make("obs-weight-old", code: "29463-7", display: "Peso corporeo", unit: "kg", value: "80", daysAgo: 1),
+            // Two heart-rate readings: the newer one trends "falling".
+            make("obs-hr-new", code: "8867-4", display: "Frequenza cardiaca", unit: "/min", value: "72", daysAgo: 0),
+            make("obs-hr-old", code: "8867-4", display: "Frequenza cardiaca", unit: "/min", value: "80", daysAgo: 1),
+            // A single reading of another code: no predecessor, so no trend arrow.
+            make("obs-glucose", code: "2339-0", display: "Glicemia", unit: "mg/dL", value: "95", daysAgo: 0)
+        ]
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -333,7 +357,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             entries = Self.uiTestSeededEntries(patientId: patient.id)
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
-            observations = []
+            observations = Self.uiTestSeededObservations(patientId: patient.id)
             return
         }
         #endif

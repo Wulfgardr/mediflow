@@ -1040,8 +1040,9 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                let trends = ObservationTrendComputer.compute(model.observations)
                 ForEach(model.observations, id: \.id) { observation in
-                    observationRow(observation)
+                    observationRow(observation, trend: trends[observation.id] ?? .none)
                 }
             }
 
@@ -1164,12 +1165,19 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     /* @Codex */
-    private func observationRow(_ observation: HomeBaseObservationSummary) -> some View {
+    private func observationRow(_ observation: HomeBaseObservationSummary, trend: ObservationTrend) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(observation.display)
                     .font(.caption.weight(.semibold))
                 Spacer(minLength: 8)
+                if observation.deletedAt == nil, let glyph = Self.trendGlyph(trend) {
+                    Image(systemName: glyph.symbol)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("observation-trend-\(observation.id)")
+                        .accessibilityLabel(glyph.label)
+                }
                 Text("\(observation.value) \(observation.unitCode)")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
@@ -1210,6 +1218,21 @@ struct PairedPatientsWorkspaceView: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// SF Symbol + accessibility label for an observation trend. Clinically neutral:
+    /// a direction only, never a good/bad color. Returns nil for `.none` (no arrow).
+    private static func trendGlyph(_ trend: ObservationTrend) -> (symbol: String, label: String)? {
+        switch trend {
+        case .rising:
+            return ("arrow.up.right", "Valore in aumento rispetto alla rilevazione precedente")
+        case .falling:
+            return ("arrow.down.right", "Valore in diminuzione rispetto alla rilevazione precedente")
+        case .steady:
+            return ("arrow.right", "Valore stabile rispetto alla rilevazione precedente")
+        case .none:
+            return nil
+        }
     }
 
     /* @Codex */
