@@ -443,25 +443,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
-            self.entries = try await self.makeClient().fetchEntries(
+            self.entries = try await self.fetchDecryptedEntries(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -496,16 +496,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 id: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
-            self.entries = try await self.makeClient().fetchEntries(
+            self.entries = try await self.fetchDecryptedEntries(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
@@ -541,7 +541,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.entries = try await self.makeClient().fetchEntries(
+            self.entries = try await self.fetchDecryptedEntries(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -584,7 +584,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.newEntryDraftId = UUID().uuidString
             self.statusMessage = "Voce diario inviata all'home-base."
             do {
-                self.entries = try await self.makeClient().fetchEntries(
+                self.entries = try await self.fetchDecryptedEntries(
                     patientId: patientId,
                     credentials: credentials,
                     sessionCookie: sessionCookie,
@@ -803,7 +803,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
             self.cancelEditingEntry()
-            self.entries = try await self.makeClient().fetchEntries(
+            self.entries = try await self.fetchDecryptedEntries(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -840,7 +840,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             if self.editingEntryId == entry.id {
                 self.cancelEditingEntry()
             }
-            self.entries = try await self.makeClient().fetchEntries(
+            self.entries = try await self.fetchDecryptedEntries(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -859,7 +859,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -901,7 +901,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.resetNewTherapyForm()
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -977,7 +977,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
             self.cancelEditingTherapy()
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1014,7 +1014,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             if self.editingTherapyId == therapy.id {
                 self.cancelEditingTherapy()
             }
-            self.therapies = try await self.makeClient().fetchTherapies(
+            self.therapies = try await self.fetchDecryptedTherapies(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1033,7 +1033,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1069,7 +1069,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.resetNewCheckupForm()
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1131,7 +1131,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
             self.cancelEditingCheckup()
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1168,7 +1168,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             if self.editingCheckupId == checkup.id {
                 self.cancelEditingCheckup()
             }
-            self.checkups = try await self.makeClient().fetchCheckups(
+            self.checkups = try await self.fetchDecryptedCheckups(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1187,7 +1187,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1228,7 +1228,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.resetNewObservationForm()
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1299,7 +1299,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
             self.cancelEditingObservation()
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1336,7 +1336,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             if self.editingObservationId == observation.id {
                 self.cancelEditingObservation()
             }
-            self.observations = try await self.makeClient().fetchObservations(
+            self.observations = try await self.fetchDecryptedObservations(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1409,6 +1409,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     private func makeClient() -> HomeBasePatientsClient {
         HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
+    }
+
+    // Fetch + decrypt the clinical sub-resources so their encrypted fields display
+    // as plaintext. Same signature as the client methods, so call sites swap the
+    // client call for these verbatim.
+    private func fetchDecryptedEntries(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseEntrySummary] {
+        try await makeClient().fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
+    }
+
+    private func fetchDecryptedTherapies(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseTherapySummary] {
+        try await makeClient().fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
+    }
+
+    private func fetchDecryptedCheckups(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseCheckupSummary] {
+        try await makeClient().fetchCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
+    }
+
+    private func fetchDecryptedObservations(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseObservationSummary] {
+        try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
     }
 
     private func applyLaunchOverrides(_ launchOverrides: AppleFoundationLaunchOverrides) {
