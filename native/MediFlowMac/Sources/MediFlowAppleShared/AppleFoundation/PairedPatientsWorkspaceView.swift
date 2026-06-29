@@ -402,9 +402,20 @@ struct PairedPatientsWorkspaceView: View {
     private func patientDetailSection(_ detail: HomeBasePatientDetail) -> some View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
         return VStack(alignment: .leading, spacing: 8) {
-            Label("Anagrafica in sola lettura", systemImage: "lock")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            HStack {
+                Label("Anagrafica", systemImage: "person.text.rectangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button {
+                    model.startEditingPatient()
+                } label: {
+                    Label("Modifica", systemImage: "pencil")
+                }
+                .font(.caption)
+                .disabled(model.isEditingPatient)
+                .accessibilityIdentifier("edit-patient-button")
+            }
             Text("\(detail.lastName) \(detail.firstName)")
                 .font(.title3.weight(.semibold))
                 .accessibilityIdentifier("patient-detail-name")
@@ -453,7 +464,46 @@ struct PairedPatientsWorkspaceView: View {
                         .font(.callout)
                 }
             }
+            if model.isEditingPatient {
+                Divider()
+                patientEditForm
+            }
         }
+    }
+
+    private var patientEditForm: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Modifica anagrafica")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Nome", text: $model.editPatientFirstName)
+                .accessibilityIdentifier("edit-patient-firstName")
+            TextField("Cognome", text: $model.editPatientLastName)
+                .accessibilityIdentifier("edit-patient-lastName")
+            TextField("Codice fiscale", text: $model.editPatientTaxCode)
+                .accessibilityIdentifier("edit-patient-taxCode")
+            TextField("Indirizzo", text: $model.editPatientAddress)
+                .accessibilityIdentifier("edit-patient-address")
+            TextField("Telefono", text: $model.editPatientPhone)
+                .accessibilityIdentifier("edit-patient-phone")
+            TextField("Caregiver", text: $model.editPatientCaregiver)
+                .accessibilityIdentifier("edit-patient-caregiver")
+            TextField("Note", text: $model.editPatientNotes, axis: .vertical)
+                .accessibilityIdentifier("edit-patient-notes")
+            HStack(spacing: 10) {
+                Button("Salva") {
+                    Task { await model.savePatient() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.isWorking)
+                .accessibilityIdentifier("save-patient-button")
+                Button("Annulla") {
+                    model.cancelEditingPatient()
+                }
+                .accessibilityIdentifier("cancel-patient-button")
+            }
+        }
+        .textFieldStyle(.roundedBorder)
     }
 
     private func cleaned(_ value: String?) -> String? {

@@ -28,6 +28,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
     @Published var editEntryContent = ""
+    @Published var editPatientFirstName = ""
+    @Published var editPatientLastName = ""
+    @Published var editPatientTaxCode = ""
+    @Published var editPatientAddress = ""
+    @Published var editPatientPhone = ""
+    @Published var editPatientCaregiver = ""
+    @Published var editPatientNotes = ""
+    @Published private(set) var isEditingPatient = false
     @Published var newTherapyDrugName = ""
     @Published var newTherapyActivePrinciple = ""
     @Published var newTherapyDosage = ""
@@ -451,6 +459,108 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editEntryType = .note
         editEntryContent = ""
     }
+
+    // A4: edit patient anagrafica.
+    func startEditingPatient() {
+        guard let patient = selectedPatient else { return }
+        editPatientFirstName = patient.firstName
+        editPatientLastName = patient.lastName
+        editPatientTaxCode = patient.taxCode
+        editPatientAddress = patient.address ?? ""
+        editPatientPhone = patient.phone ?? ""
+        editPatientCaregiver = patient.caregiver ?? ""
+        editPatientNotes = patient.notes ?? ""
+        isEditingPatient = true
+        statusMessage = "Modifica anagrafica pronta."
+    }
+
+    func cancelEditingPatient() {
+        isEditingPatient = false
+    }
+
+    func savePatient() async {
+        guard let current = selectedPatient else { return }
+        let payload = HomeBasePatientUpdatePayload(
+            version: current.version,
+            firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
+            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            address: patientPatchValue(editPatientAddress),
+            phone: patientPatchValue(editPatientPhone),
+            caregiver: patientPatchValue(editPatientCaregiver),
+            notes: patientPatchValue(editPatientNotes)
+        )
+
+        #if DEBUG
+        if Self.isUITestSeeded {
+            selectedPatient = editedPatientDetail(from: current)
+            isEditingPatient = false
+            statusMessage = "Anagrafica aggiornata."
+            return
+        }
+        #endif
+
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let patientId = current.id
+        await runTask {
+            let acknowledgement = try await self.makeClient().updatePatient(
+                patientId: patientId,
+                payload: payload,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.isEditingPatient = false
+            self.selectedPatient = try await self.makeClient().fetchPatient(
+                id: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Anagrafica aggiornata sull'home-base."
+        }
+    }
+
+    private func patientPatchValue(_ text: String) -> PatchValue<String> {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? .null : .value(trimmed)
+    }
+
+    #if DEBUG
+    static var isUITestSeeded: Bool {
+        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1"
+    }
+
+    private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
+        HomeBasePatientDetail(
+            id: current.id,
+            firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
+            birthDate: current.birthDate,
+            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            address: editPatientAddress.trimmedOrNil,
+            phone: editPatientPhone.trimmedOrNil,
+            caregiver: editPatientCaregiver.trimmedOrNil,
+            exemptions: current.exemptions,
+            diagnoses: current.diagnoses,
+            monitoringProfile: current.monitoringProfile,
+            statusReason: current.statusReason,
+            notes: editPatientNotes.trimmedOrNil,
+            aiSummary: current.aiSummary,
+            documentInsights: current.documentInsights,
+            isAdi: current.isAdi,
+            isArchived: current.isArchived,
+            version: current.version + 1,
+            ambulatoryId: current.ambulatoryId,
+            createdAt: current.createdAt,
+            updatedAt: current.updatedAt
+        )
+    }
+    #endif
 
     /* @Codex */
     func updateEditingEntry() async {

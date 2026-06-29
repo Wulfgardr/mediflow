@@ -196,4 +196,32 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "Privacy shield should cover the clinical content when the scene is not active"
         )
     }
+
+    func testEditPatientFormSavesAnagrafica() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForExistence(timeout: 5))
+
+        // Open the edit form and replace the address.
+        app.buttons["edit-patient-button"].tap()
+        let address = app.textFields["edit-patient-address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.tap()
+        if let existing = address.value as? String {
+            address.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+        }
+        address.typeText("Via Nuova 5")
+
+        app.buttons["save-patient-button"].tap()
+
+        // The detail re-renders with the new address; the form is dismissed.
+        XCTAssertTrue(app.staticTexts["Via Nuova 5"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForNonExistence(timeout: 3))
+    }
 }
