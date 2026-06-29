@@ -570,9 +570,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseEntryCreatePayload(
                     id: self.newEntryDraftId,
                     type: type,
-                    title: title,
+                    title: try self.sealField(title),
                     date: Date(),
-                    content: content
+                    content: try self.sealField(content) ?? ""
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -723,6 +723,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return .value(enc)
     }
 
+    /// Seal one encrypted clinical sub-resource field for write. Throws if the
+    /// operator key is unavailable (refuse the write) or sealing fails, so plaintext
+    /// is never persisted into an encrypted column. nil passes through (field
+    /// absent/cleared). Called from inside the throwing runTask write closures.
+    private func sealField(_ value: String?) throws -> String? {
+        guard let masterKey else { throw PairedCryptoError.keyUnavailable }
+        switch CryptoService.seal(value, masterKey: masterKey) {
+        case .sealed(let sealed): return sealed
+        case .failed: throw PairedCryptoError.sealFailed
+        }
+    }
+
     /// Seal the edited diagnoses (lossless round-trip verified) and encrypt. An
     /// empty list clears the field.
     private func encryptedDiagnosesPatchValue(masterKey: SymmetricKey) -> PatchValue<String> {
@@ -794,8 +806,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseEntryUpdatePayload(
                     version: version,
                     type: type,
-                    title: title,
-                    content: content
+                    title: try self.sealField(title),
+                    content: try self.sealField(content)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -830,7 +842,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseEntryUpdatePayload(
                     version: entry.version,
                     deletedAt: Date(),
-                    deletionReason: "mobile-paired-operator-cancelled"
+                    deletionReason: try self.sealField("mobile-paired-operator-cancelled")
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -894,7 +906,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     status: self.newTherapyStatus.rawValue,
                     startDate: self.newTherapyStartDate,
                     endDate: endDate,
-                    motivation: motivation
+                    motivation: try self.sealField(motivation)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -969,7 +981,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     startDate: self.editTherapyStartDate,
                     endDate: self.editTherapyHasEndDate ? self.editTherapyEndDate : nil,
                     shouldEncodeEndDate: true,
-                    motivation: motivation
+                    motivation: try self.sealField(motivation)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1004,7 +1016,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseTherapyUpdatePayload(
                     version: therapy.version,
                     deletedAt: Date(),
-                    deletionReason: "mobile-paired-operator-cancelled"
+                    deletionReason: try self.sealField("mobile-paired-operator-cancelled")
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1062,7 +1074,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     date: self.newCheckupDate,
                     title: title,
                     status: self.newCheckupStatus.rawValue,
-                    notes: notes
+                    notes: try self.sealField(notes)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1123,7 +1135,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     date: self.editCheckupDate,
                     title: title,
                     status: self.editCheckupStatus.rawValue,
-                    notes: notes
+                    notes: try self.sealField(notes)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1158,6 +1170,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseCheckupUpdatePayload(
                     version: checkup.version,
                     deletedAt: Date(),
+                    // checkups encrypt only `notes` (lib/db.ts), so deletionReason
+                    // stays plaintext to match what the web decrypts.
                     deletionReason: "mobile-paired-operator-cancelled"
                 ),
                 credentials: credentials,
@@ -1221,7 +1235,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     unitCode: unitCode,
                     value: value,
                     observedAt: self.newObservationObservedAt,
-                    notes: notes
+                    notes: try self.sealField(notes)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1291,7 +1305,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     unitCode: unitCode,
                     value: value,
                     observedAt: self.editObservationObservedAt,
-                    notes: notes
+                    notes: try self.sealField(notes)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1326,6 +1340,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseObservationUpdatePayload(
                     version: observation.version,
                     deletedAt: Date(),
+                    // observations encrypt only `notes` (lib/db.ts), so deletionReason
+                    // stays plaintext to match what the web decrypts.
                     deletionReason: "mobile-paired-operator-cancelled"
                 ),
                 credentials: credentials,
@@ -1722,6 +1738,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+    }
+}
+
+/// Field-crypto failures surfaced to the operator when a write cannot be sealed.
+enum PairedCryptoError: LocalizedError {
+    case keyUnavailable
+    case sealFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .keyUnavailable:
+            return "Cifratura non disponibile: riaccedi con il PIN operatore prima di salvare."
+        case .sealFailed:
+            return "Cifratura del campo non riuscita: riprova."
+        }
     }
 }
 

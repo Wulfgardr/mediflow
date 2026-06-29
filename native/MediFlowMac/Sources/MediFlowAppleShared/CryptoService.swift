@@ -67,6 +67,25 @@ public enum CryptoService {
         return try? JSONDecoder().decode(String.self, from: data)
     }
 
+    // MARK: Write sealing
+
+    /// Outcome of sealing one write field. `.failed` lets the caller abort the
+    /// whole write rather than ever send plaintext into an encrypted column.
+    public enum FieldSeal: Equatable {
+        case sealed(String?)  // nil passthrough (field absent/clear), or the ENC string
+        case failed
+    }
+
+    /// Seal an optional plaintext field for write: nil stays nil; a value is
+    /// JSON.stringify-d (matching the web) then AES-GCM encrypted to ENC:.
+    public static func seal(_ plaintext: String?, masterKey: SymmetricKey) -> FieldSeal {
+        guard let plaintext else { return .sealed(nil) }
+        guard let json = jsonEncode(plaintext), let enc = encryptField(json, masterKey: masterKey) else {
+            return .failed
+        }
+        return .sealed(enc)
+    }
+
     // MARK: Key derivation + master-key wrap
 
     /// PBKDF2-HMAC-SHA256(pin, salt, 100k) -> 256-bit KEK, matching deriveKeyFromPin.

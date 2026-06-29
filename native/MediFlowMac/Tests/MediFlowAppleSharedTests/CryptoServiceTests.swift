@@ -67,4 +67,19 @@ final class CryptoServiceTests: XCTestCase {
         XCTAssertEqual(CryptoService.jsonEncode("foo"), "\"foo\"")
         XCTAssertEqual(CryptoService.jsonDecodeString("\"foo\""), "foo")
     }
+
+    func testSealNilPassesThrough() {
+        XCTAssertEqual(CryptoService.seal(nil, masterKey: key(rawKeyB64)), .sealed(nil))
+    }
+
+    func testSealValueRoundTripsThroughDecrypt() {
+        let masterKey = key(rawKeyB64)
+        guard case .sealed(let sealedValue) = CryptoService.seal("Motivo clinico", masterKey: masterKey) else {
+            return XCTFail("sealing a value must succeed")
+        }
+        let enc = try? XCTUnwrap(sealedValue)
+        XCTAssertEqual(enc?.hasPrefix("ENC:"), true, "a sealed field must be ciphertext")
+        // The read path (decryptStringField) recovers the original plaintext.
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(enc, masterKey: masterKey), "Motivo clinico")
+    }
 }
