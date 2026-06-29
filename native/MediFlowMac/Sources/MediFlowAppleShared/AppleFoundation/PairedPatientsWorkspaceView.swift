@@ -16,6 +16,9 @@ struct PairedPatientsWorkspaceView: View {
     @State private var checkupDeletionCandidateId: String?
     @State private var confirmsDeletingObservation = false
     @State private var observationDeletionCandidateId: String?
+    @State private var patientQuery = ""
+    @State private var patientViewMode: PatientListViewMode = .active
+    @State private var patientSortMode: PatientListSortMode = .recent
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -292,28 +295,87 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         } else {
-            ForEach(model.patients) { patient in
-                Button {
-                    Task { await model.loadPatient(patient) }
-                } label: {
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(patient.lastName) \(patient.firstName)")
-                                .font(.subheadline.weight(.semibold))
-                            Text(patient.taxCode)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+            patientSearchControls
+            let results = filteredPatients
+            if results.isEmpty {
+                Text("Nessun paziente per questi filtri.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("patient-search-empty")
+            } else {
+                ForEach(results) { patient in
+                    Button {
+                        Task { await model.loadPatient(patient) }
+                    } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(patient.lastName) \(patient.firstName)")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(patient.taxCode)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            if model.selectedPatient?.id == patient.id {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tint)
+                            }
                         }
-                        Spacer(minLength: 8)
-                        if model.selectedPatient?.id == patient.id {
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tint)
-                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var filteredPatients: [HomeBasePatientSummary] {
+        PatientsFiltering.apply(
+            patients: model.patients,
+            query: patientQuery,
+            viewMode: patientViewMode,
+            sortMode: patientSortMode
+        )
+    }
+
+    private var patientSearchControls: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Cerca per nome o codice fiscale", text: $patientQuery)
+                    .textFieldStyle(.plain)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("patient-search-field")
+                if !patientQuery.isEmpty {
+                    Button {
+                        patientQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("patient-search-clear")
+                }
+            }
+            HStack(spacing: 10) {
+                Picker("Stato", selection: $patientViewMode) {
+                    Text("Attivi").tag(PatientListViewMode.active)
+                    Text("Archiviati").tag(PatientListViewMode.archived)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("patient-view-mode")
+                Menu {
+                    Picker("Ordina", selection: $patientSortMode) {
+                        Text("Recenti").tag(PatientListSortMode.recent)
+                        Text("Alfabetico").tag(PatientListSortMode.alpha)
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("patient-sort-menu")
             }
         }
     }

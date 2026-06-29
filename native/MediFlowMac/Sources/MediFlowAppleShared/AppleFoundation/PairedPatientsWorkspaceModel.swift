@@ -117,6 +117,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         guard !didPerformAutomaticActions else { return }
         didPerformAutomaticActions = true
 
+        #if DEBUG
+        if let seeded = Self.uiTestSeededPatients() {
+            patients = seeded
+            statusMessage = "Dati di test caricati."
+            return
+        }
+        #endif
+
         if automaticActions.autoDiscover {
             await discoverHomeBase()
         }
@@ -130,6 +138,31 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             await loadPatients()
         }
     }
+
+    #if DEBUG
+    /// UI-test fixture: with MEDIFLOW_APPLE_UITEST_PATIENTS=1, seed a deterministic
+    /// patient list instead of hitting the network, so the search / filter UI can be
+    /// exercised without a paired home-base. Debug-only, never compiled into release.
+    static func uiTestSeededPatients() -> [HomeBasePatientSummary]? {
+        guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
+            return nil
+        }
+        let base = Date(timeIntervalSince1970: 1_750_000_000)
+        return [
+            HomeBasePatientSummary(id: "uitest-1", firstName: "Mario", lastName: "Rossi",
+                                   birthDate: nil, taxCode: "RSSMRA80A01H501U",
+                                   isAdi: false, isArchived: false, version: 1, updatedAt: base),
+            HomeBasePatientSummary(id: "uitest-2", firstName: "Anna", lastName: "Bianchi",
+                                   birthDate: nil, taxCode: "BNCNNA85M41F205X",
+                                   isAdi: false, isArchived: false, version: 1,
+                                   updatedAt: base.addingTimeInterval(-3600)),
+            HomeBasePatientSummary(id: "uitest-3", firstName: "Luigi", lastName: "Verdi",
+                                   birthDate: nil, taxCode: "VRDLGU70T10L219Z",
+                                   isAdi: false, isArchived: true, version: 1,
+                                   updatedAt: base.addingTimeInterval(-7200))
+        ]
+    }
+    #endif
 
     func discoverHomeBase() async {
         await runTask {
