@@ -54,11 +54,31 @@ In concreto:
   parziale di un catalogo, qualita inferiore al servizio esterno), va dichiarato
   esplicitamente, non mascherato.
 
+## Aggiornamento dinamico (in-house base + fetch)
+
+Gli elementi dinamici devono poter restare aggiornati: la logica in-house e la
+**base offline** (sempre disponibile, local-first), ma quando esiste una fonte
+autorevole il modulo puo **fare fetch degli aggiornamenti** e arricchire/refrescare
+la base. Per ICD: la tabella in-app e la base, e l'app puo aggiornarla dalla
+**WHO ICD-11 API** (offline base + online refresh + cache), non dipendendo dal
+servizio a runtime e degradando con grazia alla base bundle quando offline. Le
+credenziali e il fetch non devono rompere zero-knowledge/local-first.
+
+Lo stesso pattern vale per lo "stack intelligente": l'inferenza gira
+**on-device** (Apple Foundation Models / MLX) per restare zero-knowledge, con
+eventuale refresh dei soli artefatti non sensibili (modelli, cataloghi, regole)
+da fonti autorevoli.
+
 ## Conseguenze
 
 - A14 (ICD) NON e bloccato: si costruisce una sorgente ICD in-app + ricerca,
-  usata per assegnare diagnosi. Il proxy Docker resta un'opzione facoltativa di
-  arricchimento, non una dipendenza.
+  usata per assegnare diagnosi. La base e in-app; il fetch dalla WHO ICD-11 API
+  e l'aggiornamento dinamico. Il proxy Docker resta un'opzione facoltativa, non
+  una dipendenza.
+- Lo stack intelligente (sintesi cliniche, estrazione strutturata) va portato
+  on-device (Apple Foundation Models prima, MLX dove serve controllo/modelli
+  specifici), 1:1 con i contratti AI del web, preservando zero-knowledge.
 - I prossimi "moduli intelligenti" partono in-house per default.
 - La copertura di un catalogo in-house (es. ICD) e dichiaratamente un
-  sottoinsieme curato dei codici piu comuni, ampliabile, non l'intero ICD-11.
+  sottoinsieme curato dei codici piu comuni, ampliabile + aggiornabile via fetch,
+  non l'intero ICD-11 hardcoded.
