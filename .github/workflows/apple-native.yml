@@ -18,6 +18,13 @@ on:
       - main
     paths:
       - 'native/**'
+  workflow_dispatch:
+
+# macOS runner minutes are billed at 10x. Cancel superseded runs on the same ref
+# so a burst of pushes does not pile up parallel macOS runs.
+concurrency:
+  group: apple-native-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   structure-guard:
@@ -55,6 +62,10 @@ jobs:
             build CODE_SIGNING_ALLOWED=NO
 
   ui-tests:
+    # Expensive (~10 min of macOS runner time, billed at 10x). Run only on merge
+    # to main or on demand (workflow_dispatch), not on every PR push - the XCUITest
+    # suite is run locally on each change.
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -80,5 +91,5 @@ jobs:
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
-            -retry-tests-on-failure -test-iterations 3 \
+            -retry-tests-on-failure -test-iterations 2 \
             CODE_SIGNING_ALLOWED=NO
