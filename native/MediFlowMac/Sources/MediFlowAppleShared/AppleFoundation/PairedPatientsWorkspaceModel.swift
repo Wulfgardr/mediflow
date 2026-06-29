@@ -176,7 +176,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             address: "Via Roma 1, Milano", phone: "+39 02 1234567", caregiver: "Caregiver Test",
             exemptions: "[\"048\",\"C01\"]", diagnoses: nil,
             monitoringProfile: "Profilo di monitoraggio test", statusReason: nil,
-            notes: "Note cliniche di test.", aiSummary: nil, documentInsights: nil,
+            notes: "Note cliniche di test.",
+            aiSummary: "Quadro clinico stabile, terapia in corso ben tollerata.",
+            documentInsights: nil,
             isAdi: patient.isAdi, isArchived: patient.isArchived, version: patient.version,
             ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
         )

@@ -429,6 +429,16 @@ struct PairedPatientsWorkspaceView: View {
                 InfoRow("Esenzioni", exemptions.joined(separator: " · "))
                     .accessibilityIdentifier("patient-detail-exemptions")
             }
+            if let aiSummary = cleaned(detail.aiSummary) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Sintesi AI", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(aiSummary)
+                        .font(.callout)
+                }
+                .accessibilityIdentifier("patient-detail-ai-summary")
+            }
             if let statusReason = cleaned(detail.statusReason) {
                 Text(statusReason)
                     .font(.caption)
