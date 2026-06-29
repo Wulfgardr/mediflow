@@ -57,4 +57,19 @@ final class PatientsFilteringTests: XCTestCase {
         let result = PatientsFiltering.apply(patients: sample, query: "zzz", viewMode: .active, sortMode: .alpha)
         XCTAssertTrue(result.isEmpty)
     }
+
+    func testRecentSortIsDeterministicViaTaxCodeTieBreaker() {
+        // Same updatedAt, lastName and firstName: order must fall back to taxCode,
+        // independent of input order.
+        let a = patient("a", last: "Rossi", first: "Mario", tax: "AAA", updated: 500)
+        let b = patient("b", last: "Rossi", first: "Mario", tax: "BBB", updated: 500)
+        XCTAssertEqual(
+            PatientsFiltering.apply(patients: [b, a], query: "", viewMode: .active, sortMode: .recent).map(\.id),
+            ["a", "b"]
+        )
+        XCTAssertEqual(
+            PatientsFiltering.apply(patients: [a, b], query: "", viewMode: .active, sortMode: .recent).map(\.id),
+            ["a", "b"]
+        )
+    }
 }

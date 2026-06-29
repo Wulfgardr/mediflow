@@ -77,16 +77,21 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let search = app.textFields["patient-search-field"]
         XCTAssertTrue(search.waitForExistence(timeout: 10), "Search field should render with patients present")
 
+        // Stable identifiers (not display text). Seed: 1=Rossi, 2=Bianchi, 3=Verdi(archived).
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        let bianchi = app.buttons["patient-cell-uitest-2"]
+        let verdi = app.buttons["patient-cell-uitest-3"]
+
         // Active filter: Rossi + Bianchi visible, archived Verdi hidden.
-        XCTAssertTrue(app.staticTexts["Rossi Mario"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Bianchi Anna"].exists)
-        XCTAssertFalse(app.staticTexts["Verdi Luigi"].exists, "Archived patient should be hidden by the active filter")
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        XCTAssertTrue(bianchi.exists)
+        XCTAssertFalse(verdi.exists, "Archived patient should be hidden by the active filter")
 
         // Typing narrows the list; the clear button appearing is the sync point.
         search.tap()
         search.typeText("rossi")
         XCTAssertTrue(app.buttons["patient-search-clear"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Rossi Mario"].exists)
-        XCTAssertFalse(app.staticTexts["Bianchi Anna"].exists, "Search should filter out non-matching patients")
+        XCTAssertTrue(rossi.exists)
+        XCTAssertFalse(bianchi.exists, "Search should filter out non-matching patients")
     }
 }

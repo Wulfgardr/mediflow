@@ -60,7 +60,12 @@ enum PatientsFiltering {
                 let lastNameOrder = lhs.lastName.localizedCaseInsensitiveCompare(rhs.lastName)
                 if lastNameOrder != .orderedSame { return lastNameOrder == .orderedAscending }
 
-                return lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName) == .orderedAscending
+                let firstNameOrder = lhs.firstName.localizedCaseInsensitiveCompare(rhs.firstName)
+                if firstNameOrder != .orderedSame { return firstNameOrder == .orderedAscending }
+
+                // Final tie-breaker so the order is fully deterministic when
+                // updatedAt, lastName and firstName all match.
+                return lhs.taxCode.localizedCaseInsensitiveCompare(rhs.taxCode) == .orderedAscending
             }
         }
     }

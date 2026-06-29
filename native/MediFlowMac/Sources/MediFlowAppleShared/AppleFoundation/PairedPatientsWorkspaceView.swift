@@ -325,6 +325,7 @@ struct PairedPatientsWorkspaceView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("patient-cell-\(patient.id)")
                 }
             }
         }
