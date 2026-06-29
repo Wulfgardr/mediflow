@@ -334,6 +334,23 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "Selecting an ambulatory should switch the active scope")
     }
 
+    func testDetailShowsDocumentInsightsAndTherapyExport() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+
+        // #3: the document-insights read panel renders when the field is present.
+        XCTAssertTrue(scrollDown(to: sectionView("patient-detail-document-insights")),
+                      "The document insights panel should render")
+
+        // #5: the therapy-plan export (share) action is available with therapies.
+        XCTAssertTrue(scrollDown(to: app.buttons["export-therapy-plan-button"]),
+                      "The therapy plan export should be available")
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

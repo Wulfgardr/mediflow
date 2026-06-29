@@ -466,6 +466,16 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 .accessibilityIdentifier("patient-detail-ai-summary")
             }
+            if let documentInsights = cleaned(detail.documentInsights) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Analisi documenti", systemImage: "doc.text.magnifyingglass")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(documentInsights)
+                        .font(.callout)
+                }
+                .accessibilityIdentifier("patient-detail-document-insights")
+            }
             if let statusReason = cleaned(detail.statusReason) {
                 Text(statusReason)
                     .font(.caption)
@@ -781,6 +791,18 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-therapies-button")
+
+                if !model.therapies.isEmpty {
+                    ShareLink(item: TherapyPlanDocument.plainText(
+                        patientName: model.selectedPatient.map { "\($0.firstName) \($0.lastName)" } ?? "Paziente",
+                        therapies: model.therapies,
+                        dateLabel: Self.entryDateFormatter.string(from: Date())
+                    )) {
+                        Label("Esporta", systemImage: "square.and.arrow.up")
+                            .font(.caption)
+                    }
+                    .accessibilityIdentifier("export-therapy-plan-button")
+                }
 
                 Menu {
                     Picker("Stato terapie", selection: $therapyStatusFilter) {

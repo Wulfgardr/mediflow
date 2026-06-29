@@ -201,7 +201,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             monitoringProfile: "Profilo di monitoraggio test", statusReason: nil,
             notes: "Note cliniche di test.",
             aiSummary: "Quadro clinico stabile, terapia in corso ben tollerata.",
-            documentInsights: nil,
+            documentInsights: "Referti recenti coerenti con il quadro noto, nessun nuovo reperto critico.",
             isAdi: patient.isAdi, isArchived: patient.isArchived, version: patient.version,
             ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
         )
