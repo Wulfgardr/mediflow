@@ -162,6 +162,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                                    updatedAt: base.addingTimeInterval(-7200))
         ]
     }
+
+    /// UI-test fixture detail for a seeded patient, so the patient-detail view can
+    /// be exercised (exemptions, contacts, flags) without a paired home-base.
+    static func uiTestSeededDetail(for patient: HomeBasePatientSummary) -> HomeBasePatientDetail? {
+        guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
+            return nil
+        }
+        return HomeBasePatientDetail(
+            id: patient.id, firstName: patient.firstName, lastName: patient.lastName,
+            birthDate: Date(timeIntervalSince1970: 315_532_800),
+            taxCode: patient.taxCode,
+            address: "Via Roma 1, Milano", phone: "+39 02 1234567", caregiver: "Caregiver Test",
+            exemptions: "[\"048\",\"C01\"]", diagnoses: nil,
+            monitoringProfile: "Profilo di monitoraggio test", statusReason: nil,
+            notes: "Note cliniche di test.", aiSummary: nil, documentInsights: nil,
+            isAdi: patient.isAdi, isArchived: patient.isArchived, version: patient.version,
+            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
+        )
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -241,6 +260,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
+        #if DEBUG
+        if let detail = Self.uiTestSeededDetail(for: patient) {
+            selectedPatient = detail
+            entries = []
+            therapies = []
+            checkups = []
+            observations = []
+            return
+        }
+        #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
         await runTask {
             self.selectedPatient = try await self.makeClient().fetchPatient(

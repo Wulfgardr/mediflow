@@ -94,4 +94,19 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(rossi.exists)
         XCTAssertFalse(bianchi.exists, "Search should filter out non-matching patients")
     }
+
+    func testSelectingPatientShowsEnrichedDetail() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        // Detail renders the name and the decoded exemptions (ExemptionCodesCodec).
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10),
+                      "Selecting a patient should show the enriched detail")
+        XCTAssertTrue(sectionView("patient-detail-exemptions").waitForExistence(timeout: 10),
+                      "Detail should show decoded exemption codes")
+    }
 }

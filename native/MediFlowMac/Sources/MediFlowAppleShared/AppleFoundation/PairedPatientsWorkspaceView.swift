@@ -393,31 +393,73 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private func patientDetailSection(_ detail: HomeBasePatientDetail) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
+        return VStack(alignment: .leading, spacing: 8) {
             Label("Anagrafica in sola lettura", systemImage: "lock")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text("\(detail.lastName) \(detail.firstName)")
-                .font(.subheadline.weight(.semibold))
-            Text(detail.taxCode)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let monitoringProfile = detail.monitoringProfile, !monitoringProfile.isEmpty {
-                Text(monitoringProfile)
-                    .font(.subheadline)
+                .font(.title3.weight(.semibold))
+                .accessibilityIdentifier("patient-detail-name")
+            if detail.isAdi == true || detail.isArchived == true {
+                HStack(spacing: 6) {
+                    if detail.isAdi == true { flagChip("ADI", tone: .info) }
+                    if detail.isArchived == true { flagChip("Archiviato", tone: .neutral) }
+                }
             }
-            if let statusReason = detail.statusReason, !statusReason.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                InfoRow("Codice fiscale", detail.taxCode)
+                if let birth = detail.birthDate {
+                    InfoRow("Data di nascita", Self.birthDateFormatter.string(from: birth))
+                }
+                if let address = cleaned(detail.address) { InfoRow("Indirizzo", address) }
+                if let phone = cleaned(detail.phone) { InfoRow("Telefono", phone) }
+                if let caregiver = cleaned(detail.caregiver) { InfoRow("Caregiver", caregiver) }
+                if let ambulatory = cleaned(detail.ambulatoryId) { InfoRow("Ambulatorio", ambulatory) }
+                if let monitoring = cleaned(detail.monitoringProfile) { InfoRow("Monitoraggio", monitoring) }
+            }
+            if !exemptions.isEmpty {
+                InfoRow("Esenzioni", exemptions.joined(separator: " · "))
+                    .accessibilityIdentifier("patient-detail-exemptions")
+            }
+            if let statusReason = cleaned(detail.statusReason) {
                 Text(statusReason)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let notes = detail.notes, !notes.isEmpty {
-                Text(notes)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let notes = cleaned(detail.notes) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Note")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(notes)
+                        .font(.callout)
+                }
             }
         }
     }
+
+    private func cleaned(_ value: String?) -> String? {
+        value.flatMap { $0.trimmedOrNil }
+    }
+
+    // Plain tinted capsule (no glass): glass inside the glass card would nest.
+    private func flagChip(_ text: String, tone: VetroTone) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(VetroPalette.tint(for: tone))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
+    }
+
+    private static let birthDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "it_IT")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
 
     private var diarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
