@@ -184,6 +184,19 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("homebase-password-field")
             TextField("Ambulatorio attivo (opzionale)", text: $model.ambulatoryId)
                 .accessibilityIdentifier("homebase-ambulatory-field")
+            if !model.availableAmbulatories.isEmpty {
+                Menu {
+                    ForEach(model.availableAmbulatories) { ambulatory in
+                        Button(ambulatory.name) {
+                            model.selectAmbulatory(ambulatory.id)
+                        }
+                    }
+                } label: {
+                    Label(activeAmbulatoryLabel, systemImage: "building.2")
+                        .font(.caption)
+                }
+                .accessibilityIdentifier("ambulatory-scope-picker")
+            }
             LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
                 Button("Accedi operatore") {
                     Task { await model.login() }
@@ -513,6 +526,13 @@ struct PairedPatientsWorkspaceView: View {
 
     private func cleaned(_ value: String?) -> String? {
         value.flatMap { $0.trimmedOrNil }
+    }
+
+    private var activeAmbulatoryLabel: String {
+        if let match = model.availableAmbulatories.first(where: { $0.id == model.ambulatoryId }) {
+            return "Scope: \(match.name)"
+        }
+        return model.ambulatoryId.isEmpty ? "Seleziona ambulatorio" : "Scope: \(model.ambulatoryId)"
     }
 
     // Reconciliation banner for a typed 409 conflict. Plain tinted card (no glass

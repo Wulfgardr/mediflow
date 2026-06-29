@@ -319,6 +319,21 @@ final class MediFlowMobileAppUITests: XCTestCase {
                        "Dismiss must not run the reload path")
     }
 
+    func testAmbulatoryScopePickerSwitchesScope() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let picker = app.buttons["ambulatory-scope-picker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 10),
+                      "The scope picker should appear once ambulatories are loaded")
+        picker.tap()
+        // Menu option label is the ambulatory name (distinct from the picker label).
+        app.buttons["Ambulatorio Nord"].tap()
+
+        XCTAssertTrue(app.staticTexts["Scope attivo: AMB-2."].waitForExistence(timeout: 5),
+                      "Selecting an ambulatory should switch the active scope")
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

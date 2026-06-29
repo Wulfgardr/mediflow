@@ -1107,6 +1107,37 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
+    func testFetchNetworkAmbulatoriesDecodesScopeOptions() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/ambulatories"
+            )
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            let body = """
+            [{"id":"AMB-1","name":"Centrale","address":"Via Roma 1","type":"principale",\
+            "isDefault":true,"createdAt":"2026-06-01T00:00:00.000Z"},\
+            {"id":"AMB-2","name":"Nord","address":null,"type":null,"isDefault":false,"createdAt":null}]
+            """
+            return (response, Data(body.utf8))
+        }
+
+        let result = try await client.fetchNetworkAmbulatories(
+            credentials: HomeBasePairedCredentials(clientId: "c1", clientToken: "t1"),
+            sessionCookie: "mediflow_session=s1",
+            ambulatoryId: nil
+        )
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].id, "AMB-1")
+        XCTAssertEqual(result[0].name, "Centrale")
+        XCTAssertEqual(result[0].isDefault, true)
+        XCTAssertNil(result[1].address, "a null address must decode as nil")
+        XCTAssertNil(result[1].createdAt)
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {

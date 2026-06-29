@@ -14,6 +14,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var username = ""
     @Published var password = ""
     @Published var ambulatoryId = ""
+    @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     @Published private(set) var selectedPatient: HomeBasePatientDetail?
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
@@ -138,6 +139,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         #if DEBUG
         if let seeded = Self.uiTestSeededPatients() {
             patients = seeded
+            availableAmbulatories = Self.uiTestSeededAmbulatories()
             if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_FORCE_CONFLICT"] == "1" {
                 pendingConflict = Self.uiTestSeededConflict()
             }
@@ -285,6 +287,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         ]
     }
 
+    static func uiTestSeededAmbulatories() -> [NetworkAmbulatorySummary] {
+        [
+            NetworkAmbulatorySummary(id: "AMB-1", name: "Ambulatorio Centrale", address: "Via Roma 1",
+                                     type: "principale", isDefault: true, createdAt: nil),
+            NetworkAmbulatorySummary(id: "AMB-2", name: "Ambulatorio Nord", address: "Via Verdi 9",
+                                     type: "distaccato", isDefault: false, createdAt: nil)
+        ]
+    }
+
     static func uiTestSeededConflict() -> VersionConflictPayload {
         VersionConflictPayload(
             error: "Version conflict",
@@ -361,6 +372,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.cancelEditingTherapy()
             self.cancelEditingCheckup()
             self.cancelEditingObservation()
+            // Best-effort: populate the scope picker. A failure here must not
+            // break the patient load, so keep whatever list we already have.
+            self.availableAmbulatories = (try? await self.makeClient().fetchNetworkAmbulatories(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )) ?? self.availableAmbulatories
             do {
                 try self.persistPairing()
                 try self.cacheStore.savePatientList(
@@ -469,6 +487,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// Clear the conflict banner without reloading (operator chose to ignore it).
     func dismissConflict() {
         pendingConflict = nil
+    }
+
+    /// A18: switch the active ambulatory scope. Updates the id used by every read
+    /// and reloads the patient list so the new scope takes effect.
+    func selectAmbulatory(_ id: String) {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != ambulatoryId else { return }
+        ambulatoryId = trimmed
+        #if DEBUG
+        if Self.isUITestSeeded {
+            statusMessage = "Scope attivo: \(trimmed)."
+            return
+        }
+        #endif
+        Task { await loadPatients() }
     }
 
     /* @Codex */

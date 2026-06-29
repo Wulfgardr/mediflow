@@ -168,6 +168,17 @@ public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Senda
     public let deletionReason: String?
 }
 
+// A18: paired ambulatory scope option, mirrors AmbulatorySummary from the web
+// contract (createdAt arrives as an ISO string).
+public struct NetworkAmbulatorySummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let address: String?
+    public let type: String?
+    public let isDefault: Bool?
+    public let createdAt: String?
+}
+
 /* @Codex */
 public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let id: String
@@ -598,6 +609,27 @@ public actor HomeBasePatientsClient {
             ]
         )
         return try decode([HomeBasePatientSummary].self, from: data)
+    }
+
+    // A18: fetch the ambulatory scope options for the picker. Rides on the same
+    // read capability + auth headers as the patient list.
+    public func fetchNetworkAmbulatories(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [NetworkAmbulatorySummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+        let (data, _) = try await send(
+            to: url,
+            headers: [
+                "x-mediflow-paired-client-id": credentials.clientId,
+                "x-mediflow-paired-client-token": credentials.clientToken,
+                "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            ]
+        )
+        return try decode([NetworkAmbulatorySummary].self, from: data)
     }
 
     public func fetchPatient(
