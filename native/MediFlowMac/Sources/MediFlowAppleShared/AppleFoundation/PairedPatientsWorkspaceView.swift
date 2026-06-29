@@ -20,6 +20,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var patientViewMode: PatientListViewMode = .active
     @State private var patientSortMode: PatientListSortMode = .recent
     @State private var therapyStatusFilter: TherapyStatusFilter = .all
+    @State private var checkupStatusFilter: CheckupStatusFilter = .all
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -869,8 +870,30 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(model.checkups) { checkup in
-                    checkupRow(checkup)
+                HStack {
+                    Spacer(minLength: 8)
+                    Menu {
+                        Picker("Stato controlli", selection: $checkupStatusFilter) {
+                            ForEach(CheckupStatusFilter.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                    } label: {
+                        Label(checkupStatusFilter.title, systemImage: "line.3.horizontal.decrease.circle")
+                            .font(.caption)
+                    }
+                    .accessibilityIdentifier("checkup-status-filter")
+                }
+                let filteredCheckups = CheckupFiltering.apply(model.checkups, filter: checkupStatusFilter)
+                if filteredCheckups.isEmpty {
+                    Text("Nessun controllo per questo filtro.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredCheckups) { checkup in
+                        checkupRow(checkup)
+                            .accessibilityIdentifier("checkup-row-\(checkup.id)")
+                    }
                 }
             }
 

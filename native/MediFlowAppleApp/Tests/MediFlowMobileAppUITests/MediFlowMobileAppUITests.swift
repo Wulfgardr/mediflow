@@ -133,4 +133,30 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(sectionView("therapy-row-therapy-active").exists)
         XCTAssertFalse(sectionView("therapy-row-therapy-completed").exists)
     }
+
+    func testCheckupStatusFilterNarrowsList() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        // Seeded checkups (one per status) render.
+        XCTAssertTrue(sectionView("checkup-row-checkup-pending").waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("checkup-row-checkup-completed").exists)
+        XCTAssertTrue(sectionView("checkup-row-checkup-cancelled").exists)
+
+        // Filter to "Completati"; only the completed checkup remains. (Uses the
+        // plural filter label, distinct from the row's singular "Completato", so
+        // the query is unambiguous.)
+        let filter = app.buttons["checkup-status-filter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5))
+        filter.tap()
+        app.buttons["Completati"].tap()
+
+        XCTAssertTrue(sectionView("checkup-row-checkup-completed").waitForExistence(timeout: 5))
+        XCTAssertFalse(sectionView("checkup-row-checkup-pending").exists)
+        XCTAssertFalse(sectionView("checkup-row-checkup-cancelled").exists)
+    }
 }

@@ -201,6 +201,24 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             make("therapy-completed", drug: "Amoxicillina", status: "completed")
         ]
     }
+
+    /// UI-test fixture checkups (one per status) so the checkup status filter can
+    /// be exercised without a paired home-base.
+    static func uiTestSeededCheckups(patientId: String) -> [HomeBaseCheckupSummary] {
+        let base = Date(timeIntervalSince1970: 1_750_000_000)
+        func make(_ id: String, title: String, status: String) -> HomeBaseCheckupSummary {
+            HomeBaseCheckupSummary(
+                id: id, patientId: patientId, date: base, title: title, notes: nil,
+                status: status, source: nil, version: 1, createdAt: base, updatedAt: base,
+                deletedAt: nil, deletionReason: nil
+            )
+        }
+        return [
+            make("checkup-pending", title: "Visita cardiologica", status: "pending"),
+            make("checkup-completed", title: "Esame del sangue", status: "completed"),
+            make("checkup-cancelled", title: "Controllo annullato", status: "cancelled")
+        ]
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -285,7 +303,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             selectedPatient = detail
             entries = []
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
-            checkups = []
+            checkups = Self.uiTestSeededCheckups(patientId: patient.id)
             observations = []
             return
         }
