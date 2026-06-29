@@ -291,6 +291,9 @@ struct PairedPatientsWorkspaceView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("homebase-reconciliation-state")
+        if let presentation = model.conflictPresentation {
+            conflictBanner(presentation)
+        }
         if model.isWorking && model.patients.isEmpty {
             ProgressView()
         } else if model.patients.isEmpty {
@@ -510,6 +513,38 @@ struct PairedPatientsWorkspaceView: View {
 
     private func cleaned(_ value: String?) -> String? {
         value.flatMap { $0.trimmedOrNil }
+    }
+
+    // Reconciliation banner for a typed 409 conflict. Plain tinted card (no glass
+    // nesting), warning tone. Offers a no-clobber reload, not an auto-overwrite.
+    private func conflictBanner(_ presentation: VersionConflictPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Identifier on the leaf title (not the container) so the inner buttons
+            // stay individually queryable instead of collapsing into one element.
+            Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+                .accessibilityIdentifier("version-conflict-banner")
+            Text(presentation.detail)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Ricarica i dati aggiornati") {
+                    Task { await model.reloadAfterConflict() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.isWorking)
+                .accessibilityIdentifier("reload-after-conflict-button")
+                Button("Ignora") {
+                    model.dismissConflict()
+                }
+                .accessibilityIdentifier("dismiss-conflict-button")
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.4)))
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.

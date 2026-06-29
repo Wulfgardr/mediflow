@@ -282,6 +282,43 @@ final class MediFlowMobileAppUITests: XCTestCase {
                        "A single-reading code should not render a trend arrow")
     }
 
+    private func launchWithForcedConflict() -> XCUIElement {
+        // The Debug force hook stands in for a real 409 from the home-base, which
+        // can't be driven headlessly.
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1"
+        app.launchEnvironment["MEDIFLOW_APPLE_INITIAL_SECTION"] = "modules"
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_FORCE_CONFLICT"] = "1"
+        app.launch()
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        let banner = sectionView("version-conflict-banner")
+        XCTAssertTrue(banner.waitForExistence(timeout: 10),
+                      "A typed 409 conflict should surface the reconciliation banner")
+        return banner
+    }
+
+    func testVersionConflictBannerReloadsAfterConflict() {
+        let banner = launchWithForcedConflict()
+
+        // Reloading clears the conflict (the safe no-clobber resolution) and runs
+        // the reload path, which is what sets the "ricaricati" status.
+        app.buttons["reload-after-conflict-button"].tap()
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 5),
+                      "Reloading after the conflict should dismiss the banner")
+        XCTAssertTrue(app.staticTexts["Dati ricaricati."].waitForExistence(timeout: 5),
+                      "Reload should run the reload path (distinct from a bare dismiss)")
+    }
+
+    func testVersionConflictBannerDismissesWithoutReload() {
+        let banner = launchWithForcedConflict()
+
+        // Dismiss clears the banner WITHOUT running the reload path.
+        app.buttons["dismiss-conflict-button"].tap()
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 5),
+                      "Dismiss should clear the banner")
+        XCTAssertFalse(app.staticTexts["Dati ricaricati."].exists,
+                       "Dismiss must not run the reload path")
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

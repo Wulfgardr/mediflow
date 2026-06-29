@@ -83,7 +83,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var connectionState: PairedPatientsConnectionState = .notLoaded
-    @Published private(set) var reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
+    @Published private(set) var reconciliationLine = "Scritture online dopo accesso operatore. Nessuna coda offline."
+
+    /// The active typed 409 conflict, if a write was rejected because the record
+    /// moved on the home-base. Drives the reconciliation banner; nil when clear.
+    @Published private(set) var pendingConflict: VersionConflictPayload?
+
+    /// Localized banner copy for `pendingConflict`, or nil when there is no conflict.
+    var conflictPresentation: VersionConflictPresentation? {
+        pendingConflict.map(VersionConflictPresentation.init)
+    }
     @Published private(set) var isWorking = false
 
     private let pairedStore: HomeBasePairedStore
@@ -129,6 +138,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         #if DEBUG
         if let seeded = Self.uiTestSeededPatients() {
             patients = seeded
+            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_FORCE_CONFLICT"] == "1" {
+                pendingConflict = Self.uiTestSeededConflict()
+            }
             statusMessage = "Dati di test caricati."
             return
         }
@@ -272,6 +284,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             make("obs-glucose", code: "2339-0", display: "Glicemia", unit: "mg/dL", value: "95", daysAgo: 0)
         ]
     }
+
+    static func uiTestSeededConflict() -> VersionConflictPayload {
+        VersionConflictPayload(
+            error: "Version conflict",
+            code: "VERSION_CONFLICT",
+            entity: "patient",
+            recordId: "uitest-1",
+            expectedVersion: 1,
+            currentVersion: 2,
+            currentUpdatedAt: "2026-06-29T10:15:00.000Z",
+            currentState: "active",
+            currentSnapshot: VersionConflictSnapshot(
+                id: "uitest-1", patientId: nil, version: 2,
+                updatedAt: "2026-06-29T10:15:00.000Z", deletedAt: nil, isArchived: false
+            )
+        )
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -343,7 +372,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
             self.connectionState = .pairedOnline
-            self.reconciliationLine = "Snapshot locale aggiornato. Sola lettura mobile."
+            self.reconciliationLine = "Snapshot locale aggiornato. Scritture online con sessione operatore."
             self.statusMessage = self.patients.isEmpty
                 ? "Nessun paziente nello scope corrente."
                 : "\(self.patients.count) pazienti caricati in lettura."
@@ -397,8 +426,49 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.cancelEditingTherapy()
             self.cancelEditingCheckup()
             self.cancelEditingObservation()
-            self.statusMessage = "Dettaglio \(patient.lastName) aperto in sola lettura."
+            self.statusMessage = "Dettaglio \(patient.lastName) aperto."
         }
+    }
+
+    /// Refetch the selected patient and all sub-resources after a version conflict,
+    /// so the operator sees the current home-base state before reapplying. The safe,
+    /// no-clobber resolution: it reloads, it does not auto-overwrite the other edit.
+    func reloadAfterConflict() async {
+        #if DEBUG
+        if Self.isUITestSeeded {
+            pendingConflict = nil
+            statusMessage = "Dati ricaricati."
+            return
+        }
+        #endif
+        guard let current = selectedPatient, let sessionCookie, let credentials = pairedCredentials else {
+            pendingConflict = nil
+            return
+        }
+        let id = current.id
+        await runTask {
+            self.selectedPatient = try await self.makeClient().fetchPatient(
+                id: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.entries = try await self.makeClient().fetchEntries(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.therapies = try await self.makeClient().fetchTherapies(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.checkups = try await self.makeClient().fetchCheckups(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.observations = try await self.makeClient().fetchObservations(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
+        }
+    }
+
+    /// Clear the conflict banner without reloading (operator chose to ignore it).
+    func dismissConflict() {
+        pendingConflict = nil
     }
 
     /* @Codex */
@@ -1205,7 +1275,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             resetNewObservationForm()
             cancelEditingObservation()
             connectionState = .notLoaded
-            reconciliationLine = "Sola lettura mobile. Nessuna scrittura offline disponibile."
+            reconciliationLine = "Scritture online dopo accesso operatore. Nessuna coda offline."
             discoveryMessage = nil
             sessionCookie = nil
             try cacheStore.clear()
@@ -1286,7 +1356,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
             reconciliationLine = markOffline
                 ? "Offline degradato: sola consultazione locale. Nessuna scrittura mobile disponibile."
-                : "Snapshot locale pronto. Sola lettura mobile."
+                : "Snapshot locale pronto. Scritture online dopo accesso operatore."
             return true
         } catch {
             errorMessage = "Cache locale non leggibile: \(error.localizedDescription)"
@@ -1297,6 +1367,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func runTask(_ operation: @escaping () async throws -> Void) async {
         isWorking = true
         errorMessage = nil
+        pendingConflict = nil
         defer { isWorking = false }
         do {
             try await operation()
@@ -1309,8 +1380,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
-            } else if case HomeBaseClientError.versionConflict = error {
-                // Typed 409: show the precise expected-vs-current version message.
+            } else if case HomeBaseClientError.versionConflict(let payload) = error {
+                // Typed 409: surface the structured conflict so the reconciliation
+                // banner can show expected-vs-current and offer a reload.
+                pendingConflict = payload
                 statusMessage = error.localizedDescription
                 errorMessage = nil
                 return
