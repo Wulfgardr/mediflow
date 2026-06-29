@@ -343,6 +343,10 @@ struct PairedPatientsWorkspaceView: View {
         )
     }
 
+    private var filteredDiaryEntries: [HomeBaseEntrySummary] {
+        EntryFiltering.apply(model.entries, filter: entryTypeFilter)
+    }
+
     private var patientSearchControls: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
@@ -501,12 +505,12 @@ struct PairedPatientsWorkspaceView: View {
                 Text("Nessuna voce diario caricata.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if EntryFiltering.apply(model.entries, filter: entryTypeFilter).isEmpty {
+            } else if filteredDiaryEntries.isEmpty {
                 Text("Nessuna voce per questo filtro.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(EntryFiltering.apply(model.entries, filter: entryTypeFilter)) { entry in
+                ForEach(filteredDiaryEntries) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(entry.title)
@@ -911,7 +915,7 @@ struct PairedPatientsWorkspaceView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(filteredCheckups) { checkup in
+                    ForEach(filteredCheckups, id: \.id) { checkup in
                         checkupRow(checkup)
                             .accessibilityIdentifier("checkup-row-\(checkup.id)")
                     }
@@ -974,7 +978,7 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(model.observations) { observation in
+                ForEach(model.observations, id: \.id) { observation in
                     observationRow(observation)
                 }
             }

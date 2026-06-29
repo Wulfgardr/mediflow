@@ -136,3 +136,24 @@ DIFFERITO (follow-up tracciati, non bloccanti per il build lane):
   manifest apple-wide-qa-manifest.json (declassare le capability con sola evidenza simulatore/SPM).
 - Fase 1: cablare PatchValue/VersionConflict nel client live + riconciliazione DTO/vocabolari +
   split di AppleFoundationViews.swift (120KB) prima del redesign visivo Vetro Clinico.
+
+## Progresso parity (PR #271, branch feat/apple-universal-fase0)
+
+Slice cliniche consegnate sopra la base (ognuna: logica pura unit-testata + XCUITest interazione
++ CI verde):
+- A2: ricerca/filtro/sort lista pazienti (PatientsFiltering su HomeBasePatientSummary).
+- A3: dettaglio paziente arricchito (data nascita, esenzioni via ExemptionCodesCodec, indirizzo/
+  telefono/caregiver/ambulatorio, flag ADI/archiviato via InfoRow + chip non-glass).
+- A5: filtro tipo voci diario + chip tipo per riga (EntryFiltering).
+- A7: filtro stato terapie (TherapyFiltering).
+- A8: filtro stato controlli (CheckupFiltering).
+
+Infrastruttura test consolidata: seed Debug-only gated da MEDIFLOW_APPLE_UITEST_PATIENTS=1 (lista,
+dettaglio, terapie, controlli, voci) per pilotare la UI senza pairing; identificatori stabili
+(patient-cell-<id>, therapy-row-<id>, checkup-row-<id>, entry-row-<id>); 85 unit test + 8 XCUITest.
+
+Aree ancora assenti/parziali verso parity totale: A4 anagrafica crea/modifica, A6 osservazioni
+trend/picker, A7 DrugAutocomplete AIFA, A9 prescrizioni, A10 scale, A11 import/OCR, A12 AI insight,
+A13 SISS/FSE, A14 ICD search, A15 analytics, A16 backup, A17 impostazioni complete, A18 ambulatori
+picker, A19 sync offline bidirezionale, A20 onboarding, A21 privacy blur, A22 oncologia. Restano
+inoltre i follow-up Fase 1 (contratto live) e packaging App Store macOS (sandbox + notarizzazione).

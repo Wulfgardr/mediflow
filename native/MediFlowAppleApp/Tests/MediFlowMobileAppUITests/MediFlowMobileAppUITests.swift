@@ -85,14 +85,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // Active filter: Rossi + Bianchi visible, archived Verdi hidden.
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         XCTAssertTrue(bianchi.exists)
-        XCTAssertFalse(verdi.exists, "Archived patient should be hidden by the active filter")
+        XCTAssertTrue(verdi.waitForNonExistence(timeout: 3), "Archived patient should be hidden by the active filter")
 
         // Typing narrows the list; the clear button appearing is the sync point.
         search.tap()
         search.typeText("rossi")
         XCTAssertTrue(app.buttons["patient-search-clear"].waitForExistence(timeout: 5))
         XCTAssertTrue(rossi.exists)
-        XCTAssertFalse(bianchi.exists, "Search should filter out non-matching patients")
+        XCTAssertTrue(bianchi.waitForNonExistence(timeout: 3), "Search should filter out non-matching patients")
     }
 
     func testSelectingPatientShowsEnrichedDetail() {
@@ -130,8 +130,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["Sospese"].tap()
 
         XCTAssertTrue(sectionView("therapy-row-therapy-suspended").waitForExistence(timeout: 5))
-        XCTAssertFalse(sectionView("therapy-row-therapy-active").exists)
-        XCTAssertFalse(sectionView("therapy-row-therapy-completed").exists)
+        XCTAssertTrue(sectionView("therapy-row-therapy-active").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sectionView("therapy-row-therapy-completed").waitForNonExistence(timeout: 3))
     }
 
     func testCheckupStatusFilterNarrowsList() {
@@ -156,8 +156,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["Completati"].tap()
 
         XCTAssertTrue(sectionView("checkup-row-checkup-completed").waitForExistence(timeout: 5))
-        XCTAssertFalse(sectionView("checkup-row-checkup-pending").exists)
-        XCTAssertFalse(sectionView("checkup-row-checkup-cancelled").exists)
+        XCTAssertTrue(sectionView("checkup-row-checkup-pending").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sectionView("checkup-row-checkup-cancelled").waitForNonExistence(timeout: 3))
     }
 
     func testDiaryTypeFilterNarrowsList() {
@@ -180,7 +180,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["Visite"].tap()
 
         XCTAssertTrue(sectionView("entry-row-entry-visit").waitForExistence(timeout: 5))
-        XCTAssertFalse(sectionView("entry-row-entry-note").exists)
-        XCTAssertFalse(sectionView("entry-row-entry-phone").exists)
+        XCTAssertTrue(sectionView("entry-row-entry-note").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sectionView("entry-row-entry-phone").waitForNonExistence(timeout: 3))
     }
 }

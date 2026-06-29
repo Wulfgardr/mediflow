@@ -72,4 +72,19 @@ final class PatientsFilteringTests: XCTestCase {
             ["a", "b"]
         )
     }
+
+    func testAlphaSortIsDeterministicViaTaxCodeTieBreaker() {
+        // Same lastName and firstName: alpha order must fall back to taxCode,
+        // independent of input order.
+        let a = patient("a", last: "Rossi", first: "Mario", tax: "AAA")
+        let b = patient("b", last: "Rossi", first: "Mario", tax: "BBB")
+        XCTAssertEqual(
+            PatientsFiltering.apply(patients: [b, a], query: "", viewMode: .active, sortMode: .alpha).map(\.id),
+            ["a", "b"]
+        )
+        XCTAssertEqual(
+            PatientsFiltering.apply(patients: [a, b], query: "", viewMode: .active, sortMode: .alpha).map(\.id),
+            ["a", "b"]
+        )
+    }
 }

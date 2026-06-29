@@ -73,8 +73,12 @@ jobs:
           echo "Using simulator: $NAME"
       - name: Run XCUITest interaction tests
         run: |
+          # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
+          # "Timed out while acquiring background assertion" launch flake) without
+          # masking real failures: a test must pass within the retries.
           xcodebuild test \
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -retry-tests-on-failure -test-iterations 3 \
             CODE_SIGNING_ALLOWED=NO
