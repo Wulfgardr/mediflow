@@ -155,5 +155,22 @@ dettaglio, terapie, controlli, voci) per pilotare la UI senza pairing; identific
 Aree ancora assenti/parziali verso parity totale: A4 anagrafica crea/modifica, A6 osservazioni
 trend/picker, A7 DrugAutocomplete AIFA, A9 prescrizioni, A10 scale, A11 import/OCR, A12 AI insight,
 A13 SISS/FSE, A14 ICD search, A15 analytics, A16 backup, A17 impostazioni complete, A18 ambulatori
-picker, A19 sync offline bidirezionale, A20 onboarding, A21 privacy blur, A22 oncologia. Restano
+picker, A19 sync offline bidirezionale, A20 onboarding, A22 oncologia. Restano
 inoltre i follow-up Fase 1 (contratto live) e packaging App Store macOS (sandbox + notarizzazione).
+
+## Fase 1 contratto: conferme dalla sorgente (web backend)
+
+Due domande aperte dell'audit risolte leggendo la fonte di verita (non a indovinare):
+
+1. **409 VERSION_CONFLICT FATTO e CONFERMATO**: il client live ora decodifica il body strutturato in
+   `HomeBaseClientError.versionConflict(VersionConflictPayload)` (commit 3b934da5). Verificato che
+   `VersionConflictPayload` combacia campo-per-campo con `lib/checkup-concurrency.ts`
+   (`CheckupVersionConflictPayload`: error/code/entity/recordId/expectedVersion/currentVersion?/
+   currentUpdatedAt?/currentState/currentSnapshot?) e con gli analoghi patient/therapy/entry/observation.
+   Quindi la decodifica funziona contro il contratto REALE, non solo i mock.
+2. **PatchValue SERVE (confermato)**: `lib/patient-write-normalization.ts` DISTINGUE campo-assente
+   (`undefined` -> lasciato invariato, filtrato via riga 80) da campo-null (`null` -> azzera il campo).
+   I payload Swift di update con optional semplici possono solo OMETTERE, mai mandare null esplicito,
+   quindi NON possono azzerare un campo. La migrazione a `PatchValue` (omit/null/value) e necessaria
+   per la correttezza ed e parte naturale del tier "create/update" (A4): PatchValue e l'encoding dei
+   payload di update che A4 richiede. Da fare insieme, su branch di follow-up.
