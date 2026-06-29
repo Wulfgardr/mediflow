@@ -1070,6 +1070,41 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
+    func testUpdatePatientPutsNetworkPatientPayloadWithPatchSemantics() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1"
+            )
+            let body = try self.readRequestBody(from: request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["version"] as? Int, 5)
+            XCTAssertEqual(payload["firstName"] as? String, "Mario")
+            XCTAssertNil(payload["lastName"], "an omit-only optional left nil must be absent")
+            XCTAssertEqual(payload["phone"] as? String, "06 1234")
+            XCTAssertTrue(payload.keys.contains("address"), "PatchValue .null must emit an explicit null")
+            XCTAssertTrue(payload["address"] is NSNull)
+            XCTAssertNil(payload["caregiver"], "PatchValue .omit must be absent")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let ack = try await client.updatePatient(
+            patientId: "patient-1",
+            payload: HomeBasePatientUpdatePayload(
+                version: 5, firstName: "Mario", address: .null, phone: .value("06 1234")
+            ),
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: nil
+        )
+        XCTAssertTrue(ack.success)
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {

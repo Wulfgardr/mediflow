@@ -211,6 +211,74 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
     }
 }
 
+/// A4 patient update. Plain optionals (firstName/lastName/taxCode/isAdi/isArchived)
+/// are omit-only; the nullable fields use PatchValue (omit/null/value) because the
+/// backend (lib/patient-write-normalization.ts) distinguishes field-absent
+/// (unchanged) from explicit null (clear).
+public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let firstName: String?
+    public let lastName: String?
+    public let taxCode: String?
+    public let isAdi: Bool?
+    public let isArchived: Bool?
+    public let address: PatchValue<String>
+    public let phone: PatchValue<String>
+    public let caregiver: PatchValue<String>
+    public let notes: PatchValue<String>
+    public let monitoringProfile: PatchValue<String>
+    public let statusReason: PatchValue<String>
+
+    public init(
+        version: Int,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        taxCode: String? = nil,
+        isAdi: Bool? = nil,
+        isArchived: Bool? = nil,
+        address: PatchValue<String> = .omit,
+        phone: PatchValue<String> = .omit,
+        caregiver: PatchValue<String> = .omit,
+        notes: PatchValue<String> = .omit,
+        monitoringProfile: PatchValue<String> = .omit,
+        statusReason: PatchValue<String> = .omit
+    ) {
+        self.version = version
+        self.firstName = firstName
+        self.lastName = lastName
+        self.taxCode = taxCode
+        self.isAdi = isAdi
+        self.isArchived = isArchived
+        self.address = address
+        self.phone = phone
+        self.caregiver = caregiver
+        self.notes = notes
+        self.monitoringProfile = monitoringProfile
+        self.statusReason = statusReason
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, firstName, lastName, taxCode, isAdi, isArchived
+        case address, phone, caregiver, notes, monitoringProfile, statusReason
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(firstName, forKey: .firstName)
+        try container.encodeIfPresent(lastName, forKey: .lastName)
+        try container.encodeIfPresent(taxCode, forKey: .taxCode)
+        try container.encodeIfPresent(isAdi, forKey: .isAdi)
+        try container.encodeIfPresent(isArchived, forKey: .isArchived)
+        try container.encodePatch(address, forKey: .address)
+        try container.encodePatch(phone, forKey: .phone)
+        try container.encodePatch(caregiver, forKey: .caregiver)
+        try container.encodePatch(notes, forKey: .notes)
+        try container.encodePatch(monitoringProfile, forKey: .monitoringProfile)
+        try container.encodePatch(statusReason, forKey: .statusReason)
+    }
+}
+
 /* @Codex */
 public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
     public let drugName: String
@@ -597,6 +665,26 @@ public actor HomeBasePatientsClient {
     }
 
     /* @Codex */
+    public func updatePatient(
+        patientId: String,
+        payload: HomeBasePatientUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
     public func updateEntry(
         patientId: String,
         entryId: String,
