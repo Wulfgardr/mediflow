@@ -351,7 +351,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -602,7 +607,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -787,7 +797,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -944,7 +959,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -986,6 +1006,68 @@ final class HomeBasePatientsClientTests: XCTestCase {
         )
 
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
+    }
+
+    func testVersionConflictExposesStructuredFieldsAndMessage() async throws {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = """
+            {
+              "error": "Conflict", "code": "VERSION_CONFLICT", "entity": "entry",
+              "recordId": "entry-1", "expectedVersion": 4, "currentVersion": 5,
+              "currentUpdatedAt": "2026-05-02T12:10:00.000Z", "currentState": "present",
+              "currentSnapshot": { "id": "entry-1", "patientId": "patient-1", "version": 5,
+                "updatedAt": "2026-05-02T12:10:00.000Z", "deletedAt": null }
+            }
+            """.data(using: .utf8)!
+            return (response, data)
+        }
+
+        do {
+            _ = try await client.updateEntry(
+                patientId: "patient-1", entryId: "entry-1",
+                payload: HomeBaseEntryUpdatePayload(version: 4, content: "Stale"),
+                credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+                sessionCookie: "mediflow_session=session-123", ambulatoryId: nil
+            )
+            XCTFail("Expected version conflict")
+        } catch HomeBaseClientError.versionConflict(let conflict) {
+            XCTAssertEqual(conflict.entity, "entry")
+            XCTAssertEqual(conflict.recordId, "entry-1")
+            XCTAssertEqual(conflict.expectedVersion, 4)
+            XCTAssertEqual(conflict.currentVersion, 5)
+            XCTAssertEqual(conflict.currentState, "present")
+            XCTAssertEqual(conflict.currentSnapshot?.version, 5)
+            XCTAssertEqual(conflict.currentSnapshot?.patientId, "patient-1")
+            // The user-facing message names the expected version.
+            XCTAssertTrue(HomeBaseClientError.versionConflict(conflict).localizedDescription.contains("4"))
+        }
+    }
+
+    func testGeneric409WithoutVersionConflictFallsBackToHttpStatus() async throws {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = #"{"error":"Locked","message":"Risorsa bloccata da un altro processo"}"#.data(using: .utf8)!
+            return (response, data)
+        }
+
+        do {
+            _ = try await client.updateEntry(
+                patientId: "patient-1", entryId: "entry-1",
+                payload: HomeBaseEntryUpdatePayload(version: 1, content: "x"),
+                credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+                sessionCookie: "mediflow_session=session-123", ambulatoryId: nil
+            )
+            XCTFail("Expected error")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .httpStatus(409, "Risorsa bloccata da un altro processo"))
+        }
     }
 
     private func makeClient(

@@ -441,6 +441,7 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
     case missingSessionCookie
     case transport(HomeBaseTransportIssue)
     case httpStatus(Int, String?)
+    case versionConflict(VersionConflictPayload)
     case contract
 
     public var errorDescription: String? {
@@ -455,6 +456,9 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return issue.localizedDescription
         case .httpStatus(_, let message):
             return message ?? "La richiesta verso l'home-base non e andata a buon fine."
+        case .versionConflict(let conflict):
+            let current = conflict.currentVersion.map(String.init) ?? "piu recente"
+            return "Conflitto di versione su \(conflict.entity): la versione \(conflict.expectedVersion) e superata dalla \(current). Ricarica e confronta prima di salvare."
         case .contract:
             return "La risposta dell'home-base non rispetta il contratto atteso."
         }
@@ -858,6 +862,13 @@ public actor HomeBasePatientsClient {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
+                // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
+                // it as a typed error so the UI can show expected-vs-current version.
+                if httpResponse.statusCode == 409,
+                   let conflict = try? JSONDecoder().decode(VersionConflictPayload.self, from: data),
+                   conflict.code == "VERSION_CONFLICT" {
+                    throw HomeBaseClientError.versionConflict(conflict)
+                }
                 throw HomeBaseClientError.httpStatus(httpResponse.statusCode, Self.errorMessage(from: data))
             }
             return (data, httpResponse)

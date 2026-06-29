@@ -1172,6 +1172,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
+            } else if case HomeBaseClientError.versionConflict = error {
+                // Typed 409: show the precise expected-vs-current version message.
+                statusMessage = error.localizedDescription
+                errorMessage = nil
+                return
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 409 {
                 statusMessage = "Conflitto versione: ricarica il modulo e confronta la voce prima di salvare."
