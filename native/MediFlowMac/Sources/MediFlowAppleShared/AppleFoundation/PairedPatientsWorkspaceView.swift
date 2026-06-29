@@ -31,6 +31,13 @@ struct PairedPatientsWorkspaceView: View {
         .background(PlatformColors.groupedBackground)
         .task {
             await model.performAutomaticActionsIfNeeded()
+            #if DEBUG
+            // Screenshot/UI-test affordance: auto-present a clinical scale sheet so
+            // the live-scored form can be captured. Debug-only, never in release.
+            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] == "adl" {
+                presentingScale = ClinicalScales.adl
+            }
+            #endif
         }
         .sheet(item: $presentingScale) { scale in
             ClinicalScaleFormView(
@@ -145,13 +152,31 @@ struct PairedPatientsWorkspaceView: View {
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    #if DEBUG
+                    if focusedDetailOnly, let detail = model.selectedPatient {
+                        selectedPatientSections(detail)
+                    } else {
+                        credentialsCard
+                        patientsCard
+                    }
+                    #else
                     credentialsCard
                     patientsCard
+                    #endif
                 }
                 .padding(20)
             }
         }
     }
+
+    #if DEBUG
+    // Screenshot/UI-test affordance: render only the open patient's clinical
+    // sections (skip the pairing card) so the detail view can be captured from
+    // the top without scrolling. Debug-only, never compiled into release.
+    private var focusedDetailOnly: Bool {
+        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_FOCUS_DETAIL"] == "1"
+    }
+    #endif
 
     private var emptyDetailState: some View {
         VStack(spacing: 12) {

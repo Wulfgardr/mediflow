@@ -152,6 +152,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 pendingConflict = Self.uiTestSeededConflict()
             }
             statusMessage = "Dati di test caricati."
+            // Deep-link affordance: auto-open a seeded patient so the detail view
+            // (scheda, diario, terapie, controlli, osservazioni) can be exercised
+            // without tapping a row. Debug-only, never compiled into release.
+            if let raw = ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"],
+               let index = Int(raw), seeded.indices.contains(index) {
+                await loadPatient(seeded[index])
+            }
             return
         }
         #endif
