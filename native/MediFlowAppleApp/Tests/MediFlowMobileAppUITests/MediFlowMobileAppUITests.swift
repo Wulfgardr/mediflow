@@ -159,4 +159,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(sectionView("checkup-row-checkup-pending").exists)
         XCTAssertFalse(sectionView("checkup-row-checkup-cancelled").exists)
     }
+
+    func testDiaryTypeFilterNarrowsList() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        // Seeded diary entries (one per type) render.
+        XCTAssertTrue(sectionView("entry-row-entry-note").waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("entry-row-entry-visit").exists)
+        XCTAssertTrue(sectionView("entry-row-entry-phone").exists)
+
+        // Filter to "Visite" (distinct from the row chip "Visita"); only the visit remains.
+        let filter = app.buttons["entry-type-filter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5))
+        filter.tap()
+        app.buttons["Visite"].tap()
+
+        XCTAssertTrue(sectionView("entry-row-entry-visit").waitForExistence(timeout: 5))
+        XCTAssertFalse(sectionView("entry-row-entry-note").exists)
+        XCTAssertFalse(sectionView("entry-row-entry-phone").exists)
+    }
 }

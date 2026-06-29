@@ -21,6 +21,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var patientSortMode: PatientListSortMode = .recent
     @State private var therapyStatusFilter: TherapyStatusFilter = .all
     @State private var checkupStatusFilter: CheckupStatusFilter = .all
+    @State private var entryTypeFilter: EntryTypeFilter = .all
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -482,18 +483,37 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-entries-button")
+
+                Menu {
+                    Picker("Tipo voce", selection: $entryTypeFilter) {
+                        ForEach(EntryTypeFilter.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                } label: {
+                    Label(entryTypeFilter.title, systemImage: "line.3.horizontal.decrease.circle")
+                        .font(.caption)
+                }
+                .accessibilityIdentifier("entry-type-filter")
             }
 
             if model.entries.isEmpty {
                 Text("Nessuna voce diario caricata.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if EntryFiltering.apply(model.entries, filter: entryTypeFilter).isEmpty {
+                Text("Nessuna voce per questo filtro.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
-                ForEach(model.entries) { entry in
+                ForEach(EntryFiltering.apply(model.entries, filter: entryTypeFilter)) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(entry.title)
                                 .font(.caption.weight(.semibold))
+                            if let type = PairedDiaryEntryType(rawValue: entry.type) {
+                                flagChip(type.title, tone: .info)
+                            }
                             Spacer(minLength: 8)
                             Text(Self.entryDateFormatter.string(from: entry.date))
                                 .font(.caption2)
@@ -530,6 +550,7 @@ struct PairedPatientsWorkspaceView: View {
                     }
                     .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("entry-row-\(entry.id)")
                 }
             }
 

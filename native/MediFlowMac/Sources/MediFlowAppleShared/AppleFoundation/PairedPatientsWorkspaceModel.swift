@@ -219,6 +219,24 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             make("checkup-cancelled", title: "Controllo annullato", status: "cancelled")
         ]
     }
+
+    /// UI-test fixture diary entries (one per type) so the diary type filter can
+    /// be exercised without a paired home-base.
+    static func uiTestSeededEntries(patientId: String) -> [HomeBaseEntrySummary] {
+        let base = Date(timeIntervalSince1970: 1_750_000_000)
+        func make(_ id: String, type: String, title: String) -> HomeBaseEntrySummary {
+            HomeBaseEntrySummary(
+                id: id, patientId: patientId, type: type, title: title, date: base,
+                content: "Contenuto di test.", setting: nil, metadata: nil, attachments: nil,
+                deletedAt: nil, deletionReason: nil, version: 1, createdAt: base, updatedAt: base
+            )
+        }
+        return [
+            make("entry-note", type: "note", title: "Nota clinica"),
+            make("entry-visit", type: "visit", title: "Visita di controllo"),
+            make("entry-phone", type: "phone", title: "Contatto telefonico")
+        ]
+    }
     #endif
 
     func discoverHomeBase() async {
@@ -301,7 +319,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         #if DEBUG
         if let detail = Self.uiTestSeededDetail(for: patient) {
             selectedPatient = detail
-            entries = []
+            entries = Self.uiTestSeededEntries(patientId: patient.id)
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
             observations = []
