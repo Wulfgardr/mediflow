@@ -183,4 +183,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(sectionView("entry-row-entry-note").waitForNonExistence(timeout: 3))
         XCTAssertTrue(sectionView("entry-row-entry-phone").waitForNonExistence(timeout: 3))
     }
+
+    func testPrivacyShieldRedactsContentWhenForced() {
+        // The Debug force hook stands in for the app-switcher (inactive scene),
+        // which can't be driven headlessly. The overlay must cover the content.
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_FORCE_PRIVACY"] = "1"
+        app.launch()
+        XCTAssertTrue(
+            sectionView("privacy-shield").waitForExistence(timeout: 20),
+            "Privacy shield should cover the clinical content when the scene is not active"
+        )
+    }
 }

@@ -257,6 +257,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
             }
         }
+        .privacyShield()
     }
 
     private var usesSplitLayout: Bool {
