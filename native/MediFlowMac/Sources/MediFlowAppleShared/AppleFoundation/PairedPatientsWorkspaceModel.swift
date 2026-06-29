@@ -35,6 +35,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientPhone = ""
     @Published var editPatientCaregiver = ""
     @Published var editPatientNotes = ""
+    @Published var editPatientIsArchived = false
     @Published private(set) var isEditingPatient = false
     @Published var newTherapyDrugName = ""
     @Published var newTherapyActivePrinciple = ""
@@ -470,6 +471,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editPatientPhone = patient.phone ?? ""
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
+        editPatientIsArchived = patient.isArchived ?? false
         isEditingPatient = true
         statusMessage = "Modifica anagrafica pronta."
     }
@@ -485,6 +487,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            isArchived: editPatientIsArchived,
             address: patientPatchValue(editPatientAddress),
             phone: patientPatchValue(editPatientPhone),
             caregiver: patientPatchValue(editPatientCaregiver),
@@ -553,7 +556,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             aiSummary: current.aiSummary,
             documentInsights: current.documentInsights,
             isAdi: current.isAdi,
-            isArchived: current.isArchived,
+            isArchived: editPatientIsArchived,
             version: current.version + 1,
             ambulatoryId: current.ambulatoryId,
             createdAt: current.createdAt,

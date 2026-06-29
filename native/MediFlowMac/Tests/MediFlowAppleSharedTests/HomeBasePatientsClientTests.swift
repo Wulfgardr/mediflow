@@ -1086,6 +1086,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertTrue(payload.keys.contains("address"), "PatchValue .null must emit an explicit null")
             XCTAssertTrue(payload["address"] is NSNull)
             XCTAssertNil(payload["caregiver"], "PatchValue .omit must be absent")
+            XCTAssertEqual(payload["isArchived"] as? Bool, true, "a set isArchived flag must be sent")
+            XCTAssertNil(payload["isAdi"], "an unset bool flag must be absent (encodeIfPresent)")
 
             let response = HTTPURLResponse(
                 url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
@@ -1096,7 +1098,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
         let ack = try await client.updatePatient(
             patientId: "patient-1",
             payload: HomeBasePatientUpdatePayload(
-                version: 5, firstName: "Mario", address: .null, phone: .value("06 1234")
+                version: 5, firstName: "Mario", isArchived: true, address: .null, phone: .value("06 1234")
             ),
             credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
             sessionCookie: "mediflow_session=session-123",

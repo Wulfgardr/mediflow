@@ -15,6 +15,11 @@ public enum PatchValue<Value> {
     case value(Value)
 }
 
+// A PatchValue is Sendable when its payload is, so structs that carry PatchValue
+// fields (the HomeBase update payloads) can stay Sendable without a warning under
+// the Swift 6 language mode.
+extension PatchValue: Sendable where Value: Sendable {}
+
 extension KeyedEncodingContainer {
     mutating func encodePatch<T: Encodable>(_ value: PatchValue<T>, forKey key: Key) throws {
         switch value {

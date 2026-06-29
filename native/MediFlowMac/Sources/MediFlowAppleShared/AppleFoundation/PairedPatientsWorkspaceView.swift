@@ -490,6 +490,8 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("edit-patient-caregiver")
             TextField("Note", text: $model.editPatientNotes, axis: .vertical)
                 .accessibilityIdentifier("edit-patient-notes")
+            Toggle("Archiviato", isOn: $model.editPatientIsArchived)
+                .accessibilityIdentifier("edit-patient-archived")
             HStack(spacing: 10) {
                 Button("Salva") {
                     Task { await model.savePatient() }

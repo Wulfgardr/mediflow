@@ -224,4 +224,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Via Nuova 5"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForNonExistence(timeout: 3))
     }
+
+    func testEditPatientFormArchivesPatient() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+
+        // Generous timeout: alphabetically this is the first edit test to run, so it
+        // pays the cold-launch tax for the detail navigation.
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+        // Rossi starts active: the "Archiviato" flag chip is absent (singular chip,
+        // distinct from the list's plural "Archiviati" filter, so the query is exact).
+        XCTAssertTrue(app.staticTexts["Archiviato"].waitForNonExistence(timeout: 3))
+
+        // Open the edit form and turn the archived toggle on.
+        app.buttons["edit-patient-button"].tap()
+        let archived = app.switches["edit-patient-archived"]
+        XCTAssertTrue(archived.waitForExistence(timeout: 5))
+        archived.tap()
+
+        app.buttons["save-patient-button"].tap()
+
+        // The form dismisses and the detail re-renders with the archived flag chip.
+        XCTAssertTrue(app.staticTexts["Archiviato"].waitForExistence(timeout: 5))
+    }
 }
