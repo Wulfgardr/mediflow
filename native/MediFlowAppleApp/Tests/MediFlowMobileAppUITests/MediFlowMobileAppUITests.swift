@@ -402,6 +402,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 5))
     }
 
+    func testICDSearchAddsCodedDiagnosis() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        rossi.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
+
+        app.buttons["edit-patient-button"].tap()
+        let icdSearch = app.textFields["icd-search-field"]
+        XCTAssertTrue(scrollDown(to: icdSearch), "The in-app ICD search should be in the edit form")
+        icdSearch.tap()
+        icdSearch.typeText("ipertensione")
+
+        // The in-app catalog returns I10 with no external dependency.
+        let result = app.buttons["icd-result-I10"]
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        result.tap()
+        app.buttons["save-patient-button"].tap()
+
+        // The coded diagnosis appears in the detail (existing one preserved).
+        XCTAssertTrue(app.staticTexts["I10 - Ipertensione essenziale (primaria)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["E11.9 - Diabete tipo 2"].waitForExistence(timeout: 5))
+    }
+
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {

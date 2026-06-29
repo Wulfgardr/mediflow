@@ -23,6 +23,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var checkupStatusFilter: CheckupStatusFilter = .all
     @State private var entryTypeFilter: EntryTypeFilter = .all
     @State private var presentingScale: ClinicalScaleDefinition?
+    @State private var icdQuery = ""
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
 
     var body: some View {
@@ -558,6 +559,27 @@ struct PairedPatientsWorkspaceView: View {
                             Image(systemName: "minus.circle")
                         }
                         .accessibilityIdentifier("remove-diagnosis-\(index)")
+                    }
+                }
+                // A14: in-app ICD search (ADR 0070), no external proxy. Tapping a
+                // result adds the coded diagnosis with its system.
+                TextField("Cerca ICD (in-app)", text: $icdQuery)
+                    .accessibilityIdentifier("icd-search-field")
+                if !icdQuery.isEmpty {
+                    ForEach(ICDCatalog.search(icdQuery, limit: 6)) { icd in
+                        Button {
+                            model.addDiagnosis(code: icd.code, description: icd.description, system: icd.system)
+                            icdQuery = ""
+                        } label: {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("\(icd.code)  \(icd.description)")
+                                    .font(.caption)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 4)
+                                Image(systemName: "plus.circle")
+                            }
+                        }
+                        .accessibilityIdentifier("icd-result-\(icd.code)")
                     }
                 }
                 HStack(spacing: 6) {

@@ -684,13 +684,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func addDiagnosis() {
-        let code = newDiagnosisCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        let description = newDiagnosisDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !code.isEmpty || !description.isEmpty else { return }
-        // date == nil: encode stamps it with "now", so existing dates stay intact.
-        editPatientDiagnoses.append(ClinicalDiagnosis(code: code, description: description, system: nil, date: nil))
+        addDiagnosis(code: newDiagnosisCode, description: newDiagnosisDescription, system: nil)
         newDiagnosisCode = ""
         newDiagnosisDescription = ""
+    }
+
+    /// A14: add a (possibly ICD-coded) diagnosis. system carries the coding system
+    /// for ICD-picked entries (e.g. "ICD-10"), nil for free-text. date == nil so
+    /// encode stamps it with "now" while existing diagnoses keep their date.
+    func addDiagnosis(code: String, description: String, system: String?) {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty || !description.isEmpty else { return }
+        editPatientDiagnoses.append(ClinicalDiagnosis(code: code, description: description, system: system, date: nil))
     }
 
     func removeDiagnosis(at offsets: IndexSet) {
