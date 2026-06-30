@@ -2,15 +2,15 @@
 // live HomeBaseTherapySummary so it is unit-testable independently of the UI.
 import Foundation
 
-enum TherapyStatusFilter: String, CaseIterable, Identifiable {
+public enum TherapyStatusFilter: String, CaseIterable, Identifiable {
     case all
     case active
     case suspended
     case completed
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .all: return "Tutte"
         case .active: return "Attive"
@@ -30,8 +30,8 @@ enum TherapyStatusFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum TherapyFiltering {
-    static func apply(_ therapies: [HomeBaseTherapySummary], filter: TherapyStatusFilter) -> [HomeBaseTherapySummary] {
+public enum TherapyFiltering {
+    public static func apply(_ therapies: [HomeBaseTherapySummary], filter: TherapyStatusFilter) -> [HomeBaseTherapySummary] {
         guard let target = filter.matchingStatus else { return therapies }
         // Compare via the canonical raw value so unknown/legacy statuses simply
         // fall out of the specific filters (still visible under "all").

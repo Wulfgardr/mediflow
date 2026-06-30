@@ -2,18 +2,18 @@
 // live HomeBaseEntrySummary so it is unit-testable independently of the UI.
 import Foundation
 
-enum EntryTypeFilter: String, CaseIterable, Identifiable {
+public enum EntryTypeFilter: String, CaseIterable, Identifiable {
     case all
     case note
     case visit
     case phone
     case other
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     // Filter labels are intentionally distinct from the row's type chip labels
     // (Nota/Visita) so accessibility queries stay unambiguous.
-    var title: String {
+    public var title: String {
         switch self {
         case .all: return "Tutte"
         case .note: return "Note"
@@ -34,8 +34,8 @@ enum EntryTypeFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum EntryFiltering {
-    static func apply(_ entries: [HomeBaseEntrySummary], filter: EntryTypeFilter) -> [HomeBaseEntrySummary] {
+public enum EntryFiltering {
+    public static func apply(_ entries: [HomeBaseEntrySummary], filter: EntryTypeFilter) -> [HomeBaseEntrySummary] {
         guard let target = filter.matchingType else { return entries }
         return entries.filter { entry in
             PairedDiaryEntryType(rawValue: entry.type)?.rawValue == target.rawValue

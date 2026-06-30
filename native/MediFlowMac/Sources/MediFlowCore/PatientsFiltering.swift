@@ -3,18 +3,18 @@
 // PatientSummary), so it is unit-testable and reused by the universal app.
 import Foundation
 
-enum PatientListViewMode: String, CaseIterable {
+public enum PatientListViewMode: String, CaseIterable {
     case active
     case archived
 }
 
-enum PatientListSortMode: String, CaseIterable {
+public enum PatientListSortMode: String, CaseIterable {
     case recent
     case alpha
 }
 
-enum PatientsFiltering {
-    static func apply(
+public enum PatientsFiltering {
+    public static func apply(
         patients: [HomeBasePatientSummary],
         query: String,
         viewMode: PatientListViewMode,

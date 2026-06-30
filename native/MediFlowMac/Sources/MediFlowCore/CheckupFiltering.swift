@@ -2,15 +2,15 @@
 // live HomeBaseCheckupSummary so it is unit-testable independently of the UI.
 import Foundation
 
-enum CheckupStatusFilter: String, CaseIterable, Identifiable {
+public enum CheckupStatusFilter: String, CaseIterable, Identifiable {
     case all
     case pending
     case completed
     case cancelled
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .all: return "Tutti"
         case .pending: return "Da fare"
@@ -29,8 +29,8 @@ enum CheckupStatusFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum CheckupFiltering {
-    static func apply(_ checkups: [HomeBaseCheckupSummary], filter: CheckupStatusFilter) -> [HomeBaseCheckupSummary] {
+public enum CheckupFiltering {
+    public static func apply(_ checkups: [HomeBaseCheckupSummary], filter: CheckupStatusFilter) -> [HomeBaseCheckupSummary] {
         guard let target = filter.matchingStatus else { return checkups }
         return checkups.filter { checkup in
             PairedCheckupStatus(rawValue: checkup.status)?.rawValue == target.rawValue
