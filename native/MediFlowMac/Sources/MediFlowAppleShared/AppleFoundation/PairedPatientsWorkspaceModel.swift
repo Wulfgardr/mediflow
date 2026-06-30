@@ -1497,7 +1497,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return HomeBasePairedCredentials(clientId: clientId, clientToken: clientToken)
     }
 
-    private func makeClient() -> HomeBasePatientsClient {
+    // ADR 0071 Fase 3: returns the data-source SEAM (any HomeBasePatientsDataSource),
+    // not the concrete HTTP actor, so the implementation can later be swapped for an
+    // in-process SQLite-backed adapter without touching the call sites. Today it still
+    // builds the HTTP client = zero behavior change.
+    private func makeClient() -> any HomeBasePatientsDataSource {
         HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
     }
 
