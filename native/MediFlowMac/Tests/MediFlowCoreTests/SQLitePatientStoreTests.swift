@@ -57,6 +57,21 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNil(try store.loadPatientDetail(id: "does-not-exist", masterKey: masterKey))
     }
 
+    func testListPatientsScopedByAmbulatory() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        // fixture-1 is in AMB-1; add a second patient in AMB-2.
+        _ = try store.createPatient(
+            HomeBasePatientCreatePayload(firstName: "Due", lastName: "AmbB", taxCode: "T2"),
+            id: "p2", scopeAmbulatoryId: "AMB-2", masterKey: masterKey)
+
+        XCTAssertEqual(Set(try store.listPatients().map(\.id)), ["fixture-1", "p2"])  // unscoped
+        XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-1").map(\.id), ["fixture-1"])
+        XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-2").map(\.id), ["p2"])
+        XCTAssertTrue(try store.listPatients(scopeAmbulatoryId: "AMB-NONE").isEmpty)
+    }
+
     // MARK: Write path (reversed flow: the core is the on-device write authority)
 
     /// A throwaway writable copy of the fixture so the committed db stays pristine.

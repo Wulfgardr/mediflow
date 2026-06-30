@@ -1498,11 +1498,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     // ADR 0071 Fase 3: returns the data-source SEAM (any HomeBasePatientsDataSource),
-    // not the concrete HTTP actor, so the implementation can later be swapped for an
-    // in-process SQLite-backed adapter without touching the call sites. Today it still
-    // builds the HTTP client = zero behavior change.
+    // not the concrete HTTP actor, so the implementation can be swapped for the
+    // in-process SQLite-backed adapter without touching the call sites.
+    //
+    // Opt-in local authority (MEDIFLOW_LOCAL_AUTHORITY): when enabled AND the field
+    // key is unlocked, patient list/detail are served from the on-device medical.db
+    // via LocalPatientsDataSource (the reversed-flow read path drives the app);
+    // everything else still delegates to the HTTP client. OFF by default -> the app's
+    // behavior is unchanged unless the flag is set.
     private func makeClient() -> any HomeBasePatientsDataSource {
-        HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
+        let http = HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
+        guard Self.localAuthorityEnabled, let masterKey else { return http }
+        let dbPath = HomeBaseRuntimeStatusLoader.defaultDataDirectoryURL()
+            .appendingPathComponent("medical.db").path
+        return LocalPatientsDataSource(databasePath: dbPath, masterKey: masterKey, fallback: http)
+    }
+
+    private static var localAuthorityEnabled: Bool {
+        let raw = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]?.lowercased()
+        return raw == "1" || raw == "true" || raw == "yes"
     }
 
     // Fetch + decrypt the clinical sub-resources so their encrypted fields display

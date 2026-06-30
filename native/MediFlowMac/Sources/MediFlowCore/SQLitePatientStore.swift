@@ -68,15 +68,20 @@ public struct SQLitePatientStore {
     }
 
     /// Active (non-soft-deleted) patient summaries. No decryption needed: summary
-    /// columns are plaintext.
-    public func listPatients() throws -> [HomeBasePatientSummary] {
+    /// columns are plaintext. `scopeAmbulatoryId` (when provided) filters by the
+    /// denormalized patients.ambulatory_id, the same scope model the write paths use
+    /// (PARITY NOTE: the web scopes via the patients_to_ambulatories membership; the
+    /// denormalized column diverges only for multi-membership patients).
+    public func listPatients(scopeAmbulatoryId: String? = nil) throws -> [HomeBasePatientSummary] {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
+        let scopeClause = scopeAmbulatoryId == nil ? "" : "AND ambulatory_id = ? "
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, is_adi, is_archived, version, updated_at
-        FROM patients WHERE deleted_at IS NULL ORDER BY updated_at DESC
+        FROM patients WHERE deleted_at IS NULL \(scopeClause)ORDER BY updated_at DESC
         """
-        return try db.run(sql) { row in
+        let binds: [SQLiteBind] = scopeAmbulatoryId.map { [.text($0)] } ?? []
+        return try db.run(sql, bind: binds) { row in
             HomeBasePatientSummary(
                 id: row.text(0) ?? "",
                 firstName: row.text(1) ?? "",
