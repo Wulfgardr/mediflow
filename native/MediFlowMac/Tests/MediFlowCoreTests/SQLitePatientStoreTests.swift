@@ -198,6 +198,56 @@ final class SQLitePatientStoreTests: XCTestCase {
             .noValidFields)
     }
 
+    func testUpdatePatientWritesExemptionsAndBirthDate() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let exemptionsJSON = try XCTUnwrap(ExemptionCodesCodec.encode(["048", "C01", "E02"]))
+        let birth = ISO8601DateFormatter().date(from: "1975-05-20T00:00:00Z")!
+        let payload = HomeBasePatientUpdatePayload(
+            version: 1, exemptions: .value(exemptionsJSON), birthDate: .value(birth))
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(ExemptionCodesCodec.decode(detail.exemptions), ["048", "C01", "E02"])
+        XCTAssertEqual(detail.birthDate, birth)
+        // exemptions is a STRUCTURED ENCRYPTED field: undecryptable with the wrong key.
+        let masked = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: SymmetricKey(size: .bits256)))
+        XCTAssertTrue(ExemptionCodesCodec.decode(masked.exemptions).isEmpty)
+    }
+
+    func testUpdatePatientClearsBirthDateWithNull() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        // The fixture patient has a birth date; an explicit null clears it.
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: HomeBasePatientUpdatePayload(version: 1, birthDate: .null),
+                                    masterKey: masterKey),
+            .updated(version: 2))
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertNil(detail.birthDate)
+    }
+
+    func testPatientWriteOutcomeWireResponseLocksWebCopy() {
+        typealias Outcome = SQLitePatientStore.PatientWriteOutcome
+        XCTAssertEqual(Outcome.updated(version: 2).wireResponse.status, 200)
+        XCTAssertEqual(Outcome.versionRequired.wireResponse.status, 400)
+        XCTAssertEqual(Outcome.versionRequired.wireResponse.error, "Version is required")
+        XCTAssertEqual(Outcome.noValidFields.wireResponse.error, "No valid fields to update")
+        XCTAssertEqual(Outcome.notFound.wireResponse.status, 404)
+        XCTAssertEqual(Outcome.notFound.wireResponse.error, "Not found")
+        let payload = PatientConcurrency.buildVersionConflictPayload(
+            expectedVersion: 1, recordId: "x", current: nil)
+        XCTAssertEqual(Outcome.conflict(payload).wireResponse.status, 409)
+        XCTAssertNil(Outcome.conflict(payload).wireResponse.error)
+    }
+
     // MARK: Create
 
     func testCreatePatientInsertsAndSealsFields() throws {
@@ -265,8 +315,7 @@ final class SQLitePatientStoreTests: XCTestCase {
         let store = SQLitePatientStore(path: path)
 
         XCTAssertEqual(
-            try store.softDeletePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
-                                        version: 1, masterKey: masterKey),
+            try store.softDeletePatient(id: "fixture-1", version: 1, masterKey: masterKey),
             .updated(version: 2))
         // The tombstoned patient drops out of every active read path.
         XCTAssertTrue(try store.listPatients().isEmpty)
@@ -279,7 +328,7 @@ final class SQLitePatientStoreTests: XCTestCase {
         let store = SQLitePatientStore(path: path)
 
         guard case .conflict(let conflict) = try store.softDeletePatient(
-            id: "fixture-1", scopeAmbulatoryId: "AMB-1", version: 99, masterKey: masterKey) else {
+            id: "fixture-1", version: 99, masterKey: masterKey) else {
             return XCTFail("expected a version conflict")
         }
         XCTAssertEqual(conflict.entity, "patient")
@@ -293,8 +342,7 @@ final class SQLitePatientStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         let store = SQLitePatientStore(path: path)
         XCTAssertEqual(
-            try store.softDeletePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
-                                        version: 0, masterKey: masterKey),
+            try store.softDeletePatient(id: "fixture-1", version: 0, masterKey: masterKey),
             .versionRequired)
     }
 
@@ -303,8 +351,7 @@ final class SQLitePatientStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         let store = SQLitePatientStore(path: path)
         XCTAssertEqual(
-            try store.softDeletePatient(id: "ghost", scopeAmbulatoryId: "AMB-1",
-                                        version: 1, masterKey: masterKey),
+            try store.softDeletePatient(id: "ghost", version: 1, masterKey: masterKey),
             .notFound)
     }
 }

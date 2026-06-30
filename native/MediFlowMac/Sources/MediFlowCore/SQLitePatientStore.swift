@@ -31,6 +31,23 @@ public struct SQLitePatientStore {
         case notFound
         case conflict(VersionConflictPayload)
         case encryptionFailed
+
+        /// The HTTP-equivalent (status, error-copy) for the future sync/route layer,
+        /// locking the web's EXACT wire strings in executable code (not just comments)
+        /// so they can't drift. `conflict` carries the VersionConflictPayload as its
+        /// body (no error string); `encryptionFailed` is a native fail-closed guard
+        /// with no web peer. Matches lib/network-patient-write.ts.
+        public var wireResponse: (status: Int, error: String?) {
+            switch self {
+            case .updated: return (200, nil)
+            case .versionRequired: return (400, "Version is required")
+            case .noValidFields: return (400, "No valid fields to update")
+            case .boundaryRejected(let status, let error): return (status, error)
+            case .notFound: return (404, "Not found")
+            case .conflict: return (409, nil)
+            case .encryptionFailed: return (500, "Failed to secure the record")
+            }
+        }
     }
 
     /// Outcome of a patient create, 1:1 with POST /api/v1/patients: created=201.
@@ -121,7 +138,12 @@ public struct SQLitePatientStore {
     /// denormalized patients.ambulatory_id (the only model the fixture/local store
     /// carries today, and the column the web keeps consistent with the membership
     /// per WUL-309). Full membership scoping + upsertPrimaryAmbulatoryMembership is
-    /// follow-up work, tracked with the sub-resource concurrency ports.
+    /// follow-up work, tracked with the sub-resource concurrency ports. Relatedly,
+    /// SETTING the primary ambulatoryId on update (WUL-309 set-primary) is also
+    /// deferred: the payload carries no ambulatoryId and the boundary is passed
+    /// .omit, because writing the denormalized column without the membership upsert
+    /// would desync the two. So the on-device update cannot change the primary
+    /// ambulatory yet.
     public func updatePatient(
         id: String,
         scopeAmbulatoryId: String,
@@ -218,16 +240,18 @@ public struct SQLitePatientStore {
         return .created(id: id, version: 1)
     }
 
-    /// Soft-delete a patient (ADR 0066 tombstone), 1:1 with DELETE /api/v1/patients/[id]:
-    /// version-guarded, sets deleted_at + deletion_reason + version+1 + updated_at.
-    /// deletion_reason defaults to "api-v1-delete" (web hardcode) and IS sealed: it is
-    /// an ENCRYPTED_FIELD and the core holds the key, so the at-rest encryption
-    /// invariant is kept (the web DELETE route writes it plaintext only because the
-    /// server has no key). Success is reported as `.updated(version:)` (the wire
-    /// contract is the same version-bumping 200 as an update).
+    /// Soft-delete a patient (ADR 0066 tombstone), 1:1 with the operator route
+    /// DELETE /api/v1/patients/[id]: version-guarded, sets deleted_at + deletion_reason
+    /// + version+1 + updated_at. UNSCOPED on purpose: that operator route reads
+    /// existence by id + active only (no ambulatory join, and there is no network
+    /// delete peer), so a version-mismatched active patient yields 409 regardless of
+    /// ambulatory, exactly like the web. deletion_reason defaults to "api-v1-delete"
+    /// (web hardcode) and IS sealed: it is an ENCRYPTED_FIELD and the core holds the
+    /// key, so the at-rest encryption invariant is kept (the web DELETE route writes
+    /// it plaintext only because the server is keyless). Success is reported as
+    /// `.updated(version:)` (the wire contract is the same version-bumping 200).
     public func softDeletePatient(
         id: String,
-        scopeAmbulatoryId: String,
         version: Int,
         deletionReason: String = "api-v1-delete",
         masterKey: SymmetricKey,
@@ -244,7 +268,8 @@ public struct SQLitePatientStore {
         try db.assertPatientsSchema()
         try db.execute("BEGIN IMMEDIATE")
         do {
-            let snapshot = try selectScopedSnapshot(db, id: id, scope: scopeAmbulatoryId)
+            // Unscoped existence read (id + active), matching the operator route.
+            let snapshot = try selectConflictSnapshot(db, id: id)
             switch PatientConcurrency.evaluate(rawVersion: version, recordId: id, current: snapshot) {
             case .versionRequired:
                 try db.execute("ROLLBACK"); return .versionRequired
@@ -352,11 +377,13 @@ public struct SQLitePatientStore {
             ("address", p.address), ("phone", p.phone), ("caregiver", p.caregiver),
             ("notes", p.notes), ("monitoringProfile", p.monitoringProfile),
             ("statusReason", p.statusReason), ("diagnoses", p.diagnoses),
+            ("exemptions", p.exemptions),
         ]
         for (name, value) in patches {
             if case .omit = value { continue }
             fields.insert(name)
         }
+        if case .omit = p.birthDate {} else { fields.insert("birthDate") }
         return fields
     }
 
@@ -382,10 +409,20 @@ public struct SQLitePatientStore {
               appendSealedString(&out, "notes", p.notes, masterKey),
               appendSealedString(&out, "status_reason", p.statusReason, masterKey)
         else { return nil }
-        // diagnoses is a STRUCTURED ENCRYPTED field: the plaintext is the array JSON
-        // itself (NOT JSON.stringify'd again, unlike a string field), so the array
-        // JSON string is encrypted directly. See PatientFieldCrypto.decryptStructuredField.
-        guard appendSealedStructured(&out, "diagnoses", p.diagnoses, masterKey) else { return nil }
+        // diagnoses + exemptions are STRUCTURED ENCRYPTED fields: the plaintext is the
+        // array JSON itself (NOT JSON.stringify'd again, unlike a string field), so the
+        // array JSON string is encrypted directly. See PatientFieldCrypto.decryptStructuredField.
+        // (Permissive like the web's normalizeStructuredPatientField: the caller-supplied
+        // string is stored verbatim; callers pass canonical array-JSON from the codecs.)
+        guard appendSealedStructured(&out, "diagnoses", p.diagnoses, masterKey),
+              appendSealedStructured(&out, "exemptions", p.exemptions, masterKey)
+        else { return nil }
+        // birth_date is plaintext (integer seconds); omit/null/value like the web.
+        switch p.birthDate {
+        case .omit: break
+        case .null: out.append(("birth_date", .null))
+        case .value(let date): out.append(("birth_date", .int(Int(date.timeIntervalSince1970))))
+        }
         return out
     }
 

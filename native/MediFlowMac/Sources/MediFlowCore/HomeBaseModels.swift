@@ -270,6 +270,10 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     // A14/A3: the diagnoses JSON-array string. The backend stores a string field
     // verbatim (normalizeStructuredPatientField), so the encoded array round-trips.
     public let diagnoses: PatchValue<String>
+    // exemptions: the structured exemption-codes JSON-array string (same convention
+    // as diagnoses). birthDate: omit/null/value, matching normalizeBirthDateForUpdate.
+    public let exemptions: PatchValue<String>
+    public let birthDate: PatchValue<Date>
 
     public init(
         version: Int,
@@ -284,7 +288,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         notes: PatchValue<String> = .omit,
         monitoringProfile: PatchValue<String> = .omit,
         statusReason: PatchValue<String> = .omit,
-        diagnoses: PatchValue<String> = .omit
+        diagnoses: PatchValue<String> = .omit,
+        exemptions: PatchValue<String> = .omit,
+        birthDate: PatchValue<Date> = .omit
     ) {
         self.version = version
         self.firstName = firstName
@@ -299,11 +305,14 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         self.monitoringProfile = monitoringProfile
         self.statusReason = statusReason
         self.diagnoses = diagnoses
+        self.exemptions = exemptions
+        self.birthDate = birthDate
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, firstName, lastName, taxCode, isAdi, isArchived
         case address, phone, caregiver, notes, monitoringProfile, statusReason, diagnoses
+        case exemptions, birthDate
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -321,6 +330,8 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         try container.encodePatch(monitoringProfile, forKey: .monitoringProfile)
         try container.encodePatch(statusReason, forKey: .statusReason)
         try container.encodePatch(diagnoses, forKey: .diagnoses)
+        try container.encodePatch(exemptions, forKey: .exemptions)
+        try container.encodePatch(birthDate, forKey: .birthDate)
     }
 }
 
