@@ -6,6 +6,7 @@
 // are JSON-unwrapped (the web stores JSON.stringify(value)).
 import Foundation
 import CryptoKit
+import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
 
 public enum PatientFieldCrypto {
     /// A plain string field: ENC -> decrypt -> JSON-unwrap; plaintext -> as-is;

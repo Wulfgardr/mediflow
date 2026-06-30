@@ -1,13 +1,13 @@
 import XCTest
-import CryptoKit
-@testable import MediFlowAppleShared
+import Crypto
+import MediFlowCore
 
-/// ADR 0071 Fase 0: the Swift core (CryptoService) MUST reproduce the
-/// language-neutral zero-knowledge crypto oracle byte-for-byte. The fixture at
-/// native/contracts/crypto-golden-vectors.v1.json is generated from the web
-/// WebCrypto reference (lib/security.ts); this test is the gate that proves the
-/// Swift implementation agrees. The same fixture will gate the Windows-MSVC and
-/// Linux Swift toolchains once MediFlowCore is extracted.
+/// ADR 0071 Fase 0/1: the platform-free core (CryptoService in MediFlowCore) MUST
+/// reproduce the language-neutral zero-knowledge crypto oracle byte-for-byte. The
+/// fixture at native/contracts/crypto-golden-vectors.v1.json is generated from the
+/// web WebCrypto reference (lib/security.ts); this test is the gate that proves the
+/// Swift implementation agrees. The same fixture + this target gate the
+/// Windows-MSVC and Linux Swift toolchains (swift-crypto) in CI.
 final class CryptoGoldenVectorsTests: XCTestCase {
 
     private struct Fixture: Decodable {

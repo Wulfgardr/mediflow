@@ -8,7 +8,11 @@
 // JSON.stringify-d before encryption. So a string field decrypts to a quoted
 // JSON string ("foo") and an array field (diagnoses) decrypts to its array JSON.
 import Foundation
-import CryptoKit
+// ADR 0071: the core uses swift-crypto's `Crypto` (one source path on every OS).
+// On Apple platforms `Crypto` re-exports CryptoKit, so SymmetricKey/AES.GCM/HMAC
+// are the same types the rest of the Apple code uses; on Linux/Windows the same
+// API is BoringSSL-backed. The golden-vector gate proves byte-compatibility.
+import Crypto
 
 public enum CryptoService {
     public static let encPrefix = "ENC:"

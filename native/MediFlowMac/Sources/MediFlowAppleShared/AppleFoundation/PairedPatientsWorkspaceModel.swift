@@ -1,5 +1,6 @@
 import SwiftUI
 import CryptoKit
+import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
 #if os(macOS)
 import AppKit
 #else
