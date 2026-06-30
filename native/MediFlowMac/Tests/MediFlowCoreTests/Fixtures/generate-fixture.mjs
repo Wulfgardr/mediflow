@@ -89,5 +89,74 @@ const cols = Object.keys(patient);
 db.prepare(`INSERT INTO patients (${cols.map((c) => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
     .run(...cols.map((c) => patient[c]));
 
+// ADR 0071 Fase 3 slice 4: one row per clinical sub-resource, sealed under the same
+// golden-vector master key, so SQLiteClinicalStore list-read tests (both the core
+// target and the AppleShared adapter, which cannot construct tables itself - the
+// SQLite wrapper is internal to MediFlowCore) can read a real on-disk fixture without
+// regenerating tables in-test. Real web schema (verbatim from the live medical.db).
+db.exec(`CREATE TABLE "entries" (
+    \`id\` text PRIMARY KEY NOT NULL, \`patient_id\` text NOT NULL, \`type\` text NOT NULL,
+    \`title\` text NOT NULL DEFAULT 'Voce clinica', \`date\` integer NOT NULL, \`content\` text NOT NULL,
+    \`setting\` text, \`metadata\` text, \`attachments\` text, \`deleted_at\` integer, \`deletion_reason\` text,
+    \`version\` integer NOT NULL DEFAULT 1, \`created_at\` integer DEFAULT (unixepoch()), \`updated_at\` integer DEFAULT (unixepoch())
+);`);
+db.exec(`CREATE TABLE "therapies" (
+    \`id\` text PRIMARY KEY NOT NULL, \`patient_id\` text NOT NULL, \`drug_name\` text NOT NULL,
+    \`aic\` text, \`atc\` text, \`active_principle\` text, \`dosage\` text NOT NULL, \`motivation\` text,
+    \`diagnosis_code\` text, \`diagnosis_name\` text, \`status\` text NOT NULL DEFAULT 'active',
+    \`start_date\` integer NOT NULL, \`end_date\` integer, \`version\` integer NOT NULL DEFAULT 1,
+    \`created_at\` integer DEFAULT (unixepoch()), \`updated_at\` integer DEFAULT (unixepoch()),
+    \`deleted_at\` integer, \`deletion_reason\` text
+);`);
+db.exec(`CREATE TABLE "checkups" (
+    \`id\` text PRIMARY KEY NOT NULL, \`patient_id\` text NOT NULL, \`date\` integer NOT NULL,
+    \`title\` text NOT NULL, \`notes\` text, \`status\` text DEFAULT 'pending', \`source\` text,
+    \`version\` integer NOT NULL DEFAULT 1, \`created_at\` integer DEFAULT (unixepoch()),
+    \`updated_at\` integer DEFAULT (unixepoch()), \`deleted_at\` integer, \`deletion_reason\` text
+);`);
+db.exec(`CREATE TABLE "observations" (
+    \`id\` text PRIMARY KEY NOT NULL, \`patient_id\` text NOT NULL, \`code_system\` text NOT NULL,
+    \`code\` text NOT NULL, \`display\` text NOT NULL, \`unit_system\` text NOT NULL, \`unit_code\` text NOT NULL,
+    \`value\` text NOT NULL, \`notes\` text, \`observed_at\` integer NOT NULL, \`source\` text DEFAULT 'manual',
+    \`version\` integer NOT NULL DEFAULT 1, \`created_at\` integer DEFAULT (unixepoch()),
+    \`updated_at\` integer DEFAULT (unixepoch()), \`deleted_at\` integer, \`deletion_reason\` text
+);`);
+
+const entry = {
+    id: 'fixture-entry-1', patient_id: 'fixture-1', type: 'note', title: await enc('Visita di controllo'),
+    date: 1751000000, content: await enc('Paziente stabile, nessuna variazione terapeutica.'),
+    setting: 'ambulatory', metadata: null, attachments: null, deleted_at: null, deletion_reason: null,
+    version: 1, created_at: 1751000000, updated_at: 1751000000,
+};
+db.prepare(`INSERT INTO entries (${Object.keys(entry).map((c) => `"${c}"`).join(',')}) VALUES (${Object.keys(entry).map(() => '?').join(',')})`)
+    .run(...Object.values(entry));
+
+const therapy = {
+    id: 'fixture-therapy-1', patient_id: 'fixture-1', drug_name: 'Metformina', aic: null, atc: 'A10BA02',
+    active_principle: 'Metformina cloridrato', dosage: '500mg 2x/die', motivation: await enc('Diabete tipo 2'),
+    diagnosis_code: 'E11.9', diagnosis_name: 'Diabete mellito tipo 2', status: 'active',
+    start_date: 1748000000, end_date: null, version: 1, created_at: 1748000000, updated_at: 1748000000,
+    deleted_at: null, deletion_reason: null,
+};
+db.prepare(`INSERT INTO therapies (${Object.keys(therapy).map((c) => `"${c}"`).join(',')}) VALUES (${Object.keys(therapy).map(() => '?').join(',')})`)
+    .run(...Object.values(therapy));
+
+const checkup = {
+    id: 'fixture-checkup-1', patient_id: 'fixture-1', date: 1749000000, title: 'Controllo glicemico',
+    notes: await enc('Valori nella norma'), status: 'completed', source: 'manual',
+    version: 1, created_at: 1749000000, updated_at: 1749000000, deleted_at: null, deletion_reason: null,
+};
+db.prepare(`INSERT INTO checkups (${Object.keys(checkup).map((c) => `"${c}"`).join(',')}) VALUES (${Object.keys(checkup).map(() => '?').join(',')})`)
+    .run(...Object.values(checkup));
+
+const observation = {
+    id: 'fixture-observation-1', patient_id: 'fixture-1', code_system: 'LOINC', code: '4548-4',
+    display: 'Emoglobina glicata', unit_system: 'UCUM', unit_code: '%', value: '6.8',
+    notes: await enc('Buon controllo glicemico'), observed_at: 1747000000, source: 'manual',
+    version: 1, created_at: 1747000000, updated_at: 1747000000, deleted_at: null, deletion_reason: null,
+};
+db.prepare(`INSERT INTO observations (${Object.keys(observation).map((c) => `"${c}"`).join(',')}) VALUES (${Object.keys(observation).map(() => '?').join(',')})`)
+    .run(...Object.values(observation));
+
 db.close();
-console.log('OK: wrote', dbPath, '(1 patient, encrypted fields sealed with the golden-vector master key)');
+console.log('OK: wrote', dbPath, '(1 patient + 1 entry/therapy/checkup/observation, encrypted fields sealed with the golden-vector master key)');

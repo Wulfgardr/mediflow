@@ -78,6 +78,119 @@ public struct SQLiteClinicalStore {
         self.path = path
     }
 
+    // MARK: Per-entity list (read), 1:1 with lib/network-{e}-read.ts listNetworkScoped*.
+    // NOT active-filtered (soft-deleted rows are listed too, same as the web); scoped
+    // via the denormalized patients.ambulatory_id (same PARITY NOTE as the writes).
+    // Decrypts the ENCRYPTED_FIELDS in-core via ClinicalFieldCrypto, mirroring
+    // SQLitePatientStore.loadPatientDetail's decrypt-before-return shape.
+
+    public func listEntries(
+        patientId: String, scopeAmbulatoryId: String, masterKey: SymmetricKey, limit: Int? = nil
+    ) throws -> [HomeBaseEntrySummary] {
+        let sql = """
+        SELECT e.id, e.patient_id, e.type, e.title, e.date, e.content, e.setting, e.metadata,
+               e.attachments, e.deleted_at, e.deletion_reason, e.version, e.created_at, e.updated_at
+        FROM entries e JOIN patients p ON e.patient_id = p.id
+        WHERE e.patient_id = ? AND p.ambulatory_id = ? ORDER BY e.date DESC\(limitClause(limit))
+        """
+        let raw = try listQuery(sql, table: "entries", requiredColumns: Self.entryColumns,
+                                patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
+            HomeBaseEntrySummary(
+                id: row.text(0) ?? "", patientId: row.text(1) ?? "", type: row.text(2) ?? "",
+                title: row.text(3) ?? "", date: row.date(4) ?? Date(timeIntervalSince1970: 0),
+                content: row.text(5) ?? "", setting: row.text(6), metadata: row.text(7),
+                attachments: row.text(8), deletedAt: row.date(9), deletionReason: row.text(10),
+                version: row.int(11) ?? 1, createdAt: row.date(12), updatedAt: row.date(13))
+        }
+        return raw.map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
+    }
+
+    public func listTherapies(
+        patientId: String, scopeAmbulatoryId: String, masterKey: SymmetricKey, limit: Int? = nil
+    ) throws -> [HomeBaseTherapySummary] {
+        let sql = """
+        SELECT t.id, t.patient_id, t.drug_name, t.aic, t.atc, t.active_principle, t.dosage,
+               t.motivation, t.diagnosis_code, t.diagnosis_name, t.status, t.start_date, t.end_date,
+               t.version, t.created_at, t.updated_at, t.deleted_at, t.deletion_reason
+        FROM therapies t JOIN patients p ON t.patient_id = p.id
+        WHERE t.patient_id = ? AND p.ambulatory_id = ? ORDER BY t.start_date DESC\(limitClause(limit))
+        """
+        let raw = try listQuery(sql, table: "therapies", requiredColumns: Self.therapyColumns,
+                                patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
+            HomeBaseTherapySummary(
+                id: row.text(0) ?? "", patientId: row.text(1) ?? "", drugName: row.text(2) ?? "",
+                aic: row.text(3), atc: row.text(4), activePrinciple: row.text(5),
+                dosage: row.text(6) ?? "", motivation: row.text(7), diagnosisCode: row.text(8),
+                diagnosisName: row.text(9), status: ClinicalStatusNormalization.therapyStatus(row.text(10)),
+                startDate: row.date(11) ?? Date(timeIntervalSince1970: 0), endDate: row.date(12),
+                version: row.int(13) ?? 1, createdAt: row.date(14), updatedAt: row.date(15),
+                deletedAt: row.date(16), deletionReason: row.text(17))
+        }
+        return raw.map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
+    }
+
+    public func listCheckups(
+        patientId: String, scopeAmbulatoryId: String, masterKey: SymmetricKey, limit: Int? = nil
+    ) throws -> [HomeBaseCheckupSummary] {
+        let sql = """
+        SELECT c.id, c.patient_id, c.date, c.title, c.notes, c.status, c.source,
+               c.version, c.created_at, c.updated_at, c.deleted_at, c.deletion_reason
+        FROM checkups c JOIN patients p ON c.patient_id = p.id
+        WHERE c.patient_id = ? AND p.ambulatory_id = ? ORDER BY c.date DESC\(limitClause(limit))
+        """
+        let raw = try listQuery(sql, table: "checkups", requiredColumns: Self.checkupColumns,
+                                patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
+            HomeBaseCheckupSummary(
+                id: row.text(0) ?? "", patientId: row.text(1) ?? "",
+                date: row.date(2) ?? Date(timeIntervalSince1970: 0), title: row.text(3) ?? "",
+                notes: row.text(4), status: ClinicalStatusNormalization.checkupStatus(row.text(5)), source: row.text(6),
+                version: row.int(7) ?? 1, createdAt: row.date(8), updatedAt: row.date(9),
+                deletedAt: row.date(10), deletionReason: row.text(11))
+        }
+        return raw.map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
+    }
+
+    public func listObservations(
+        patientId: String, scopeAmbulatoryId: String, masterKey: SymmetricKey, limit: Int? = nil
+    ) throws -> [HomeBaseObservationSummary] {
+        let sql = """
+        SELECT o.id, o.patient_id, o.code_system, o.code, o.display, o.unit_system, o.unit_code,
+               o.value, o.notes, o.observed_at, o.source, o.version, o.created_at, o.updated_at,
+               o.deleted_at, o.deletion_reason
+        FROM observations o JOIN patients p ON o.patient_id = p.id
+        WHERE o.patient_id = ? AND p.ambulatory_id = ? ORDER BY o.observed_at DESC\(limitClause(limit))
+        """
+        let raw = try listQuery(sql, table: "observations", requiredColumns: Self.observationColumns,
+                                patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
+            HomeBaseObservationSummary(
+                id: row.text(0) ?? "", patientId: row.text(1) ?? "", codeSystem: row.text(2) ?? "",
+                code: row.text(3) ?? "", display: row.text(4) ?? "", unitSystem: row.text(5) ?? "",
+                unitCode: row.text(6) ?? "", value: row.text(7) ?? "", notes: row.text(8),
+                observedAt: row.date(9) ?? Date(timeIntervalSince1970: 0), source: row.text(10),
+                version: row.int(11) ?? 1, createdAt: row.date(12), updatedAt: row.date(13),
+                deletedAt: row.date(14), deletionReason: row.text(15))
+        }
+        return raw.map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
+    }
+
+    /// `LIMIT ?` clause text; the bind value is appended by listQuery. Empty when the
+    /// web would treat `limit` as falsy (nil, 0, or negative -> unbounded), matching
+    /// `filters.limit ? query.limit(filters.limit) : query` in lib/network-{e}-read.ts.
+    private func limitClause(_ limit: Int?) -> String { (limit ?? 0) > 0 ? " LIMIT ?" : "" }
+
+    /// Shared list-query runner: opens a connection, asserts the schema, binds
+    /// patientId + scope (+ limit when positive, matching limitClause), and maps each row.
+    private func listQuery<T>(
+        _ sql: String, table: String, requiredColumns: [String],
+        patientId: String, scope: String, limit: Int?, _ map: (SQLiteRow) -> T
+    ) throws -> [T] {
+        let db = try SQLiteConnection(readOnlyPath: path)
+        try db.assertSchema(table: table, requiredColumns: requiredColumns)
+        var binds: [SQLiteBind] = [.text(patientId), .text(scope)]
+        if let limit, limit > 0 { binds.append(.int(limit)) }
+        return try db.run(sql, bind: binds, map)
+    }
+
     // MARK: Per-entity update (soft-delete = update carrying deletedAt + deletionReason)
 
     public func updateEntry(
@@ -456,10 +569,14 @@ public struct SQLiteClinicalStore {
         }
 
         /// An ENCRYPTED string column: JSON.stringify(value) then AES-GCM (nil = omit).
+        /// sealOrPassthrough (Fase 3 slice 5): a value ALREADY sealed for HTTP (the
+        /// model pre-seals clinical write payloads too) passes through verbatim when
+        /// it is authenticated ciphertext under this key; plaintext (or a forged
+        /// "ENC:") is sealed. Avoids double-encryption without touching the model.
         mutating func sealString(_ field: String, _ column: String, _ value: String?) {
             guard let value else { return }
             presentFields.insert(field)
-            guard case .sealed(let enc?) = CryptoService.seal(value, masterKey: masterKey) else {
+            guard case .sealed(let enc?) = CryptoService.sealOrPassthrough(value, masterKey: masterKey) else {
                 failed = true
                 return
             }
@@ -478,9 +595,11 @@ public struct SQLiteClinicalStore {
             pairs.append((column, .int(Int(value.timeIntervalSince1970))))
         }
 
+        /// Required ENCRYPTED string column (create): same strict sealOrPassthrough as
+        /// `sealString`, but the field is always present (no nil/omit case).
         mutating func sealRequired(_ field: String, _ column: String, _ value: String) {
             presentFields.insert(field)
-            guard case .sealed(let enc?) = CryptoService.seal(value, masterKey: masterKey) else {
+            guard case .sealed(let enc?) = CryptoService.sealOrPassthrough(value, masterKey: masterKey) else {
                 failed = true
                 return
             }

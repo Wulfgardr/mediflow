@@ -44,6 +44,44 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertEqual(detail.address, "Via Roma 1, Milano")  // decrypted in-core, no HTTP
     }
 
+    // MARK: Local clinical reads (Fase 3 slice 4) — read-only against the committed
+    // fixture, which ships one pre-seeded row per sub-resource (fixture-entry-1 etc.)
+
+    func testFetchEntriesServedLocallyAndDecrypted() async throws {
+        let entries = try await makeSource().fetchEntries(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(entries.map(\.id), ["fixture-entry-1"])
+        XCTAssertEqual(entries.first?.content, "Paziente stabile, nessuna variazione terapeutica.")
+    }
+
+    func testFetchTherapiesServedLocallyAndDecrypted() async throws {
+        let therapies = try await makeSource().fetchTherapies(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(therapies.map(\.id), ["fixture-therapy-1"])
+        XCTAssertEqual(therapies.first?.motivation, "Diabete tipo 2")
+    }
+
+    func testFetchCheckupsServedLocallyAndDecrypted() async throws {
+        let checkups = try await makeSource().fetchCheckups(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(checkups.map(\.id), ["fixture-checkup-1"])
+        XCTAssertEqual(checkups.first?.notes, "Valori nella norma")
+    }
+
+    func testFetchObservationsServedLocallyAndDecrypted() async throws {
+        let observations = try await makeSource().fetchObservations(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(observations.map(\.id), ["fixture-observation-1"])
+        XCTAssertEqual(observations.first?.notes, "Buon controllo glicemico")
+        XCTAssertEqual(observations.first?.value, "6.8")
+    }
+
+    func testFetchEntriesOutOfScopeIsEmpty() async throws {
+        let entries = try await makeSource().fetchEntries(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-OTHER", limit: 20)
+        XCTAssertTrue(entries.isEmpty)
+    }
+
     func testFetchPatientMissingMaps404() async throws {
         do {
             _ = try await makeSource().fetchPatient(
@@ -102,6 +140,63 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         } catch let HomeBaseClientError.versionConflict(payload) {
             XCTAssertEqual(payload.currentVersion, 1)
             XCTAssertEqual(payload.entity, "patient")
+        }
+    }
+
+    // MARK: Local clinical writes (Fase 3 slice 5)
+
+    func testCreateEntryWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let created = try await source.createEntry(
+            patientId: "fixture-1",
+            payload: HomeBaseEntryCreatePayload(id: "e-new", type: "note", date: Date(), content: "nuovo"),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(created.id, "e-new")
+        XCTAssertEqual(created.version, 1)
+
+        let entries = try await source.fetchEntries(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertTrue(entries.contains { $0.id == "e-new" && $0.content == "nuovo" })
+    }
+
+    /// Proves the clinical double-encryption fix end to end: a value pre-sealed like
+    /// the model does for HTTP passes through the write verbatim, and a SINGLE
+    /// decryption on read recovers the plaintext (no double-encryption).
+    func testUpdateTherapyPassesThroughPreSealedMotivation() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        guard case .sealed(let presealed?) = CryptoService.seal("motivazione aggiornata", masterKey: masterKey) else {
+            return XCTFail("seal failed")
+        }
+        let ack = try await source.updateTherapy(
+            patientId: "fixture-1", therapyId: "fixture-therapy-1",
+            payload: HomeBaseTherapyUpdatePayload(version: 1, motivation: presealed),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertTrue(ack.success)
+
+        let therapies = try await source.fetchTherapies(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(therapies.first { $0.id == "fixture-therapy-1" }?.motivation, "motivazione aggiornata")
+    }
+
+    func testUpdateCheckupVersionConflictThrows() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+        do {
+            _ = try await source.updateCheckup(
+                patientId: "fixture-1", checkupId: "fixture-checkup-1",
+                payload: HomeBaseCheckupUpdatePayload(version: 99, title: "Stale"),
+                credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+            XCTFail("expected a version conflict")
+        } catch let HomeBaseClientError.versionConflict(payload) {
+            XCTAssertEqual(payload.currentVersion, 1)
+            XCTAssertEqual(payload.entity, "checkup")
         }
     }
 }

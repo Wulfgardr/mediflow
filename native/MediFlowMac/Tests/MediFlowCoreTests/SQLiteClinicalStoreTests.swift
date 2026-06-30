@@ -18,32 +18,16 @@ final class SQLiteClinicalStoreTests: XCTestCase {
             .path
     }
 
-    /// Copy the patient fixture and create the four sub-resource tables.
+    /// Copy the patient fixture (which now ships the four clinical tables, each with
+    /// one pre-seeded row, for the AppleShared adapter tests that cannot create
+    /// tables themselves) and clear them so the write-path tests in this file start
+    /// from a clean slate.
     private func makeDB() throws -> (path: String, db: SQLiteConnection) {
         let dst = NSTemporaryDirectory() + "mediflow-clinical-\(UUID().uuidString).db"
         try? FileManager.default.removeItem(atPath: dst)
         try FileManager.default.copyItem(atPath: fixturePath(), toPath: dst)
         let db = try SQLiteConnection(readWritePath: dst)
-        try db.execute("""
-        CREATE TABLE entries (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, type TEXT NOT NULL,
-            title TEXT NOT NULL, date INTEGER NOT NULL, content TEXT NOT NULL, setting TEXT,
-            metadata TEXT, attachments TEXT, deleted_at INTEGER, deletion_reason TEXT,
-            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER);
-        CREATE TABLE therapies (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, drug_name TEXT NOT NULL,
-            aic TEXT, atc TEXT, active_principle TEXT, dosage TEXT NOT NULL, motivation TEXT,
-            diagnosis_code TEXT, diagnosis_name TEXT, status TEXT NOT NULL, start_date INTEGER NOT NULL,
-            end_date INTEGER, version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
-            deleted_at INTEGER, deletion_reason TEXT);
-        CREATE TABLE checkups (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, date INTEGER NOT NULL,
-            title TEXT NOT NULL, notes TEXT, status TEXT DEFAULT 'pending', source TEXT,
-            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
-            deleted_at INTEGER, deletion_reason TEXT);
-        CREATE TABLE observations (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, code_system TEXT NOT NULL,
-            code TEXT NOT NULL, display TEXT NOT NULL, unit_system TEXT NOT NULL, unit_code TEXT NOT NULL,
-            value TEXT NOT NULL, notes TEXT, observed_at INTEGER NOT NULL, source TEXT DEFAULT 'manual',
-            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
-            deleted_at INTEGER, deletion_reason TEXT);
-        """)
+        try db.execute("DELETE FROM entries; DELETE FROM therapies; DELETE FROM checkups; DELETE FROM observations;")
         return (dst, db)
     }
 
@@ -327,6 +311,137 @@ final class SQLiteClinicalStoreTests: XCTestCase {
         XCTAssertEqual(
             PatientFieldCrypto.decryptStringField(try rawText(reader, "observations", "notes", id: "o-new"), masterKey: masterKey),
             "a riposo")
+    }
+
+    // MARK: List (read), 1:1 with lib/network-{e}-read.ts listNetworkScoped*
+
+    func testListEntriesDecryptsOrdersByDateDescAndIncludesSoftDeleted() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+
+        _ = try store.createEntry(
+            HomeBaseEntryCreatePayload(id: "e-old", type: "note", date: Date(timeIntervalSince1970: 1_000), content: "vecchia"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        _ = try store.createEntry(
+            HomeBaseEntryCreatePayload(id: "e-new", type: "note", date: Date(timeIntervalSince1970: 2_000), content: "recente"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        // Soft-delete the older one: the list must still include it (no active filter, matching the web).
+        _ = try store.updateEntry(
+            id: "e-old", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: HomeBaseEntryUpdatePayload(version: 1, deletedAt: Date(timeIntervalSince1970: 3_000),
+                                               deletionReason: "test"),
+            masterKey: masterKey)
+
+        let list = try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(list.map(\.id), ["e-new", "e-old"])  // date DESC
+        XCTAssertEqual(list.map(\.content), ["recente", "vecchia"])  // decrypted
+        XCTAssertNotNil(list.last?.deletedAt)  // tombstoned row still listed
+    }
+
+    func testListEntriesOutOfScopeIsEmptyAndLimitIsRespected() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        for i in 0..<3 {
+            _ = try store.createEntry(
+                HomeBaseEntryCreatePayload(id: "e\(i)", type: "note", date: Date(timeIntervalSince1970: Double(i)), content: "c\(i)"),
+                patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        }
+        XCTAssertTrue(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-OTHER", masterKey: masterKey).isEmpty)
+        XCTAssertEqual(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, limit: 2).count, 2)
+    }
+
+    func testListTherapiesOrdersByStartDateDescAndDecryptsMotivation() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        _ = try store.createTherapy(
+            HomeBaseTherapyCreatePayload(drugName: "ASA", dosage: "100mg", status: "active",
+                                        startDate: Date(timeIntervalSince1970: 1_000), motivation: "prevenzione"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "t-old")
+        _ = try store.createTherapy(
+            HomeBaseTherapyCreatePayload(drugName: "Plavix", dosage: "75mg", status: "active",
+                                        startDate: Date(timeIntervalSince1970: 2_000)),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "t-new")
+
+        let list = try store.listTherapies(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(list.map(\.id), ["t-new", "t-old"])
+        XCTAssertEqual(list.last?.motivation, "prevenzione")
+    }
+
+    func testListCheckupsOrdersByDateDescAndDecryptsNotes() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        _ = try store.createCheckup(
+            HomeBaseCheckupCreatePayload(date: Date(timeIntervalSince1970: 1_000), title: "Vecchio", status: "pending", notes: "riservato"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "c-old")
+        _ = try store.createCheckup(
+            HomeBaseCheckupCreatePayload(date: Date(timeIntervalSince1970: 2_000), title: "Nuovo", status: "pending"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "c-new")
+
+        let list = try store.listCheckups(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(list.map(\.id), ["c-new", "c-old"])
+        XCTAssertEqual(list.last?.notes, "riservato")
+    }
+
+    func testListObservationsOrdersByObservedAtDescAndDecryptsNotes() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        _ = try store.createObservation(
+            HomeBaseObservationCreatePayload(code: "8480-6", display: "Systolic", unitCode: "mm[Hg]",
+                                            value: "120", observedAt: Date(timeIntervalSince1970: 1_000), notes: "a riposo"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "o-old")
+        _ = try store.createObservation(
+            HomeBaseObservationCreatePayload(code: "8480-6", display: "Systolic", unitCode: "mm[Hg]",
+                                            value: "130", observedAt: Date(timeIntervalSince1970: 2_000)),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "o-new")
+
+        let list = try store.listObservations(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(list.map(\.id), ["o-new", "o-old"])
+        XCTAssertEqual(list.last?.notes, "a riposo")
+        XCTAssertEqual(list.first?.value, "130")  // plaintext column, no crypto involved
+    }
+
+    /// Read-time status canonicalization, 1:1 with normalizeTherapyStatus/
+    /// normalizeCheckupStatus (lib/status-normalization.ts): the web ALWAYS collapses
+    /// legacy aliases on every read, not just on write. Seeded via a raw INSERT
+    /// (bypassing createTherapy/createCheckup, which already canonicalize on write) so
+    /// the assertion proves the READ path itself canonicalizes, independent of how the
+    /// raw token got into the row (e.g. a legacy import or a direct DB write).
+    func testListTherapiesAndCheckupsCanonicalizeLegacyStatusAliases() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("""
+        INSERT INTO therapies (id, patient_id, drug_name, dosage, status, start_date, version)
+        VALUES ('t-legacy', 'fixture-1', 'ASA', '100mg', 'paused', 1000, 1)
+        """)
+        try seed.execute("""
+        INSERT INTO checkups (id, patient_id, date, title, status, version)
+        VALUES ('c-legacy', 'fixture-1', 1000, 'Vecchio', 'done', 1)
+        """)
+        let store = SQLiteClinicalStore(path: path)
+
+        let therapies = try store.listTherapies(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(therapies.first?.status, "suspended")  // 'paused' canonicalized
+        let checkups = try store.listCheckups(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        XCTAssertEqual(checkups.first?.status, "completed")  // 'done' canonicalized
+    }
+
+    /// limit == 0 means unbounded, matching the web's JS-falsy ternary
+    /// (`filters.limit ? query.limit(filters.limit) : query`).
+    func testListEntriesLimitZeroIsUnbounded() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        for i in 0..<3 {
+            _ = try store.createEntry(
+                HomeBaseEntryCreatePayload(id: "e\(i)", type: "note", date: Date(timeIntervalSince1970: Double(i)), content: "c\(i)"),
+                patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey)
+        }
+        XCTAssertEqual(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, limit: 0).count, 3)
     }
 }
 
