@@ -115,6 +115,8 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+8933fa8d1   native(apple): local patient READ authority behind a flag (Fase 3 slice 2)
+847dbff56   native(apple): introduce HomeBasePatientsDataSource seam (Fase 3 slice 1)
 61b2de22f   native(core): sub-resource CREATE for entry/therapy/checkup/observation
 a0af0ae1f   docs: handover - clinical update/soft-delete done; only sub-resource CREATE remains
 a20f5b49c   native(core): SQLiteClinicalStore update + soft-delete for the 4 sub-resources
@@ -156,11 +158,21 @@ full field coverage, status canonicalization, observation trim/LOINC-UCUM canoni
 entry setting '' -> NULL) are all applied + tested (74 core tests). The READ + WRITE
 reversed-flow core is done. Remaining:
 
-1. **Fase 3 wiring.** Re-point the macOS app from the HTTP `HomeBasePatientsClient`
-   to the in-process `SQLitePatientStore` + `SQLiteClinicalStore` (the app becomes
-   the local authority); demote the Next.js data-plane to a signed-write ingest +
-   ciphertext-delta pull. This is the integration step that makes the built authority
-   actually drive the app.
+1. **Fase 3 wiring (IN PROGRESS).** Slice 1 DONE (`847dbff56`): a `HomeBasePatientsDataSource`
+   seam (the model depends on `any HomeBasePatientsDataSource`, the HTTP actor conforms,
+   `makeClient()` returns the existential). Slice 2 DONE (`8933fa8d1`): `LocalPatientsDataSource`
+   (serial actor) serves patient list/detail in-process from the on-device medical.db behind
+   `MEDIFLOW_LOCAL_AUTHORITY` (off by default), delegating everything else to HTTP.
+   - **Slice 3 (next): local WRITES.** Blocked on the double-encryption decision (the model
+     PRE-SEALS write payloads for HTTP; the stores seal internally -> double-encrypt). Codex
+     consulted (use the scratchpad answer): resolve at the adapter/store boundary via
+     seal-or-passthrough (ENC: prefix -> verbatim) or a verbatim write path, WITHOUT touching
+     the model. Then route patient update (+ create/soft-delete) through the local store,
+     mapping outcomes to `HomeBaseClientError.versionConflict`.
+   - **Slice 4: local CLINICAL reads** need read/list methods on `SQLiteClinicalStore`
+     (create/update only today); until then clinical stays HTTP via the adapter's fallback.
+   - **Slice 5: demote Next.js** to a signed-write ingest + ciphertext-delta pull (the true
+     reversed flow). Needs a device-owned db + sync (conflict/delta/tombstone) - the big one.
 2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
    `patients.ambulatory_id` scope check (used by every store write) with the
    `patients_to_ambulatories` join + port `upsertPrimaryAmbulatoryMembership`;
