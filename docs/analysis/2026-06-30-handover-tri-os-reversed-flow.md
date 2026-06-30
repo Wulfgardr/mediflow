@@ -115,6 +115,7 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+f211e99c9   native: local clinical WRITE authority + close slice-4 read-parity gaps (Fase 3 slice 5 + audit fixes)
 5d6e2fcb1   native: local patient WRITE authority via strict seal-or-passthrough (Fase 3 slice 3)
 8933fa8d1   native(apple): local patient READ authority behind a flag (Fase 3 slice 2)
 847dbff56   native(apple): introduce HomeBasePatientsDataSource seam (Fase 3 slice 1)
@@ -159,9 +160,13 @@ full field coverage, status canonicalization, observation trim/LOINC-UCUM canoni
 entry setting '' -> NULL) are all applied + tested (74 core tests). The READ + WRITE
 reversed-flow core is done. Remaining:
 
-1. **Fase 3 wiring (PATIENT entity DONE, flag-gated).** Slices 1-3 complete + verified;
-   with `MEDIFLOW_LOCAL_AUTHORITY` set, the app READS and WRITES patients via the
-   on-device core (zero-knowledge, no localhost), everything else still HTTP:
+1. **Fase 3 wiring (PATIENT + CLINICAL entities DONE, flag-gated).** Slices 1-5
+   complete + adversarially verified (every finding fixed); with
+   `MEDIFLOW_LOCAL_AUTHORITY` set, the app READS and WRITES patients AND all 4
+   clinical sub-resources via the on-device core (zero-knowledge, no localhost).
+   Only login, ambulatories, and patient create/soft-delete still go over HTTP
+   (the latter two have no wire/HTTP peer at all - confirmed by grepping the
+   protocol - so there is nothing to wire for them):
    - Slice 1 (`847dbff56`): `HomeBasePatientsDataSource` seam (model depends on the
      existential; HTTP actor conforms; `makeClient()` returns it).
    - Slice 2 (`8933fa8d1`): `LocalPatientsDataSource` serves patient list/detail locally.
@@ -169,16 +174,22 @@ reversed-flow core is done. Remaining:
      (`CryptoService.sealOrPassthrough`/`encryptOrPassthrough`: verbatim ONLY for
      authenticated ciphertext under the key, else seal; fail-closed). Resolves the
      double-encryption landmine without touching the model. Codex-confirmed.
-   - **Slice 4 (next): local CLINICAL reads.** Add read/list methods to
-     `SQLiteClinicalStore` (create/update only today): `listEntries/Therapies/Checkups/
-     Observations(patientId:scope:masterKey:)` reading raw rows -> Summary ->
-     `ClinicalFieldCrypto.decrypt*` (reuse the model's decrypt). Then point the adapter's
-     fetchEntries/etc. local. Mirrors SQLitePatientStore.loadPatientDetail per entity.
-   - **Slice 5: local clinical/patient CREATE + soft-delete** through the adapter (the
-     stores already support them; just route + map outcomes; create/soft-delete were held
-     back from slice 3 per Codex - more parity surface).
-   - **Slice 6: demote Next.js** to a signed-write ingest + ciphertext-delta pull (the true
-     reversed flow). Needs a device-owned db + sync (conflict/delta/tombstone) - the big one.
+   - Slice 4+5 (`f211e99c9`): `SQLiteClinicalStore` gained `listEntries/Therapies/
+     Checkups/Observations` (read, decrypted in-core, scoped + ordered + 1:1 with
+     lib/network-{e}-read.ts) and `LocalPatientsDataSource` wires all 8 clinical
+     create*/update* to the store (same sealOrPassthrough fix applied to
+     `AssignmentBuilder.sealString/sealRequired`). The fixture
+     (`Fixtures/medical_fixture.db`, regenerated via `generate-fixture.mjs`) now ships
+     one pre-seeded row per clinical sub-resource for the AppleShared adapter tests
+     (which cannot create tables themselves - `SQLiteConnection` is internal to
+     MediFlowCore). Adversarial audit (2 rounds, Sonnet-5 agents) found + fixed: reads
+     must canonicalize status too (not just writes - `ClinicalStatusNormalization`
+     reused on the list-read path) and `limit<=0` must mean unbounded (matching the
+     web's JS-falsy ternary).
+   - **Slice 6 (next, the big one): demote Next.js** to a signed-write ingest +
+     ciphertext-delta pull (the true reversed flow). Needs a device-owned db + sync
+     (conflict/delta/tombstone), plus turning `MEDIFLOW_LOCAL_AUTHORITY` from a flag
+     into the default (UI to drive PIN-unlock -> local-authority handoff).
 2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
    `patients.ambulatory_id` scope check (used by every store write) with the
    `patients_to_ambulatories` join + port `upsertPrimaryAmbulatoryMembership`;
