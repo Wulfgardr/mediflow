@@ -324,6 +324,60 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     }
 }
 
+/// A4 patient create (reversed flow: the native core inserts locally). Plaintext
+/// inputs; SQLitePatientStore.createPatient seals the ENCRYPTED_FIELDS in-core.
+/// firstName/lastName/taxCode are required; the rest are optional. exemptions and
+/// diagnoses carry the array-JSON STRING (structured fields), like the update payload.
+/// Mirrors normalizePatientCreateInput (lib/patient-write-normalization.ts).
+public struct HomeBasePatientCreatePayload: Encodable, Sendable {
+    public let firstName: String
+    public let lastName: String
+    public let taxCode: String
+    public let birthDate: Date?
+    public let address: String?
+    public let phone: String?
+    public let caregiver: String?
+    public let exemptions: String?
+    public let diagnoses: String?
+    public let monitoringProfile: String?
+    public let statusReason: String?
+    public let notes: String?
+    public let isAdi: Bool
+    public let isArchived: Bool
+
+    public init(
+        firstName: String,
+        lastName: String,
+        taxCode: String,
+        birthDate: Date? = nil,
+        address: String? = nil,
+        phone: String? = nil,
+        caregiver: String? = nil,
+        exemptions: String? = nil,
+        diagnoses: String? = nil,
+        monitoringProfile: String? = nil,
+        statusReason: String? = nil,
+        notes: String? = nil,
+        isAdi: Bool = false,
+        isArchived: Bool = false
+    ) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.taxCode = taxCode
+        self.birthDate = birthDate
+        self.address = address
+        self.phone = phone
+        self.caregiver = caregiver
+        self.exemptions = exemptions
+        self.diagnoses = diagnoses
+        self.monitoringProfile = monitoringProfile
+        self.statusReason = statusReason
+        self.notes = notes
+        self.isAdi = isAdi
+        self.isArchived = isArchived
+    }
+}
+
 /* @Codex */
 public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
     public let drugName: String

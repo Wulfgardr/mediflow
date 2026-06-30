@@ -197,6 +197,116 @@ final class SQLitePatientStoreTests: XCTestCase {
                                     payload: payload, masterKey: masterKey),
             .noValidFields)
     }
+
+    // MARK: Create
+
+    func testCreatePatientInsertsAndSealsFields() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let diagnosesJSON = try XCTUnwrap(DiagnosesCodec.encode(
+            [ClinicalDiagnosis(code: "I10", description: "Ipertensione", system: "ICD-10")],
+            defaultDate: "2026-01-01T00:00:00.000Z"))
+        let payload = HomeBasePatientCreatePayload(
+            firstName: "Lucia", lastName: "Bianchi", taxCode: "BNCLCU85M41F205X",
+            address: "Via Verdi 3", diagnoses: diagnosesJSON, isAdi: true)
+        XCTAssertEqual(
+            try store.createPatient(payload, id: "new-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey),
+            .created(id: "new-1", version: 1))
+
+        XCTAssertEqual(try store.listPatients().count, 2)  // fixture-1 + new-1
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "new-1", masterKey: masterKey))
+        XCTAssertEqual(detail.firstName, "Lucia")
+        XCTAssertEqual(detail.address, "Via Verdi 3")
+        XCTAssertEqual(detail.version, 1)
+        XCTAssertEqual(detail.ambulatoryId, "AMB-1")
+        XCTAssertEqual(detail.isAdi, true)
+        XCTAssertEqual(DiagnosesCodec.decode(detail.diagnoses).first?.code, "I10")
+
+        // Encrypted at rest: the wrong key cannot read address, plaintext stays visible.
+        let masked = try XCTUnwrap(try store.loadPatientDetail(id: "new-1", masterKey: SymmetricKey(size: .bits256)))
+        XCTAssertNil(masked.address)
+        XCTAssertEqual(masked.firstName, "Lucia")
+    }
+
+    func testCreatePatientGeneratesLowercaseUUIDWhenIdOmitted() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let payload = HomeBasePatientCreatePayload(firstName: "Anon", lastName: "X", taxCode: "T")
+        guard case .created(let id, let version) = try store.createPatient(
+            payload, scopeAmbulatoryId: nil, masterKey: masterKey) else {
+            return XCTFail("expected create success")
+        }
+        XCTAssertEqual(version, 1)
+        XCTAssertEqual(id, id.lowercased())
+        XCTAssertEqual(id.count, 36)  // uuidv4 format
+        XCTAssertNotNil(try store.loadPatientDetail(id: id, masterKey: masterKey))
+    }
+
+    func testCreatePatientCollapsesEmptyNotesToNull() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let payload = HomeBasePatientCreatePayload(firstName: "Empty", lastName: "Notes", taxCode: "T", notes: "")
+        _ = try store.createPatient(payload, id: "n2", scopeAmbulatoryId: nil, masterKey: masterKey)
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "n2", masterKey: masterKey))
+        XCTAssertNil(detail.notes)
+    }
+
+    // MARK: Soft-delete (ADR 0066 tombstone)
+
+    func testSoftDeletePatientTombstonesAndHidesFromReads() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                        version: 1, masterKey: masterKey),
+            .updated(version: 2))
+        // The tombstoned patient drops out of every active read path.
+        XCTAssertTrue(try store.listPatients().isEmpty)
+        XCTAssertNil(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+    }
+
+    func testSoftDeletePatientVersionMismatchConflictsAndRollsBack() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        guard case .conflict(let conflict) = try store.softDeletePatient(
+            id: "fixture-1", scopeAmbulatoryId: "AMB-1", version: 99, masterKey: masterKey) else {
+            return XCTFail("expected a version conflict")
+        }
+        XCTAssertEqual(conflict.entity, "patient")
+        XCTAssertEqual(conflict.currentVersion, 1)
+        // Still present + active (rolled back).
+        XCTAssertNotNil(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+    }
+
+    func testSoftDeletePatientVersionZeroIsVersionRequired() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                        version: 0, masterKey: masterKey),
+            .versionRequired)
+    }
+
+    func testSoftDeletePatientMissingIdReturnsNotFound() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "ghost", scopeAmbulatoryId: "AMB-1",
+                                        version: 1, masterKey: masterKey),
+            .notFound)
+    }
 }
 
 private extension Data {

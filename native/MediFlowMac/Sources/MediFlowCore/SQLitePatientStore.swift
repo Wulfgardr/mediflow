@@ -33,6 +33,14 @@ public struct SQLitePatientStore {
         case encryptionFailed
     }
 
+    /// Outcome of a patient create, 1:1 with POST /api/v1/patients: created=201.
+    /// encryptionFailed is the local-authority fail-closed guard. (There is no
+    /// invalidBirthDate case: the typed payload pre-parses birthDate to a Date.)
+    public enum PatientCreateOutcome: Equatable {
+        case created(id: String, version: Int)
+        case encryptionFailed
+    }
+
     /// A typed bind value for the minimal SQLite wrapper below.
     private enum Bind {
         case text(String)
@@ -179,6 +187,157 @@ public struct SQLitePatientStore {
             try? db.execute("ROLLBACK")
             throw error
         }
+    }
+
+    /// Insert a new patient locally (reversed flow), sealing the ENCRYPTED_FIELDS
+    /// in-core. Ported from normalizePatientCreateInput + the web INSERT: version=1,
+    /// createdAt=updatedAt=now, deletedAt/deletionReason/aiSummary/documentInsights
+    /// null. `id` defaults to a fresh lowercased UUID (uuidv4 format).
+    ///
+    /// PARITY NOTE: the web also upserts patients_to_ambulatories on create; on-device
+    /// we set only the denormalized patients.ambulatory_id (membership table deferred,
+    /// see updatePatient). notes "" collapses to null (web length>0 rule); the other
+    /// string fields store their value as-is when present.
+    public func createPatient(
+        _ payload: HomeBasePatientCreatePayload,
+        id: String = UUID().uuidString.lowercased(),
+        scopeAmbulatoryId: String?,
+        masterKey: SymmetricKey,
+        now: Date = Date()
+    ) throws -> PatientCreateOutcome {
+        guard let assignments = buildPatientInsertAssignments(
+            payload, id: id, scopeAmbulatoryId: scopeAmbulatoryId, masterKey: masterKey, now: now)
+        else { return .encryptionFailed }
+
+        let db = try Connection(readWritePath: path)
+        try db.assertPatientsSchema()
+        let columns = assignments.map { $0.column }.joined(separator: ", ")
+        let placeholders = assignments.map { _ in "?" }.joined(separator: ", ")
+        let sql = "INSERT INTO patients (\(columns)) VALUES (\(placeholders))"
+        _ = try db.run(sql, bind: assignments.map { $0.bind }) { _ in 0 }
+        return .created(id: id, version: 1)
+    }
+
+    /// Soft-delete a patient (ADR 0066 tombstone), 1:1 with DELETE /api/v1/patients/[id]:
+    /// version-guarded, sets deleted_at + deletion_reason + version+1 + updated_at.
+    /// deletion_reason defaults to "api-v1-delete" (web hardcode) and IS sealed: it is
+    /// an ENCRYPTED_FIELD and the core holds the key, so the at-rest encryption
+    /// invariant is kept (the web DELETE route writes it plaintext only because the
+    /// server has no key). Success is reported as `.updated(version:)` (the wire
+    /// contract is the same version-bumping 200 as an update).
+    public func softDeletePatient(
+        id: String,
+        scopeAmbulatoryId: String,
+        version: Int,
+        deletionReason: String = "api-v1-delete",
+        masterKey: SymmetricKey,
+        now: Date = Date()
+    ) throws -> PatientWriteOutcome {
+        guard let expected = PatientConcurrency.parseExpectedVersion(version) else {
+            return .versionRequired
+        }
+        guard case .sealed(let sealedReason?) = CryptoService.seal(deletionReason, masterKey: masterKey) else {
+            return .encryptionFailed
+        }
+
+        let db = try Connection(readWritePath: path)
+        try db.assertPatientsSchema()
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            let snapshot = try selectScopedSnapshot(db, id: id, scope: scopeAmbulatoryId)
+            switch PatientConcurrency.evaluate(rawVersion: version, recordId: id, current: snapshot) {
+            case .versionRequired:
+                try db.execute("ROLLBACK"); return .versionRequired
+            case .notFound:
+                try db.execute("ROLLBACK"); return .notFound
+            case .conflict(let conflict):
+                try db.execute("ROLLBACK"); return .conflict(conflict)
+            case .ok(let nextVersion):
+                let sql = """
+                UPDATE patients SET deleted_at = ?, deletion_reason = ?, version = ?, updated_at = ?
+                WHERE id = ? AND version = ? AND deleted_at IS NULL
+                """
+                let stamp = Int(now.timeIntervalSince1970)
+                _ = try db.run(sql, bind: [.int(stamp), .text(sealedReason), .int(nextVersion),
+                                           .int(stamp), .text(id), .int(expected)]) { _ in 0 }
+                if db.changes == 0 {
+                    let raced = try selectConflictSnapshot(db, id: id)
+                    try db.execute("ROLLBACK")
+                    return .conflict(PatientConcurrency.buildVersionConflictPayload(
+                        expectedVersion: expected, recordId: id, current: raced))
+                }
+                try db.execute("COMMIT")
+                return .updated(version: nextVersion)
+            }
+        } catch {
+            try? db.execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    /// Build the (column, bind) INSERT assignments for a new patient, sealing the
+    /// ENCRYPTED_FIELDS. Returns nil if any field fails to seal.
+    private func buildPatientInsertAssignments(
+        _ p: HomeBasePatientCreatePayload, id: String, scopeAmbulatoryId: String?,
+        masterKey: SymmetricKey, now: Date
+    ) -> [(column: String, bind: Bind)]? {
+        let stamp = Int(now.timeIntervalSince1970)
+        var out: [(column: String, bind: Bind)] = []
+        out.append(("id", .text(id)))
+        out.append(("first_name", .text(p.firstName)))
+        out.append(("last_name", .text(p.lastName)))
+        out.append(("tax_code", .text(p.taxCode)))
+        out.append(("birth_date", p.birthDate.map { .int(Int($0.timeIntervalSince1970)) } ?? .null))
+        // ENCRYPTED string fields (nil -> NULL column).
+        guard sealInto(&out, "address", p.address, masterKey),
+              sealInto(&out, "phone", p.phone, masterKey),
+              sealInto(&out, "caregiver", p.caregiver, masterKey),
+              sealInto(&out, "status_reason", p.statusReason, masterKey)
+        else { return nil }
+        // notes: the web stores null for empty strings (length>0 rule).
+        let notes = (p.notes?.isEmpty ?? true) ? nil : p.notes
+        guard sealInto(&out, "notes", notes, masterKey) else { return nil }
+        // STRUCTURED ENCRYPTED fields: encrypt the array-JSON string directly.
+        guard sealStructuredInto(&out, "exemptions", p.exemptions, masterKey),
+              sealStructuredInto(&out, "diagnoses", p.diagnoses, masterKey)
+        else { return nil }
+        // monitoring_profile is plaintext (not an ENCRYPTED_FIELD).
+        out.append(("monitoring_profile", p.monitoringProfile.map { .text($0) } ?? .null))
+        out.append(("ai_summary", .null))
+        out.append(("document_insights", .null))
+        out.append(("is_adi", .int(p.isAdi ? 1 : 0)))
+        out.append(("is_archived", .int(p.isArchived ? 1 : 0)))
+        out.append(("deleted_at", .null))
+        out.append(("deletion_reason", .null))
+        out.append(("version", .int(1)))
+        out.append(("ambulatory_id", scopeAmbulatoryId.map { .text($0) } ?? .null))
+        out.append(("created_at", .int(stamp)))
+        out.append(("updated_at", .int(stamp)))
+        return out
+    }
+
+    /// Seal an optional plaintext string field into the assignments (nil -> NULL).
+    /// Returns false if a present value fails to encrypt.
+    private func sealInto(
+        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ value: String?, _ key: SymmetricKey
+    ) -> Bool {
+        guard let value else { out.append((column, .null)); return true }
+        guard case .sealed(let enc?) = CryptoService.seal(value, masterKey: key) else { return false }
+        out.append((column, .text(enc)))
+        return true
+    }
+
+    /// Seal an optional STRUCTURED field (array/object JSON string) into the
+    /// assignments by encrypting the JSON directly (no JSON.stringify wrap).
+    private func sealStructuredInto(
+        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ value: String?, _ key: SymmetricKey
+    ) -> Bool {
+        guard let value else { out.append((column, .null)); return true }
+        guard let enc = CryptoService.encryptField(value, masterKey: key) else { return false }
+        out.append((column, .text(enc)))
+        return true
     }
 
     /// The set of logical field names present in the patch (for the write boundary).
@@ -354,7 +513,8 @@ public struct SQLitePatientStore {
             let required = ["id", "first_name", "last_name", "tax_code", "version", "deleted_at",
                             "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
                             "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
-                            "ambulatory_id"]
+                            "ambulatory_id", "created_at", "birth_date", "ai_summary",
+                            "document_insights", "deletion_reason"]
             var present = Set<String>()
             _ = try run("PRAGMA table_info(patients)") { row -> Int in
                 if let name = row.text(1) { present.insert(name) }
