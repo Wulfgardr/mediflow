@@ -199,6 +199,91 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             XCTAssertEqual(payload.entity, "checkup")
         }
     }
+
+    // The 5 remaining wired methods (adversarial audit, slice 5): each round-trips
+    // through the adapter and asserts on the SPECIFIC row id, which would fail
+    // (.notFound / wrong row) if id and patientId were ever swapped at the wiring layer.
+
+    func testUpdateEntryWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let ack = try await source.updateEntry(
+            patientId: "fixture-1", entryId: "fixture-entry-1",
+            payload: HomeBaseEntryUpdatePayload(version: 1, content: "aggiornato"),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertTrue(ack.success)
+
+        let entries = try await source.fetchEntries(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(entries.first { $0.id == "fixture-entry-1" }?.content, "aggiornato")
+    }
+
+    func testCreateTherapyWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let created = try await source.createTherapy(
+            patientId: "fixture-1",
+            payload: HomeBaseTherapyCreatePayload(drugName: "Plavix", dosage: "75mg", status: "active", startDate: Date()),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(created.version, 1)
+
+        let therapies = try await source.fetchTherapies(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertTrue(therapies.contains { $0.id == created.id && $0.drugName == "Plavix" })
+    }
+
+    func testCreateCheckupWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let created = try await source.createCheckup(
+            patientId: "fixture-1",
+            payload: HomeBaseCheckupCreatePayload(date: Date(), title: "Nuovo controllo", status: "pending"),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(created.version, 1)
+
+        let checkups = try await source.fetchCheckups(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertTrue(checkups.contains { $0.id == created.id && $0.title == "Nuovo controllo" })
+    }
+
+    func testCreateObservationWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let created = try await source.createObservation(
+            patientId: "fixture-1",
+            payload: HomeBaseObservationCreatePayload(code: "29463-7", display: "Peso", unitCode: "kg",
+                                                      value: "70", observedAt: Date()),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(created.version, 1)
+
+        let observations = try await source.fetchObservations(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertTrue(observations.contains { $0.id == created.id && $0.value == "70" })
+    }
+
+    func testUpdateObservationWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        let ack = try await source.updateObservation(
+            patientId: "fixture-1", observationId: "fixture-observation-1",
+            payload: HomeBaseObservationUpdatePayload(version: 1, value: "7.2"),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertTrue(ack.success)
+
+        let observations = try await source.fetchObservations(
+            patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
+        XCTAssertEqual(observations.first { $0.id == "fixture-observation-1" }?.value, "7.2")
+    }
 }
 
 private extension Data {

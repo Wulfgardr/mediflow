@@ -281,6 +281,36 @@ final class SQLiteClinicalStoreTests: XCTestCase {
             "primo")
     }
 
+    /// Regression (adversarial audit, slice 5): production ALWAYS pre-seals title/
+    /// content before calling createEntry (PairedPatientsWorkspaceModel.sealField), so
+    /// a retry of the SAME logical content under the SAME draft id arrives re-sealed
+    /// with a FRESH random IV - a different ciphertext string each time. The
+    /// idempotency check must decrypt both sides (not compare ciphertext-vs-plaintext
+    /// or ciphertext-vs-ciphertext), or every real retry misfires as a 409 idConflict.
+    func testCreateEntryRetryWithPreSealedFieldsIsRecognizedAsIdempotent() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+
+        func sealedPayload() throws -> HomeBaseEntryCreatePayload {
+            guard case .sealed(let title?) = CryptoService.seal("Diario", masterKey: masterKey),
+                  case .sealed(let content?) = CryptoService.seal("stesso contenuto", masterKey: masterKey)
+            else { throw XCTSkip("seal failed") }
+            return HomeBaseEntryCreatePayload(
+                id: "draft-1", type: "note", title: title,
+                date: Date(timeIntervalSince1970: 1750000000), content: content)
+        }
+
+        XCTAssertEqual(
+            try store.createEntry(try sealedPayload(), patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey),
+            .created(id: "draft-1", version: 1))
+        // Retry: same logical content, but a FRESH seal (different ciphertext/IV) -
+        // exactly what a second sealField() call on retry produces in production.
+        XCTAssertEqual(
+            try store.createEntry(try sealedPayload(), patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey),
+            .idempotent(id: "draft-1", version: 1))
+    }
+
     func testCreateTherapyAndObservationSealEncryptedFieldsAndTrimValue() throws {
         let (path, _) = try makeDB()
         defer { try? FileManager.default.removeItem(atPath: path) }

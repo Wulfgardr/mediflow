@@ -430,10 +430,17 @@ public struct SQLiteClinicalStore {
              deletedAt: row.date(7), version: row.int(8) ?? 1)
         }
         guard let existing = rows.first else { return nil }  // no clash -> proceed to INSERT
+        // Decrypt BOTH sides before comparing: the production caller (the model)
+        // pre-seals title/content before calling createEntry, so payload.title/content
+        // is itself an ENC: ciphertext on every real retry, never plaintext. Comparing
+        // a decrypted existing value against a still-sealed incoming one would always
+        // mismatch (a fresh random IV per call), turning every retry into a false
+        // .idConflict instead of the intended .idempotent. decryptStringField no-ops on
+        // non-ENC input, so a plaintext payload (e.g. from a test) still compares correctly.
         let dec = { PatientFieldCrypto.decryptStringField($0, masterKey: masterKey) }
         let same = existing.type == payload.type
-            && dec(existing.title) == (payload.title ?? Self.entryDefaultTitle)
-            && dec(existing.content) == payload.content
+            && dec(existing.title) == (dec(payload.title) ?? Self.entryDefaultTitle)
+            && dec(existing.content) == dec(payload.content)
             && PatientFieldCrypto.decryptStructuredField(existing.metadata, masterKey: masterKey)
                 == PatientFieldCrypto.decryptStructuredField(payload.metadata, masterKey: masterKey)
             && existing.setting == Self.normalizedSetting(payload.setting)
