@@ -5,47 +5,12 @@ import AppKit
 import UIKit
 #endif
 
-enum PairedDiaryEntryType: String, CaseIterable, Identifiable {
-    case note
-    case visit
-    case phone
-    case other
+// ADR 0071 Fase 1: the Vetro Clinico presentation for the clinical status enums.
+// The domain enums (PairedDiaryEntryType/PairedTherapyStatus/PairedCheckupStatus)
+// live in MediFlowCore; their tone (a presentation concern, VetroTone) stays here
+// in the Apple UI layer.
 
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .note:
-            return "Nota"
-        case .visit:
-            return "Visita"
-        case .phone:
-            return "Telefono"
-        case .other:
-            return "Altro"
-        }
-    }
-}
-
-/* @Codex */
-enum PairedTherapyStatus: String, CaseIterable, Identifiable {
-    case active
-    case suspended
-    case completed
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .active:
-            return "Attiva"
-        case .suspended:
-            return "Sospesa"
-        case .completed:
-            return "Conclusa"
-        }
-    }
-
+extension PairedTherapyStatus {
     /// Vetro Clinico status tone for a therapy.
     var tone: VetroTone {
         switch self {
@@ -59,25 +24,7 @@ enum PairedTherapyStatus: String, CaseIterable, Identifiable {
     }
 }
 
-/* @Codex */
-enum PairedCheckupStatus: String, CaseIterable, Identifiable {
-    case pending
-    case completed
-    case cancelled
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .pending:
-            return "Da fare"
-        case .completed:
-            return "Completato"
-        case .cancelled:
-            return "Annullato"
-        }
-    }
-
+extension PairedCheckupStatus {
     /// Vetro Clinico status tone for a checkup.
     var tone: VetroTone {
         switch self {
