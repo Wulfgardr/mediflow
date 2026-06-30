@@ -5,8 +5,7 @@
 // diagnoses) keep their decrypted array JSON for the codecs; plain string fields
 // are JSON-unwrapped (the web stores JSON.stringify(value)).
 import Foundation
-import CryptoKit
-import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
+import Crypto  // swift-crypto: re-exports CryptoKit on Apple, BoringSSL on Linux/Windows (ADR 0071)
 
 public enum PatientFieldCrypto {
     /// A plain string field: ENC -> decrypt -> JSON-unwrap; plaintext -> as-is;

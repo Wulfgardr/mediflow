@@ -3,7 +3,7 @@
 // string fields), plaintext (API-direct / test seeds) passes through, and an
 // undecryptable ENC value becomes empty/nil so ciphertext is never shown.
 import Foundation
-import CryptoKit
+import Crypto  // swift-crypto: re-exports CryptoKit on Apple, BoringSSL on Linux/Windows (ADR 0071)
 
 public enum ClinicalFieldCrypto {
     private static func string(_ value: String?, _ key: SymmetricKey?) -> String? {

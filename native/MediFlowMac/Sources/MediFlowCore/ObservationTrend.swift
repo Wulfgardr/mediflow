@@ -16,7 +16,7 @@ public enum ObservationTrendComputer {
     /// is not a single scalar. Accepts an Italian decimal comma ("120,5") or a
     /// dot, and a leading sign. Composite values (blood pressure "120/80",
     /// ratios) return nil on purpose: a single arrow would misrepresent them.
-    static func numericValue(_ raw: String) -> Double? {
+    public static func numericValue(_ raw: String) -> Double? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         // Non-scalar values must not get a single directional arrow, which would
