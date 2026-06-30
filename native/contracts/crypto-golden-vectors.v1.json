@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "purpose": "Language-neutral byte-exact oracle for the MediFlow zero-knowledge field crypto (ADR 0071, Fase 0). Every core (web TS reference / Swift MediFlowCore / future Rust) must reproduce these exactly on macOS, Windows-MSVC and Linux.",
+  "reference": "lib/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)",
+  "algorithm": {
+    "fieldCipher": "AES-256-GCM, 12-byte IV, 16-byte tag appended to ciphertext",
+    "kdf": "PBKDF2-HMAC-SHA256",
+    "iterations": 100000,
+    "masterKeyBits": 256,
+    "fieldFormat": "ENC:base64(iv):base64(ciphertext||tag)",
+    "plaintextConvention": "JSON.stringify(value) then UTF-8 bytes",
+    "wrappedMasterKeyFormat": "base64(iv12 || AES-GCM(rawMasterKey, KEK))"
+  },
+  "inputs": {
+    "pin": "1357",
+    "saltHex": "000102030405060708090a0b0c0d0e0f",
+    "rawMasterKeyHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "fieldIvHex": "0a0b0c0d0e0f101112131415",
+    "wrapIvHex": "a1a2a3a4a5a6a7a8a9aaabac"
+  },
+  "vectors": {
+    "kekFromPinHex": "e76b56577a32661c86f4ad039730ef3754bedeb67db8f64c8dc2b4699d9c4aa2",
+    "wrappedMasterKeyB64": "oaKjpKWmp6ipqqus8XBbbVnZPH/xT4uJ7ssb0u5MwdsHwsWeGAUmyNrHOdtISFNmXHSErM4k34p3AozW",
+    "fields": [
+      {
+        "name": "patient.address",
+        "value": "Via Roma 1, Milano",
+        "json": "\"Via Roma 1, Milano\"",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "BTiedHWzXcRv4Zxm+serXojTIfXgo9c3Yz8Gy2xn3VgfvBSM",
+        "enc": "ENC:CgsMDQ4PEBESExQV:BTiedHWzXcRv4Zxm+serXojTIfXgo9c3Yz8Gy2xn3VgfvBSM"
+      },
+      {
+        "name": "patient.phone",
+        "value": "+39 02 1234567",
+        "json": "\"+39 02 1234567\"",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "BUXELHXRAIk/855+77z1EB9v97VX5VKotz6VQXm0zew=",
+        "enc": "ENC:CgsMDQ4PEBESExQV:BUXELHXRAIk/855+77z1EB9v97VX5VKotz6VQXm0zew="
+      },
+      {
+        "name": "patient.diagnoses",
+        "value": [
+          {
+            "code": "E11.9",
+            "description": "Diabete tipo 2",
+            "system": "ICD-10",
+            "date": "2026-01-01T00:00:00.000Z"
+          }
+        ],
+        "json": "[{\"code\":\"E11.9\",\"description\":\"Diabete tipo 2\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "fBXVdjqFV4s04+h766T7EMWfKrL6qnEOWNCZevh3v7YwbFaJQUgEL0Bi9dP2QKDLdNR8cWoeKZvqTDIF27arwb6LlYZq9aOJd20x4Fo/ph8AzKPm/YFI9jxY+pHv2rGaPyHVPjdh0+H1au9OMkcmbmnqBpEg",
+        "enc": "ENC:CgsMDQ4PEBESExQV:fBXVdjqFV4s04+h766T7EMWfKrL6qnEOWNCZevh3v7YwbFaJQUgEL0Bi9dP2QKDLdNR8cWoeKZvqTDIF27arwb6LlYZq9aOJd20x4Fo/ph8AzKPm/YFI9jxY+pHv2rGaPyHVPjdh0+H1au9OMkcmbmnqBpEg"
+      },
+      {
+        "name": "checkup.notes.empty",
+        "value": "",
+        "json": "\"\"",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "BUy0dU5bn+0dmFHZE+Q+sl4+",
+        "enc": "ENC:CgsMDQ4PEBESExQV:BUy0dU5bn+0dmFHZE+Q+sl4+"
+      },
+      {
+        "name": "observation.value.number",
+        "value": 1.25,
+        "json": "1.25",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "FkDFIKtm7P/mVcZPMWyA67DZHmc=",
+        "enc": "ENC:CgsMDQ4PEBESExQV:FkDFIKtm7P/mVcZPMWyA67DZHmc="
+      }
+    ]
+  }
+}
