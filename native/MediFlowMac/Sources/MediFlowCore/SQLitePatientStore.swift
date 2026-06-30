@@ -1,6 +1,5 @@
 import Foundation
 import Crypto
-import MediFlowSQLiteC
 
 // ADR 0071 Fase 2 (Codex review): the local-authority persistence over the web's
 // medical.db. Fails fast on schema drift (the native consumes the web schema and
@@ -13,12 +12,6 @@ import MediFlowSQLiteC
 // write rejected here is rejected identically on the web.
 
 public struct SQLitePatientStore {
-    public enum StoreError: Error, Equatable {
-        case cannotOpen(String)
-        case query(String)
-        case incompatibleSchema(String)
-    }
-
     /// Outcome of a patient write, 1:1 with updateNetworkScopedPatient's responses:
     /// updated=200, versionRequired/noValidFields=400, boundaryRejected=403/400,
     /// notFound=404, conflict=409. encryptionFailed is a local-authority guard (the
@@ -58,12 +51,15 @@ public struct SQLitePatientStore {
         case encryptionFailed
     }
 
-    /// A typed bind value for the minimal SQLite wrapper below.
-    private enum Bind {
-        case text(String)
-        case int(Int)
-        case null
-    }
+    /// Every column the patient store reads OR writes; the shared schema guard
+    /// fails fast if the web's medical.db drifts from it.
+    private static let patientRequiredColumns = [
+        "id", "first_name", "last_name", "tax_code", "version", "deleted_at",
+        "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
+        "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
+        "ambulatory_id", "created_at", "birth_date", "ai_summary",
+        "document_insights", "deletion_reason",
+    ]
 
     private let path: String
 
@@ -74,8 +70,8 @@ public struct SQLitePatientStore {
     /// Active (non-soft-deleted) patient summaries. No decryption needed: summary
     /// columns are plaintext.
     public func listPatients() throws -> [HomeBasePatientSummary] {
-        let db = try Connection(readOnlyPath: path)
-        try db.assertPatientsSchema()
+        let db = try SQLiteConnection(readOnlyPath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, is_adi, is_archived, version, updated_at
         FROM patients WHERE deleted_at IS NULL ORDER BY updated_at DESC
@@ -98,8 +94,8 @@ public struct SQLitePatientStore {
     /// master key. nil when the id is absent (or soft-deleted). Reuses
     /// PatientFieldCrypto so decryption stays byte-identical with the web.
     public func loadPatientDetail(id: String, masterKey: SymmetricKey) throws -> HomeBasePatientDetail? {
-        let db = try Connection(readOnlyPath: path)
-        try db.assertPatientsSchema()
+        let db = try SQLiteConnection(readOnlyPath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, address, phone, caregiver, notes,
                ai_summary, is_adi, is_archived, ambulatory_id, created_at, updated_at, document_insights,
@@ -177,8 +173,8 @@ public struct SQLitePatientStore {
         guard !assignments.isEmpty else { return .noValidFields }
 
         // 4. Transaction: read scoped snapshot -> concurrency policy -> UPDATE.
-        let db = try Connection(readWritePath: path)
-        try db.assertPatientsSchema()
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         try db.execute("BEGIN IMMEDIATE")
         do {
             let snapshot = try selectScopedSnapshot(db, id: id, scope: scopeAmbulatoryId)
@@ -231,8 +227,8 @@ public struct SQLitePatientStore {
             payload, id: id, scopeAmbulatoryId: scopeAmbulatoryId, masterKey: masterKey, now: now)
         else { return .encryptionFailed }
 
-        let db = try Connection(readWritePath: path)
-        try db.assertPatientsSchema()
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         let columns = assignments.map { $0.column }.joined(separator: ", ")
         let placeholders = assignments.map { _ in "?" }.joined(separator: ", ")
         let sql = "INSERT INTO patients (\(columns)) VALUES (\(placeholders))"
@@ -264,8 +260,8 @@ public struct SQLitePatientStore {
             return .encryptionFailed
         }
 
-        let db = try Connection(readWritePath: path)
-        try db.assertPatientsSchema()
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         try db.execute("BEGIN IMMEDIATE")
         do {
             // Unscoped existence read (id + active), matching the operator route.
@@ -305,9 +301,9 @@ public struct SQLitePatientStore {
     private func buildPatientInsertAssignments(
         _ p: HomeBasePatientCreatePayload, id: String, scopeAmbulatoryId: String?,
         masterKey: SymmetricKey, now: Date
-    ) -> [(column: String, bind: Bind)]? {
+    ) -> [(column: String, bind: SQLiteBind)]? {
         let stamp = Int(now.timeIntervalSince1970)
-        var out: [(column: String, bind: Bind)] = []
+        var out: [(column: String, bind: SQLiteBind)] = []
         out.append(("id", .text(id)))
         out.append(("first_name", .text(p.firstName)))
         out.append(("last_name", .text(p.lastName)))
@@ -344,7 +340,7 @@ public struct SQLitePatientStore {
     /// Seal an optional plaintext string field into the assignments (nil -> NULL).
     /// Returns false if a present value fails to encrypt.
     private func sealInto(
-        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: String?, _ key: SymmetricKey
     ) -> Bool {
         guard let value else { out.append((column, .null)); return true }
@@ -356,7 +352,7 @@ public struct SQLitePatientStore {
     /// Seal an optional STRUCTURED field (array/object JSON string) into the
     /// assignments by encrypting the JSON directly (no JSON.stringify wrap).
     private func sealStructuredInto(
-        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: String?, _ key: SymmetricKey
     ) -> Bool {
         guard let value else { out.append((column, .null)); return true }
@@ -392,8 +388,8 @@ public struct SQLitePatientStore {
     /// seal; an empty array means "No valid fields to update".
     private func buildPatientUpdateAssignments(
         _ p: HomeBasePatientUpdatePayload, masterKey: SymmetricKey
-    ) -> [(column: String, bind: Bind)]? {
-        var out: [(column: String, bind: Bind)] = []
+    ) -> [(column: String, bind: SQLiteBind)]? {
+        var out: [(column: String, bind: SQLiteBind)] = []
         // Plaintext scalar columns (web: typeof === 'string'/'boolean' -> set, else skip).
         if let v = p.firstName { out.append(("first_name", .text(v))) }
         if let v = p.lastName { out.append(("last_name", .text(v))) }
@@ -426,7 +422,7 @@ public struct SQLitePatientStore {
         return out
     }
 
-    private func appendPlain(_ out: inout [(column: String, bind: Bind)], _ column: String, _ value: PatchValue<String>) {
+    private func appendPlain(_ out: inout [(column: String, bind: SQLiteBind)], _ column: String, _ value: PatchValue<String>) {
         switch value {
         case .omit: break
         case .null: out.append((column, .null))
@@ -435,7 +431,7 @@ public struct SQLitePatientStore {
     }
 
     private func appendSealedString(
-        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: PatchValue<String>, _ key: SymmetricKey
     ) -> Bool {
         switch value {
@@ -449,7 +445,7 @@ public struct SQLitePatientStore {
     }
 
     private func appendSealedStructured(
-        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: PatchValue<String>, _ key: SymmetricKey
     ) -> Bool {
         switch value {
@@ -463,8 +459,8 @@ public struct SQLitePatientStore {
     }
 
     private func applyPatientUpdate(
-        _ db: Connection, id: String, expected: Int, nextVersion: Int,
-        assignments: [(column: String, bind: Bind)], now: Date
+        _ db: SQLiteConnection, id: String, expected: Int, nextVersion: Int,
+        assignments: [(column: String, bind: SQLiteBind)], now: Date
     ) throws {
         var columns = assignments
         columns.append(("version", .int(nextVersion)))
@@ -480,7 +476,7 @@ public struct SQLitePatientStore {
     }
 
     private func selectScopedSnapshot(
-        _ db: Connection, id: String, scope: String
+        _ db: SQLiteConnection, id: String, scope: String
     ) throws -> PatientConcurrency.ConflictSource? {
         let sql = """
         SELECT id, version, updated_at, is_archived FROM patients
@@ -494,7 +490,7 @@ public struct SQLitePatientStore {
     }
 
     private func selectConflictSnapshot(
-        _ db: Connection, id: String
+        _ db: SQLiteConnection, id: String
     ) throws -> PatientConcurrency.ConflictSource? {
         let sql = "SELECT id, version, updated_at, is_archived FROM patients WHERE id = ? AND deleted_at IS NULL"
         return try db.run(sql, bind: [.text(id)]) { row in
@@ -502,121 +498,5 @@ public struct SQLitePatientStore {
                 id: row.text(0) ?? "", version: row.int(1) ?? 1,
                 updatedAt: row.date(2), isArchived: row.bool(3))
         }.first
-    }
-
-    // MARK: Minimal SQLite wrapper (confined here)
-
-    private final class Connection {
-        private let handle: OpaquePointer
-        private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-
-        private init(path: String, flags: Int32) throws {
-            var db: OpaquePointer?
-            let rc = sqlite3_open_v2(path, &db, flags, nil)
-            guard rc == SQLITE_OK, let db else {
-                if let db { sqlite3_close(db) }
-                throw StoreError.cannotOpen("sqlite3_open_v2 rc=\(rc) for \(path)")
-            }
-            handle = db
-        }
-
-        convenience init(readOnlyPath: String) throws {
-            try self.init(path: readOnlyPath, flags: SQLITE_OPEN_READONLY)
-        }
-
-        convenience init(readWritePath: String) throws {
-            try self.init(path: readWritePath, flags: SQLITE_OPEN_READWRITE)
-        }
-
-        deinit { sqlite3_close(handle) }
-
-        /// Rows changed by the most recent statement on this connection.
-        var changes: Int { Int(sqlite3_changes(handle)) }
-
-        /// Run a non-query statement (BEGIN/COMMIT/ROLLBACK).
-        func execute(_ sql: String) throws {
-            var errorMessage: UnsafeMutablePointer<CChar>?
-            let rc = sqlite3_exec(handle, sql, nil, nil, &errorMessage)
-            guard rc == SQLITE_OK else {
-                let message = errorMessage.map { String(cString: $0) } ?? String(cString: sqlite3_errmsg(handle))
-                sqlite3_free(errorMessage)
-                throw StoreError.query(message)
-            }
-        }
-
-        /// Fail-fast schema guard: the patients table must carry every column the
-        /// store reads OR writes. The native never migrates the web's schema.
-        func assertPatientsSchema() throws {
-            let required = ["id", "first_name", "last_name", "tax_code", "version", "deleted_at",
-                            "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
-                            "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
-                            "ambulatory_id", "created_at", "birth_date", "ai_summary",
-                            "document_insights", "deletion_reason"]
-            var present = Set<String>()
-            _ = try run("PRAGMA table_info(patients)") { row -> Int in
-                if let name = row.text(1) { present.insert(name) }
-                return 0
-            }
-            let missing = required.filter { !present.contains($0) }
-            guard missing.isEmpty else {
-                throw StoreError.incompatibleSchema("patients table missing columns: \(missing.joined(separator: ", "))")
-            }
-        }
-
-        func run<T>(_ sql: String, bind params: [Bind] = [], _ map: (Row) -> T) throws -> [T] {
-            var stmt: OpaquePointer?
-            guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
-                throw StoreError.query(String(cString: sqlite3_errmsg(handle)))
-            }
-            defer { sqlite3_finalize(stmt) }
-            for (index, value) in params.enumerated() {
-                let position = Int32(index + 1)
-                switch value {
-                case .text(let string): sqlite3_bind_text(stmt, position, string, -1, Self.transient)
-                case .int(let number): sqlite3_bind_int64(stmt, position, Int64(number))
-                case .null: sqlite3_bind_null(stmt, position)
-                }
-            }
-            var out: [T] = []
-            while true {
-                let rc = sqlite3_step(stmt)
-                if rc == SQLITE_ROW {
-                    out.append(map(Row(stmt: stmt)))
-                } else if rc == SQLITE_DONE {
-                    break
-                } else {
-                    throw StoreError.query(String(cString: sqlite3_errmsg(handle)))
-                }
-            }
-            return out
-        }
-    }
-
-    /// Column accessors for one result row.
-    private struct Row {
-        let stmt: OpaquePointer
-
-        func text(_ col: Int32) -> String? {
-            guard sqlite3_column_type(stmt, col) != SQLITE_NULL,
-                  let c = sqlite3_column_text(stmt, col) else { return nil }
-            return String(cString: c)
-        }
-
-        func int(_ col: Int32) -> Int? {
-            guard sqlite3_column_type(stmt, col) != SQLITE_NULL else { return nil }
-            return Int(sqlite3_column_int64(stmt, col))
-        }
-
-        /// SQLite stores booleans as 0/1 integers.
-        func bool(_ col: Int32) -> Bool? {
-            guard let value = int(col) else { return nil }
-            return value != 0
-        }
-
-        /// unixepoch seconds -> Date.
-        func date(_ col: Int32) -> Date? {
-            guard let value = int(col) else { return nil }
-            return Date(timeIntervalSince1970: TimeInterval(value))
-        }
     }
 }
