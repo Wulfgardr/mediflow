@@ -115,6 +115,8 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+61b2de22f   native(core): sub-resource CREATE for entry/therapy/checkup/observation
+a0af0ae1f   docs: handover - clinical update/soft-delete done; only sub-resource CREATE remains
 a20f5b49c   native(core): SQLiteClinicalStore update + soft-delete for the 4 sub-resources
 a1f118728   native(core): extract shared SQLiteConnection from SQLitePatientStore
 25845720f   docs: handover - patient authority complete + audited; sub-resource specs captured
@@ -142,46 +144,40 @@ e4b9a633f   feat(native): ADR 0071 + Fase 0 crypto golden-vector gate
 
 ## NEXT STEPS (in order)
 
-DONE since this doc was written (commits above, all adversarially parity-audited by
-multi-lens workflows): the FULL patient write authority (update + create + soft-delete),
-the conflict-payload encode parity, the generic `ClinicalConcurrency`, the audit-finding
-fixes, the shared `SQLiteConnection` extraction, AND `SQLiteClinicalStore` update +
-soft-delete for all 4 sub-resources (entry/therapy/checkup/observation) - the clinical
-concurrency lens found ZERO drift; the field-map lens fixes (per-entity deletion_reason
-crypto, full update field coverage, observation value trim) are applied. Remaining:
+The reversed-flow WRITE AUTHORITY IS COMPLETE (all commits above adversarially
+parity-audited by multi-lens workflows, every finding fixed): patient CRUD
+(create/update/soft-delete) + clinical CRUD for all 4 sub-resources
+(entry/therapy/checkup/observation: create/update/soft-delete, soft-delete = update
+carrying deletedAt+deletionReason), the 409 encode parity, the generic
+`ClinicalConcurrency`, the shared `SQLiteConnection`, and `ClinicalStatusNormalization`
+(status alias/casing canonicalization). Two clinical audit passes found ZERO
+concurrency/transaction drift; the field-map fixes (per-entity deletion_reason crypto,
+full field coverage, status canonicalization, observation trim/LOINC-UCUM canonical,
+entry setting '' -> NULL) are all applied + tested (74 core tests). The READ + WRITE
+reversed-flow core is done. Remaining:
 
-1. **Sub-resource CREATE (entry/therapy/checkup/observation).** The only piece of the
-   write authority left. `SQLiteClinicalStore` already has the connection, the sealed
-   AssignmentBuilder, the boundary + scope helpers, and the typed `HomeBase*CreatePayload`
-   types exist. Add a `createX` per entity:
-   - boundary `validateSubResource(.x, mode: .create, presentFields, attachmentsNonEmpty)`
-     (create forbids more fields than update: see NetworkWriteBoundary.forbiddenClientFields);
-   - normalize defaults from the create normalizers (entry title -> "Voce clinica",
-     checkup status -> "pending"/source -> "manual", observation codeSystem "LOINC"/
-     unitSystem "UCUM"/source "manual", therapy status -> "active"); version=1,
-     createdAt=updatedAt=now, deletedAt/deletionReason null; id = payload.id or lowercased uuid;
-   - transaction: patientIsInScope (denormalized ambulatory) else 404 -> INSERT (201).
-   - **entry idempotency** (the one tricky bit, lib/network-entry-write.ts:204-263): if the
-     client id already exists active, compare the create payload to the row; identical ->
-     200 {id, version, idempotent:true}; different content -> 409 "Network diary create id
-     already exists with different content". Comparing needs decrypting the existing row's
-     fields - decide plaintext-compare vs defer the same-payload check.
-   - entry metadata IS encrypted+structured on create (HomeBaseEntryCreatePayload.metadata):
-     resolve whether the payload carries plaintext (seal in-core) or pre-encrypted ENC:
-     (store verbatim) - see the deferred metadata note in HomeBaseEntryUpdatePayload.
-   - Test as the update tests do (copy fixture for the patient/scope, create the table).
+1. **Fase 3 wiring.** Re-point the macOS app from the HTTP `HomeBasePatientsClient`
+   to the in-process `SQLitePatientStore` + `SQLiteClinicalStore` (the app becomes
+   the local authority); demote the Next.js data-plane to a signed-write ingest +
+   ciphertext-delta pull. This is the integration step that makes the built authority
+   actually drive the app.
 2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
-   `patients.ambulatory_id` scope check with the `patients_to_ambulatories` join +
-   port `upsertPrimaryAmbulatoryMembership`; regenerate the fixture to model that
-   table. Until then out-of-scope 404 diverges for multi-membership patients.
-4. **Fase 3 wiring.** Re-point the macOS app from the HTTP `HomeBasePatientsClient`
-   to the in-process `SQLitePatientStore`; demote the Next.js data-plane to a
-   signed-write ingest + ciphertext-delta pull.
-5. **Formal target split** (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
+   `patients.ambulatory_id` scope check (used by every store write) with the
+   `patients_to_ambulatories` join + port `upsertPrimaryAmbulatoryMembership`;
+   regenerate the fixture to model that table. Until then out-of-scope 404 diverges
+   for multi-membership patients, and patient create/update can't set the primary
+   ambulatory. Also unblocks setting ambulatoryId on patient update (deferred).
+3. **Small parity follow-ups (low-risk, optional):** entry `metadata` UPDATE (encrypted,
+   needs the plaintext-vs-pre-encrypted decision - create already handles both via
+   seal-or-passthrough); clinical clear-to-null on update (the typed *UpdatePayload use
+   nil=omit, so a field can't be cleared / a tombstone restored); enum REJECTION on
+   write (the store canonicalizes but never 400s an invalid enum, since the typed
+   payloads are trusted producers).
+4. **Formal target split** (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
    `MediFlowAppleUI` = SwiftUI). Deferred deliberately: it touches the 1,831-LOC
    `PairedPatientsWorkspaceModel` (Codex: leave it; highest-risk move). The core is
    already cleanly isolated, so this is reorganization, not blocking.
-6. **Schema-fingerprint test** (Codex): hash `drizzle/meta/0000_snapshot.json` +
+5. **Schema-fingerprint test** (Codex): hash `drizzle/meta/0000_snapshot.json` +
    expected columns so a stale Swift row mapping fails fast.
 
 ## OPEN ITEMS / watch-list
