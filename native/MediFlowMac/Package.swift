@@ -11,9 +11,22 @@ var products: [Product] = [
     .library(name: "MediFlowCore", targets: ["MediFlowCore"])
 ]
 var targets: [Target] = [
+    // ADR 0071 Fase 2 (Codex review): the vendored SQLite amalgamation, so the
+    // core bundles SQLite on every OS instead of relying on a system libsqlite3.
+    .target(
+        name: "MediFlowSQLiteC",
+        publicHeadersPath: "include",
+        cSettings: [
+            .define("SQLITE_THREADSAFE", to: "1"),
+            .define("SQLITE_OMIT_LOAD_EXTENSION"),
+            .define("SQLITE_DQS", to: "0"),
+            .define("SQLITE_DEFAULT_FOREIGN_KEYS", to: "1")
+        ]
+    ),
     .target(
         name: "MediFlowCore",
         dependencies: [
+            "MediFlowSQLiteC",
             // swift-crypto: one crypto source path for all OSes. Re-exports
             // CryptoKit on Apple; BoringSSL-backed on Linux/Windows.
             .product(name: "Crypto", package: "swift-crypto")

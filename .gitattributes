@@ -1,0 +1,2 @@
+native/MediFlowMac/Sources/MediFlowSQLiteC/sqlite3.c linguist-vendored
+native/MediFlowMac/Sources/MediFlowSQLiteC/include/* linguist-vendored
