@@ -21,7 +21,7 @@ public enum PatchValue<Value> {
 extension PatchValue: Sendable where Value: Sendable {}
 
 extension KeyedEncodingContainer {
-    mutating func encodePatch<T: Encodable>(_ value: PatchValue<T>, forKey key: Key) throws {
+    public mutating func encodePatch<T: Encodable>(_ value: PatchValue<T>, forKey key: Key) throws {
         switch value {
         case .omit:
             break

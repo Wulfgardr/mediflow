@@ -29,7 +29,7 @@ public struct VersionConflictPresentation: Equatable {
 
     /// Human label for the conflicting record. The five paired entities share the
     /// 409 payload shape; an unknown entity falls back to its raw code.
-    static func entityLabel(_ entity: String) -> String {
+    public static func entityLabel(_ entity: String) -> String {
         switch entity {
         case "patient": return "anagrafica paziente"
         case "entry": return "voce di diario"
@@ -42,7 +42,7 @@ public struct VersionConflictPresentation: Equatable {
 
     /// The YYYY-MM-DD prefix of an ISO 8601 timestamp, or nil when absent/too
     /// short. Pure string slicing so the copy stays locale and timezone neutral.
-    static func dayPrefix(_ iso: String?) -> String? {
+    public static func dayPrefix(_ iso: String?) -> String? {
         guard let iso, iso.count >= 10 else { return nil }
         let day = Array(iso.prefix(10))
         // Shape must be YYYY-MM-DD: dashes at index 4 and 7, ASCII digits elsewhere.

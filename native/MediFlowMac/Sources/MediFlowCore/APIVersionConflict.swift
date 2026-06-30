@@ -22,6 +22,20 @@ public struct VersionConflictPayload: Decodable, Equatable {
     public let currentUpdatedAt: String?
     public let currentState: String
     public let currentSnapshot: VersionConflictSnapshot?
+
+    public init(error: String, code: String, entity: String, recordId: String,
+                expectedVersion: Int, currentVersion: Int?, currentUpdatedAt: String?,
+                currentState: String, currentSnapshot: VersionConflictSnapshot?) {
+        self.error = error
+        self.code = code
+        self.entity = entity
+        self.recordId = recordId
+        self.expectedVersion = expectedVersion
+        self.currentVersion = currentVersion
+        self.currentUpdatedAt = currentUpdatedAt
+        self.currentState = currentState
+        self.currentSnapshot = currentSnapshot
+    }
 }
 
 // Patient snapshots carry isArchived; clinical sub-resource snapshots carry
@@ -33,4 +47,14 @@ public struct VersionConflictSnapshot: Decodable, Equatable {
     public let updatedAt: String?
     public let deletedAt: String?
     public let isArchived: Bool?
+
+    public init(id: String, patientId: String?, version: Int,
+                updatedAt: String?, deletedAt: String?, isArchived: Bool?) {
+        self.id = id
+        self.patientId = patientId
+        self.version = version
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.isArchived = isArchived
+    }
 }

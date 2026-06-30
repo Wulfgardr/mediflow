@@ -2,8 +2,8 @@
 import Foundation
 
 /* @Codex */
-enum ExemptionCodesCodec {
-    static func decode(_ raw: String?) -> [String] {
+public enum ExemptionCodesCodec {
+    public static func decode(_ raw: String?) -> [String] {
         guard let raw else { return [] }
 
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -21,7 +21,7 @@ enum ExemptionCodesCodec {
         return normalizedCodes([trimmed])
     }
 
-    static func encode(_ codes: [String]) -> String? {
+    public static func encode(_ codes: [String]) -> String? {
         let normalized = normalizedCodes(codes)
         guard !normalized.isEmpty else { return nil }
 
@@ -31,11 +31,11 @@ enum ExemptionCodesCodec {
         return String(data: data, encoding: .utf8)
     }
 
-    static func normalizedCode(_ code: String) -> String {
+    public static func normalizedCode(_ code: String) -> String {
         code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
-    static func normalizedCodes(_ codes: [String]) -> [String] {
+    public static func normalizedCodes(_ codes: [String]) -> [String] {
         var seen = Set<String>()
         var normalized: [String] = []
 
