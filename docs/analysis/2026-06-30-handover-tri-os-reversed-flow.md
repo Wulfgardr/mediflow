@@ -115,6 +115,10 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+088ba3c7d   native(core): close patient-write parity gaps from the adversarial audit
+63bcdf6a9   native(core): patient create + soft-delete write paths
+9a7243ca1   native(core): generic ClinicalConcurrency for the 4 sub-resources
+32200f939   docs: handover - patient write path + 409 encode parity done
 73ac01e43   native(core): 409 conflict-payload encode parity (ADR 0071 Fase 2 watch-item)
 8b4ac6949   native(core): port the patient write path to SQLitePatientStore (ADR 0071 Fase 2)
 62bd1390f   native(core): make the *Filtering enums + apply() public (fixup for fb9ea8ad0)
@@ -135,22 +139,32 @@ e4b9a633f   feat(native): ADR 0071 + Fase 0 crypto golden-vector gate
 
 ## NEXT STEPS (in order)
 
-DONE since this doc was written: the patient write path (NEXT STEP 1's patient
-slice) and the conflict-payload encode parity (old NEXT STEP 2). Remaining:
+DONE since this doc was written (commits above, all adversarially parity-audited by
+a 4-lens workflow): the FULL patient write authority (update + create + soft-delete),
+the conflict-payload encode parity, the generic `ClinicalConcurrency` (the 4 clinical
+builders collapsed into one), and the audit-finding fixes (unscoped soft-delete,
+exemptions+birthDate on update, wireResponse copy lock). Remaining:
 
-1. **Patient create + soft-delete write paths.** `updatePatient` is in; add
-   `createPatient` (port `normalizePatientCreateInput`: version=1, createdAt/updatedAt,
-   seal ENCRYPTED_FIELDS, INSERT) and the soft-delete transition (ADR 0066:
-   set deleted_at/deletion_reason under the same version guard). Same transactional
-   shape + pure-function authority as `updatePatient`.
-2. **Sub-resource write paths (entry/therapy/checkup/observation).** Port the 4
-   concurrency builders 1:1 from `lib/{entry,therapy,checkup,observation}-concurrency.ts`
-   (the clinical snapshot is `{id, patientId, version, updatedAt, deletedAt}` - the
-   encode side already handles it), then their transactional create/update/soft-delete
-   in the store, reusing `NetworkWriteBoundary.validateSubResource`. The clinical
-   ENCRYPTED_FIELDS differ per table (see `lib/db.ts` ENCRYPTED_FIELDS) - mind the
-   string-vs-structured seal convention (entries carry `metadata`/`attachments`).
-3. **Membership-scope parity (watch-item, see below).** Replace the denormalized
+1. **Sub-resource STORE write paths (entry/therapy/checkup/observation).** The pure
+   `ClinicalConcurrency` + the typed Create/Update payloads + the encode side are all
+   ready; what's left is the transactional store plumbing. Recommended shape:
+   - Extract the SQLite primitives (`Connection`/`Bind`/`Row`/`StoreError`) out of
+     SQLitePatientStore into a shared internal `SQLiteConnection.swift` (StoreError is
+     NOT referenced outside that file, so this is a safe move); generalize
+     `assertPatientsSchema` to `assertSchema(table:requiredColumns:)`.
+   - Add a `SQLiteClinicalStore` with a generic version-guarded-update skeleton (BEGIN
+     IMMEDIATE -> clinical snapshot -> `ClinicalConcurrency.evaluate` -> UPDATE ->
+     changes==0 raced -> COMMIT) + per-entity create/update assignment builders.
+     SOFT-DELETE falls out of update (the *UpdatePayload types carry deletedAt +
+     deletionReason); no separate delete method needed.
+   - Reuse `NetworkWriteBoundary.validateSubResource` (create vs update mode); seal the
+     per-table ENCRYPTED_FIELDS (see the appendix specs below; entries' metadata +
+     attachments are STRUCTURED, everything else here is string). createX also needs the
+     patient-in-scope 404 check + entry's idempotency (id match -> 200/409).
+   - Test by creating the needed table in a temp DB via the extracted SQLiteConnection
+     (@testable) - no fixture regen / Node needed. Full per-entity contracts are in the
+     "Sub-resource parity specs" appendix at the end of this doc.
+2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
    `patients.ambulatory_id` scope check with the `patients_to_ambulatories` join +
    port `upsertPrimaryAmbulatoryMembership`; regenerate the fixture to model that
    table. Until then out-of-scope 404 diverges for multi-membership patients.
@@ -190,3 +204,44 @@ slice) and the conflict-payload encode parity (old NEXT STEP 2). Remaining:
   commit compiles from its committed state (not just the working tree).
 - Tooling notes also persist in the session memory: `tri-os-reversed-flow-vision`,
   `native-apple-toolchain`, `apple-paired-crypto`, `in-house-first-principle`.
+
+## Appendix: sub-resource parity specs (extracted, for NEXT STEP 1)
+
+Extracted by a 5-agent understand workflow from `lib/network-{e}-write.ts`,
+`lib/{e}-concurrency.ts`, `lib/api-v1-clinical-write-normalization.ts`, `lib/db.ts`,
+`lib/schema.ts`. All four share: version-guarded UPDATE (`WHERE id=? AND patientId=?
+AND version=expected`), `changes==0` -> 409 via `ClinicalConcurrency` (clinical
+snapshot `{id,patientId,version,updatedAt,deletedAt}`), create boundary forbids AI
+fields (403 "Network {label} write boundary excludes AI/document-derived fields") +
+client-controlled fields (400), patient-in-scope else 404, soft-delete = update with
+deletedAt+deletionReason. Timestamps = unixepoch SECONDS. Boundary label: entry -> "diary".
+
+- **entry** (`entries`): cols id, patient_id, type(notNull), title(notNull, default
+  "Voce clinica"), date(notNull), content(notNull), setting, metadata, attachments,
+  deleted_at, deletion_reason, version, created_at, updated_at. ENCRYPTED: title
+  (string), content (string), metadata (STRUCTURED), attachments (STRUCTURED),
+  deletion_reason (string). Create required: type, date, content; title defaults; id
+  client-or-uuid. **Idempotency**: if id exists + payload matches (deletedAt null) ->
+  200 {id, version, idempotent:true}; if exists + content differs -> 409 "Network
+  diary create id already exists with different content". Create forbids non-empty
+  attachments (403). Swift: HomeBaseEntryCreatePayload {id,type,title?,date,content,
+  metadata?}, HomeBaseEntryUpdatePayload {version,type?,title?,content?,deletedAt?,
+  deletionReason?}.
+- **therapy** (`therapies`): cols id, patient_id, drug_name(notNull), aic, atc,
+  active_principle, dosage(notNull), motivation, diagnosis_code, diagnosis_name,
+  status(notNull, default "active", enum active|suspended|completed), start_date(notNull),
+  end_date, version, created_at, updated_at, deleted_at, deletion_reason. ENCRYPTED:
+  motivation (string), deletion_reason (string). Create required: drugName, dosage,
+  startDate. Swift payloads OMIT aic/atc/diagnosisCode/diagnosisName (add if needed);
+  UpdatePayload uses shouldEncodeEndDate for omit-vs-null endDate.
+- **checkup** (`checkups`): cols id, patient_id, date(notNull), title(notNull), notes,
+  status(default "pending", enum pending|completed|cancelled), source(enum
+  manual|ai_suggestion, default manual), version, created_at, updated_at, deleted_at,
+  deletion_reason. ENCRYPTED: notes (string) ONLY. Swift UpdatePayload omits source.
+- **observation** (`observations`): cols id, patient_id, code_system(notNull, literal
+  "LOINC"), code(notNull), display(notNull), unit_system(notNull, literal "UCUM"),
+  unit_code(notNull), value(notNull, string), notes, observed_at(notNull),
+  source(default manual), version, created_at, updated_at, deleted_at, deletion_reason.
+  ENCRYPTED: notes (string) ONLY. value is string (web coerces number->string).
+  code_system/unit_system/source immutable on update (absent from UpdatePayload).
+  Conflict snapshot deliberately omits PHI (only id/patientId/version/updatedAt/deletedAt).
