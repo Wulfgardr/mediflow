@@ -218,6 +218,116 @@ final class SQLiteClinicalStoreTests: XCTestCase {
         XCTAssertTrue(rawNotes.hasPrefix("ENC:"))
         XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawNotes, masterKey: masterKey), "post-prandiale")
     }
+
+    // MARK: Create (patient-in-scope 404, INSERT 201, entry idempotency)
+
+    func testCreateCheckupInScopeInsertsAndSealsNotes() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+
+        let payload = HomeBaseCheckupCreatePayload(
+            date: Date(timeIntervalSince1970: 1750000000), title: "Nuovo", status: "done", notes: "riservato")
+        guard case .created(let id, let version) = try store.createCheckup(
+            payload, patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "ck-new") else {
+            return XCTFail("expected create success")
+        }
+        XCTAssertEqual(id, "ck-new")
+        XCTAssertEqual(version, 1)
+
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try rawText(reader, "checkups", "title", id: "ck-new"), "Nuovo")  // plaintext
+        XCTAssertEqual(try rawText(reader, "checkups", "status", id: "ck-new"), "completed")  // 'done' canonicalized
+        XCTAssertEqual(try intCol(reader, "checkups", "version", id: "ck-new"), 1)
+        XCTAssertNil(try intCol(reader, "checkups", "deleted_at", id: "ck-new"))
+        let rawNotes = try XCTUnwrap(try rawText(reader, "checkups", "notes", id: "ck-new"))
+        XCTAssertTrue(rawNotes.hasPrefix("ENC:"))
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawNotes, masterKey: masterKey), "riservato")
+    }
+
+    func testCreateOutOfScopeReturnsNotFound() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        let payload = HomeBaseCheckupCreatePayload(
+            date: Date(timeIntervalSince1970: 1750000000), title: "X", status: "pending")
+        XCTAssertEqual(
+            try store.createCheckup(payload, patientId: "fixture-1", scopeAmbulatoryId: "AMB-OTHER",
+                                    masterKey: masterKey, id: "ck-x"),
+            .notFound)
+        // also: a patient that does not exist at all is out of scope.
+        XCTAssertEqual(
+            try store.createCheckup(payload, patientId: "ghost", scopeAmbulatoryId: "AMB-1",
+                                    masterKey: masterKey, id: "ck-y"),
+            .notFound)
+    }
+
+    func testCreateEntrySealsFieldsAndIsIdempotent() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+
+        let payload = HomeBaseEntryCreatePayload(
+            id: "e-new", type: "note", title: "Diario",
+            date: Date(timeIntervalSince1970: 1750000000), content: "primo")
+        // First create -> 201.
+        XCTAssertEqual(
+            try store.createEntry(payload, patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey),
+            .created(id: "e-new", version: 1))
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        for (column, expected) in [("title", "Diario"), ("content", "primo")] {
+            let raw = try XCTUnwrap(try rawText(reader, "entries", column, id: "e-new"))
+            XCTAssertTrue(raw.hasPrefix("ENC:"), "\(column) must be ENC at rest")
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(raw, masterKey: masterKey), expected)
+        }
+        // Identical create (same client id) -> 200 idempotent, no second row.
+        XCTAssertEqual(
+            try store.createEntry(payload, patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey),
+            .idempotent(id: "e-new", version: 1))
+        // Same id, different content -> 409 idConflict; the stored row is untouched.
+        let changed = HomeBaseEntryCreatePayload(
+            id: "e-new", type: "note", title: "Diario",
+            date: Date(timeIntervalSince1970: 1750000000), content: "DIVERSO")
+        guard case .idConflict = try store.createEntry(
+            changed, patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey) else {
+            return XCTFail("expected idConflict")
+        }
+        XCTAssertEqual(
+            PatientFieldCrypto.decryptStringField(try rawText(reader, "entries", "content", id: "e-new"), masterKey: masterKey),
+            "primo")
+    }
+
+    func testCreateTherapyAndObservationSealEncryptedFieldsAndTrimValue() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+
+        XCTAssertEqual(
+            try store.createTherapy(
+                HomeBaseTherapyCreatePayload(drugName: "ASA", dosage: "100mg", status: "paused",
+                                            startDate: Date(timeIntervalSince1970: 1750000000), motivation: "prevenzione"),
+                patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "t-new"),
+            .created(id: "t-new", version: 1))
+        XCTAssertEqual(
+            try store.createObservation(
+                HomeBaseObservationCreatePayload(codeSystem: "loinc", code: "  8480-6  ", display: "Systolic",
+                                                unitCode: "mm[Hg]", value: "  120  ",
+                                                observedAt: Date(timeIntervalSince1970: 1750000000), notes: "a riposo"),
+                patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, id: "o-new"),
+            .created(id: "o-new", version: 1))
+
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try rawText(reader, "therapies", "status", id: "t-new"), "suspended")  // 'paused' canonicalized
+        let rawMot = try XCTUnwrap(try rawText(reader, "therapies", "motivation", id: "t-new"))
+        XCTAssertTrue(rawMot.hasPrefix("ENC:"))
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawMot, masterKey: masterKey), "prevenzione")
+        XCTAssertEqual(try rawText(reader, "observations", "code_system", id: "o-new"), "LOINC")  // canonical literal
+        XCTAssertEqual(try rawText(reader, "observations", "code", id: "o-new"), "8480-6")  // trimmed
+        XCTAssertEqual(try rawText(reader, "observations", "value", id: "o-new"), "120")  // trimmed plaintext
+        XCTAssertEqual(
+            PatientFieldCrypto.decryptStringField(try rawText(reader, "observations", "notes", id: "o-new"), masterKey: masterKey),
+            "a riposo")
+    }
 }
 
 private extension Data {

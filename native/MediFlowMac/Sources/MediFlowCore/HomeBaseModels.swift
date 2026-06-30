@@ -210,16 +210,20 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let title: String?
     public let date: Date
     public let content: String
-    // A10: encrypted structured payload for scale entries (ENC: string), omitted
-    // when nil so ordinary diary entries are unchanged.
+    public let setting: String?
+    // A10: encrypted structured payload for scale entries. The store accepts either a
+    // plaintext JSON (sealed in-core) or an already-encrypted ENC: string (stored
+    // verbatim), omitted when nil so ordinary diary entries are unchanged.
     public let metadata: String?
 
-    public init(id: String, type: String, title: String? = nil, date: Date, content: String, metadata: String? = nil) {
+    public init(id: String, type: String, title: String? = nil, date: Date, content: String,
+                setting: String? = nil, metadata: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
         self.date = date
         self.content = content
+        self.setting = setting
         self.metadata = metadata
     }
 }
@@ -402,7 +406,11 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
 /* @Codex */
 public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
     public let drugName: String
+    public let aic: String?
+    public let atc: String?
     public let activePrinciple: String?
+    public let diagnosisCode: String?
+    public let diagnosisName: String?
     public let dosage: String
     public let status: String
     public let startDate: Date
@@ -411,7 +419,11 @@ public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
 
     public init(
         drugName: String,
+        aic: String? = nil,
+        atc: String? = nil,
         activePrinciple: String? = nil,
+        diagnosisCode: String? = nil,
+        diagnosisName: String? = nil,
         dosage: String,
         status: String,
         startDate: Date,
@@ -419,7 +431,11 @@ public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
         motivation: String? = nil
     ) {
         self.drugName = drugName
+        self.aic = aic
+        self.atc = atc
         self.activePrinciple = activePrinciple
+        self.diagnosisCode = diagnosisCode
+        self.diagnosisName = diagnosisName
         self.dosage = dosage
         self.status = status
         self.startDate = startDate

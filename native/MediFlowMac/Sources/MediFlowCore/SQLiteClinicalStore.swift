@@ -49,6 +49,29 @@ public struct SQLiteClinicalStore {
         }
     }
 
+    /// 1:1 with the web sub-resource create responses: created=201. idempotent=200
+    /// and idConflict=409 are entry-only (client-id retry semantics). notFound=404
+    /// is the patient-out-of-scope path; encryptionFailed is the fail-closed guard.
+    public enum ClinicalCreateOutcome: Equatable {
+        case created(id: String, version: Int)
+        case idempotent(id: String, version: Int)
+        case idConflict(error: String)
+        case boundaryRejected(status: Int, error: String)
+        case notFound
+        case encryptionFailed
+
+        public var wireResponse: (status: Int, error: String?) {
+            switch self {
+            case .created: return (201, nil)
+            case .idempotent: return (200, nil)
+            case .idConflict(let error): return (409, error)
+            case .boundaryRejected(let status, let error): return (status, error)
+            case .notFound: return (404, "Not found")
+            case .encryptionFailed: return (500, "Failed to secure the record")
+            }
+        }
+    }
+
     private let path: String
 
     public init(path: String) {
@@ -66,7 +89,7 @@ public struct SQLiteClinicalStore {
         b.sealString("title", "title", payload.title)       // entries: title ENCRYPTED
         b.sealString("content", "content", payload.content)  // entries: content ENCRYPTED
         b.date("date", "date", payload.date)
-        b.plainText("setting", "setting", payload.setting)   // entries: setting plaintext
+        b.plainText("setting", "setting", Self.normalizedSetting(payload.setting))   // entries: setting plaintext, '' -> nil
         b.date("deletedAt", "deleted_at", payload.deletedAt)
         b.sealString("deletionReason", "deletion_reason", payload.deletionReason)
         return try runUpdate(.entry, "entry", "entries", Self.entryColumns,
@@ -86,7 +109,7 @@ public struct SQLiteClinicalStore {
         b.plainText("diagnosisCode", "diagnosis_code", payload.diagnosisCode)
         b.plainText("diagnosisName", "diagnosis_name", payload.diagnosisName)
         b.plainText("dosage", "dosage", payload.dosage)
-        b.plainText("status", "status", payload.status)
+        b.plainText("status", "status", payload.status.map { ClinicalStatusNormalization.therapyStatus($0) })
         b.date("startDate", "start_date", payload.startDate)
         b.date("endDate", "end_date", payload.endDate)
         b.sealString("motivation", "motivation", payload.motivation)  // therapies: motivation ENCRYPTED
@@ -104,7 +127,7 @@ public struct SQLiteClinicalStore {
         var b = AssignmentBuilder(masterKey: masterKey)
         b.date("date", "date", payload.date)
         b.plainText("title", "title", payload.title)   // checkups: title is plaintext
-        b.plainText("status", "status", payload.status)
+        b.plainText("status", "status", payload.status.map { ClinicalStatusNormalization.checkupStatus($0) })
         b.plainText("source", "source", payload.source)
         b.sealString("notes", "notes", payload.notes)  // checkups ENCRYPTED_FIELDS = [notes] ONLY
         b.date("deletedAt", "deleted_at", payload.deletedAt)
@@ -120,13 +143,14 @@ public struct SQLiteClinicalStore {
         payload: HomeBaseObservationUpdatePayload, masterKey: SymmetricKey, now: Date = Date()
     ) throws -> ClinicalWriteOutcome {
         var b = AssignmentBuilder(masterKey: masterKey)
-        b.plainText("codeSystem", "code_system", payload.codeSystem)
-        b.plainText("code", "code", payload.code)
-        b.plainText("display", "display", payload.display)
-        b.plainText("unitSystem", "unit_system", payload.unitSystem)
-        b.plainText("unitCode", "unit_code", payload.unitCode)
-        // value is a plaintext string column; the web trims it (normalizeObservationValue).
-        b.plainText("value", "value", payload.value.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        // Mirror the web normalizers: canonical 'LOINC'/'UCUM' uppercased; trim
+        // code/display/unitCode/value.
+        b.plainText("codeSystem", "code_system", payload.codeSystem.map { Self.canonicalSystem($0) })
+        b.plainText("code", "code", payload.code.map { Self.trimmed($0) })
+        b.plainText("display", "display", payload.display.map { Self.trimmed($0) })
+        b.plainText("unitSystem", "unit_system", payload.unitSystem.map { Self.canonicalSystem($0) })
+        b.plainText("unitCode", "unit_code", payload.unitCode.map { Self.trimmed($0) })
+        b.plainText("value", "value", payload.value.map { Self.trimmed($0) })
         b.date("observedAt", "observed_at", payload.observedAt)
         b.plainText("source", "source", payload.source)
         b.sealString("notes", "notes", payload.notes)     // observations ENCRYPTED_FIELDS = [notes] ONLY
@@ -136,6 +160,176 @@ public struct SQLiteClinicalStore {
         return try runUpdate(.observation, "observation", "observations", Self.observationColumns,
                              id: id, patientId: patientId, scope: scopeAmbulatoryId,
                              rawVersion: payload.version, builder: b, now: now)
+    }
+
+    // MARK: Per-entity create (patient-in-scope 404 -> INSERT 201; entry has idempotency)
+
+    public func createEntry(
+        _ payload: HomeBaseEntryCreatePayload, patientId: String, scopeAmbulatoryId: String,
+        masterKey: SymmetricKey, now: Date = Date()
+    ) throws -> ClinicalCreateOutcome {
+        let clientId = payload.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let id = clientId.isEmpty ? UUID().uuidString.lowercased() : payload.id
+        var b = AssignmentBuilder(masterKey: masterKey)
+        b.text("type", "type", payload.type)
+        b.sealRequired("title", "title", payload.title ?? Self.entryDefaultTitle)  // entries: title ENCRYPTED
+        b.requiredDate("date", "date", payload.date)
+        b.sealRequired("content", "content", payload.content)  // entries: content ENCRYPTED
+        b.plainText("setting", "setting", Self.normalizedSetting(payload.setting))
+        b.sealStructuredOrPassthrough("metadata", "metadata", payload.metadata)  // ENC structured or verbatim
+        b.serverNull("attachments")  // attachment writes are excluded by the boundary
+        b.serverCreate(id: id, patientId: patientId, now: now)
+        // Idempotency only when the client supplied the id (1:1 with the web).
+        let idempotency: ((SQLiteConnection) throws -> ClinicalCreateOutcome?)? = clientId.isEmpty ? nil : { db in
+            try self.entryCreateIdempotency(db, id: id, patientId: patientId, payload: payload, masterKey: masterKey)
+        }
+        return try runCreate(.entry, "entries", Self.entryColumns, id: id, patientId: patientId,
+                             scope: scopeAmbulatoryId, builder: b, idempotency: idempotency)
+    }
+
+    public func createTherapy(
+        _ payload: HomeBaseTherapyCreatePayload, patientId: String, scopeAmbulatoryId: String,
+        masterKey: SymmetricKey, id: String = UUID().uuidString.lowercased(), now: Date = Date()
+    ) throws -> ClinicalCreateOutcome {
+        var b = AssignmentBuilder(masterKey: masterKey)
+        b.text("drugName", "drug_name", payload.drugName)
+        b.plainText("aic", "aic", payload.aic)
+        b.plainText("atc", "atc", payload.atc)
+        b.plainText("activePrinciple", "active_principle", payload.activePrinciple)
+        b.plainText("diagnosisCode", "diagnosis_code", payload.diagnosisCode)
+        b.plainText("diagnosisName", "diagnosis_name", payload.diagnosisName)
+        b.text("dosage", "dosage", payload.dosage)
+        b.text("status", "status", ClinicalStatusNormalization.therapyStatus(payload.status))
+        b.requiredDate("startDate", "start_date", payload.startDate)
+        b.date("endDate", "end_date", payload.endDate)
+        b.sealString("motivation", "motivation", payload.motivation)  // therapies: motivation ENCRYPTED
+        b.serverCreate(id: id, patientId: patientId, now: now)
+        return try runCreate(.therapy, "therapies", Self.therapyColumns, id: id, patientId: patientId,
+                             scope: scopeAmbulatoryId, builder: b)
+    }
+
+    public func createCheckup(
+        _ payload: HomeBaseCheckupCreatePayload, patientId: String, scopeAmbulatoryId: String,
+        masterKey: SymmetricKey, id: String = UUID().uuidString.lowercased(), now: Date = Date()
+    ) throws -> ClinicalCreateOutcome {
+        var b = AssignmentBuilder(masterKey: masterKey)
+        b.requiredDate("date", "date", payload.date)
+        b.text("title", "title", payload.title)   // checkups: title plaintext
+        b.text("status", "status", ClinicalStatusNormalization.checkupStatus(payload.status))
+        b.text("source", "source", payload.source)
+        b.sealString("notes", "notes", payload.notes)  // checkups ENCRYPTED_FIELDS = [notes] ONLY
+        b.serverCreate(id: id, patientId: patientId, now: now)
+        return try runCreate(.checkup, "checkups", Self.checkupColumns, id: id, patientId: patientId,
+                             scope: scopeAmbulatoryId, builder: b)
+    }
+
+    public func createObservation(
+        _ payload: HomeBaseObservationCreatePayload, patientId: String, scopeAmbulatoryId: String,
+        masterKey: SymmetricKey, id: String = UUID().uuidString.lowercased(), now: Date = Date()
+    ) throws -> ClinicalCreateOutcome {
+        var b = AssignmentBuilder(masterKey: masterKey)
+        // The web stores the canonical 'LOINC'/'UCUM' literal (uppercased) and trims
+        // code/display/unitCode/value (normalizeObservation*); mirror that here.
+        b.text("codeSystem", "code_system", Self.canonicalSystem(payload.codeSystem))
+        b.text("code", "code", Self.trimmed(payload.code))
+        b.text("display", "display", Self.trimmed(payload.display))
+        b.text("unitSystem", "unit_system", Self.canonicalSystem(payload.unitSystem))
+        b.text("unitCode", "unit_code", Self.trimmed(payload.unitCode))
+        b.text("value", "value", Self.trimmed(payload.value))
+        b.requiredDate("observedAt", "observed_at", payload.observedAt)
+        b.text("source", "source", payload.source)
+        b.sealString("notes", "notes", payload.notes)  // observations ENCRYPTED_FIELDS = [notes] ONLY
+        b.serverCreate(id: id, patientId: patientId, now: now)
+        return try runCreate(.observation, "observations", Self.observationColumns, id: id, patientId: patientId,
+                             scope: scopeAmbulatoryId, builder: b)
+    }
+
+    private static let entryDefaultTitle = "Voce clinica"
+
+    // Value-normalization helpers matching the web normalizers (lib/api-v1-clinical-write-normalization.ts).
+    private static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    /// Observation code/unit system: the web stores the canonical uppercase literal ('LOINC'/'UCUM').
+    private static func canonicalSystem(_ value: String) -> String { trimmed(value).uppercased() }
+    /// Entry setting: '' -> nil (web normalizeEntrySetting maps the empty string to NULL).
+    private static func normalizedSetting(_ value: String?) -> String? {
+        (value?.isEmpty ?? true) ? nil : value
+    }
+
+    // MARK: Shared create skeleton
+
+    private func runCreate(
+        _ resource: NetworkWriteBoundary.SubResource, _ table: String, _ requiredColumns: [String],
+        id: String, patientId: String, scope: String, builder: AssignmentBuilder,
+        idempotency: ((SQLiteConnection) throws -> ClinicalCreateOutcome?)? = nil
+    ) throws -> ClinicalCreateOutcome {
+        let boundary = NetworkWriteBoundary.validateSubResource(
+            resource, mode: .create, presentFields: builder.presentFields)
+        if case .rejected(let status, let error) = boundary {
+            return .boundaryRejected(status: status, error: error)
+        }
+        guard let assignments = builder.assignments else { return .encryptionFailed }
+
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.assertSchema(table: table, requiredColumns: requiredColumns)
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            guard try patientIsInScope(db, patientId: patientId, scope: scope) else {
+                try db.execute("ROLLBACK"); return .notFound
+            }
+            if let idempotency, let early = try idempotency(db) {
+                try db.execute("ROLLBACK"); return early  // 200 idempotent / 409 id-conflict, nothing written
+            }
+            let columns = assignments.map { $0.column }.joined(separator: ", ")
+            let placeholders = assignments.map { _ in "?" }.joined(separator: ", ")
+            let sql = "INSERT INTO \(table) (\(columns)) VALUES (\(placeholders))"
+            _ = try db.run(sql, bind: assignments.map { $0.bind }) { _ in 0 }
+            try db.execute("COMMIT")
+            return .created(id: id, version: 1)
+        } catch {
+            try? db.execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    /// The entity's patient must be in the ambulatory scope (web: patientsToAmbulatories
+    /// membership; on-device: the denormalized patients.ambulatory_id, same deferral).
+    private func patientIsInScope(_ db: SQLiteConnection, patientId: String, scope: String) throws -> Bool {
+        try !db.run("SELECT 1 FROM patients WHERE id = ? AND ambulatory_id = ?",
+                    bind: [.text(patientId), .text(scope)]) { _ in true }.isEmpty
+    }
+
+    /// 1:1 with isSameEntryCreatePayload: when the client id already exists, an
+    /// identical create is idempotent (200), a different one conflicts (409). The
+    /// comparison is on DECRYPTED plaintext (ciphertext differs per IV).
+    private func entryCreateIdempotency(
+        _ db: SQLiteConnection, id: String, patientId: String,
+        payload: HomeBaseEntryCreatePayload, masterKey: SymmetricKey
+    ) throws -> ClinicalCreateOutcome? {
+        let sql = """
+        SELECT type, title, date, content, setting, metadata, attachments, deleted_at, version
+        FROM entries WHERE id = ? AND patient_id = ?
+        """
+        let rows = try db.run(sql, bind: [.text(id), .text(patientId)]) { row in
+            (type: row.text(0), title: row.text(1), date: row.date(2), content: row.text(3),
+             setting: row.text(4), metadata: row.text(5), attachments: row.text(6),
+             deletedAt: row.date(7), version: row.int(8) ?? 1)
+        }
+        guard let existing = rows.first else { return nil }  // no clash -> proceed to INSERT
+        let dec = { PatientFieldCrypto.decryptStringField($0, masterKey: masterKey) }
+        let same = existing.type == payload.type
+            && dec(existing.title) == (payload.title ?? Self.entryDefaultTitle)
+            && dec(existing.content) == payload.content
+            && PatientFieldCrypto.decryptStructuredField(existing.metadata, masterKey: masterKey)
+                == PatientFieldCrypto.decryptStructuredField(payload.metadata, masterKey: masterKey)
+            && existing.setting == Self.normalizedSetting(payload.setting)
+            && existing.attachments == nil
+            && existing.deletedAt == nil
+            && existing.date.map { Int($0.timeIntervalSince1970) } == Int(payload.date.timeIntervalSince1970)
+        return same
+            ? .idempotent(id: id, version: existing.version)
+            : .idConflict(error: "Network diary create id already exists with different content")
     }
 
     // MARK: Shared version-guarded update skeleton
@@ -270,6 +464,59 @@ public struct SQLiteClinicalStore {
                 return
             }
             pairs.append((column, .text(enc)))
+        }
+
+        // --- Required client fields (create): always set, tracked as present. ---
+
+        mutating func text(_ field: String, _ column: String, _ value: String) {
+            presentFields.insert(field)
+            pairs.append((column, .text(value)))
+        }
+
+        mutating func requiredDate(_ field: String, _ column: String, _ value: Date) {
+            presentFields.insert(field)
+            pairs.append((column, .int(Int(value.timeIntervalSince1970))))
+        }
+
+        mutating func sealRequired(_ field: String, _ column: String, _ value: String) {
+            presentFields.insert(field)
+            guard case .sealed(let enc?) = CryptoService.seal(value, masterKey: masterKey) else {
+                failed = true
+                return
+            }
+            pairs.append((column, .text(enc)))
+        }
+
+        /// A structured ENCRYPTED field that may arrive plaintext (sealed in-core) or
+        /// already-encrypted ENC: (stored verbatim). nil = omit.
+        mutating func sealStructuredOrPassthrough(_ field: String, _ column: String, _ value: String?) {
+            guard let value else { return }
+            presentFields.insert(field)
+            if value.hasPrefix(CryptoService.encPrefix) {
+                pairs.append((column, .text(value)))  // already encrypted by the caller
+                return
+            }
+            guard let enc = CryptoService.encryptField(value, masterKey: masterKey) else {
+                failed = true
+                return
+            }
+            pairs.append((column, .text(enc)))
+        }
+
+        // --- Server-controlled columns (create): NOT tracked as present (the create
+        //     boundary forbids client-set id/version/createdAt/etc.). ---
+
+        mutating func serverNull(_ column: String) { pairs.append((column, .null)) }
+
+        mutating func serverCreate(id: String, patientId: String, now: Date) {
+            let seconds = Int(now.timeIntervalSince1970)
+            pairs.append(("id", .text(id)))
+            pairs.append(("patient_id", .text(patientId)))
+            pairs.append(("version", .int(1)))
+            pairs.append(("created_at", .int(seconds)))
+            pairs.append(("updated_at", .int(seconds)))
+            pairs.append(("deleted_at", .null))
+            pairs.append(("deletion_reason", .null))
         }
     }
 
