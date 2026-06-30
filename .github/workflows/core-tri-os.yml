@@ -1,0 +1,72 @@
+name: Core tri-OS gate
+
+# ADR 0071 "Punto di non ritorno": the platform-free MediFlowCore must build and
+# pass the byte-exact zero-knowledge crypto golden-vector gate on macOS, Linux AND
+# Windows. This is the kill-switch that confirms the Swift-core direction: if the
+# Swift toolchain on Windows/Linux ever diverges on AES-GCM/PBKDF2 (swift-crypto),
+# this fails and we reconsider a Rust core (the golden vectors are language-neutral
+# and already in hand). On non-Apple OSes the package manifest excludes the SwiftUI
+# targets, so only MediFlowCore + MediFlowCoreTests compile here.
+
+on:
+  pull_request:
+    paths:
+      - 'native/MediFlowMac/Sources/MediFlowCore/**'
+      - 'native/MediFlowMac/Tests/MediFlowCoreTests/**'
+      - 'native/MediFlowMac/Package.swift'
+      - 'native/contracts/**'
+      - '.github/workflows/core-tri-os.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/MediFlowMac/Sources/MediFlowCore/**'
+      - 'native/contracts/**'
+  workflow_dispatch:
+
+concurrency:
+  group: core-tri-os-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0-noble
+    steps:
+      - uses: actions/checkout@v5
+      - name: Swift version
+        run: swift --version
+      - name: Build MediFlowCore (manifest excludes Apple targets off-Apple)
+        run: swift build --package-path native/MediFlowMac --target MediFlowCore
+      - name: Golden-vector gate (MediFlowCoreTests)
+        run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+      - name: Swift version
+        run: swift --version
+      - name: Build MediFlowCore
+        run: swift build --package-path native/MediFlowMac --target MediFlowCore
+      - name: Golden-vector gate (MediFlowCoreTests)
+        run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Build + golden-vector gate
+        run: |
+          swift build --package-path native/MediFlowMac --target MediFlowCore
+          swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
