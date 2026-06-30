@@ -443,7 +443,10 @@ public struct SQLitePatientStore {
         case .omit: return true
         case .null: out.append((column, .null)); return true
         case .value(let v):
-            guard case .sealed(let enc?) = CryptoService.seal(v, masterKey: key) else { return false }
+            // sealOrPassthrough (Fase 3): the model may hand us a value ALREADY sealed
+            // for the HTTP path; authenticated ciphertext passes through verbatim to
+            // avoid double-encryption, plaintext is sealed, a forged "ENC:" is sealed.
+            guard case .sealed(let enc?) = CryptoService.sealOrPassthrough(v, masterKey: key) else { return false }
             out.append((column, .text(enc)))
             return true
         }
@@ -457,7 +460,7 @@ public struct SQLitePatientStore {
         case .omit: return true
         case .null: out.append((column, .null)); return true
         case .value(let json):
-            guard let enc = CryptoService.encryptField(json, masterKey: key) else { return false }
+            guard case .sealed(let enc?) = CryptoService.encryptOrPassthrough(json, masterKey: key) else { return false }
             out.append((column, .text(enc)))
             return true
         }

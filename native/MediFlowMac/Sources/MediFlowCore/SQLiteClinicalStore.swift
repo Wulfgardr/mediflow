@@ -488,15 +488,13 @@ public struct SQLiteClinicalStore {
         }
 
         /// A structured ENCRYPTED field that may arrive plaintext (sealed in-core) or
-        /// already-encrypted ENC: (stored verbatim). nil = omit.
+        /// already-authenticated ciphertext under this key (stored verbatim). nil = omit.
+        /// Strict (Codex): a value that merely looks like "ENC:" but is not decryptable
+        /// is sealed as plaintext, never passed through (fail-closed for PHI).
         mutating func sealStructuredOrPassthrough(_ field: String, _ column: String, _ value: String?) {
             guard let value else { return }
             presentFields.insert(field)
-            if value.hasPrefix(CryptoService.encPrefix) {
-                pairs.append((column, .text(value)))  // already encrypted by the caller
-                return
-            }
-            guard let enc = CryptoService.encryptField(value, masterKey: masterKey) else {
+            guard case .sealed(let enc?) = CryptoService.encryptOrPassthrough(value, masterKey: masterKey) else {
                 failed = true
                 return
             }

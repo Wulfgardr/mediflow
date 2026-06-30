@@ -57,13 +57,31 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
+    // Local patient WRITE (Fase 3 slice 3). The model pre-seals the payload for HTTP;
+    // SQLitePatientStore now uses sealOrPassthrough, so authenticated ciphertext passes
+    // through verbatim (no double-encryption). Needs a scope; falls back to HTTP when
+    // none is given (the web resolves the default scope server-side). Outcomes map to
+    // the same errors the model already handles (versionConflict / httpStatus).
     public func updatePatient(
         patientId: String, payload: HomeBasePatientUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement {
-        try await fallback.updatePatient(
-            patientId: patientId, payload: payload, credentials: credentials,
-            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        guard let scope = ambulatoryId, !scope.isEmpty else {
+            return try await fallback.updatePatient(
+                patientId: patientId, payload: payload, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        }
+        let outcome = try patientStore.updatePatient(
+            id: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey)
+        switch outcome {
+        case .updated:
+            return HomeBaseMutationAcknowledgement(success: true)
+        case .conflict(let conflictPayload):
+            throw HomeBaseClientError.versionConflict(conflictPayload)
+        case .versionRequired, .noValidFields, .notFound, .boundaryRejected, .encryptionFailed:
+            let wire = outcome.wireResponse
+            throw HomeBaseClientError.httpStatus(wire.status, wire.error)
+        }
     }
 
     public func fetchEntries(

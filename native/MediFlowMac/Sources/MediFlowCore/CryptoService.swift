@@ -90,6 +90,36 @@ public enum CryptoService {
         return .sealed(enc)
     }
 
+    /// True only for AUTHENTICATED ciphertext under `masterKey`: the ENC: prefix AND a
+    /// successful AES-GCM open (which validates the 3 parts, base64, nonce/tag, and the
+    /// tag itself). A plaintext value - even one literally starting "ENC:" - is false
+    /// (decryptField returns nil for a malformed/forged ENC, and returns the value
+    /// unchanged for a non-ENC string, so the prefix guard excludes that case).
+    public static func isEncryptedUnder(_ value: String, masterKey: SymmetricKey) -> Bool {
+        value.hasPrefix(encPrefix) && decryptField(value, masterKey: masterKey) != nil
+    }
+
+    /// Seal a STRING field unless it is ALREADY authenticated ciphertext under this key,
+    /// in which case store it verbatim (the caller pre-sealed it). Fail-closed: a value
+    /// that merely looks like ENC: but is not decryptable is treated as plaintext and
+    /// sealed, never passed through. Lets one core write path accept both pre-sealed
+    /// payloads (today's PairedPatientsWorkspaceModel) and plaintext (reversed-flow).
+    public static func sealOrPassthrough(_ plaintext: String?, masterKey: SymmetricKey) -> FieldSeal {
+        guard let plaintext else { return .sealed(nil) }
+        if isEncryptedUnder(plaintext, masterKey: masterKey) { return .sealed(plaintext) }
+        return seal(plaintext, masterKey: masterKey)
+    }
+
+    /// Same fail-closed passthrough for a STRUCTURED field (array/object JSON): the
+    /// plaintext is the JSON itself (NOT JSON.stringify-d again), so a fresh value is
+    /// encryptField-ed directly; authenticated ciphertext passes through verbatim.
+    public static func encryptOrPassthrough(_ value: String?, masterKey: SymmetricKey) -> FieldSeal {
+        guard let value else { return .sealed(nil) }
+        if isEncryptedUnder(value, masterKey: masterKey) { return .sealed(value) }
+        guard let enc = encryptField(value, masterKey: masterKey) else { return .failed }
+        return .sealed(enc)
+    }
+
     // MARK: Key derivation + master-key wrap
 
     /// PBKDF2-HMAC-SHA256(pin, salt, 100k) -> 256-bit KEK, matching deriveKeyFromPin.

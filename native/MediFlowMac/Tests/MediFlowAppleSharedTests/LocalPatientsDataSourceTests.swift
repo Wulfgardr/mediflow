@@ -53,6 +53,57 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             XCTAssertEqual(code, 404)
         }
     }
+
+    // MARK: Local writes (Fase 3 slice 3) — on a writable fixture copy
+
+    private func writableFixtureCopy() throws -> String {
+        let destination = NSTemporaryDirectory() + "mediflow-localds-\(UUID().uuidString).db"
+        try? FileManager.default.removeItem(atPath: destination)
+        try FileManager.default.copyItem(atPath: fixturePath(), toPath: destination)
+        return destination
+    }
+
+    private func writableSource(_ path: String) -> LocalPatientsDataSource {
+        let fallback = HomeBasePatientsClient(
+            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://127.0.0.1:1", tlsPin: ""))
+        return LocalPatientsDataSource(databasePath: path, masterKey: masterKey, fallback: fallback)
+    }
+
+    func testUpdatePatientWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        // Pre-seal like the model does for the HTTP path; the store passes it through.
+        guard case .sealed(let presealed?) = CryptoService.seal("Via Nuova 5", masterKey: masterKey) else {
+            return XCTFail("seal failed")
+        }
+        let ack = try await source.updatePatient(
+            patientId: "fixture-1", payload: HomeBasePatientUpdatePayload(version: 1, address: .value(presealed)),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertTrue(ack.success)
+
+        // Persisted locally + decrypts to the plaintext (no double-encryption).
+        let detail = try await source.fetchPatient(
+            id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(detail.address, "Via Nuova 5")
+        XCTAssertEqual(detail.version, 2)
+    }
+
+    func testUpdatePatientVersionConflictThrows() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+        do {
+            _ = try await source.updatePatient(
+                patientId: "fixture-1", payload: HomeBasePatientUpdatePayload(version: 99, firstName: "Stale"),
+                credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+            XCTFail("expected a version conflict")
+        } catch let HomeBaseClientError.versionConflict(payload) {
+            XCTAssertEqual(payload.currentVersion, 1)
+            XCTAssertEqual(payload.entity, "patient")
+        }
+    }
 }
 
 private extension Data {

@@ -263,6 +263,27 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNil(Outcome.conflict(payload).wireResponse.error)
     }
 
+    func testUpdatePatientPassesThroughPreSealedValues() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        // Fase 3: the model pre-seals write fields for the HTTP path. The store must
+        // store authenticated ciphertext verbatim (passthrough), not re-encrypt it.
+        guard case .sealed(let presealed?) = CryptoService.seal("Via Milano 9", masterKey: masterKey) else {
+            return XCTFail("seal failed")
+        }
+        let payload = HomeBasePatientUpdatePayload(version: 1, address: .value(presealed))
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+
+        // A SINGLE decryption yields the plaintext => stored verbatim, not double-encrypted.
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(detail.address, "Via Milano 9")
+    }
+
     // MARK: Create
 
     func testCreatePatientInsertsAndSealsFields() throws {
