@@ -115,6 +115,7 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+c5ea157d4   native(core): fix entry create-idempotency to decrypt the incoming payload too
 f211e99c9   native: local clinical WRITE authority + close slice-4 read-parity gaps (Fase 3 slice 5 + audit fixes)
 5d6e2fcb1   native: local patient WRITE authority via strict seal-or-passthrough (Fase 3 slice 3)
 8933fa8d1   native(apple): local patient READ authority behind a flag (Fase 3 slice 2)
@@ -186,6 +187,16 @@ reversed-flow core is done. Remaining:
      must canonicalize status too (not just writes - `ClinicalStatusNormalization`
      reused on the list-read path) and `limit<=0` must mean unbounded (matching the
      web's JS-falsy ternary).
+   - Slice 5 follow-up audit + fix (`c5ea157d4`, Sonnet-5 max-effort, empirically
+     reproduced): `entryCreateIdempotency` decrypted the EXISTING row's title/content
+     but compared them against the RAW, still-sealed incoming payload. Production
+     ALWAYS pre-seals before calling createEntry, so a real retry's payload is itself
+     ciphertext with a fresh IV - a decrypted plaintext can never equal it, so EVERY
+     entry-creation retry deterministically misfired as a 409 instead of the intended
+     200 idempotent ack. Fixed by decrypting both sides (metadata already did this
+     correctly; title/content did not). Concrete proof that the adversarial-verify
+     step is pulling its weight: a real, broadly-reachable bug in the only production
+     call path, invisible to `swift build` and to the existing plaintext-only test.
    - **Slice 6 (next, the big one): demote Next.js** to a signed-write ingest +
      ciphertext-delta pull (the true reversed flow). Needs a device-owned db + sync
      (conflict/delta/tombstone), plus turning `MEDIFLOW_LOCAL_AUTHORITY` from a flag
