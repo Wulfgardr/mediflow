@@ -123,3 +123,19 @@ public struct VersionConflictSnapshot: Decodable, Equatable {
         self.isArchived = isArchived
     }
 }
+
+/// JS `Date.toISOString()` equivalent (UTC, millisecond precision, "Z" suffix, e.g.
+/// "2026-01-01T00:00:00.000Z"); nil for a nil/invalid date. Shared by the
+/// concurrency builders that stamp conflict snapshots, so the 409 timestamp format
+/// is identical for patient and clinical entities.
+func isoConflictTimestamp(_ value: Date?) -> String? {
+    guard let value else { return nil }
+    return isoConflictFormatter.string(from: value)
+}
+
+private let isoConflictFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    return formatter
+}()

@@ -65,7 +65,7 @@ public enum PatientConcurrency {
                 expectedVersion: expectedVersion, currentVersion: nil, currentUpdatedAt: nil,
                 currentState: "missing", currentSnapshot: nil)
         }
-        let currentUpdatedAt = toIsoString(current.updatedAt)
+        let currentUpdatedAt = isoConflictTimestamp(current.updatedAt)
         return VersionConflictPayload(
             error: "Conflict", code: "VERSION_CONFLICT", entity: "patient", recordId: recordId,
             expectedVersion: expectedVersion, currentVersion: current.version, currentUpdatedAt: currentUpdatedAt,
@@ -75,17 +75,7 @@ public enum PatientConcurrency {
                 updatedAt: currentUpdatedAt, deletedAt: nil, isArchived: current.isArchived))
     }
 
-    /// JS Date.toISOString() equivalent: UTC, millisecond precision, "Z" suffix
-    /// (e.g. "2026-01-01T00:00:00.000Z"). nil for a nil/invalid date.
-    static func toIsoString(_ value: Date?) -> String? {
-        guard let value else { return nil }
-        return isoFormatter.string(from: value)
-    }
-
-    private static let isoFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
+    /// JS Date.toISOString() equivalent; delegates to the shared conflict-timestamp
+    /// formatter (see isoConflictTimestamp in APIVersionConflict.swift).
+    static func toIsoString(_ value: Date?) -> String? { isoConflictTimestamp(value) }
 }
