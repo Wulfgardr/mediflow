@@ -56,6 +56,147 @@ final class SQLitePatientStoreTests: XCTestCase {
         let store = SQLitePatientStore(path: fixturePath())
         XCTAssertNil(try store.loadPatientDetail(id: "does-not-exist", masterKey: masterKey))
     }
+
+    // MARK: Write path (reversed flow: the core is the on-device write authority)
+
+    /// A throwaway writable copy of the fixture so the committed db stays pristine.
+    private func writableFixtureCopy() throws -> String {
+        let destination = NSTemporaryDirectory() + "mediflow-write-\(UUID().uuidString).db"
+        try? FileManager.default.removeItem(atPath: destination)
+        try FileManager.default.copyItem(atPath: fixturePath(), toPath: destination)
+        return destination
+    }
+
+    func testUpdatePatientBumpsVersionSealsFieldsAndPersists() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let payload = HomeBasePatientUpdatePayload(
+            version: 1, firstName: "Maria", address: .value("Via Milano 9"))
+        let outcome = try store.updatePatient(
+            id: "fixture-1", scopeAmbulatoryId: "AMB-1", payload: payload, masterKey: masterKey)
+        XCTAssertEqual(outcome, .updated(version: 2))
+
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(detail.firstName, "Maria")
+        XCTAssertEqual(detail.address, "Via Milano 9")
+        XCTAssertEqual(detail.version, 2)
+        // Untouched encrypted field still decrypts (we only wrote address).
+        XCTAssertEqual(detail.phone, "+39 02 1234567")
+
+        // Proof of zero-knowledge at rest: the wrong key can't read the new address
+        // (it is ENC:, not plaintext) while the plaintext column stays visible.
+        let wrongKey = SymmetricKey(size: .bits256)
+        let masked = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: wrongKey))
+        XCTAssertNil(masked.address)
+        XCTAssertEqual(masked.firstName, "Maria")
+    }
+
+    func testUpdatePatientStructuredDiagnosesSealedAtRest() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let diagnoses = [ClinicalDiagnosis(code: "I10", description: "Ipertensione", system: "ICD-10")]
+        let diagnosesJSON = try XCTUnwrap(
+            DiagnosesCodec.encode(diagnoses, defaultDate: "2026-01-01T00:00:00.000Z"))
+        let payload = HomeBasePatientUpdatePayload(version: 1, diagnoses: .value(diagnosesJSON))
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(DiagnosesCodec.decode(detail.diagnoses).first?.code, "I10")
+        // ENC at rest: undecryptable with the wrong key.
+        let masked = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: SymmetricKey(size: .bits256)))
+        XCTAssertTrue(DiagnosesCodec.decode(masked.diagnoses).isEmpty)
+    }
+
+    func testUpdatePatientClearsNullableFieldWithExplicitNull() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let payload = HomeBasePatientUpdatePayload(version: 1, address: .null)
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertNil(detail.address)
+        XCTAssertEqual(detail.version, 2)
+    }
+
+    func testUpdatePatientVersionMismatchReturnsConflictAndRollsBack() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        let payload = HomeBasePatientUpdatePayload(version: 99, firstName: "Stale")
+        let outcome = try store.updatePatient(
+            id: "fixture-1", scopeAmbulatoryId: "AMB-1", payload: payload, masterKey: masterKey)
+        guard case .conflict(let conflict) = outcome else {
+            return XCTFail("expected a version conflict, got \(outcome)")
+        }
+        XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+        XCTAssertEqual(conflict.entity, "patient")
+        XCTAssertEqual(conflict.recordId, "fixture-1")
+        XCTAssertEqual(conflict.expectedVersion, 99)
+        XCTAssertEqual(conflict.currentVersion, 1)
+        XCTAssertEqual(conflict.currentState, "present")
+        XCTAssertEqual(conflict.currentSnapshot?.isArchived, false)
+
+        // The conflicting write left no trace (rolled back).
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(detail.version, 1)
+        XCTAssertEqual(detail.firstName, "Mario")
+    }
+
+    func testUpdatePatientMissingIdReturnsNotFound() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        let payload = HomeBasePatientUpdatePayload(version: 1, firstName: "Ghost")
+        XCTAssertEqual(
+            try store.updatePatient(id: "no-such-id", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .notFound)
+    }
+
+    func testUpdatePatientOutOfScopeReturnsNotFound() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        let payload = HomeBasePatientUpdatePayload(version: 1, firstName: "Wrong scope")
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-OTHER",
+                                    payload: payload, masterKey: masterKey),
+            .notFound)
+    }
+
+    func testUpdatePatientVersionZeroIsVersionRequired() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        let payload = HomeBasePatientUpdatePayload(version: 0, firstName: "NoVersion")
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .versionRequired)
+    }
+
+    func testUpdatePatientWithNoFieldsIsNoValidFields() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        let payload = HomeBasePatientUpdatePayload(version: 1)  // version only, all else omit/nil
+        XCTAssertEqual(
+            try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .noValidFields)
+    }
 }
 
 private extension Data {

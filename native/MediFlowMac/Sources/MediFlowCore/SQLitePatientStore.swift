@@ -2,18 +2,42 @@ import Foundation
 import Crypto
 import MediFlowSQLiteC
 
-// ADR 0071 Fase 2 (Codex review): the read-only first slice of the local-authority
-// persistence. Opens a medical.db read-only, fails fast on schema drift (the native
-// consumes the web schema and never migrates it), reads the active patients, and
-// reuses PatientFieldCrypto to decrypt the ENCRYPTED_FIELDS in-process. The write
-// path / transaction + the pure conflict policy (NetworkWriteBoundary,
-// PatientConcurrency) come next.
+// ADR 0071 Fase 2 (Codex review): the local-authority persistence over the web's
+// medical.db. Fails fast on schema drift (the native consumes the web schema and
+// never migrates it), reads the active patients, and reuses PatientFieldCrypto to
+// decrypt the ENCRYPTED_FIELDS in-process. The reversed-flow WRITE path lives here
+// too: updatePatient() runs the pure authority logic (NetworkWriteBoundary +
+// PatientConcurrency) inside a transaction, seals the ENCRYPTED_FIELDS in-core, and
+// applies a version-guarded UPDATE. The conflict policy stays in the pure functions
+// (never buried in SQL); status codes + copy match lib/network-patient-write.ts so a
+// write rejected here is rejected identically on the web.
 
 public struct SQLitePatientStore {
     public enum StoreError: Error, Equatable {
         case cannotOpen(String)
         case query(String)
         case incompatibleSchema(String)
+    }
+
+    /// Outcome of a patient write, 1:1 with updateNetworkScopedPatient's responses:
+    /// updated=200, versionRequired/noValidFields=400, boundaryRejected=403/400,
+    /// notFound=404, conflict=409. encryptionFailed is a local-authority guard (the
+    /// core refuses to persist plaintext into an encrypted column) with no web peer.
+    public enum PatientWriteOutcome: Equatable {
+        case updated(version: Int)
+        case versionRequired
+        case noValidFields
+        case boundaryRejected(status: Int, error: String)
+        case notFound
+        case conflict(VersionConflictPayload)
+        case encryptionFailed
+    }
+
+    /// A typed bind value for the minimal SQLite wrapper below.
+    private enum Bind {
+        case text(String)
+        case int(Int)
+        case null
     }
 
     private let path: String
@@ -57,7 +81,7 @@ public struct SQLitePatientStore {
                exemptions, diagnoses, monitoring_profile, status_reason, version
         FROM patients WHERE id = ? AND deleted_at IS NULL
         """
-        let rows = try db.run(sql, bind: [id]) { row -> HomeBasePatientDetail in
+        let rows = try db.run(sql, bind: [.text(id)]) { row -> HomeBasePatientDetail in
             // The encrypted columns are read RAW (ENC:iv:data); PatientFieldCrypto
             // decrypts them below, exactly as it does for a fetched network detail.
             HomeBasePatientDetail(
@@ -74,29 +98,263 @@ public struct SQLitePatientStore {
         return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
     }
 
-    // MARK: Minimal read-only SQLite wrapper (confined here)
+    // MARK: Write path (reversed flow: the core is the on-device write authority)
+
+    /// Apply a scoped patient update under optimistic concurrency, sealing the
+    /// ENCRYPTED_FIELDS in-core. Ported 1:1 from updateNetworkScopedPatient
+    /// (lib/network-patient-write.ts): version is checked first, then the write
+    /// boundary, then the transaction reads a snapshot, the pure PatientConcurrency
+    /// policy decides, and a version-guarded UPDATE is applied. The input is the
+    /// app's plaintext patch payload; this method does the zero-knowledge sealing
+    /// (the home-base only ever stores ciphertext).
+    ///
+    /// PARITY NOTE (scope): the web 404s an out-of-scope patient via the
+    /// patients_to_ambulatories membership join; on-device we scope by the
+    /// denormalized patients.ambulatory_id (the only model the fixture/local store
+    /// carries today, and the column the web keeps consistent with the membership
+    /// per WUL-309). Full membership scoping + upsertPrimaryAmbulatoryMembership is
+    /// follow-up work, tracked with the sub-resource concurrency ports.
+    public func updatePatient(
+        id: String,
+        scopeAmbulatoryId: String,
+        payload: HomeBasePatientUpdatePayload,
+        masterKey: SymmetricKey,
+        now: Date = Date()
+    ) throws -> PatientWriteOutcome {
+        // 1. Version first (1:1 parseExpectedVersion): a 400 before any I/O.
+        guard let expected = PatientConcurrency.parseExpectedVersion(payload.version) else {
+            return .versionRequired
+        }
+
+        // 2. Write-boundary authority. The typed payload structurally cannot carry
+        //    the forbidden AI fields or an ambulatoryId, so this is .allowed today;
+        //    it stays wired as the authority seam for future untyped / peer-sourced
+        //    writes (fan-out), where the field set is dynamic.
+        let boundary = NetworkWriteBoundary.validatePatient(
+            presentFields: presentPatientFields(payload),
+            ambulatoryIdInBody: .omit,
+            scopeAmbulatoryId: scopeAmbulatoryId)
+        if case .rejected(let status, let error) = boundary {
+            return .boundaryRejected(status: status, error: error)
+        }
+
+        // 3. Normalize -> sealed column assignments. nil means a field failed to
+        //    encrypt: abort rather than ever persist plaintext into an encrypted
+        //    column (CryptoService.seal's fail-closed contract).
+        guard let assignments = buildPatientUpdateAssignments(payload, masterKey: masterKey) else {
+            return .encryptionFailed
+        }
+        guard !assignments.isEmpty else { return .noValidFields }
+
+        // 4. Transaction: read scoped snapshot -> concurrency policy -> UPDATE.
+        let db = try Connection(readWritePath: path)
+        try db.assertPatientsSchema()
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            let snapshot = try selectScopedSnapshot(db, id: id, scope: scopeAmbulatoryId)
+            switch PatientConcurrency.evaluate(rawVersion: payload.version, recordId: id, current: snapshot) {
+            case .versionRequired:
+                try db.execute("ROLLBACK"); return .versionRequired
+            case .notFound:
+                try db.execute("ROLLBACK"); return .notFound
+            case .conflict(let conflict):
+                try db.execute("ROLLBACK"); return .conflict(conflict)
+            case .ok(let nextVersion):
+                try applyPatientUpdate(db, id: id, expected: expected,
+                                       nextVersion: nextVersion, assignments: assignments, now: now)
+                if db.changes == 0 {
+                    // Raced between the snapshot read and the version-guarded UPDATE
+                    // (1:1 with the web's updateResult.changes === 0 path): re-read
+                    // the active snapshot (unscoped, like selectPatientConflictSnapshot)
+                    // and emit the conflict.
+                    let raced = try selectConflictSnapshot(db, id: id)
+                    try db.execute("ROLLBACK")
+                    return .conflict(PatientConcurrency.buildVersionConflictPayload(
+                        expectedVersion: expected, recordId: id, current: raced))
+                }
+                try db.execute("COMMIT")
+                return .updated(version: nextVersion)
+            }
+        } catch {
+            try? db.execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    /// The set of logical field names present in the patch (for the write boundary).
+    private func presentPatientFields(_ p: HomeBasePatientUpdatePayload) -> Set<String> {
+        var fields = Set<String>()
+        if p.firstName != nil { fields.insert("firstName") }
+        if p.lastName != nil { fields.insert("lastName") }
+        if p.taxCode != nil { fields.insert("taxCode") }
+        if p.isAdi != nil { fields.insert("isAdi") }
+        if p.isArchived != nil { fields.insert("isArchived") }
+        let patches: [(String, PatchValue<String>)] = [
+            ("address", p.address), ("phone", p.phone), ("caregiver", p.caregiver),
+            ("notes", p.notes), ("monitoringProfile", p.monitoringProfile),
+            ("statusReason", p.statusReason), ("diagnoses", p.diagnoses),
+        ]
+        for (name, value) in patches {
+            if case .omit = value { continue }
+            fields.insert(name)
+        }
+        return fields
+    }
+
+    /// Build the (column, sealed-bind) assignments for the SET clause, excluding the
+    /// always-set version/updated_at. Returns nil if any ENCRYPTED_FIELD fails to
+    /// seal; an empty array means "No valid fields to update".
+    private func buildPatientUpdateAssignments(
+        _ p: HomeBasePatientUpdatePayload, masterKey: SymmetricKey
+    ) -> [(column: String, bind: Bind)]? {
+        var out: [(column: String, bind: Bind)] = []
+        // Plaintext scalar columns (web: typeof === 'string'/'boolean' -> set, else skip).
+        if let v = p.firstName { out.append(("first_name", .text(v))) }
+        if let v = p.lastName { out.append(("last_name", .text(v))) }
+        if let v = p.taxCode { out.append(("tax_code", .text(v))) }
+        if let v = p.isAdi { out.append(("is_adi", .int(v ? 1 : 0))) }
+        if let v = p.isArchived { out.append(("is_archived", .int(v ? 1 : 0))) }
+        // monitoring_profile is NOT an ENCRYPTED_FIELD (lib/db.ts): stored plaintext.
+        appendPlain(&out, "monitoring_profile", p.monitoringProfile)
+        // ENCRYPTED string fields: JSON.stringify(value) then AES-GCM (seal).
+        guard appendSealedString(&out, "address", p.address, masterKey),
+              appendSealedString(&out, "phone", p.phone, masterKey),
+              appendSealedString(&out, "caregiver", p.caregiver, masterKey),
+              appendSealedString(&out, "notes", p.notes, masterKey),
+              appendSealedString(&out, "status_reason", p.statusReason, masterKey)
+        else { return nil }
+        // diagnoses is a STRUCTURED ENCRYPTED field: the plaintext is the array JSON
+        // itself (NOT JSON.stringify'd again, unlike a string field), so the array
+        // JSON string is encrypted directly. See PatientFieldCrypto.decryptStructuredField.
+        guard appendSealedStructured(&out, "diagnoses", p.diagnoses, masterKey) else { return nil }
+        return out
+    }
+
+    private func appendPlain(_ out: inout [(column: String, bind: Bind)], _ column: String, _ value: PatchValue<String>) {
+        switch value {
+        case .omit: break
+        case .null: out.append((column, .null))
+        case .value(let v): out.append((column, .text(v)))
+        }
+    }
+
+    private func appendSealedString(
+        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ value: PatchValue<String>, _ key: SymmetricKey
+    ) -> Bool {
+        switch value {
+        case .omit: return true
+        case .null: out.append((column, .null)); return true
+        case .value(let v):
+            guard case .sealed(let enc?) = CryptoService.seal(v, masterKey: key) else { return false }
+            out.append((column, .text(enc)))
+            return true
+        }
+    }
+
+    private func appendSealedStructured(
+        _ out: inout [(column: String, bind: Bind)], _ column: String,
+        _ value: PatchValue<String>, _ key: SymmetricKey
+    ) -> Bool {
+        switch value {
+        case .omit: return true
+        case .null: out.append((column, .null)); return true
+        case .value(let json):
+            guard let enc = CryptoService.encryptField(json, masterKey: key) else { return false }
+            out.append((column, .text(enc)))
+            return true
+        }
+    }
+
+    private func applyPatientUpdate(
+        _ db: Connection, id: String, expected: Int, nextVersion: Int,
+        assignments: [(column: String, bind: Bind)], now: Date
+    ) throws {
+        var columns = assignments
+        columns.append(("version", .int(nextVersion)))
+        // updated_at is stored as unixepoch SECONDS (drizzle timestamp mode), the
+        // same unit listPatients/loadPatientDetail read back.
+        columns.append(("updated_at", .int(Int(now.timeIntervalSince1970))))
+        let setClause = columns.map { "\($0.column) = ?" }.joined(separator: ", ")
+        // The UPDATE is version-guarded + active-only (not scope-joined): scope was
+        // already enforced by selectScopedSnapshot, exactly like the web.
+        let sql = "UPDATE patients SET \(setClause) WHERE id = ? AND version = ? AND deleted_at IS NULL"
+        let binds = columns.map { $0.bind } + [.text(id), .int(expected)]
+        _ = try db.run(sql, bind: binds) { _ in 0 }  // an UPDATE yields no rows
+    }
+
+    private func selectScopedSnapshot(
+        _ db: Connection, id: String, scope: String
+    ) throws -> PatientConcurrency.ConflictSource? {
+        let sql = """
+        SELECT id, version, updated_at, is_archived FROM patients
+        WHERE id = ? AND ambulatory_id = ? AND deleted_at IS NULL
+        """
+        return try db.run(sql, bind: [.text(id), .text(scope)]) { row in
+            PatientConcurrency.ConflictSource(
+                id: row.text(0) ?? "", version: row.int(1) ?? 1,
+                updatedAt: row.date(2), isArchived: row.bool(3))
+        }.first
+    }
+
+    private func selectConflictSnapshot(
+        _ db: Connection, id: String
+    ) throws -> PatientConcurrency.ConflictSource? {
+        let sql = "SELECT id, version, updated_at, is_archived FROM patients WHERE id = ? AND deleted_at IS NULL"
+        return try db.run(sql, bind: [.text(id)]) { row in
+            PatientConcurrency.ConflictSource(
+                id: row.text(0) ?? "", version: row.int(1) ?? 1,
+                updatedAt: row.date(2), isArchived: row.bool(3))
+        }.first
+    }
+
+    // MARK: Minimal SQLite wrapper (confined here)
 
     private final class Connection {
         private let handle: OpaquePointer
         private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-        init(readOnlyPath: String) throws {
+        private init(path: String, flags: Int32) throws {
             var db: OpaquePointer?
-            let rc = sqlite3_open_v2(readOnlyPath, &db, SQLITE_OPEN_READONLY, nil)
+            let rc = sqlite3_open_v2(path, &db, flags, nil)
             guard rc == SQLITE_OK, let db else {
                 if let db { sqlite3_close(db) }
-                throw StoreError.cannotOpen("sqlite3_open_v2 rc=\(rc) for \(readOnlyPath)")
+                throw StoreError.cannotOpen("sqlite3_open_v2 rc=\(rc) for \(path)")
             }
             handle = db
         }
 
+        convenience init(readOnlyPath: String) throws {
+            try self.init(path: readOnlyPath, flags: SQLITE_OPEN_READONLY)
+        }
+
+        convenience init(readWritePath: String) throws {
+            try self.init(path: readWritePath, flags: SQLITE_OPEN_READWRITE)
+        }
+
         deinit { sqlite3_close(handle) }
 
-        /// Fail-fast schema guard: the patients table must carry the columns the
-        /// store reads. The native never migrates the web's schema.
+        /// Rows changed by the most recent statement on this connection.
+        var changes: Int { Int(sqlite3_changes(handle)) }
+
+        /// Run a non-query statement (BEGIN/COMMIT/ROLLBACK).
+        func execute(_ sql: String) throws {
+            var errorMessage: UnsafeMutablePointer<CChar>?
+            let rc = sqlite3_exec(handle, sql, nil, nil, &errorMessage)
+            guard rc == SQLITE_OK else {
+                let message = errorMessage.map { String(cString: $0) } ?? String(cString: sqlite3_errmsg(handle))
+                sqlite3_free(errorMessage)
+                throw StoreError.query(message)
+            }
+        }
+
+        /// Fail-fast schema guard: the patients table must carry every column the
+        /// store reads OR writes. The native never migrates the web's schema.
         func assertPatientsSchema() throws {
             let required = ["id", "first_name", "last_name", "tax_code", "version", "deleted_at",
-                            "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at"]
+                            "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
+                            "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
+                            "ambulatory_id"]
             var present = Set<String>()
             _ = try run("PRAGMA table_info(patients)") { row -> Int in
                 if let name = row.text(1) { present.insert(name) }
@@ -108,14 +366,19 @@ public struct SQLitePatientStore {
             }
         }
 
-        func run<T>(_ sql: String, bind params: [String] = [], _ map: (Row) -> T) throws -> [T] {
+        func run<T>(_ sql: String, bind params: [Bind] = [], _ map: (Row) -> T) throws -> [T] {
             var stmt: OpaquePointer?
             guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
                 throw StoreError.query(String(cString: sqlite3_errmsg(handle)))
             }
             defer { sqlite3_finalize(stmt) }
             for (index, value) in params.enumerated() {
-                sqlite3_bind_text(stmt, Int32(index + 1), value, -1, Self.transient)
+                let position = Int32(index + 1)
+                switch value {
+                case .text(let string): sqlite3_bind_text(stmt, position, string, -1, Self.transient)
+                case .int(let number): sqlite3_bind_int64(stmt, position, Int64(number))
+                case .null: sqlite3_bind_null(stmt, position)
+                }
             }
             var out: [T] = []
             while true {
