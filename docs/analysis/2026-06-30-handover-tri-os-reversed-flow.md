@@ -10,12 +10,20 @@ session can continue from it. Authoritative decision = `docs/adr/0071-tri-os-rev
   binaries (macOS/Windows/Linux)**, where the **native app is the on-device
   authority** and "localhost"/Next.js demotes to a **ciphertext-only sync/archive
   peer** (the data flow reverses).
-- Done this session: ADR + **Fase 0** (crypto golden-vector gate) -> **Fase 1**
+- Done: ADR + **Fase 0** (crypto golden-vector gate) -> **Fase 1**
   (the entire platform-free surface extracted into a `MediFlowCore` Swift package)
   -> **tri-OS CI gate** -> **Fase 2 authority logic** (write-boundary +
   optimistic-concurrency, ported 1:1 from the web and adversarially parity-audited)
   -> **vendored SQLite** -> **read-only `SQLitePatientStore`** (the reversed-flow
   READ path is alive: the core opens a real `medical.db` and decrypts in-process).
+- Done (continuation, commits `8b4ac6949` + `73ac01e43`): the reversed-flow
+  **patient WRITE path** is alive. `SQLitePatientStore.updatePatient` runs the pure
+  authority fns inside a `BEGIN IMMEDIATE` transaction, seals the ENCRYPTED_FIELDS
+  in-core (string vs structured crypto convention respected), applies a
+  version-guarded UPDATE, and returns 1:1-with-web outcomes (400/403/404/409/200).
+  The **409 conflict-payload encode parity** (old watch-item) is closed: custom
+  `Encodable` with explicit nulls + entity-specific snapshot. 8 write tests + 4
+  encode tests added.
 - `MediFlowCore` imports only `Foundation` + `Crypto` (swift-crypto) +
   `MediFlowSQLiteC` (vendored SQLite); it builds in isolation and is tri-OS ready.
 - Everything is build + test + Xcode-app verified at each step.
@@ -107,6 +115,8 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+73ac01e43   native(core): 409 conflict-payload encode parity (ADR 0071 Fase 2 watch-item)
+8b4ac6949   native(core): port the patient write path to SQLitePatientStore (ADR 0071 Fase 2)
 62bd1390f   native(core): make the *Filtering enums + apply() public (fixup for fb9ea8ad0)
 6b36cdef4   native(core): read-only SQLitePatientStore over the vendored SQLite
 b50ab746c   native(core): vendor SQLite C amalgamation for the local store
@@ -125,31 +135,46 @@ e4b9a633f   feat(native): ADR 0071 + Fase 0 crypto golden-vector gate
 
 ## NEXT STEPS (in order)
 
-1. **Write path (Fase 2, the immediate next slice).** Add the transactional write
-   to `SQLitePatientStore`: `BEGIN -> read snapshot -> call the pure authority fns
-   (NetworkWriteBoundary.validate* + PatientConcurrency.evaluate) -> apply the SQL
-   update/insert/soft-delete -> bump version -> COMMIT`. The conflict policy stays
-   in the pure functions (Codex: never bury it in SQL). Reuse `CryptoService.seal`
-   to encrypt ENCRYPTED_FIELDS before writing. Port the remaining 4 sub-resource
-   concurrency builders (entry/therapy/checkup/observation) like `PatientConcurrency`.
-2. **Conflict-payload encode parity (watch-item, blocks the 409 serialization).**
-   The Fase 2 parity audit found ONE real (latent) drift, documented on
-   `VersionConflictPayload` in `APIVersionConflict.swift`: when the native authority
-   PRODUCES a 409, it must serialize like the web's `JSON.stringify` (Swift omits
-   nil optionals; the web includes explicit nulls in the "missing" state, and the
-   snapshot fields are entity-specific). Implement the custom `Encodable` then.
-3. **Fase 3 wiring.** Re-point the macOS app from the HTTP `HomeBasePatientsClient`
+DONE since this doc was written: the patient write path (NEXT STEP 1's patient
+slice) and the conflict-payload encode parity (old NEXT STEP 2). Remaining:
+
+1. **Patient create + soft-delete write paths.** `updatePatient` is in; add
+   `createPatient` (port `normalizePatientCreateInput`: version=1, createdAt/updatedAt,
+   seal ENCRYPTED_FIELDS, INSERT) and the soft-delete transition (ADR 0066:
+   set deleted_at/deletion_reason under the same version guard). Same transactional
+   shape + pure-function authority as `updatePatient`.
+2. **Sub-resource write paths (entry/therapy/checkup/observation).** Port the 4
+   concurrency builders 1:1 from `lib/{entry,therapy,checkup,observation}-concurrency.ts`
+   (the clinical snapshot is `{id, patientId, version, updatedAt, deletedAt}` - the
+   encode side already handles it), then their transactional create/update/soft-delete
+   in the store, reusing `NetworkWriteBoundary.validateSubResource`. The clinical
+   ENCRYPTED_FIELDS differ per table (see `lib/db.ts` ENCRYPTED_FIELDS) - mind the
+   string-vs-structured seal convention (entries carry `metadata`/`attachments`).
+3. **Membership-scope parity (watch-item, see below).** Replace the denormalized
+   `patients.ambulatory_id` scope check with the `patients_to_ambulatories` join +
+   port `upsertPrimaryAmbulatoryMembership`; regenerate the fixture to model that
+   table. Until then out-of-scope 404 diverges for multi-membership patients.
+4. **Fase 3 wiring.** Re-point the macOS app from the HTTP `HomeBasePatientsClient`
    to the in-process `SQLitePatientStore`; demote the Next.js data-plane to a
    signed-write ingest + ciphertext-delta pull.
-4. **Formal target split** (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
+5. **Formal target split** (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
    `MediFlowAppleUI` = SwiftUI). Deferred deliberately: it touches the 1,831-LOC
    `PairedPatientsWorkspaceModel` (Codex: leave it; highest-risk move). The core is
    already cleanly isolated, so this is reorganization, not blocking.
-5. **Schema-fingerprint test** (Codex): hash `drizzle/meta/0000_snapshot.json` +
+6. **Schema-fingerprint test** (Codex): hash `drizzle/meta/0000_snapshot.json` +
    expected columns so a stale Swift row mapping fails fast.
 
 ## OPEN ITEMS / watch-list
 
+- **Membership-scope divergence (PARITY NOTE, NEW):** `updatePatient` scopes the
+  out-of-scope 404 via the denormalized `patients.ambulatory_id` (the only model the
+  local store / fixture carries), NOT the web's `patients_to_ambulatories` join.
+  Equivalent for single-membership patients; diverges for multi-membership. Tracked
+  as NEXT STEP 3. The web's UPDATE itself is unscoped (id+version+active), already
+  matched.
+- **Encode-parity watch-item: RESOLVED** (commit `73ac01e43`). The 409
+  `VersionConflictPayload` now has a custom `Encodable` (explicit nulls +
+  entity-specific snapshot); decode unchanged.
 - **`project.pbxproj` anomaly (USER decision):** the Xcode project has an EXTERNAL,
   not-mine modification adding `MediFlowDemoTour.swift` to the UITests target, but
   that file does not exist on disk -> the UITests target would fail to build. I left
