@@ -115,6 +115,9 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+a20f5b49c   native(core): SQLiteClinicalStore update + soft-delete for the 4 sub-resources
+a1f118728   native(core): extract shared SQLiteConnection from SQLitePatientStore
+25845720f   docs: handover - patient authority complete + audited; sub-resource specs captured
 088ba3c7d   native(core): close patient-write parity gaps from the adversarial audit
 63bcdf6a9   native(core): patient create + soft-delete write paths
 9a7243ca1   native(core): generic ClinicalConcurrency for the 4 sub-resources
@@ -140,30 +143,33 @@ e4b9a633f   feat(native): ADR 0071 + Fase 0 crypto golden-vector gate
 ## NEXT STEPS (in order)
 
 DONE since this doc was written (commits above, all adversarially parity-audited by
-a 4-lens workflow): the FULL patient write authority (update + create + soft-delete),
-the conflict-payload encode parity, the generic `ClinicalConcurrency` (the 4 clinical
-builders collapsed into one), and the audit-finding fixes (unscoped soft-delete,
-exemptions+birthDate on update, wireResponse copy lock). Remaining:
+multi-lens workflows): the FULL patient write authority (update + create + soft-delete),
+the conflict-payload encode parity, the generic `ClinicalConcurrency`, the audit-finding
+fixes, the shared `SQLiteConnection` extraction, AND `SQLiteClinicalStore` update +
+soft-delete for all 4 sub-resources (entry/therapy/checkup/observation) - the clinical
+concurrency lens found ZERO drift; the field-map lens fixes (per-entity deletion_reason
+crypto, full update field coverage, observation value trim) are applied. Remaining:
 
-1. **Sub-resource STORE write paths (entry/therapy/checkup/observation).** The pure
-   `ClinicalConcurrency` + the typed Create/Update payloads + the encode side are all
-   ready; what's left is the transactional store plumbing. Recommended shape:
-   - Extract the SQLite primitives (`Connection`/`Bind`/`Row`/`StoreError`) out of
-     SQLitePatientStore into a shared internal `SQLiteConnection.swift` (StoreError is
-     NOT referenced outside that file, so this is a safe move); generalize
-     `assertPatientsSchema` to `assertSchema(table:requiredColumns:)`.
-   - Add a `SQLiteClinicalStore` with a generic version-guarded-update skeleton (BEGIN
-     IMMEDIATE -> clinical snapshot -> `ClinicalConcurrency.evaluate` -> UPDATE ->
-     changes==0 raced -> COMMIT) + per-entity create/update assignment builders.
-     SOFT-DELETE falls out of update (the *UpdatePayload types carry deletedAt +
-     deletionReason); no separate delete method needed.
-   - Reuse `NetworkWriteBoundary.validateSubResource` (create vs update mode); seal the
-     per-table ENCRYPTED_FIELDS (see the appendix specs below; entries' metadata +
-     attachments are STRUCTURED, everything else here is string). createX also needs the
-     patient-in-scope 404 check + entry's idempotency (id match -> 200/409).
-   - Test by creating the needed table in a temp DB via the extracted SQLiteConnection
-     (@testable) - no fixture regen / Node needed. Full per-entity contracts are in the
-     "Sub-resource parity specs" appendix at the end of this doc.
+1. **Sub-resource CREATE (entry/therapy/checkup/observation).** The only piece of the
+   write authority left. `SQLiteClinicalStore` already has the connection, the sealed
+   AssignmentBuilder, the boundary + scope helpers, and the typed `HomeBase*CreatePayload`
+   types exist. Add a `createX` per entity:
+   - boundary `validateSubResource(.x, mode: .create, presentFields, attachmentsNonEmpty)`
+     (create forbids more fields than update: see NetworkWriteBoundary.forbiddenClientFields);
+   - normalize defaults from the create normalizers (entry title -> "Voce clinica",
+     checkup status -> "pending"/source -> "manual", observation codeSystem "LOINC"/
+     unitSystem "UCUM"/source "manual", therapy status -> "active"); version=1,
+     createdAt=updatedAt=now, deletedAt/deletionReason null; id = payload.id or lowercased uuid;
+   - transaction: patientIsInScope (denormalized ambulatory) else 404 -> INSERT (201).
+   - **entry idempotency** (the one tricky bit, lib/network-entry-write.ts:204-263): if the
+     client id already exists active, compare the create payload to the row; identical ->
+     200 {id, version, idempotent:true}; different content -> 409 "Network diary create id
+     already exists with different content". Comparing needs decrypting the existing row's
+     fields - decide plaintext-compare vs defer the same-payload check.
+   - entry metadata IS encrypted+structured on create (HomeBaseEntryCreatePayload.metadata):
+     resolve whether the payload carries plaintext (seal in-core) or pre-encrypted ENC:
+     (store verbatim) - see the deferred metadata note in HomeBaseEntryUpdatePayload.
+   - Test as the update tests do (copy fixture for the patient/scope, create the table).
 2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
    `patients.ambulatory_id` scope check with the `patients_to_ambulatories` join +
    port `upsertPrimaryAmbulatoryMembership`; regenerate the fixture to model that
