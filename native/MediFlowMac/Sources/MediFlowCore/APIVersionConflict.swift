@@ -12,6 +12,18 @@ import Foundation
 
 // entity is "patient" or one of the clinical sub-resources
 // (entry/therapy/checkup/observation); all five share this payload shape.
+//
+// DECODE is the only direction wired today: this decodes the home-base's 409 body,
+// and decoding is robust to present-null vs absent. ENCODE PARITY (Fase 3, when the
+// native authority PRODUCES + serializes a 409) requires custom Encodable to match
+// the web's JSON.stringify byte-for-byte, because Swift's default Encodable OMITS
+// nil optionals whereas the web includes explicit nulls:
+//   - the payload ALWAYS includes currentVersion/currentUpdatedAt/currentSnapshot
+//     (as explicit null in the "missing" state) — do NOT use encodeIfPresent there;
+//   - the snapshot is ENTITY-SPECIFIC: a patient snapshot is {id, version,
+//     updatedAt, isArchived} (omits patientId/deletedAt); a clinical snapshot is
+//     {id, patientId, version, updatedAt, deletedAt} (omits isArchived).
+// Verified by the Fase 2 adversarial parity audit (the only real-drift found).
 public struct VersionConflictPayload: Decodable, Equatable {
     public let error: String
     public let code: String
