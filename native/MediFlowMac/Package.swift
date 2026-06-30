@@ -34,7 +34,9 @@ var targets: [Target] = [
     ),
     .testTarget(
         name: "MediFlowCoreTests",
-        dependencies: ["MediFlowCore"]
+        dependencies: ["MediFlowCore"],
+        // The fixture DB + its generator are read via #filePath, not bundled.
+        exclude: ["Fixtures"]
     )
 ]
 
