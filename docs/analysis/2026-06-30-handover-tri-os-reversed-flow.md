@@ -115,6 +115,7 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+5d6e2fcb1   native: local patient WRITE authority via strict seal-or-passthrough (Fase 3 slice 3)
 8933fa8d1   native(apple): local patient READ authority behind a flag (Fase 3 slice 2)
 847dbff56   native(apple): introduce HomeBasePatientsDataSource seam (Fase 3 slice 1)
 61b2de22f   native(core): sub-resource CREATE for entry/therapy/checkup/observation
@@ -158,20 +159,25 @@ full field coverage, status canonicalization, observation trim/LOINC-UCUM canoni
 entry setting '' -> NULL) are all applied + tested (74 core tests). The READ + WRITE
 reversed-flow core is done. Remaining:
 
-1. **Fase 3 wiring (IN PROGRESS).** Slice 1 DONE (`847dbff56`): a `HomeBasePatientsDataSource`
-   seam (the model depends on `any HomeBasePatientsDataSource`, the HTTP actor conforms,
-   `makeClient()` returns the existential). Slice 2 DONE (`8933fa8d1`): `LocalPatientsDataSource`
-   (serial actor) serves patient list/detail in-process from the on-device medical.db behind
-   `MEDIFLOW_LOCAL_AUTHORITY` (off by default), delegating everything else to HTTP.
-   - **Slice 3 (next): local WRITES.** Blocked on the double-encryption decision (the model
-     PRE-SEALS write payloads for HTTP; the stores seal internally -> double-encrypt). Codex
-     consulted (use the scratchpad answer): resolve at the adapter/store boundary via
-     seal-or-passthrough (ENC: prefix -> verbatim) or a verbatim write path, WITHOUT touching
-     the model. Then route patient update (+ create/soft-delete) through the local store,
-     mapping outcomes to `HomeBaseClientError.versionConflict`.
-   - **Slice 4: local CLINICAL reads** need read/list methods on `SQLiteClinicalStore`
-     (create/update only today); until then clinical stays HTTP via the adapter's fallback.
-   - **Slice 5: demote Next.js** to a signed-write ingest + ciphertext-delta pull (the true
+1. **Fase 3 wiring (PATIENT entity DONE, flag-gated).** Slices 1-3 complete + verified;
+   with `MEDIFLOW_LOCAL_AUTHORITY` set, the app READS and WRITES patients via the
+   on-device core (zero-knowledge, no localhost), everything else still HTTP:
+   - Slice 1 (`847dbff56`): `HomeBasePatientsDataSource` seam (model depends on the
+     existential; HTTP actor conforms; `makeClient()` returns it).
+   - Slice 2 (`8933fa8d1`): `LocalPatientsDataSource` serves patient list/detail locally.
+   - Slice 3 (`5d6e2fcb1`): local patient UPDATE via STRICT seal-or-passthrough
+     (`CryptoService.sealOrPassthrough`/`encryptOrPassthrough`: verbatim ONLY for
+     authenticated ciphertext under the key, else seal; fail-closed). Resolves the
+     double-encryption landmine without touching the model. Codex-confirmed.
+   - **Slice 4 (next): local CLINICAL reads.** Add read/list methods to
+     `SQLiteClinicalStore` (create/update only today): `listEntries/Therapies/Checkups/
+     Observations(patientId:scope:masterKey:)` reading raw rows -> Summary ->
+     `ClinicalFieldCrypto.decrypt*` (reuse the model's decrypt). Then point the adapter's
+     fetchEntries/etc. local. Mirrors SQLitePatientStore.loadPatientDetail per entity.
+   - **Slice 5: local clinical/patient CREATE + soft-delete** through the adapter (the
+     stores already support them; just route + map outcomes; create/soft-delete were held
+     back from slice 3 per Codex - more parity surface).
+   - **Slice 6: demote Next.js** to a signed-write ingest + ciphertext-delta pull (the true
      reversed flow). Needs a device-owned db + sync (conflict/delta/tombstone) - the big one.
 2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
    `patients.ambulatory_id` scope check (used by every store write) with the
