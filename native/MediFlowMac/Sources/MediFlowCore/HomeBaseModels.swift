@@ -230,14 +230,22 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
     public let type: String?
     public let title: String?
     public let content: String?
+    public let date: Date?
+    public let setting: String?
     public let deletedAt: Date?
     public let deletionReason: String?
+    // NOTE: metadata (an ENCRYPTED structured field) is intentionally absent here:
+    // its update input shape (plaintext-to-seal vs pre-encrypted) is unresolved, so
+    // metadata edits stay create-only on-device. attachments is excluded by design
+    // (the web boundary rejects attachment writes).
 
     public init(
         version: Int,
         type: String? = nil,
         title: String? = nil,
         content: String? = nil,
+        date: Date? = nil,
+        setting: String? = nil,
         deletedAt: Date? = nil,
         deletionReason: String? = nil
     ) {
@@ -245,6 +253,8 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         self.type = type
         self.title = title
         self.content = content
+        self.date = date
+        self.setting = setting
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
     }
@@ -422,7 +432,11 @@ public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
 public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let drugName: String?
+    public let aic: String?
+    public let atc: String?
     public let activePrinciple: String?
+    public let diagnosisCode: String?
+    public let diagnosisName: String?
     public let dosage: String?
     public let status: String?
     public let startDate: Date?
@@ -435,7 +449,11 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     public init(
         version: Int,
         drugName: String? = nil,
+        aic: String? = nil,
+        atc: String? = nil,
         activePrinciple: String? = nil,
+        diagnosisCode: String? = nil,
+        diagnosisName: String? = nil,
         dosage: String? = nil,
         status: String? = nil,
         startDate: Date? = nil,
@@ -447,7 +465,11 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     ) {
         self.version = version
         self.drugName = drugName
+        self.aic = aic
+        self.atc = atc
         self.activePrinciple = activePrinciple
+        self.diagnosisCode = diagnosisCode
+        self.diagnosisName = diagnosisName
         self.dosage = dosage
         self.status = status
         self.startDate = startDate
@@ -461,7 +483,11 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case version
         case drugName
+        case aic
+        case atc
         case activePrinciple
+        case diagnosisCode
+        case diagnosisName
         case dosage
         case status
         case startDate
@@ -475,7 +501,11 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(version, forKey: .version)
         try container.encodeIfPresent(drugName, forKey: .drugName)
+        try container.encodeIfPresent(aic, forKey: .aic)
+        try container.encodeIfPresent(atc, forKey: .atc)
         try container.encodeIfPresent(activePrinciple, forKey: .activePrinciple)
+        try container.encodeIfPresent(diagnosisCode, forKey: .diagnosisCode)
+        try container.encodeIfPresent(diagnosisName, forKey: .diagnosisName)
         try container.encodeIfPresent(dosage, forKey: .dosage)
         try container.encodeIfPresent(status, forKey: .status)
         try container.encodeIfPresent(startDate, forKey: .startDate)
@@ -516,6 +546,7 @@ public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
     public let title: String?
     public let status: String?
     public let notes: String?
+    public let source: String?
     public let deletedAt: Date?
     public let deletionReason: String?
 
@@ -525,6 +556,7 @@ public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
         title: String? = nil,
         status: String? = nil,
         notes: String? = nil,
+        source: String? = nil,
         deletedAt: Date? = nil,
         deletionReason: String? = nil
     ) {
@@ -533,6 +565,7 @@ public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
         self.title = title
         self.status = status
         self.notes = notes
+        self.source = source
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
     }
@@ -576,33 +609,42 @@ public struct HomeBaseObservationCreatePayload: Encodable, Sendable {
 /* @Codex */
 public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
     public let version: Int
+    public let codeSystem: String?
     public let code: String?
     public let display: String?
+    public let unitSystem: String?
     public let unitCode: String?
     public let value: String?
     public let observedAt: Date?
     public let notes: String?
+    public let source: String?
     public let deletedAt: Date?
     public let deletionReason: String?
 
     public init(
         version: Int,
+        codeSystem: String? = nil,
         code: String? = nil,
         display: String? = nil,
+        unitSystem: String? = nil,
         unitCode: String? = nil,
         value: String? = nil,
         observedAt: Date? = nil,
         notes: String? = nil,
+        source: String? = nil,
         deletedAt: Date? = nil,
         deletionReason: String? = nil
     ) {
         self.version = version
+        self.codeSystem = codeSystem
         self.code = code
         self.display = display
+        self.unitSystem = unitSystem
         self.unitCode = unitCode
         self.value = value
         self.observedAt = observedAt
         self.notes = notes
+        self.source = source
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
     }

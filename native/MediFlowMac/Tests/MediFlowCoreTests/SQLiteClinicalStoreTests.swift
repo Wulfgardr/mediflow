@@ -1,0 +1,234 @@
+import XCTest
+import Crypto
+@testable import MediFlowCore
+
+/// ADR 0071 Fase 2: the clinical sub-resource WRITE authority. Tests build a writable
+/// DB by copying the patient fixture (which carries fixture-1 @ AMB-1, used by the
+/// in-scope join) and creating the sub-resource tables, then exercise the version-
+/// guarded update + soft-delete. Encrypted fields are checked decrypted AND at-rest.
+final class SQLiteClinicalStoreTests: XCTestCase {
+
+    private let masterKey = SymmetricKey(
+        data: Data(hexString: "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"))
+
+    private func fixturePath() -> String {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/medical_fixture.db")
+            .path
+    }
+
+    /// Copy the patient fixture and create the four sub-resource tables.
+    private func makeDB() throws -> (path: String, db: SQLiteConnection) {
+        let dst = NSTemporaryDirectory() + "mediflow-clinical-\(UUID().uuidString).db"
+        try? FileManager.default.removeItem(atPath: dst)
+        try FileManager.default.copyItem(atPath: fixturePath(), toPath: dst)
+        let db = try SQLiteConnection(readWritePath: dst)
+        try db.execute("""
+        CREATE TABLE entries (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, type TEXT NOT NULL,
+            title TEXT NOT NULL, date INTEGER NOT NULL, content TEXT NOT NULL, setting TEXT,
+            metadata TEXT, attachments TEXT, deleted_at INTEGER, deletion_reason TEXT,
+            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER);
+        CREATE TABLE therapies (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, drug_name TEXT NOT NULL,
+            aic TEXT, atc TEXT, active_principle TEXT, dosage TEXT NOT NULL, motivation TEXT,
+            diagnosis_code TEXT, diagnosis_name TEXT, status TEXT NOT NULL, start_date INTEGER NOT NULL,
+            end_date INTEGER, version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
+            deleted_at INTEGER, deletion_reason TEXT);
+        CREATE TABLE checkups (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, date INTEGER NOT NULL,
+            title TEXT NOT NULL, notes TEXT, status TEXT DEFAULT 'pending', source TEXT,
+            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
+            deleted_at INTEGER, deletion_reason TEXT);
+        CREATE TABLE observations (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, code_system TEXT NOT NULL,
+            code TEXT NOT NULL, display TEXT NOT NULL, unit_system TEXT NOT NULL, unit_code TEXT NOT NULL,
+            value TEXT NOT NULL, notes TEXT, observed_at INTEGER NOT NULL, source TEXT DEFAULT 'manual',
+            version INTEGER NOT NULL DEFAULT 1, created_at INTEGER, updated_at INTEGER,
+            deleted_at INTEGER, deletion_reason TEXT);
+        """)
+        return (dst, db)
+    }
+
+    /// Raw plaintext of a column for one row (no decryption).
+    private func rawText(_ db: SQLiteConnection, _ table: String, _ column: String, id: String) throws -> String? {
+        try db.run("SELECT \(column) FROM \(table) WHERE id = ?", bind: [.text(id)]) { $0.text(0) }.first ?? nil
+    }
+
+    private func intCol(_ db: SQLiteConnection, _ table: String, _ column: String, id: String) throws -> Int? {
+        try db.run("SELECT \(column) FROM \(table) WHERE id = ?", bind: [.text(id)]) { $0.int(0) }.first ?? nil
+    }
+
+    // MARK: Checkup (notes-only encrypted) — the representative happy + edge paths
+
+    func testUpdateCheckupSetsFieldsSealsNotesAndBumpsVersion() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO checkups (id, patient_id, date, title, status, version) VALUES ('c1', 'fixture-1', 1750000000, 'Controllo', 'pending', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        let payload = HomeBaseCheckupUpdatePayload(
+            version: 1, title: "Visita", status: "completed", notes: "Tutto regolare", source: "manual")
+        XCTAssertEqual(
+            try store.updateCheckup(id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try intCol(reader, "checkups", "version", id: "c1"), 2)
+        XCTAssertEqual(try rawText(reader, "checkups", "title", id: "c1"), "Visita")   // title plaintext
+        XCTAssertEqual(try rawText(reader, "checkups", "status", id: "c1"), "completed")
+        XCTAssertEqual(try rawText(reader, "checkups", "source", id: "c1"), "manual")
+        // notes is ENCRYPTED: ENC at rest, decrypts to the plaintext.
+        let rawNotes = try XCTUnwrap(try rawText(reader, "checkups", "notes", id: "c1"))
+        XCTAssertTrue(rawNotes.hasPrefix("ENC:"))
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawNotes, masterKey: masterKey), "Tutto regolare")
+    }
+
+    func testUpdateCheckupVersionMismatchConflicts() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO checkups (id, patient_id, date, title, status, version) VALUES ('c1', 'fixture-1', 1750000000, 'Controllo', 'pending', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        guard case .conflict(let conflict) = try store.updateCheckup(
+            id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: HomeBaseCheckupUpdatePayload(version: 99, title: "X"), masterKey: masterKey) else {
+            return XCTFail("expected conflict")
+        }
+        XCTAssertEqual(conflict.entity, "checkup")
+        XCTAssertEqual(conflict.currentVersion, 1)
+        XCTAssertEqual(conflict.currentSnapshot?.patientId, "fixture-1")
+        XCTAssertNil(conflict.currentSnapshot?.isArchived)  // clinical snapshot shape
+    }
+
+    func testUpdateCheckupOutOfScopeAndMissingReturnNotFound() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO checkups (id, patient_id, date, title, status, version) VALUES ('c1', 'fixture-1', 1750000000, 'Controllo', 'pending', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        XCTAssertEqual(
+            try store.updateCheckup(id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-OTHER",
+                                    payload: HomeBaseCheckupUpdatePayload(version: 1, title: "X"), masterKey: masterKey),
+            .notFound)
+        XCTAssertEqual(
+            try store.updateCheckup(id: "ghost", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: HomeBaseCheckupUpdatePayload(version: 1, title: "X"), masterKey: masterKey),
+            .notFound)
+    }
+
+    func testUpdateCheckupVersionRequiredAndNoValidFields() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO checkups (id, patient_id, date, title, status, version) VALUES ('c1', 'fixture-1', 1750000000, 'Controllo', 'pending', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        XCTAssertEqual(
+            try store.updateCheckup(id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: HomeBaseCheckupUpdatePayload(version: 0, title: "X"), masterKey: masterKey),
+            .versionRequired)
+        XCTAssertEqual(
+            try store.updateCheckup(id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: HomeBaseCheckupUpdatePayload(version: 1), masterKey: masterKey),
+            .noValidFields)
+    }
+
+    func testUpdateCheckupSoftDeleteSetsTombstoneAndSealsReason() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO checkups (id, patient_id, date, title, status, version) VALUES ('c1', 'fixture-1', 1750000000, 'Controllo', 'pending', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        let when = Date(timeIntervalSince1970: 1751000000)
+        let payload = HomeBaseCheckupUpdatePayload(version: 1, deletedAt: when, deletionReason: "obsolete")
+        XCTAssertEqual(
+            try store.updateCheckup(id: "c1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try intCol(reader, "checkups", "deleted_at", id: "c1"), 1751000000)
+        // checkups: deletion_reason is NOT in ENCRYPTED_FIELDS -> stored plaintext.
+        XCTAssertEqual(try rawText(reader, "checkups", "deletion_reason", id: "c1"), "obsolete")
+    }
+
+    // MARK: Entry / therapy / observation — per-entity crypto coverage
+
+    func testUpdateEntrySealsTitleAndContent() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO entries (id, patient_id, type, title, date, content, version) VALUES ('e1', 'fixture-1', 'note', 'seed', 1750000000, 'seed', 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        let when = Date(timeIntervalSince1970: 1751500000)
+        let payload = HomeBaseEntryUpdatePayload(
+            version: 1, title: "Diario", content: "Paziente stabile", date: when, setting: "home")
+        XCTAssertEqual(
+            try store.updateEntry(id: "e1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                  payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        for (column, expected) in [("title", "Diario"), ("content", "Paziente stabile")] {
+            let raw = try XCTUnwrap(try rawText(reader, "entries", column, id: "e1"))
+            XCTAssertTrue(raw.hasPrefix("ENC:"), "\(column) must be ENC at rest")
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(raw, masterKey: masterKey), expected)
+        }
+        XCTAssertEqual(try rawText(reader, "entries", "setting", id: "e1"), "home")   // plaintext
+        XCTAssertEqual(try intCol(reader, "entries", "date", id: "e1"), 1751500000)
+    }
+
+    func testUpdateTherapySealsMotivationAndSetsEndDate() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO therapies (id, patient_id, drug_name, dosage, status, start_date, version) VALUES ('t1', 'fixture-1', 'ASA', '100mg', 'active', 1750000000, 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        let end = Date(timeIntervalSince1970: 1752000000)
+        let payload = HomeBaseTherapyUpdatePayload(
+            version: 1, aic: "012345", diagnosisCode: "I10", dosage: "75mg",
+            endDate: end, motivation: "tapering")
+        XCTAssertEqual(
+            try store.updateTherapy(id: "t1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                    payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try rawText(reader, "therapies", "dosage", id: "t1"), "75mg")  // plaintext
+        XCTAssertEqual(try rawText(reader, "therapies", "aic", id: "t1"), "012345")
+        XCTAssertEqual(try rawText(reader, "therapies", "diagnosis_code", id: "t1"), "I10")
+        XCTAssertEqual(try intCol(reader, "therapies", "end_date", id: "t1"), 1752000000)
+        let rawMot = try XCTUnwrap(try rawText(reader, "therapies", "motivation", id: "t1"))
+        XCTAssertTrue(rawMot.hasPrefix("ENC:"))
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawMot, masterKey: masterKey), "tapering")
+    }
+
+    func testUpdateObservationSetsValuePlaintextAndSealsNotes() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at, version) VALUES ('o1', 'fixture-1', 'LOINC', '8480-6', 'Systolic', 'UCUM', 'mm[Hg]', '120', 1750000000, 1)")
+        let store = SQLiteClinicalStore(path: path)
+
+        let payload = HomeBaseObservationUpdatePayload(
+            version: 1, value: "  130  ", observedAt: nil, notes: "post-prandiale", source: "manual")
+        XCTAssertEqual(
+            try store.updateObservation(id: "o1", patientId: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                                        payload: payload, masterKey: masterKey),
+            .updated(version: 2))
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        XCTAssertEqual(try rawText(reader, "observations", "value", id: "o1"), "130")  // plaintext + trimmed
+        XCTAssertEqual(try rawText(reader, "observations", "source", id: "o1"), "manual")
+        let rawNotes = try XCTUnwrap(try rawText(reader, "observations", "notes", id: "o1"))
+        XCTAssertTrue(rawNotes.hasPrefix("ENC:"))
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(rawNotes, masterKey: masterKey), "post-prandiale")
+    }
+}
+
+private extension Data {
+    init(hexString: String) {
+        var data = Data(capacity: hexString.count / 2)
+        var index = hexString.startIndex
+        while index < hexString.endIndex {
+            let next = hexString.index(index, offsetBy: 2)
+            data.append(UInt8(hexString[index..<next], radix: 16)!)
+            index = next
+        }
+        self = data
+    }
+}
