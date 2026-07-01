@@ -365,17 +365,37 @@ struct PairedPatientsWorkspaceView: View {
                     } label: {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("\(patient.lastName) \(patient.firstName)")
-                                    .font(.subheadline.weight(.semibold))
-                                Text(patient.taxCode)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 6) {
+                                    Text("\(patient.lastName) \(patient.firstName)")
+                                        .font(.subheadline.weight(.semibold))
+                                    if patient.isAdi == true { flagChip("ADI", tone: .info) }
+                                    if patient.isArchived == true { flagChip("Archiviato", tone: .neutral) }
+                                }
+                                HStack(spacing: 6) {
+                                    Text(patient.taxCode)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    if let age = Self.age(from: patient.birthDate) {
+                                        Text("· \(age) anni")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .accessibilityIdentifier("patient-cell-age-\(patient.id)")
+                                    }
+                                }
                             }
                             Spacer(minLength: 8)
-                            if model.selectedPatient?.id == patient.id {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tint)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                if let updated = patient.updatedAt {
+                                    Text(Self.relativeUpdated(updated))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                        .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
+                                }
+                                if model.selectedPatient?.id == patient.id {
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.tint)
+                                }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -698,6 +718,26 @@ struct PairedPatientsWorkspaceView: View {
         formatter.timeStyle = .none
         return formatter
     }()
+
+    // Age in whole years from a birth date; nil when absent or implausible.
+    static func age(from birthDate: Date?) -> Int? {
+        guard let birthDate else { return nil }
+        let years = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year
+        guard let years, years >= 0, years < 140 else { return nil }
+        return years
+    }
+
+    private static let relativeUpdatedFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "it_IT")
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+
+    // Relative "aggiornato" label (e.g. "2 h fa", "ieri") in Italian.
+    static func relativeUpdated(_ date: Date) -> String {
+        relativeUpdatedFormatter.localizedString(for: date, relativeTo: Date())
+    }
 
     private var diarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
