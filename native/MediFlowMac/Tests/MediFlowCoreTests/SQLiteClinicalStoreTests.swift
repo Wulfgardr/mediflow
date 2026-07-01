@@ -382,6 +382,23 @@ final class SQLiteClinicalStoreTests: XCTestCase {
         XCTAssertEqual(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey, limit: 2).count, 2)
     }
 
+    /// Clinical scope also uses the patients_to_ambulatories membership: an entry whose
+    /// patient is a member of AMB-2 (in addition to the primary AMB-1) is listable when
+    /// scoped to AMB-2. Also proves createEntry's patientIsInScope uses the membership.
+    func testListEntriesScopeUsesMembership() throws {
+        let (path, seed) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try seed.execute("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('fixture-1', 'AMB-2')")
+        let store = SQLiteClinicalStore(path: path)
+        // createEntry via the AMB-2 membership succeeds (patient-in-scope by membership).
+        _ = try store.createEntry(
+            HomeBaseEntryCreatePayload(id: "e1", type: "note", date: Date(), content: "x"),
+            patientId: "fixture-1", scopeAmbulatoryId: "AMB-2", masterKey: masterKey)
+
+        XCTAssertEqual(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-2", masterKey: masterKey).map(\.id), ["e1"])
+        XCTAssertEqual(try store.listEntries(patientId: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey).map(\.id), ["e1"])
+    }
+
     func testListTherapiesOrdersByStartDateDescAndDecryptsMotivation() throws {
         let (path, _) = try makeDB()
         defer { try? FileManager.default.removeItem(atPath: path) }

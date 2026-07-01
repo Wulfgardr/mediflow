@@ -92,6 +92,17 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         }
     }
 
+    func testFetchPatientOutOfScopeMaps404() async throws {
+        do {
+            // fixture-1 exists but is not a member of AMB-OTHER -> membership scope 404.
+            _ = try await makeSource().fetchPatient(
+                id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-OTHER")
+            XCTFail("expected a 404")
+        } catch let HomeBaseClientError.httpStatus(code, _) {
+            XCTAssertEqual(code, 404)
+        }
+    }
+
     // MARK: Local writes (Fase 3 slice 3) — on a writable fixture copy
 
     private func writableFixtureCopy() throws -> String {

@@ -41,8 +41,10 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         id: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
         // loadPatientDetail decrypts the ENCRYPTED_FIELDS in-core; the model's later
-        // decryptDetail is a benign no-op (already-plaintext passes through).
-        guard let detail = try patientStore.loadPatientDetail(id: id, masterKey: masterKey) else {
+        // decryptDetail is a benign no-op (already-plaintext passes through). Scoped by
+        // the membership when present (1:1 with getNetworkScopedPatient's 404).
+        let scope = ambulatoryId?.isEmpty == false ? ambulatoryId : nil
+        guard let detail = try patientStore.loadPatientDetail(id: id, scopeAmbulatoryId: scope, masterKey: masterKey) else {
             throw HomeBaseClientError.httpStatus(404, "Not found")  // 1:1 with the HTTP 404
         }
         return detail

@@ -89,6 +89,18 @@ const cols = Object.keys(patient);
 db.prepare(`INSERT INTO patients (${cols.map((c) => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
     .run(...cols.map((c) => patient[c]));
 
+// ADR 0071 membership-scope parity: the web scopes every read/write via the
+// patients_to_ambulatories join table (WUL-309), not the denormalized
+// patients.ambulatory_id. Seed fixture-1's membership in AMB-1 (matching its
+// denormalized column) so the store's membership-join scope checks find it.
+db.exec(`CREATE TABLE "patients_to_ambulatories" (
+    \`patient_id\` text NOT NULL, \`ambulatory_id\` text NOT NULL,
+    \`assigned_at\` integer DEFAULT (unixepoch()),
+    PRIMARY KEY(\`patient_id\`, \`ambulatory_id\`)
+);`);
+db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at) VALUES (?, ?, ?)')
+    .run('fixture-1', 'AMB-1', 1750000000);
+
 // ADR 0071 Fase 3 slice 4: one row per clinical sub-resource, sealed under the same
 // golden-vector master key, so SQLiteClinicalStore list-read tests (both the core
 // target and the AppleShared adapter, which cannot construct tables itself - the

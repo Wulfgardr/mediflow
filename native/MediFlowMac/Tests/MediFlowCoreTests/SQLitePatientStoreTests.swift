@@ -57,6 +57,13 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNil(try store.loadPatientDetail(id: "does-not-exist", masterKey: masterKey))
     }
 
+    func testLoadPatientDetailScopedByMembership() throws {
+        let store = SQLitePatientStore(path: fixturePath())  // fixture-1 is a member of AMB-1
+        XCTAssertNotNil(try store.loadPatientDetail(id: "fixture-1", scopeAmbulatoryId: "AMB-1", masterKey: masterKey))
+        // Out-of-scope detail is 404-equivalent (nil), 1:1 with getNetworkScopedPatient.
+        XCTAssertNil(try store.loadPatientDetail(id: "fixture-1", scopeAmbulatoryId: "AMB-OTHER", masterKey: masterKey))
+    }
+
     func testListPatientsScopedByAmbulatory() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -70,6 +77,22 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-1").map(\.id), ["fixture-1"])
         XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-2").map(\.id), ["p2"])
         XCTAssertTrue(try store.listPatients(scopeAmbulatoryId: "AMB-NONE").isEmpty)
+    }
+
+    /// Proves the scope join uses patients_to_ambulatories, NOT the denormalized
+    /// patients.ambulatory_id: a MULTI-membership patient (primary AMB-1, also a
+    /// member of AMB-2) is found when scoped to AMB-2, which the denormalized column
+    /// alone cannot express.
+    func testListPatientsScopeUsesMembershipNotDenormalizedColumn() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        // fixture-1's denormalized ambulatory_id is AMB-1; add an extra AMB-2 membership.
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.execute("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('fixture-1', 'AMB-2')")
+
+        XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-2").map(\.id), ["fixture-1"])
+        XCTAssertEqual(try store.listPatients(scopeAmbulatoryId: "AMB-1").map(\.id), ["fixture-1"])
     }
 
     // MARK: Write path (reversed flow: the core is the on-device write authority)

@@ -75,10 +75,15 @@ public struct SQLitePatientStore {
     public func listPatients(scopeAmbulatoryId: String? = nil) throws -> [HomeBasePatientSummary] {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
-        let scopeClause = scopeAmbulatoryId == nil ? "" : "AND ambulatory_id = ? "
+        // Scope via the patients_to_ambulatories membership join (1:1 with the web,
+        // lib/network-patient-read.ts) - a patient can belong to more than one
+        // ambulatory, and the denormalized patients.ambulatory_id only holds the
+        // primary; unscoped lists every active patient.
+        let scopeJoin = scopeAmbulatoryId == nil ? "" :
+            "JOIN patients_to_ambulatories pa ON p.id = pa.patient_id AND pa.ambulatory_id = ? "
         let sql = """
-        SELECT id, first_name, last_name, tax_code, birth_date, is_adi, is_archived, version, updated_at
-        FROM patients WHERE deleted_at IS NULL \(scopeClause)ORDER BY updated_at DESC
+        SELECT p.id, p.first_name, p.last_name, p.tax_code, p.birth_date, p.is_adi, p.is_archived, p.version, p.updated_at
+        FROM patients p \(scopeJoin)WHERE p.deleted_at IS NULL ORDER BY p.updated_at DESC
         """
         let binds: [SQLiteBind] = scopeAmbulatoryId.map { [.text($0)] } ?? []
         return try db.run(sql, bind: binds) { row in
@@ -96,18 +101,25 @@ public struct SQLitePatientStore {
     }
 
     /// One patient's full detail with the ENCRYPTED_FIELDS decrypted by the operator
-    /// master key. nil when the id is absent (or soft-deleted). Reuses
-    /// PatientFieldCrypto so decryption stays byte-identical with the web.
-    public func loadPatientDetail(id: String, masterKey: SymmetricKey) throws -> HomeBasePatientDetail? {
+    /// master key. nil when the id is absent, soft-deleted, or (when a scope is given)
+    /// the patient is not a member of it - 1:1 with getNetworkScopedPatient's membership
+    /// scope. Reuses PatientFieldCrypto so decryption stays byte-identical with the web.
+    public func loadPatientDetail(
+        id: String, scopeAmbulatoryId: String? = nil, masterKey: SymmetricKey
+    ) throws -> HomeBasePatientDetail? {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
+        let scopeClause = scopeAmbulatoryId == nil ? "" :
+            "AND id IN (SELECT patient_id FROM patients_to_ambulatories WHERE ambulatory_id = ?) "
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, address, phone, caregiver, notes,
                ai_summary, is_adi, is_archived, ambulatory_id, created_at, updated_at, document_insights,
                exemptions, diagnoses, monitoring_profile, status_reason, version
-        FROM patients WHERE id = ? AND deleted_at IS NULL
+        FROM patients WHERE id = ? AND deleted_at IS NULL \(scopeClause)
         """
-        let rows = try db.run(sql, bind: [.text(id)]) { row -> HomeBasePatientDetail in
+        var binds: [SQLiteBind] = [.text(id)]
+        if let scope = scopeAmbulatoryId { binds.append(.text(scope)) }
+        let rows = try db.run(sql, bind: binds) { row -> HomeBasePatientDetail in
             // The encrypted columns are read RAW (ENC:iv:data); PatientFieldCrypto
             // decrypts them below, exactly as it does for a fetched network detail.
             HomeBasePatientDetail(
@@ -134,17 +146,12 @@ public struct SQLitePatientStore {
     /// app's plaintext patch payload; this method does the zero-knowledge sealing
     /// (the home-base only ever stores ciphertext).
     ///
-    /// PARITY NOTE (scope): the web 404s an out-of-scope patient via the
-    /// patients_to_ambulatories membership join; on-device we scope by the
-    /// denormalized patients.ambulatory_id (the only model the fixture/local store
-    /// carries today, and the column the web keeps consistent with the membership
-    /// per WUL-309). Full membership scoping + upsertPrimaryAmbulatoryMembership is
-    /// follow-up work, tracked with the sub-resource concurrency ports. Relatedly,
-    /// SETTING the primary ambulatoryId on update (WUL-309 set-primary) is also
-    /// deferred: the payload carries no ambulatoryId and the boundary is passed
-    /// .omit, because writing the denormalized column without the membership upsert
-    /// would desync the two. So the on-device update cannot change the primary
-    /// ambulatory yet.
+    /// Scope 404 is via the patients_to_ambulatories membership join, 1:1 with the web
+    /// (a patient can be in more than one ambulatory). PARITY NOTE: SETTING the primary
+    /// ambulatoryId on update (WUL-309 set-primary) is still deferred - the update
+    /// payload carries no ambulatoryId, so the boundary is passed .omit; createPatient
+    /// does upsert the membership. So the on-device update cannot change the primary
+    /// ambulatory yet (a follow-up: add ambulatoryId to the payload + upsert here too).
     public func updatePatient(
         id: String,
         scopeAmbulatoryId: String,
@@ -217,10 +224,11 @@ public struct SQLitePatientStore {
     /// createdAt=updatedAt=now, deletedAt/deletionReason/aiSummary/documentInsights
     /// null. `id` defaults to a fresh lowercased UUID (uuidv4 format).
     ///
-    /// PARITY NOTE: the web also upserts patients_to_ambulatories on create; on-device
-    /// we set only the denormalized patients.ambulatory_id (membership table deferred,
-    /// see updatePatient). notes "" collapses to null (web length>0 rule); the other
-    /// string fields store their value as-is when present.
+    /// Sets BOTH the denormalized patients.ambulatory_id AND the patients_to_ambulatories
+    /// membership row (upsertPrimaryAmbulatoryMembership, 1:1 with the web), so a locally
+    /// created patient is visible to the membership-join scope checks. Both writes run in
+    /// one transaction. notes "" collapses to null (web length>0 rule); the other string
+    /// fields store their value as-is when present.
     public func createPatient(
         _ payload: HomeBasePatientCreatePayload,
         id: String = UUID().uuidString.lowercased(),
@@ -236,8 +244,24 @@ public struct SQLitePatientStore {
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         let columns = assignments.map { $0.column }.joined(separator: ", ")
         let placeholders = assignments.map { _ in "?" }.joined(separator: ", ")
-        let sql = "INSERT INTO patients (\(columns)) VALUES (\(placeholders))"
-        _ = try db.run(sql, bind: assignments.map { $0.bind }) { _ in 0 }
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            _ = try db.run("INSERT INTO patients (\(columns)) VALUES (\(placeholders))",
+                           bind: assignments.map { $0.bind }) { _ in 0 }
+            // WUL-309 set-primary: upsert the targeted (patient, ambulatory) membership
+            // only, never touching other memberships. resolvePrimaryAmbulatoryId: a
+            // non-empty string sets it; blank/nil is a no-op.
+            if let scope = scopeAmbulatoryId, !scope.trimmingCharacters(in: .whitespaces).isEmpty {
+                _ = try db.run("""
+                INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at)
+                VALUES (?, ?, ?) ON CONFLICT DO NOTHING
+                """, bind: [.text(id), .text(scope), .int(Int(now.timeIntervalSince1970))]) { _ in 0 }
+            }
+            try db.execute("COMMIT")
+        } catch {
+            try? db.execute("ROLLBACK")
+            throw error
+        }
         return .created(id: id, version: 1)
     }
 
@@ -486,11 +510,14 @@ public struct SQLitePatientStore {
     private func selectScopedSnapshot(
         _ db: SQLiteConnection, id: String, scope: String
     ) throws -> PatientConcurrency.ConflictSource? {
+        // Scope via the membership join (1:1 with updateNetworkScopedPatient's existing
+        // check), not the denormalized patients.ambulatory_id.
         let sql = """
-        SELECT id, version, updated_at, is_archived FROM patients
-        WHERE id = ? AND ambulatory_id = ? AND deleted_at IS NULL
+        SELECT p.id, p.version, p.updated_at, p.is_archived
+        FROM patients p JOIN patients_to_ambulatories pa ON p.id = pa.patient_id AND pa.ambulatory_id = ?
+        WHERE p.id = ? AND p.deleted_at IS NULL
         """
-        return try db.run(sql, bind: [.text(id), .text(scope)]) { row in
+        return try db.run(sql, bind: [.text(scope), .text(id)]) { row in
             PatientConcurrency.ConflictSource(
                 id: row.text(0) ?? "", version: row.int(1) ?? 1,
                 updatedAt: row.date(2), isArchived: row.bool(3))

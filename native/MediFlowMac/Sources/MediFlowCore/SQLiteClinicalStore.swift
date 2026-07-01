@@ -90,8 +90,8 @@ public struct SQLiteClinicalStore {
         let sql = """
         SELECT e.id, e.patient_id, e.type, e.title, e.date, e.content, e.setting, e.metadata,
                e.attachments, e.deleted_at, e.deletion_reason, e.version, e.created_at, e.updated_at
-        FROM entries e JOIN patients p ON e.patient_id = p.id
-        WHERE e.patient_id = ? AND p.ambulatory_id = ? ORDER BY e.date DESC\(limitClause(limit))
+        FROM entries e JOIN patients_to_ambulatories pa ON e.patient_id = pa.patient_id
+        WHERE e.patient_id = ? AND pa.ambulatory_id = ? ORDER BY e.date DESC\(limitClause(limit))
         """
         let raw = try listQuery(sql, table: "entries", requiredColumns: Self.entryColumns,
                                 patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
@@ -112,8 +112,8 @@ public struct SQLiteClinicalStore {
         SELECT t.id, t.patient_id, t.drug_name, t.aic, t.atc, t.active_principle, t.dosage,
                t.motivation, t.diagnosis_code, t.diagnosis_name, t.status, t.start_date, t.end_date,
                t.version, t.created_at, t.updated_at, t.deleted_at, t.deletion_reason
-        FROM therapies t JOIN patients p ON t.patient_id = p.id
-        WHERE t.patient_id = ? AND p.ambulatory_id = ? ORDER BY t.start_date DESC\(limitClause(limit))
+        FROM therapies t JOIN patients_to_ambulatories pa ON t.patient_id = pa.patient_id
+        WHERE t.patient_id = ? AND pa.ambulatory_id = ? ORDER BY t.start_date DESC\(limitClause(limit))
         """
         let raw = try listQuery(sql, table: "therapies", requiredColumns: Self.therapyColumns,
                                 patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
@@ -135,8 +135,8 @@ public struct SQLiteClinicalStore {
         let sql = """
         SELECT c.id, c.patient_id, c.date, c.title, c.notes, c.status, c.source,
                c.version, c.created_at, c.updated_at, c.deleted_at, c.deletion_reason
-        FROM checkups c JOIN patients p ON c.patient_id = p.id
-        WHERE c.patient_id = ? AND p.ambulatory_id = ? ORDER BY c.date DESC\(limitClause(limit))
+        FROM checkups c JOIN patients_to_ambulatories pa ON c.patient_id = pa.patient_id
+        WHERE c.patient_id = ? AND pa.ambulatory_id = ? ORDER BY c.date DESC\(limitClause(limit))
         """
         let raw = try listQuery(sql, table: "checkups", requiredColumns: Self.checkupColumns,
                                 patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
@@ -157,8 +157,8 @@ public struct SQLiteClinicalStore {
         SELECT o.id, o.patient_id, o.code_system, o.code, o.display, o.unit_system, o.unit_code,
                o.value, o.notes, o.observed_at, o.source, o.version, o.created_at, o.updated_at,
                o.deleted_at, o.deletion_reason
-        FROM observations o JOIN patients p ON o.patient_id = p.id
-        WHERE o.patient_id = ? AND p.ambulatory_id = ? ORDER BY o.observed_at DESC\(limitClause(limit))
+        FROM observations o JOIN patients_to_ambulatories pa ON o.patient_id = pa.patient_id
+        WHERE o.patient_id = ? AND pa.ambulatory_id = ? ORDER BY o.observed_at DESC\(limitClause(limit))
         """
         let raw = try listQuery(sql, table: "observations", requiredColumns: Self.observationColumns,
                                 patientId: patientId, scope: scopeAmbulatoryId, limit: limit) { row in
@@ -406,10 +406,11 @@ public struct SQLiteClinicalStore {
         }
     }
 
-    /// The entity's patient must be in the ambulatory scope (web: patientsToAmbulatories
-    /// membership; on-device: the denormalized patients.ambulatory_id, same deferral).
+    /// The entity's patient must be in the ambulatory scope, checked via the
+    /// patients_to_ambulatories membership (1:1 with the web's patientIsInScope), not
+    /// the denormalized patients.ambulatory_id.
     private func patientIsInScope(_ db: SQLiteConnection, patientId: String, scope: String) throws -> Bool {
-        try !db.run("SELECT 1 FROM patients WHERE id = ? AND ambulatory_id = ?",
+        try !db.run("SELECT 1 FROM patients_to_ambulatories WHERE patient_id = ? AND ambulatory_id = ?",
                     bind: [.text(patientId), .text(scope)]) { _ in true }.isEmpty
     }
 
@@ -521,8 +522,8 @@ public struct SQLiteClinicalStore {
     ) throws -> ClinicalConcurrency.ConflictSource? {
         let sql = """
         SELECT t.id, t.patient_id, t.version, t.updated_at, t.deleted_at
-        FROM \(table) t JOIN patients p ON t.patient_id = p.id
-        WHERE t.id = ? AND t.patient_id = ? AND p.ambulatory_id = ?
+        FROM \(table) t JOIN patients_to_ambulatories pa ON t.patient_id = pa.patient_id
+        WHERE t.id = ? AND t.patient_id = ? AND pa.ambulatory_id = ?
         """
         return try db.run(sql, bind: [.text(id), .text(patientId), .text(scope)]) { row in
             ClinicalConcurrency.ConflictSource(
