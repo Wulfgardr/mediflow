@@ -818,8 +818,15 @@ struct PairedPatientsWorkspaceView: View {
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-entries-button")
 
-                Button {
-                    presentingScale = ClinicalScales.adl
+                Menu {
+                    ForEach(ClinicalScales.all) { scale in
+                        Button {
+                            presentingScale = scale
+                        } label: {
+                            Text("\(scale.title) (\(scale.questions.count) domande)")
+                        }
+                        .accessibilityIdentifier("new-scale-option-\(scale.id)")
+                    }
                 } label: {
                     Label("Valutazione", systemImage: "checklist")
                         .font(.caption)

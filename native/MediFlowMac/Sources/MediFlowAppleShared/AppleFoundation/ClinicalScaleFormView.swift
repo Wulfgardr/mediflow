@@ -17,8 +17,10 @@ struct ClinicalScaleFormView: View {
         self.definition = definition
         self.onSubmit = onSubmit
         self.onCancel = onCancel
-        // Binary scales default every item to 0 (the dependent/lower option).
-        _answers = State(initialValue: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) }))
+        // Seed every item to its FIRST option value (0 for all ported scales, incl.
+        // GDS positive items whose first option is the non-depressive Si=0), so the
+        // picker shows a concrete selection and an untouched item contributes 0.
+        _answers = State(initialValue: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, $0.options.first?.value ?? 0) }))
     }
 
     private var result: ClinicalScaleResult { definition.result(from: answers) }
@@ -42,10 +44,17 @@ struct ClinicalScaleFormView: View {
                 }
                 Section("Voci") {
                     ForEach(definition.questions) { question in
-                        Toggle(question.text, isOn: Binding(
-                            get: { (answers[question.id] ?? 0) > 0 },
-                            set: { answers[question.id] = $0 ? 1 : 0 }
-                        ))
+                        // Menu picker over the question's options so 3/4-way scales
+                        // (Tinetti/MMSE) and inverted-order scales (GDS) score right.
+                        Picker(question.text, selection: Binding(
+                            get: { answers[question.id] ?? question.options.first?.value ?? 0 },
+                            set: { answers[question.id] = $0 }
+                        )) {
+                            ForEach(question.options, id: \.value) { option in
+                                Text(option.label).tag(option.value)
+                            }
+                        }
+                        .pickerStyle(.menu)
                         .accessibilityIdentifier("scale-question-\(question.id)")
                     }
                 }
