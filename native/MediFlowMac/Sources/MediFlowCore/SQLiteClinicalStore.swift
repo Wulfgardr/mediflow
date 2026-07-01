@@ -10,12 +10,10 @@ import Crypto
 // deletionReason (the web has no separate delete path; the audit event flips, which
 // the store does not model). The ENCRYPTED_FIELDS are sealed in-core.
 //
-// PARITY NOTE (scope): the web checks the row's patient is in the ambulatory via the
-// patients_to_ambulatories membership join; on-device we use the denormalized
-// patients.ambulatory_id (the same deferral as SQLitePatientStore). The clinical
-// UPDATE itself is NOT active-filtered (a soft-deleted row can still be updated),
-// matching the web. CREATE is a separate follow-up slice (per-entity defaults +
-// entry idempotency).
+// SCOPE: the row's patient must be in the ambulatory, checked via the
+// patients_to_ambulatories membership join (1:1 with the web, same as SQLitePatientStore).
+// The clinical UPDATE itself is NOT active-filtered (a soft-deleted row can still be
+// updated), matching the web.
 //
 // PAYLOAD NOTE: the typed *UpdatePayload types use plain optionals (nil = omit) for
 // the clinical fields, so the store can SET a field but cannot CLEAR it to null
@@ -80,8 +78,8 @@ public struct SQLiteClinicalStore {
 
     // MARK: Per-entity list (read), 1:1 with lib/network-{e}-read.ts listNetworkScoped*.
     // NOT active-filtered (soft-deleted rows are listed too, same as the web); scoped
-    // via the denormalized patients.ambulatory_id (same PARITY NOTE as the writes).
-    // Decrypts the ENCRYPTED_FIELDS in-core via ClinicalFieldCrypto, mirroring
+    // via the patients_to_ambulatories membership join (1:1 with the web, same as the
+    // writes). Decrypts the ENCRYPTED_FIELDS in-core via ClinicalFieldCrypto, mirroring
     // SQLitePatientStore.loadPatientDetail's decrypt-before-return shape.
 
     public func listEntries(
@@ -515,8 +513,8 @@ public struct SQLiteClinicalStore {
         }
     }
 
-    /// Existence-in-scope read: the row joined to its patient's denormalized
-    /// ambulatory (the web joins patients_to_ambulatories). nil -> 404.
+    /// Existence-in-scope read: the row joined to its patient's ambulatory via the
+    /// patients_to_ambulatories membership (1:1 with the web's {e}IsInScope). nil -> 404.
     private func selectScopedSnapshot(
         _ db: SQLiteConnection, table: String, id: String, patientId: String, scope: String
     ) throws -> ClinicalConcurrency.ConflictSource? {

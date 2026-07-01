@@ -68,10 +68,9 @@ public struct SQLitePatientStore {
     }
 
     /// Active (non-soft-deleted) patient summaries. No decryption needed: summary
-    /// columns are plaintext. `scopeAmbulatoryId` (when provided) filters by the
-    /// denormalized patients.ambulatory_id, the same scope model the write paths use
-    /// (PARITY NOTE: the web scopes via the patients_to_ambulatories membership; the
-    /// denormalized column diverges only for multi-membership patients).
+    /// columns are plaintext. `scopeAmbulatoryId` (when provided) filters via the
+    /// patients_to_ambulatories membership join (1:1 with the web's listNetworkScopedPatients,
+    /// the same scope model every store read/write uses); unscoped lists every active patient.
     public func listPatients(scopeAmbulatoryId: String? = nil) throws -> [HomeBasePatientSummary] {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)

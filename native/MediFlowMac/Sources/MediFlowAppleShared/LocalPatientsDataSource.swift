@@ -12,7 +12,7 @@ import Foundation
 // protocol at all - no web peer to wire) still DELEGATE to the HTTP `fallback`. The
 // masterKey crosses only Swift call frames inside the app process (no FFI / loopback /
 // IPC), per the KeyStore rule. Every local write/read needs a non-empty ambulatoryId
-// scope (joined against the denormalized patients.ambulatory_id); without one, the
+// scope (joined against the patients_to_ambulatories membership); without one, the
 // call falls back to HTTP (matching the web, which resolves the default scope
 // server-side - a capability the local store does not have).
 public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
@@ -33,7 +33,7 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     public func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBasePatientSummary] {
-        // Scoped by the denormalized ambulatory when present; otherwise all active.
+        // Scoped by the patients_to_ambulatories membership when present; else all active.
         try patientStore.listPatients(scopeAmbulatoryId: ambulatoryId?.isEmpty == false ? ambulatoryId : nil)
     }
 
@@ -121,7 +121,7 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     }
 
     // Local clinical reads (Fase 3 slice 4). Needs a scope to join against the
-    // denormalized patients.ambulatory_id; falls back to HTTP when none is given.
+    // patients_to_ambulatories membership; falls back to HTTP when none is given.
     public func fetchEntries(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String,
         ambulatoryId: String?, limit: Int
