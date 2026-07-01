@@ -66,10 +66,36 @@ reversible, ~+3-4 weighted. Then export FHIR (JSON) as the first advanced lever.
 ## Voices
 
 - **Claude Code (proposer):** A + C. Reach ~50% in-app; defer backend (B) to a joint item.
-- **Codex:** _(pending consult 2026-07-01)_
+- **Codex (2026-07-01, voted):** AGREE with A + C. Refinement: do the **AIFA catalog FIRST**
+  among advanced levers (public catalog data, in-house-first, lifts therapies; no PHI
+  materialization), export FHIR/PDF AFTER (it deliberately materializes plaintext clinical
+  data, so more perimeter risk). Guardrails added below. Defer B; the only B item worth
+  considering now is diary `includeDeleted` (read-only, ciphertext-preserving) as a SEPARATE
+  joint perimeter item owned by Entity B (Next.js), never smuggled into the 50% push.
 - **Gemini:** _(pending: human runs the Antigravity prompt)_
-- **Human ratification:** _(pending)_
+- **Human ratification:** _(pending; charter needs human + >=2 entity voices - 2 agree)_
+
+## Guardrails (from Codex's vote, adopted)
+
+- Export (FHIR/PDF) decrypts ONLY in-app, ONLY on explicit user action; NO PHI committed to
+  repo/logs/fixtures/screenshots or persistent temp artifacts.
+- Export is LOCAL preparation/export, NOT a certified SISS/FSE submission (claim discipline,
+  see [[claim-freeze-zero-knowledge]]).
+- AIFA bundled data carries source/version/provenance + an honest freshness story; it is a
+  lookup, NOT prescribing automation.
+- Auth in-session lock is fine as session control; PIN change/rewrap is out of scope unless
+  the backend/core key path is explicitly handled (likely a separate item).
+- No new plaintext clinical validation in Next.js after ADR 0071; any validation goes in the
+  native/core lane.
+
+## Revised recommendation (converged, 2 of 3 voices)
+
+A + C. Order of work: (1) core UI polish (observations chart, patient-list context-menu +
+lead-diagnosis, edit birthDate/gender) - solo-allowed, in-perimeter; (2) AIFA catalog
+in-house (first advanced lever, Codex); (3) export FHIR/PDF (with the plaintext-export
+guardrails above). Defer all B (backend) to a separate joint item.
 
 ## Dissent / minority report
 
-_(none yet)_
+Codex: the sole B item potentially worth doing now is diary `includeDeleted` (read-only,
+ciphertext-preserving) - but as a separate joint item, not part of A+C.
