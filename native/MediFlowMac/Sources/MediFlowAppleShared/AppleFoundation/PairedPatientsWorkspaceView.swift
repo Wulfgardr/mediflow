@@ -589,6 +589,8 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("edit-patient-notes")
             Toggle("Archiviato", isOn: $model.editPatientIsArchived)
                 .accessibilityIdentifier("edit-patient-archived")
+            Toggle("ADI (assistenza domiciliare)", isOn: $model.editPatientIsAdi)
+                .accessibilityIdentifier("edit-patient-adi")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Diagnosi")
@@ -640,6 +642,41 @@ struct PairedPatientsWorkspaceView: View {
                         Image(systemName: "plus.circle")
                     }
                     .accessibilityIdentifier("add-diagnosis-button")
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Esenzioni")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                if model.editPatientExemptions.isEmpty {
+                    Text("Nessuna esenzione")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                ForEach(model.editPatientExemptions, id: \.self) { code in
+                    HStack {
+                        Text(code)
+                            .font(.callout)
+                        Spacer(minLength: 8)
+                        Button(role: .destructive) {
+                            model.removeExemption(code)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .accessibilityIdentifier("remove-exemption-\(code)")
+                    }
+                }
+                HStack(spacing: 6) {
+                    TextField("Codice esenzione", text: $model.newExemptionCode)
+                        .accessibilityIdentifier("new-exemption-code")
+                        .frame(maxWidth: 160)
+                    Button {
+                        model.addExemption()
+                    } label: {
+                        Image(systemName: "plus.circle")
+                    }
+                    .accessibilityIdentifier("add-exemption-button")
                 }
             }
 

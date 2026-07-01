@@ -44,6 +44,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientNotes = ""
     @Published var editPatientIsArchived = false
     @Published private(set) var editPatientDiagnoses: [ClinicalDiagnosis] = []
+    @Published var editPatientIsAdi = false
+    @Published private(set) var editPatientExemptions: [String] = []
+    @Published var newExemptionCode = ""
     @Published var newDiagnosisCode = ""
     @Published var newDiagnosisDescription = ""
     @Published private(set) var isEditingPatient = false
@@ -684,7 +687,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
         editPatientIsArchived = patient.isArchived ?? false
+        editPatientIsAdi = patient.isAdi ?? false
         editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
+        editPatientExemptions = ExemptionCodesCodec.decode(patient.exemptions)
+        newExemptionCode = ""
         newDiagnosisCode = ""
         newDiagnosisDescription = ""
         isEditingPatient = true
@@ -695,6 +701,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         addDiagnosis(code: newDiagnosisCode, description: newDiagnosisDescription, system: nil)
         newDiagnosisCode = ""
         newDiagnosisDescription = ""
+    }
+
+    func addExemption() {
+        let code = ExemptionCodesCodec.normalizedCode(newExemptionCode)
+        guard !code.isEmpty, !editPatientExemptions.contains(code) else { return }
+        editPatientExemptions.append(code)
+        newExemptionCode = ""
+    }
+
+    func removeExemption(_ code: String) {
+        editPatientExemptions.removeAll { $0 == code }
     }
 
     /// A14: add a (possibly ICD-coded) diagnosis. system carries the coding system
@@ -743,12 +760,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            isAdi: editPatientIsAdi,
             isArchived: editPatientIsArchived,
             address: encryptedStringPatchValue(editPatientAddress, masterKey: masterKey),
             phone: encryptedStringPatchValue(editPatientPhone, masterKey: masterKey),
             caregiver: encryptedStringPatchValue(editPatientCaregiver, masterKey: masterKey),
             notes: encryptedStringPatchValue(editPatientNotes, masterKey: masterKey),
-            diagnoses: encryptedDiagnosesPatchValue(masterKey: masterKey)
+            diagnoses: encryptedDiagnosesPatchValue(masterKey: masterKey),
+            exemptions: encryptedExemptionsPatchValue(masterKey: masterKey)
         )
         let patientId = current.id
         await runTask {
@@ -821,6 +840,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return .value(enc)
     }
 
+    /// Seal the edited exemption codes (structured JSON array) and encrypt. An empty
+    /// list clears the field (encode returns nil -> .null), matching the diagnoses flow.
+    private func encryptedExemptionsPatchValue(masterKey: SymmetricKey) -> PatchValue<String> {
+        guard let plainJSON = ExemptionCodesCodec.encode(editPatientExemptions) else {
+            return .null
+        }
+        guard let enc = CryptoService.encryptField(plainJSON, masterKey: masterKey) else {
+            return .omit
+        }
+        return .value(enc)
+    }
+
     static func nowISODate() -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -842,14 +873,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             address: editPatientAddress.trimmedOrNil,
             phone: editPatientPhone.trimmedOrNil,
             caregiver: editPatientCaregiver.trimmedOrNil,
-            exemptions: current.exemptions,
+            exemptions: ExemptionCodesCodec.encode(editPatientExemptions),
             diagnoses: DiagnosesCodec.encode(editPatientDiagnoses, defaultDate: Self.nowISODate()),
             monitoringProfile: current.monitoringProfile,
             statusReason: current.statusReason,
             notes: editPatientNotes.trimmedOrNil,
             aiSummary: current.aiSummary,
             documentInsights: current.documentInsights,
-            isAdi: current.isAdi,
+            isAdi: editPatientIsAdi,
             isArchived: editPatientIsArchived,
             version: current.version + 1,
             ambulatoryId: current.ambulatoryId,
