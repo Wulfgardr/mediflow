@@ -49,6 +49,9 @@ struct PairedPatientsWorkspaceView: View {
                 onCancel: { presentingScale = nil }
             )
         }
+        .sheet(isPresented: $model.isCreatingPatient) {
+            createPatientForm
+        }
         .confirmationDialog(
             "Annullare questa voce diario?",
             isPresented: $confirmsDeletingEntry,
@@ -344,6 +347,14 @@ struct PairedPatientsWorkspaceView: View {
         if let presentation = model.conflictPresentation {
             conflictBanner(presentation)
         }
+        Button {
+            model.startCreatingPatient()
+        } label: {
+            Label("Nuovo paziente", systemImage: "person.badge.plus")
+        }
+        .font(.caption)
+        .disabled(model.isWorking)
+        .accessibilityIdentifier("new-patient-button")
         if model.isWorking && model.patients.isEmpty {
             ProgressView()
         } else if model.patients.isEmpty {
@@ -418,6 +429,50 @@ struct PairedPatientsWorkspaceView: View {
 
     private var filteredDiaryEntries: [HomeBaseEntrySummary] {
         EntryFiltering.apply(model.entries, filter: entryTypeFilter)
+    }
+
+    private var createPatientForm: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Nome", text: $model.newPatientFirstName)
+                        .accessibilityIdentifier("new-patient-first-name")
+                    TextField("Cognome", text: $model.newPatientLastName)
+                        .accessibilityIdentifier("new-patient-last-name")
+                    TextField("Codice fiscale", text: $model.newPatientTaxCode)
+                        .accessibilityIdentifier("new-patient-tax-code")
+                }
+                Section {
+                    Toggle("Data di nascita", isOn: $model.newPatientHasBirthDate)
+                        .accessibilityIdentifier("new-patient-has-birth-date")
+                    if model.newPatientHasBirthDate {
+                        DatePicker("Nascita", selection: $model.newPatientBirthDate, displayedComponents: .date)
+                            .accessibilityIdentifier("new-patient-birth-date")
+                    }
+                    TextField("Indirizzo (opzionale)", text: $model.newPatientAddress)
+                        .accessibilityIdentifier("new-patient-address")
+                    TextField("Telefono (opzionale)", text: $model.newPatientPhone)
+                        .accessibilityIdentifier("new-patient-phone")
+                    TextField("Caregiver (opzionale)", text: $model.newPatientCaregiver)
+                        .accessibilityIdentifier("new-patient-caregiver")
+                }
+                Text("Creazione on-device (autorita locale). Richiede il PIN operatore per cifrare i campi.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .navigationTitle("Nuovo paziente")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annulla") { model.cancelCreatingPatient() }
+                        .accessibilityIdentifier("cancel-new-patient-button")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Crea") { Task { await model.createPatient() } }
+                        .disabled(!model.canCreatePatient)
+                        .accessibilityIdentifier("create-patient-button")
+                }
+            }
+        }
     }
 
     private var patientSearchControls: some View {

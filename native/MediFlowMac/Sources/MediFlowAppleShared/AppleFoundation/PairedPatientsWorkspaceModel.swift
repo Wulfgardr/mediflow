@@ -47,6 +47,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     @Published var newExemptionCode = ""
+    // Patient CREATE form (ADR 0071: served only by the on-device local authority).
+    @Published var isCreatingPatient = false
+    @Published var newPatientFirstName = ""
+    @Published var newPatientLastName = ""
+    @Published var newPatientTaxCode = ""
+    @Published var newPatientHasBirthDate = false
+    @Published var newPatientBirthDate = Date()
+    @Published var newPatientAddress = ""
+    @Published var newPatientPhone = ""
+    @Published var newPatientCaregiver = ""
     @Published var newDiagnosisCode = ""
     @Published var newDiagnosisDescription = ""
     @Published private(set) var isEditingPatient = false
@@ -676,6 +686,65 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editEntryTitle = ""
         editEntryType = .note
         editEntryContent = ""
+    }
+
+    // ADR 0071: patient CREATE. Only functions under the on-device local authority
+    // (makeClient() returns the local adapter only when MEDIFLOW_LOCAL_AUTHORITY + a
+    // master key are present); over the paired HTTP wire it fails fast with a 405.
+    var canCreatePatient: Bool {
+        !isWorking
+        && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func startCreatingPatient() {
+        newPatientFirstName = ""
+        newPatientLastName = ""
+        newPatientTaxCode = ""
+        newPatientHasBirthDate = false
+        newPatientBirthDate = Date()
+        newPatientAddress = ""
+        newPatientPhone = ""
+        newPatientCaregiver = ""
+        isCreatingPatient = true
+        statusMessage = "Nuovo paziente pronto."
+    }
+
+    func cancelCreatingPatient() {
+        isCreatingPatient = false
+    }
+
+    func createPatient() async {
+        guard canCreatePatient else { return }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima una sessione paired online."
+            return
+        }
+        // Refuse to create without the key: the store seals the ENCRYPTED_FIELDS in-core.
+        guard masterKey != nil else {
+            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
+            return
+        }
+        let payload = HomeBasePatientCreatePayload(
+            firstName: newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastName: newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
+            taxCode: newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            birthDate: newPatientHasBirthDate ? newPatientBirthDate : nil,
+            address: newPatientAddress.trimmedOrNil,
+            phone: newPatientPhone.trimmedOrNil,
+            caregiver: newPatientCaregiver.trimmedOrNil
+        )
+        await runTask {
+            let created = try await self.makeClient().createPatient(
+                payload: payload, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.isCreatingPatient = false
+            self.patients = try await self.makeClient().fetchPatients(
+                credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "Paziente creato sull'home-base (id \(created.id))."
+        }
     }
 
     // A4: edit patient anagrafica.
