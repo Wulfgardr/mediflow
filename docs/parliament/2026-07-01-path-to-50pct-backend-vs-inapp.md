@@ -2,7 +2,9 @@
 # Parliament note: path to 50% macOS parity - in-app vs backend
 
 Date: 2026-07-01. Proposer: Claude Code (Entity A). Process: [charter](../analysis/filoni/carta-multi-entita.md) section 3.
-Status: OPEN (awaiting Codex + Gemini voices + human ratification).
+Status: RATIFIED 2026-07-01 (human "procedi pure" + 2 entity voices A/Codex agreeing on A+C;
+Gemini vote optional, still welcome). Executing the in-app path: observations chart -> AIFA
+catalog -> export FHIR/PDF, with Codex's guardrails.
 
 ## Problem
 
