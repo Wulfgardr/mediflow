@@ -498,6 +498,7 @@ struct PairedPatientsWorkspaceView: View {
                     if detail.isArchived == true { flagChip("Archiviato", tone: .neutral) }
                 }
             }
+            patientSignals(detail, exemptionsCount: exemptions.count)
             VStack(alignment: .leading, spacing: 4) {
                 InfoRow("Codice fiscale", detail.taxCode)
                 if let birth = detail.birthDate {
@@ -709,6 +710,64 @@ struct PairedPatientsWorkspaceView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
+    }
+
+    // Clinical lists are fetched capped (see HomeBasePatientsClient limit: 20), so a
+    // count that hits the cap is a floor, shown as "N+".
+    static let clinicalPreviewCap = 20
+
+    private func signalTile(_ icon: String, _ count: Int, _ label: String, atCap: Bool = false) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(atCap ? "\(count)+" : "\(count)")
+                    .font(.callout.weight(.semibold))
+                    .monospacedDigit()
+            }
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // Quadro clinical-signals strip (parity with the web "segnali clinici"): counts
+    // derived from the already-loaded collections + the next upcoming follow-up.
+    @ViewBuilder
+    private func patientSignals(_ detail: HomeBasePatientDetail, exemptionsCount: Int) -> some View {
+        let cap = Self.clinicalPreviewCap
+        let problemi = DiagnosesCodec.decode(detail.diagnoses).count
+        let terapie = model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count
+        let parametri = model.observations.filter { $0.deletedAt == nil }.count
+        let diario = model.entries.filter { $0.deletedAt == nil }.count
+        let nextCheckup = model.checkups
+            .filter { $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() }
+            .min(by: { $0.date < $1.date })
+        VStack(alignment: .leading, spacing: 6) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
+                signalTile("cross.case", problemi, "Problemi")
+                signalTile("pills", terapie, "Terapie", atCap: model.therapies.count >= cap)
+                signalTile("waveform.path.ecg", parametri, "Parametri", atCap: model.observations.count >= cap)
+                signalTile("list.bullet.clipboard", diario, "Diario", atCap: model.entries.count >= cap)
+                signalTile("seal", exemptionsCount, "Esenzioni")
+            }
+            .accessibilityIdentifier("patient-clinical-signals")
+            if let next = nextCheckup {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Prossimo follow-up: \(Self.birthDateFormatter.string(from: next.date)) · \(next.title)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("patient-next-followup")
+            }
+        }
     }
 
     private static let birthDateFormatter: DateFormatter = {
