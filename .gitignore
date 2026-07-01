@@ -18,6 +18,8 @@
 /tmp-e2e-data
 /tmp-concurrency-data
 /tmp-native-derived-data
+/tmp-ios-sim-dd
+/tmp-mac-derived-data
 /tmp-parity-smoke
 /tmp-audit-test
 /tmp-auth-lockout-test
