@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 #if os(macOS)
 import AppKit
 #else
@@ -1589,6 +1590,18 @@ struct PairedPatientsWorkspaceView: View {
             Text("\(observation.codeSystem) \(observation.code) - \(Self.entryDateFormatter.string(from: observation.observedAt))")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+            let series = numericObservationSeries(forCode: observation.code)
+            if observation.deletedAt == nil, series.count >= 2 {
+                Chart(series) { point in
+                    LineMark(x: .value("Data", point.date), y: .value("Valore", point.value))
+                        .interpolationMethod(.monotone)
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(height: 30)
+                .accessibilityIdentifier("observation-sparkline-\(observation.code)")
+                .accessibilityLabel("Andamento \(observation.display): \(series.count) rilevazioni")
+            }
             if let notes = observation.notes, !notes.isEmpty {
                 Text(notes)
                     .font(.caption)
@@ -1622,6 +1635,34 @@ struct PairedPatientsWorkspaceView: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private struct ObservationPoint: Identifiable {
+        let id: Int
+        let date: Date
+        let value: Double
+    }
+
+    // The numeric time-series for a LOINC code across the loaded (non-deleted)
+    // observations, oldest-first, for the inline sparkline. Non-numeric values
+    // (e.g. "120/80", "positivo") are skipped, so a series appears only for scalar
+    // parameters with >= 2 readings.
+    private func numericObservationSeries(forCode code: String) -> [ObservationPoint] {
+        model.observations
+            .filter { $0.code == code && $0.deletedAt == nil }
+            .compactMap { obs -> (Date, Double)? in
+                guard let value = Self.parseObservationValue(obs.value) else { return nil }
+                return (obs.observedAt, value)
+            }
+            .sorted { $0.0 < $1.0 }
+            .enumerated()
+            .map { ObservationPoint(id: $0.offset, date: $0.element.0, value: $0.element.1) }
+    }
+
+    static func parseObservationValue(_ raw: String) -> Double? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if let direct = Double(trimmed) { return direct }
+        return Double(trimmed.replacingOccurrences(of: ",", with: "."))
     }
 
     /// SF Symbol + accessibility label for an observation trend. Clinically neutral:
