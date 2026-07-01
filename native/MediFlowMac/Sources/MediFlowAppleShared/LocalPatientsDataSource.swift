@@ -81,6 +81,26 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             id: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey))
     }
 
+    // Local patient CREATE (ADR 0071). No paired wire peer exists, so this is the ONLY
+    // real create path. The store seals the ENCRYPTED_FIELDS in-core (seal-or-passthrough,
+    // so plaintext form values are sealed and any already-ENC value passes through), runs
+    // the INSERT + membership upsert in one transaction, and returns the new id+version.
+    // A non-empty scope is required (it becomes the patients_to_ambulatories membership so
+    // the new patient is visible in the scoped list); without one we fall back to HTTP,
+    // which fails fast (there is no create peer).
+    public func createPatient(
+        payload: HomeBasePatientCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        guard let scope = ambulatoryId, !scope.isEmpty else {
+            return try await fallback.createPatient(
+                payload: payload, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        }
+        return try mapped(try patientStore.createPatient(
+            payload, scopeAmbulatoryId: scope, masterKey: masterKey))
+    }
+
     // MARK: Outcome -> wire-error mapping (shared by every local write below)
 
     private func mapped(_ outcome: SQLitePatientStore.PatientWriteOutcome) throws -> HomeBaseMutationAcknowledgement {
@@ -92,6 +112,15 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         case .versionRequired, .noValidFields, .notFound, .boundaryRejected, .encryptionFailed:
             let wire = outcome.wireResponse
             throw HomeBaseClientError.httpStatus(wire.status, wire.error)
+        }
+    }
+
+    private func mapped(_ outcome: SQLitePatientStore.PatientCreateOutcome) throws -> HomeBaseCreatedResource {
+        switch outcome {
+        case .created(let id, let version):
+            return HomeBaseCreatedResource(id: id, version: version)
+        case .encryptionFailed:
+            throw HomeBaseClientError.httpStatus(500, "Cifratura non disponibile: riaccedi con il PIN operatore.")
         }
     }
 

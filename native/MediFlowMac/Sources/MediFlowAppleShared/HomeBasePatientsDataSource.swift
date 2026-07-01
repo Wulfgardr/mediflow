@@ -30,6 +30,14 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
+    // ADR 0071: patient CREATE has no paired-client wire peer, so it is served only by
+    // the on-device local authority (SQLitePatientStore.createPatient). The HTTP client
+    // conforms with a throwing stub; the local adapter does the real work.
+    func createPatient(
+        payload: HomeBasePatientCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource
+
     // limit has no default in the protocol requirement (Swift forbids it); the
     // 4-argument convenience below restores the call sites' default of 20.
     func fetchEntries(
@@ -126,5 +134,15 @@ public extension HomeBasePatientsDataSource {
 }
 
 // The existing HTTP client satisfies the seam as-is (its methods already match, and
-// its `limit: Int = 20` defaults are unaffected by the requirement).
-extension HomeBasePatientsClient: HomeBasePatientsDataSource {}
+// its `limit: Int = 20` defaults are unaffected by the requirement). The one addition
+// is the patient-create stub: the paired wire protocol has no create peer, so over HTTP
+// it fails fast with a clear message; real creation happens via the local authority.
+extension HomeBasePatientsClient: HomeBasePatientsDataSource {
+    public func createPatient(
+        payload: HomeBasePatientCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        throw HomeBaseClientError.httpStatus(
+            405, "Creazione paziente non supportata dal peer paired: richiede l'autorita locale sul dispositivo.")
+    }
+}

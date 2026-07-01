@@ -154,6 +154,45 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         }
     }
 
+    // MARK: Local patient CREATE (ADR 0071 - only real create path)
+
+    func testCreatePatientWritesLocally() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+
+        // Plaintext payload; the store seals the ENCRYPTED_FIELDS in-core on create.
+        let created = try await source.createPatient(
+            payload: HomeBasePatientCreatePayload(
+                firstName: "Nuovo", lastName: "Paziente", taxCode: "NVOPZT80A01H501Z", address: "Via Test 1"),
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertFalse(created.id.isEmpty)
+        XCTAssertEqual(created.version, 1)
+
+        // Appears in the AMB-1 scoped list (membership upserted) and its encrypted
+        // address round-trips to plaintext (seal-on-create works, no double-encryption).
+        let list = try await source.fetchPatients(credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertTrue(list.contains { $0.id == created.id && $0.lastName == "Paziente" })
+        let detail = try await source.fetchPatient(
+            id: created.id, credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        XCTAssertEqual(detail.address, "Via Test 1")
+        XCTAssertEqual(detail.taxCode, "NVOPZT80A01H501Z")
+    }
+
+    func testCreatePatientWithoutScopeFallsBackToUnsupportedHTTP() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let source = writableSource(path)
+        do {
+            _ = try await source.createPatient(
+                payload: HomeBasePatientCreatePayload(firstName: "X", lastName: "Y", taxCode: "T"),
+                credentials: credentials, sessionCookie: "", ambulatoryId: nil)
+            XCTFail("expected the HTTP create stub to throw (no paired create peer)")
+        } catch let HomeBaseClientError.httpStatus(status, _) {
+            XCTAssertEqual(status, 405)
+        }
+    }
+
     // MARK: Local clinical writes (Fase 3 slice 5)
 
     func testCreateEntryWritesLocally() async throws {
