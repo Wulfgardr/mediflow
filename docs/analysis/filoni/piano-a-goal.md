@@ -5,6 +5,25 @@ Part of the [tri-OS filoni](README.md). Baseline measured 2026-07-01 (adversaria
 verified). This defines what "100%" means and where we are against it, then the
 ordered goals to get there.
 
+## Progress log (G1/G2 push toward 50%)
+
+Started 2026-07-01 from a measured ~24% weighted. Slices landed (each build + test verified):
+
+- `608ae8cb5` patient-list rows: age, ADI/Archiviato chips, last-touched (list 30 -> ~50)
+- `fdded9c5c` quadro clinical-signals strip (detail-overview 12 -> ~40)
+- `bcdde92de` full clinical-scales library Tinetti/IADL/MMSE/GDS, byte-exact + Picker form (scales 20 -> ~90)
+- `c35249298` ADI flag + exemptions editable in patient edit (edit-lifecycle 42 -> ~65)
+
+Estimated weighted parity now ~33% (core-clinical ~50%). To reach 50% weighted the core
+tier must reach ~77-81% plus a platform bump; the single biggest remaining lever is
+**patient-create** (0 -> ~80, via the local-authority path: SQLitePatientStore.createPatient
+already exists, needs wiring through LocalPatientsDataSource + a create form), then
+observations chart, diary rich-text/restore, therapies diagnosis-link, patient-list
+context-menu + lead-diagnosis, and auth in-session-lock/PIN-change.
+
+Incident (recovered, 0 loss): a spec workflow subagent ran `git checkout main`, switching
+the tree off the branch mid-run; caught and restored. See [[workflow-agents-git-hazard]].
+
 ## The 100% (user directive, 2026-07-01)
 
 "Full parity macOS is the primary objective, with an adequate level of Linux and
