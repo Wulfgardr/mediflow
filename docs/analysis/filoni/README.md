@@ -15,6 +15,10 @@ sync/archive peer.
 100% = full macOS parity + adequate Linux/Windows, measures where we are today
 (~24% weighted macOS parity), and gives the ordered goals G1-G6).
 
+**Multi-entity charter: [carta-multi-entita.md](carta-multi-entita.md)** (how Claude Code,
+Codex.app, and Gemini share the repo without collisions: worktree perimeters, the shared
+constitution, and the parliamentary decision process. Provisional: 2 of 3 entity voices in).
+
 ## The one shared spine (identical on every filone)
 
 `MediFlowCore` (Swift Package, platform-free: Foundation + swift-crypto + vendored
