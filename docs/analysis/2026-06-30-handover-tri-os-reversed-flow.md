@@ -115,6 +115,7 @@ the extraction work is mostly **raising access levels to `public`** + adding
 ## Commits this session (branch feat/apple-universal-fase0, none pushed)
 
 ```
+f66a18b7d   native(core): scope via patients_to_ambulatories membership, not the denormalized column
 c5ea157d4   native(core): fix entry create-idempotency to decrypt the incoming payload too
 f211e99c9   native: local clinical WRITE authority + close slice-4 read-parity gaps (Fase 3 slice 5 + audit fixes)
 5d6e2fcb1   native: local patient WRITE authority via strict seal-or-passthrough (Fase 3 slice 3)
@@ -197,37 +198,54 @@ reversed-flow core is done. Remaining:
      correctly; title/content did not). Concrete proof that the adversarial-verify
      step is pulling its weight: a real, broadly-reachable bug in the only production
      call path, invisible to `swift build` and to the existing plaintext-only test.
-   - **Slice 6 (next, the big one): demote Next.js** to a signed-write ingest +
-     ciphertext-delta pull (the true reversed flow). Needs a device-owned db + sync
-     (conflict/delta/tombstone), plus turning `MEDIFLOW_LOCAL_AUTHORITY` from a flag
-     into the default (UI to drive PIN-unlock -> local-authority handoff).
-2. **Membership-scope parity (watch-item, see below).** Replace the denormalized
-   `patients.ambulatory_id` scope check (used by every store write) with the
-   `patients_to_ambulatories` join + port `upsertPrimaryAmbulatoryMembership`;
-   regenerate the fixture to model that table. Until then out-of-scope 404 diverges
-   for multi-membership patients, and patient create/update can't set the primary
-   ambulatory. Also unblocks setting ambulatoryId on patient update (deferred).
-3. **Small parity follow-ups (low-risk, optional):** entry `metadata` UPDATE (encrypted,
-   needs the plaintext-vs-pre-encrypted decision - create already handles both via
-   seal-or-passthrough); clinical clear-to-null on update (the typed *UpdatePayload use
-   nil=omit, so a field can't be cleared / a tombstone restored); enum REJECTION on
-   write (the store canonicalizes but never 400s an invalid enum, since the typed
-   payloads are trusted producers).
-4. **Formal target split** (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
-   `MediFlowAppleUI` = SwiftUI). Deferred deliberately: it touches the 1,831-LOC
-   `PairedPatientsWorkspaceModel` (Codex: leave it; highest-risk move). The core is
-   already cleanly isolated, so this is reorganization, not blocking.
-5. **Schema-fingerprint test** (Codex): hash `drizzle/meta/0000_snapshot.json` +
-   expected columns so a stale Swift row mapping fails fast.
+ The remaining roadmap is now Codex-designed (see "Slice 6 demotion roadmap" below).
+
+2. **Membership-scope parity: DONE (`f66a18b7d`).** Every store scope check now joins
+   `patients_to_ambulatories` (not the denormalized `patients.ambulatory_id`), 1:1 with
+   the web; createPatient upserts the membership; loadPatientDetail scopes too; fixture
+   regenerated with the table. Multi-membership tested. (Codex ranked this #1.) Still
+   deferred: SETTING primary ambulatoryId on patient UPDATE (payload has no ambulatoryId).
+
+## Slice 6 demotion roadmap (Codex-designed, 2026-07-01)
+
+Codex's ordering for the rest of the reversed flow (do NOT jump straight to a
+device-db + sync - too large/dangerous as one slice; eliminate dual-writer ambiguity
+FIRST):
+1. Membership-scope parity via `patients_to_ambulatories`. **DONE (`f66a18b7d`).**
+2. Small parity follow-ups: entry `metadata` UPDATE (encrypted; create already handles
+   plaintext-or-ENC via seal-or-passthrough), clinical clear-to-null on update (typed
+   *UpdatePayload use nil=omit, so no clear/restore), enum REJECTION on write (the store
+   canonicalizes but never 400s an invalid enum).
+3. Schema-fingerprint test: hash `drizzle/meta/0000_snapshot.json` + expected columns so
+   a stale Swift row mapping fails fast.
+4. Harden login/PIN unlock so local authority can become the DEFAULT (retire the
+   `MEDIFLOW_LOCAL_AUTHORITY` flag) - only once key-unlock UX + fallback are solid.
+5. Explicit SINGLE-WRITER transition mode: native writes, web read-only for the locally
+   authoritative tables. (Dual-writer on the shared localhost db is the #1 landmine.)
+6. Device-owned DB migration: seed via a ciphertext-preserving snapshot/export (stop
+   writes -> fingerprint schema -> copy the SQLite file once into a device container ->
+   post-copy parity check: row counts, schema fingerprint, decrypt-sample, version/
+   deleted_at presence -> mark the localhost db as archive/ingest, not authority). Master
+   key unchanged (PIN-derived KEK, RAM-only); add ownership metadata (device id, schema
+   fingerprint, export epoch, key-wrap meta). No key rotation in the first migration.
+7. Signed-write ingest: mTLS + clientId/token for transport, PLUS an app-level signed
+   envelope {deviceId, sequence, table, entityId, baseVersion, newVersion, op, updatedAt,
+   deletedAt, ciphertextColumns, signature} (HMAC/Ed25519 over canonical JSON). Existing
+   `version` gives conflict detection if ingest requires baseVersion == archive.currentVersion;
+   the device `sequence` gives ordering/replay protection the version alone can't.
+8. Ciphertext delta pull + conflict/tombstone sync. Freeze tombstone semantics BEFORE
+   inventing sync. Next.js must archive ciphertext/version/tombstone only - never
+   re-validate plaintext clinical semantics after demotion.
+9. Formal target split (`MediFlowAppleSync` = client/Keychain/Bonjour/cache +
+   `MediFlowAppleUI` = SwiftUI) - after behavior is stable, unless needed to isolate sync
+   code. Touches the 1,831-LOC `PairedPatientsWorkspaceModel` (Codex: highest-risk move).
 
 ## OPEN ITEMS / watch-list
 
-- **Membership-scope divergence (PARITY NOTE, NEW):** `updatePatient` scopes the
-  out-of-scope 404 via the denormalized `patients.ambulatory_id` (the only model the
-  local store / fixture carries), NOT the web's `patients_to_ambulatories` join.
-  Equivalent for single-membership patients; diverges for multi-membership. Tracked
-  as NEXT STEP 3. The web's UPDATE itself is unscoped (id+version+active), already
-  matched.
+- **Membership-scope divergence: RESOLVED** (`f66a18b7d`). All store scope checks now
+  use the `patients_to_ambulatories` membership join, matching the web for
+  multi-membership patients. Only SETTING the primary ambulatoryId on patient UPDATE
+  stays deferred (the update payload carries no ambulatoryId; create upserts it).
 - **Encode-parity watch-item: RESOLVED** (commit `73ac01e43`). The 409
   `VersionConflictPayload` now has a custom `Encodable` (explicit nulls +
   entity-specific snapshot); decode unchanged.
