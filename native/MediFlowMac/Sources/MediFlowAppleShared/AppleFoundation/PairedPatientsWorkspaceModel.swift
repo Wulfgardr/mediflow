@@ -58,6 +58,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newTherapyStartDate = Date()
     @Published var newTherapyHasEndDate = false
     @Published var newTherapyEndDate = Date()
+    @Published var newTherapyDiagnosisCode = ""
     @Published private(set) var editingTherapyId: String?
     @Published private(set) var editingTherapyVersion: Int?
     @Published var editTherapyDrugName = ""
@@ -68,6 +69,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editTherapyStartDate = Date()
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
+    @Published var editTherapyDiagnosisCode = ""
     @Published var newCheckupTitle = ""
     @Published var newCheckupNotes = ""
     @Published var newCheckupStatus: PairedCheckupStatus = .pending
@@ -988,6 +990,20 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
+    /// The selected patient's diagnoses (decoded), for the therapy diagnosis-link picker.
+    var currentPatientDiagnoses: [ClinicalDiagnosis] {
+        guard let detail = selectedPatient else { return [] }
+        return DiagnosesCodec.decode(detail.diagnoses)
+    }
+
+    // Resolve the display name for a linked diagnosis code from the patient's diagnoses.
+    // diagnosisCode/diagnosisName are PLAINTEXT on therapy (only motivation/deletion_reason
+    // are encrypted), so no sealing here.
+    private func therapyDiagnosisName(forCode code: String?) -> String? {
+        guard let code, !code.isEmpty else { return nil }
+        return currentPatientDiagnoses.first { $0.code == code }?.description
+    }
+
     func createTherapyForSelectedPatient() async {
         guard canCreateTherapy else { return }
         guard let patientId = selectedPatient?.id,
@@ -1001,12 +1017,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let dosage = newTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
         let motivation = newTherapyMotivation.trimmedOrNil
         let endDate = newTherapyHasEndDate ? newTherapyEndDate : nil
+        let diagnosisCode = newTherapyDiagnosisCode.trimmedOrNil
+        let diagnosisName = therapyDiagnosisName(forCode: diagnosisCode)
         await runTask {
             _ = try await self.makeClient().createTherapy(
                 patientId: patientId,
                 payload: HomeBaseTherapyCreatePayload(
                     drugName: drugName,
                     activePrinciple: activePrinciple,
+                    diagnosisCode: diagnosisCode,
+                    diagnosisName: diagnosisName,
                     dosage: dosage,
                     status: self.newTherapyStatus.rawValue,
                     startDate: self.newTherapyStartDate,
@@ -1041,6 +1061,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editTherapyStartDate = therapy.startDate
         editTherapyHasEndDate = therapy.endDate != nil
         editTherapyEndDate = therapy.endDate ?? Date()
+        editTherapyDiagnosisCode = therapy.diagnosisCode ?? ""
         statusMessage = "Modifica terapia pronta."
     }
 
@@ -1056,6 +1077,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editTherapyStartDate = Date()
         editTherapyHasEndDate = false
         editTherapyEndDate = Date()
+        editTherapyDiagnosisCode = ""
     }
 
     /* @Codex */
@@ -1073,6 +1095,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let activePrinciple = editTherapyActivePrinciple.trimmingCharacters(in: .whitespacesAndNewlines)
         let dosage = editTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
         let motivation = editTherapyMotivation.trimmingCharacters(in: .whitespacesAndNewlines)
+        let diagnosisCode = editTherapyDiagnosisCode.trimmedOrNil
+        let diagnosisName = therapyDiagnosisName(forCode: diagnosisCode)
         await runTask {
             let acknowledgement = try await self.makeClient().updateTherapy(
                 patientId: patientId,
@@ -1081,6 +1105,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     version: version,
                     drugName: drugName,
                     activePrinciple: activePrinciple,
+                    diagnosisCode: diagnosisCode,
+                    diagnosisName: diagnosisName,
                     dosage: dosage,
                     status: self.editTherapyStatus.rawValue,
                     startDate: self.editTherapyStartDate,
@@ -1685,6 +1711,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newTherapyStartDate = Date()
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
+        newTherapyDiagnosisCode = ""
     }
 
     /* @Codex */

@@ -1103,6 +1103,8 @@ struct PairedPatientsWorkspaceView: View {
                     startDate: $model.editTherapyStartDate,
                     hasEndDate: $model.editTherapyHasEndDate,
                     endDate: $model.editTherapyEndDate,
+                    diagnosisCode: $model.editTherapyDiagnosisCode,
+                    diagnosisOptions: model.currentPatientDiagnoses,
                     primaryLabel: "Salva modifiche",
                     primaryIdentifier: "homebase-update-therapy-button",
                     canSubmit: model.canUpdateEditingTherapy,
@@ -1126,6 +1128,8 @@ struct PairedPatientsWorkspaceView: View {
                 startDate: $model.newTherapyStartDate,
                 hasEndDate: $model.newTherapyHasEndDate,
                 endDate: $model.newTherapyEndDate,
+                diagnosisCode: $model.newTherapyDiagnosisCode,
+                diagnosisOptions: model.currentPatientDiagnoses,
                 primaryLabel: "Salva terapia",
                 primaryIdentifier: "homebase-create-therapy-button",
                 canSubmit: model.canCreateTherapy,
@@ -1221,6 +1225,8 @@ struct PairedPatientsWorkspaceView: View {
         startDate: Binding<Date>,
         hasEndDate: Binding<Bool>,
         endDate: Binding<Date>,
+        diagnosisCode: Binding<String>,
+        diagnosisOptions: [ClinicalDiagnosis],
         primaryLabel: String,
         primaryIdentifier: String,
         canSubmit: Bool,
@@ -1239,6 +1245,16 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("\(primaryIdentifier)-dosage")
             TextField("Motivazione (opzionale)", text: motivation)
                 .accessibilityIdentifier("\(primaryIdentifier)-motivation")
+            if !diagnosisOptions.isEmpty {
+                Picker("Diagnosi collegata", selection: diagnosisCode) {
+                    Text("Nessuna").tag("")
+                    ForEach(diagnosisOptions, id: \.code) { diagnosis in
+                        Text(diagnosis.displayText).tag(diagnosis.code)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("\(primaryIdentifier)-diagnosis")
+            }
             Picker("Stato", selection: status) {
                 ForEach(PairedTherapyStatus.allCases) { status in
                     Text(status.title).tag(status)
