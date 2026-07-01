@@ -11,6 +11,10 @@ The goal is ONE product shipped as THREE native binaries, each the on-device
 authority for its OS, with "localhost"/Next.js demoted to a ciphertext-only
 sync/archive peer.
 
+**Goal-based plan + honest baseline: [piano-a-goal.md](piano-a-goal.md)** (defines the
+100% = full macOS parity + adequate Linux/Windows, measures where we are today
+(~24% weighted macOS parity), and gives the ordered goals G1-G6).
+
 ## The one shared spine (identical on every filone)
 
 `MediFlowCore` (Swift Package, platform-free: Foundation + swift-crypto + vendored
