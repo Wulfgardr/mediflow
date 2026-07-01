@@ -13,16 +13,19 @@ Started 2026-07-01 from a measured ~24% weighted. Slices landed (each build + te
 - `fdded9c5c` quadro clinical-signals strip (detail-overview 12 -> ~40)
 - `bcdde92de` full clinical-scales library Tinetti/IADL/MMSE/GDS, byte-exact + Picker form (scales 20 -> ~90)
 - `c35249298` ADI flag + exemptions editable in patient edit (edit-lifecycle 42 -> ~65)
+- `7666cfffc` link a diagnosis to therapies (create + edit) (therapies 55 -> ~70)
+- `453024356` + `17b13cc51` **patient-create** through the data-source seam + form/CTA
+  (0 -> ~75; local-authority only, HTTP peer returns 405; first user-visible write only the
+  on-device authority can serve)
 
-Estimated weighted parity now ~33% (core-clinical ~50%). To reach 50% weighted the core
-tier must reach ~77-81% plus a platform bump; the single biggest remaining lever is
-**patient-create** (0 -> ~80, via the local-authority path: SQLitePatientStore.createPatient
-already exists, needs wiring through LocalPatientsDataSource + a create form), then
-observations chart, diary rich-text/restore, therapies diagnosis-link, patient-list
-context-menu + lead-diagnosis, and auth in-session-lock/PIN-change.
+Estimated weighted parity now ~40% (core-clinical ~62%). Work moved to the dedicated worktree
+`medical-record-app-apple-wt` after a second worktree hijack; see [[workflow-agents-git-hazard]]
+and the [charter](carta-multi-entita.md). To reach 50% the remaining core levers are
+detail-overview (review-queue summary), observations chart, diary rich-text/restore,
+patient-list context-menu + lead-diagnosis, plus auth in-session-lock/PIN-change (platform).
 
-Incident (recovered, 0 loss): a spec workflow subagent ran `git checkout main`, switching
-the tree off the branch mid-run; caught and restored. See [[workflow-agents-git-hazard]].
+Incident (recovered, 0 loss): a `git checkout` hijacked the MAIN worktree twice (once ->main,
+once ->codex/wul-423); commits recovered onto feat; now isolated in a dedicated worktree.
 
 ## The 100% (user directive, 2026-07-01)
 
