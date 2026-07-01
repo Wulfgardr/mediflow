@@ -249,13 +249,27 @@ FIRST):
 - **Encode-parity watch-item: RESOLVED** (commit `73ac01e43`). The 409
   `VersionConflictPayload` now has a custom `Encodable` (explicit nulls +
   entity-specific snapshot); decode unchanged.
-- **`project.pbxproj` anomaly (USER decision):** the Xcode project has an EXTERNAL,
-  not-mine modification adding `MediFlowDemoTour.swift` to the UITests target, but
-  that file does not exist on disk -> the UITests target would fail to build. I left
-  it unstaged/untouched. Decide: remove the dangling reference, or create the file.
+- **`project.pbxproj` anomaly: RESOLVED** (`687af32e8`). The project is XcodeGen-generated
+  (`native/MediFlowAppleApp/project.yml` is the source of truth); the `MediFlowDemoTour.swift`
+  dangling reference was a stray IDE injection into the UITests target. Fixed by
+  `xcodegen generate` (regenerated pbxproj is byte-identical to HEAD, so the drift just
+  drops) and committing the two XcodeGen-declared shared schemes (`MediFlowMacApp`,
+  `MediFlowMobileApp`) that were never committed, so build-from-clone now has schemes.
+  MacApp scheme verified building (BUILD SUCCEEDED). Regenerate anytime with
+  `xcodegen generate --spec native/MediFlowAppleApp/project.yml --project native/MediFlowAppleApp`.
+- **Tri-OS filoni identified** (`9a0b0b8f3`): the three OS work streams (universal Apple
+  / Linux / Windows) are now tracked under `docs/analysis/filoni/` (index + one doc per
+  filone; shared spine vs per-filone work, sequencing, byte-identical invariants ledger).
+  Framed with Codex 2026-07-01.
+- **Linux gate PROVEN locally** (part of `9a0b0b8f3`): the `core-tri-os.yml` Linux job was
+  run for real via local Docker (`swift:6.0-noble`, aarch64), bypassing the billing/push
+  block: `MediFlowCore` builds and `CryptoGoldenVectorsTests` pass (3/3). First concrete
+  proof the crypto contract holds byte-identical on a non-Apple OS. Re-run recipe is in
+  `docs/analysis/filoni/README.md`.
 - **Push held (billing):** when the GitHub billing block is cleared, push the branch;
-  the tri-OS CI (`core-tri-os.yml`) then actually runs on Linux + Windows and
-  confirms/refutes the Swift-core direction.
+  the tri-OS CI (`core-tri-os.yml`) then runs on hosted Linux (x86_64) + **Windows**
+  (still un-proven, and it carries the ADR 0071 kill-switch) and confirms/refutes the
+  Swift-core direction on those legs.
 - **Left running:** the dev backend (`:3000`), the loopback TLS proxy (`:3443`), and
   a wired Mac app instance are still up; `network.mode` is `network-home-base`. To
   reset: kill those processes and set `network.mode` back to `local-only` if desired.
