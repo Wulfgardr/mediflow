@@ -53,6 +53,8 @@ export interface PatientReviewQueueInput {
     insight: {
         enabled: boolean;
         hasSummary: boolean;
+        /* Insight presente ma piu vecchio dell'ultimo dato clinico. */
+        stale?: boolean;
     };
     evidence: ReviewQueueEvidenceItem[];
     smartImport: {
@@ -130,6 +132,16 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
             'Patient Insight',
             'vuoto',
             'Nessun insight generato: si avvia solo manualmente dal pannello.',
+            { anchor },
+        );
+    }
+
+    if (input.stale) {
+        return row(
+            'insight',
+            'Patient Insight',
+            'da-rivedere',
+            'Insight non aggiornato: dati clinici modificati dopo la generazione. Rigeneralo dal pannello.',
             { anchor },
         );
     }

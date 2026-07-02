@@ -54,6 +54,23 @@ export interface PatientInsightContextSnapshot {
         firstName: string;
         lastName: string;
     };
+    // Firma deterministica del contenuto clinico del contesto: se non cambia,
+    // l'insight non e stantio e la rigenerazione automatica puo essere saltata.
+    contextHash: string;
+}
+
+// Hash FNV-1a a 32 bit: deterministico e sincrono, per change-detection (non
+// crittografico). Restituisce una stringa esadecimale stabile.
+function computeContextHash(sourceRefs: PatientInsightSourceRef[]): string {
+    const signature = sourceRefs
+        .map((ref) => `${ref.id}|${ref.promptLine}|${ref.evidenceSourceId ?? ''}`)
+        .join('\n');
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < signature.length; i += 1) {
+        hash ^= signature.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 const MAX_ENTRIES = 5;
@@ -656,6 +673,7 @@ export async function buildPatientInsightContext(
             limitations: ['Paziente non trovato nel database locale.'],
             outputMaxTokens: 512,
             patientName: { firstName: '', lastName: '' },
+            contextHash: computeContextHash([]),
         };
     }
 
@@ -971,6 +989,7 @@ export async function buildPatientInsightContext(
             firstName: patient.firstName,
             lastName: patient.lastName,
         },
+        contextHash: computeContextHash(sourceRefs),
     };
 }
 

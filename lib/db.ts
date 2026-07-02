@@ -101,6 +101,10 @@ export interface Patient {
     deletedAt?: Date;
     deletionReason?: string;
     aiSummary?: string;
+    // Ciclo di vita dell'insight: quando e stato generato e hash deterministico del
+    // contesto clinico su cui poggia. Non PHI (id + timestamp), quindi non cifrati.
+    aiSummaryGeneratedAt?: Date;
+    aiSummaryContextHash?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
     /* @Codex */
     exemptions?: string[];

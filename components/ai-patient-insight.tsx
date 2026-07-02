@@ -21,6 +21,8 @@ import {
 
 interface AIPatientInsightProps {
     patient: Patient;
+    /* Insight presente ma piu vecchio dell'ultimo dato clinico (dal detail page). */
+    stale?: boolean;
 }
 
 /* @Codex */
@@ -202,7 +204,7 @@ function coerceInsightToReadable(rawSummary: string): ReadableInsight {
     return { kind: 'unreadable', reason: 'json-envelope' };
 }
 
-export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
+export default function AIPatientInsight({ patient, stale = false }: AIPatientInsightProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
@@ -376,6 +378,16 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3>
                             {modelLabel && (
                                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel}</p>
+                            )}
+                            {patient.aiSummaryGeneratedAt && (
+                                <p className="text-[10px] font-medium text-slate-400 tracking-tight">
+                                    Generato il {new Date(patient.aiSummaryGeneratedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    {stale && (
+                                        <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                            Dati modificati dopo la generazione
+                                        </span>
+                                    )}
+                                </p>
                             )}
                         </div>
                     </div>
