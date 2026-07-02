@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Accessibility, Activity, Calendar, Download, FileText, Pencil, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
@@ -30,6 +30,7 @@ import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/
 import { db, type Attachment, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
+import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
@@ -57,11 +58,15 @@ export default function PatientDetailPage() {
         },
         [id],
     );
+    /* @Codex WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
+       annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
+       raccontano lo stesso insieme, e un appuntamento annullato non compare piu
+       come prossimo follow-up. */
     const checkups = useLiveQuery(
         async () => {
             const items = await db.checkups.filter((checkup: Checkup) => checkup.patientId === id).toArray();
             return items
-                .filter((checkup) => checkup.status !== 'completed')
+                .filter((checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
                 .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
         },
         [id],
@@ -87,8 +92,15 @@ export default function PatientDetailPage() {
         },
         [id],
     );
-    const observationCount = useLiveQuery(
-        async () => db.observations.filter((observation) => observation.patientId === id).count(),
+    /* @Codex WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
+       le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
+       le osservazioni del paziente, senza filtri). */
+    const therapies = useLiveQuery(
+        async () => db.therapies.filter((therapy) => therapy.patientId === id).toArray(),
+        [id],
+    );
+    const observations = useLiveQuery(
+        async () => db.observations.filter((observation) => observation.patientId === id).toArray(),
         [id],
     );
     // Ultima osservazione registrata: data e valore per la cella Parametri.
@@ -183,6 +195,17 @@ export default function PatientDetailPage() {
             }));
         },
         [exemptionCodes.join('|')],
+    );
+
+    /* @Codex WUL-UIUX Fase 7: stessa pipeline del Quadro (lib/patient-workspace).
+       I numeri della Scheda con un omologo nel cockpit derivano da qui e non
+       possono divergere per costruzione. Finche una query non e pronta il
+       workspace resta undefined: mai zeri finti durante il caricamento. */
+    const workspace = useMemo(
+        () => (patient && entries && therapies && checkups && observations && attachments
+            ? buildPatientWorkspaceFromRecords({ patient, entries, therapies, checkups, observations, attachments })
+            : undefined),
+        [patient, entries, therapies, checkups, observations, attachments],
     );
 
     if (!patient) {
@@ -282,7 +305,6 @@ export default function PatientDetailPage() {
     /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
        inventano flag (resta onesto). */
-    const therapyCount = activeTherapies?.length ?? 0;
     // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
     // percorso e ancora aperto (rilevante soprattutto per l'ADI).
     const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
@@ -330,14 +352,14 @@ export default function PatientDetailPage() {
         { href: '#quadro', label: 'Quadro' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
         { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
-        { href: '#terapie', label: 'Terapie', meta: activeTherapies !== undefined ? String(therapyCount) : undefined },
+        { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
-        { href: '#parametri', label: 'Parametri', meta: observationCount !== undefined ? String(observationCount) : undefined },
+        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
         { href: '#siss', label: 'SISS/FSE' },
         { href: '#documenti', label: 'Documenti', meta: String(documentInsights.length) },
         { href: '#scale', label: 'Scale' },
-        { href: '#follow-up', label: 'Follow-up', meta: String((checkups ?? []).length) },
+        { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
     ];
 
     const handleExportConfirm = async () => {
@@ -417,10 +439,10 @@ export default function PatientDetailPage() {
                 <button
                     type="button"
                     onClick={async () => {
-                        const therapies = await db.therapies.filter((therapy) => therapy.patientId === id).toArray();
-                        const observations = await db.observations.filter((observation) => observation.patientId === id).toArray();
+                        const reportTherapies = await db.therapies.filter((therapy) => therapy.patientId === id).toArray();
+                        const reportObservations = await db.observations.filter((observation) => observation.patientId === id).toArray();
                         const reportService = await import('@/lib/report-service');
-                        reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, therapies, observations);
+                        reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
                     }}
                     className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
@@ -439,7 +461,7 @@ export default function PatientDetailPage() {
             backHref={`/patients/${id}`}
             backLabel="Quadro paziente"
             patientLabel={`${patient.lastName} ${patient.firstName}`}
-            statusLabel={`${nonScaleEntries.length} eventi · ${(checkups ?? []).length} follow-up · ${documentInsights.length} evidenze`}
+            statusLabel={`${nonScaleEntries.length} eventi · ${workspace ? workspace.pendingCheckupsCount : (checkups ?? []).length} follow-up · ${documentInsights.length} evidenze`}
             navItems={workspaceNavItems}
         >
             <div id="quadro" className={workspaceStyles.anchorStack}>
@@ -450,7 +472,7 @@ export default function PatientDetailPage() {
                     otherProblemsCount={otherProblemsCount}
                     signals={synopticSignals}
                     therapies={synopticTherapies}
-                    therapiesTotal={therapyCount}
+                    therapiesTotal={workspace?.activeTherapiesCount}
                     latestMeasure={latestMeasure}
                     nextCheckupLabel={nextCheckupLabel}
                     nextCheckupTitle={nextCheckup?.title}
@@ -527,8 +549,8 @@ export default function PatientDetailPage() {
                         kicker="Terapie"
                         title="Terapie farmacologiche"
                         icon={Pill}
-                        count={activeTherapies !== undefined ? `${therapyCount} attive` : undefined}
-                        summary={activeTherapies !== undefined && therapyCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
+                        count={workspace ? `${workspace.activeTherapiesCount} attive` : undefined}
+                        summary={workspace?.activeTherapiesCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
                         keepMounted
                     >
                         <TherapyManager patientId={id} embedded />
@@ -551,8 +573,8 @@ export default function PatientDetailPage() {
                         kicker="Parametri"
                         title="Parametri clinici"
                         icon={Activity}
-                        count={observationCount !== undefined ? String(observationCount) : undefined}
-                        summary={observationCount === 0 ? 'Nessun parametro registrato.' : undefined}
+                        count={workspace ? String(workspace.observationsCount) : undefined}
+                        summary={workspace?.observationsCount === 0 ? 'Nessun parametro registrato.' : undefined}
                         keepMounted
                     >
                         <ObservationManager patientId={id} embedded />
