@@ -23,7 +23,8 @@ import {
 } from './document-excerpt';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
-import { routeDocumentClass } from './document-class-router';
+/* @Codex */
+import { routeDocumentClassForSynthesis, type DocumentSynthesisRoutingOptions } from './document-synthesis-routing';
 /* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
@@ -39,7 +40,7 @@ import {
 const MAX_SYNTHESIS_CHARS = 12000;
 
 /* @Codex */
-export interface SynthesizeDocumentOptions {
+export interface SynthesizeDocumentOptions extends DocumentSynthesisRoutingOptions {
     attachmentId?: string;
 }
 
@@ -166,10 +167,9 @@ export async function synthesizeDocument(
     const normalized = normalizeDocumentInput(rawMarkdown);
     const analysis = await analyzeDocumentContent(rawMarkdown);
 
-    // Classificazione deterministica (nome file + testata): segnale additivo per la
-    // review, non altera il flusso di sintesi. Producer non disponibile qui perche
-    // il testo e estratto server-side; nome file e contenuto bastano.
-    const routed = routeDocumentClass({ fileName, textSample: normalized.normalizedText });
+    // Classificazione deterministica (nome file + metadata PDF + testata):
+    // segnale additivo per la review, non altera il flusso di sintesi.
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
 
     const patient = await db.patients.get(patientId);
     if (!patient) {

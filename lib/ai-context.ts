@@ -40,6 +40,7 @@ export interface PatientInsightSourceRef {
     section: string;
     label: string;
     promptLine: string;
+    versionSignature?: string;
     evidenceSourceId?: string;
     evidenceSchemaVersion?: typeof MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION;
     citation?: EvidenceQueueCitation;
@@ -64,7 +65,7 @@ export interface PatientInsightContextSnapshot {
 // crittografico). Restituisce una stringa esadecimale stabile.
 function computeContextHash(sourceRefs: PatientInsightSourceRef[]): string {
     const signature = sourceRefs
-        .map((ref) => `${ref.id}|${ref.promptLine}|${ref.evidenceSourceId ?? ''}`)
+        .map((ref) => `${ref.id}|${ref.promptLine}|${ref.evidenceSourceId ?? ''}|${ref.versionSignature ?? ''}`)
         .join('\n');
     let hash = 0x811c9dc5;
     for (let i = 0; i < signature.length; i += 1) {
@@ -167,6 +168,7 @@ interface DocumentContextCandidate {
 /* @Codex */
 interface PatientInsightSourceLine {
     promptLine: string;
+    versionSignature?: string;
     evidenceSourceId?: string;
     evidenceSchemaVersion?: typeof MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION;
     citation?: EvidenceQueueCitation;
@@ -211,6 +213,13 @@ function formatDate(value: unknown): string {
     const parsed = value instanceof Date ? value : new Date(value as string | number);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString('it-IT');
+}
+
+/* @Codex */
+function formatVersionTimestamp(value: unknown): string {
+    if (!value) return '';
+    const parsed = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
 }
 
 function compareDatesDesc(left: unknown, right: unknown): number {
@@ -646,6 +655,7 @@ function createSourceRefs(
             section,
             label: `${section}: ${compactText(line.promptLine, 160)}`,
             promptLine: line.promptLine,
+            versionSignature: line.versionSignature,
             evidenceSourceId: line.evidenceSourceId,
             evidenceSchemaVersion: line.evidenceSchemaVersion,
             citation: line.citation,
@@ -878,7 +888,13 @@ export async function buildPatientInsightContext(
         .slice(0, MAX_THERAPIES)
         .map((therapy) => {
             const indication = therapy.diagnosisName ? `; indicazione ${compactText(therapy.diagnosisName, 80)}` : '';
-            return `- ${compactText(therapy.drugName, 80)} ${compactText(therapy.dosage, 60)}${indication}`;
+            return {
+                promptLine: `- ${compactText(therapy.drugName, 80)} ${compactText(therapy.dosage, 60)}${indication}`,
+                versionSignature: [
+                    `start:${formatVersionTimestamp(therapy.startDate)}`,
+                    `updated:${formatVersionTimestamp((therapy as { updatedAt?: unknown }).updatedAt)}`,
+                ].join('|'),
+            };
         });
 
     const observationLines = observations
@@ -891,7 +907,13 @@ export async function buildPatientInsightContext(
             const outOfRange = flag
                 ? ` (${flag === 'alto' ? 'sopra' : 'sotto'} range rif ${formatReferenceRange(observation.refLow, observation.refHigh, observation.refText)})`
                 : '';
-            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode}${outOfRange} [${formatDate(observation.observedAt)}]${note}`;
+            return {
+                promptLine: `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode}${outOfRange} [${formatDate(observation.observedAt)}]${note}`,
+                versionSignature: [
+                    `observed:${formatVersionTimestamp(observation.observedAt)}`,
+                    `updated:${formatVersionTimestamp((observation as { updatedAt?: unknown }).updatedAt)}`,
+                ].join('|'),
+            };
         });
 
     const checkupLines = checkups

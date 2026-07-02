@@ -2,6 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStoredDocumentExcerpt } from './document-excerpt';
+/* @Codex */
+import { routeDocumentClassForSynthesis } from './document-synthesis-routing';
+/* @Codex */
+import { rememberPdfDocumentMetadata } from './pdf-document-metadata';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
 import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 import {
@@ -105,6 +109,19 @@ test('buildStoredDocumentExcerpt rescues signal from OCR-like single-line docume
     assert.match(excerpt, /Indicazioni alla dimissione/);
     assert.match(excerpt, /Controllo ortopedico tra 10 giorni/);
     assert.match(excerpt, /FKT domiciliare bisettimanale/);
+});
+
+test('routeDocumentClassForSynthesis includes remembered PDF producer metadata', () => {
+    const rawMarkdown = 'Risultato Valore Unita';
+    rememberPdfDocumentMetadata('scan.pdf', rawMarkdown, {
+        producer: 'JasperReports Library version 6.20',
+        creator: 'Clinical Laboratory Exporter',
+    });
+
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, 'scan.pdf');
+
+    assert.equal(routed.classification, 'lab_report');
+    assert.ok(routed.signals.includes('producer:known'));
 });
 
 test('buildDocumentParseEvidenceArtifact passes the canonical parser/evidence chamber on the baseline discharge case', () => {
