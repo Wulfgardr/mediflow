@@ -85,6 +85,7 @@
     "test:patient-soft-delete": "bash scripts/patient-soft-delete-test.sh",
     "test:patient-cascade": "node --test scripts/patient-cascade.test.mjs",
     "test:service-prescription-items-catalog-migration": "bash scripts/service-prescription-items-catalog-migration-test.sh",
+    "test:document-intelligence-columns-migration": "node --test scripts/document-intelligence-columns-migration.test.mjs",
     "test:concurrency:patients": "bash scripts/patient-concurrency-smoke.sh",
     "test:concurrency:patients:runner": "node --test --test-concurrency=1 scripts/patient-concurrency.test.mjs",
     "check:audit-quality-gate": "node scripts/audit-quality-gate.mjs",
