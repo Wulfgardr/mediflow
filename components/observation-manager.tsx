@@ -70,6 +70,9 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
     const [value, setValue] = useState('');
     const [observedAt, setObservedAt] = useState(toLocalDateTimeInput(new Date()));
     const [notes, setNotes] = useState('');
+    // S6: range di riferimento del referto (opzionali). Se assenti, nessun flag.
+    const [refLow, setRefLow] = useState('');
+    const [refHigh, setRefHigh] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
@@ -178,6 +181,8 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                 unitCode,
                 value: numericValue,
                 notes: notes.trim() || undefined,
+                refLow: refLow.trim() ? refLow.replace(',', '.').trim() : undefined,
+                refHigh: refHigh.trim() ? refHigh.replace(',', '.').trim() : undefined,
                 observedAt: observedDate,
                 source: 'manual',
                 createdAt: new Date(),
@@ -188,6 +193,8 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                successiva dello stesso referto mantiene lo stesso timestamp. */
             setValue('');
             setNotes('');
+            setRefLow('');
+            setRefHigh('');
             codeSelectRef.current?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
@@ -296,6 +303,28 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                     <span className="block text-[10.5px] font-mono uppercase tracking-wide text-slate-400 dark:text-slate-500">
                         UCUM {unitCode}
                     </span>
+                </label>
+
+                <label className="space-y-1">
+                    <span className="section-kicker">Rif. min (opzionale)</span>
+                    <input
+                        value={refLow}
+                        onChange={(e) => setRefLow(e.target.value)}
+                        className="mf-input"
+                        inputMode="decimal"
+                        placeholder="Es. 70"
+                    />
+                </label>
+
+                <label className="space-y-1">
+                    <span className="section-kicker">Rif. max (opzionale)</span>
+                    <input
+                        value={refHigh}
+                        onChange={(e) => setRefHigh(e.target.value)}
+                        className="mf-input"
+                        inputMode="decimal"
+                        placeholder="Es. 110"
+                    />
                 </label>
 
                 <label className="md:col-span-2 space-y-1">
