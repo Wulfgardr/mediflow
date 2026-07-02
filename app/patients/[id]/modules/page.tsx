@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Accessibility, Activity, Calendar, Download, FileText, FlaskConical, HeartPulse, Pencil, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
+import { Accessibility, Activity, Calendar, Download, FileText, Pencil, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
-import { PatientClinicalSignals, type ClinicalSignal } from '@/components/patient-clinical-signals';
+import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type SynopticTherapyLine } from '@/components/patient-synoptic-sheet';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -32,7 +32,7 @@ import { buildValidationMessage, type ValidatePatientExportResponse } from '@/li
 import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
-import { classifyObservationRange } from '@/lib/observation-range';
+import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
@@ -93,6 +93,40 @@ export default function PatientDetailPage() {
             return items
                 .filter((observation) => observation.observedAt)
                 .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0] ?? null;
+        },
+        [id],
+    );
+    /* @Codex WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
+       calcolato DENTRO il gruppo per codice (mai tra analiti diversi) e solo se
+       stessa unita e valori numerici. Classificazione fuori-range da observation-range. */
+    const latestMeasure = useLiveQuery<SynopticMeasure | null>(
+        async () => {
+            const items = await db.observations.filter((observation) => observation.patientId === id).toArray();
+            const sorted = items
+                .filter((observation) => observation.observedAt)
+                .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
+            const latest = sorted[0];
+            if (!latest) return null;
+            const previous = sorted.find(
+                (observation, index) => index > 0 && observation.code === latest.code && observation.unitCode === latest.unitCode,
+            );
+            let delta: SynopticMeasure['delta'];
+            const latestNum = toNumericValue(latest.value);
+            const previousNum = previous ? toNumericValue(previous.value) : null;
+            if (latestNum !== null && previousNum !== null) {
+                const diff = Math.round((latestNum - previousNum) * 100) / 100;
+                delta = {
+                    direction: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat',
+                    label: `${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')}`,
+                };
+            }
+            return {
+                display: latest.display,
+                valueLabel: `${latest.value}${latest.unitCode ? ` ${latest.unitCode}` : ''}`,
+                dateLabel: new Date(latest.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+                delta,
+                outOfRange: classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ?? undefined,
+            };
         },
         [id],
     );
@@ -236,21 +270,6 @@ export default function PatientDetailPage() {
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
        inventano flag (resta onesto). */
     const therapyCount = activeTherapies?.length ?? 0;
-    // Primi 2 principi attivi con posologia direttamente nella cella.
-    const therapyHint = activeTherapies && activeTherapies.length > 0
-        ? activeTherapies
-            .slice(0, 2)
-            .map((therapy) => [therapy.drugName, therapy.dosage].filter(Boolean).join(' '))
-            .join('; ') + (activeTherapies.length > 2 ? `; +${activeTherapies.length - 2}` : '')
-        : undefined;
-    // Ultima misura registrata (data + valore), deterministica.
-    const observationHint = latestObservation
-        ? `${latestObservation.display}: ${latestObservation.value}${latestObservation.unitCode ? ' ' + latestObservation.unitCode : ''} · ${new Date(latestObservation.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`
-        : undefined;
-    // Colora la cella Parametri solo se l'ultima misura e realmente fuori range
-    // (range presente sul dato). Mai un flag inventato.
-    const observationOutOfRange = Boolean(latestObservation
-        && classifyObservationRange(latestObservation.value, latestObservation.refLow, latestObservation.refHigh));
     // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
     // percorso e ancora aperto (rilevante soprattutto per l'ADI).
     const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
@@ -260,43 +279,38 @@ export default function PatientDetailPage() {
     const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
     // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.
     const missingSynthesisCount = attachmentItems.length - attachmentsWithTextCount;
-    const clinicalSignals: ClinicalSignal[] = [
+    /* @Codex WUL-UIUX (Fase 4): input per il Foglio sinottico. Terapie e ultima
+       misura hanno righe dedicate; qui restano i segnali di contesto onesti senza
+       una riga propria. Nessun flag fuori-range inventato. */
+    const otherProblemsCount = Math.max(0, diagnosisItems.length - (leadDiagnosis ? 1 : 0));
+    const synopticTherapies: SynopticTherapyLine[] | undefined = activeTherapies?.map((therapy) => ({
+        id: therapy.id,
+        drugName: therapy.drugName,
+        dosage: therapy.dosage,
+    }));
+    const synopticSignals: SynopticSignal[] = [
         {
-            label: 'Problemi attivi',
-            value: diagnosisItems.length,
-            icon: Stethoscope,
-            hint: leadDiagnosis?.description,
+            label: 'Da rivedere',
+            value: reviewQueueSummary.attentionCount,
+            tone: reviewQueueSummary.attentionCount > 0 ? 'warning' : 'neutral',
+            href: '#coda-revisione',
         },
-        { label: 'Terapie attive', value: therapyCount, icon: Pill, hint: therapyHint },
-        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical, hint: observationHint, tone: observationOutOfRange ? 'critical' : 'neutral' },
         {
             label: 'Ultimo contatto',
-            value: lastEntryDate
-                ? lastEntryDate.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
-                : 'Nessuno',
-            icon: FileText,
+            value: lastEntryDate ? lastEntryDate.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : 'Nessuno',
             tone: contactStale ? 'warning' : 'neutral',
-            hint: daysSinceContact !== null
-                ? (daysSinceContact === 0 ? 'oggi' : `${daysSinceContact} giorni fa`)
-                : undefined,
         },
         {
             label: 'Doc. da sintetizzare',
             value: missingSynthesisCount,
-            icon: FileText,
             tone: missingSynthesisCount > 0 ? 'warning' : 'neutral',
+            href: '#archivio',
         },
-        {
-            label: 'Prossimo follow-up',
-            value: nextCheckup
-                ? new Date(nextCheckup.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
-                : 'Nessuno',
-            icon: Calendar,
-            tone: nextCheckup ? 'warning' : 'neutral',
-            hint: nextCheckup?.title,
-        },
-        { label: 'Esenzioni', value: exemptionCodes.length, icon: HeartPulse },
+        { label: 'Esenzioni', value: exemptionCodes.length },
     ];
+    const nextCheckupLabel = nextCheckup
+        ? new Date(nextCheckup.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+        : undefined;
     /* @Codex WUL-UIUX: ordine del rail allineato al DOM a colonna singola:
        Diario risale sotto Timeline, Protesica ha la sua ancora. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
@@ -410,6 +424,23 @@ export default function PatientDetailPage() {
             navItems={workspaceNavItems}
         >
             <div id="quadro" className={workspaceStyles.anchorStack}>
+                <PatientSynopticSheet
+                    patient={patient}
+                    ageLabel={ageLabel}
+                    leadDiagnosis={leadDiagnosis}
+                    otherProblemsCount={otherProblemsCount}
+                    signals={synopticSignals}
+                    therapies={synopticTherapies}
+                    therapiesTotal={therapyCount}
+                    latestMeasure={latestMeasure}
+                    nextCheckupLabel={nextCheckupLabel}
+                    nextCheckupTitle={nextCheckup?.title}
+                    actions={actionsDock}
+                />
+
+                {/* @Codex WUL-UIUX: la lens completa scende a livello 2 sotto il
+                    Foglio (dettaglio del quadro: tutte le diagnosi ed esenzioni).
+                    Le azioni vivono nel Foglio, non qui, per non duplicare il dock. */}
                 <PatientIdentityLens
                     variant="reader"
                     patient={patient}
@@ -418,12 +449,9 @@ export default function PatientDetailPage() {
                     diagnoses={diagnosisItems}
                     exemptions={exemptionCodes}
                     exemptionDetails={exemptionDetails ?? []}
-                    actions={actionsDock}
                     summary={summaryText}
                     nextStep={nextStepText}
                 />
-
-                <PatientClinicalSignals signals={clinicalSignals} />
 
                 <CollapsibleSection
                     id="coda-revisione"
@@ -482,7 +510,6 @@ export default function PatientDetailPage() {
                         icon={Pill}
                         count={activeTherapies !== undefined ? `${therapyCount} attive` : undefined}
                         summary={activeTherapies !== undefined && therapyCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
-                        keepMounted
                     >
                         <TherapyManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -494,7 +521,6 @@ export default function PatientDetailPage() {
                         icon={Stethoscope}
                         count={prestazioniCount !== undefined ? String(prestazioniCount) : undefined}
                         summary={prestazioniCount === 0 ? 'Nessuna prestazione prescritta.' : undefined}
-                        keepMounted
                     >
                         <ServicePrescriptionManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -506,7 +532,6 @@ export default function PatientDetailPage() {
                         icon={Activity}
                         count={observationCount !== undefined ? String(observationCount) : undefined}
                         summary={observationCount === 0 ? 'Nessun parametro registrato.' : undefined}
-                        keepMounted
                     >
                         <ObservationManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -518,7 +543,6 @@ export default function PatientDetailPage() {
                         icon={Accessibility}
                         count={protesicaCount !== undefined ? String(protesicaCount) : undefined}
                         summary={protesicaCount === 0 ? 'Nessuna voce protesica registrata.' : undefined}
-                        keepMounted
                     >
                         <ProstheticPrescriptionManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -530,7 +554,6 @@ export default function PatientDetailPage() {
                         icon={ShieldCheck}
                         count={sissHandoffCount !== undefined ? `${sissHandoffCount} passaggi` : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
-                        keepMounted
                     >
                         <div className="space-y-4">
                             <SissPatientContextPanel

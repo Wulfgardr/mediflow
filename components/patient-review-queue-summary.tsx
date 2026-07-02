@@ -15,6 +15,9 @@ import type {
 
 interface PatientReviewQueueSummaryProps {
     summary: PatientReviewQueueSummary;
+    /* @Codex WUL-UIUX: senza card e header propri, per vivere dentro una
+       CollapsibleSection che fornisce gia superficie e intestazione. */
+    embedded?: boolean;
 }
 
 const STATE_CHIP_CLASSES: Record<ReviewQueueRowState, string> = {
@@ -64,7 +67,17 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
     );
 }
 
-export default function PatientReviewQueueSummaryPanel({ summary }: PatientReviewQueueSummaryProps) {
+export default function PatientReviewQueueSummaryPanel({ summary, embedded = false }: PatientReviewQueueSummaryProps) {
+    if (embedded) {
+        return (
+            <ul className="grid gap-2" data-testid="patient-review-queue-summary">
+                {summary.rows.map((row) => (
+                    <ReviewQueueRow key={row.id} row={row} />
+                ))}
+            </ul>
+        );
+    }
+
     return (
         <section
             id="coda-revisione"
