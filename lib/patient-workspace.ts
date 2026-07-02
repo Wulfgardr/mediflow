@@ -262,6 +262,56 @@ function buildCodingHints(
   return hints.slice(0, 3);
 }
 
+/* @Codex WUL-UIUX Fase 7 (innesto): adapter per la Scheda (/modules), che ha
+   gia il record Patient di '@/lib/db' e gli array grezzi. Costruiamo il minimo
+   Kree8Patient che buildPatientWorkspace legge davvero (solo `raw`, da cui
+   arrivano diagnoses e documentInsights) e deleghiamo alla stessa pipeline del
+   Quadro: i numeri non possono divergere per costruzione. Gli array vengono
+   copiati perche il builder ordina in-place e gli array della pagina sono
+   condivisi con altre viste. Nessun cambio di comportamento per il cockpit. */
+export function buildPatientWorkspaceFromRecords({
+  patient,
+  entries,
+  therapies,
+  checkups,
+  observations,
+  attachments,
+}: {
+  patient: Patient;
+  entries: ClinicalEntry[];
+  therapies: Therapy[];
+  checkups: Checkup[];
+  observations: Observation[];
+  attachments: Attachment[];
+}): Kree8PatientWorkspace {
+  const minimalPatient: Kree8Patient = {
+    id: patient.id,
+    name: [patient.lastName, patient.firstName].filter(Boolean).join(' ') || 'Paziente senza nome',
+    code: '',
+    scope: 'ambulatorio',
+    list: patient.isArchived ? 'archivio' : 'attivi',
+    status: 'blue',
+    statusLabel: '',
+    diagnoses: [],
+    lastTouch: '',
+    pathway: '',
+    href: '',
+    modulesHref: '',
+    ageLabel: '',
+    summary: '',
+    raw: patient,
+  };
+
+  return buildPatientWorkspace({
+    patient: minimalPatient,
+    entries: [...entries],
+    therapies: [...therapies],
+    checkups: [...checkups],
+    observations: [...observations],
+    attachments: [...attachments],
+  });
+}
+
 /* @Codex */
 export function buildPatientWorkspace({
   patient,

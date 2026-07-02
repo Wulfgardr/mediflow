@@ -52,7 +52,9 @@ export interface PatientSynopticSheetProps {
     otherProblemsCount: number;
     signals: SynopticSignal[];
     therapies?: SynopticTherapyLine[];
-    therapiesTotal: number;
+    /* @Codex WUL-UIUX Fase 7: undefined finche la pipeline workspace non e
+       pronta, cosi il totale non mostra zeri finti durante il caricamento. */
+    therapiesTotal?: number;
     latestMeasure?: SynopticMeasure | null;
     nextCheckupLabel?: string;
     nextCheckupTitle?: string;
@@ -99,7 +101,7 @@ export function PatientSynopticSheet({
     actions,
 }: PatientSynopticSheetProps) {
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
-    const extraTherapies = therapiesTotal - visibleTherapies.length;
+    const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
 
     return (
         <section aria-labelledby="synoptic-name" className="patient-detail-section border p-5 md:p-6">
@@ -175,7 +177,7 @@ export function PatientSynopticSheet({
                 <div className="min-w-0">
                     <a href="#terapie" className="mf-listrow !px-1 !py-0.5 justify-between">
                         <MicroLabel>Terapie attive</MicroLabel>
-                        <span className="text-[11px] text-[color:var(--mf-muted)]">{therapiesTotal || 0}</span>
+                        <span className="text-[11px] text-[color:var(--mf-muted)]">{therapiesTotal ?? '–'}</span>
                     </a>
                     {therapies === undefined ? (
                         <div className="mt-2"><SkeletonLines rows={3} /></div>
