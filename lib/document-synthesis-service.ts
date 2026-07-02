@@ -23,6 +23,7 @@ import {
 } from './document-excerpt';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
+import { routeDocumentClass } from './document-class-router';
 /* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
@@ -165,6 +166,11 @@ export async function synthesizeDocument(
     const normalized = normalizeDocumentInput(rawMarkdown);
     const analysis = await analyzeDocumentContent(rawMarkdown);
 
+    // Classificazione deterministica (nome file + testata): segnale additivo per la
+    // review, non altera il flusso di sintesi. Producer non disponibile qui perche
+    // il testo e estratto server-side; nome file e contenuto bastano.
+    const routed = routeDocumentClass({ fileName, textSample: normalized.normalizedText });
+
     const patient = await db.patients.get(patientId);
     if (!patient) {
         throw new Error('Paziente non trovato');
@@ -196,7 +202,9 @@ export async function synthesizeDocument(
             : undefined,
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
-            : undefined
+            : undefined,
+        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
     };
 
     const parseEvidenceArtifact = buildDocumentParseEvidenceArtifact({

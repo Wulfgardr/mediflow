@@ -83,6 +83,13 @@ export interface DocumentInsight {
     autofill?: {
         appliedDiagnoses?: string[];
     };
+    // Classificazione deterministica pre-LLM (router di classe) e data documento
+    // dal nome file: segnali additivi, non alterano il flusso di sintesi.
+    routedClass?: {
+        classification: string;
+        confidence: string;
+    };
+    documentDate?: string;
 }
 
 export interface Patient {

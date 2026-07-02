@@ -45,3 +45,26 @@ export function matchTypeLabel(value: string | undefined | null): string {
         default: return fallbackLabel(value);
     }
 }
+
+const DOCUMENT_CLASS_LABELS: Record<string, string> = {
+    identity_document: 'Documento di identita',
+    medication_prescription: 'Prescrizione farmaco',
+    specialist_service_prescription: 'Impegnativa specialistica',
+    lab_prescription: 'Impegnativa laboratorio',
+    imaging_prescription: 'Impegnativa imaging',
+    screening_prescription_or_invitation: 'Screening/invito',
+    specialist_report: 'Referto specialistico',
+    lab_report: 'Referto di laboratorio',
+    imaging_report: 'Referto imaging',
+    exemption_document: 'Esenzione',
+    prosthetic_prescription: 'Prescrizione protesica',
+    administrative: 'Amministrativo',
+    mute_or_scanned: 'Scansione/muto',
+    unknown: 'Da classificare',
+};
+
+/** Classe documentale del router deterministico (14 tipi di document-decision). */
+export function documentClassLabel(value: string | undefined | null): string {
+    const key = fallbackLabel(value).toLowerCase();
+    return DOCUMENT_CLASS_LABELS[key] ?? fallbackLabel(value);
+}

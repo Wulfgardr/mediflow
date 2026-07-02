@@ -6,7 +6,7 @@ import { db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
-import { qualityLabel } from '@/lib/ai-labels';
+import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 
 interface DocumentInsightsPanelProps {
@@ -158,6 +158,11 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                             {insight.quality?.level && (
                                                 <span className={`ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${qualityTone(insight.quality.level)}`}>
                                                     {qualityLabel(insight.quality.level)}
+                                                </span>
+                                            )}
+                                            {insight.routedClass?.classification && insight.routedClass.classification !== 'unknown' && (
+                                                <span className="ml-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:border-white/10 dark:text-slate-300">
+                                                    {documentClassLabel(insight.routedClass.classification)}
                                                 </span>
                                             )}
                                         </div>
