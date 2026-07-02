@@ -50,15 +50,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+        uses: compnerd/gha-setup-swift@v0.4.0
         with:
-          swift-version: '6.0'
+          swift-version: swift-6.0.3-release
+          swift-build: 6.0.3-RELEASE
       - name: Swift version
         run: swift --version
+        shell: pwsh
       - name: Build MediFlowCore
         run: swift build --package-path native/MediFlowMac --target MediFlowCore
+        shell: pwsh
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
+        shell: pwsh
 
   macos:
     runs-on: macos-15
