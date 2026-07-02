@@ -54,6 +54,7 @@ jobs:
         with:
           swift-version: swift-6.0.3-release
           swift-build: 6.0.3-RELEASE
+          update-sdk-modules: true
       - name: Select supported Windows SDK
         uses: compnerd/gha-setup-vsdevenv@v6
         with:
