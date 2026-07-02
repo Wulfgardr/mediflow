@@ -52,6 +52,9 @@ export const patients = sqliteTable('patients', {
     statusReason: text('status_reason'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
+    // Ciclo di vita dell'insight (S1): quando generato + hash del contesto clinico.
+    aiSummaryGeneratedAt: integer('ai_summary_generated_at', { mode: 'timestamp' }),
+    aiSummaryContextHash: text('ai_summary_context_hash'),
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
@@ -145,6 +148,11 @@ export const observations = sqliteTable('observations', {
     notes: text('notes'),
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
+    // S6: range di riferimento. refLow/refHigh solo se numerici, refText per range
+    // grezzi/qualitativi ("< 200", "Negativo"). Non cifrati (metadati come value).
+    refLow: text('ref_low'),
+    refHigh: text('ref_high'),
+    refText: text('ref_text'),
     /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),

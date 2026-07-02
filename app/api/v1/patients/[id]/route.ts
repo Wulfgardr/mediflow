@@ -88,6 +88,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             /* @Codex */
             aiSummary: patient.aiSummary ?? null,
             /* @Codex */
+            aiSummaryGeneratedAt: toIsoString(patient.aiSummaryGeneratedAt),
+            /* @Codex */
+            aiSummaryContextHash: patient.aiSummaryContextHash ?? null,
+            /* @Codex */
             documentInsights: patient.documentInsights ?? null,
             isAdi: patient.isAdi ?? null,
             isArchived: patient.isArchived ?? null,

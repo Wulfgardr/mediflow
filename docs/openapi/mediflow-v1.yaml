@@ -2550,6 +2550,15 @@ components:
           type:
             - string
             - 'null'
+        aiSummaryGeneratedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        aiSummaryContextHash:
+          type:
+            - string
+            - 'null'
         documentInsights:
           type:
             - string
@@ -3145,6 +3154,18 @@ components:
           type:
             - string
             - 'null'
+        refLow:
+          type:
+            - string
+            - 'null'
+        refHigh:
+          type:
+            - string
+            - 'null'
+        refText:
+          type:
+            - string
+            - 'null'
         observedAt:
           type: string
           format: date-time
@@ -3218,6 +3239,18 @@ components:
           type:
             - string
             - 'null'
+        refLow:
+          type:
+            - string
+            - 'null'
+        refHigh:
+          type:
+            - string
+            - 'null'
+        refText:
+          type:
+            - string
+            - 'null'
         observedAt:
           type: string
           format: date-time
@@ -3259,6 +3292,18 @@ components:
             - type: string
             - type: number
         notes:
+          type:
+            - string
+            - 'null'
+        refLow:
+          type:
+            - string
+            - 'null'
+        refHigh:
+          type:
+            - string
+            - 'null'
+        refText:
           type:
             - string
             - 'null'
@@ -3350,6 +3395,15 @@ components:
             - string
             - 'null'
         aiSummary:
+          type:
+            - string
+            - 'null'
+        aiSummaryGeneratedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        aiSummaryContextHash:
           type:
             - string
             - 'null'

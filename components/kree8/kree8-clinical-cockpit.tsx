@@ -13,7 +13,6 @@ import {
   AlertTriangle,
   Archive,
   ArrowUpRight,
-  Bell,
   CalendarClock,
   Check,
   ChevronRight,
@@ -47,13 +46,26 @@ import {
 
 import {
   db,
-  type Attachment,
   type Checkup,
   type ClinicalEntry,
-  type Observation,
   type Patient,
-  type Therapy,
 } from '@/lib/db';
+/* @Codex WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
+import {
+  buildPatientWorkspace,
+  clinicalEntryTypeLabel,
+  countPlannedCheckups,
+  countTodayCheckups,
+  formatWorkspaceDate,
+  mapCheckupsForKree8,
+  parseDiagnosisLabels,
+  type InboxList,
+  type Kree8AgendaRow,
+  type Kree8Patient,
+  type Kree8PatientSource,
+  type Kree8PatientWorkspace,
+  type PillVariant,
+} from '@/lib/patient-workspace';
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 import type {
   SissPatientContextAction,
@@ -65,7 +77,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import styles from './kree8-clinical-cockpit.module.css';
 
-type AreaId =
+export type AreaId =
   | 'turno'
   | 'incarico'
   | 'scheda'
@@ -74,11 +86,13 @@ type AreaId =
   | 'repertori'
   | 'handoff'
   | 'governance';
+
+/* @Codex WUL-UIUX: id validi per il deep-link ?area= letto da app/page.tsx. */
+export const AREA_ID_VALUES: AreaId[] = ['turno', 'incarico', 'scheda', 'diario', 'revisione', 'repertori', 'handoff', 'governance'];
 type DocDecision = 'pending' | 'apply' | 'note' | 'ignore';
 type StageId = 'identity' | 'consent' | 'handoff' | 'outcome';
 type StatusFilter = 'all' | 'urgent' | 'ai' | 'manual';
 type InboxScope = 'ambulatorio' | 'network' | 'tutti';
-type InboxList = 'attivi' | 'archivio';
 type HandoffFeedback = {
   kind: 'success' | 'warning' | 'error';
   message: string;
@@ -123,70 +137,20 @@ type ClinicalAgendaBridgeClientState = {
 
 type Kree8PatientStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-type Kree8PatientSource = Partial<Patient> & {
-  id: string;
-  statusReason?: string | null;
-};
-
-type Kree8Patient = {
-  id: string;
-  name: string;
-  code: string;
-  scope: 'ambulatorio' | 'network';
-  list: InboxList;
-  status: 'green' | 'blue' | 'muted';
-  statusLabel: string;
-  diagnoses: string[];
-  lastTouch: string;
-  pathway: string;
-  href: string;
-  modulesHref: string;
-  ageLabel: string;
-  summary: string;
-  raw: Kree8PatientSource;
-};
-
 type Kree8PatientClientState = {
   status: Kree8PatientStatus;
   patients: Kree8Patient[];
 };
 
-/* @Codex */
-type Kree8PatientWorkspace = {
-  entriesCount: number;
-  latestEntry?: { title: string; date: string; type: string };
-  activeTherapiesCount: number;
-  therapyLabels: string[];
-  pendingCheckupsCount: number;
-  nextCheckup?: { title: string; date: string; pill: PillVariant; pillLabel: string };
-  observationsCount: number;
-  latestObservation?: { label: string; date: string; value: string };
-  attachmentsCount: number;
-  recentAttachmentNames: string[];
-  documentInsightCount: number;
-  codingHints: string[];
-};
-
-type Kree8AgendaRow = {
-  time: string;
-  title: string;
-  sub: string;
-  pill: 'green' | 'blue' | 'yellow' | 'coral' | 'muted' | 'violet';
-  pillLabel: string;
-};
-
-type Kree8CheckupSource = {
-  id: string;
-  patientId: string;
-  date: string | Date;
-  title: string;
-  notes?: string | null;
-  status?: string | null;
-};
-
 type Kree8AgendaClientState = {
   status: Kree8PatientStatus;
   rows: Kree8AgendaRow[];
+  /* @Codex WUL-UIUX: conteggio degli appuntamenti di oggi sull'intero set, non
+     limitato alle max 6 righe mostrate. */
+  todayCount?: number;
+  /* @Codex WUL-UIUX: totale dei passaggi pianificati (oggi + futuri) prima dello
+     slice(0,6), cosi la testata non dichiara solo le righe visibili. */
+  plannedCount?: number;
 };
 
 /* @Codex */
@@ -594,38 +558,6 @@ const REVIEW_DIARY_STATE: Kree8DiaryClientState = {
   patientCount: new Set(REVIEW_DIARY_ENTRIES.map((entry) => entry.patientId)).size,
 };
 
-function parseStructuredList(value: unknown): unknown[] {
-  if (Array.isArray(value)) return value;
-  if (typeof value !== 'string' || !value.trim()) return [];
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function parseDiagnosisLabels(value: unknown): string[] {
-  return parseStructuredList(value)
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (!item || typeof item !== 'object') return null;
-      const record = item as Record<string, unknown>;
-      const code = typeof record.code === 'string' ? record.code.trim() : '';
-      const description =
-        typeof record.description === 'string'
-          ? record.description.trim()
-          : typeof record.name === 'string'
-            ? record.name.trim()
-            : '';
-      if (code && description) return `${code} · ${description}`;
-      return description || code || null;
-    })
-    .filter((item): item is string => Boolean(item))
-    .slice(0, 3);
-}
-
 function formatPatientDate(value: string | Date | null | undefined): string {
   if (!value) return 'n/d';
   const date = new Date(value);
@@ -840,97 +772,6 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
   };
 }
 
-function formatCheckupTime(value: string | Date): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '–';
-  return new Intl.DateTimeFormat('it-IT', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
-function isSameCalendarDay(left: Date, right: Date): boolean {
-  return left.getFullYear() === right.getFullYear()
-    && left.getMonth() === right.getMonth()
-    && left.getDate() === right.getDate();
-}
-
-function classifyCheckupPill(checkup: Kree8CheckupSource): Pick<Kree8AgendaRow, 'pill' | 'pillLabel'> {
-  const status = checkup.status ?? 'pending';
-  const date = new Date(checkup.date);
-  const now = new Date();
-
-  if (status === 'completed') return { pill: 'green', pillLabel: 'Completato' };
-  if (status === 'cancelled') return { pill: 'muted', pillLabel: 'Annullato' };
-  if (!Number.isNaN(date.getTime()) && date.getTime() < now.getTime() && !isSameCalendarDay(date, now)) {
-    return { pill: 'coral', pillLabel: 'Scaduto' };
-  }
-  if (!Number.isNaN(date.getTime()) && isSameCalendarDay(date, now)) {
-    return { pill: 'yellow', pillLabel: 'Oggi' };
-  }
-  return { pill: 'blue', pillLabel: 'Pianificato' };
-}
-
-function mapCheckupsForKree8(
-  checkups: Kree8CheckupSource[],
-  patients: Kree8Patient[],
-): Kree8AgendaRow[] {
-  const patientById = new Map(patients.map((patient) => [patient.id, patient]));
-
-  return checkups
-    .filter((checkup) => checkup.status !== 'cancelled')
-    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
-    .slice(0, 6)
-    .map((checkup) => {
-      const patient = patientById.get(checkup.patientId);
-      const pill = classifyCheckupPill(checkup);
-      return {
-        time: formatCheckupTime(checkup.date),
-        title: checkup.title || 'Appuntamento clinico',
-        sub: patient
-          ? `${patient.name} · ${patient.code}`
-          : 'Paziente non presente nell’elenco pazienti',
-        ...pill,
-      };
-    });
-}
-
-/* @Codex */
-function formatWorkspaceDate(value: string | Date | null | undefined): string {
-  if (!value) return 'n/d';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'n/d';
-  return new Intl.DateTimeFormat('it-IT', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
-/* @Codex */
-function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined): string {
-  switch (type) {
-    case 'visit':
-      return 'Visita';
-    case 'phone':
-      return 'Telefonata';
-    case 'exam':
-      return 'Esame';
-    case 'hospitalization':
-      return 'Ricovero';
-    case 'access':
-      return 'Accesso';
-    case 'scale':
-      return 'Scala';
-    case 'remote':
-      return 'Remoto';
-    case 'note':
-    default:
-      return 'Nota';
-  }
-}
-
 /* @Codex */
 async function fetchCatalogCount(path: string): Promise<number> {
   const response = await fetch(path, { cache: 'no-store' });
@@ -1049,113 +890,9 @@ function buildGlobalDiaryState(
   };
 }
 
-/* @Codex */
-function summarizeObservation(observation: Observation): string {
-  const unit = observation.unitCode ? ` ${observation.unitCode}` : '';
-  return `${observation.display || observation.code}: ${observation.value}${unit}`;
-}
-
-/* @Codex */
-function buildCodingHints(
-  patient: Kree8Patient,
-  therapies: Therapy[],
-  attachments: Attachment[],
-): string[] {
-  const hints: string[] = [];
-  const structuredDiagnoses = parseDiagnosisLabels(patient.raw.diagnoses);
-  const hasCodedDiagnosis = structuredDiagnoses.some((diagnosis) => /^[A-Z][0-9A-Z.-]*\s*·/.test(diagnosis));
-  const therapiesWithoutDiagnosis = therapies.filter((therapy) => therapy.status === 'active' && !therapy.diagnosisCode);
-
-  if (!hasCodedDiagnosis) {
-    hints.push('Diagnosi da collegare a codifica clinica');
-  }
-  if (therapiesWithoutDiagnosis.length > 0) {
-    hints.push(`${therapiesWithoutDiagnosis.length} terapie senza aggancio diagnosi`);
-  }
-  if (attachments.length > 0) {
-    hints.push('Documenti recenti da usare per confermare codifiche');
-  }
-
-  return hints.slice(0, 3);
-}
-
-/* @Codex */
-function buildPatientWorkspace({
-  patient,
-  entries,
-  therapies,
-  checkups,
-  observations,
-  attachments,
-}: {
-  patient: Kree8Patient;
-  entries: ClinicalEntry[];
-  therapies: Therapy[];
-  checkups: Checkup[];
-  observations: Observation[];
-  attachments: Attachment[];
-}): Kree8PatientWorkspace {
-  const activeEntries = entries
-    .filter((entry) => !entry.deletedAt)
-    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
-  const activeTherapies = therapies
-    .filter((therapy) => therapy.status === 'active')
-    .sort((left, right) => new Date(right.updatedAt ?? right.createdAt).getTime() - new Date(left.updatedAt ?? left.createdAt).getTime());
-  const pendingCheckups = checkups
-    .filter((checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
-    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
-  const latestObservations = observations
-    .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
-  const recentAttachments = attachments
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-  const nextCheckup = pendingCheckups[0];
-  const latestEntry = activeEntries[0];
-  const latestObservation = latestObservations[0];
-  const documentInsightCount = Array.isArray(patient.raw.documentInsights)
-    ? patient.raw.documentInsights.length
-    : 0;
-
-  return {
-    entriesCount: activeEntries.length,
-    latestEntry: latestEntry
-      ? {
-        title: latestEntry.title || 'Voce diario',
-        date: formatWorkspaceDate(latestEntry.date),
-        type: clinicalEntryTypeLabel(latestEntry.type),
-      }
-      : undefined,
-    activeTherapiesCount: activeTherapies.length,
-    therapyLabels: activeTherapies
-      .slice(0, 3)
-      .map((therapy) => [therapy.drugName, therapy.dosage].filter(Boolean).join(' · ')),
-    pendingCheckupsCount: pendingCheckups.length,
-    nextCheckup: nextCheckup
-      ? {
-        title: nextCheckup.title || 'Follow-up',
-        date: formatWorkspaceDate(nextCheckup.date),
-        ...classifyCheckupPill(nextCheckup),
-      }
-      : undefined,
-    observationsCount: latestObservations.length,
-    latestObservation: latestObservation
-      ? {
-        label: summarizeObservation(latestObservation),
-        date: formatWorkspaceDate(latestObservation.observedAt),
-        value: String(latestObservation.value),
-      }
-      : undefined,
-    attachmentsCount: recentAttachments.length,
-    recentAttachmentNames: recentAttachments.slice(0, 3).map((attachment) => attachment.name || 'Documento clinico'),
-    documentInsightCount,
-    codingHints: buildCodingHints(patient, activeTherapies, recentAttachments),
-  };
-}
-
 function classNames(...parts: (string | false | undefined)[]) {
   return parts.filter(Boolean).join(' ');
 }
-
-type PillVariant = 'blue' | 'yellow' | 'green' | 'coral' | 'muted' | 'violet' | 'ink';
 
 const PILL_VARIANT_CLASS: Record<PillVariant, string> = {
   blue: styles.pillBlue,
@@ -1236,8 +973,10 @@ function Toolbar({
         <Upload size={13} />
         Nuova scheda da documento
       </Link>
-      <button type="button" className={styles.aiButton} onClick={() => onOpenArea('revisione')}>
-        <Sparkles size={13} />
+      {/* @Codex WUL-UIUX: apre la revisione documenti, non una funzione AI:
+          icona e stile standard per non promettere piu di quanto consegna. */}
+      <button type="button" className={styles.toolChip} onClick={() => onOpenArea('revisione')}>
+        <FileSearch size={13} />
         Documenti paziente
       </button>
       <span className={styles.avatarPill}>
@@ -1420,7 +1159,10 @@ function TurnoArea({
       : patientState.status === 'error'
         ? 'pazienti non disponibili'
         : 'aggiornamento in corso';
-  const todayVisitCount = agendaState.rows.filter((row) => row.pillLabel === 'Oggi').length;
+  const todayVisitCount = agendaState.todayCount ?? agendaState.rows.filter((row) => row.pillLabel === 'Oggi').length;
+  /* @Codex WUL-UIUX: totale pianificato reale (pre-slice), per non dichiarare
+     nella testata solo le max 6 righe mostrate. */
+  const plannedVisitCount = agendaState.plannedCount ?? agendaState.rows.length;
   const visitCountLabel =
     agendaState.status === 'loading' || agendaState.status === 'idle'
       ? '…'
@@ -1429,7 +1171,7 @@ function TurnoArea({
         : String(todayVisitCount);
   const visitSubLabel =
     agendaState.status === 'ready'
-      ? `${agendaState.rows.length} passaggi pianificati`
+      ? `${plannedVisitCount} passaggi pianificati`
       : agendaState.status === 'error'
         ? 'agenda non disponibile'
         : 'aggiornamento agenda';
@@ -1482,7 +1224,7 @@ function TurnoArea({
         <div>
           <p className={styles.areaCaption}>Oggi</p>
           <h1 className={styles.areaTitle}>
-            Agenda di oggi <em>{agendaState.rows.length} appuntamenti</em>
+            Agenda di oggi <em>{todayVisitCount} appuntamenti</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
@@ -1500,13 +1242,17 @@ function TurnoArea({
             <ArrowUpRight size={12} /> {patientTrendLabel}
           </span>
         </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Documenti in coda</span>
-          <span className={styles.statValue}>{documentCountLabel}</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
-            {documentSubLabel}
-          </span>
-        </div>
+        {/* @Codex WUL-UIUX: in live queste due card restavano fisse a '-' con un
+            trend simulato: meglio non mostrarle finche non hanno dati reali. */}
+        {isReview ? (
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Documenti in coda</span>
+            <span className={styles.statValue}>{documentCountLabel}</span>
+            <span className={classNames(styles.statTrend, styles.statTrendMuted)}>
+              {documentSubLabel}
+            </span>
+          </div>
+        ) : null}
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Appuntamenti oggi</span>
           <span className={styles.statValue}>{visitCountLabel}</span>
@@ -1514,14 +1260,16 @@ function TurnoArea({
             {visitSubLabel}
           </span>
         </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Suggerimenti da rivedere</span>
-          <span className={styles.statValue}>{decisionCountLabel}</span>
-          <span className={classNames(styles.statTrend, styles.statTrendDown)}>
-            <ArrowUpRight size={12} style={{ transform: 'rotate(90deg)' }} />
-            {decisionSubLabel}
-          </span>
-        </div>
+        {isReview ? (
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Suggerimenti da rivedere</span>
+            <span className={styles.statValue}>{decisionCountLabel}</span>
+            <span className={classNames(styles.statTrend, styles.statTrendDown)}>
+              <ArrowUpRight size={12} style={{ transform: 'rotate(90deg)' }} />
+              {decisionSubLabel}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className={styles.twoCol}>
@@ -1616,6 +1364,7 @@ function IncaricoArea({
   searchFocusSignal,
   onSelectPatient,
   onOpenArea,
+  isReview,
 }: {
   patients: Kree8Patient[];
   patientStatus: Kree8PatientStatus;
@@ -1623,6 +1372,7 @@ function IncaricoArea({
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
+  isReview: boolean;
 }) {
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
@@ -1682,22 +1432,29 @@ function IncaricoArea({
             <MapPin size={12} />
             Ambulatorio locale
           </button>
-          <button
-            type="button"
-            className={classNames(styles.scopeChip, scope === 'network' && styles.scopeChipActive)}
-            onClick={() => setScope('network')}
-          >
-            <Cloud size={12} />
-            Rete locale
-          </button>
-          <button
-            type="button"
-            className={classNames(styles.scopeChip, scope === 'tutti' && styles.scopeChipActive)}
-            onClick={() => setScope('tutti')}
-          >
-            <Users size={12} />
-            Tutti gli ambulatori
-          </button>
+          {/* @Codex WUL-UIUX: in live tutti i pazienti hanno scope 'ambulatorio':
+              i filtri Rete locale / Tutti sarebbero affordance morte. Restano nel
+              ramo review finche lo scope di rete non e mappato sui dati reali. */}
+          {isReview ? (
+            <>
+              <button
+                type="button"
+                className={classNames(styles.scopeChip, scope === 'network' && styles.scopeChipActive)}
+                onClick={() => setScope('network')}
+              >
+                <Cloud size={12} />
+                Rete locale
+              </button>
+              <button
+                type="button"
+                className={classNames(styles.scopeChip, scope === 'tutti' && styles.scopeChipActive)}
+                onClick={() => setScope('tutti')}
+              >
+                <Users size={12} />
+                Tutti gli ambulatori
+              </button>
+            </>
+          ) : null}
 
           <span className={styles.patientScopeActions}>
             <button
@@ -2992,6 +2749,8 @@ function DiarioArea({
                 <span className={styles.evidenceTitle}>{entry.title}</span>
                 <span className={styles.panelActions}>
                   <PillBadge variant={entry.deleted ? 'coral' : 'blue'}>{entry.typeLabel}</PillBadge>
+                  {/* @Codex WUL-UIUX: lo stato eliminato non puo essere solo colore (WCAG 1.4.1). */}
+                  {entry.deleted ? <PillBadge variant="coral">Eliminata</PillBadge> : null}
                 </span>
               </header>
               <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
@@ -4152,6 +3911,7 @@ function AreaContent({
           searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
+          isReview={isReview}
         />
       );
     case 'scheda':
@@ -4228,6 +3988,23 @@ export function Kree8ClinicalCockpit({
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
+
+  /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
+     '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
+     sulla home (le route dedicate come /diary restano canoniche) e solo in live.
+     replaceState conserva history.state per non disturbare il router Next. */
+  useEffect(() => {
+    if (isReview || typeof window === 'undefined') return;
+    if (window.location.pathname !== '/') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('area', area);
+    if (selectedPatientId) {
+      url.searchParams.set('paziente', selectedPatientId);
+    } else {
+      url.searchParams.delete('paziente');
+    }
+    window.history.replaceState(window.history.state, '', url);
+  }, [area, selectedPatientId, isReview]);
 
   const selectedPatient = useMemo(
     () => {
@@ -4336,12 +4113,23 @@ export function Kree8ClinicalCockpit({
       return;
     }
 
-    const patients = livePatientRows.map(mapPatientForKree8);
+    /* @Codex WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
+       createdAt) cosi la lista pazienti non esce in ordine di inserimento
+       IndexedDB e lo scanning "recenti" e possibile. */
+    const patients = [...livePatientRows]
+      .sort((left, right) => {
+        const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
+        const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
+        return rightTime - leftTime;
+      })
+      .map(mapPatientForKree8);
     const checkups = liveCheckupRows ?? [];
     setPatientState({ status: 'ready', patients });
     setAgendaState({
       status: liveCheckupRows ? 'ready' : 'loading',
       rows: mapCheckupsForKree8(checkups, patients),
+      todayCount: countTodayCheckups(checkups),
+      plannedCount: countPlannedCheckups(checkups),
     });
     setSelectedPatientId((current) => {
       if (current && patients.some((patient) => patient.id === current)) return current;
@@ -4382,7 +4170,8 @@ export function Kree8ClinicalCockpit({
             <span className={styles.brandThemeToggle}>
               <ThemeToggle />
             </span>
-            <Bell size={14} color="var(--ink-subtle)" />
+            {/* @Codex WUL-UIUX: campanella rimossa: sembrava un centro notifiche
+                ma non faceva nulla. Torna quando esistera un centro notifiche reale. */}
           </span>
         </div>
 
@@ -4436,6 +4225,31 @@ export function Kree8ClinicalCockpit({
           }}
           operatorName={operatorName}
         />
+        {/* @Codex WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
+            (il rail le colora come Pazienti): tab Quadro / Documenti / SISS con
+            aria-current e nome del paziente attivo. */}
+        {(area === 'scheda' || area === 'revisione' || area === 'handoff') ? (
+          <nav className={styles.subareaTabs} aria-label="Sezioni del paziente">
+            {selectedPatient ? (
+              <span className={styles.subareaPatient}>{selectedPatient.name}</span>
+            ) : null}
+            {([
+              { id: 'scheda' as AreaId, label: 'Quadro' },
+              { id: 'revisione' as AreaId, label: 'Documenti' },
+              { id: 'handoff' as AreaId, label: 'SISS' },
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setArea(tab.id)}
+                aria-current={area === tab.id ? 'page' : undefined}
+                className={`${styles.subareaTab} ${area === tab.id ? styles.subareaTabActive : ''}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
         <AreaContent
           area={area}
           filter={filter}

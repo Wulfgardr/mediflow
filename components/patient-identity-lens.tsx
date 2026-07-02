@@ -21,7 +21,9 @@ interface PatientIdentityLensProps {
     birthDateLabel: string;
     diagnoses: Diagnosis[];
     exemptions: string[];
-    actions: ReactNode;
+    /* @Codex WUL-UIUX: opzionale: come livello 2 sotto il Foglio sinottico la lens
+       non ripete il dock azioni (vive nel Foglio). {actions} rende nulla se assente. */
+    actions?: ReactNode;
     /* @Codex */
     summary?: string;
     /* @Codex */
@@ -30,14 +32,21 @@ interface PatientIdentityLensProps {
     exemptionDetails?: PatientExemptionLensItem[];
 }
 
-/* @Codex */
-function isIcd11Diagnosis(diagnosis: Diagnosis) {
-    return diagnosis.system?.toUpperCase() === 'ICD-11';
+function isCodedDiagnosis(diagnosis: Diagnosis) {
+    return Boolean(diagnosis.code?.trim());
 }
 
-/* @Codex */
+function diagnosisSystemLabel(system?: string) {
+    const normalized = system?.trim().toUpperCase();
+    if (!normalized) return 'Codice';
+    if (normalized.startsWith('ICD-11') || normalized === 'ICD11') return 'ICD-11';
+    if (normalized.startsWith('ICD-10') || normalized === 'ICD10') return 'ICD-10';
+    if (normalized.startsWith('ICD-9') || normalized === 'ICD9' || normalized === 'ICD-9-CM') return 'ICD-9';
+    return normalized;
+}
+
 function getFeaturedDiagnoses(diagnoses: Diagnosis[]) {
-    return diagnoses.filter(isIcd11Diagnosis).slice(0, 4);
+    return diagnoses.filter(isCodedDiagnosis).slice(0, 4);
 }
 
 /* @Codex */
@@ -74,14 +83,12 @@ export function PatientIdentityLens({
     const featuredDiagnoses = getFeaturedDiagnoses(diagnoses);
     /* @Codex */
     const featuredExemptions = getFeaturedExemptions(exemptions, exemptionDetails);
-    /* @Codex */
-    const icd11DiagnosisCount = diagnoses.filter(isIcd11Diagnosis).length;
+    const codedDiagnosisCount = diagnoses.filter(isCodedDiagnosis).length;
     /* @Codex */
     const leadDiagnosis = featuredDiagnoses[0];
     /* @Codex */
     const secondaryDiagnoses = featuredDiagnoses.slice(1);
-    /* @Codex */
-    const remainingIcd11Count = Math.max(icd11DiagnosisCount - featuredDiagnoses.length, 0);
+    const remainingCodedCount = Math.max(codedDiagnosisCount - featuredDiagnoses.length, 0);
     /* @Codex */
     const remainingExemptionCount = Math.max(exemptions.length - featuredExemptions.length, 0);
 
@@ -114,7 +121,7 @@ export function PatientIdentityLens({
                                         kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                                         label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
                                     />
-                                    {icd11DiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${icd11DiagnosisCount} ICD-11`} /> : null}
+                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} /> : null}
                                     {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} /> : null}
                                 </div>
                             </div>
@@ -145,7 +152,7 @@ export function PatientIdentityLens({
                                     Quadro clinico
                                 </h2>
                                 <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--mf-muted)]">
-                                    <span>{icd11DiagnosisCount} ICD-11</span>
+                                    <span>{codedDiagnosisCount} diagnosi</span>
                                     <span aria-hidden>·</span>
                                     <span>{exemptions.length} esenzioni</span>
                                 </div>
@@ -154,7 +161,7 @@ export function PatientIdentityLens({
                             <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
                                 <div className="min-w-0">
                                     <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                        Diagnosi ICD-11
+                                        Diagnosi codificate
                                     </p>
                                     {leadDiagnosis ? (
                                         <div className="patient-diagnosis-card mt-2 rounded-[12px] border border-[color:rgba(94,53,95,0.16)] bg-white/70 p-3">
@@ -166,14 +173,15 @@ export function PatientIdentityLens({
                                                     <p className="text-[15px] font-semibold leading-6 text-[color:var(--mf-ink)]">
                                                         {leadDiagnosis.description}
                                                     </p>
+                                                    <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                                        {diagnosisSystemLabel(leadDiagnosis.system)}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
                                     ) : (
                                         <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">
-                                            {diagnoses.length > 0
-                                                ? 'Sono presenti diagnosi codificate, ma nessuna ICD-11 in primo piano.'
-                                                : 'Nessuna diagnosi ICD-11 strutturata in primo piano.'}
+                                            Nessuna diagnosi codificata in primo piano.
                                         </p>
                                     )}
 
@@ -186,14 +194,17 @@ export function PatientIdentityLens({
                                                 >
                                                     <span className="font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
+                                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
+                                                        {diagnosisSystemLabel(diagnosis.system)}
+                                                    </span>
                                                 </span>
                                             ))}
                                         </div>
                                     ) : null}
 
-                                    {remainingIcd11Count > 0 ? (
+                                    {remainingCodedCount > 0 ? (
                                         <p className="mt-2 text-xs text-[color:var(--mf-muted)]">
-                                            +{remainingIcd11Count} altre diagnosi ICD-11 presenti in scheda.
+                                            +{remainingCodedCount} altre diagnosi codificate presenti in scheda.
                                         </p>
                                     ) : null}
                                 </div>
@@ -305,6 +316,9 @@ export function PatientIdentityLens({
                                         >
                                             <span className="font-semibold text-[color:var(--mf-plum)]">{diagnosis.code}</span>
                                             {diagnosis.description}
+                                            <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
+                                                {diagnosisSystemLabel(diagnosis.system)}
+                                            </span>
                                         </span>
                                     ))
                                 ) : (

@@ -5,15 +5,12 @@
 
 import { AIService } from './ai-service';
 import type {
-    Diagnosis,
-    DocumentDiagnosisSuggestion,
     DocumentInsight,
 } from './db';
 import { db } from './db';
 import { v4 as uuid } from 'uuid';
 import { buildDocumentSynthesisExtractionPrompt } from './ai-task-contracts';
 import {
-    normalizeDiagnosisSystem,
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
 } from './document-synthesis-parser';
@@ -24,6 +21,8 @@ import {
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
 /* @Codex */
+import { routeDocumentClassForSynthesis, type DocumentSynthesisRoutingOptions } from './document-synthesis-routing';
+/* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
     projectDocumentEvidencePack,
@@ -33,12 +32,17 @@ import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     assertAiDocumentSynthesisEnabledValue,
 } from './ai-document-synthesis-kill-switch';
+/* @Codex */
+import {
+    buildDocumentSynthesisAutofillPlan,
+    parseExistingDocumentSynthesisDiagnoses,
+} from './document-synthesis-autofill';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 12000;
 
 /* @Codex */
-export interface SynthesizeDocumentOptions {
+export interface SynthesizeDocumentOptions extends DocumentSynthesisRoutingOptions {
     attachmentId?: string;
 }
 
@@ -63,76 +67,6 @@ function parseExistingInsights(raw: unknown): DocumentInsight[] {
 }
 
 /* @Codex */
-function normalizePatientDiagnosis(value: unknown): Diagnosis | null {
-    if (!value || typeof value !== 'object') return null;
-
-    const record = value as Record<string, unknown>;
-    const code = typeof record.code === 'string' ? record.code.trim().toUpperCase() : '';
-    const description = typeof record.description === 'string' ? record.description.trim() : '';
-    const system = normalizeDiagnosisSystem(record.system);
-
-    if (!code || !description || !system) return null;
-
-    const rawDate = record.date;
-    const date = rawDate ? new Date(rawDate as string | number | Date) : new Date();
-
-    return {
-        code,
-        description,
-        system,
-        date: Number.isNaN(date.getTime()) ? new Date() : date
-    };
-}
-
-/* @Codex */
-function parseExistingDiagnoses(raw: unknown): Diagnosis[] {
-    if (!raw) return [];
-
-    const source = Array.isArray(raw)
-        ? raw
-        : typeof raw === 'string'
-            ? (() => {
-                try {
-                    const parsed = JSON.parse(raw);
-                    return Array.isArray(parsed) ? parsed : [];
-                } catch {
-                    return [];
-                }
-            })()
-            : [];
-
-    return source
-        .map(normalizePatientDiagnosis)
-        .filter((item): item is Diagnosis => Boolean(item));
-}
-
-/* @Codex */
-function mergeDiagnoses(
-    existingDiagnoses: Diagnosis[],
-    suggestions: DocumentDiagnosisSuggestion[]
-): { diagnoses: Diagnosis[]; appliedCodes: string[] } {
-    const seen = new Set(existingDiagnoses.map(item => `${item.system}:${item.code}`));
-    const appliedCodes: string[] = [];
-    const diagnoses = [...existingDiagnoses];
-
-    for (const suggestion of suggestions) {
-        const key = `${suggestion.system}:${suggestion.code}`;
-        if (seen.has(key)) continue;
-
-        diagnoses.push({
-            code: suggestion.code,
-            description: suggestion.description,
-            system: suggestion.system,
-            date: new Date()
-        });
-        seen.add(key);
-        appliedCodes.push(key);
-    }
-
-    return { diagnoses, appliedCodes };
-}
-
-/* @Codex */
 /**
  * Analyze OCR text without persisting anything.
  */
@@ -140,7 +74,10 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
-    const ai = await AIService.create('clinical');
+    // Ruolo 'reasoning': di default risolve allo stesso modello di 'clinical'
+    // (resolveTextModel con fallback), ma permette di instradare la sintesi
+    // documentale su un modello dedicato senza toccare patient_insight.
+    const ai = await AIService.create('reasoning');
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
@@ -162,6 +99,10 @@ export async function synthesizeDocument(
     const normalized = normalizeDocumentInput(rawMarkdown);
     const analysis = await analyzeDocumentContent(rawMarkdown);
 
+    // Classificazione deterministica (nome file + metadata PDF + testata):
+    // segnale additivo per la review, non altera il flusso di sintesi.
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+
     const patient = await db.patients.get(patientId);
     if (!patient) {
         throw new Error('Paziente non trovato');
@@ -171,11 +112,18 @@ export async function synthesizeDocument(
     }
 
     const existingInsights = parseExistingInsights(patient.documentInsights);
-    const existingDiagnoses = parseExistingDiagnoses(patient.diagnoses);
-    const suggestionsForAutofill = analysis.quality?.level === 'red'
-        ? []
-        : analysis.diagnoses.filter((item) => item.confidence !== 'low');
-    const { diagnoses, appliedCodes } = mergeDiagnoses(existingDiagnoses, suggestionsForAutofill);
+    const existingDiagnoses = parseExistingDocumentSynthesisDiagnoses(patient.diagnoses);
+    const autofillPlan = buildDocumentSynthesisAutofillPlan({
+        documentId: options.attachmentId ?? `${patientId}:${fileName}`,
+        attachmentId: options.attachmentId,
+        fileName,
+        rawMarkdown: normalized.normalizedText,
+        qualityLevel: analysis.quality?.level,
+        diagnoses: analysis.diagnoses,
+        existingDiagnoses: existingDiagnoses.diagnoses,
+        existingDiagnosesRaw: patient.diagnoses,
+    });
+    const { diagnoses, appliedCodes } = autofillPlan;
 
     const insight: DocumentInsight = {
         id: uuid(),
@@ -193,7 +141,9 @@ export async function synthesizeDocument(
             : undefined,
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
-            : undefined
+            : undefined,
+        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
     };
 
     const parseEvidenceArtifact = buildDocumentParseEvidenceArtifact({

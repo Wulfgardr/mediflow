@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db';
+import { useToast } from '@/components/ui/toast-provider';
 import {
     DEFAULT_OCR_MODEL,
     DEFAULT_TEXT_MODEL,
@@ -50,6 +51,7 @@ type AIHealthState = {
 
 /* @Codex */
 export function useAiSettingsController() {
+    const { showToast } = useToast();
     const [hardwareProfile, setHardwareProfile] = useState<HardwareProfile>('custom');
     const [aiConfig, setAiConfig] = useState<AIConfigState>({
         provider: 'ollama',
@@ -189,9 +191,10 @@ export function useAiSettingsController() {
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
+            showToast({ tone: 'success', title: 'Configurazione AI salvata' });
         } catch (e) {
             console.error(e);
-            alert('Errore salvataggio.');
+            showToast({ tone: 'error', title: 'Salvataggio non riuscito' });
         } finally {
             setIsSavingAi(false);
         }

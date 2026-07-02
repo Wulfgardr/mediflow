@@ -19,6 +19,11 @@ interface CollapsibleSectionProps {
        utile (cosa c'e dentro), non meta-testo. */
     summary?: string;
     defaultOpen?: boolean;
+    /* @Codex WUL-UIUX: mantiene i figli montati anche da chiusi (solo nascosti).
+       Va usato per i gestori con form, cosi una compilazione a meta non si perde
+       quando la sezione viene collassata. Per default i figli si smontano da
+       chiusi (lazy mount) per tenere la pagina leggera. */
+    keepMounted?: boolean;
     /* Classe della superficie glass, cosi la sezione si allinea alla colonna in
        cui vive (es. patient-detail-side-section nella colonna stretta). */
     surfaceClassName?: string;
@@ -33,12 +38,24 @@ export function CollapsibleSection({
     count,
     summary,
     defaultOpen = false,
+    keepMounted = false,
     surfaceClassName = 'patient-detail-section border',
     children,
 }: CollapsibleSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
     const reactId = useId();
     const regionId = `${reactId}-region`;
+
+    /* @Codex WUL-UIUX: defaultOpen puo diventare true dopo il caricamento dati
+       (es. attentionCount 0 -> N): useState lo legge solo al mount. Apriamo sul
+       fronte false->true col pattern React "adjust state during render" (niente
+       effetto), senza richiudere cio che l'utente ha aperto ne riaprire cio che
+       ha chiuso a mano. */
+    const [prevDefaultOpen, setPrevDefaultOpen] = useState(defaultOpen);
+    if (defaultOpen !== prevDefaultOpen) {
+        setPrevDefaultOpen(defaultOpen);
+        if (defaultOpen) setOpen(true);
+    }
 
     /* Se si naviga verso l'ancora della sezione, la si apre per non lasciare
        l'utente davanti a un contenitore vuoto. */
@@ -82,7 +99,7 @@ export function CollapsibleSection({
                 />
             </button>
             <div id={regionId} hidden={!open} className="px-5 pb-5 md:px-6 md:pb-6">
-                {open ? children : null}
+                {keepMounted || open ? children : null}
             </div>
         </section>
     );

@@ -145,6 +145,9 @@ type ObservationCreateValues = {
     unitCode: string;
     value: string;
     notes: string | null;
+    refLow: string | null;
+    refHigh: string | null;
+    refText: string | null;
     observedAt: Date;
     source: CheckupSource;
     version: number;
@@ -163,6 +166,9 @@ type ObservationUpdateValues = {
     unitCode?: string;
     value?: string;
     notes?: string | null;
+    refLow?: string | null;
+    refHigh?: string | null;
+    refText?: string | null;
     observedAt?: Date;
     source?: CheckupSource | null;
     updatedAt?: Date;
@@ -806,6 +812,13 @@ export function normalizeObservationCreateInput(
     const notes = parseNullableString(input.notes, 'notes');
     if (!notes.ok) return notes;
 
+    const refLow = parseNullableString(input.refLow, 'refLow');
+    if (!refLow.ok) return refLow;
+    const refHigh = parseNullableString(input.refHigh, 'refHigh');
+    if (!refHigh.ok) return refHigh;
+    const refText = parseNullableString(input.refText, 'refText');
+    if (!refText.ok) return refText;
+
     const observedAt = parseRequiredDate(input.observedAt, 'observedAt');
     if (!observedAt.ok) return observedAt;
 
@@ -824,6 +837,9 @@ export function normalizeObservationCreateInput(
             unitCode: unitCode.values.trim(),
             value: value.values,
             notes: notes.values,
+            refLow: refLow.values,
+            refHigh: refHigh.values,
+            refText: refText.values,
             observedAt: observedAt.values,
             source: source.values,
             version: 1,
@@ -874,6 +890,18 @@ export function normalizeObservationUpdateInput(
     const notes = parseOptionalNullableString(input.notes, 'notes');
     if (!notes.ok) return notes;
     if (notes.values !== undefined) update.notes = notes.values;
+
+    const refLow = parseOptionalNullableString(input.refLow, 'refLow');
+    if (!refLow.ok) return refLow;
+    if (refLow.values !== undefined) update.refLow = refLow.values;
+
+    const refHigh = parseOptionalNullableString(input.refHigh, 'refHigh');
+    if (!refHigh.ok) return refHigh;
+    if (refHigh.values !== undefined) update.refHigh = refHigh.values;
+
+    const refText = parseOptionalNullableString(input.refText, 'refText');
+    if (!refText.ok) return refText;
+    if (refText.values !== undefined) update.refText = refText.values;
 
     const observedAt = parseOptionalDate(input.observedAt, 'observedAt');
     if (!observedAt.ok) return observedAt;

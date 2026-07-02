@@ -23,9 +23,11 @@ import {
     type ServicePrescriptionStatus,
 } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Props = {
     patientId: string;
+    embedded?: boolean;
 };
 
 type FormState = {
@@ -169,7 +171,8 @@ function childServiceCodeForDraft(
     return draft.serviceCode ?? inheritedServiceCode;
 }
 
-export default function ServicePrescriptionManager({ patientId }: Props) {
+export default function ServicePrescriptionManager({ patientId, embedded = false }: Props) {
+    const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -357,41 +360,53 @@ export default function ServicePrescriptionManager({ patientId }: Props) {
     };
 
     const deleteItem = async (item: ServicePrescription) => {
-        const confirmed = confirm(`Eliminare la prestazione "${item.serviceName}"?`);
+        const { confirmed } = await confirm({
+            title: `Eliminare la prestazione "${item.serviceName}"?`,
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
         if (!confirmed) return;
         const children = itemsByPrescription.get(item.id) ?? [];
         await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true })));
         await db.servicePrescriptions.delete(item.id);
     };
 
+    const headerActions = (
+        <>
+            <span className="apple-chip">{prescriptions?.length ?? 0} prestazioni</span>
+            <span className="apple-chip">{prescriptionItems?.length ?? 0} voci</span>
+            <span className="apple-chip">{openCount} aperte</span>
+            <span className="apple-chip">{reportCount} referti</span>
+            <button
+                type="button"
+                onClick={() => setIsFormOpen((value) => !value)}
+                className="ui-btn-primary h-10 px-4 text-sm font-semibold"
+            >
+                <Plus className="h-4 w-4" />
+                Nuova prestazione
+            </button>
+        </>
+    );
+
     return (
-        <section id="prestazioni" className="patient-detail-section border p-5 md:p-6">
-            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <p className="section-kicker">Prestazioni</p>
-                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                        <Stethoscope className="h-5 w-5 text-[color:var(--mf-primary)]" />
-                        Prestazioni prescritte
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                        Visite, esami, imaging, riabilitazione e screening richiesti. Non sono terapie farmacologiche.
-                    </p>
+        <section id={embedded ? undefined : 'prestazioni'} className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+            {embedded ? (
+                <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
+            ) : (
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="section-kicker">Prestazioni</p>
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
+                            <Stethoscope className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                            Prestazioni prescritte
+                        </h2>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                            Visite, esami, imaging, riabilitazione e screening richiesti. Non sono terapie farmacologiche.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">{headerActions}</div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <span className="apple-chip">{prescriptions?.length ?? 0} prestazioni</span>
-                    <span className="apple-chip">{prescriptionItems?.length ?? 0} voci</span>
-                    <span className="apple-chip">{openCount} aperte</span>
-                    <span className="apple-chip">{reportCount} referti</span>
-                    <button
-                        type="button"
-                        onClick={() => setIsFormOpen((value) => !value)}
-                        className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Nuova prestazione
-                    </button>
-                </div>
-            </div>
+            )}
 
             {isFormOpen && (
                 <form

@@ -3,6 +3,56 @@
 @source "../app";
 @source "../components";
 
+/* @Codex WUL-UIUX: Tailwind v4 e CSS-first e senza questa riga la variante dark:
+   ricade sul default @media (prefers-color-scheme), scollegata dal toggle a classe
+   del theme-provider (applyThemeClass aggiunge .dark/.light su <html>, anche per
+   'system'). Legando dark: alla classe .dark, le utility dark: e i token :root.dark
+   seguono la stessa sorgente: dark mode coerente per costruzione. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* @Codex WUL-UIUX: skeleton condiviso per gli stati di caricamento, sostituisce i
+   pulse inline eterogenei. Rispetta prefers-reduced-motion. */
+.mf-skeleton {
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.06);
+  animation: mf-skeleton-pulse 1.6s ease-in-out infinite;
+}
+:root.dark .mf-skeleton {
+  background: rgba(255, 255, 255, 0.06);
+}
+@keyframes mf-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mf-skeleton { animation: none; }
+}
+
+/* @Codex WUL-UIUX: riga maestra densa per le liste cliniche (parametri, farmaci).
+   Una riga = un'entita; si espande in place. Nessun bordo proprio: le righe sono
+   separate da hairline dal contenitore. Focus da tastiera di prima classe. */
+.mf-listrow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--mf-ink);
+  transition: background-color 160ms ease;
+}
+.mf-listrow:hover {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+:root.dark .mf-listrow:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+.mf-listrow:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+}
+
 .liquid-blur {
   filter: blur(5px);
   opacity: 0.6;
@@ -40,6 +90,10 @@
   --mf-flow-primary: rgba(47, 58, 72, 0.48);
   --mf-flow-secondary: rgba(85, 81, 97, 0.32);
 
+  /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
+     css kree8 (shell + cockpit) al posto degli stack duplicati. */
+  --mf-font-sans: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
   --glass-border: rgba(15, 23, 42, 0.08);
   --glass-bg: rgba(255, 255, 255, 0.74);
   --glass-shadow: 0 16px 38px rgba(15, 23, 42, 0.06);
@@ -58,6 +112,11 @@
   --ui-btn-primary-bg: linear-gradient(135deg, #151923, #2f3a48 58%, #475569);
   --ui-btn-primary-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
   --ui-btn-primary-radius: 18px;
+  /* @Codex WUL-UIUX: colore testo della CTA primaria. Era usato da
+     .ui-btn-primary.mf-tone-warning (unlayered) ma mai definito: var() senza
+     fallback rendeva la dichiarazione invalida e il testo poteva ereditare l'ink
+     scuro del contenitore. Definirlo bianco chiude il difetto latente. */
+  --ui-btn-primary-fg: #ffffff;
 
   --apple-blue: #334155;
   --apple-gray: #667085;
@@ -109,7 +168,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
-  font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--mf-font-sans);
   min-height: 100vh;
   letter-spacing: 0;
   background-image: var(--ui-canvas-background);
@@ -977,22 +1036,24 @@ body {
   line-height: 1.2;
 }
 
+/* @Codex WUL-UIUX: tinte semantiche allineate ai token --mf-success/--mf-warning
+   (rgba dei token al 10-14%), cosi light e dark comunicano lo stesso stato. */
 .graphite-chip-tone-info {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  border-color: rgba(75, 85, 101, 0.24);
+  background-color: rgba(75, 85, 101, 0.08);
+  color: var(--mf-accent);
 }
 
 .graphite-chip-tone-success {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  border-color: rgba(75, 99, 84, 0.3);
+  background-color: rgba(75, 99, 84, 0.1);
+  color: var(--mf-success);
 }
 
 .graphite-chip-tone-warning {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  border-color: rgba(154, 106, 47, 0.32);
+  background-color: rgba(154, 106, 47, 0.12);
+  color: var(--mf-warning);
 }
 
 .graphite-chip-tone-critical {
@@ -1799,6 +1860,13 @@ textarea.input-field {
   color: var(--mf-ink);
 }
 
+/* @Codex WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
+   (autocomplete). Prima mancava e alcuni consumer azzeravano l'outline. */
+.mf-popover-row:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+}
+
 /* Semantic alert blocks reused across diagnostics/SISS/import flows */
 .mf-alert {
   border-radius: 16px;
@@ -1812,22 +1880,24 @@ textarea.input-field {
   line-height: 1.5;
 }
 
+/* @Codex WUL-UIUX: stesse tinte semantiche dei chip graphite (rgba dei token
+   --mf-success/--mf-warning al 10-14%): light e dark comunicano lo stesso stato. */
 .mf-alert-info {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
+  border-color: rgba(75, 85, 101, 0.24);
+  background-color: rgba(75, 85, 101, 0.08);
   color: var(--mf-ink);
 }
 
 .mf-alert-success {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  border-color: rgba(75, 99, 84, 0.3);
+  background-color: rgba(75, 99, 84, 0.1);
+  color: var(--mf-success);
 }
 
 .mf-alert-warning {
-  border-color: rgba(15, 23, 42, 0.14);
-  background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  border-color: rgba(154, 106, 47, 0.32);
+  background-color: rgba(154, 106, 47, 0.12);
+  color: var(--mf-warning);
 }
 
 .mf-alert-critical {
@@ -1843,15 +1913,15 @@ textarea.input-field {
 }
 
 :root.dark .mf-alert-success {
-  border-color: rgba(203, 213, 225, 0.24);
-  background-color: rgba(203, 213, 225, 0.08);
-  color: rgb(203, 213, 225);
+  border-color: rgba(140, 210, 160, 0.32);
+  background-color: rgba(110, 190, 130, 0.12);
+  color: rgb(170, 220, 180);
 }
 
 :root.dark .mf-alert-warning {
-  border-color: rgba(203, 213, 225, 0.24);
-  background-color: rgba(203, 213, 225, 0.08);
-  color: rgb(203, 213, 225);
+  border-color: rgba(232, 180, 96, 0.34);
+  background-color: rgba(232, 180, 96, 0.14);
+  color: rgb(240, 200, 130);
 }
 
 :root.dark .mf-alert-critical {
@@ -2265,115 +2335,116 @@ textarea.input-field {
 /* @Codex WUL-273: neutral adapter for legacy Tailwind chroma.
    State should be carried by copy, hierarchy and enabled/disabled controls first.
    Red critical states remain untouched; older blue/green/amber/purple accents are
-   mapped to the graphite redesign language. */
-:root[data-ui-style='redesign'] [class*="bg-blue-"],
-:root[data-ui-style='redesign'] [class*="bg-sky-"],
-:root[data-ui-style='redesign'] [class*="bg-cyan-"],
-:root[data-ui-style='redesign'] [class*="bg-teal-"],
-:root[data-ui-style='redesign'] [class*="bg-emerald-"],
-:root[data-ui-style='redesign'] [class*="bg-green-"],
-:root[data-ui-style='redesign'] [class*="bg-lime-"],
-:root[data-ui-style='redesign'] [class*="bg-yellow-"],
-:root[data-ui-style='redesign'] [class*="bg-amber-"],
-:root[data-ui-style='redesign'] [class*="bg-orange-"],
-:root[data-ui-style='redesign'] [class*="bg-indigo-"],
-:root[data-ui-style='redesign'] [class*="bg-purple-"],
-:root[data-ui-style='redesign'] [class*="bg-violet-"] {
+   mapped to the graphite redesign language. A component may opt out with the
+   .mf-chroma-keep class to declare intentional colour. */
+:root[data-ui-style='redesign'] [class*="bg-blue-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-sky-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-cyan-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-teal-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-emerald-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-green-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-lime-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-yellow-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-amber-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-orange-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-indigo-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-purple-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="bg-violet-"]:not(.mf-chroma-keep) {
   background-color: rgba(248, 250, 252, 0.88) !important;
 }
 
-:root[data-ui-style='redesign'] [class*="text-blue-"],
-:root[data-ui-style='redesign'] [class*="text-sky-"],
-:root[data-ui-style='redesign'] [class*="text-cyan-"],
-:root[data-ui-style='redesign'] [class*="text-teal-"],
-:root[data-ui-style='redesign'] [class*="text-emerald-"],
-:root[data-ui-style='redesign'] [class*="text-green-"],
-:root[data-ui-style='redesign'] [class*="text-lime-"],
-:root[data-ui-style='redesign'] [class*="text-yellow-"],
-:root[data-ui-style='redesign'] [class*="text-amber-"],
-:root[data-ui-style='redesign'] [class*="text-orange-"],
-:root[data-ui-style='redesign'] [class*="text-indigo-"],
-:root[data-ui-style='redesign'] [class*="text-purple-"],
-:root[data-ui-style='redesign'] [class*="text-violet-"] {
+:root[data-ui-style='redesign'] [class*="text-blue-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-sky-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-cyan-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-teal-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-emerald-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-green-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-lime-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-yellow-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-amber-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-orange-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-indigo-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-purple-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="text-violet-"]:not(.mf-chroma-keep) {
   color: var(--mf-ink) !important;
 }
 
-:root[data-ui-style='redesign'] [class*="border-blue-"],
-:root[data-ui-style='redesign'] [class*="border-sky-"],
-:root[data-ui-style='redesign'] [class*="border-cyan-"],
-:root[data-ui-style='redesign'] [class*="border-teal-"],
-:root[data-ui-style='redesign'] [class*="border-emerald-"],
-:root[data-ui-style='redesign'] [class*="border-green-"],
-:root[data-ui-style='redesign'] [class*="border-lime-"],
-:root[data-ui-style='redesign'] [class*="border-yellow-"],
-:root[data-ui-style='redesign'] [class*="border-amber-"],
-:root[data-ui-style='redesign'] [class*="border-orange-"],
-:root[data-ui-style='redesign'] [class*="border-indigo-"],
-:root[data-ui-style='redesign'] [class*="border-purple-"],
-:root[data-ui-style='redesign'] [class*="border-violet-"] {
+:root[data-ui-style='redesign'] [class*="border-blue-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-sky-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-cyan-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-teal-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-emerald-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-green-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-lime-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-yellow-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-amber-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-orange-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-indigo-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-purple-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="border-violet-"]:not(.mf-chroma-keep) {
   border-color: rgba(15, 23, 42, 0.16) !important;
 }
 
-:root[data-ui-style='redesign'] [class*="ring-blue-"],
-:root[data-ui-style='redesign'] [class*="ring-sky-"],
-:root[data-ui-style='redesign'] [class*="ring-cyan-"],
-:root[data-ui-style='redesign'] [class*="ring-teal-"],
-:root[data-ui-style='redesign'] [class*="ring-emerald-"],
-:root[data-ui-style='redesign'] [class*="ring-green-"],
-:root[data-ui-style='redesign'] [class*="ring-lime-"],
-:root[data-ui-style='redesign'] [class*="ring-yellow-"],
-:root[data-ui-style='redesign'] [class*="ring-amber-"],
-:root[data-ui-style='redesign'] [class*="ring-orange-"],
-:root[data-ui-style='redesign'] [class*="ring-indigo-"],
-:root[data-ui-style='redesign'] [class*="ring-purple-"],
-:root[data-ui-style='redesign'] [class*="ring-violet-"] {
+:root[data-ui-style='redesign'] [class*="ring-blue-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-sky-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-cyan-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-teal-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-emerald-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-green-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-lime-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-yellow-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-amber-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-orange-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-indigo-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-purple-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="ring-violet-"]:not(.mf-chroma-keep) {
   --tw-ring-color: rgba(15, 23, 42, 0.18) !important;
 }
 
-:root[data-ui-style='redesign'] [class*="accent-blue-"],
-:root[data-ui-style='redesign'] [class*="accent-sky-"],
-:root[data-ui-style='redesign'] [class*="accent-cyan-"],
-:root[data-ui-style='redesign'] [class*="accent-teal-"],
-:root[data-ui-style='redesign'] [class*="accent-emerald-"],
-:root[data-ui-style='redesign'] [class*="accent-green-"],
-:root[data-ui-style='redesign'] [class*="accent-lime-"],
-:root[data-ui-style='redesign'] [class*="accent-yellow-"],
-:root[data-ui-style='redesign'] [class*="accent-amber-"],
-:root[data-ui-style='redesign'] [class*="accent-orange-"],
-:root[data-ui-style='redesign'] [class*="accent-indigo-"],
-:root[data-ui-style='redesign'] [class*="accent-purple-"],
-:root[data-ui-style='redesign'] [class*="accent-violet-"] {
+:root[data-ui-style='redesign'] [class*="accent-blue-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-sky-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-cyan-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-teal-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-emerald-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-green-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-lime-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-yellow-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-amber-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-orange-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-indigo-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-purple-"]:not(.mf-chroma-keep),
+:root[data-ui-style='redesign'] [class*="accent-violet-"]:not(.mf-chroma-keep) {
   accent-color: var(--mf-ink) !important;
 }
 
-:root.dark[data-ui-style='redesign'] [class*="bg-blue-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-sky-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-cyan-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-teal-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-emerald-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-green-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-lime-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-yellow-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-amber-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-orange-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-indigo-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-purple-"],
-:root.dark[data-ui-style='redesign'] [class*="bg-violet-"] {
+:root.dark[data-ui-style='redesign'] [class*="bg-blue-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-sky-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-cyan-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-teal-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-emerald-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-green-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-lime-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-yellow-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-amber-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-orange-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-indigo-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-purple-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="bg-violet-"]:not(.mf-chroma-keep) {
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-:root.dark[data-ui-style='redesign'] [class*="text-blue-"],
-:root.dark[data-ui-style='redesign'] [class*="text-sky-"],
-:root.dark[data-ui-style='redesign'] [class*="text-cyan-"],
-:root.dark[data-ui-style='redesign'] [class*="text-teal-"],
-:root.dark[data-ui-style='redesign'] [class*="text-emerald-"],
-:root.dark[data-ui-style='redesign'] [class*="text-green-"],
-:root.dark[data-ui-style='redesign'] [class*="text-lime-"],
-:root.dark[data-ui-style='redesign'] [class*="text-yellow-"],
-:root.dark[data-ui-style='redesign'] [class*="text-amber-"],
-:root.dark[data-ui-style='redesign'] [class*="text-orange-"],
-:root.dark[data-ui-style='redesign'] [class*="text-indigo-"],
-:root.dark[data-ui-style='redesign'] [class*="text-purple-"],
-:root.dark[data-ui-style='redesign'] [class*="text-violet-"] {
+:root.dark[data-ui-style='redesign'] [class*="text-blue-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-sky-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-cyan-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-teal-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-emerald-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-green-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-lime-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-yellow-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-amber-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-orange-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-indigo-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-purple-"]:not(.mf-chroma-keep),
+:root.dark[data-ui-style='redesign'] [class*="text-violet-"]:not(.mf-chroma-keep) {
   color: rgb(226, 232, 240) !important;
 }

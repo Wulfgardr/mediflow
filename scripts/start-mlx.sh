@@ -26,4 +26,7 @@ echo "   Port: $PORT"
 echo "   Python: $PYTHON_EXEC"
 
 # Run Server (Directly using venv python)
-exec "$PYTHON_EXEC" -m mlx_lm.server --model $MODEL --port $PORT --host 0.0.0.0 --log-level INFO
+# Bind su loopback: coerente con targetPolicy 'loopback-only' del piano AI di rete
+# (lib/network-ai-runtime-model.ts). Il server MLX resta benchmark-only e non deve
+# essere raggiungibile fuori dalla macchina.
+exec "$PYTHON_EXEC" -m mlx_lm.server --model $MODEL --port $PORT --host 127.0.0.1 --log-level INFO

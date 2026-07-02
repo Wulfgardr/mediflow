@@ -19,10 +19,12 @@ import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocument
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/toast-provider';
 
 export default function NewEntryPage() {
     const params = useParams();
     const router = useRouter();
+    const { showToast } = useToast();
     const id = params.id as string;
 
     const now = new Date();
@@ -54,7 +56,7 @@ export default function NewEntryPage() {
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
-            alert('Inserisci un resoconto clinico prima di registrare la voce.');
+            showToast({ tone: 'warning', title: 'Resoconto clinico mancante', description: 'Inserisci un resoconto clinico prima di registrare la voce.' });
             return;
         }
 
@@ -149,7 +151,7 @@ export default function NewEntryPage() {
             router.push(`/patients/${id}/modules`);
         } catch (error) {
             console.error(error);
-            alert('Errore durante il salvataggio. Riprova.');
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Riprova.' });
             setIsSubmitting(false);
             setUploadProgress('');
         }

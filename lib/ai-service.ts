@@ -3,6 +3,15 @@ import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } 
 
 export type AIProvider = 'ollama';
 
+// Timeout per-task: una connessione Ollama appesa non deve bloccare la superficie
+// chiamante (insight, smart import, sintesi, OCR). Valori generosi perche i task
+// clinici girano con think:false; servono solo a spezzare le richieste infinite.
+const TEXT_CHAT_TIMEOUT_MS = 300_000;
+const OCR_CHAT_TIMEOUT_MS = 180_000;
+// Mantiene il modello caldo dopo l'uso per evitare il ricarico a freddo (default
+// Ollama 5m). Passa nel body /api/chat, inoltrato integro dal proxy loopback.
+const MODEL_KEEP_ALIVE = '30m';
+
 export interface AIStats {
     latency: number;
     tokensIn: number;
@@ -62,13 +71,15 @@ export class AIService {
     private baseUrl: string;
     private model: string;
     private disableThinking: boolean;
+    private chatTimeoutMs: number;
 
-    constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false) {
+    constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false, chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS) {
         // Clean URL: Handle /v1, /v (typo), and trailing slash
         this.baseUrl = baseUrl.replace(/\/v1?\/?$/, '').replace(/\/$/, '');
         this.provider = provider;
         this.model = model;
         this.disableThinking = disableThinking;
+        this.chatTimeoutMs = chatTimeoutMs;
     }
 
     /* @Codex */
@@ -127,7 +138,13 @@ export class AIService {
 
         console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
 
-        return new AIService(provider, url, model, task === 'clinical');
+        // think:false per tutti i task testuali contract-bound (clinical e
+        // reasoning): sono estrazioni JSON, non ragionamento aperto. Evita il crollo
+        // di latenza dei modelli con thinking abilitato. OCR e multimodale, il flag
+        // non si applica.
+        const disableThinking = task !== 'ocr';
+        const chatTimeoutMs = task === 'ocr' ? OCR_CHAT_TIMEOUT_MS : TEXT_CHAT_TIMEOUT_MS;
+        return new AIService(provider, url, model, disableThinking, chatTimeoutMs);
     }
 
     /**
@@ -139,6 +156,7 @@ export class AIService {
             model: this.model,
             messages: toOllamaMessages(messages),
             stream: false,
+            keep_alive: MODEL_KEEP_ALIVE,
             options: {
                 temperature: 0.4,
                 num_predict: maxTokens || 4096,
@@ -155,12 +173,17 @@ export class AIService {
             headers['x-target-url'] = this.baseUrl;
         }
 
+        // Combina il timeout per-task con l'eventuale signal esterno (annullamento
+        // utente). Se Ollama si appende, la richiesta viene abortita comunque.
+        const timeoutSignal = AbortSignal.timeout(this.chatTimeoutMs);
+        const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(body),
-                signal // Allow cancellation
+                signal: effectiveSignal // annullamento utente + timeout per-task
             });
 
             if (!response.ok) {
@@ -184,6 +207,12 @@ export class AIService {
             };
 
         } catch (e: unknown) {
+            // Timeout per-task: distinguibile dall'annullamento utente (che imposta
+            // il proprio signal.aborted) per dare un messaggio chiaro a valle.
+            if (e instanceof DOMException && e.name === 'TimeoutError' && !signal?.aborted) {
+                console.error(`AI Service Chat Timeout dopo ${this.chatTimeoutMs} ms`);
+                throw new Error(`Timeout del provider AI dopo ${Math.round(this.chatTimeoutMs / 1000)}s. Verifica che il modello sia caricato e riprova.`);
+            }
             console.error("AI Service Chat Error:", e);
             throw e;
         }

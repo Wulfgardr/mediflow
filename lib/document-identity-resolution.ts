@@ -22,7 +22,42 @@ export interface ResolveDocumentTaxCodeRolesResult {
     rationale: string;
 }
 
-const ITALIAN_TAX_CODE_REGEX = /\b[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]\b/g;
+// Case-insensitive: l'OCR restituisce spesso il CF in minuscolo. Il flag `i`
+// non altera indici o lunghezza, quindi context/snippet restano allineati.
+const ITALIAN_TAX_CODE_REGEX = /\b[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]\b/gi;
+
+// Carattere di controllo del codice fiscale (algoritmo pubblico, tutto in-house).
+// Le tabelle danno un valore a ciascun carattere per posizione dispari/pari
+// (1-indexed) e includono le lettere di omocodia, quindi si calcola direttamente
+// sui 16 caratteri come scritti, senza deconvertire l'omocodia.
+const CF_ODD_VALUES: Record<string, number> = {
+    '0': 1, '1': 0, '2': 5, '3': 7, '4': 9, '5': 13, '6': 15, '7': 17, '8': 19, '9': 21,
+    A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21,
+    K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14,
+    U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23,
+};
+const CF_EVEN_VALUES: Record<string, number> = {
+    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7, I: 8, J: 9,
+    K: 10, L: 11, M: 12, N: 13, O: 14, P: 15, Q: 16, R: 17, S: 18, T: 19,
+    U: 20, V: 21, W: 22, X: 23, Y: 24, Z: 25,
+};
+const CF_STRUCTURE_REGEX = /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/;
+
+export function isValidItalianTaxCodeChecksum(taxCode: string): boolean {
+    const cf = taxCode.trim().toUpperCase();
+    if (cf.length !== 16 || !CF_STRUCTURE_REGEX.test(cf)) return false;
+    let sum = 0;
+    for (let i = 0; i < 15; i += 1) {
+        const char = cf[i];
+        // posizione 1-indexed dispari -> tabella dispari
+        const value = (i % 2 === 0) ? CF_ODD_VALUES[char] : CF_EVEN_VALUES[char];
+        if (value === undefined) return false;
+        sum += value;
+    }
+    const expected = String.fromCharCode(65 + (sum % 26));
+    return expected === cf[15];
+}
 
 // Specific prescriber/operator labels must be evaluated before generic physician or patient prose.
 const ROLE_PATTERNS: Array<{
@@ -148,13 +183,19 @@ export function resolveDocumentTaxCodeRoles(
         const evidenceId = `tax-code:${taxCodes.length + 1}`;
         const role = inferRole(context.snippet, context.taxCodeIndex);
 
+        // Un CF con checksum non valido (tipico dei falsi positivi OCR O/0, I/1)
+        // non puo mai essere high confidence: viene declassato a medium, cosi
+        // il merge automatico paziente resta gated dietro review.
+        const checksumValid = isValidItalianTaxCodeChecksum(value);
+        const confidence = (role.confidence === 'high' && !checksumValid) ? 'medium' : role.confidence;
+
         if (seen.has(`${value}:${role.role}`)) continue;
         seen.add(`${value}:${role.role}`);
         evidenceRefs.push(createDocumentDecisionEvidenceRef(evidenceId, context.snippet, sourceId));
         taxCodes.push({
             value,
             role: role.role,
-            confidence: role.confidence,
+            confidence,
             evidenceRefs: [evidenceId],
         });
     }
