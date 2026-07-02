@@ -8,6 +8,8 @@ import { Activity, ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } 
 import { db } from '@/lib/db';
 import { searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /* @Codex */
 function toLocalDateTimeInput(date: Date): string {
@@ -65,6 +67,8 @@ function Sparkline({ values }: { values: number[] }) {
 
 /* @Codex */
 export default function ObservationManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [code, setCode] = useState('8480-6');
     const [unitCode, setUnitCode] = useState('mm[Hg]');
     const [value, setValue] = useState('');
@@ -231,19 +235,25 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             codeSelectRef.current?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
-            alert('Salvataggio osservazione fallito');
+            showToast({ tone: 'error', title: 'Salvataggio osservazione fallito' });
         } finally {
             setIsSaving(false);
         }
     };
 
     const deleteObservation = async (id: string) => {
-        if (!confirm('Eliminare questa misura?')) return;
+        const { confirmed } = await confirm({
+            title: 'Eliminare questa misura?',
+            message: 'La misura verra rimossa dai parametri clinici del paziente.',
+            confirmLabel: 'Elimina',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await db.observations.delete(id);
         } catch (error) {
             console.error('Failed to delete observation', error);
-            alert('Eliminazione misura fallita');
+            showToast({ tone: 'error', title: 'Eliminazione misura fallita' });
         }
     };
 

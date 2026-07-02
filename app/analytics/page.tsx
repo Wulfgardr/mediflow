@@ -240,7 +240,7 @@ export default function AnalyticsPage() {
                 eyebrow="Analisi"
                 title="Cruscotto locale"
                 subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
-                backHref="/"
+                backHref="/?area=incarico"
                 backLabel="Torna ai pazienti"
                 statusLabel="Sto leggendo dal Mac..."
                 navItems={ANALYTICS_NAV_ITEMS}
@@ -259,7 +259,7 @@ export default function AnalyticsPage() {
             eyebrow="Analisi"
             title="Cruscotto locale"
             subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
-            backHref="/"
+            backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={`${stats.totalInRange} schede in ${normalizedAgeRange[0]}-${normalizedAgeRange[1]} anni · ${stats.withoutBirthDate} senza data nascita`}
             navItems={ANALYTICS_NAV_ITEMS}

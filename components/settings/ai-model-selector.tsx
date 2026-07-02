@@ -11,6 +11,8 @@ import {
     SETTINGS_INPUT_CLASS,
     SETTINGS_SECONDARY_BUTTON_CLASS,
 } from '@/components/settings/settings-ui';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // --- Model Selector Component ---
 export interface ModelSelectorProps {
@@ -34,6 +36,8 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const [pullStatus, setPullStatus] = useState("");
     const [showCustom, setShowCustom] = useState(false);
     const [pullingModel, setPullingModel] = useState<string | null>(null);
+    const { showToast } = useToast();
+    const confirm = useConfirm();
 
     const checkInstalled = useCallback(async () => {
         try {
@@ -63,7 +67,12 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     }, [provider, checkInstalled]);
 
     const handlePull = async (modelName: string) => {
-        if (!confirm(`Vuoi scaricare il modello '${modelName}'? \nPotrebbe richiedere diversi GB e tempo a seconda della connessione.`)) return;
+        const { confirmed } = await confirm({
+            title: `Scaricare il modello ${modelName}?`,
+            message: 'Il download può richiedere diversi GB e tempo a seconda della connessione.',
+            confirmLabel: 'Scarica'
+        });
+        if (!confirmed) return;
 
         setIsPulling(true);
         setPullingModel(modelName);
@@ -110,13 +119,17 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
             if (trailingData?.status) setPullStatus(trailingData.status);
             if (trailingData?.progress !== undefined) setPullProgress(trailingData.progress);
 
-            alert(`Modello ${modelName} installato con successo!`);
+            showToast({ tone: 'success', title: `Modello ${modelName} installato` });
             await checkInstalled();
             onChange(modelName); // Auto select
 
         } catch (e) {
             console.error(e);
-            alert(`Errore durante il download: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            showToast({
+                tone: 'error',
+                title: 'Download non riuscito',
+                description: e instanceof Error ? e.message : 'Errore imprevisto'
+            });
         } finally {
             setIsPulling(false);
             setPullingModel(null);

@@ -30,6 +30,8 @@ import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/
 import { db, type Attachment, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useToast } from '@/components/ui/toast-provider';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
@@ -44,6 +46,8 @@ export default function PatientDetailPage() {
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
     const [smartImportReview, setSmartImportReview] = useState<SmartImportReviewSnapshot | null>(null);
+    const confirm = useConfirm();
+    const { showToast } = useToast();
 
     const patient = useLiveQuery(() => db.patients.get(id), [id]);
     const entries = useLiveQuery(
@@ -187,7 +191,7 @@ export default function PatientDetailPage() {
                 eyebrow="Scheda clinica"
                 title="Scheda paziente"
                 subtitle="Recupero dei dati dalla cartella locale prima di aprire la scheda."
-                backHref="/"
+                backHref="/?area=incarico"
                 backLabel="Pazienti"
             >
                 <div className={workspaceStyles.loadingCard}>Caricamento scheda paziente...</div>
@@ -241,7 +245,14 @@ export default function PatientDetailPage() {
         patient.updatedAt ? new Date(patient.updatedAt).getTime() : 0,
         ...activeEntries.map((entry) => (entry.date ? new Date(entry.date).getTime() : 0)),
         ...(activeTherapies ?? []).map((therapy) => new Date(therapy.updatedAt ?? therapy.startDate).getTime()),
-        latestObservation?.observedAt ? new Date(latestObservation.observedAt).getTime() : 0,
+        /* @Codex WUL-UIUX: usa il max tra prelievo e registrazione, cosi una misura
+           retrodatata trascritta oggi rende comunque stale l'insight. */
+        latestObservation
+            ? Math.max(
+                latestObservation.observedAt ? new Date(latestObservation.observedAt).getTime() : 0,
+                latestObservation.createdAt ? new Date(latestObservation.createdAt).getTime() : 0,
+            )
+            : 0,
     ];
     const maxClinicalTimestamp = clinicalTimestamps.reduce((max, value) => (value > max ? value : max), 0);
     const insightStale = Boolean(patient.aiSummary?.trim())
@@ -338,15 +349,21 @@ export default function PatientDetailPage() {
             const validation = await validationResponse.json() as ValidatePatientExportResponse;
 
             if (validation.hasErrors) {
-                alert(`Esportazione bloccata: risolvi gli errori di validazione FSE prima del download.\n\n${buildValidationMessage(validation)}`);
+                showToast({
+                    tone: 'error',
+                    title: 'Esportazione bloccata: risolvi gli errori di validazione FSE',
+                    description: buildValidationMessage(validation),
+                });
                 return;
             }
 
             if (validation.hasWarnings) {
-                const proceed = confirm(
-                    `Sono presenti warning di validazione FSE.\n\n${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
-                );
-                if (!proceed) return;
+                const { confirmed } = await confirm({
+                    title: 'Warning di validazione FSE',
+                    message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                    confirmLabel: 'Esporta comunque',
+                });
+                if (!confirmed) return;
             }
 
             const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
@@ -364,10 +381,10 @@ export default function PatientDetailPage() {
             document.body.removeChild(anchor);
             URL.revokeObjectURL(url);
 
-            alert('Esportazione FHIR completata con successo!');
+            showToast('Esportazione FHIR completata.', 'success');
         } catch (error) {
             console.error('Export failed', error);
-            alert("Errore durante l'esportazione.");
+            showToast("Errore durante l'esportazione.", 'error');
         }
     };
 

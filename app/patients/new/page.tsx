@@ -11,6 +11,8 @@ import { AlertTriangle, CheckCircle2, FileSearch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
 /* @Codex */
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
@@ -96,6 +98,8 @@ function parseImportedServicePrescriptionDate(value: string | undefined, fallbac
 
 export default function NewPatientPage() {
     const router = useRouter();
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
     /* @Codex */
     const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
@@ -117,8 +121,13 @@ export default function NewPatientPage() {
             if (data.taxCode) {
                 const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode).toArray())[0];
                 if (existing) {
-                    const confirmMsg = `Esiste già una scheda con questo codice fiscale.\n\n${existing.lastName} ${existing.firstName}\n\nVuoi aprire la scheda esistente invece di crearne una nuova?`;
-                    if (confirm(confirmMsg)) {
+                    const { confirmed } = await confirm({
+                        title: 'Scheda già esistente',
+                        message: `Esiste già una scheda con questo codice fiscale: ${existing.lastName} ${existing.firstName}. Vuoi aprire la scheda esistente invece di crearne una nuova?`,
+                        confirmLabel: 'Apri scheda esistente',
+                        cancelLabel: 'Annulla',
+                    });
+                    if (confirmed) {
                         router.push(`/patients/${existing.id}`);
                         return;
                     } else {
@@ -201,7 +210,7 @@ export default function NewPatientPage() {
             router.push('/');
         } catch (error) {
             console.error("Failed to save patient", error);
-            alert("Errore durante il salvataggio. Controlla i dati e riprova.");
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Controlla i dati e riprova.' });
         }
     };
 
@@ -226,7 +235,7 @@ export default function NewPatientPage() {
             eyebrow="Paziente"
             title="Nuova scheda"
             subtitle="Da documento clinico o con inserimento manuale."
-            backHref="/"
+            backHref="/?area=incarico"
             backLabel="Torna alla lista"
             statusLabel={statusLabel}
             navItems={navItems}
