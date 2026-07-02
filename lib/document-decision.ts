@@ -87,7 +87,10 @@ export type DocumentDecisionForbiddenReason =
     | 'diagnostic_question_is_not_diagnosis'
     | 'exemption_is_not_diagnosis'
     | 'prosthetic_required_fields_missing'
-    | 'false_patient_create_risk';
+    | 'false_patient_create_risk'
+    | 'confidence_too_low_for_auto_apply'
+    | 'target_field_locked'
+    | 'structured_fact_already_present';
 
 /* @Codex */
 export type DocumentDecisionHumanRequirement =
@@ -556,6 +559,20 @@ function collectDocumentDecisionViolations(decision: DocumentDecision): Document
                 ? 'OCR-needed documents cannot propose clinical structured writes.'
                 : 'OCR review required before structured clinical writes.',
             actionIds: offendingActionIds,
+        });
+    }
+
+    const lowConfidenceClinicalWriteActionIds = decision.proposedActions
+        .filter((action) => (
+            CLINICAL_WRITE_ACTION_KINDS.has(action.kind)
+            && (action.confidence === 'low' || action.confidence === 'blocked')
+        ))
+        .map((action) => action.id);
+    if (lowConfidenceClinicalWriteActionIds.length > 0) {
+        violations.push({
+            code: 'confidence_too_low_for_auto_apply',
+            message: `Low-confidence clinical writes require review-first handling: ${lowConfidenceClinicalWriteActionIds.join(', ')}.`,
+            actionIds: lowConfidenceClinicalWriteActionIds,
         });
     }
 
