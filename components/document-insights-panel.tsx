@@ -8,6 +8,8 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -18,6 +20,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
     // Modelli reali dalla config invece di nomi hardcoded nel footer.
     const [modelLabels, setModelLabels] = useState<{ clinical: string; ocr: string } | null>(null);
+    const { showToast } = useToast();
+    const confirm = useConfirm();
 
     useEffect(() => {
         getAiModelLabels().then(setModelLabels).catch(() => setModelLabels(null));
@@ -62,11 +66,19 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                 await refreshPatientSummaryIfEnabled(patient.id);
             } catch (refreshError) {
                 console.warn('[DocumentInsightsPanel] AI summary refresh failed', refreshError);
-                alert("Archivio aggiornato, ma non è stato possibile riallineare subito AI Patient Insight.");
+                showToast({
+                    tone: 'warning',
+                    title: 'Archivio aggiornato',
+                    description: 'Non è stato possibile riallineare subito AI Patient Insight.'
+                });
             }
         } catch (error) {
             console.error('[DocumentInsightsPanel] Archive update failed', error);
-            alert("Errore durante l'aggiornamento dell'Archivio Intelligente.");
+            showToast({
+                tone: 'error',
+                title: 'Aggiornamento non riuscito',
+                description: "Errore durante l'aggiornamento dell'Archivio Intelligente."
+            });
         } finally {
             setBusyAction(null);
         }
@@ -74,7 +86,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const handleRemoveInsight = async (insightId: string, fileName: string) => {
-        const confirmed = confirm(`Rimuovere "${fileName}" dall'Archivio Intelligente del paziente?`);
+        const { confirmed } = await confirm({
+            title: 'Rimuovere il documento?',
+            message: `"${fileName}" verrà rimosso dall'Archivio Intelligente del paziente.`,
+            tone: 'danger',
+            confirmLabel: 'Rimuovi'
+        });
         if (!confirmed) return;
 
         const nextInsights = insights.filter((insight) => insight.id !== insightId);
@@ -83,7 +100,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const handleClearArchive = async () => {
-        const confirmed = confirm("Svuotare completamente l'Archivio Intelligente di questo paziente?");
+        const { confirmed } = await confirm({
+            title: "Svuotare l'Archivio Intelligente?",
+            message: 'Tutti i documenti analizzati di questo paziente verranno rimossi.',
+            tone: 'danger',
+            confirmLabel: 'Svuota'
+        });
         if (!confirmed) return;
 
         await persistArchive([], 'all');

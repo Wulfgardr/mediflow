@@ -28,6 +28,8 @@ import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summa
 /* @Codex */
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface DocumentUploadProps {
     patientId: string;
@@ -39,6 +41,8 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
     const [replayingId, setReplayingId] = useState<string | null>(null);
@@ -198,7 +202,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             } catch (e) {
                 console.error("Upload failed", e);
-                alert("Errore caricamento file: " + file.name);
+                showToast({ tone: 'error', title: 'Caricamento file non riuscito', description: file.name });
             }
         }
         /* @Codex */
@@ -213,7 +217,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         setIsProcessing(false);
         /* @Codex */
         setAiStage("");
-    }, [patientId, aiModels, documentSynthesisEnabled]);
+    }, [patientId, aiModels, documentSynthesisEnabled, showToast]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -223,7 +227,13 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     });
 
     const handleDelete = async (id: string) => {
-        if (confirm("Sei sicuro di voler eliminare questo documento?")) {
+        const { confirmed } = await confirm({
+            title: 'Sei sicuro di voler eliminare questo documento?',
+            message: 'Il documento verra rimosso dagli allegati del paziente.',
+            confirmLabel: 'Elimina',
+            tone: 'danger',
+        });
+        if (confirmed) {
             await db.attachments.delete(id);
             // Re-calculate summary REMOVED
         }

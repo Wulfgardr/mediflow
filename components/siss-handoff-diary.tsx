@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Props = {
     patientId: string;
@@ -68,6 +69,7 @@ function outcomeLabel(value: SissHandoffOutcome): string {
 }
 
 export default function SissHandoffDiary({ patientId, embedded = false }: Props) {
+    const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -156,7 +158,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     };
 
     const deleteItem = async (item: SissHandoffEvent) => {
-        const confirmed = confirm(`Eliminare la voce SISS "${item.moduleLabel}"?`);
+        const { confirmed } = await confirm({
+            title: `Eliminare la voce SISS "${item.moduleLabel}"?`,
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
         if (!confirmed) return;
         await db.sissHandoffs.delete(item.id);
     };

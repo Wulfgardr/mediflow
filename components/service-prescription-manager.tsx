@@ -23,6 +23,7 @@ import {
     type ServicePrescriptionStatus,
 } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Props = {
     patientId: string;
@@ -171,6 +172,7 @@ function childServiceCodeForDraft(
 }
 
 export default function ServicePrescriptionManager({ patientId, embedded = false }: Props) {
+    const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -358,7 +360,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     };
 
     const deleteItem = async (item: ServicePrescription) => {
-        const confirmed = confirm(`Eliminare la prestazione "${item.serviceName}"?`);
+        const { confirmed } = await confirm({
+            title: `Eliminare la prestazione "${item.serviceName}"?`,
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
         if (!confirmed) return;
         const children = itemsByPrescription.get(item.id) ?? [];
         await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true })));

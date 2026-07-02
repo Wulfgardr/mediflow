@@ -122,6 +122,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
+    // WUL-UIUX: errore inline per i flussi setup/ripristino, al posto di alert() nativo.
+    // Il toast non e utilizzabile qui: ToastProvider e montato dentro SecurityProvider.
+    const [flowError, setFlowError] = useState<string | null>(null);
 
     /* @Codex */
     const setActiveMasterKey = (key: CryptoKey | null) => {
@@ -244,6 +247,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const repairFromLegacy = async () => {
         if (isRepairing) return;
         setIsRepairing(true);
+        setFlowError(null);
         try {
             const { response: res, payload } = await repairLegacyDbRequest();
             if (!res.ok) {
@@ -252,7 +256,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             await checkAuthStatus();
         } catch (e) {
             console.error('Repair failed', e);
-            alert('Ripristino fallito. Verifica i dettagli in console.');
+            setFlowError('Ripristino fallito. Verifica i dettagli in console.');
         } finally {
             setIsRepairing(false);
         }
@@ -378,6 +382,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     // New handler for Onboarding Wizard
     const handleWizardComplete = async (data: { displayName: string; ambulatoryName: string; pin: string }) => {
         const { displayName, ambulatoryName, pin } = data;
+        setFlowError(null);
 
         try {
             // Generate crypto
@@ -405,7 +410,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     if (!success) {
                         setIsAuthenticated(false);
                         setIsLocked(true);
-                        alert("Setup già completato. Inserisci il PIN esistente.");
+                        // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
+                        setAuthErrorMessage("Setup già completato. Inserisci il PIN esistente.");
                     }
                     return;
                 }
@@ -429,19 +435,30 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (e) {
             console.error("Setup failed", e);
-            alert("Errore configurazione: " + e);
+            const detail = e instanceof Error ? e.message : String(e);
+            setFlowError("Errore configurazione: " + detail);
         }
     };
 
     /* @Codex */
     if (authHealth?.status === 'error') {
         return (
-            <AuthHealthScreen
-                health={authHealth}
-                onRetry={() => checkAuthStatus()}
-                onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
-                isRepairing={isRepairing}
-            />
+            <>
+                {flowError && (
+                    <div
+                        role="alert"
+                        className="fixed top-4 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700 shadow-lg"
+                    >
+                        {flowError}
+                    </div>
+                )}
+                <AuthHealthScreen
+                    health={authHealth}
+                    onRetry={() => checkAuthStatus()}
+                    onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
+                    isRepairing={isRepairing}
+                />
+            </>
         );
     }
 
@@ -454,7 +471,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     if (requiresSetup) {
         return (
             <div className="h-screen w-screen fixed inset-0 z-[100] bg-gradient-to-br from-indigo-50 to-blue-100 flex items-center justify-center p-4">
-                <OnboardingWizard onComplete={handleWizardComplete} />
+                <div className="w-full max-w-2xl space-y-4">
+                    {flowError && (
+                        <div
+                            role="alert"
+                            className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            {flowError}
+                        </div>
+                    )}
+                    <OnboardingWizard onComplete={handleWizardComplete} />
+                </div>
             </div>
         );
     }

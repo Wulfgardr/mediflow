@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { Accessibility, CheckCircle2, FileText, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Props = {
     patientId: string;
@@ -99,6 +100,7 @@ function parseDocumentRefs(value: string | undefined): string[] {
 }
 
 export default function ProstheticPrescriptionManager({ patientId, embedded = false }: Props) {
+    const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -173,7 +175,11 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     };
 
     const deleteItem = async (item: ProstheticPrescription) => {
-        const confirmed = confirm(`Eliminare la voce protesica "${item.description}"?`);
+        const { confirmed } = await confirm({
+            title: `Eliminare la voce protesica "${item.description}"?`,
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
         if (!confirmed) return;
         await db.prostheticPrescriptions.delete(item.id);
     };

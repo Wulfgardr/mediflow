@@ -13,6 +13,8 @@ import { it } from 'date-fns/locale';
 import ICDAutocomplete from './icd-autocomplete';
 import DrugAutocomplete from './drug-autocomplete';
 import { AifaDrug } from '@/lib/db';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const therapySchema = z.object({
     drugName: z.string().min(2, "Il nome del farmaco è richiesto"),
@@ -43,6 +45,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     /* @Codex WUL-UIUX: protezione doppio submit e nome farmaco corrente in edit. */
     const [isSaving, setIsSaving] = useState(false);
     const [editingDrugName, setEditingDrugName] = useState('');
+    const { showToast } = useToast();
+    const confirm = useConfirm();
 
     const therapies = useLiveQuery(
         async () => {
@@ -156,7 +160,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             cancelEditing();
         } catch (error) {
             console.error("Failed to save therapy", error);
-            alert('Salvataggio terapia fallito. Controlla i dati e riprova.');
+            showToast({ tone: 'error', title: 'Salvataggio terapia fallito', description: 'Controlla i dati e riprova.' });
         } finally {
             setIsSaving(false);
         }
@@ -174,7 +178,13 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     };
 
     const handleSoftDelete = async (id: string) => {
-        if (confirm('Eliminare questo farmaco dalla cartella? Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.')) {
+        const { confirmed } = await confirm({
+            title: 'Eliminare questo farmaco dalla cartella?',
+            message: 'Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
+        if (confirmed) {
             await db.therapies.delete(id);
         }
     };
