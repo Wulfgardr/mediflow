@@ -118,6 +118,9 @@ function applySchemaGuards() {
         // WUL-306 (ADR 0066): soft-delete tombstone columns, additive and idempotent
         ensureColumn('patients', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn('patients', 'deletion_reason', 'deletion_reason TEXT');
+        // S1: ciclo di vita insight (staleness). Additive e idempotenti.
+        ensureColumn('patients', 'ai_summary_generated_at', 'ai_summary_generated_at INTEGER');
+        ensureColumn('patients', 'ai_summary_context_hash', 'ai_summary_context_hash TEXT');
     } catch (error) {
         console.warn('[MediFlow] Patients schema check skipped:', error);
     }
