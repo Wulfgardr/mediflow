@@ -292,6 +292,10 @@ VERIFICA LIVE (DB sbloccato, dati reali su localhost:3000, 189 pazienti): confer
 | S3 (core) Router deterministico di classe (`document-class-router.ts`) | fatto + test | 4105c85c1 |
 | S3 (wiring additivo) Router agganciato alla sintesi, classe+data sull'insight, badge in archivio | fatto + test | 9cc03b5ae |
 | S1 (fix persistenza) Colonne server-side ai_summary_generated_at/context_hash + normalizer, altrimenti la staleness non persisteva | fatto + test + verifica live | 0478d7684 |
+| S6 Range di riferimento Observation (refLow/refHigh/refText: colonne + normalizer + colorazione deterministica single-source + prompt AI) e proiezione follow-up documenti read-only con conferma | fatto + test (12 casi) + verifica live | wf Ultracode |
+| S6 input range nel form osservazioni (percorso manuale) | fatto + verifica live | (commit dedicato) |
+
+Verifica live S6 (dati reali): inserita una misura fuori range (PA 180, rif 70-110), confermata la colorazione critica su ObservationManager ("180" rosso + badge "rif 70-110" + chip "Alto"), sulla strip (cella Parametri rossa + hint), e a livello DB (colonne ref_low/ref_high/ref_text presenti nel runtime medical.db, riga persistita). Riga di test poi rimossa. Nota emersa: il `confirm()` nativo di eliminazione misura (anti-pattern gia in opportunita UI 1) blocca l'automazione browser: rafforza la priorita di sostituirlo con un dialog Vetro Clinico.
 
 ### Non fatto in sessione (motivo esplicito)
 
