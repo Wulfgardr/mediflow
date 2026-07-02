@@ -37,9 +37,18 @@ interface SummaryOptions {
 /* @Codex */
 export type PatientSummaryRefreshResult =
     | { status: 'updated'; modelInfo: SummaryModelInfo }
-    | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' };
+    | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' | 'already-running' };
 
 const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
+// Coalescing di burst (es. upload multiplo): se arriva una richiesta mentre una
+// generazione e in corso, si segna un rerun in coda che parte una sola volta al
+// termine, cosi lo stato finale del burst viene comunque catturato senza N run.
+const pendingRerun = new Set<string>();
+
+/* @Codex */
+export function isSummaryGenerationInFlight(patientId: string): boolean {
+    return inflight.has(patientId);
+}
 
 const SECTION_TITLES = [
     'Quadro attuale',
@@ -129,6 +138,9 @@ export async function regeneratePatientSummary(
     if (!patientId) return null;
 
     if (inflight.has(patientId)) {
+        // Una generazione e gia in corso: segna un rerun in coda (cattura lo stato
+        // finale del burst) e restituisci il risultato della run corrente.
+        pendingRerun.add(patientId);
         return inflight.get(patientId) ?? null;
     }
 
@@ -185,6 +197,13 @@ export async function regeneratePatientSummary(
         return await task;
     } finally {
         inflight.delete(patientId);
+        if (pendingRerun.has(patientId)) {
+            pendingRerun.delete(patientId);
+            // Rerun trailing senza options (no onStage/signal della run originale,
+            // gia conclusa) e senza bloccare il chiamante; errori ignorati perche
+            // e un aggiornamento best-effort a valle del burst.
+            void regeneratePatientSummary(patientId).catch(() => {});
+        }
     }
 }
 
@@ -197,10 +216,17 @@ export async function refreshPatientSummaryIfEnabled(
         return { status: 'skipped', reason: 'missing-patient-id' };
     }
 
+    // Osservabilita: se una generazione e gia in corso questa richiesta vi si
+    // aggancia (e lascia in coda un rerun trailing), quindi non e una nuova run.
+    const joinedInFlight = isSummaryGenerationInFlight(patientId);
+
     try {
         const modelInfo = await regeneratePatientSummary(patientId, options);
         if (!modelInfo) {
             return { status: 'skipped', reason: 'missing-patient-id' };
+        }
+        if (joinedInFlight) {
+            return { status: 'skipped', reason: 'already-running' };
         }
         return { status: 'updated', modelInfo };
     } catch (error) {

@@ -260,11 +260,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
             if (!info) throw new Error("Risposta vuota dal provider AI");
 
-            // Force refresh to show new data
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
-
+            // La pagina legge patient.aiSummary via useLiveQuery: la scrittura su
+            // db.patients invalida la query e ridisegna il pannello senza reload.
         } catch (err) {
             if (abortControllerRef.current?.signal.aborted) {
                 console.log("Generation aborted by user");

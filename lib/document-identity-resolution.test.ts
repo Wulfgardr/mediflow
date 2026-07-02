@@ -12,6 +12,7 @@ import {
 /* @Codex */
 import {
     buildDocumentDecisionIdentityFromTaxCodes,
+    isValidItalianTaxCodeChecksum,
     resolveDocumentTaxCodeRoles,
 } from './document-identity-resolution';
 
@@ -24,11 +25,14 @@ const baseSource = {
     ocrStatus: 'not_needed' as const,
 };
 
-// Deliberately invalid CF-like tokens accepted by the structural resolver regex.
-const SYNTHETIC_PATIENT_CF = 'TSTTST00A00A000A';
-const SYNTHETIC_PRESCRIBER_CF = 'MEDPRS00A00A000A';
-const SYNTHETIC_OPERATOR_CF = 'OPRTST00A00A000A';
-const SYNTHETIC_FACILITY_CF = 'FCLTST00A00A000A';
+// Synthetic CF-like tokens: structurally valid AND checksum-valid, so the
+// resolver can promote them to high confidence (the check char gates high).
+const SYNTHETIC_PATIENT_CF = 'TSTTST00A00A000X';
+const SYNTHETIC_PRESCRIBER_CF = 'MEDPRS00A00A000X';
+const SYNTHETIC_OPERATOR_CF = 'OPRTST00A00A000L';
+const SYNTHETIC_FACILITY_CF = 'FCLTST00A00A000W';
+// A structurally valid token with a wrong check char: never reaches high confidence.
+const SYNTHETIC_INVALID_CHECKSUM_CF = 'TSTTST00A00A000A';
 
 function action(kind: DocumentDecisionAction['kind'], evidenceRefs = ['tax-code:1']): DocumentDecisionAction {
     return {
@@ -52,6 +56,37 @@ test('tax code resolver marks explicit assisted person CF as patient_cf', () => 
     assert.equal(result.taxCodes[0].confidence, 'high');
     assert.equal(result.humanRequired, false);
     assert.match(result.evidenceRefs[0].snippet, /Assistito codice fiscale/i);
+});
+
+test('isValidItalianTaxCodeChecksum accepts valid check char and rejects wrong one', () => {
+    assert.equal(isValidItalianTaxCodeChecksum(SYNTHETIC_PATIENT_CF), true);
+    assert.equal(isValidItalianTaxCodeChecksum(SYNTHETIC_INVALID_CHECKSUM_CF), false);
+    assert.equal(isValidItalianTaxCodeChecksum('too-short'), false);
+    // case-insensitive: OCR lowercase must validate the same way
+    assert.equal(isValidItalianTaxCodeChecksum(SYNTHETIC_PATIENT_CF.toLowerCase()), true);
+});
+
+test('tax code resolver recovers a lowercase (OCR) patient CF and normalizes it to uppercase', () => {
+    const result = resolveDocumentTaxCodeRoles({
+        text: `Assistito codice fiscale ${SYNTHETIC_PATIENT_CF.toLowerCase()}. Prestazione richiesta: visita ORL.`,
+    });
+
+    assert.equal(result.taxCodes.length, 1);
+    assert.equal(result.taxCodes[0].value, SYNTHETIC_PATIENT_CF);
+    assert.equal(result.taxCodes[0].role, 'patient_cf');
+    assert.equal(result.taxCodes[0].confidence, 'high');
+});
+
+test('tax code resolver demotes a patient CF with invalid checksum below high confidence', () => {
+    const result = resolveDocumentTaxCodeRoles({
+        text: `Assistito codice fiscale ${SYNTHETIC_INVALID_CHECKSUM_CF}. Prestazione richiesta: visita ORL.`,
+    });
+
+    assert.equal(result.taxCodes.length, 1);
+    assert.equal(result.taxCodes[0].role, 'patient_cf');
+    assert.equal(result.taxCodes[0].confidence, 'medium');
+    // Never high without a valid checksum, so identity stays in review (fail-safe).
+    assert.equal(result.humanRequired, true);
 });
 
 test('tax code resolver measures label distance on normalized text despite irregular OCR spacing', () => {

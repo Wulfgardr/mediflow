@@ -297,16 +297,29 @@ function normalizeFreeText(raw: string): { normalizedText: string; sections: Doc
     };
 }
 
+// Finestra pivot per anni a 2 cifre: l'anno di default e 20xx, ma se cadrebbe
+// nel futuro rispetto all'anno corrente si interpreta come 19xx. Necessario per
+// le date di nascita (es. 58 -> 1958, non 2058) senza rompere le date recenti.
+export function expandTwoDigitYear(twoDigitYear: string, currentYear: number): number {
+    const yy = Number.parseInt(twoDigitYear, 10);
+    if (Number.isNaN(yy)) return Number.NaN;
+    const candidate = 2000 + yy;
+    return candidate > currentYear ? 1900 + yy : candidate;
+}
+
 /* @Codex */
 function collectNormalizedDates(text: string): DocumentNormalizationDateHint[] {
     const seen = new Set<string>();
     const dates: DocumentNormalizationDateHint[] = [];
+    const currentYear = new Date().getFullYear();
 
     for (const match of text.matchAll(DATE_TOKEN_REGEX)) {
         const [raw, dayValue, monthValue, yearValue] = match;
         const day = Number.parseInt(dayValue, 10);
         const month = Number.parseInt(monthValue, 10);
-        const year = Number.parseInt(yearValue.length === 2 ? `20${yearValue}` : yearValue, 10);
+        const year = yearValue.length === 2
+            ? expandTwoDigitYear(yearValue, currentYear)
+            : Number.parseInt(yearValue, 10);
 
         if (
             Number.isNaN(day)

@@ -140,7 +140,10 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
-    const ai = await AIService.create('clinical');
+    // Ruolo 'reasoning': di default risolve allo stesso modello di 'clinical'
+    // (resolveTextModel con fallback), ma permette di instradare la sintesi
+    // documentale su un modello dedicato senza toccare patient_insight.
+    const ai = await AIService.create('reasoning');
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
