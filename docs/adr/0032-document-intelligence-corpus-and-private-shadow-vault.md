@@ -2,7 +2,12 @@
 # ADR 0032: corpus document intelligence canonico in repo e vault locale privato per shadow evaluation
 
 Date: 2026-04-02  
-Status: Proposed
+Status: Accepted
+
+Update 2026-07-02: il secondo giro di hardening dello stack intelligence
+promuove questa decisione a `Accepted` e fissa la struttura minima del vault
+privato usato dai benchmark documentali. Il repository resta `synthetic-only`;
+il vault resta fuori Git e fuori dagli artifact pubblici.
 
 ## Problema
 
@@ -77,6 +82,77 @@ MediFlow usera due livelli distinti:
     progettazione di nuovi archetipi sintetici
   - non va committato, allegato a PR o trattato come dataset operativo
 
+### Layout operativo del vault
+
+Il vault vive fuori Git. Il percorso concreto e locale all installazione e deve
+essere passato esplicitamente agli script, senza default che punti dentro il
+repository.
+
+Layout raccomandato:
+
+```text
+document-vault/
+  manifests/
+    router-manifest.json
+  cases/
+    <classe>/
+      <case-id>/
+        source/
+        derived/
+        notes.md
+  reports/
+    router/
+```
+
+Regole:
+
+- `source/` contiene solo materiale privato locale e non redistribuibile.
+- `derived/` contiene estratti minimizzati o redatti usati per failure analysis
+  locale, mai per commit.
+- `notes.md` deve contenere solo osservazioni operative redatte e non deve
+  essere copiato nel repository se deriva da materiale reale.
+- `reports/` puo contenere output benchmark PHI-safe, ma la pubblicazione in PR
+  richiede review manuale e deve escludere file path reali, testo clinico reale,
+  CF, NRE, codici regionali, indirizzi, contatti e altri identificatori.
+
+### Manifest benchmark router
+
+Il router deterministico consuma un manifest JSON fuori Git, passato da CLI.
+La forma minima e:
+
+```json
+{
+  "entries": [
+    {
+      "file": "2026-01-01__laboratorio__caso-sintetico.pdf",
+      "expectedClass": "lab_report",
+      "labelSource": "filename"
+    }
+  ]
+}
+```
+
+Campi opzionali ammessi per benchmark locale:
+
+- `text`: estratto redatto o sintetico usato come `textSample`
+- `producer`: metadato PDF Producer redatto o sintetico
+- `creator`: metadato PDF Creator redatto o sintetico
+
+`file` nel manifest privato puo essere un nome relativo o un identificatore di
+caso. Nei report condivisi non devono comparire path assoluti del vault.
+
+### Consumo nei benchmark
+
+I benchmark devono:
+
+- leggere il manifest da un percorso CLI esplicito
+- usare fixture sintetiche inline per self-test ripetibili in repo
+- produrre metriche aggregate per classe e confusioni, non dump del contenuto
+  documentale
+- fallire in modo esplicito su manifest malformati
+- non aprire network, non introdurre cloud e non scrivere nel repository durante
+  la valutazione del vault
+
 Ogni caso documentale canonico deve essere pensato come **pacchetto di caso** e
 non come semplice testo sorgente. La shape minima da preservare e:
 
@@ -109,12 +185,13 @@ Diventa piu difficile:
 
 ## First Thin Slice
 
-1. Persistire questa decisione come ADR proposta e collegarla a `WUL-131`.
-2. Aggiungere una nota operativa con struttura minima dei casi documentali e
-   policy `repo canonico vs vault privato`.
+1. Persistire questa decisione come ADR accettata e mantenerla collegata a
+   `WUL-131`.
+2. Usare `scripts/benchmark-document-router.ts` come primo consumer del manifest
+   privato del vault, con `--self-test` sintetico sempre eseguibile in repo.
 3. Tenere il vault privato fuori Git e fuori dai flussi automatici del runtime.
-4. Usare `WUL-131` come ponte tra il corpus multi-archetipo chiuso in `WUL-129`
-   e la governance AI di `WUL-111`.
+4. Usare i report aggregati del router per distillare nuovi archetipi sintetici
+   nel corpus canonico, senza promuovere materiale reale nel repository.
 
 ## Fuori Scope
 
