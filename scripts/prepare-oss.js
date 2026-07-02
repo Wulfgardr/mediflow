@@ -82,6 +82,7 @@ const TO_EXCLUDE_BY_PATH = [
     'docs/analysis/2026-06-01-agentic-dynamics-test-run.md',
     'docs/analysis/2026-06-01-agentic-parliament-repoprompt-export.md',
     'docs/analysis/2026-06-01-agentic-parliament-run.md',
+    'docs/parliament',
     'docs/private',
     'docs/linear-codex-playbook.md',
     'docs/linear-completed-issues-archive-2026-05-21.md',

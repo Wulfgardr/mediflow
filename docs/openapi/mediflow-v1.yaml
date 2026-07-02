@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.12.0
-  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.13.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
