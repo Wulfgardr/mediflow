@@ -63,15 +63,33 @@ export default function PatientDetailPage() {
         [id],
     );
     /* @Codex WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
-    const therapyCount = useLiveQuery(
-        async () =>
-            db.therapies
+    // Terapie attive complete (non solo il conteggio) per servire i principi attivi
+    // con posologia direttamente nella cella, senza scendere al TherapyManager.
+    const activeTherapies = useLiveQuery(
+        async () => {
+            const items = await db.therapies
                 .filter((therapy) => therapy.patientId === id && therapy.status === 'active' && !therapy.deletedAt)
-                .count(),
+                .toArray();
+            return items.sort((left, right) => {
+                const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
+                const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
+                return rightTime - leftTime;
+            });
+        },
         [id],
     );
     const observationCount = useLiveQuery(
         async () => db.observations.filter((observation) => observation.patientId === id).count(),
+        [id],
+    );
+    // Ultima osservazione registrata: data e valore per la cella Parametri.
+    const latestObservation = useLiveQuery(
+        async () => {
+            const items = await db.observations.filter((observation) => observation.patientId === id).toArray();
+            return items
+                .filter((observation) => observation.observedAt)
+                .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0] ?? null;
+        },
         [id],
     );
     const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
@@ -138,6 +156,10 @@ export default function PatientDetailPage() {
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
+    /* @Codex WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
+       la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
+       di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
+    const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
     const recentEvidence = documentInsights.slice(0, 4);
     const leadDiagnosis = diagnosisItems[0];
     const nextCheckup = (checkups ?? [])[0];
@@ -178,6 +200,27 @@ export default function PatientDetailPage() {
     /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
        inventano flag (resta onesto). */
+    const therapyCount = activeTherapies?.length ?? 0;
+    // Primi 2 principi attivi con posologia direttamente nella cella.
+    const therapyHint = activeTherapies && activeTherapies.length > 0
+        ? activeTherapies
+            .slice(0, 2)
+            .map((therapy) => [therapy.drugName, therapy.dosage].filter(Boolean).join(' '))
+            .join('; ') + (activeTherapies.length > 2 ? `; +${activeTherapies.length - 2}` : '')
+        : undefined;
+    // Ultima misura registrata (data + valore), deterministica.
+    const observationHint = latestObservation
+        ? `${latestObservation.display}: ${latestObservation.value}${latestObservation.unitCode ? ' ' + latestObservation.unitCode : ''} · ${new Date(latestObservation.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`
+        : undefined;
+    // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
+    // percorso e ancora aperto (rilevante soprattutto per l'ADI).
+    const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
+    const daysSinceContact = lastEntryDate
+        ? Math.floor((Date.now() - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+    const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
+    // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.
+    const missingSynthesisCount = attachmentItems.length - attachmentsWithTextCount;
     const clinicalSignals: ClinicalSignal[] = [
         {
             label: 'Problemi attivi',
@@ -185,9 +228,25 @@ export default function PatientDetailPage() {
             icon: Stethoscope,
             hint: leadDiagnosis?.description,
         },
-        { label: 'Terapie attive', value: therapyCount ?? 0, icon: Pill },
-        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical },
-        { label: 'Referti', value: documentInsights.length, icon: FileText },
+        { label: 'Terapie attive', value: therapyCount, icon: Pill, hint: therapyHint },
+        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical, hint: observationHint },
+        {
+            label: 'Ultimo contatto',
+            value: lastEntryDate
+                ? lastEntryDate.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+                : 'Nessuno',
+            icon: FileText,
+            tone: contactStale ? 'warning' : 'neutral',
+            hint: daysSinceContact !== null
+                ? (daysSinceContact === 0 ? 'oggi' : `${daysSinceContact} giorni fa`)
+                : undefined,
+        },
+        {
+            label: 'Doc. da sintetizzare',
+            value: missingSynthesisCount,
+            icon: FileText,
+            tone: missingSynthesisCount > 0 ? 'warning' : 'neutral',
+        },
         {
             label: 'Prossimo follow-up',
             value: nextCheckup
@@ -374,7 +433,7 @@ export default function PatientDetailPage() {
                             </div>
                             <span className="apple-chip self-start md:self-auto">{nonScaleEntries.length} voci attive</span>
                         </div>
-                        {entries ? <Timeline entries={entries} /> : null}
+                        {entries ? <Timeline entries={timelineEntries} /> : null}
                     </section>
 
                     <div id="siss" className={workspaceStyles.anchorStack}>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
+import { confidenceLabel, matchTypeLabel } from '@/lib/ai-labels';
 import { db, type ClinicalEntry, type Patient } from '@/lib/db';
 import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
@@ -675,7 +676,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         {reviewStateLabel(diagnosis.review.state)}
                                                                     </span>
                                                                     <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-slate-500 dark:bg-white/10">
-                                                                        {diagnosis.confidence}
+                                                                        {confidenceLabel(diagnosis.confidence)}
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
@@ -799,7 +800,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         {therapyStateLabel(therapy.therapyState)}
                                                                     </span>
                                                                     <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-slate-500 dark:bg-white/10">
-                                                                        {therapy.matchType}
+                                                                        {matchTypeLabel(therapy.matchType)}
                                                                     </span>
                                                                 </div>
                                                                 <p className="break-words text-[10px] font-bold text-slate-700 dark:text-slate-200">

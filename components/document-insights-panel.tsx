@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { qualityLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 
 interface DocumentInsightsPanelProps {
@@ -15,6 +16,12 @@ interface DocumentInsightsPanelProps {
 export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanelProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
+    // Modelli reali dalla config invece di nomi hardcoded nel footer.
+    const [modelLabels, setModelLabels] = useState<{ clinical: string; ocr: string } | null>(null);
+
+    useEffect(() => {
+        getAiModelLabels().then(setModelLabels).catch(() => setModelLabels(null));
+    }, []);
 
     // Parse insights from patient
     const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
@@ -150,7 +157,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                             {formatDate(insight.date)}
                                             {insight.quality?.level && (
                                                 <span className={`ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${qualityTone(insight.quality.level)}`}>
-                                                    {insight.quality.level}
+                                                    {qualityLabel(insight.quality.level)}
                                                 </span>
                                             )}
                                         </div>
@@ -229,7 +236,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className="mt-4 flex items-center gap-2 border-t border-slate-200/80 pt-3 text-[10px] text-slate-400 dark:border-white/10">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Sintesi generata da IA locale (DeepSeek OCR 2 + Qwen 3.5 35B A3B). Verificare sempre.</span>
+                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.ocr} + ${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
             </div>
         </div>
     );
