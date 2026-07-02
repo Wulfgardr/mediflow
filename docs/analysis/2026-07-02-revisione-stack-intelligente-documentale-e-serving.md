@@ -270,7 +270,9 @@ Attriti principali (tutti con riferimento nel dossier UI):
 
 ## Parte 9: stato di esecuzione (branch feat/stack-intelligente-fixes)
 
-Eseguito in questa sessione sul branch `feat/stack-intelligente-fixes`. Ogni batch ha typecheck, lint ed eventuali test dedicati verdi (81 test nelle suite toccate). La verifica visiva con dati paziente seed non era disponibile in sessione: la copertura poggia su typecheck + lint + unit test.
+Eseguito in questa sessione sul branch `feat/stack-intelligente-fixes`. Ogni batch ha typecheck, lint ed eventuali test dedicati verdi (88 test nelle suite toccate).
+
+VERIFICA LIVE (DB sbloccato, dati reali su localhost:3000, 189 pazienti): confermati end-to-end Q1 (paziente con 5 diagnosi ICD-9 prima nascoste ora tutte visibili con badge "ICD-9"), Q4 (strip con ultima misura, ultimo contatto, doc da sintetizzare), Q2 (rigenerazione insight senza reload di pagina), S1 (compare "Generato il 02 lug 2026"). La verifica ha anche scoperto e fatto correggere un bug reale di persistenza server-side (vedi S1 fix sotto).
 
 ### Fatto (committato e testato)
 
@@ -289,6 +291,7 @@ Eseguito in questa sessione sul branch `feat/stack-intelligente-fixes`. Ogni bat
 | S9 (parte) Factory kill-switch condivisa, rimossa la triplicazione | fatto + test | 0d117a1d8 |
 | S3 (core) Router deterministico di classe (`document-class-router.ts`) | fatto + test | 4105c85c1 |
 | S3 (wiring additivo) Router agganciato alla sintesi, classe+data sull'insight, badge in archivio | fatto + test | 9cc03b5ae |
+| S1 (fix persistenza) Colonne server-side ai_summary_generated_at/context_hash + normalizer, altrimenti la staleness non persisteva | fatto + test + verifica live | 0478d7684 |
 
 ### Non fatto in sessione (motivo esplicito)
 
