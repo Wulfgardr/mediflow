@@ -287,11 +287,12 @@ Eseguito in questa sessione sul branch `feat/stack-intelligente-fixes`. Ogni bat
 | S1 Staleness insight (generatedAt + contextHash, cache skip-if-unchanged, riga review queue, badge pannello) | fatto + test | 4bdfc2f7a |
 | S2 View model unico insight (`patient-insight-view-model.ts`), queue e pannello concordano | fatto + test | 907b1616e |
 | S9 (parte) Factory kill-switch condivisa, rimossa la triplicazione | fatto + test | 0d117a1d8 |
-| S3 (core) Router deterministico di classe (`document-class-router.ts`) | fatto + test, NON ancora wired | 4105c85c1 |
+| S3 (core) Router deterministico di classe (`document-class-router.ts`) | fatto + test | 4105c85c1 |
+| S3 (wiring additivo) Router agganciato alla sintesi, classe+data sull'insight, badge in archivio | fatto + test | 9cc03b5ae |
 
 ### Non fatto in sessione (motivo esplicito)
 
-- **S3 wiring**: il router e completo e testato ma non ancora chiamato dalla pipeline. Serve prima aggiungere `pdf.getMetadata()` in `lib/pdf-service.ts` (oggi mai chiamato) e integrarlo in `lib/document-synthesis-service.ts`/`document-ocr-decision.ts`. E' un cambio sul flusso PDF client-side che va verificato con un preview su documenti reali: rimandato per non introdurlo alla cieca.
+- **S3 reroute del control-flow**: il router e agganciato in modo ADDITIVO (classifica e mostra, non decide ancora). Il passo che porta valore pieno (saltare l'LLM sul 55-60% deterministico, mandare gli AcroForm a field-map invece che OCR, merge testo per pagina sulle cartelle ibride) cambia il flusso PDF client-side e va verificato con preview su documenti reali. Serve anche `pdf.getMetadata()` in `lib/pdf-service.ts` (oggi mai chiamato) per dare al router anche il segnale Producer.
 - **S3 parser deterministici** (`ssn-prescription-parser`, `lab-report-parser`) e **fact kind `lab_result`**: nuovi moduli ampi con estrazione tabellare; da fare dopo il wiring del router, con case pack dal vault.
 - **S4 Integrare l'autofill sintesi nei guardrail del decision layer**: chiude il doppio sistema decisionale ma tocca l'unico auto-write clinico; richiede test di non-regressione mirati prima di modificarlo.
 - **S5 Vault ADR 0032 + benchmark router**: la promozione ADR e il manifest sono doc/script; il benchmark ha bisogno del corpus nel vault privato (fuori sessione).
