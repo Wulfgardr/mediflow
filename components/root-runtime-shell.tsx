@@ -14,6 +14,8 @@ import { Sidebar } from '@/components/sidebar';
 import { ThemeProvider } from '@/components/theme-provider';
 import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider';
 import { UIStyleProvider } from '@/components/ui-style-provider';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
+import { ToastProvider } from '@/components/ui/toast-provider';
 
 const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8', '/mockups/scheda']);
 // @Codex Keep route additions aligned with docs/design/wul-271-kree8-visual-translation.md.
@@ -66,23 +68,27 @@ export function RootRuntimeShell({
           <UIAccessibilityProvider>
             <UIStyleProvider>
               <PrivacyProvider>
-                {isFullscreenLiveRoute ? (
-                  <main className="relative z-10 min-h-screen">
-                    {children}
-                  </main>
-                ) : (
-                  <div className="relative z-10 xl:flex">
-                    <div className="hidden xl:block">
-                      <Sidebar />
-                    </div>
-                    <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
-                      <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <MobileShellChrome />
+                <ToastProvider>
+                  <ConfirmProvider>
+                    {isFullscreenLiveRoute ? (
+                      <main className="relative z-10 min-h-screen">
                         {children}
+                      </main>
+                    ) : (
+                      <div className="relative z-10 xl:flex">
+                        <div className="hidden xl:block">
+                          <Sidebar />
+                        </div>
+                        <main className="min-h-screen flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pt-6 xl:ml-[21rem] xl:px-10 xl:pb-10 xl:pt-8">
+                          <div className="mx-auto max-w-[1520px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <MobileShellChrome />
+                            {children}
+                          </div>
+                        </main>
                       </div>
-                    </main>
-                  </div>
-                )}
+                    )}
+                  </ConfirmProvider>
+                </ToastProvider>
               </PrivacyProvider>
             </UIStyleProvider>
           </UIAccessibilityProvider>

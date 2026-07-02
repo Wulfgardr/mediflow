@@ -21,9 +21,14 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    /* @Codex WUL-UIUX: in modifica il campo parte con defaultValue (nome farmaco):
+       non deve far partire una ricerca ne aprire il popover finche il medico non
+       digita davvero. */
+    const hasUserTyped = useRef(false);
 
     // Debounce search
     useEffect(() => {
+        if (!hasUserTyped.current) return;
         const timer = setTimeout(async () => {
             const tokens = query.trim().split(/\s+/).filter(t => t.length > 0);
 
@@ -103,7 +108,10 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 <input
                     type="text"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => {
+                        hasUserTyped.current = true;
+                        setQuery(e.target.value);
+                    }}
                     placeholder={placeholder}
                     autoFocus={autoFocus}
                     className={drugInputClassName}
