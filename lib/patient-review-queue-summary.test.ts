@@ -89,6 +89,15 @@ test('stale insight surfaces as an attention row to regenerate', () => {
     assert.ok(summary.attentionCount >= 1);
 });
 
+test('unreadable saved insight is an attention row, not "disponibile"', () => {
+    const input = baseInput();
+    // Saved but not renderable by the panel: queue and panel must agree.
+    input.insight = { enabled: true, hasSummary: true, readable: false };
+    const insight = buildPatientReviewQueueSummary(input).rows[0];
+    assert.equal(insight.state, 'da-rivedere');
+    assert.match(insight.detail, /non leggibile/i);
+});
+
 test('evidence row prioritises non-green quality as "da rivedere"', () => {
     const input = baseInput();
     input.evidence = [

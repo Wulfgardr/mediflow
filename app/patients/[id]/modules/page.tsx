@@ -31,6 +31,7 @@ import { db, type Attachment, type Checkup, type ClinicalEntry, type ExemptionCo
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
+import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export default function PatientDetailPage() {
@@ -210,6 +211,7 @@ export default function PatientDetailPage() {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
             hasSummary: Boolean(patient.aiSummary?.trim()),
             stale: insightStale,
+            readable: classifyInsightReadability(patient.aiSummary) !== 'unreadable',
         },
         evidence: documentInsights.map((insight) => ({
             qualityLevel: insight.quality?.level,

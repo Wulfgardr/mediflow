@@ -55,6 +55,9 @@ export interface PatientReviewQueueInput {
         hasSummary: boolean;
         /* Insight presente ma piu vecchio dell'ultimo dato clinico. */
         stale?: boolean;
+        /* Insight salvato ma non leggibile dal pannello (es. envelope JSON grezzo).
+           Se false quando hasSummary e true, queue e pannello concordano. */
+        readable?: boolean;
     };
     evidence: ReviewQueueEvidenceItem[];
     smartImport: {
@@ -132,6 +135,16 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
             'Patient Insight',
             'vuoto',
             'Nessun insight generato: si avvia solo manualmente dal pannello.',
+            { anchor },
+        );
+    }
+
+    if (input.readable === false) {
+        return row(
+            'insight',
+            'Patient Insight',
+            'da-rivedere',
+            'Insight salvato non leggibile: rigeneralo dal pannello.',
             { anchor },
         );
     }
