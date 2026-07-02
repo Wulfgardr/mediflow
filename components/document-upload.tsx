@@ -410,8 +410,9 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrReplay(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Riprova OCR"
+                                    aria-label={`Riprova OCR su ${file.name}`}
                                 >
                                     <RefreshCw className={cn("w-4 h-4", replayingId === file.id && "animate-spin")} />
                                 </button>
@@ -420,24 +421,27 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrManualReview(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Segna per revisione manuale"
+                                    aria-label={`Segna ${file.name} per revisione manuale`}
                                 >
                                     <AlertTriangle className="w-4 h-4" />
                                 </button>
                             )}
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
+                                className="rounded-lg p-2 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(15,23,42,0.06)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/10"
                                 title="Visualizza"
+                                aria-label={`Visualizza ${file.name}`}
                             >
                                 <Eye className="w-4 h-4" />
                             </button>
 
                             <button
                                 onClick={() => handleDelete(file.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-2 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-critical)] hover:bg-[color:rgba(163,58,47,0.1)] rounded-lg transition-colors"
                                 title="Elimina"
+                                aria-label={`Elimina ${file.name}`}
                             >
                                 <X className="w-4 h-4" />
                             </button>

@@ -1475,6 +1475,14 @@
     0 0 0 1px var(--line);
 }
 
+/* @Codex WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
+   tastiera vive sul contenitore, coerente con l'anello condiviso. */
+.patientSearchField:focus-within {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+}
+
 .patientSearchField input {
   width: 100%;
   min-width: 0;

@@ -3,6 +3,56 @@
 @source "../app";
 @source "../components";
 
+/* @Codex WUL-UIUX: Tailwind v4 e CSS-first e senza questa riga la variante dark:
+   ricade sul default @media (prefers-color-scheme), scollegata dal toggle a classe
+   del theme-provider (applyThemeClass aggiunge .dark/.light su <html>, anche per
+   'system'). Legando dark: alla classe .dark, le utility dark: e i token :root.dark
+   seguono la stessa sorgente: dark mode coerente per costruzione. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* @Codex WUL-UIUX: skeleton condiviso per gli stati di caricamento, sostituisce i
+   pulse inline eterogenei. Rispetta prefers-reduced-motion. */
+.mf-skeleton {
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.06);
+  animation: mf-skeleton-pulse 1.6s ease-in-out infinite;
+}
+:root.dark .mf-skeleton {
+  background: rgba(255, 255, 255, 0.06);
+}
+@keyframes mf-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mf-skeleton { animation: none; }
+}
+
+/* @Codex WUL-UIUX: riga maestra densa per le liste cliniche (parametri, farmaci).
+   Una riga = un'entita; si espande in place. Nessun bordo proprio: le righe sono
+   separate da hairline dal contenitore. Focus da tastiera di prima classe. */
+.mf-listrow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--mf-ink);
+  transition: background-color 160ms ease;
+}
+.mf-listrow:hover {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+:root.dark .mf-listrow:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+.mf-listrow:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+}
+
 .liquid-blur {
   filter: blur(5px);
   opacity: 0.6;
@@ -1797,6 +1847,13 @@ textarea.input-field {
 :root.dark .mf-popover-row.is-active {
   background-color: rgba(203, 213, 225, 0.10);
   color: var(--mf-ink);
+}
+
+/* @Codex WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
+   (autocomplete). Prima mancava e alcuni consumer azzeravano l'outline. */
+.mf-popover-row:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
 }
 
 /* Semantic alert blocks reused across diagnostics/SISS/import flows */
