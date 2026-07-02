@@ -20,7 +20,11 @@
     "lib/document-source-provenance-audit.ts",
     "lib/document-source-provenance-audit.test.ts",
     "lib/document-synthesis-service.test.ts",
+    "lib/document-synthesis-autofill.ts",
+    "lib/document-synthesis-autofill.test.ts",
     "lib/document-synthesis-parser.ts",
+    "lib/document-decision.ts",
+    "lib/locked-field-guard.ts",
     "lib/ai-task-contracts.ts"
   ]
 }

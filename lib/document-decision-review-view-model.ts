@@ -88,6 +88,9 @@ const FORBIDDEN_REASON_LABELS: Record<string, string> = {
     exemption_is_not_diagnosis: 'esenzione non diagnosi',
     prosthetic_required_fields_missing: 'campi protesica mancanti',
     false_patient_create_risk: 'rischio falso paziente',
+    confidence_too_low_for_auto_apply: 'confidenza insufficiente',
+    target_field_locked: 'campo cifrato non leggibile',
+    structured_fact_already_present: 'dato gia presente',
 };
 
 function actionView(action: DocumentDecisionAction): DocumentDecisionReviewActionView {
