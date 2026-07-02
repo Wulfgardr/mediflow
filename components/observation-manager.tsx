@@ -81,6 +81,11 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
     const [fullGroups, setFullGroups] = useState<Set<string>>(new Set());
+    /* @Codex WUL-UIUX (Fase 3): "Per data" legge un prelievo/pannello a colpo
+       d'occhio (piu analiti dello stesso giorno). "Stesso giorno" e un'euristica
+       onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
+       schema non si afferma che sia lo stesso referto. */
+    const [viewMode, setViewMode] = useState<'parametro' | 'data'>('parametro');
 
     const toggleGroup = (analyteCode: string) =>
         setOpenGroups((prev) => {
@@ -149,6 +154,34 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             (a, b) => new Date(b.items[0].observedAt).getTime() - new Date(a.items[0].observedAt).getTime(),
         );
         return result;
+    }, [observations]);
+
+    /* @Codex WUL-UIUX (Fase 3): raggruppamento per giorno locale di observedAt,
+       per leggere insieme le misure dello stesso prelievo. Giorni piu recenti in
+       cima; dentro il giorno, misure per ora decrescente. Chiave = data locale
+       (non UTC) cosi non slitta a cavallo di mezzanotte. */
+    const byDay = useMemo(() => {
+        if (!observations) return undefined;
+        const dayKey = (date: Date) =>
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const byKey = new Map<string, { key: string; date: Date; items: Observation[] }>();
+        for (const observation of observations) {
+            const date = new Date(observation.observedAt);
+            if (Number.isNaN(date.getTime())) continue;
+            const key = dayKey(date);
+            const bucket = byKey.get(key);
+            if (bucket) {
+                bucket.items.push(observation);
+            } else {
+                byKey.set(key, { key, date, items: [observation] });
+            }
+        }
+        return Array.from(byKey.values())
+            .map((day) => ({
+                ...day,
+                items: [...day.items].sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime()),
+            }))
+            .sort((a, b) => b.date.getTime() - a.date.getTime());
     }, [observations]);
 
     const selectedLoinc = loincOptions.find((item) => item.code === code);
@@ -351,6 +384,28 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             </form>
 
             <div className="space-y-3">
+                {groups && groups.length > 0 ? (
+                    <div className="flex justify-end">
+                        <div role="group" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:rgba(15,23,42,0.12)] bg-white/70 p-0.5 text-xs dark:border-white/10 dark:bg-white/5">
+                            <button
+                                type="button"
+                                aria-pressed={viewMode === 'parametro'}
+                                onClick={() => setViewMode('parametro')}
+                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'parametro' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
+                            >
+                                Per parametro
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={viewMode === 'data'}
+                                onClick={() => setViewMode('data')}
+                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'data' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
+                            >
+                                Per data
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
                 {groups === undefined ? (
                     <div className="space-y-2" aria-hidden>
                         {[0, 1, 2].map((row) => (
@@ -364,6 +419,46 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                     <p className="text-sm italic text-[color:var(--mf-muted)]">
                         Nessun parametro registrato. Usa il modulo qui sopra per registrare la prima misura.
                     </p>
+                ) : viewMode === 'data' ? (
+                    (byDay ?? []).map((day) => (
+                        <section
+                            key={day.key}
+                            className="overflow-hidden rounded-[18px] border border-slate-200/80 bg-white/78 dark:border-white/10 dark:bg-white/5"
+                        >
+                            <header className="border-b border-slate-200/70 bg-white/55 px-3.5 py-2 dark:border-white/10 dark:bg-white/5">
+                                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                    Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </span>
+                                <span className="ml-2 text-[11px] text-[color:var(--mf-muted)]">
+                                    {day.items.length} {day.items.length === 1 ? 'misura' : 'misure'}
+                                </span>
+                            </header>
+                            <div className="divide-y divide-slate-200/60 dark:divide-white/5">
+                                {day.items.map((item) => {
+                                    const flag = classifyObservationRange(item.value, item.refLow, item.refHigh);
+                                    const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
+                                    return (
+                                        <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-2 px-3.5 py-1.5">
+                                            <span className="min-w-0 truncate text-[13px] text-slate-800 dark:text-slate-100">
+                                                {italianLoincLabel(item.code, item.display)}
+                                            </span>
+                                            <span className="inline-flex items-center gap-2">
+                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:var(--mf-critical)]' : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'}>
+                                                    {item.value}{item.unitCode ? ` ${item.unitCode}` : ''}
+                                                </span>
+                                                {range ? <span className="text-[10px] text-slate-400 dark:text-slate-500">rif {range}</span> : null}
+                                                {flag ? (
+                                                    <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--mf-critical)]">
+                                                        {flag === 'alto' ? 'Alto' : 'Basso'}
+                                                    </span>
+                                                ) : null}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    ))
                 ) : (
                     groups.map((group) => {
                         const latest = group.items[0];

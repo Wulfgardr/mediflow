@@ -8,6 +8,7 @@ import { useLiveQuery } from '@/lib/live-query';
 
 type Props = {
     patientId: string;
+    embedded?: boolean;
 };
 
 type FormState = {
@@ -97,7 +98,7 @@ function parseDocumentRefs(value: string | undefined): string[] {
     }
 }
 
-export default function ProstheticPrescriptionManager({ patientId }: Props) {
+export default function ProstheticPrescriptionManager({ patientId, embedded = false }: Props) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -177,32 +178,40 @@ export default function ProstheticPrescriptionManager({ patientId }: Props) {
         await db.prostheticPrescriptions.delete(item.id);
     };
 
+    const headerActions = (
+        <>
+            <span className="apple-chip">{prescriptions?.length ?? 0} voci</span>
+            <span className="apple-chip">{testedCount} collaudi</span>
+            <button
+                type="button"
+                onClick={() => setIsFormOpen((value) => !value)}
+                className="ui-btn-primary h-10 px-4 text-sm font-semibold"
+            >
+                <Plus className="h-4 w-4" />
+                Nuova voce
+            </button>
+        </>
+    );
+
     return (
-        <section className="patient-detail-section rounded-[20px] border p-5 md:p-6">
-            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <p className="section-kicker">Protesica</p>
-                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                        <Accessibility className="h-5 w-5 text-[color:var(--mf-primary)]" />
-                        Diario ausili e prescrizioni
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
-                        Registra cosa è stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
-                    </p>
+        <section className={embedded ? '' : 'patient-detail-section rounded-[20px] border p-5 md:p-6'}>
+            {embedded ? (
+                <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
+            ) : (
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="section-kicker">Protesica</p>
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
+                            <Accessibility className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                            Diario ausili e prescrizioni
+                        </h2>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                            Registra cosa è stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">{headerActions}</div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <span className="apple-chip">{prescriptions?.length ?? 0} voci</span>
-                    <span className="apple-chip">{testedCount} collaudi</span>
-                    <button
-                        type="button"
-                        onClick={() => setIsFormOpen((value) => !value)}
-                        className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Nuova voce
-                    </button>
-                </div>
-            </div>
+            )}
 
             {isFormOpen && (
                 <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
@@ -331,7 +340,7 @@ export default function ProstheticPrescriptionManager({ patientId }: Props) {
                                                 Collaudo
                                             </button>
                                         )}
-                                        <button type="button" className="ui-btn-secondary h-9 px-3 text-xs text-rose-700" onClick={() => void deleteItem(item)}>
+                                        <button type="button" aria-label={`Elimina ${item.description}`} className="ui-btn-secondary h-9 px-3 text-xs text-rose-700" onClick={() => void deleteItem(item)}>
                                             <Trash2 className="h-4 w-4" />
                                         </button>
                                     </div>

@@ -281,7 +281,7 @@ export const generatePatientReport = (
             observation.codeSystem || '-',
             observation.code || '-',
             observation.display || '-',
-            observation.value || '-',
+            observation.value ?? '-',
             observation.unitCode || '-',
             observation.notes || '-'
         ]);

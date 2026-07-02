@@ -187,6 +187,12 @@ type Kree8CheckupSource = {
 type Kree8AgendaClientState = {
   status: Kree8PatientStatus;
   rows: Kree8AgendaRow[];
+  /* @Codex WUL-UIUX: conteggio degli appuntamenti di oggi sull'intero set, non
+     limitato alle max 6 righe mostrate. */
+  todayCount?: number;
+  /* @Codex WUL-UIUX: totale dei passaggi pianificati (oggi + futuri) prima dello
+     slice(0,6), cosi la testata non dichiara solo le righe visibili. */
+  plannedCount?: number;
 };
 
 /* @Codex */
@@ -877,8 +883,20 @@ function mapCheckupsForKree8(
 ): Kree8AgendaRow[] {
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
 
+  /* @Codex WUL-UIUX: "Agenda di oggi" deve mostrare oggi e i prossimi passaggi,
+     non i checkup piu vecchi dell'archivio. Escludiamo annullati e conclusi e le
+     date anteriori a inizio giornata; l'ordine ascendente e lo slice arrivano dopo
+     il filtro. Il conteggio "di oggi" si calcola sull'intero set filtrato. */
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
   return checkups
-    .filter((checkup) => checkup.status !== 'cancelled')
+    .filter((checkup) => {
+      if (checkup.status === 'cancelled' || checkup.status === 'completed') return false;
+      const date = new Date(checkup.date);
+      if (Number.isNaN(date.getTime())) return false;
+      return date.getTime() >= startOfToday.getTime();
+    })
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
     .slice(0, 6)
     .map((checkup) => {
@@ -893,6 +911,29 @@ function mapCheckupsForKree8(
         ...pill,
       };
     });
+}
+
+/* @Codex WUL-UIUX: appuntamenti di oggi (non annullati/conclusi) sull'intero set. */
+function countTodayCheckups(checkups: Kree8CheckupSource[]): number {
+  const now = new Date();
+  return checkups.filter((checkup) => {
+    if (checkup.status === 'cancelled' || checkup.status === 'completed') return false;
+    const date = new Date(checkup.date);
+    return !Number.isNaN(date.getTime()) && isSameCalendarDay(date, now);
+  }).length;
+}
+
+/* @Codex WUL-UIUX: passaggi pianificati (oggi + futuri, non annullati/conclusi)
+   sull'intero set, stesso filtro di mapCheckupsForKree8 ma senza lo slice(0,6),
+   cosi la testata dichiara il carico reale della giornata e non solo le righe viste. */
+function countPlannedCheckups(checkups: Kree8CheckupSource[]): number {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return checkups.filter((checkup) => {
+    if (checkup.status === 'cancelled' || checkup.status === 'completed') return false;
+    const date = new Date(checkup.date);
+    return !Number.isNaN(date.getTime()) && date.getTime() >= startOfToday.getTime();
+  }).length;
 }
 
 /* @Codex */
@@ -1420,7 +1461,10 @@ function TurnoArea({
       : patientState.status === 'error'
         ? 'pazienti non disponibili'
         : 'aggiornamento in corso';
-  const todayVisitCount = agendaState.rows.filter((row) => row.pillLabel === 'Oggi').length;
+  const todayVisitCount = agendaState.todayCount ?? agendaState.rows.filter((row) => row.pillLabel === 'Oggi').length;
+  /* @Codex WUL-UIUX: totale pianificato reale (pre-slice), per non dichiarare
+     nella testata solo le max 6 righe mostrate. */
+  const plannedVisitCount = agendaState.plannedCount ?? agendaState.rows.length;
   const visitCountLabel =
     agendaState.status === 'loading' || agendaState.status === 'idle'
       ? '…'
@@ -1429,7 +1473,7 @@ function TurnoArea({
         : String(todayVisitCount);
   const visitSubLabel =
     agendaState.status === 'ready'
-      ? `${agendaState.rows.length} passaggi pianificati`
+      ? `${plannedVisitCount} passaggi pianificati`
       : agendaState.status === 'error'
         ? 'agenda non disponibile'
         : 'aggiornamento agenda';
@@ -1482,7 +1526,7 @@ function TurnoArea({
         <div>
           <p className={styles.areaCaption}>Oggi</p>
           <h1 className={styles.areaTitle}>
-            Agenda di oggi <em>{agendaState.rows.length} appuntamenti</em>
+            Agenda di oggi <em>{todayVisitCount} appuntamenti</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
@@ -4336,12 +4380,23 @@ export function Kree8ClinicalCockpit({
       return;
     }
 
-    const patients = livePatientRows.map(mapPatientForKree8);
+    /* @Codex WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
+       createdAt) cosi la lista pazienti non esce in ordine di inserimento
+       IndexedDB e lo scanning "recenti" e possibile. */
+    const patients = [...livePatientRows]
+      .sort((left, right) => {
+        const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
+        const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
+        return rightTime - leftTime;
+      })
+      .map(mapPatientForKree8);
     const checkups = liveCheckupRows ?? [];
     setPatientState({ status: 'ready', patients });
     setAgendaState({
       status: liveCheckupRows ? 'ready' : 'loading',
       rows: mapCheckupsForKree8(checkups, patients),
+      todayCount: countTodayCheckups(checkups),
+      plannedCount: countPlannedCheckups(checkups),
     });
     setSelectedPatientId((current) => {
       if (current && patients.some((patient) => patient.id === current)) return current;

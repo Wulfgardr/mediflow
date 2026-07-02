@@ -21,7 +21,9 @@ interface PatientIdentityLensProps {
     birthDateLabel: string;
     diagnoses: Diagnosis[];
     exemptions: string[];
-    actions: ReactNode;
+    /* @Codex WUL-UIUX: opzionale: come livello 2 sotto il Foglio sinottico la lens
+       non ripete il dock azioni (vive nel Foglio). {actions} rende nulla se assente. */
+    actions?: ReactNode;
     /* @Codex */
     summary?: string;
     /* @Codex */
