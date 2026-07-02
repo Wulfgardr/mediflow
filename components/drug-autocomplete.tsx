@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { db, AifaDrug } from '@/lib/db';
 import { Search, X, Pill, Database, Activity } from 'lucide-react';
 
@@ -20,6 +20,10 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const [results, setResults] = useState<AifaDrug[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    /* @Codex WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const listboxId = useId();
+    const optionId = (index: number) => `${listboxId}-opt-${index}`;
     const wrapperRef = useRef<HTMLDivElement>(null);
     /* @Codex WUL-UIUX: in modifica il campo parte con defaultValue (nome farmaco):
        non deve far partire una ricerca ne aprire il popover finche il medico non
@@ -68,6 +72,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     }).slice(0, 30); // Limit final display
 
                     setResults(filtered);
+                    setActiveIndex(-1);
                     setIsOpen(true);
                 } catch (e) {
                     console.error("Drug search error", e);
@@ -76,6 +81,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 }
             } else if (tokens.length === 0) {
                 setResults([]);
+                setActiveIndex(-1);
                 setIsOpen(false);
             }
         }, 300);
@@ -97,7 +103,33 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const handleSelect = (drug: AifaDrug) => {
         setQuery(drug.name);
         setIsOpen(false);
+        setActiveIndex(-1);
         onSelect(drug);
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!isOpen && results.length > 0) {
+                setIsOpen(true);
+                return;
+            }
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev + 1) % results.length));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev - 1 + results.length) % results.length));
+        } else if (event.key === 'Enter') {
+            if (isOpen && activeIndex >= 0 && activeIndex < results.length) {
+                event.preventDefault();
+                handleSelect(results[activeIndex]);
+            }
+        } else if (event.key === 'Escape') {
+            if (isOpen) {
+                event.preventDefault();
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
+        }
     };
 
     return (
@@ -107,11 +139,17 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
                 <input
                     type="text"
+                    role="combobox"
+                    aria-expanded={isOpen && results.length > 0}
+                    aria-controls={listboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                     value={query}
                     onChange={(e) => {
                         hasUserTyped.current = true;
                         setQuery(e.target.value);
                     }}
+                    onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     autoFocus={autoFocus}
                     className={drugInputClassName}
@@ -138,18 +176,22 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className={drugPopoverClassName}>
-                    <div className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--mf-muted)] dark:border-white/10">
+                <div className={drugPopoverClassName} role="listbox" id={listboxId} aria-label="Risultati catalogo farmaci">
+                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--mf-muted)] dark:border-white/10">
                         <span>Risultati catalogo ({results.length})</span>
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> AIFA locale</span>
                     </div>
 
-                    {results.map((drug) => (
+                    {results.map((drug, index) => (
                         <button
                             key={drug.aic}
                             type="button"
+                            role="option"
+                            id={optionId(index)}
+                            aria-selected={index === activeIndex}
                             onClick={() => handleSelect(drug)}
-                            className={drugRowClassName}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            className={`${drugRowClassName} ${index === activeIndex ? 'bg-[color:rgba(248,250,252,0.86)] dark:bg-white/6' : ''}`}
                             aria-label={`Seleziona ${drug.name}`}
                         >
                             <div className="flex justify-between items-start w-full">

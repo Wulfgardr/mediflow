@@ -108,6 +108,11 @@
   --ui-btn-primary-bg: linear-gradient(135deg, #151923, #2f3a48 58%, #475569);
   --ui-btn-primary-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
   --ui-btn-primary-radius: 18px;
+  /* @Codex WUL-UIUX: colore testo della CTA primaria. Era usato da
+     .ui-btn-primary.mf-tone-warning (unlayered) ma mai definito: var() senza
+     fallback rendeva la dichiarazione invalida e il testo poteva ereditare l'ink
+     scuro del contenitore. Definirlo bianco chiude il difetto latente. */
+  --ui-btn-primary-fg: #ffffff;
 
   --apple-blue: #334155;
   --apple-gray: #667085;
