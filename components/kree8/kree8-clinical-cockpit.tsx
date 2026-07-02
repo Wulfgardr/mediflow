@@ -1526,7 +1526,7 @@ function TurnoArea({
         <div>
           <p className={styles.areaCaption}>Oggi</p>
           <h1 className={styles.areaTitle}>
-            Agenda di oggi <em>{plannedVisitCount} appuntamenti</em>
+            Agenda di oggi <em>{todayVisitCount} appuntamenti</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'

@@ -37,6 +37,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     const resolverRef = useRef<((result: ConfirmResult) => void) | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
     const titleId = useId();
+    const messageId = useId();
+    const reasonId = useId();
 
     const close = useCallback((result: ConfirmResult) => {
         resolverRef.current?.(result);
@@ -48,6 +50,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }));
 
     const confirm = useCallback<ConfirmFn>((opts) => {
+        /* @Codex WUL-UIUX: se un dialogo e gia aperto, risolvi la Promise pendente
+           come annullata prima di rimpiazzarla, altrimenti resterebbe irrisolta. */
+        resolverRef.current?.({ confirmed: false });
+        resolverRef.current = null;
         setOptions(opts);
         setReason('');
         return new Promise<ConfirmResult>((resolve) => {
@@ -74,6 +80,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={titleId}
+                        aria-describedby={options.message ? messageId : undefined}
                         tabIndex={-1}
                         className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
                     >
@@ -96,15 +103,17 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                             </div>
 
                             {options.message ? (
-                                <p className="text-sm leading-6 text-[color:var(--mf-muted)]">{options.message}</p>
+                                <p id={messageId} className="text-sm leading-6 text-[color:var(--mf-muted)]">{options.message}</p>
                             ) : null}
 
                             {options.requireReason ? (
                                 <div className="mt-4">
-                                    <label className="mf-field-label">
+                                    <label htmlFor={reasonId} className="mf-field-label">
                                         {options.reasonLabel ?? 'Motivazione'} <span style={{ color: 'var(--mf-critical)' }}>*</span>
                                     </label>
                                     <textarea
+                                        id={reasonId}
+                                        aria-required
                                         value={reason}
                                         onChange={(event) => setReason(event.target.value)}
                                         rows={3}

@@ -25,6 +25,9 @@ export interface SynopticTherapyLine {
 export interface SynopticDelta {
     direction: 'up' | 'down' | 'flat';
     label: string;
+    /* @Codex WUL-UIUX: data della misura precedente ("dal 12 gen"), cosi la
+       variazione non nasconde un salto temporale lungo (es. -10 kg dopo 6 mesi). */
+    sinceLabel?: string;
 }
 
 export interface SynopticMeasure {
@@ -140,14 +143,14 @@ export function PatientSynopticSheet({
 
             {/* C. Segnali di contesto */}
             {signals.length > 0 ? (
-                <dl className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
+                <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
                     {signals.map((signal) => {
                         const body = (
                             <>
-                                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">{signal.label}</dt>
-                                <dd className={`mt-0.5 text-[18px] font-semibold leading-none tabular-nums ${SIGNAL_TONE[signal.tone ?? 'neutral']}`}>
+                                <span className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">{signal.label}</span>
+                                <span className={`mt-0.5 block text-[18px] font-semibold leading-none tabular-nums ${SIGNAL_TONE[signal.tone ?? 'neutral']}`}>
                                     {signal.value}
-                                </dd>
+                                </span>
                             </>
                         );
                         return signal.href ? (
@@ -162,7 +165,7 @@ export function PatientSynopticSheet({
                             <div key={signal.label}>{body}</div>
                         );
                     })}
-                </dl>
+                </div>
             ) : null}
 
             <hr className="my-4 border-0 border-t border-[color:var(--glass-border,rgba(15,23,42,0.08))]" />
@@ -225,6 +228,9 @@ export function PatientSynopticSheet({
                                             <Minus className="h-3.5 w-3.5" aria-label="stabile" />
                                         )}
                                         <span className="tabular-nums">{latestMeasure.delta.label}</span>
+                                        {latestMeasure.delta.sinceLabel ? (
+                                            <span className="text-[color:var(--mf-muted)]">{latestMeasure.delta.sinceLabel}</span>
+                                        ) : null}
                                     </span>
                                 ) : null}
                                 <span className="text-[11px] text-[color:var(--mf-muted)]">{latestMeasure.dateLabel}</span>

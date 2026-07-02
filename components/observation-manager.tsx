@@ -386,11 +386,10 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             <div className="space-y-3">
                 {groups && groups.length > 0 ? (
                     <div className="flex justify-end">
-                        <div role="tablist" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:rgba(15,23,42,0.12)] bg-white/70 p-0.5 text-xs dark:border-white/10 dark:bg-white/5">
+                        <div role="group" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:rgba(15,23,42,0.12)] bg-white/70 p-0.5 text-xs dark:border-white/10 dark:bg-white/5">
                             <button
                                 type="button"
-                                role="tab"
-                                aria-selected={viewMode === 'parametro'}
+                                aria-pressed={viewMode === 'parametro'}
                                 onClick={() => setViewMode('parametro')}
                                 className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'parametro' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
                             >
@@ -398,8 +397,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                             </button>
                             <button
                                 type="button"
-                                role="tab"
-                                aria-selected={viewMode === 'data'}
+                                aria-pressed={viewMode === 'data'}
                                 onClick={() => setViewMode('data')}
                                 className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'data' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
                             >

@@ -263,6 +263,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 ) : (
                                     <div className="relative">
                                         <DrugAutocomplete
+                                            /* @Codex WUL-UIUX: key legata alla riga in modifica: passando da
+                                               una terapia all'altra con form aperto, React rimonta il combobox
+                                               e rilegge defaultValue (query e useState(defaultValue), letto solo
+                                               al mount) evitando di mostrare il farmaco della terapia precedente. */
+                                            key={editingId ?? 'new'}
                                             onSelect={(drug: AifaDrug) => {
                                                 setValue('drugName', drug.name);
                                                 /* @Codex */

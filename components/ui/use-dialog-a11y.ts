@@ -59,7 +59,13 @@ export function useDialogA11y(
         document.addEventListener('keydown', onKeyDown);
         return () => {
             document.removeEventListener('keydown', onKeyDown);
-            previouslyFocused.current?.focus?.();
+            /* @Codex WUL-UIUX: ripristina il focus solo se l'elemento e ancora nel
+               DOM; se e stato smontato (es. la riga che ha aperto il dialogo),
+               evita che il focus cada sul body. */
+            const previous = previouslyFocused.current;
+            if (previous && document.body.contains(previous)) {
+                previous.focus?.();
+            }
         };
     }, [isOpen, dialogRef]);
 }

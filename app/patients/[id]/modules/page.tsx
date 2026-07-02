@@ -33,6 +33,7 @@ import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
+import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
@@ -113,15 +114,16 @@ export default function PatientDetailPage() {
             let delta: SynopticMeasure['delta'];
             const latestNum = toNumericValue(latest.value);
             const previousNum = previous ? toNumericValue(previous.value) : null;
-            if (latestNum !== null && previousNum !== null) {
+            if (latestNum !== null && previousNum !== null && previous) {
                 const diff = Math.round((latestNum - previousNum) * 100) / 100;
                 delta = {
                     direction: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat',
                     label: `${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')}`,
+                    sinceLabel: `dal ${new Date(previous.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`,
                 };
             }
             return {
-                display: latest.display,
+                display: resolveStaticTerminology('LOINC', latest.code)?.displayIt ?? latest.display,
                 valueLabel: `${latest.value}${latest.unitCode ? ` ${latest.unitCode}` : ''}`,
                 dateLabel: new Date(latest.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
                 delta,
@@ -510,6 +512,7 @@ export default function PatientDetailPage() {
                         icon={Pill}
                         count={activeTherapies !== undefined ? `${therapyCount} attive` : undefined}
                         summary={activeTherapies !== undefined && therapyCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
+                        keepMounted
                     >
                         <TherapyManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -521,6 +524,7 @@ export default function PatientDetailPage() {
                         icon={Stethoscope}
                         count={prestazioniCount !== undefined ? String(prestazioniCount) : undefined}
                         summary={prestazioniCount === 0 ? 'Nessuna prestazione prescritta.' : undefined}
+                        keepMounted
                     >
                         <ServicePrescriptionManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -532,6 +536,7 @@ export default function PatientDetailPage() {
                         icon={Activity}
                         count={observationCount !== undefined ? String(observationCount) : undefined}
                         summary={observationCount === 0 ? 'Nessun parametro registrato.' : undefined}
+                        keepMounted
                     >
                         <ObservationManager patientId={id} embedded />
                     </CollapsibleSection>
@@ -543,6 +548,7 @@ export default function PatientDetailPage() {
                         icon={Accessibility}
                         count={protesicaCount !== undefined ? String(protesicaCount) : undefined}
                         summary={protesicaCount === 0 ? 'Nessuna voce protesica registrata.' : undefined}
+                        keepMounted
                     >
                         <ProstheticPrescriptionManager patientId={id} embedded />
                     </CollapsibleSection>

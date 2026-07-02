@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { searchICDHybrid, ICDSearchResult } from '@/lib/icd-service'; // UPDATED Import
 import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
 import { Search, X, Server } from 'lucide-react';
@@ -19,6 +19,10 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     const [isOpen, setIsOpen] = useState(false);
     /* @Codex */
     const [searchError, setSearchError] = useState<string | null>(null);
+    /* @Codex WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const listboxId = useId();
+    const optionId = (index: number) => `${listboxId}-opt-${index}`;
     const wrapperRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // @Codex
     const latestSearchRef = useRef(createLatestRequestGuard()); // @Codex
@@ -79,6 +83,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                         if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
                         setSearchError(null); // @Codex
                         setResults(matches); // @Codex
+                        setActiveIndex(-1); // @Codex WUL-UIUX
                         setIsOpen(true); // @Codex
                     }) // @Codex
                     .catch(() => { // @Codex
@@ -97,6 +102,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             latestSearchRef.current.discard(); // @Codex
             setSearchError(null); // @Codex
             setResults([]);
+            setActiveIndex(-1); // @Codex WUL-UIUX
             setIsOpen(false);
             setIsLoading(false); // @Codex
         }
@@ -128,7 +134,33 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         }
 
         setQuery(`${item.code} - ${item.description}`);
+        setActiveIndex(-1);
         setIsOpen(false);
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!isOpen && results.length > 0) {
+                setIsOpen(true);
+                return;
+            }
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev + 1) % results.length));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev - 1 + results.length) % results.length));
+        } else if (event.key === 'Enter') {
+            if (isOpen && activeIndex >= 0 && activeIndex < results.length) {
+                event.preventDefault();
+                handleSelect(results[activeIndex]);
+            }
+        } else if (event.key === 'Escape') {
+            if (isOpen) {
+                event.preventDefault();
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
+        }
     };
 
     return (
@@ -138,11 +170,16 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} aria-hidden="true" />
                 <input
                     type="text"
+                    role="combobox"
                     value={query}
                     onChange={handleSearch}
+                    onKeyDown={handleKeyDown}
                     placeholder="Cerca diagnosi (ICD-11 Official - English)"
                     className="mf-input mf-input-sm icd-autocomplete-input"
-                    aria-expanded={isOpen}
+                    aria-expanded={isOpen && results.length > 0}
+                    aria-controls={listboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                     aria-invalid={!!searchError}
                 />
                 {isLoading && (
@@ -178,13 +215,17 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute z-[100] w-full mt-2 mf-popover max-h-64 overflow-y-auto">
-                    {results.map((item) => (
+                <div className="absolute z-[100] w-full mt-2 mf-popover max-h-64 overflow-y-auto" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
+                    {results.map((item, index) => (
                         <button
                             key={`${item.system}-${item.code}`}
                             type="button"
+                            role="option"
+                            id={optionId(index)}
+                            aria-selected={index === activeIndex}
                             onClick={() => handleSelect(item)}
-                            className="mf-popover-row w-full text-left flex items-center justify-between"
+                            onMouseEnter={() => setActiveIndex(index)}
+                            className={`mf-popover-row w-full text-left flex items-center justify-between ${index === activeIndex ? 'is-active' : ''}`}
                         >
                             <span className="font-medium text-sm truncate" style={{ color: 'var(--mf-ink)' }}>{item.description}</span>
                             <div className="flex items-center gap-2 shrink-0">
