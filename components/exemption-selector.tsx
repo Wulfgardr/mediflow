@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 
 type ExemptionOption = {
@@ -23,6 +23,10 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [detailsByCode, setDetailsByCode] = useState<Record<string, ExemptionOption>>({});
+    /* @Codex WUL-UIUX (Fase 6-7): pattern combobox ARIA + navigazione da tastiera. */
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const listboxId = useId();
+    const optionId = (index: number) => `${listboxId}-opt-${index}`;
     /* @Codex */
     const [catalogCount, setCatalogCount] = useState<number | null>(null);
 
@@ -87,6 +91,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
         const trimmed = query.trim();
         if (trimmed.length < 2) {
             setResults([]);
+            setActiveIndex(-1);
             return;
         }
 
@@ -97,10 +102,12 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                 const response = await fetch(`/api/exemptions?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal });
                 if (!response.ok) {
                     setResults([]);
+                    setActiveIndex(-1);
                     return;
                 }
                 const items: ExemptionOption[] = await response.json();
                 setResults(items);
+                setActiveIndex(-1);
                 setIsOpen(true);
             } catch (error) {
                 if ((error as Error).name !== 'AbortError') {
@@ -123,10 +130,36 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
         setQuery('');
         setResults([]);
         setIsOpen(false);
+        setActiveIndex(-1);
     };
 
     const removeCode = (code: string) => {
         onChange(value.filter((item) => item !== code));
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!isOpen && results.length > 0) {
+                setIsOpen(true);
+                return;
+            }
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev + 1) % results.length));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev - 1 + results.length) % results.length));
+        } else if (event.key === 'Enter') {
+            if (isOpen && activeIndex >= 0 && activeIndex < results.length) {
+                event.preventDefault();
+                addCode(results[activeIndex].code);
+            }
+        } else if (event.key === 'Escape') {
+            if (isOpen) {
+                event.preventDefault();
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
+        }
     };
 
     return (
@@ -134,8 +167,15 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
             <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--mf-muted)]" />
                 <input
+                    type="text"
+                    role="combobox"
+                    aria-expanded={isOpen && results.length > 0}
+                    aria-controls={listboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={handleKeyDown}
                     onFocus={() => setIsOpen(results.length > 0)}
                     placeholder="Cerca codice o descrizione esenzione (min 2 caratteri)"
                     className="mf-input"
@@ -145,7 +185,12 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                 />
 
                 {isOpen && (
-                    <div className="mf-popover absolute z-30 mt-2 max-h-72 w-full overflow-auto">
+                    <div
+                        className="mf-popover absolute z-30 mt-2 max-h-72 w-full overflow-auto"
+                        role="listbox"
+                        id={listboxId}
+                        aria-label="Risultati catalogo esenzioni"
+                    >
                         {isLoading ? (
                             <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Ricerca in corso...</p>
                         ) : catalogCount === 0 ? (
@@ -159,17 +204,21 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                             <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Nessun codice trovato.</p>
                         ) : (
                             <div className="space-y-0.5">
-                                {results.map((result) => {
+                                {results.map((result, index) => {
                                     const selected = value.includes(result.code);
                                     return (
                                         <button
                                             key={result.code}
                                             type="button"
+                                            role="option"
+                                            id={optionId(index)}
+                                            aria-selected={index === activeIndex}
                                             onClick={() => addCode(result.code)}
+                                            onMouseEnter={() => setActiveIndex(index)}
                                             disabled={selected}
                                             className={`w-full rounded-xl px-3 py-2 text-left transition-colors ${selected
                                                 ? 'bg-[color:rgba(15,123,104,0.1)] opacity-60'
-                                                : 'hover:bg-[color:rgba(15,23,42,0.06)] dark:hover:bg-white/5'
+                                                : `hover:bg-[color:rgba(15,23,42,0.06)] dark:hover:bg-white/5 ${index === activeIndex ? 'bg-[color:rgba(15,23,42,0.06)] dark:bg-white/5' : ''}`
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between gap-3">

@@ -16,7 +16,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             eyebrow="Sistema"
             title="Impostazioni"
             subtitle="Configurazione del Mac che ospita MediFlow."
-            backHref="/"
+            backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."
         >
