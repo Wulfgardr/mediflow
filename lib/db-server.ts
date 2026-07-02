@@ -118,6 +118,9 @@ function applySchemaGuards() {
         // WUL-306 (ADR 0066): soft-delete tombstone columns, additive and idempotent
         ensureColumn('patients', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn('patients', 'deletion_reason', 'deletion_reason TEXT');
+        // S1: ciclo di vita insight (staleness). Additive e idempotenti.
+        ensureColumn('patients', 'ai_summary_generated_at', 'ai_summary_generated_at INTEGER');
+        ensureColumn('patients', 'ai_summary_context_hash', 'ai_summary_context_hash TEXT');
     } catch (error) {
         console.warn('[MediFlow] Patients schema check skipped:', error);
     }
@@ -236,6 +239,10 @@ function applySchemaGuards() {
         ensureColumn('observations', 'updated_at', 'updated_at INTEGER');
         ensureColumn('observations', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn('observations', 'deletion_reason', 'deletion_reason TEXT');
+        // S6: range di riferimento (additive, idempotenti)
+        ensureColumn('observations', 'ref_low', 'ref_low TEXT');
+        ensureColumn('observations', 'ref_high', 'ref_high TEXT');
+        ensureColumn('observations', 'ref_text', 'ref_text TEXT');
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
     } catch (error) {

@@ -32,14 +32,35 @@ export interface SummaryModelInfo {
 interface SummaryOptions {
     signal?: AbortSignal;
     onStage?: (stage: SummaryStage, info?: SummaryModelInfo) => void;
+    // Via automatica: salta la rigenerazione se il contesto clinico non e cambiato
+    // rispetto all'ultima generazione (cache basata su aiSummaryContextHash).
+    skipIfUnchanged?: boolean;
+}
+
+// Sentinella per lo skip "contesto invariato": permette al chiamante automatico di
+// distinguerlo da un aggiornamento reale senza cambiare il tipo di ritorno.
+export class PatientInsightUnchangedError extends Error {
+    constructor() {
+        super('Patient Insight gia aggiornato rispetto al contesto clinico corrente.');
+        this.name = 'PatientInsightUnchangedError';
+    }
 }
 
 /* @Codex */
 export type PatientSummaryRefreshResult =
     | { status: 'updated'; modelInfo: SummaryModelInfo }
-    | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' };
+    | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' | 'already-running' | 'unchanged' };
 
 const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
+// Coalescing di burst (es. upload multiplo): se arriva una richiesta mentre una
+// generazione e in corso, si segna un rerun in coda che parte una sola volta al
+// termine, cosi lo stato finale del burst viene comunque catturato senza N run.
+const pendingRerun = new Set<string>();
+
+/* @Codex */
+export function isSummaryGenerationInFlight(patientId: string): boolean {
+    return inflight.has(patientId);
+}
 
 const SECTION_TITLES = [
     'Quadro attuale',
@@ -129,6 +150,9 @@ export async function regeneratePatientSummary(
     if (!patientId) return null;
 
     if (inflight.has(patientId)) {
+        // Una generazione e gia in corso: segna un rerun in coda (cattura lo stato
+        // finale del burst) e restituisci il risultato della run corrente.
+        pendingRerun.add(patientId);
         return inflight.get(patientId) ?? null;
     }
 
@@ -150,6 +174,18 @@ export async function regeneratePatientSummary(
 
         const contextData = await buildPatientInsightContext(patientId);
         options.onStage?.('context', info);
+
+        // Cache staleness: se il contesto clinico non e cambiato dall'ultima
+        // generazione e un insight esiste gia, la via automatica salta il modello.
+        // Il bottone manuale non passa skipIfUnchanged, quindi rigenera sempre.
+        if (
+            options.skipIfUnchanged
+            && patient.aiSummary?.trim()
+            && patient.aiSummaryContextHash
+            && patient.aiSummaryContextHash === contextData.contextHash
+        ) {
+            throw new PatientInsightUnchangedError();
+        }
 
         const prompt = buildPatientInsightExtractionPrompt(contextData.prompt);
 
@@ -173,6 +209,8 @@ export async function regeneratePatientSummary(
         options.onStage?.('save', info);
         await db.patients.update(patientId, {
             aiSummary: cleaned,
+            aiSummaryGeneratedAt: new Date(),
+            aiSummaryContextHash: contextData.contextHash,
             version: patient.version,
             updatedAt: new Date()
         });
@@ -185,6 +223,13 @@ export async function regeneratePatientSummary(
         return await task;
     } finally {
         inflight.delete(patientId);
+        if (pendingRerun.has(patientId)) {
+            pendingRerun.delete(patientId);
+            // Rerun trailing (no onStage/signal della run originale, gia conclusa),
+            // best-effort e non bloccante. skipIfUnchanged evita una seconda
+            // generazione se la run appena conclusa ha gia catturato tutto.
+            void regeneratePatientSummary(patientId, { skipIfUnchanged: true }).catch(() => {});
+        }
     }
 }
 
@@ -197,13 +242,25 @@ export async function refreshPatientSummaryIfEnabled(
         return { status: 'skipped', reason: 'missing-patient-id' };
     }
 
+    // Osservabilita: se una generazione e gia in corso questa richiesta vi si
+    // aggancia (e lascia in coda un rerun trailing), quindi non e una nuova run.
+    const joinedInFlight = isSummaryGenerationInFlight(patientId);
+
     try {
-        const modelInfo = await regeneratePatientSummary(patientId, options);
+        // Via automatica: skipIfUnchanged di default (a meno di override esplicito),
+        // cosi i trigger post-upload non rigenerano se il contesto non e cambiato.
+        const modelInfo = await regeneratePatientSummary(patientId, { skipIfUnchanged: true, ...options });
         if (!modelInfo) {
             return { status: 'skipped', reason: 'missing-patient-id' };
         }
+        if (joinedInFlight) {
+            return { status: 'skipped', reason: 'already-running' };
+        }
         return { status: 'updated', modelInfo };
     } catch (error) {
+        if (error instanceof PatientInsightUnchangedError) {
+            return { status: 'skipped', reason: 'unchanged' };
+        }
         if (error instanceof AiPatientInsightDisabledError) {
             return { status: 'skipped', reason: 'disabled' };
         }

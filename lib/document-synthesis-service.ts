@@ -23,6 +23,7 @@ import {
 } from './document-excerpt';
 /* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
+import { routeDocumentClass } from './document-class-router';
 /* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
@@ -140,7 +141,10 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
-    const ai = await AIService.create('clinical');
+    // Ruolo 'reasoning': di default risolve allo stesso modello di 'clinical'
+    // (resolveTextModel con fallback), ma permette di instradare la sintesi
+    // documentale su un modello dedicato senza toccare patient_insight.
+    const ai = await AIService.create('reasoning');
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
@@ -161,6 +165,11 @@ export async function synthesizeDocument(
 
     const normalized = normalizeDocumentInput(rawMarkdown);
     const analysis = await analyzeDocumentContent(rawMarkdown);
+
+    // Classificazione deterministica (nome file + testata): segnale additivo per la
+    // review, non altera il flusso di sintesi. Producer non disponibile qui perche
+    // il testo e estratto server-side; nome file e contenuto bastano.
+    const routed = routeDocumentClass({ fileName, textSample: normalized.normalizedText });
 
     const patient = await db.patients.get(patientId);
     if (!patient) {
@@ -193,7 +202,9 @@ export async function synthesizeDocument(
             : undefined,
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
-            : undefined
+            : undefined,
+        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
     };
 
     const parseEvidenceArtifact = buildDocumentParseEvidenceArtifact({

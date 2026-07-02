@@ -25,6 +25,7 @@ import {
 } from '@/lib/evidence-queue-contract';
 /* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
+import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -54,6 +55,23 @@ export interface PatientInsightContextSnapshot {
         firstName: string;
         lastName: string;
     };
+    // Firma deterministica del contenuto clinico del contesto: se non cambia,
+    // l'insight non e stantio e la rigenerazione automatica puo essere saltata.
+    contextHash: string;
+}
+
+// Hash FNV-1a a 32 bit: deterministico e sincrono, per change-detection (non
+// crittografico). Restituisce una stringa esadecimale stabile.
+function computeContextHash(sourceRefs: PatientInsightSourceRef[]): string {
+    const signature = sourceRefs
+        .map((ref) => `${ref.id}|${ref.promptLine}|${ref.evidenceSourceId ?? ''}`)
+        .join('\n');
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < signature.length; i += 1) {
+        hash ^= signature.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 const MAX_ENTRIES = 5;
@@ -656,6 +674,7 @@ export async function buildPatientInsightContext(
             limitations: ['Paziente non trovato nel database locale.'],
             outputMaxTokens: 512,
             patientName: { firstName: '', lastName: '' },
+            contextHash: computeContextHash([]),
         };
     }
 
@@ -866,7 +885,13 @@ export async function buildPatientInsightContext(
         .slice(0, MAX_OBSERVATIONS)
         .map((observation) => {
             const note = observation.notes ? `; note ${compactText(observation.notes, 90)}` : '';
-            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode} [${formatDate(observation.observedAt)}]${note}`;
+            // Marcatore deterministico "fuori range" solo quando il range e presente
+            // sul dato e il valore e numerico (mai inventato).
+            const flag = classifyObservationRange(observation.value, observation.refLow, observation.refHigh);
+            const outOfRange = flag
+                ? ` (${flag === 'alto' ? 'sopra' : 'sotto'} range rif ${formatReferenceRange(observation.refLow, observation.refHigh, observation.refText)})`
+                : '';
+            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode}${outOfRange} [${formatDate(observation.observedAt)}]${note}`;
         });
 
     const checkupLines = checkups
@@ -971,6 +996,7 @@ export async function buildPatientInsightContext(
             firstName: patient.firstName,
             lastName: patient.lastName,
         },
+        contextHash: computeContextHash(sourceRefs),
     };
 }
 

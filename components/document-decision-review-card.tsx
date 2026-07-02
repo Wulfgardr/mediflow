@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, FileSearch, ShieldAlert, UserRound } from 
 import type { DocumentDecision } from '../lib/document-decision';
 /* @Codex */
 import { buildDocumentDecisionReviewViewModel, type DocumentDecisionReviewActionView } from '../lib/document-decision-review-view-model';
+import { confidenceLabel } from '../lib/ai-labels';
 
 function ActionList({
     title,
@@ -29,7 +30,7 @@ function ActionList({
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-bold">{item.label}</p>
                             <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                                {item.confidence}
+                                {confidenceLabel(item.confidence)}
                             </span>
                             {item.blockedReason && (
                                 <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-white/10 dark:text-slate-200">

@@ -8,11 +8,9 @@ import PrivacyBlur from '@/components/privacy-blur';
 import Link from 'next/link';
 import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels, parsePatientInsight } from '@/lib/ai-summary-service';
+import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
-import { splitInsightDiagnostics } from '@/lib/patient-insight';
-/* @Codex */
-import { parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
     AiPatientInsightDisabledError,
@@ -21,188 +19,11 @@ import {
 
 interface AIPatientInsightProps {
     patient: Patient;
+    /* Insight presente ma piu vecchio dell'ultimo dato clinico (dal detail page). */
+    stale?: boolean;
 }
 
-/* @Codex */
-type ReadableInsight =
-    | {
-        kind: 'structured';
-        summary: string;
-        alerts: string[];
-        nextSteps: string[];
-        gaps: string[];
-        sourcesMarkdown: string;
-        limitsMarkdown: string;
-    }
-    | {
-        kind: 'markdown';
-        markdown: string;
-        sourcesMarkdown: string;
-        limitsMarkdown: string;
-    }
-    | {
-        kind: 'unreadable';
-        reason: 'json-envelope' | 'empty';
-    };
-
-/* @Codex */
-const ENVELOPE_HINT_PATTERN = /["']?(?:choices|message|content|role|delta|object|schemaVersion|finish_reason)["']?\s*:/i;
-
-/* @Codex */
-function looksLikeJsonOrEnvelope(content: string): boolean {
-    const trimmed = content.trim();
-    if (!trimmed) return false;
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) return true;
-    return ENVELOPE_HINT_PATTERN.test(trimmed.slice(0, 400));
-}
-
-/* @Codex */
-function deepFindReadableString(node: unknown, keys: string[], depth = 0): string | null {
-    if (depth > 6) return null;
-    if (typeof node === 'string') return null;
-    if (Array.isArray(node)) {
-        for (const item of node) {
-            const found = deepFindReadableString(item, keys, depth + 1);
-            if (found) return found;
-        }
-        return null;
-    }
-    if (node && typeof node === 'object') {
-        const record = node as Record<string, unknown>;
-        for (const key of keys) {
-            const value = record[key];
-            if (typeof value === 'string' && value.trim().length > 16) return value;
-        }
-        for (const value of Object.values(record)) {
-            const found = deepFindReadableString(value, keys, depth + 1);
-            if (found) return found;
-        }
-    }
-    return null;
-}
-
-/* @Codex */
-function asStructured(
-    summary: string,
-    alerts: string[],
-    nextSteps: string[],
-    gaps: string[],
-    diagnostics: { sourcesMarkdown: string; limitsMarkdown: string },
-): ReadableInsight {
-    return {
-        kind: 'structured',
-        summary: summary.replace(/\n+/g, ' ').trim(),
-        alerts: alerts.filter((item) => item && item.trim().length > 0),
-        nextSteps: nextSteps.filter((item) => item && item.trim().length > 0),
-        gaps: gaps.filter((item) => item && item.trim().length > 0),
-        sourcesMarkdown: diagnostics.sourcesMarkdown,
-        limitsMarkdown: diagnostics.limitsMarkdown,
-    };
-}
-
-/* @Codex */
-function coerceInsightToReadable(rawSummary: string): ReadableInsight {
-    const content = (rawSummary || '').trim();
-    if (!content) return { kind: 'unreadable', reason: 'empty' };
-
-    const fromMarkdown = parsePatientInsight(content);
-    const diagnostics = splitInsightDiagnostics(content);
-    const hasStructured = Boolean(
-        fromMarkdown.summary ||
-        fromMarkdown.alerts.length ||
-        fromMarkdown.nextSteps.length ||
-        fromMarkdown.gaps.length,
-    );
-
-    if (hasStructured) {
-        return asStructured(
-            fromMarkdown.summary,
-            fromMarkdown.alerts,
-            fromMarkdown.nextSteps,
-            fromMarkdown.gaps,
-            diagnostics,
-        );
-    }
-
-    if (!looksLikeJsonOrEnvelope(content)) {
-        const mainMarkdown = diagnostics.mainMarkdown || fromMarkdown.fallbackMarkdown;
-        if (mainMarkdown.trim().length === 0) {
-            return { kind: 'unreadable', reason: 'empty' };
-        }
-        return {
-            kind: 'markdown',
-            markdown: mainMarkdown,
-            sourcesMarkdown: diagnostics.sourcesMarkdown,
-            limitsMarkdown: diagnostics.limitsMarkdown,
-        };
-    }
-
-    try {
-        const extraction = parsePatientInsightExtractionResponse(content);
-        const data = extraction.value.data;
-        const hasExtraction = Boolean(
-            data.currentState.length ||
-            data.alerts.length ||
-            data.nextSteps.length ||
-            data.gaps.length,
-        );
-
-        if (hasExtraction) {
-            return asStructured(
-                data.currentState.join(' '),
-                data.alerts,
-                data.nextSteps,
-                data.gaps,
-                diagnostics,
-            );
-        }
-
-        if (extraction.value.summary) {
-            return asStructured(extraction.value.summary, [], [], [], diagnostics);
-        }
-    } catch {
-        // fall through to free-text recovery
-    }
-
-    try {
-        const parsed = JSON.parse(content) as unknown;
-        const inner = deepFindReadableString(parsed, ['content', 'text', 'summary', 'output', 'value', 'markdown']);
-        if (inner) {
-            const innerStructured = parsePatientInsight(inner);
-            const innerDiagnostics = splitInsightDiagnostics(inner);
-            const innerHas = Boolean(
-                innerStructured.summary ||
-                innerStructured.alerts.length ||
-                innerStructured.nextSteps.length ||
-                innerStructured.gaps.length,
-            );
-            if (innerHas) {
-                return asStructured(
-                    innerStructured.summary,
-                    innerStructured.alerts,
-                    innerStructured.nextSteps,
-                    innerStructured.gaps,
-                    innerDiagnostics,
-                );
-            }
-            const innerMarkdown = innerDiagnostics.mainMarkdown || innerStructured.fallbackMarkdown;
-            if (innerMarkdown.trim().length > 0) {
-                return {
-                    kind: 'markdown',
-                    markdown: innerMarkdown,
-                    sourcesMarkdown: innerDiagnostics.sourcesMarkdown,
-                    limitsMarkdown: innerDiagnostics.limitsMarkdown,
-                };
-            }
-        }
-    } catch {
-        // payload was JSON-like but not valid JSON
-    }
-
-    return { kind: 'unreadable', reason: 'json-envelope' };
-}
-
-export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
+export default function AIPatientInsight({ patient, stale = false }: AIPatientInsightProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
@@ -260,11 +81,8 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
 
             if (!info) throw new Error("Risposta vuota dal provider AI");
 
-            // Force refresh to show new data
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
-
+            // La pagina legge patient.aiSummary via useLiveQuery: la scrittura su
+            // db.patients invalida la query e ridisegna il pannello senza reload.
         } catch (err) {
             if (abortControllerRef.current?.signal.aborted) {
                 console.log("Generation aborted by user");
@@ -379,6 +197,16 @@ export default function AIPatientInsight({ patient }: AIPatientInsightProps) {
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3>
                             {modelLabel && (
                                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel}</p>
+                            )}
+                            {patient.aiSummaryGeneratedAt && (
+                                <p className="text-[10px] font-medium text-slate-400 tracking-tight">
+                                    Generato il {new Date(patient.aiSummaryGeneratedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    {stale && (
+                                        <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                            Dati modificati dopo la generazione
+                                        </span>
+                                    )}
+                                </p>
                             )}
                         </div>
                     </div>

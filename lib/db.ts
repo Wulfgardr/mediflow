@@ -83,6 +83,13 @@ export interface DocumentInsight {
     autofill?: {
         appliedDiagnoses?: string[];
     };
+    // Classificazione deterministica pre-LLM (router di classe) e data documento
+    // dal nome file: segnali additivi, non alterano il flusso di sintesi.
+    routedClass?: {
+        classification: string;
+        confidence: string;
+    };
+    documentDate?: string;
 }
 
 export interface Patient {
@@ -101,6 +108,10 @@ export interface Patient {
     deletedAt?: Date;
     deletionReason?: string;
     aiSummary?: string;
+    // Ciclo di vita dell'insight: quando e stato generato e hash deterministico del
+    // contesto clinico su cui poggia. Non PHI (id + timestamp), quindi non cifrati.
+    aiSummaryGeneratedAt?: Date;
+    aiSummaryContextHash?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
     /* @Codex */
     exemptions?: string[];
@@ -824,6 +835,11 @@ export interface Observation {
     unitCode: string;
     value: number | string;
     notes?: string;
+    // S6: range di riferimento. refLow/refHigh confrontabili solo se numerici;
+    // refText per il range grezzo/qualitativo. Non PHI, non cifrati.
+    refLow?: string | null;
+    refHigh?: string | null;
+    refText?: string | null;
     observedAt: Date;
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;

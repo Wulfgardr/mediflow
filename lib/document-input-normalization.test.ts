@@ -1,7 +1,17 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeDocumentInput } from './document-input-normalization';
+import { expandTwoDigitYear, normalizeDocumentInput } from './document-input-normalization';
+
+test('expandTwoDigitYear uses a pivot window so future 20xx years fall back to 19xx', () => {
+    // Recent past stays in 2000s.
+    assert.equal(expandTwoDigitYear('24', 2026), 2024);
+    assert.equal(expandTwoDigitYear('26', 2026), 2026);
+    // A 20xx interpretation in the future is demoted to 19xx (birth dates).
+    assert.equal(expandTwoDigitYear('58', 2026), 1958);
+    assert.equal(expandTwoDigitYear('27', 2026), 1927);
+    assert.ok(Number.isNaN(expandTwoDigitYear('ab', 2026)));
+});
 
 test('normalizeDocumentInput extracts tolerant narrative from partial CDA sections', () => {
     const result = normalizeDocumentInput(`
