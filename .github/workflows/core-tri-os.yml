@@ -46,7 +46,7 @@ jobs:
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
 
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
       - name: Set up Swift
@@ -54,6 +54,10 @@ jobs:
         with:
           swift-version: swift-6.0.3-release
           swift-build: 6.0.3-RELEASE
+      - name: Select supported Windows SDK
+        uses: compnerd/gha-setup-vsdevenv@v6
+        with:
+          winsdk: 10.0.22621.0
       - name: Swift version
         run: swift --version
         shell: pwsh
