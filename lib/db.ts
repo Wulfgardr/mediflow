@@ -835,6 +835,11 @@ export interface Observation {
     unitCode: string;
     value: number | string;
     notes?: string;
+    // S6: range di riferimento. refLow/refHigh confrontabili solo se numerici;
+    // refText per il range grezzo/qualitativo. Non PHI, non cifrati.
+    refLow?: string | null;
+    refHigh?: string | null;
+    refText?: string | null;
     observedAt: Date;
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;

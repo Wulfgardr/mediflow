@@ -32,6 +32,9 @@ import { buildValidationMessage, type ValidatePatientExportResponse } from '@/li
 import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
+import { classifyObservationRange } from '@/lib/observation-range';
+import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
+import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export default function PatientDetailPage() {
@@ -177,6 +180,8 @@ export default function PatientDetailPage() {
     const recentEvidence = documentInsights.slice(0, 4);
     const leadDiagnosis = diagnosisItems[0];
     const nextCheckup = (checkups ?? [])[0];
+    // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
+    const followupSuggestions = projectFollowupSuggestions(documentInsights);
     const summaryText = leadDiagnosis
         ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
         : 'Nessuna diagnosi codificata nella scheda.';
@@ -242,6 +247,10 @@ export default function PatientDetailPage() {
     const observationHint = latestObservation
         ? `${latestObservation.display}: ${latestObservation.value}${latestObservation.unitCode ? ' ' + latestObservation.unitCode : ''} · ${new Date(latestObservation.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`
         : undefined;
+    // Colora la cella Parametri solo se l'ultima misura e realmente fuori range
+    // (range presente sul dato). Mai un flag inventato.
+    const observationOutOfRange = Boolean(latestObservation
+        && classifyObservationRange(latestObservation.value, latestObservation.refLow, latestObservation.refHigh));
     // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
     // percorso e ancora aperto (rilevante soprattutto per l'ADI).
     const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
@@ -259,7 +268,7 @@ export default function PatientDetailPage() {
             hint: leadDiagnosis?.description,
         },
         { label: 'Terapie attive', value: therapyCount, icon: Pill, hint: therapyHint },
-        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical, hint: observationHint },
+        { label: 'Parametri', value: observationCount ?? 0, icon: FlaskConical, hint: observationHint, tone: observationOutOfRange ? 'critical' : 'neutral' },
         {
             label: 'Ultimo contatto',
             value: lastEntryDate
@@ -651,6 +660,12 @@ export default function PatientDetailPage() {
                                 </Link>
                             </div>
                         )}
+
+                        <FollowupSuggestions
+                            patientId={id}
+                            suggestions={followupSuggestions}
+                            existingTitles={(checkups ?? []).map((checkup) => checkup.title)}
+                        />
                     </section>
                 </div>
             </div>

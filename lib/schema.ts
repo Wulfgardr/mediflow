@@ -148,6 +148,11 @@ export const observations = sqliteTable('observations', {
     notes: text('notes'),
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
+    // S6: range di riferimento. refLow/refHigh solo se numerici, refText per range
+    // grezzi/qualitativi ("< 200", "Negativo"). Non cifrati (metadati come value).
+    refLow: text('ref_low'),
+    refHigh: text('ref_high'),
+    refText: text('ref_text'),
     /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),

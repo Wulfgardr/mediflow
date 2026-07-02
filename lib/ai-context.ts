@@ -25,6 +25,7 @@ import {
 } from '@/lib/evidence-queue-contract';
 /* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
+import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
@@ -884,7 +885,13 @@ export async function buildPatientInsightContext(
         .slice(0, MAX_OBSERVATIONS)
         .map((observation) => {
             const note = observation.notes ? `; note ${compactText(observation.notes, 90)}` : '';
-            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode} [${formatDate(observation.observedAt)}]${note}`;
+            // Marcatore deterministico "fuori range" solo quando il range e presente
+            // sul dato e il valore e numerico (mai inventato).
+            const flag = classifyObservationRange(observation.value, observation.refLow, observation.refHigh);
+            const outOfRange = flag
+                ? ` (${flag === 'alto' ? 'sopra' : 'sotto'} range rif ${formatReferenceRange(observation.refLow, observation.refHigh, observation.refText)})`
+                : '';
+            return `- ${compactText(observation.display, 90)} (${observation.code}) = ${observation.value} ${observation.unitCode}${outOfRange} [${formatDate(observation.observedAt)}]${note}`;
         });
 
     const checkupLines = checkups

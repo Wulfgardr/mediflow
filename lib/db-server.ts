@@ -239,6 +239,10 @@ function applySchemaGuards() {
         ensureColumn('observations', 'updated_at', 'updated_at INTEGER');
         ensureColumn('observations', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn('observations', 'deletion_reason', 'deletion_reason TEXT');
+        // S6: range di riferimento (additive, idempotenti)
+        ensureColumn('observations', 'ref_low', 'ref_low TEXT');
+        ensureColumn('observations', 'ref_high', 'ref_high TEXT');
+        ensureColumn('observations', 'ref_text', 'ref_text TEXT');
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
     } catch (error) {
