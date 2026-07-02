@@ -42,7 +42,7 @@ test('a scan producer without readable header routes to mute_or_scanned', () => 
 });
 
 test('a post-processing producer is flagged and does not drive classification', () => {
-    const result = routeDocumentClass({ producer: 'pdf-lib (https://github.com/Hopding/pdf-lib)' });
+    const result = routeDocumentClass({ producer: 'pdf-lib (github.com/Hopding/pdf-lib)' });
     assert.equal(result.postProcessed, true);
     assert.equal(result.classification, 'unknown');
     assert.equal(result.confidence, 'low');
