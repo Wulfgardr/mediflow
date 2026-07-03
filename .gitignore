@@ -35,6 +35,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /.next-manual-browser/
 /.next-real-import/
 /.next-api-v1-put-negative/

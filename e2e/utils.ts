@@ -13,10 +13,15 @@ export async function isVisible(locator: Locator, timeout = 1200): Promise<boole
 
 /* @Codex */
 async function hasSecurityOverlay(page: Page): Promise<boolean> {
+  // WUL-274/Kree8: the lock chrome moved to the Kree8 lock shell
+  // (components/lock-screen.tsx). The unlock title is now "Sblocca MediFlow"
+  // and the setup title "Crea il tuo PIN"; the shell root carries
+  // aria-label="MediFlow lock screen". "Chi sei?" keys the onboarding wizard.
   const surfaces = await Promise.all([
     isVisible(page.getByRole('heading', { name: 'Chi sei?' }), 250),
     isVisible(page.getByRole('heading', { name: 'Crea il tuo PIN' }), 250),
-    isVisible(page.getByRole('heading', { name: 'MediFlow Sicurezza' }), 250),
+    isVisible(page.getByRole('heading', { name: 'Sblocca MediFlow' }), 250),
+    isVisible(page.getByLabel('MediFlow lock screen'), 250),
   ]);
 
   return surfaces.some(Boolean);
@@ -56,7 +61,7 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
 
 /* @Codex */
 export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
-  const lockHeading = page.getByRole('heading', { name: 'MediFlow Sicurezza' });
+  const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (!(await isVisible(lockHeading))) return;
 
   const pinInput = page.locator('input[placeholder="Inserisci PIN"]:not([disabled])').first();
@@ -110,13 +115,16 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
 
 /* @Codex */
 export async function waitForUnlockedInteractiveShell(page: Page): Promise<void> {
-  const securityHeading = page.getByRole('heading', { name: 'MediFlow Sicurezza' });
+  // WUL-274/Kree8: the lock shell is identified by aria-label="MediFlow lock screen"
+  // (components/lock-screen.tsx). The setup and onboarding surfaces are keyed by their
+  // headings ("Crea il tuo PIN" and "Chi sei?"). The legacy z-[9999] overlay is gone.
+  const lockShell = page.getByLabel('MediFlow lock screen');
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
-  const securityOverlay = page.locator('div.fixed.inset-0.z-\\[9999\\]');
+  const onboardingHeading = page.getByRole('heading', { name: 'Chi sei?' });
 
-  await expect(securityHeading).toBeHidden({ timeout: 10_000 });
+  await expect(lockShell).toHaveCount(0, { timeout: 10_000 });
   await expect(setupHeading).toBeHidden({ timeout: 10_000 });
-  await expect(securityOverlay).toHaveCount(0, { timeout: 10_000 });
+  await expect(onboardingHeading).toBeHidden({ timeout: 10_000 });
   await page.waitForTimeout(250);
-  await expect(securityOverlay).toHaveCount(0, { timeout: 5_000 });
+  await expect(lockShell).toHaveCount(0, { timeout: 5_000 });
 }
