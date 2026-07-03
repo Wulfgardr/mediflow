@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./tmp-visit-transcript-draft-test",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "lib/visit-transcript-draft.ts",
+    "lib/visit-transcript-draft.test.ts",
+    "lib/patient-smart-import-matching.ts",
+    "lib/ai-task-contracts.ts",
+    "lib/prescription-boundary.ts"
+  ]
+}

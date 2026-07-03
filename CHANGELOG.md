@@ -5,6 +5,16 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Aggiunto
+
+- **Visita review-first da transcript sintetico (`WUL-419`/`WUL-420`/`WUL-421`)**:
+  boundary ADR 0072, workspace web per bozza visita manuale/dettata, endpoint
+  interno `POST /api/visit-session/draft` e test deterministico su transcript
+  sintetico. La slice non acquisisce audio reale, non persiste raw audio e non
+  scrive terapie/diagnosi/checkup/osservazioni senza revisione esplicita.
+
 ## [0.7.1] - 2026-07-03
 
 > Nota release: `v0.7.1` consolida il grande ramo Apple/native e lo prepara al
