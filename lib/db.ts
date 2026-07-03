@@ -208,6 +208,20 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
 };
 
+/* STREAM B: serializable list-query params consumed by the server list handlers.
+   Only plaintext columns may appear in orderBy (the server whitelists them and
+   returns 400 otherwise). metadataOnly is attachments-only. */
+export interface ApiTableQuery {
+    patientId?: string;
+    conversationId?: string;
+    limit?: number;
+    offset?: number;
+    orderBy?: string;
+    orderDir?: 'asc' | 'desc';
+    metadataOnly?: boolean;
+    includeDeleted?: boolean;
+}
+
 class ApiTable<T> {
     private endpoint: string;
     private tableName: string;
@@ -245,6 +259,10 @@ class ApiTable<T> {
     private _reverse?: boolean;
     /* @Codex */
     private _includeDeleted?: boolean;
+    /* STREAM B: server-side query params (kill the full-table fetch). Only set via
+       .query(); serialized into buildListEndpoint so the server filters/sorts and
+       we decrypt only what returns. */
+    private _serverQuery?: ApiTableQuery;
 
     private clone(): ApiTable<T> {
         const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey);
@@ -252,6 +270,7 @@ class ApiTable<T> {
         copy._limit = this._limit;
         copy._reverse = this._reverse;
         copy._includeDeleted = this._includeDeleted;
+        copy._serverQuery = this._serverQuery;
         return copy;
     }
 
@@ -259,6 +278,17 @@ class ApiTable<T> {
     includeDeleted(): ApiTable<T> {
         const clone = this.clone();
         clone._includeDeleted = true;
+        return clone;
+    }
+
+    /* STREAM B: parametrized server-side query. Unlike .filter(fn) (a JS predicate
+       that cannot be serialized), these params are pushed to the list endpoint so
+       the server does the filtering/sorting/pagination and we only download and
+       decrypt the rows that come back. Chainable + terminal-compatible with the
+       Dexie shim: call .toArray() after. */
+    query(params: ApiTableQuery): ApiTable<T> {
+        const clone = this.clone();
+        clone._serverQuery = { ...clone._serverQuery, ...params };
         return clone;
     }
 
@@ -299,9 +329,24 @@ class ApiTable<T> {
 
     /* @Codex */
     private buildListEndpoint(): string {
-        if (!this._includeDeleted) return this.endpoint;
+        const search = new URLSearchParams();
+        const q = this._serverQuery;
+        if (q) {
+            if (q.patientId) search.set('patientId', q.patientId);
+            if (q.conversationId) search.set('conversationId', q.conversationId);
+            if (typeof q.limit === 'number') search.set('limit', String(q.limit));
+            if (typeof q.offset === 'number') search.set('offset', String(q.offset));
+            if (q.orderBy) search.set('orderBy', q.orderBy);
+            if (q.orderDir) search.set('orderDir', q.orderDir);
+            if (q.metadataOnly) search.set('metadata', 'true');
+        }
+        // includeDeleted may come from either the chain shim or the query params.
+        if (this._includeDeleted || q?.includeDeleted) search.set('includeDeleted', 'true');
+
+        const qs = search.toString();
+        if (!qs) return this.endpoint;
         const separator = this.endpoint.includes('?') ? '&' : '?';
-        return `${this.endpoint}${separator}includeDeleted=true`;
+        return `${this.endpoint}${separator}${qs}`;
     }
 
 
@@ -331,8 +376,10 @@ class ApiTable<T> {
     }
 
     /* @Codex */
+    // STREAM B: scope the notification to this table so useLiveQuery subscribers
+    // scoped to other tables don't needlessly re-run.
     private emitChange() {
-        notifyDbChange();
+        notifyDbChange(this.tableName);
     }
 
     /* @Codex */

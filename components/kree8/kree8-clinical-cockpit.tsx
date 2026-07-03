@@ -4020,18 +4020,24 @@ export function Kree8ClinicalCockpit({
   const livePatientRows = useLiveQuery<Patient[]>(
     async () => (isReview ? [] : db.patients.toArray()),
     [isReview],
+    undefined,
+    ['patients'],
   );
 
   /* @Codex */
   const liveCheckupRows = useLiveQuery<Checkup[]>(
     async () => (isReview ? [] : db.checkups.toArray()),
     [isReview],
+    undefined,
+    ['checkups'],
   );
 
   /* @Codex */
   const liveDiaryRows = useLiveQuery<ClinicalEntry[]>(
-    async () => (isReview ? [] : db.entries.orderBy('date').reverse().limit(50).toArray()),
+    async () => (isReview ? [] : db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray()),
     [isReview],
+    undefined,
+    ['entries'],
   );
 
   /* @Codex */
@@ -4054,11 +4060,11 @@ export function Kree8ClinicalCockpit({
       if (isReview || !selectedPatient) return null;
       const patientId = selectedPatient.id;
       const [entries, therapies, checkups, observations, attachments] = await Promise.all([
-        db.entries.filter((entry) => entry.patientId === patientId).toArray(),
-        db.therapies.filter((therapy) => therapy.patientId === patientId).toArray(),
-        db.checkups.filter((checkup) => checkup.patientId === patientId).toArray(),
-        db.observations.filter((observation) => observation.patientId === patientId).toArray(),
-        db.attachments.filter((attachment) => attachment.patientId === patientId).toArray(),
+        db.entries.query({ patientId }).toArray(),
+        db.therapies.query({ patientId }).toArray(),
+        db.checkups.query({ patientId }).toArray(),
+        db.observations.query({ patientId }).toArray(),
+        db.attachments.query({ patientId, metadataOnly: true }).toArray(),
       ]);
 
       return buildPatientWorkspace({
@@ -4071,6 +4077,8 @@ export function Kree8ClinicalCockpit({
       });
     },
     [isReview, selectedPatient?.id],
+    undefined,
+    ['entries', 'therapies', 'checkups', 'observations', 'attachments'],
   );
 
   useEffect(() => {
