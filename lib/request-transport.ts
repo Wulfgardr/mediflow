@@ -16,14 +16,17 @@ const HTTPS_PROTOCOL = 'https:';
 const TLS_PROXY_MARKER_HEADER = 'x-mediflow-tls-proxy';
 const TLS_PROXY_MARKER_VALUE = 'local-api';
 
-// D1 (WAVE 2 security hardening): the plaintext Next server binds loopback only;
-// the proxy's HTTP target is validated as loopback in the proxy itself. So a
-// request whose own URL is loopback and that carries the proxy marker genuinely
-// came through TLS. Anything reaching the loopback port directly cannot come
-// from the LAN, and a LAN attacker cannot forge the marker because it cannot
-// reach the plaintext port at all.
-const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1']);
-
+// D1 (WAVE 2 security hardening): the plaintext Next server binds loopback only
+// and the proxy's HTTP target is validated as loopback in the proxy itself. A
+// LAN attacker therefore cannot reach the plaintext port to inject the marker,
+// so the marker alone authoritatively proves the request arrived over TLS.
+//
+// We deliberately do NOT gate on the request URL host being loopback: the proxy
+// forwards the client's original Host header untouched (see
+// scripts/local-api-tls-proxy.mjs spreading ...req.headers), so a genuine remote
+// paired device produces a non-loopback host (a .local mDNS name or LAN IP).
+// Requiring a loopback URL here would wrongly downgrade that path to secure:false
+// and break the LAN paired requirement.
 function forwardedProtoValues(request: Request): string[] {
     const forwardedProto = request.headers.get('x-forwarded-proto');
     if (!forwardedProto) return [];
@@ -34,23 +37,14 @@ function forwardedProtoValues(request: Request): string[] {
         .filter(Boolean);
 }
 
-function isLoopbackHostname(hostname: string): boolean {
-    // URL parsing wraps IPv6 literals in brackets; strip them before comparing.
-    const normalized = hostname.startsWith('[') && hostname.endsWith(']')
-        ? hostname.slice(1, -1)
-        : hostname;
-    return LOOPBACK_HOSTNAMES.has(normalized);
-}
-
 /* @Codex */
 function isFromLocalTlsProxy(request: Request): boolean {
+    // The proxy authoritatively overwrites this marker on every forwarded request
+    // (it is set after ...req.headers is spread, so a client-supplied value cannot
+    // survive), and a LAN client cannot reach the loopback-only plaintext port to
+    // inject it directly. The marker's presence is therefore sufficient proof.
     const marker = request.headers.get(TLS_PROXY_MARKER_HEADER);
-    if (marker?.trim().toLowerCase() !== TLS_PROXY_MARKER_VALUE) return false;
-
-    // The genuine proxy only ever forwards to the loopback Next server, so a
-    // proxied request must arrive on a loopback URL. This rejects any attempt to
-    // replay the marker header against a non-loopback origin.
-    return isLoopbackHostname(new URL(request.url).hostname);
+    return marker?.trim().toLowerCase() === TLS_PROXY_MARKER_VALUE;
 }
 
 /* @Codex */

@@ -55,16 +55,21 @@ test('isHttpsRequest ignores forged x-forwarded-proto without the proxy marker',
     assert.equal(sessionCookieOptionsForRequest(request).secure, false);
 });
 
-test('isHttpsRequest ignores the proxy marker replayed against a non-loopback origin', () => {
-    const request = new Request('http://198.51.100.7:3000/api/auth/login', {
+// D1 reviewer fix: the genuine LAN paired path reaches the loopback-only Next
+// server through the TLS proxy, which forwards the client's ORIGINAL Host header
+// (a .local mDNS name or LAN IP). The request URL host is therefore non-loopback
+// on a real remote device. The proxy marker alone must still assert secure:true
+// here, otherwise LAN pairing regresses to insecure cookies.
+test('isHttpsRequest trusts the proxy marker on a non-loopback (LAN paired) host', () => {
+    const request = new Request('http://mediflow-home.local:3000/api/auth/login', {
         headers: {
             ...PROXY_HEADERS,
             'x-forwarded-proto': 'https',
         },
     });
 
-    assert.equal(isHttpsRequest(request), false);
-    assert.equal(sessionCookieOptionsForRequest(request).secure, false);
+    assert.equal(isHttpsRequest(request), true);
+    assert.equal(sessionCookieOptionsForRequest(request).secure, true);
 });
 
 test('isHttpsRequest ignores an unrelated proxy-marker value', () => {
@@ -89,7 +94,7 @@ test('the proxy marker alone (no forwarded https) does not assert a secure trans
     assert.equal(sessionCookieOptionsForRequest(request).secure, false);
 });
 
-test('localhost hostname is treated as loopback for the proxy path', () => {
+test('isHttpsRequest trusts the proxy marker on a localhost host', () => {
     const request = new Request('http://localhost:3000/api/auth/login', {
         headers: {
             ...PROXY_HEADERS,
