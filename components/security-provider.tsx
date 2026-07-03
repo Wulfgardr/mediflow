@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
     generateMasterKey,
-    deriveKeyFromPin,
-    wrapMasterKey,
-    unwrapMasterKey
+    getKdfVersion,
+    CURRENT_KDF_VERSION,
+    wrapMasterKeyVersioned,
+    unwrapMasterKeyVersioned,
 } from '@/lib/security';
 /* @Codex */
 import {
@@ -36,6 +37,7 @@ import {
     loginWithPinRequest,
     logoutSecuritySession,
     repairLegacyDbRequest,
+    rewrapMasterKeyRequest,
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
@@ -313,8 +315,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 saltBytes = new Uint8Array(salt);
             }
 
-            const kek = await deriveKeyFromPin(pin, saltBytes);
-            const masterKey = await unwrapMasterKey(encryptedMasterKey, kek);
+            const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
 
             setActiveMasterKey(masterKey);
             setUser(userData);
@@ -327,6 +328,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (e) {
                 console.error("Failed to save session", e);
+            }
+
+            // Lazy KDF upgrade: if the stored blob is below the current version,
+            // re-wrap the (unchanged) master key at v2 and persist server-side.
+            // Best-effort: a failure here never blocks a valid login.
+            if (getKdfVersion(encryptedMasterKey) < CURRENT_KDF_VERSION) {
+                try {
+                    const newSalt = window.crypto.getRandomValues(new Uint8Array(16));
+                    const rewrapped = await wrapMasterKeyVersioned(masterKey, pin, newSalt);
+                    await rewrapMasterKeyRequest({
+                        encryptedMasterKey: rewrapped,
+                        salt: btoa(String.fromCharCode(...newSalt)),
+                    });
+                } catch (e) {
+                    console.error('KDF lazy upgrade failed', e);
+                }
             }
 
             return true;
@@ -385,11 +402,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setFlowError(null);
 
         try {
-            // Generate crypto
+            // Generate crypto. New setups wrap at the current KDF version (v2, 600k).
             const salt = window.crypto.getRandomValues(new Uint8Array(16));
-            const kek = await deriveKeyFromPin(pin, salt);
             const masterKey = await generateMasterKey();
-            const encryptedMasterKey = await wrapMasterKey(masterKey, kek);
+            const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, pin, salt);
             const saltB64 = btoa(String.fromCharCode(...salt));
 
             // Send to Server

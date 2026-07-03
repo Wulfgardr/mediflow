@@ -4,8 +4,55 @@ export const SECURITY_CONFIG = {
     PIN_MIN_LENGTH: 4,
     PIN_MAX_LENGTH: 8,
     AUTO_LOCK_TIMEOUT_MS: 15 * 60 * 1000,
-    ITERATIONS: 100000, // PBKDF2 iterations
+    ITERATIONS: 100000, // PBKDF2 iterations (legacy default, kept for byte parity with v1 blobs)
 };
+
+// Versioned PBKDF2 work factor for the wrapped-master-key blob.
+// v1 = legacy 100k (read/unwrap support forever; never used for NEW wraps).
+// v2 = OWASP guidance for PBKDF2-HMAC-SHA256 (600k); every NEW wrap uses this.
+// The master key itself never changes across versions: only the PIN-derived
+// wrapping does, so an upgrade re-wraps in place without re-encrypting data.
+// Native (Swift CommonCrypto/CryptoKit) must stay in lockstep with this table.
+export const KDF_ITERATIONS: Record<number, number> = {
+    1: 100_000,
+    2: 600_000,
+};
+
+// The version every NEW wrapped-master-key blob is written at.
+export const CURRENT_KDF_VERSION = 2;
+
+// Serialized wrapped blobs are self-describing: a bare base64 string (no marker)
+// is the legacy v1 shape; a "v<N>:" prefix pins the KDF version explicitly.
+// Absent marker => v1 keeps existing stored blobs (DB / localStorage) valid.
+const KDF_VERSION_PREFIX = /^v(\d+):/;
+
+/**
+ * Splits a stored wrapped-master-key blob into its KDF version and the raw
+ * base64(iv||ct||tag) payload. A blob with no "v<N>:" marker is treated as v1.
+ */
+export function parseWrappedMasterKey(blob: string): { version: number; base64: string } {
+    const match = blob.match(KDF_VERSION_PREFIX);
+    if (!match) {
+        return { version: 1, base64: blob };
+    }
+    return { version: Number(match[1]), base64: blob.slice(match[0].length) };
+}
+
+/**
+ * The KDF version of a stored blob (1 when unmarked). Used to decide whether a
+ * lazy re-wrap to CURRENT_KDF_VERSION is needed on login / change-pin.
+ */
+export function getKdfVersion(blob: string): number {
+    return parseWrappedMasterKey(blob).version;
+}
+
+function iterationsForVersion(version: number): number {
+    const iterations = KDF_ITERATIONS[version];
+    if (!iterations) {
+        throw new Error(`Unsupported KDF version: ${version}`);
+    }
+    return iterations;
+}
 
 /* @Codex */
 function getCryptoApi(): Crypto {
@@ -32,9 +79,16 @@ export async function generateMasterKey(): Promise<CryptoKey> {
 }
 
 /**
- * Derives a Key Encrypting Key (KEK) from the user's PIN using PBKDF2
+ * Derives a Key Encrypting Key (KEK) from the user's PIN using PBKDF2.
+ * `iterations` defaults to the legacy v1 work factor so existing 2-arg callers
+ * stay byte-identical with v1 blobs; version-aware callers pass the matching
+ * iteration count (see KDF_ITERATIONS).
  */
-export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+export async function deriveKeyFromPin(
+    pin: string,
+    salt: Uint8Array,
+    iterations: number = SECURITY_CONFIG.ITERATIONS,
+): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const keyMaterial = await getCryptoApi().subtle.importKey(
         'raw',
@@ -48,7 +102,7 @@ export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<C
         {
             name: 'PBKDF2',
             salt: salt as unknown as BufferSource,
-            iterations: SECURITY_CONFIG.ITERATIONS,
+            iterations,
             hash: 'SHA-256',
         },
         keyMaterial,
@@ -103,6 +157,41 @@ export async function unwrapMasterKey(encryptedMasterKeyB64: string, kek: Crypto
         true,
         ['encrypt', 'decrypt']
     );
+}
+
+// --- Versioned wrapped-master-key blob ---
+
+/**
+ * Wraps the master key at a given KDF version and returns a self-describing,
+ * versioned blob (e.g. "v2:<base64>"). Derives the KEK from the PIN + salt using
+ * the iteration count for that version; defaults to CURRENT_KDF_VERSION so every
+ * NEW wrap is written at the strongest supported work factor.
+ */
+export async function wrapMasterKeyVersioned(
+    masterKey: CryptoKey,
+    pin: string,
+    salt: Uint8Array,
+    version: number = CURRENT_KDF_VERSION,
+): Promise<string> {
+    const kek = await deriveKeyFromPin(pin, salt, iterationsForVersion(version));
+    const base64 = await wrapMasterKey(masterKey, kek);
+    return `v${version}:${base64}`;
+}
+
+/**
+ * Unwraps a stored (possibly legacy-unmarked) wrapped-master-key blob. Reads the
+ * KDF version from the blob, derives the KEK with the matching iteration count,
+ * and returns the master key. The master key is identical across versions, so an
+ * upgrade only changes the wrapping.
+ */
+export async function unwrapMasterKeyVersioned(
+    blob: string,
+    pin: string,
+    salt: Uint8Array,
+): Promise<CryptoKey> {
+    const { version, base64 } = parseWrappedMasterKey(blob);
+    const kek = await deriveKeyFromPin(pin, salt, iterationsForVersion(version));
+    return unwrapMasterKey(base64, kek);
 }
 
 // --- Data Encryption ---

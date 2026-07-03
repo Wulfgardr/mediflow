@@ -1,5 +1,5 @@
 /* @Codex */
-import { SECURITY_CONFIG, deriveKeyFromPin, wrapMasterKey } from './security';
+import { SECURITY_CONFIG, wrapMasterKeyVersioned } from './security';
 
 /* @Codex */
 export const PIN_CHANGE_INVALID_CURRENT_PIN_CODE = 'PIN_CHANGE_INVALID_CURRENT_PIN';
@@ -48,8 +48,8 @@ export function validatePinChangeInput(currentPin: string, newPin: string): stri
 /* @Codex */
 export async function createPinRotationBundle(masterKey: CryptoKey, newPin: string): Promise<{ encryptedMasterKey: string; salt: string }> {
     const salt = getCryptoApi().getRandomValues(new Uint8Array(16));
-    const kek = await deriveKeyFromPin(newPin, salt);
-    const encryptedMasterKey = await wrapMasterKey(masterKey, kek);
+    // Always re-wrap at the current KDF version (v2, 600k) on PIN change.
+    const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, newPin, salt);
 
     return {
         encryptedMasterKey,

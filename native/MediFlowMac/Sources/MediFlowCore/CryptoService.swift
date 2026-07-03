@@ -1,8 +1,9 @@
 // Zero-knowledge field crypto for the paired Apple client, byte-compatible with
 // the web (lib/security.ts). The home-base stores ENC:base64(iv):base64(ct‖tag)
 // ciphertext; the server never holds the key. The operator PIN derives a KEK
-// (PBKDF2-HMAC-SHA256, 100k) that unwraps the AES-256-GCM master key, which then
-// decrypts/encrypts clinical fields. Verified against web-produced test vectors.
+// (PBKDF2-HMAC-SHA256; v1=100k legacy, v2=600k for new wraps) that unwraps the
+// AES-256-GCM master key, which then decrypts/encrypts clinical fields. Verified
+// against web-produced test vectors.
 //
 // Plaintext convention (matches encryptData/decryptData): the value is
 // JSON.stringify-d before encryption. So a string field decrypts to a quoted
@@ -16,7 +17,16 @@ import Crypto
 
 public enum CryptoService {
     public static let encPrefix = "ENC:"
-    private static let pbkdf2Iterations = 100_000
+
+    // Versioned PBKDF2 work factor for the wrapped-master-key blob, in lockstep
+    // with the web (lib/security.ts KDF_ITERATIONS). v1 = legacy 100k (unwrap
+    // support forever); v2 = OWASP-guided 600k for every new wrap. The master key
+    // is identical across versions: only the PIN-derived wrapping changes.
+    public static let kdfIterations: [Int: Int] = [
+        1: 100_000,
+        2: 600_000,
+    ]
+    public static let currentKdfVersion = 2
 
     // MARK: AES-GCM field crypto
 
@@ -122,11 +132,54 @@ public enum CryptoService {
 
     // MARK: Key derivation + master-key wrap
 
-    /// PBKDF2-HMAC-SHA256(pin, salt, 100k) -> 256-bit KEK, matching deriveKeyFromPin.
-    public static func deriveKEK(pin: String, salt: Data) -> SymmetricKey {
+    /// PBKDF2-HMAC-SHA256(pin, salt, iterations) -> 256-bit KEK, matching
+    /// deriveKeyFromPin. `iterations` defaults to the legacy v1 work factor so
+    /// existing callers stay byte-identical with v1 blobs; version-aware callers
+    /// pass the matching count from `kdfIterations`.
+    public static func deriveKEK(pin: String, salt: Data, iterations: Int = 100_000) -> SymmetricKey {
         let derived = pbkdf2SHA256(password: Data(pin.utf8), salt: salt,
-                                   iterations: pbkdf2Iterations, keyLength: 32)
+                                   iterations: iterations, keyLength: 32)
         return SymmetricKey(data: derived)
+    }
+
+    // MARK: Versioned wrapped-master-key blob
+
+    /// Split a stored wrapped-master-key blob into its KDF version and the raw
+    /// base64(iv‖ct‖tag) payload. A blob with no "v<N>:" marker is legacy v1, so
+    /// existing stored blobs stay valid.
+    public static func parseWrappedMasterKey(_ blob: String) -> (version: Int, base64: String) {
+        guard let colon = blob.firstIndex(of: ":"),
+              blob.hasPrefix("v"),
+              let version = Int(blob[blob.index(after: blob.startIndex)..<colon]) else {
+            return (1, blob)
+        }
+        return (version, String(blob[blob.index(after: colon)...]))
+    }
+
+    /// KDF version of a stored blob (1 when unmarked).
+    public static func kdfVersion(of blob: String) -> Int {
+        parseWrappedMasterKey(blob).version
+    }
+
+    /// Unwrap a (possibly legacy-unmarked) versioned wrapped-master-key blob:
+    /// reads the version, derives the KEK at the matching iteration count, and
+    /// returns the master key. Master key is identical across versions.
+    public static func unwrapMasterKeyVersioned(blob: String, pin: String, salt: Data) -> SymmetricKey? {
+        let parsed = parseWrappedMasterKey(blob)
+        guard let iterations = kdfIterations[parsed.version] else { return nil }
+        let kek = deriveKEK(pin: pin, salt: salt, iterations: iterations)
+        return unwrapMasterKey(wrappedBase64: parsed.base64, kek: kek)
+    }
+
+    /// Wrap a master key at a given KDF version, returning a self-describing
+    /// "v<N>:<base64>" blob. Defaults to the current version so new wraps use the
+    /// strongest supported work factor.
+    public static func wrapMasterKeyVersioned(_ masterKey: SymmetricKey, pin: String, salt: Data,
+                                              version: Int = currentKdfVersion) -> String? {
+        guard let iterations = kdfIterations[version] else { return nil }
+        let kek = deriveKEK(pin: pin, salt: salt, iterations: iterations)
+        guard let base64 = wrapMasterKey(masterKey, kek: kek) else { return nil }
+        return "v\(version):\(base64)"
     }
 
     /// Unwrap base64(iv‖AES-GCM(rawMasterKey)) with the KEK -> master key.
