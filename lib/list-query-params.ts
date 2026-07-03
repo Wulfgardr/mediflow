@@ -68,6 +68,11 @@ export function parseListParams(
 
     const offsetRaw = parseNonNegativeInt(searchParams.get('offset'));
     if (offsetRaw === 'invalid') return { ok: false, error: 'Invalid offset' };
+    // SQLite rejects OFFSET without an accompanying LIMIT, so an offset alone
+    // would 500 at query time. Require a limit whenever offset is supplied.
+    if (offsetRaw !== null && limitRaw === null) {
+        return { ok: false, error: 'offset richiede limit' };
+    }
 
     const orderByRaw = searchParams.get('orderBy');
     let orderBy: string | undefined = spec.defaultOrderBy;

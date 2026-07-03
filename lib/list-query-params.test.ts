@@ -29,10 +29,19 @@ test('valid limit and offset parse to integers', () => {
     assert.equal(result.params.offset, 10);
 });
 
-test('offset=0 is a valid explicit offset', () => {
-    const result = parseListParams(sp('offset=0'), ENTRY_SPEC);
+test('offset=0 with a limit is a valid explicit offset', () => {
+    const result = parseListParams(sp('limit=10&offset=0'), ENTRY_SPEC);
     assert.ok(result.ok);
     assert.equal(result.params.offset, 0);
+});
+
+test('offset without limit is rejected (SQLite forbids OFFSET without LIMIT)', () => {
+    for (const query of ['offset=10', 'offset=0']) {
+        const result = parseListParams(sp(query), ENTRY_SPEC);
+        assert.equal(result.ok, false, `'${query}' must be rejected`);
+        assert.ok(!result.ok);
+        assert.equal(result.error, 'offset richiede limit');
+    }
 });
 
 test('garbage limit is rejected with 400-worthy error', () => {
