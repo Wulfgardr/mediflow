@@ -9,6 +9,10 @@ import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -46,7 +50,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(therapyCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

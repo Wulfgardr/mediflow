@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { canTransitionDocumentOcrQueueState, isDocumentOcrQueueState } from '@/lib/document-ocr-queue';
 import { applyDocumentOcrReplay } from '@/lib/document-ocr-replay';
+import { attachmentOcrReplaySchema } from '@/lib/api-schemas/attachments';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 /**
  * Replay documentale post-OCR per un allegato in coda OCR-needed.
@@ -28,12 +30,10 @@ export async function POST(
         if (!body || typeof body !== 'object') {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
-        const payload = body as Record<string, unknown>;
-        const ocrText = typeof payload.ocrText === 'string' ? payload.ocrText : null;
-        const documentSha256 = typeof payload.documentSha256 === 'string' ? payload.documentSha256.trim() : '';
-        if (ocrText === null || !documentSha256) {
-            return NextResponse.json({ error: 'ocrText and documentSha256 are required' }, { status: 400 });
-        }
+        const parsedBody = parseApiBody(attachmentOcrReplaySchema, body);
+        if (!parsedBody.ok) return parsedBody.response;
+        const { ocrText } = parsedBody.data;
+        const documentSha256 = parsedBody.data.documentSha256.trim();
 
         const existing = await dbServer
             .select({

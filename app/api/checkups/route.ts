@@ -9,6 +9,10 @@ import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 /* @Codex */
 function parseRequiredDate(value: unknown): Date | null {
@@ -58,7 +62,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(checkupCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

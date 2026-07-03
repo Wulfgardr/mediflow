@@ -9,6 +9,10 @@ import {
     isDocumentOcrQueueState,
     type DocumentOcrQueueState,
 } from '@/lib/document-ocr-queue';
+/* @Codex */
+import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function PUT(
     request: Request,
@@ -23,7 +27,9 @@ export async function PUT(
         if (!body || typeof body !== 'object') {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
-        const payload = body as Record<string, unknown>;
+        const parsedBody = parseApiBody(attachmentUpdateSchema, body);
+        if (!parsedBody.ok) return parsedBody.response;
+        const payload = parsedBody.data;
 
         const existing = await dbServer
             .select({ id: attachments.id, ocrQueueState: attachments.ocrQueueState })
