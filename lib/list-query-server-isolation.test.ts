@@ -15,7 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryBuilder } from 'drizzle-orm/sqlite-core';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-import { entries, attachments } from './schema';
+import { entries, attachments, observations } from './schema';
 import { parseListParams } from './list-query-params';
 
 // A driver-less query builder: builds SQL (.toSQL()) without opening a native
@@ -99,6 +99,68 @@ test('limit and offset are pushed into the SQL', () => {
     assert.match(built.sql, /offset\s+\?/i);
     assert.ok(built.params.includes(25));
     assert.ok(built.params.includes(5));
+});
+
+// WUL-308: the legacy /api/observations list once returned soft-deleted rows, so a
+// paired-client v1 deletion still bled into the web Parameters cell, synoptic latest
+// card, workspace summary and PDF report. The list now hides tombstones by default
+// with an includeDeleted opt-out, exactly like entries.
+const OBSERVATION_SORT = {
+    observedAt: observations.observedAt,
+    createdAt: observations.createdAt,
+    updatedAt: observations.updatedAt,
+} as const;
+
+// Mirrors app/api/observations/route.ts GET query construction exactly.
+function buildObservationsQuery(search: string) {
+    const searchParams = new URLSearchParams(search);
+    const params = parseListParams(searchParams, {
+        sortableColumns: Object.keys(OBSERVATION_SORT),
+        defaultOrderBy: 'observedAt',
+        defaultOrderDir: 'desc',
+    });
+    if (!params.ok) return { error: params.error };
+    const patientId = searchParams.get('patientId');
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const { limit, offset, orderBy, orderDir } = params.params;
+
+    const filters: SQL[] = [];
+    if (patientId) filters.push(eq(observations.patientId, patientId));
+    if (!includeDeleted) filters.push(isNull(observations.deletedAt));
+    const whereClause = filters.length > 0 ? and(...filters) : undefined;
+
+    const sortColumn = OBSERVATION_SORT[(orderBy ?? 'observedAt') as keyof typeof OBSERVATION_SORT];
+    const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    let query = qb.select().from(observations).where(whereClause).orderBy(orderExpr).$dynamic();
+    if (typeof limit === 'number') query = query.limit(limit);
+    if (typeof offset === 'number') query = query.offset(offset);
+    return query.toSQL();
+}
+
+test('observations: a patientId-scoped list excludes soft-deleted rows by default', () => {
+    const built = buildObservationsQuery('patientId=pat-A');
+    assert.ok(!('error' in built));
+    // patient scoping is still a bound parameter, never string-concatenated.
+    assert.ok(built.params.includes('pat-A'), 'patientId must be a bound parameter');
+    assert.match(built.sql, /"patient_id"\s*=\s*\?/);
+    // the tombstone guard is the fix: soft-deleted observations must not surface.
+    assert.match(built.sql, /"deleted_at"\s+is\s+null/i);
+});
+
+test('observations: unscoped list still filters out soft-deleted rows', () => {
+    const built = buildObservationsQuery('');
+    assert.ok(!('error' in built));
+    assert.match(built.sql, /"deleted_at"\s+is null/i);
+    assert.equal(built.params.length, 0);
+});
+
+test('observations: includeDeleted=true drops the tombstone guard', () => {
+    const built = buildObservationsQuery('patientId=pat-A&includeDeleted=true');
+    assert.ok(!('error' in built));
+    assert.ok(built.params.includes('pat-A'));
+    // With the explicit opt-out the deleted_at guard is absent.
+    assert.ok(!/"deleted_at"\s+is\s+null/i.test(built.sql), 'includeDeleted must not add the deleted_at guard');
 });
 
 // Attachments metadata-only projection (mirrors app/api/attachments/route.ts).

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 /* @Codex */
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
     /* STREAM B */
     const parsed = parseListParams(searchParams, {
@@ -36,7 +37,10 @@ export async function GET(request: Request) {
     const { limit, offset, orderBy, orderDir } = parsed.params;
 
     try {
-        const whereClause = patientId ? eq(observations.patientId, patientId) : undefined;
+        const filters: SQL[] = [];
+        if (patientId) filters.push(eq(observations.patientId, patientId));
+        if (!includeDeleted) filters.push(isNull(observations.deletedAt));
+        const whereClause = filters.length > 0 ? and(...filters) : undefined;
 
         const sortColumn = OBSERVATION_SORT_COLUMNS[(orderBy ?? 'observedAt') as keyof typeof OBSERVATION_SORT_COLUMNS];
         const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
