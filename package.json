@@ -60,6 +60,7 @@
     "test:document-class-router": "node scripts/run-strip-types.mjs --test lib/document-class-router.test.ts",
     "test:document-router-benchmark": "node scripts/run-strip-types.mjs --test scripts/benchmark-document-router.test.ts",
     "test:observation-range": "node scripts/run-strip-types.mjs --test lib/observation-range.test.ts",
+    "test:list-query-data-plane": "node scripts/run-strip-types.mjs --test lib/list-query-params.test.ts lib/live-query-scoped-invalidation.test.ts lib/list-query-server-isolation.test.ts",
     "test:patient-followup-projection": "node scripts/run-strip-types.mjs --test lib/patient-followup-projection.test.ts",
     "test:latest-request-guard": "bash scripts/latest-request-guard-test.sh",
     "test:document-identity-resolution": "bash scripts/document-identity-resolution-test.sh",
