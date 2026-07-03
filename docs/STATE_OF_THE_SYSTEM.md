@@ -17,7 +17,7 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-07-03 (`v0.7.1` release candidate)
+Ultimo aggiornamento: 2026-07-03 (`v0.7.1` mainline)
 
 ---
 
@@ -26,9 +26,9 @@ Ultimo aggiornamento: 2026-07-03 (`v0.7.1` release candidate)
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.
 Lo stato corrente non va letto come una semplice web app con AI aggiunta: e un
 sistema locale ibrido in cui il Mac resta il nodo autorevole, il database e
-SQLite cifrato, la web app e la superficie primaria, la family Apple/native
-cresce sopra contratti locali versionati e ogni integrazione esterna resta
-dentro boundary documentati.
+SQLite locale con campi clinici sensibili cifrati lato client, la web app e la
+superficie primaria, la family Apple/native cresce sopra contratti locali
+versionati e ogni integrazione esterna resta dentro boundary documentati.
 
 La fotografia corrente e questa:
 
@@ -37,9 +37,12 @@ La fotografia corrente e questa:
   selector o preview profiles persistiti. Kree8 resta ispirazione visuale
   esterna e grammatica di riferimento, non un prodotto MediFlow a se.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
-  server via Drizzle e cifratura client-side dei campi clinici.
-- **Sicurezza di default**: local-only, zero-knowledge a riposo, nessun cloud o
-  telemetry default-on.
+  server via Drizzle e cifratura client-side dei campi clinici sensibili.
+- **Sicurezza di default**: local-only, campi clinici sensibili cifrati lato
+  client, nessun cloud o telemetry default-on. Il claim pubblico non deve
+  descrivere l'intero file SQLite come completamente zero-knowledge finché
+  identificativi, metadati e backup non sono coperti dallo stesso perimetro
+  verificato.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`

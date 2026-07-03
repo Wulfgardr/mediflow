@@ -20,7 +20,7 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 ## 🔒 Principi di sicurezza fondamentali
 
 - **Local-first di default**: nessuna uscita cloud se non esplicitamente implementata e documentata.
-- **Zero-knowledge a riposo**: il database deve restare illeggibile senza il PIN utente.
+- **Cifratura a riposo prudente**: i campi clinici sensibili devono restare cifrati lato client; non presentare l'intero file SQLite come completamente zero-knowledge finché identificativi, metadati e backup non sono coperti dallo stesso perimetro documentato.
 - **Least privilege**: le API locali devono essere autenticate; il proxy deve essere allowlisted.
 - **No PHI/PII in repo**: mai committare dati reali di pazienti.
 
@@ -50,6 +50,8 @@ Non copriamo ancora:
 
 - Lo storage autorevole è un singolo file SQLite nella directory dati MediFlow.
 - I campi sensibili vengono cifrati **lato client** prima della scrittura.
+- Il claim pubblico corretto è "campi clinici sensibili cifrati lato client",
+  non "intero database illeggibile senza PIN", salvo ADR e verifica dedicata.
 - I valori cifrati usano il formato:
 
 ```

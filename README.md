@@ -7,7 +7,7 @@
 Dati sul tuo Mac, flusso rapido in visita, AI locale sempre rivedibile.
 Il cloud non è un requisito: entra solo se scelto e documentato.
 
-`v0.7.1` · Web app locale · App Apple/native · Core tri-OS · SQLite cifrato · MIT
+Web app locale · Mac home-base · Client Apple paired · SQLite con campi clinici cifrati · MIT
 
 Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto.
 
@@ -31,16 +31,15 @@ documento, terapia, dubbio, revisione, continuità.
 
 ## ✅ Dove siamo adesso
 
-`v0.7.1` racconta MediFlow per quello che sta diventando: non solo una web app
-clinica con AI, ma un sistema locale ibrido. Il Mac resta il nodo autorevole,
-la web app resta la superficie più completa, il contratto `/api/v1` tiene aperta
-la strada ai client paired e la document intelligence cresce come evidenza
-rivedibile, non come automatismo opaco.
+MediFlow oggi non è solo una web app clinica con AI: è un sistema locale ibrido.
+Il Mac resta il nodo autorevole, la web app resta la superficie più completa, il
+contratto `/api/v1` tiene aperta la strada ai client paired e la document
+intelligence cresce come evidenza rivedibile, non come automatismo opaco.
 
-Nel mainline `0.7.1`, ci sono queste cose:
+Sul mainline attuale ci sono queste cose:
 
-- **web app locale come superficie primaria** su Mac, con SQLite cifrato e flusso quotidiano più leggibile;
-- **Kree8 cockpit come root web live**: la home locale apre la nuova grammatica visuale, senza selector o preview profiles persistiti; la passata 2026-06 porta copy più asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
+- **web app locale come superficie primaria** su Mac, con SQLite locale, campi clinici sensibili cifrati lato client e flusso quotidiano più leggibile;
+- **Kree8 cockpit come root web live**: la home locale apre la nuova grammatica visuale, senza selector o preview profiles persistiti; il lavoro 2026-06 porta copy più asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
 - **contratto locale `/api/v1`** più esplicito, stabile e riusabile per client nativi e superfici locali;
 - **modalità `network home-base` paired**: pairing esplicito, capability discovery, lettura pazienti e write versionati per profilo/status, diario clinico, terapie, checkup e osservazioni;
 - **app Apple/native in Fase 0 avanzata**: il bundle macOS usa la shell Apple/home-base, il core Swift condiviso concentra logica clinica, cifratura, contratti e SQLite locale, e i target iPhone/iPad restano client paired senza accesso diretto al database;
@@ -59,7 +58,7 @@ ricostruire il quadro da dieci file separati.
 ## ⚠️ Confini dichiarati, senza ambiguità
 
 - **Local-first di default**: nessuna dipendenza cloud obbligatoria.
-- **Zero-knowledge a riposo**: senza PIN il dato non è leggibile.
+- **Cifratura a riposo prudente**: i campi clinici sensibili sono cifrati lato client; il PIN sblocca la sessione locale, mentre dispositivo, backup e metadati restano parte del perimetro da proteggere.
 - **Apple clients**: la web app resta la superficie più solida sul Mac; il bundle macOS home-base è la nuova base runtime packaged; iPadOS e iOS rientrano nella stessa direzione `home-base + paired client`, non in un database remoto esposto.
 - **Windows e Linux**: esiste una base di portabilita del core e della CI, non una promessa di parity applicativa completa.
 - **SISS/FSE**: oggi MediFlow prepara il contesto e richiama percorsi ufficiali. Non dichiara integrazione nativa regionale certificata, sincronizzazione FSE, writeback o invio prescrittivo da MediFlow.
