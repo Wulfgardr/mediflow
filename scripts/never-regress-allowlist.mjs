@@ -76,6 +76,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: "username:\\s*'paired-user'",
             reason: 'Network operating mode tests use a synthetic paired operator fixture to render the session-bound UI state without real credentials.',
         },
+        {
+            path: 'lib/settings-write-policy.test.ts',
+            pattern: "username:\\s*'policy-user'",
+            reason: 'Settings write-policy tests build a synthetic ServerSession fixture to exercise the per-channel write allowlist matrix without real credentials.',
+        },
     ],
     externalUrls: [
         {
@@ -122,6 +127,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
             pattern: 'https://home-base\\.test',
             reason: 'Home-base paired-store tests use a synthetic .test server URL to verify trimmed persistence without contacting a live endpoint.',
+        },
+        {
+            path: 'lib/request-transport.test.ts',
+            pattern: 'http://mediflow-home\\.local:3000/api/auth/login',
+            reason: 'Request-transport tests use a synthetic LAN .local Host fixture to verify the TLS-proxy marker still asserts secure cookies on a non-loopback paired host; no runtime egress occurs.',
         },
         {
             path: 'native/MediFlowMac/Package.swift',
