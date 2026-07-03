@@ -140,6 +140,15 @@ export function changePinRequest(payload: PinChangeRequestPayload) {
 }
 
 /* @Codex */
+export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; salt: string }) {
+    return requestJson<{ success?: boolean; error?: string; code?: string }>('/api/auth/rewrap-master-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+}
+
+/* @Codex */
 export function repairLegacyDbRequest() {
     return requestJson<RepairDbPayload>('/api/system/repair-db', { method: 'POST' });
 }

@@ -136,6 +136,7 @@
     "test:redaction:resilience": "node scripts/run-strip-types.mjs scripts/benchmark-redaction-resilience.ts",
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
+    "test:kdf-versioning": "node scripts/run-strip-types.mjs --test lib/kdf-versioning.test.ts",
     "test:settings-navigation": "bash scripts/settings-navigation-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
     "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",
