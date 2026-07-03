@@ -30,6 +30,7 @@
 /tmp-manual-browser
 /tmp-network-home-base-readonly
 /tmp-api-v1-put-negative-routes
+/tmp-*
 /tmp/
 
 # next.js
