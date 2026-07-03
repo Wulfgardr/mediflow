@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.12.0
-  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.13.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
@@ -419,6 +419,35 @@ paths:
                     error: Conflict
                     code: PAIRING_INTENT_EXPIRED
                     message: Pairing intent has expired and must be requested again.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/ambulatories:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkAmbulatories
+      summary: List ambulatory scope options through the paired home-base data plane
+      description: |
+        Returns the ambulatory summaries the paired app uses to drive its scope
+        picker. Rides on the read-only patient capability and requires both a
+        valid paired client credential and an operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Ambulatory scope options available to the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AmbulatorySummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients:
@@ -2391,6 +2420,38 @@ components:
           $ref: '#/components/schemas/NetworkPairedClientSummary'
         authHeaders:
           $ref: '#/components/schemas/NetworkPairedClientAuthHeaders'
+    AmbulatorySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - address
+        - type
+        - isDefault
+        - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type:
+            - string
+            - 'null'
+        type:
+          type:
+            - string
+            - 'null'
+        isDefault:
+          type:
+            - boolean
+            - 'null'
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
     PatientSummary:
       type: object
       additionalProperties: false

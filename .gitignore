@@ -18,6 +18,8 @@
 /tmp-e2e-data
 /tmp-concurrency-data
 /tmp-native-derived-data
+/tmp-ios-sim-dd
+/tmp-mac-derived-data
 /tmp-parity-smoke
 /tmp-audit-test
 /tmp-auth-lockout-test
@@ -81,3 +83,6 @@ logs/
 docs/private/
 /prompt-exports/
 /tmp-locked-field-guard-test
+
+# Test fixture DB is intentionally tracked (read via #filePath by the SQLite store tests)
+!native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db

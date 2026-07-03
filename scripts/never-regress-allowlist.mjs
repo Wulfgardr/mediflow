@@ -17,6 +17,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Native auth tests use a synthetic PIN literal to validate typed error mapping without hitting a live backend.',
         },
         {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/CryptoServiceTests.swift',
+            pattern: 'pin:\\s*"1234"',
+            reason: 'Crypto compatibility tests use a synthetic PIN fixture to verify PBKDF2 parity with the web implementation.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/CryptoServiceTests.swift',
+            pattern: 'pin:\\s*"9999"',
+            reason: 'Crypto compatibility tests use a synthetic PIN fixture to verify local master-key wrap and unwrap behavior.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBasePairedStore.swift',
             pattern: 'username\\s*=\\s*"mediflow\\.homeBase\\.username"',
             reason: 'The paired home-base store persists the operator name under a scoped UserDefaults key; this is an internal setting identifier, not a runtime credential.',
@@ -102,6 +112,26 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
             pattern: 'https://home-base\\.test',
             reason: 'Home-base paired-store tests use a synthetic .test server URL to verify trimmed persistence without contacting a live endpoint.',
+        },
+        {
+            path: 'native/MediFlowMac/Package.swift',
+            pattern: 'https://github\\.com/apple/swift-crypto\\.git',
+            reason: 'SwiftPM resolves the pinned swift-crypto package during explicit build setup; this is dependency resolution, not runtime patient-data egress.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift',
+            pattern: 'http://loinc\\.org',
+            reason: 'LOINC appears as a terminology system identifier in UI test seed data and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift',
+            pattern: 'http://unitsofmeasure\\.org',
+            reason: 'UCUM appears as a terminology system identifier in UI test seed data and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/ObservationTrendTests.swift',
+            pattern: 'http://unitsofmeasure\\.org',
+            reason: 'UCUM appears as a terminology system identifier in synthetic observation trend tests and does not initiate network access.',
         },
         {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',

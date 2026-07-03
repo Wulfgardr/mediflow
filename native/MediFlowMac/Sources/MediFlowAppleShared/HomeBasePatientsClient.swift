@@ -3,483 +3,6 @@
 import CryptoKit
 import Foundation
 
-public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
-    public var serverURLString: String
-    public var tlsPin: String
-
-    public init(serverURLString: String = "https://localhost:3443", tlsPin: String = "") {
-        self.serverURLString = serverURLString
-        self.tlsPin = tlsPin
-    }
-
-    func serverURL() throws -> URL {
-        var candidate = serverURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !candidate.isEmpty else { throw HomeBaseClientError.invalidServerURL }
-        if candidate.hasSuffix("/api/v1/") {
-            candidate.removeLast("/api/v1/".count)
-        } else if candidate.hasSuffix("/api/v1") {
-            candidate.removeLast("/api/v1".count)
-        }
-        if candidate.hasSuffix("/") {
-            candidate.removeLast()
-        }
-        guard let url = URL(string: candidate), url.host != nil else {
-            throw HomeBaseClientError.invalidServerURL
-        }
-        guard url.scheme?.lowercased() == "https" else {
-            throw HomeBaseClientError.insecureTransport
-        }
-        return url
-    }
-
-    func apiBaseURL() throws -> URL {
-        try serverURL()
-            .appendingPathComponent("api")
-            .appendingPathComponent("v1")
-    }
-
-    var normalizedTLSPin: String {
-        tlsPin
-            .lowercased()
-            .replacingOccurrences(of: ":", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
-
-public struct HomeBasePairedCredentials: Hashable, Sendable {
-    public let clientId: String
-    public let clientToken: String
-
-    public init(clientId: String, clientToken: String) {
-        self.clientId = clientId
-        self.clientToken = clientToken
-    }
-}
-
-public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let firstName: String
-    public let lastName: String
-    public let birthDate: Date?
-    public let taxCode: String
-    public let isAdi: Bool?
-    public let isArchived: Bool?
-    public let version: Int
-    public let updatedAt: Date?
-}
-
-public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let firstName: String
-    public let lastName: String
-    public let birthDate: Date?
-    public let taxCode: String
-    public let address: String?
-    public let phone: String?
-    public let caregiver: String?
-    public let exemptions: String?
-    public let diagnoses: String?
-    public let monitoringProfile: String?
-    public let statusReason: String?
-    public let notes: String?
-    public let aiSummary: String?
-    public let documentInsights: String?
-    public let isAdi: Bool?
-    public let isArchived: Bool?
-    public let version: Int
-    public let ambulatoryId: String?
-    public let createdAt: Date?
-    public let updatedAt: Date?
-}
-
-/* @Codex */
-public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let patientId: String
-    public let type: String
-    public let title: String
-    public let date: Date
-    public let content: String
-    public let setting: String?
-    public let metadata: String?
-    public let attachments: String?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-    public let version: Int
-    public let createdAt: Date?
-    public let updatedAt: Date?
-}
-
-/* @Codex */
-public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let patientId: String
-    public let drugName: String
-    public let aic: String?
-    public let atc: String?
-    public let activePrinciple: String?
-    public let dosage: String
-    public let motivation: String?
-    public let diagnosisCode: String?
-    public let diagnosisName: String?
-    public let status: String
-    public let startDate: Date
-    public let endDate: Date?
-    public let version: Int
-    public let createdAt: Date?
-    public let updatedAt: Date?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-}
-
-/* @Codex */
-public struct HomeBaseCheckupSummary: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let patientId: String
-    public let date: Date
-    public let title: String
-    public let notes: String?
-    public let status: String
-    public let source: String?
-    public let version: Int
-    public let createdAt: Date?
-    public let updatedAt: Date?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-}
-
-/* @Codex */
-public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Sendable {
-    public let id: String
-    public let patientId: String
-    public let codeSystem: String
-    public let code: String
-    public let display: String
-    public let unitSystem: String
-    public let unitCode: String
-    public let value: String
-    public let notes: String?
-    public let observedAt: Date
-    public let source: String?
-    public let version: Int
-    public let createdAt: Date?
-    public let updatedAt: Date?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-}
-
-/* @Codex */
-public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
-    public let id: String
-    public let type: String
-    public let title: String?
-    public let date: Date
-    public let content: String
-
-    public init(id: String, type: String, title: String? = nil, date: Date, content: String) {
-        self.id = id
-        self.type = type
-        self.title = title
-        self.date = date
-        self.content = content
-    }
-}
-
-/* @Codex */
-public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
-    public let version: Int
-    public let type: String?
-    public let title: String?
-    public let content: String?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-
-    public init(
-        version: Int,
-        type: String? = nil,
-        title: String? = nil,
-        content: String? = nil,
-        deletedAt: Date? = nil,
-        deletionReason: String? = nil
-    ) {
-        self.version = version
-        self.type = type
-        self.title = title
-        self.content = content
-        self.deletedAt = deletedAt
-        self.deletionReason = deletionReason
-    }
-}
-
-/* @Codex */
-public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
-    public let drugName: String
-    public let activePrinciple: String?
-    public let dosage: String
-    public let status: String
-    public let startDate: Date
-    public let endDate: Date?
-    public let motivation: String?
-
-    public init(
-        drugName: String,
-        activePrinciple: String? = nil,
-        dosage: String,
-        status: String,
-        startDate: Date,
-        endDate: Date? = nil,
-        motivation: String? = nil
-    ) {
-        self.drugName = drugName
-        self.activePrinciple = activePrinciple
-        self.dosage = dosage
-        self.status = status
-        self.startDate = startDate
-        self.endDate = endDate
-        self.motivation = motivation
-    }
-}
-
-/* @Codex */
-public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
-    public let version: Int
-    public let drugName: String?
-    public let activePrinciple: String?
-    public let dosage: String?
-    public let status: String?
-    public let startDate: Date?
-    public let endDate: Date?
-    public let motivation: String?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-    private let shouldEncodeEndDate: Bool
-
-    public init(
-        version: Int,
-        drugName: String? = nil,
-        activePrinciple: String? = nil,
-        dosage: String? = nil,
-        status: String? = nil,
-        startDate: Date? = nil,
-        endDate: Date? = nil,
-        shouldEncodeEndDate: Bool = false,
-        motivation: String? = nil,
-        deletedAt: Date? = nil,
-        deletionReason: String? = nil
-    ) {
-        self.version = version
-        self.drugName = drugName
-        self.activePrinciple = activePrinciple
-        self.dosage = dosage
-        self.status = status
-        self.startDate = startDate
-        self.endDate = endDate
-        self.shouldEncodeEndDate = shouldEncodeEndDate
-        self.motivation = motivation
-        self.deletedAt = deletedAt
-        self.deletionReason = deletionReason
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case version
-        case drugName
-        case activePrinciple
-        case dosage
-        case status
-        case startDate
-        case endDate
-        case motivation
-        case deletedAt
-        case deletionReason
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(version, forKey: .version)
-        try container.encodeIfPresent(drugName, forKey: .drugName)
-        try container.encodeIfPresent(activePrinciple, forKey: .activePrinciple)
-        try container.encodeIfPresent(dosage, forKey: .dosage)
-        try container.encodeIfPresent(status, forKey: .status)
-        try container.encodeIfPresent(startDate, forKey: .startDate)
-        if shouldEncodeEndDate {
-            if let endDate {
-                try container.encode(endDate, forKey: .endDate)
-            } else {
-                try container.encodeNil(forKey: .endDate)
-            }
-        }
-        try container.encodeIfPresent(motivation, forKey: .motivation)
-        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
-        try container.encodeIfPresent(deletionReason, forKey: .deletionReason)
-    }
-}
-
-/* @Codex */
-public struct HomeBaseCheckupCreatePayload: Encodable, Sendable {
-    public let date: Date
-    public let title: String
-    public let status: String
-    public let notes: String?
-    public let source: String
-
-    public init(date: Date, title: String, status: String, notes: String? = nil, source: String = "manual") {
-        self.date = date
-        self.title = title
-        self.status = status
-        self.notes = notes
-        self.source = source
-    }
-}
-
-/* @Codex */
-public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
-    public let version: Int
-    public let date: Date?
-    public let title: String?
-    public let status: String?
-    public let notes: String?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-
-    public init(
-        version: Int,
-        date: Date? = nil,
-        title: String? = nil,
-        status: String? = nil,
-        notes: String? = nil,
-        deletedAt: Date? = nil,
-        deletionReason: String? = nil
-    ) {
-        self.version = version
-        self.date = date
-        self.title = title
-        self.status = status
-        self.notes = notes
-        self.deletedAt = deletedAt
-        self.deletionReason = deletionReason
-    }
-}
-
-/* @Codex */
-public struct HomeBaseObservationCreatePayload: Encodable, Sendable {
-    public let codeSystem: String
-    public let code: String
-    public let display: String
-    public let unitSystem: String
-    public let unitCode: String
-    public let value: String
-    public let observedAt: Date
-    public let notes: String?
-    public let source: String
-
-    public init(
-        codeSystem: String = "LOINC",
-        code: String,
-        display: String,
-        unitSystem: String = "UCUM",
-        unitCode: String,
-        value: String,
-        observedAt: Date,
-        notes: String? = nil,
-        source: String = "manual"
-    ) {
-        self.codeSystem = codeSystem
-        self.code = code
-        self.display = display
-        self.unitSystem = unitSystem
-        self.unitCode = unitCode
-        self.value = value
-        self.observedAt = observedAt
-        self.notes = notes
-        self.source = source
-    }
-}
-
-/* @Codex */
-public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
-    public let version: Int
-    public let code: String?
-    public let display: String?
-    public let unitCode: String?
-    public let value: String?
-    public let observedAt: Date?
-    public let notes: String?
-    public let deletedAt: Date?
-    public let deletionReason: String?
-
-    public init(
-        version: Int,
-        code: String? = nil,
-        display: String? = nil,
-        unitCode: String? = nil,
-        value: String? = nil,
-        observedAt: Date? = nil,
-        notes: String? = nil,
-        deletedAt: Date? = nil,
-        deletionReason: String? = nil
-    ) {
-        self.version = version
-        self.code = code
-        self.display = display
-        self.unitCode = unitCode
-        self.value = value
-        self.observedAt = observedAt
-        self.notes = notes
-        self.deletedAt = deletedAt
-        self.deletionReason = deletionReason
-    }
-}
-
-/* @Codex */
-public struct HomeBaseMutationAcknowledgement: Decodable, Equatable, Sendable {
-    public let success: Bool
-}
-
-public enum HomeBaseClientError: LocalizedError, Equatable {
-    case invalidServerURL
-    case insecureTransport
-    case missingSessionCookie
-    case transport(HomeBaseTransportIssue)
-    case httpStatus(Int, String?)
-    case contract
-
-    public var errorDescription: String? {
-        switch self {
-        case .invalidServerURL:
-            return "URL home-base non valida."
-        case .insecureTransport:
-            return "Trasporto non sicuro: HTTPS richiesto."
-        case .missingSessionCookie:
-            return "La login non ha restituito una sessione operatore valida."
-        case .transport(let issue):
-            return issue.localizedDescription
-        case .httpStatus(_, let message):
-            return message ?? "La richiesta verso l'home-base non e andata a buon fine."
-        case .contract:
-            return "La risposta dell'home-base non rispetta il contratto atteso."
-        }
-    }
-}
-
-public enum HomeBaseTransportIssue: Equatable {
-    case tlsHandshakeFailed
-    case unreachable
-    case timeout
-    case other(Int)
-
-    var localizedDescription: String {
-        switch self {
-        case .tlsHandshakeFailed:
-            return "Handshake TLS fallito. Verifica fingerprint o certificato."
-        case .unreachable:
-            return "Home-base non raggiungibile."
-        case .timeout:
-            return "Timeout verso l'home-base."
-        case .other:
-            return "Errore di trasporto verso l'home-base."
-        }
-    }
-}
 
 public actor HomeBasePatientsClient {
     private let configuration: HomeBaseConnectionConfiguration
@@ -499,14 +22,22 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
-    public func login(username: String?, password: String) async throws -> String {
+    public func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
         let url = try configuration.serverURL()
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
             .appendingPathComponent("login")
         let body = try JSONEncoder().encode(AuthLoginRequest(username: username, password: password))
-        let (_, response) = try await send(to: url, method: "POST", body: body)
-        return try Self.extractSessionCookie(from: response, url: url)
+        let (data, response) = try await send(to: url, method: "POST", body: body)
+        let sessionCookie = try Self.extractSessionCookie(from: response, url: url)
+        // The login body carries the wrapped master key + PBKDF2 salt (same as the
+        // web client). We keep them so the PIN can unwrap the field-crypto key.
+        let payload = try? JSONDecoder().decode(AuthLoginResponse.self, from: data)
+        return HomeBaseLoginResult(
+            sessionCookie: sessionCookie,
+            encryptedMasterKey: payload?.encryptedMasterKey,
+            salt: payload?.salt
+        )
     }
 
     public func fetchPatients(
@@ -526,6 +57,27 @@ public actor HomeBasePatientsClient {
             ]
         )
         return try decode([HomeBasePatientSummary].self, from: data)
+    }
+
+    // A18: fetch the ambulatory scope options for the picker. Rides on the same
+    // read capability + auth headers as the patient list.
+    public func fetchNetworkAmbulatories(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [NetworkAmbulatorySummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+        let (data, _) = try await send(
+            to: url,
+            headers: [
+                "x-mediflow-paired-client-id": credentials.clientId,
+                "x-mediflow-paired-client-token": credentials.clientToken,
+                "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            ]
+        )
+        return try decode([NetworkAmbulatorySummary].self, from: data)
     }
 
     public func fetchPatient(
@@ -593,6 +145,26 @@ public actor HomeBasePatientsClient {
     }
 
     /* @Codex */
+    public func updatePatient(
+        patientId: String,
+        payload: HomeBasePatientUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
     public func updateEntry(
         patientId: String,
         entryId: String,
@@ -858,6 +430,13 @@ public actor HomeBasePatientsClient {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
+                // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
+                // it as a typed error so the UI can show expected-vs-current version.
+                if httpResponse.statusCode == 409,
+                   let conflict = try? JSONDecoder().decode(VersionConflictPayload.self, from: data),
+                   conflict.code == "VERSION_CONFLICT" {
+                    throw HomeBaseClientError.versionConflict(conflict)
+                }
                 throw HomeBaseClientError.httpStatus(httpResponse.statusCode, Self.errorMessage(from: data))
             }
             return (data, httpResponse)
@@ -956,6 +535,25 @@ private final class HomeBaseTLSSessionDelegate: NSObject, URLSessionDelegate {
 private struct AuthLoginRequest: Encodable {
     let username: String?
     let password: String
+}
+
+// The /api/auth/login body carries the operator's wrapped master key + PBKDF2
+// salt (base64), exactly as the web client consumes them.
+private struct AuthLoginResponse: Decodable {
+    let encryptedMasterKey: String?
+    let salt: String?
+}
+
+public struct HomeBaseLoginResult: Sendable {
+    public let sessionCookie: String
+    public let encryptedMasterKey: String?
+    public let salt: String?
+
+    public init(sessionCookie: String, encryptedMasterKey: String?, salt: String?) {
+        self.sessionCookie = sessionCookie
+        self.encryptedMasterKey = encryptedMasterKey
+        self.salt = salt
+    }
 }
 
 private struct APIErrorPayload: Decodable {

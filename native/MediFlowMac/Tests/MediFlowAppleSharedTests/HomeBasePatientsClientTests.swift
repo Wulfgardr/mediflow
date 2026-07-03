@@ -31,12 +31,14 @@ final class HomeBasePatientsClientTests: XCTestCase {
                     "Set-Cookie": "mediflow_session=session-123; Path=/; HttpOnly; SameSite=Lax",
                 ]
             )!
-            return (response, Data(#"{"success":true}"#.utf8))
+            return (response, Data(#"{"success":true,"encryptedMasterKey":"d3JhcHBlZE1L","salt":"c2FsdA=="}"#.utf8))
         }
 
-        let cookie = try await client.login(username: "doctor", password: "1992")
+        let result = try await client.login(username: "doctor", password: "1992")
 
-        XCTAssertEqual(cookie, "mediflow_session=session-123")
+        XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
+        XCTAssertEqual(result.encryptedMasterKey, "d3JhcHBlZE1L", "login must surface the wrapped master key")
+        XCTAssertEqual(result.salt, "c2FsdA==", "login must surface the PBKDF2 salt for the field crypto")
     }
 
     func testFetchPatientsUsesPairedHeadersAndAmbulatoryCookie() async throws {
@@ -351,7 +353,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -602,7 +609,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -787,7 +799,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -944,7 +961,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             )
             XCTFail("Expected version conflict")
         } catch let error as HomeBaseClientError {
-            XCTAssertEqual(error, .httpStatus(409, "Conflict"))
+            guard case .versionConflict(let conflict) = error else {
+                return XCTFail("Expected versionConflict, got \(error)")
+            }
+            XCTAssertEqual(conflict.code, "VERSION_CONFLICT")
+            XCTAssertFalse(conflict.entity.isEmpty)
+            XCTAssertNotNil(conflict.currentSnapshot)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -986,6 +1008,142 @@ final class HomeBasePatientsClientTests: XCTestCase {
         )
 
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
+    }
+
+    func testVersionConflictExposesStructuredFieldsAndMessage() async throws {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = """
+            {
+              "error": "Conflict", "code": "VERSION_CONFLICT", "entity": "entry",
+              "recordId": "entry-1", "expectedVersion": 4, "currentVersion": 5,
+              "currentUpdatedAt": "2026-05-02T12:10:00.000Z", "currentState": "present",
+              "currentSnapshot": { "id": "entry-1", "patientId": "patient-1", "version": 5,
+                "updatedAt": "2026-05-02T12:10:00.000Z", "deletedAt": null }
+            }
+            """.data(using: .utf8)!
+            return (response, data)
+        }
+
+        do {
+            _ = try await client.updateEntry(
+                patientId: "patient-1", entryId: "entry-1",
+                payload: HomeBaseEntryUpdatePayload(version: 4, content: "Stale"),
+                credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+                sessionCookie: "mediflow_session=session-123", ambulatoryId: nil
+            )
+            XCTFail("Expected version conflict")
+        } catch HomeBaseClientError.versionConflict(let conflict) {
+            XCTAssertEqual(conflict.entity, "entry")
+            XCTAssertEqual(conflict.recordId, "entry-1")
+            XCTAssertEqual(conflict.expectedVersion, 4)
+            XCTAssertEqual(conflict.currentVersion, 5)
+            XCTAssertEqual(conflict.currentState, "present")
+            XCTAssertEqual(conflict.currentSnapshot?.version, 5)
+            XCTAssertEqual(conflict.currentSnapshot?.patientId, "patient-1")
+            // The user-facing message names the expected version.
+            XCTAssertTrue(HomeBaseClientError.versionConflict(conflict).localizedDescription.contains("4"))
+        }
+    }
+
+    func testGeneric409WithoutVersionConflictFallsBackToHttpStatus() async throws {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = #"{"error":"Locked","message":"Risorsa bloccata da un altro processo"}"#.data(using: .utf8)!
+            return (response, data)
+        }
+
+        do {
+            _ = try await client.updateEntry(
+                patientId: "patient-1", entryId: "entry-1",
+                payload: HomeBaseEntryUpdatePayload(version: 1, content: "x"),
+                credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+                sessionCookie: "mediflow_session=session-123", ambulatoryId: nil
+            )
+            XCTFail("Expected error")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .httpStatus(409, "Risorsa bloccata da un altro processo"))
+        }
+    }
+
+    func testUpdatePatientPutsNetworkPatientPayloadWithPatchSemantics() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/patients/patient-1"
+            )
+            let body = try self.readRequestBody(from: request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["version"] as? Int, 5)
+            XCTAssertEqual(payload["firstName"] as? String, "Mario")
+            XCTAssertNil(payload["lastName"], "an omit-only optional left nil must be absent")
+            XCTAssertEqual(payload["phone"] as? String, "06 1234")
+            XCTAssertTrue(payload.keys.contains("address"), "PatchValue .null must emit an explicit null")
+            XCTAssertTrue(payload["address"] is NSNull)
+            XCTAssertNil(payload["caregiver"], "PatchValue .omit must be absent")
+            XCTAssertEqual(payload["isArchived"] as? Bool, true, "a set isArchived flag must be sent")
+            XCTAssertNil(payload["isAdi"], "an unset bool flag must be absent (encodeIfPresent)")
+            XCTAssertEqual(
+                payload["diagnoses"] as? String,
+                "[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]",
+                "diagnoses must be sent verbatim as the JSON-array string"
+            )
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let ack = try await client.updatePatient(
+            patientId: "patient-1",
+            payload: HomeBasePatientUpdatePayload(
+                version: 5, firstName: "Mario", isArchived: true, address: .null, phone: .value("06 1234"),
+                diagnoses: .value("[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]")
+            ),
+            credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),
+            sessionCookie: "mediflow_session=session-123",
+            ambulatoryId: nil
+        )
+        XCTAssertTrue(ack.success)
+    }
+
+    func testFetchNetworkAmbulatoriesDecodesScopeOptions() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/ambulatories"
+            )
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            let body = """
+            [{"id":"AMB-1","name":"Centrale","address":"Via Roma 1","type":"principale",\
+            "isDefault":true,"createdAt":"2026-06-01T00:00:00.000Z"},\
+            {"id":"AMB-2","name":"Nord","address":null,"type":null,"isDefault":false,"createdAt":null}]
+            """
+            return (response, Data(body.utf8))
+        }
+
+        let result = try await client.fetchNetworkAmbulatories(
+            credentials: HomeBasePairedCredentials(clientId: "c1", clientToken: "t1"),
+            sessionCookie: "mediflow_session=s1",
+            ambulatoryId: nil
+        )
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].id, "AMB-1")
+        XCTAssertEqual(result[0].name, "Centrale")
+        XCTAssertEqual(result[0].isDefault, true)
+        XCTAssertNil(result[1].address, "a null address must decode as nil")
+        XCTAssertNil(result[1].createdAt)
     }
 
     private func makeClient(
