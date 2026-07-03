@@ -6,6 +6,7 @@ import path from 'path';
 import { ensureAuditSqliteSchema } from '@/lib/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
+import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 
 // Ensure the data directory exists in production or use project root for dev
 /* @Codex */
@@ -69,7 +70,10 @@ if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
     }
 }
 
+// WUL-268 (STREAM A): apply durable pragmas (WAL, busy_timeout, synchronous,
+// foreign_keys) right after every open (boot + swap). See lib/sqlite-pragmas.ts.
 let sqlite = new Database(dbPath);
+initSqlitePragmas(sqlite);
 /* @Codex */
 type TableInfoRow = { name: string };
 /* @Codex */
@@ -439,6 +443,27 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] SISS handoff events schema check skipped:', error);
     }
+    // WUL-268 (STREAM A): core tables shipped without secondary indices, so
+    // patient-scoped reads and lookups fell back to full table scans (verified
+    // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so
+    // the indices are created here (idempotent) alongside the drizzle index()
+    // declarations in lib/schema.ts. Composite (patient_id, deleted_at) covers the
+    // soft-delete tombstone read predicate on tables that carry a deleted_at.
+    try {
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS entries_patient_idx ON entries(patient_id)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS entries_patient_deleted_idx ON entries(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS therapies_patient_idx ON therapies(patient_id)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS therapies_patient_deleted_idx ON therapies(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS checkups_patient_idx ON checkups(patient_id)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS checkups_patient_deleted_idx ON checkups(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS observations_patient_deleted_idx ON observations(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS attachments_patient_idx ON attachments(patient_id)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS patients_deleted_idx ON patients(deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS patients_last_name_idx ON patients(last_name)').run();
+    } catch (error) {
+        console.warn('[MediFlow] Core secondary index check skipped:', error);
+    }
     /* @Codex */
     try {
         ensureAuditSqliteSchema(sqlite);
@@ -467,6 +492,7 @@ export async function swapDatabaseFromFile(sourcePath: string, backupPath: strin
         connection: sqlite,
         reopenConnection: () => {
             sqlite = new Database(dbPath);
+            initSqlitePragmas(sqlite);
             applySchemaGuards();
         },
     });
