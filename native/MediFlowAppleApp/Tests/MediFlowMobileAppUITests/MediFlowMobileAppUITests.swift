@@ -390,6 +390,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let scaleButton = app.buttons["new-scale-button"]
         XCTAssertTrue(scrollDown(to: scaleButton), "The scale entry button should be available")
         scaleButton.tap()
+        let adlOption = app.buttons["new-scale-option-adl"]
+        XCTAssertTrue(adlOption.waitForExistence(timeout: 5), "The ADL scale option should be available")
+        adlOption.tap()
 
         // The ADL form rendered: items + the live score (scoring is unit-tested).
         XCTAssertTrue(app.switches["scale-question-bath"].waitForExistence(timeout: 5))

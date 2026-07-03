@@ -44,18 +44,25 @@ struct ClinicalScaleFormView: View {
                 }
                 Section("Voci") {
                     ForEach(definition.questions) { question in
-                        // Menu picker over the question's options so 3/4-way scales
-                        // (Tinetti/MMSE) and inverted-order scales (GDS) score right.
-                        Picker(question.text, selection: Binding(
-                            get: { answers[question.id] ?? question.options.first?.value ?? 0 },
-                            set: { answers[question.id] = $0 }
-                        )) {
-                            ForEach(question.options, id: \.value) { option in
-                                Text(option.label).tag(option.value)
+                        if isAutonomyToggleQuestion(question) {
+                            Toggle(question.text, isOn: Binding(
+                                get: { (answers[question.id] ?? 0) == 1 },
+                                set: { answers[question.id] = $0 ? 1 : 0 }
+                            ))
+                            .accessibilityIdentifier("scale-question-\(question.id)")
+                        } else {
+                            // @Codex: keep multi-option and inverted binary scales on explicit choices.
+                            Picker(question.text, selection: Binding(
+                                get: { answers[question.id] ?? question.options.first?.value ?? 0 },
+                                set: { answers[question.id] = $0 }
+                            )) {
+                                ForEach(question.options, id: \.value) { option in
+                                    Text(option.label).tag(option.value)
+                                }
                             }
+                            .pickerStyle(.menu)
+                            .accessibilityIdentifier("scale-question-\(question.id)")
                         }
-                        .pickerStyle(.menu)
-                        .accessibilityIdentifier("scale-question-\(question.id)")
                     }
                 }
             }
@@ -71,5 +78,11 @@ struct ClinicalScaleFormView: View {
                 }
             }
         }
+    }
+
+    private func isAutonomyToggleQuestion(_ question: ClinicalScaleQuestion) -> Bool {
+        guard question.options.count == 2 else { return false }
+        return question.options[0] == ClinicalScaleOption(label: "Dipendente", value: 0)
+            && question.options[1] == ClinicalScaleOption(label: "Autonomo", value: 1)
     }
 }
