@@ -116,14 +116,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(patients).values(normalized.values);
+        // WUL-268 (STREAM A): the patient row and its ambulatory membership must be
+        // created atomically. better-sqlite3 transactions are synchronous, so no
+        // awaits inside; the async audit write stays outside (separate audit DB).
+        dbServer.transaction((tx) => {
+            tx.insert(patients).values(normalized.values).run();
 
-        /* @Codex */
-        if (normalized.values.ambulatoryId) {
-            await dbServer.insert(patientsToAmbulatories)
-                .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
-                .onConflictDoNothing();
-        }
+            /* @Codex */
+            if (normalized.values.ambulatoryId) {
+                tx.insert(patientsToAmbulatories)
+                    .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
+                    .onConflictDoNothing()
+                    .run();
+            }
+        });
 
         /* @Codex */
         await recordPatientAuditEvent(request, session, 'patient.created', normalized.values.id, {
