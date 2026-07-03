@@ -43,8 +43,25 @@ registerHooks({
                 throw new Error('MEDIFLOW_SCHEMA_DRIFT_ROOT is not set');
             }
             const target = resolveAliasedPath(path.join(ROOT_DIR, specifier.slice(2)));
-            return nextResolve(pathToFileURL(target).href, context);
+            // Short-circuit rather than delegating to nextResolve: db-server.ts
+            // imports "@/lib/audit-db" without a "./" prefix or extension, so the
+            // strip-types loader transpiles it to CommonJS and emits a require().
+            // Handing a "file://.../audit-db.ts" URL back to the default CJS
+            // resolver via nextResolve makes it throw MODULE_NOT_FOUND (it will
+            // not resolve a .ts file URL). Short-circuiting hands the already
+            // resolved .ts URL straight to the strip-types load hook to transpile.
+            return { url: pathToFileURL(target).href, shortCircuit: true };
         }
         return nextResolve(specifier, context);
+    },
+    load(url, context, nextLoad) {
+        // The strip-types loader only special-cases its OWN server-only stub URL.
+        // This hook returns a DIFFERENT stub URL above, so it must also serve the
+        // stub source; otherwise the default loader tries to readFileSync() the
+        // data: URI and fails with ENOENT.
+        if (url === SERVER_ONLY_STUB) {
+            return { format: 'commonjs', shortCircuit: true, source: 'module.exports = {};\n' };
+        }
+        return nextLoad(url, context);
     },
 });

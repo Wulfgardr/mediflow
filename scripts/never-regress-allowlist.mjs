@@ -52,6 +52,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Home-base client tests use a synthetic password literal only inside a mocked local login exchange and never against a live backend.',
         },
         {
+            path: 'lib/api-schemas/api-schemas.test.ts',
+            pattern: "username:\\s*'admin'",
+            reason: 'API-schema tests use a synthetic admin username fixture to exercise the authSetupSchema validation boundary without real credentials.',
+        },
+        {
+            path: 'lib/api-schemas/api-schemas.test.ts',
+            pattern: "password:\\s*'1234'",
+            reason: 'API-schema tests use a synthetic password fixture to exercise the authSetupSchema validation boundary without real credentials.',
+        },
+        {
             path: 'lib/network-identity.test.ts',
             pattern: "username:\\s*'solo-user'",
             reason: 'Network identity tests use a synthetic single-user fixture to validate login-hint derivation without real credentials.',
