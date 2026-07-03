@@ -27,27 +27,32 @@ export async function POST(request: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Transaction-like insertion (SQLite doesn't support strict transactions in HTTP stateless easily without extensive logic, but sequential is fine here)
+        // WUL-268 (STREAM A): the admin user and its seed settings must be created
+        // atomically so a crash can never leave a user without settings (or vice
+        // versa). better-sqlite3 transactions are synchronous, so no awaits inside;
+        // bcrypt.hash already ran above and the values are plain.
         const userId = uuidv4();
-        await dbServer.insert(users).values({
-            id: userId,
-            username,
-            displayName,
-            ambulatoryName,
-            role: 'admin', // First user is always admin
-            passwordHash: hashedPassword,
-            encryptedMasterKey,
-            salt,
-            createdAt: new Date()
-        });
+        dbServer.transaction((tx) => {
+            tx.insert(users).values({
+                id: userId,
+                username,
+                displayName,
+                ambulatoryName,
+                role: 'admin', // First user is always admin
+                passwordHash: hashedPassword,
+                encryptedMasterKey,
+                salt,
+                createdAt: new Date()
+            }).run();
 
-        // Initialize Settings
-        if (displayName) {
-            await dbServer.insert(settings).values({ key: 'doctorName', value: displayName }).onConflictDoUpdate({ target: settings.key, set: { value: displayName } });
-        }
-        if (ambulatoryName) {
-            await dbServer.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } });
-        }
+            // Initialize Settings
+            if (displayName) {
+                tx.insert(settings).values({ key: 'doctorName', value: displayName }).onConflictDoUpdate({ target: settings.key, set: { value: displayName } }).run();
+            }
+            if (ambulatoryName) {
+                tx.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } }).run();
+            }
+        });
 
         /* @Codex */
         const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');

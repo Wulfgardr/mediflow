@@ -18,35 +18,40 @@ export async function POST() {
         // 1. Check if default ambulatory exists
         const existingAmbulatories = await dbServer.select().from(ambulatories).limit(1);
 
-        let defaultAmbulatoryId: string;
+        const mustCreateDefault = existingAmbulatories.length === 0;
+        const defaultAmbulatoryId: string = mustCreateDefault
+            ? uuidv4()
+            : (existingAmbulatories.find(a => a.isDefault) || existingAmbulatories[0]).id;
 
-        if (existingAmbulatories.length === 0) {
-            console.log("No ambulatories found. Creating default...");
-            defaultAmbulatoryId = uuidv4();
-            await dbServer.insert(ambulatories).values({
-                id: defaultAmbulatoryId,
-                name: 'Ambulatorio Principale',
-                address: 'Sede Legale',
-                isDefault: true,
-                createdAt: new Date(),
-            });
-            console.log("Default ambulatory created:", defaultAmbulatoryId);
-        } else {
-            console.log("Ambulatories exist.");
-            // Find the default one or just pick the first
-            const defaultAmb = existingAmbulatories.find(a => a.isDefault) || existingAmbulatories[0];
-            defaultAmbulatoryId = defaultAmb.id;
-        }
-
-        // 2. Migrate orphaned patients
+        // 2. Count orphaned patients (read outside the transaction)
         const orphanedPatients = await dbServer.select().from(patients).where(isNull(patients.ambulatoryId));
 
-        if (orphanedPatients.length > 0) {
-            console.log(`Migrating ${orphanedPatients.length} orphaned patients to ${defaultAmbulatoryId}...`);
-            await dbServer.update(patients)
-                .set({ ambulatoryId: defaultAmbulatoryId })
-                .where(isNull(patients.ambulatoryId));
-        }
+        // WUL-268 (STREAM A): creating the default ambulatory and relinking orphaned
+        // patients to it must be atomic, otherwise a crash could relink patients to
+        // an ambulatory that was never committed. Transaction is synchronous (no awaits).
+        dbServer.transaction((tx) => {
+            if (mustCreateDefault) {
+                console.log("No ambulatories found. Creating default...");
+                tx.insert(ambulatories).values({
+                    id: defaultAmbulatoryId,
+                    name: 'Ambulatorio Principale',
+                    address: 'Sede Legale',
+                    isDefault: true,
+                    createdAt: new Date(),
+                }).run();
+                console.log("Default ambulatory created:", defaultAmbulatoryId);
+            } else {
+                console.log("Ambulatories exist.");
+            }
+
+            if (orphanedPatients.length > 0) {
+                console.log(`Migrating ${orphanedPatients.length} orphaned patients to ${defaultAmbulatoryId}...`);
+                tx.update(patients)
+                    .set({ ambulatoryId: defaultAmbulatoryId })
+                    .where(isNull(patients.ambulatoryId))
+                    .run();
+            }
+        });
 
         return NextResponse.json({
             success: true,

@@ -116,13 +116,19 @@ export async function PUT(
             );
         }
 
-        if (updateData.isDefault === true) {
-            await dbServer.update(ambulatories)
-                .set({ isDefault: false })
-                .where(ne(ambulatories.id, id));
-        }
+        // WUL-268 (STREAM A): promoting to default clears the flag on every other
+        // ambulatory then sets it here; both writes must be atomic so a crash can
+        // never leave zero or two defaults. Transaction is synchronous (no awaits).
+        dbServer.transaction((tx) => {
+            if (updateData.isDefault === true) {
+                tx.update(ambulatories)
+                    .set({ isDefault: false })
+                    .where(ne(ambulatories.id, id))
+                    .run();
+            }
 
-        await dbServer.update(ambulatories).set(updateData).where(eq(ambulatories.id, id));
+            tx.update(ambulatories).set(updateData).where(eq(ambulatories.id, id)).run();
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {
@@ -167,6 +173,7 @@ export async function DELETE(
             );
         }
 
+        let fallbackId: string | null = null;
         if (existing.isDefault) {
             const fallback = await dbServer
                 .select({ id: ambulatories.id })
@@ -177,16 +184,26 @@ export async function DELETE(
             if (!fallback) {
                 return NextResponse.json({ error: 'Cannot delete the last ambulatory' }, { status: 409 });
             }
-
-            await dbServer.update(ambulatories)
-                .set({ isDefault: false })
-                .where(eq(ambulatories.isDefault, true));
-            await dbServer.update(ambulatories)
-                .set({ isDefault: true })
-                .where(eq(ambulatories.id, fallback.id));
+            fallbackId = fallback.id;
         }
 
-        await dbServer.delete(ambulatories).where(eq(ambulatories.id, id));
+        // WUL-268 (STREAM A): reassign the default flag and delete the row atomically
+        // so a crash can never leave the clinic without a default ambulatory.
+        // Transaction is synchronous (no awaits inside).
+        dbServer.transaction((tx) => {
+            if (fallbackId) {
+                tx.update(ambulatories)
+                    .set({ isDefault: false })
+                    .where(eq(ambulatories.isDefault, true))
+                    .run();
+                tx.update(ambulatories)
+                    .set({ isDefault: true })
+                    .where(eq(ambulatories.id, fallbackId))
+                    .run();
+            }
+
+            tx.delete(ambulatories).where(eq(ambulatories.id, id)).run();
+        });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error(`API DELETE /ambulatories/${id} error:`, error);
