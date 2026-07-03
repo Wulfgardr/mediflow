@@ -117,10 +117,6 @@
      fallback rendeva la dichiarazione invalida e il testo poteva ereditare l'ink
      scuro del contenitore. Definirlo bianco chiude il difetto latente. */
   --ui-btn-primary-fg: #ffffff;
-
-  --apple-blue: #334155;
-  --apple-gray: #667085;
-  --system-gray-6: #eef2f7;
 }
 
 :root[data-ui-style='liquid'] {
@@ -216,9 +212,6 @@ body {
   --muted: #a8b1c1;
   --muted-foreground: #a8b1c1;
   --primary: #cbd5e1;
-  --apple-blue: #cbd5e1;
-  --apple-gray: #a8b1c1;
-  --system-gray-6: #202633;
 }
 
 :root.dark[data-ui-style='liquid'] {
@@ -829,7 +822,7 @@ body {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
     background-color: var(--ui-chip-bg);
     border-color: var(--ui-chip-border);
-    color: var(--apple-gray);
+    color: var(--mf-muted);
   }
 
   .apple-list-row {
