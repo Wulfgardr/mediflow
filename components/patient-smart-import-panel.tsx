@@ -301,10 +301,14 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
     const attachments = useLiveQuery(
         async () => {
-            const items = await db.attachments.filter((attachment: { patientId: string }) => attachment.patientId === patient.id).toArray();
+            const items = await db.attachments.query({ patientId: patient.id }).toArray();
+            // summarySnapshot is ENC:-encrypted: this filter must stay client-side,
+            // it runs on the decrypted value after ApiTable.decryptItem().
             return items.filter((attachment) => attachment.summarySnapshot?.trim());
         },
-        [patient.id]
+        [patient.id],
+        undefined,
+        ['attachments'],
     );
     const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
 

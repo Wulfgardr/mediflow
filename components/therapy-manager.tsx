@@ -50,17 +50,20 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
 
     const therapies = useLiveQuery(
         async () => {
-            const items = await db.therapies.filter((therapy: Therapy) => therapy.patientId === patientId).toArray();
+            const items = await db.therapies.query({ patientId }).toArray();
             return items
-                .filter((therapy) => !therapy.deletedAt)
                 .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
         },
-        [patientId]
+        [patientId],
+        undefined,
+        ['therapies'],
     );
 
     const patient = useLiveQuery(
         () => db.patients.get(patientId),
-        [patientId]
+        [patientId],
+        undefined,
+        ['patients'],
     );
 
     const visibleTherapies = therapies || [];
