@@ -11,6 +11,10 @@ import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normali
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
+/* @Codex */
+import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 // Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
 const CHECKUP_SORT_COLUMNS = {
@@ -74,7 +78,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(checkupCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

@@ -11,6 +11,10 @@ import { buildAttachmentPath } from '@/lib/attachment-path';
 import { getAttachmentPayloadByteSize } from '@/lib/attachment-payload';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
+/* @Codex */
+import { attachmentCreateSchema } from '@/lib/api-schemas/attachments';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
 // plaintext metadata and safe to sort on.
@@ -111,7 +115,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
         }
 
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(attachmentCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const newId = body.id || uuidv4();
         /* @Codex */
         if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {

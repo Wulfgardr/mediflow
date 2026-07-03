@@ -11,6 +11,10 @@ import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normali
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
+/* @Codex */
+import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 // motivation is ENC:, so it is not sortable. Only plaintext columns here.
 const THERAPY_SORT_COLUMNS = {
@@ -66,7 +70,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(therapyCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

@@ -9,6 +9,10 @@ import { auditSourceSurfaceFromRequest } from '@/lib/audit';
 import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
 /* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+/* @Codex */
+import { authSetupSchema } from '@/lib/api-schemas/auth';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function POST(request: Request) {
     try {
@@ -18,12 +22,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, { status: 403 });
         }
 
-        const body = await request.json();
-        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = body;
-
-        if (!username || !password || !encryptedMasterKey || !salt) {
-            return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-        }
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(authSetupSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
