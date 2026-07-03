@@ -4,6 +4,11 @@
 This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
+## 2026-07-03 Codex
+- Prepared the `v0.7.1` release framing on top of the Apple/native branch: bumped version metadata, added the `0.7.1` changelog section, refreshed README, FAQ, roadmap, state-of-system and OSS-facing copy around Apple/native Fase 0, `MediFlowCore` tri-OS checks, macOS as the most mature native front, and Windows/Linux as early portability fronts rather than complete app parity.
+- Added public development credits for assisted implementation/review: Codex as primary implementation and verification copilot, Claude Code as secondary review/support lane, with Fable/Oracle contributions kept in private attribution surfaces and not exported as runtime/product material.
+- Kept OSS boundaries explicit by preserving `docs/analysis`, `docs/parliament`, private planning and orchestration material outside the public export while allowing the narrow public credit line in the sanitized README.
+
 ## 2026-06-18 Codex
 - Made the MediFlow Loop Orchestrator live as a local macOS scheduled runner for `WUL-407`: extended `scripts/loop-orchestrator.mjs` with `run-once`, `status`, `install-global-runner`, `uninstall-launch-agent`, manifest-based due checks, local state/digest files, lock protection, deterministic check execution, LaunchAgent plist generation, and tests; documented the live runner in ADR 0069 and the internal agentic operating loop without touching clinical runtime or reading PHI/PII: `scripts/loop-orchestrator.mjs`, `scripts/loop-orchestrator.test.mjs`, `docs/agentic-development-operating-loop.md`, `docs/adr/0069-loop-orchestrator-baseline.md`, `docs/agent-attribution.md`.
 

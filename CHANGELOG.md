@@ -5,6 +5,47 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-07-03
+
+> Nota release: `v0.7.1` consolida il grande ramo Apple/native e lo prepara al
+> mainline: macOS diventa il fronte piu avanzato dell'app nativa, iPhone/iPad
+> restano client paired sul modello `home-base`, e Linux/Windows entrano come
+> gate di portabilita del core condiviso, non come promessa di app complete.
+
+### Aggiunto
+
+- **App Apple/native Fase 0 avanzata**: nuova shell Apple/home-base, design kit
+  Vetro Clinico/Liquid Glass, workspace paziente condiviso, privacy shield,
+  pannello runtime e flussi clinici nativi piu vicini alla web app.
+- **Core Swift condiviso tri-OS**: `MediFlowCore` concentra logica portabile,
+  filtri, contratti, cifratura, conflict handling, clinical scales, SQLite
+  vendorizzato e test dedicati eseguibili su macOS, Linux e Windows.
+- **Store locale native**: prime superfici read/write verso SQLite locale con
+  vettori crypto, store pazienti, store clinico, concorrenza ottimistica e
+  idempotenza dei create clinici.
+- **Contratto ambulatori paired**: `GET /api/v1/network/ambulatories` entra nel
+  contratto OpenAPI e nella documentazione della superficie `/api/v1`.
+
+### Migliorato
+
+- **CI native e tri-OS**: workflow GitHub separati per Apple native e core
+  Linux/macOS/Windows; la gate Windows usa Swift corrente e SDK compatibile.
+- **OSS export piu pulito**: artefatti temporanei, analisi interne e materiali
+  di coordinamento/sviluppo restano fuori dall'export pubblico.
+- **Narrativa pubblica piu aggiornata**: README, FAQ, roadmap e facciata OSS
+  descrivono `0.7.1` senza il vecchio paragone con `0.3`, distinguendo web app,
+  app Apple/native e core tri-OS.
+
+### Confini
+
+- macOS e il fronte nativo piu maturo; Windows e Linux dimostrano oggi
+  portabilita del core e della CI, non parity applicativa completa.
+- La release non introduce sync automatico, multi-master, hard delete remoto,
+  integrazione SISS/FSE certificata, prescrizione regionale nativa o AI cloud
+  di default.
+- La 0.7.1 richiede CI verde su `main` dopo il merge della PR Apple/native
+  prima di tag o pubblicazione.
+
 ## [0.7.0] - 2026-06-16
 
 > ⚠️ Nota di compatibilità: l'unificazione del ciclo di vita delle sotto-risorse cliniche su `/api/v1` (`WUL-308`) è una breaking change per il client nativo macOS storico. L'adeguamento resta tracciato in `WUL-333`; la release `0.7.0` pubblica il mainline web/home-base, documentazione e facciata OSS aggiornate, mantenendo il limite nativo esplicito.
@@ -75,7 +116,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Clinical Workbench unico su `main`**: preview profiles runtime ritirati; AI, Smart Import e contesto paziente SISS/FSE vivono nella shell ufficiale.
 - **Corpus SISS/FSE locale**: manifest sorgenti, sync incrementale e report di freschezza preparano le integrazioni regionali future senza entrare nel runtime clinico.
 - **Lane AI opt-in e shadow-only piu disciplinate**: comparator cloud `gpt-5.4` per engineering interno e adapter OpenMed `redaction.v1` separato dal runtime clinico.
-- **MLX parity benchmark-visible**: MLX e visibile in benchmark, model parliament e diagnostica home-base read-only, con guard dedicato; Ollama resta runtime clinico standard e OCR resta Ollama-only.
+- **MLX parity benchmark-visible**: MLX e visibile in benchmark, registry comparativo e diagnostica home-base read-only, con guard dedicato; Ollama resta runtime clinico standard e OCR resta Ollama-only.
 
 ### 🧪 Migliorato
 
@@ -105,7 +146,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### ✨ Aggiunto
 
-- **Governance AI locale più esplicita**: envelope condiviso `mediflow.ai.extract.v1`, benchmark headless sui task contract, benchmark `smart import`, registro candidati `model stack` e `model parliament` con artifact locali versionabili.
+- **Governance AI locale più esplicita**: envelope condiviso `mediflow.ai.extract.v1`, benchmark headless sui task contract, benchmark `smart import` e registro candidati locali con artifact versionabili.
 - **Lane benchmark-only separate per toolkit clinici esterni**: benchmark `redaction.v1` e `clinical_entities.v1` con adapter locali `OpenMed`/`HUMADEX`, runbook dedicati e stop-rules esplicite senza toccare il runtime applicativo.
 
 ### 🧪 Migliorato

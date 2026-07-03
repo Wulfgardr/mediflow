@@ -1974,4 +1974,3 @@ enum PairedCryptoError: LocalizedError {
         }
     }
 }
-

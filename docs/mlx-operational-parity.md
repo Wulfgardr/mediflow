@@ -30,7 +30,7 @@ Questo significa:
 | Config provider native | Supportato | Supportato con fallback esplicito | Parity controllata |
 | OCR | Primario locale; fallback Apple Vision solo macOS | Escluso | MLX fuori dalla pipeline OCR deliberatamente |
 | Benchmark `ai-task-contracts` | `ollama_chat` | `mlx_chat` | Parity benchmark |
-| Model parliament | Runtime distinto | Runtime distinto | Parity reportistica |
+| Registry comparativo modelli | Runtime distinto | Runtime distinto | Parity reportistica |
 | Start/stop app-managed home-base | Non app-managed | Non app-managed | Parity di non gestione |
 | Runtime centralizzato paired | Gate su Ollama locale | Non promosso | Fuori scope |
 

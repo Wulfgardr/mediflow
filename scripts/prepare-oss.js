@@ -288,6 +288,10 @@ function collectFilesByExtension(baseDir, extension) {
     return files;
 }
 
+function isAllowedPublicCreditLine(line) {
+    return /^Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto\.$/.test(line);
+}
+
 function sanitizeMarkdownReferences(targetDir) {
     const markdownFiles = collectFilesByExtension(targetDir, '.md');
     let updatedFiles = 0;
@@ -337,7 +341,7 @@ function sanitizeMarkdownReferences(targetDir) {
 
         const filteredLines = [];
         for (const line of content.split('\n')) {
-            if (PRIVATE_MARKDOWN_LINE_PATTERNS.some((pattern) => pattern.test(line))) {
+            if (!isAllowedPublicCreditLine(line) && PRIVATE_MARKDOWN_LINE_PATTERNS.some((pattern) => pattern.test(line))) {
                 removedInternalLines += 1;
                 continue;
             }
