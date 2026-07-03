@@ -60,6 +60,7 @@ Documenti da consultare **al bisogno**:
 - Runbook governance rollout AI: [docs/ai-rollout-governance.md](./ai-rollout-governance.md)
 - Runbook `cloud comparator shadow eval`: [docs/cloud-comparator-shadow-eval.md](./cloud-comparator-shadow-eval.md)
 - Protocollo dialogo design-time Codex/Opus: [docs/codex-opus-dialogue.md](./codex-opus-dialogue.md)
+- Review adversariale Gemini sulla forward guidance 1/2/5 anni: [docs/analysis/2026-07-03-forward-guidance-gemini-review.md](./analysis/2026-07-03-forward-guidance-gemini-review.md)
 
 ## 🧭 Ordine di lettura consigliato
 
@@ -93,6 +94,7 @@ Documenti da consultare **al bisogno**:
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |
 | Orchestrazione delivery Linear + Codex | [docs/linear-codex-playbook.md](./linear-codex-playbook.md) | `CANONICAL` | Workflow operativo planning -> coding -> audit trail con issue linking e convenzioni branch/PR. |
 | Proposta stabilizzazione/push post-bug-hunt | [docs/development-push-proposal-2026-06-16.md](./development-push-proposal-2026-06-16.md) | `SECONDARY` | Punto fermo operativo `WUL-373`: definisce exit package, PR merge/hold, fix selezionate, claim freeze e watchlist `leonardopegollo.dev`; non e release note e non prevale su `PLANS.md` o ADR. |
+| Forward guidance 1/2/5 anni: review Gemini | [docs/analysis/2026-07-03-forward-guidance-gemini-review.md](./analysis/2026-07-03-forward-guidance-gemini-review.md) | `SECONDARY / STRATEGIC REVIEW` | Sintesi verify-first della review adversariale Gemini su installabilita, FHIR/export, low-resource, AI claims e governance. Non prevale su `docs/ROADMAP.md`, `PLANS.md` o ADR. |
 | Monitor locale workflow Codex | [docs/codex-workflow-monitor.md](./codex-workflow-monitor.md), [docs/adr/0063-local-workflow-monitor-control-plane.md](./adr/0063-local-workflow-monitor-control-plane.md) | `SECONDARY` | Tooling locale WUL-283 per controllare branch, scope, privacy e verifiche tramite soli metadati Git/check, con LaunchAgent opzionale e digest locale redatto. |
 | Operating loop agentico | [docs/agentic-development-operating-loop.md](./agentic-development-operating-loop.md), [docs/adr/0067-agentic-development-operating-loop.md](./adr/0067-agentic-development-operating-loop.md), [docs/adr/0069-loop-orchestrator-baseline.md](./adr/0069-loop-orchestrator-baseline.md), `docs/loop-orchestrator.config.json` | `SECONDARY / INTERNAL` | Protocollo WUL-295/WUL-406 per usare Codex, RepoPrompt, Linear, `/goal`, Claude/Gemini, ChatGPT web research, workflow monitor e loop orchestrator come pool bounded con Codex controller-of-record. |
 | Ledger dual-thesis agentico | [docs/agentic-dual-thesis-run-ledger-template.md](./agentic-dual-thesis-run-ledger-template.md) | `SECONDARY / INTERNAL` | Template WUL-296 per registrare packet, tesi Claude, tesi Codex/ChatGPT, cross-exam Gemini, artifact registry e decisione Codex senza raw transcript o dati sensibili. |
