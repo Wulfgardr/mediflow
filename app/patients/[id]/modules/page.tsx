@@ -27,7 +27,7 @@ import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kr
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } from '@/lib/ai-patient-insight-kill-switch';
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/lib/ai-smart-import-kill-switch';
-import { db, type Attachment, type Checkup, type ClinicalEntry, type ExemptionCode } from '@/lib/db';
+import { db, type Checkup, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
@@ -50,13 +50,15 @@ export default function PatientDetailPage() {
     const confirm = useConfirm();
     const { showToast } = useToast();
 
-    const patient = useLiveQuery(() => db.patients.get(id), [id]);
+    const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
     const entries = useLiveQuery(
         async () => {
-            const items = await db.entries.includeDeleted().filter((entry: ClinicalEntry) => entry.patientId === id).toArray();
+            const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
             return items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
         },
         [id],
+        undefined,
+        ['entries'],
     );
     /* @Codex WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
        annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
@@ -64,61 +66,73 @@ export default function PatientDetailPage() {
        come prossimo follow-up. */
     const checkups = useLiveQuery(
         async () => {
-            const items = await db.checkups.filter((checkup: Checkup) => checkup.patientId === id).toArray();
+            const items = await db.checkups.query({ patientId: id }).toArray();
             return items
-                .filter((checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
+                .filter((checkup: Checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
                 .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
         },
         [id],
+        undefined,
+        ['checkups'],
     );
     /* WUL-262: same data the archive and Smart Import panels already read. */
     const attachments = useLiveQuery(
-        async () => db.attachments.filter((attachment: Attachment) => attachment.patientId === id).toArray(),
+        async () => db.attachments.query({ patientId: id }).toArray(),
         [id],
+        undefined,
+        ['attachments'],
     );
     /* @Codex WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
     // Terapie attive complete (non solo il conteggio) per servire i principi attivi
     // con posologia direttamente nella cella, senza scendere al TherapyManager.
     const activeTherapies = useLiveQuery(
         async () => {
-            const items = await db.therapies
-                .filter((therapy) => therapy.patientId === id && therapy.status === 'active' && !therapy.deletedAt)
-                .toArray();
-            return items.sort((left, right) => {
-                const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
-                const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
-                return rightTime - leftTime;
-            });
+            const items = await db.therapies.query({ patientId: id }).toArray();
+            return items
+                .filter((therapy) => therapy.status === 'active' && !therapy.deletedAt)
+                .sort((left, right) => {
+                    const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
+                    const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
+                    return rightTime - leftTime;
+                });
         },
         [id],
+        undefined,
+        ['therapies'],
     );
     /* @Codex WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
        le osservazioni del paziente, senza filtri). */
     const therapies = useLiveQuery(
-        async () => db.therapies.filter((therapy) => therapy.patientId === id).toArray(),
+        async () => db.therapies.query({ patientId: id }).toArray(),
         [id],
+        undefined,
+        ['therapies'],
     );
     const observations = useLiveQuery(
-        async () => db.observations.filter((observation) => observation.patientId === id).toArray(),
+        async () => db.observations.query({ patientId: id }).toArray(),
         [id],
+        undefined,
+        ['observations'],
     );
     // Ultima osservazione registrata: data e valore per la cella Parametri.
     const latestObservation = useLiveQuery(
         async () => {
-            const items = await db.observations.filter((observation) => observation.patientId === id).toArray();
+            const items = await db.observations.query({ patientId: id }).toArray();
             return items
                 .filter((observation) => observation.observedAt)
                 .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0] ?? null;
         },
         [id],
+        undefined,
+        ['observations'],
     );
     /* @Codex WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
        calcolato DENTRO il gruppo per codice (mai tra analiti diversi) e solo se
        stessa unita e valori numerici. Classificazione fuori-range da observation-range. */
     const latestMeasure = useLiveQuery<SynopticMeasure | null>(
         async () => {
-            const items = await db.observations.filter((observation) => observation.patientId === id).toArray();
+            const items = await db.observations.query({ patientId: id }).toArray();
             const sorted = items
                 .filter((observation) => observation.observedAt)
                 .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
@@ -147,19 +161,27 @@ export default function PatientDetailPage() {
             };
         },
         [id],
+        undefined,
+        ['observations'],
     );
     /* @Codex WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
     const prestazioniCount = useLiveQuery(
-        async () => db.servicePrescriptions.filter((prescription) => prescription.patientId === id).count(),
+        async () => db.servicePrescriptions.query({ patientId: id }).count(),
         [id],
+        undefined,
+        ['service_prescriptions'],
     );
     const protesicaCount = useLiveQuery(
-        async () => db.prostheticPrescriptions.filter((prescription) => prescription.patientId === id).count(),
+        async () => db.prostheticPrescriptions.query({ patientId: id }).count(),
         [id],
+        undefined,
+        ['prosthetic_prescriptions'],
     );
     const sissHandoffCount = useLiveQuery(
-        async () => db.sissHandoffs.filter((handoff) => handoff.patientId === id).count(),
+        async () => db.sissHandoffs.query({ patientId: id }).count(),
         [id],
+        undefined,
+        ['siss_handoff_events'],
     );
     const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
     const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
@@ -439,8 +461,8 @@ export default function PatientDetailPage() {
                 <button
                     type="button"
                     onClick={async () => {
-                        const reportTherapies = await db.therapies.filter((therapy) => therapy.patientId === id).toArray();
-                        const reportObservations = await db.observations.filter((observation) => observation.patientId === id).toArray();
+                        const reportTherapies = await db.therapies.query({ patientId: id }).toArray();
+                        const reportObservations = await db.observations.query({ patientId: id }).toArray();
                         const reportService = await import('@/lib/report-service');
                         reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
                     }}

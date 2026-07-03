@@ -90,18 +90,20 @@ export default function NewEntryPage() {
     const [visitDraftError, setVisitDraftError] = useState('');
     const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
     /* @Codex */
-    const patient = useLiveQuery(() => db.patients.get(id), [id]);
+    const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
     /* @Codex WUL-420 */
     const patientEntries = useLiveQuery<ClinicalEntry[], ClinicalEntry[]>(
-        async () => db.entries.filter((entry: ClinicalEntry) => entry.patientId === id && !entry.deletedAt).toArray(),
+        async () => db.entries.query({ patientId: id }).toArray(),
         [id],
         [],
+        ['entries'],
     ) ?? [];
     /* @Codex WUL-420 */
     const patientAttachments = useLiveQuery<Attachment[], Attachment[]>(
-        async () => db.attachments.filter((attachment: Attachment) => attachment.patientId === id).toArray(),
+        async () => db.attachments.query({ patientId: id }).toArray(),
         [id],
         [],
+        ['attachments'],
     ) ?? [];
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
