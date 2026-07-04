@@ -5,6 +5,7 @@ This log tracks contributions by non-Antigravity agents.
 Entries are additive and minimal.
 
 ## 2026-07-03 Codex
+- Hardened OSS export failure behavior for malformed private sections after the loop-runtime Gemini cross-check: `prepare:oss` now refuses to export when bounded internal sections such as Codex attribution or cloud comparator notes are missing their terminator, and focused tests cover closed vs unclosed marker behavior: `scripts/prepare-oss.js`, `scripts/prepare-oss.test.mjs`.
 - Prepared the `v0.7.1` release framing on top of the Apple/native branch: bumped version metadata, added the `0.7.1` changelog section, refreshed README, FAQ, roadmap, state-of-system and OSS-facing copy around Apple/native Fase 0, `MediFlowCore` tri-OS checks, macOS as the most mature native front, and Windows/Linux as early portability fronts rather than complete app parity.
 - Added public development credits for assisted implementation/review: Codex as primary implementation and verification copilot, Claude Code as secondary review/support lane, with Fable/Oracle contributions kept in private attribution surfaces and not exported as runtime/product material.
 - Kept OSS boundaries explicit by preserving `docs/analysis`, `docs/parliament`, private planning and orchestration material outside the public export while allowing the narrow public credit line in the sanitized README.

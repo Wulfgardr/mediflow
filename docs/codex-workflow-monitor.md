@@ -64,9 +64,10 @@ npm run workflow-monitor -- --once --json \
   --check test:workflow-monitor=pass
 ```
 
-Quando uno snapshot viene scritto con check dichiarati, i run automatici possono
-riusare quei check solo se `HEAD`, branch, path e dirty state sono invariati e
-il working tree e pulito. Qualunque nuovo edit o commit li invalida.
+Quando uno snapshot viene scritto con check dichiarati, i run successivi possono
+riusare quei check anche in modalita read-only solo se `HEAD`, branch, path e
+dirty state sono invariati e il working tree e pulito. Qualunque nuovo edit o
+commit li invalida.
 
 Snapshot salvato fuori repo:
 

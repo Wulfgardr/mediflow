@@ -112,6 +112,7 @@ const TO_EXCLUDE_BY_PATH = [
     'scripts/prepare-linear-import.mjs',
     'scripts/prepare-oss.js',
     'scripts/prepare-oss.mjs',
+    'scripts/prepare-oss.test.mjs',
     'docs/openmed-redaction-benchmark.md',
     'docs/openmed-toolkit-evaluation.md',
     'docs/parity-click-map-macos.md',
@@ -292,6 +293,31 @@ function isAllowedPublicCreditLine(line) {
     return /^Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto\.$/.test(line);
 }
 
+function replaceBoundedSectionOrThrow(content, {
+    filePath,
+    sectionName,
+    startPattern,
+    endPattern,
+    replacement = '\n'
+}) {
+    const startMatch = startPattern.exec(content);
+    if (!startMatch || startMatch.index === undefined) return content;
+
+    const startIndex = startMatch.index;
+    const tail = content.slice(startIndex + startMatch[0].length);
+    const endMatch = endPattern.exec(tail);
+
+    if (!endMatch || endMatch.index === undefined) {
+        throw new Error(
+            `Unclosed private OSS section in ${filePath}: ${sectionName}. ` +
+            'Refusing to export until the section terminator is restored.'
+        );
+    }
+
+    const endIndex = startIndex + startMatch[0].length + endMatch.index + endMatch[0].length;
+    return `${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`;
+}
+
 function sanitizeMarkdownReferences(targetDir) {
     const markdownFiles = collectFilesByExtension(targetDir, '.md');
     let updatedFiles = 0;
@@ -393,9 +419,18 @@ function sanitizeContributingForOss(targetDir) {
     if (!fs.existsSync(contributingPath)) return;
 
     const original = fs.readFileSync(contributingPath, 'utf8');
-    const sanitized = original
-        .replace(/\n## [^\n]*Igiene workflow e tracciabilita[\s\S]*?\n---\n/m, '\n')
-        .replace(/\n## [^\n]*Attribution \(Codex \/ agent\)[\s\S]*?\n---\n/m, '\n')
+    let sanitized = replaceBoundedSectionOrThrow(original, {
+        filePath: 'CONTRIBUTING.md',
+        sectionName: 'Igiene workflow e tracciabilita',
+        startPattern: /(?:^|\n)## [^\n]*Igiene workflow e tracciabilita[^\n]*\n/m,
+        endPattern: /---\n/,
+    });
+    sanitized = replaceBoundedSectionOrThrow(sanitized, {
+        filePath: 'CONTRIBUTING.md',
+        sectionName: 'Attribution (Codex / agent)',
+        startPattern: /(?:^|\n)## [^\n]*Attribution \(Codex \/ agent\)[^\n]*\n/m,
+        endPattern: /---\n/,
+    })
         .replace(/\n## [^\n]*Export OSS \(repo pubblica\)[\s\S]*$/m, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/\s+$/g, '\n');
@@ -496,8 +531,13 @@ function sanitizeSecurityForOss(targetDir) {
     if (!fs.existsSync(securityPath)) return;
 
     const original = fs.readFileSync(securityPath, 'utf8');
-    const sanitized = original
-        .replace(/\n## Comparator cloud opt-in[\s\S]*?\n---\n\n## Logging e redazione/m, '\n## Logging e redazione')
+    const sanitized = replaceBoundedSectionOrThrow(original, {
+        filePath: 'SECURITY.md',
+        sectionName: 'Comparator cloud opt-in',
+        startPattern: /(?:^|\n)## Comparator cloud opt-in[^\n]*\n/m,
+        endPattern: /---\n\n## Logging e redazione/,
+        replacement: '\n## Logging e redazione',
+    })
         .replace(/\n- case pack privati\/comparator cloud o output non minimizzati di shadow eval/g, '')
         .replace(/canale privato/g, 'canale riservato')
         .replace(/Preferisci canale riservato/g, 'Preferisci un canale riservato')
@@ -555,7 +595,7 @@ function copyRecursive(src, dest, relPath = '') {
     }
 }
 
-try {
+function prepareOssRelease() {
     console.log(`Preparing OSS release...`);
     console.log(`Source: ${SOURCE_DIR}`);
     console.log(`Target: ${TARGET_DIR}`);
@@ -597,6 +637,20 @@ try {
     sanitizeClaimsGuardForOss(TARGET_DIR);
 
     console.log('Done! Open Source version ready at: ' + TARGET_DIR);
-} catch (e) {
-    console.error('Error:', e);
 }
+
+if (require.main === module) {
+    try {
+        prepareOssRelease();
+    } catch (e) {
+        console.error('Error:', e);
+        process.exitCode = 1;
+    }
+}
+
+module.exports = {
+    replaceBoundedSectionOrThrow,
+    sanitizeContributingForOss,
+    sanitizeSecurityForOss,
+    prepareOssRelease,
+};
