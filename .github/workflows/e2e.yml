@@ -1,0 +1,108 @@
+name: E2E (Playwright)
+
+# Playwright end-to-end smoke for the local-first web app. Boots a seeded, ephemeral
+# Next.js dev server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
+#
+# Node 24: npm ci rebuilds the native better-sqlite3 binding against the Node 24 ABI,
+# so the server can open the SQLite database. The web-core.yml gate also runs on Node 24.
+#
+# Hermetic: every run seeds a unique temp data dir (MEDIFLOW_DATA_DIR) and a dedicated
+# Next dist dir (MEDIFLOW_NEXT_DIST_DIR=.next-e2e); nothing depends on a checked-in
+# medical.db or on developer state.
+#
+# fixme'd specs (skipped, not failures) as of this workflow landing:
+#   - e2e/document-import.spec.ts
+#   - e2e/document-synthesis-kill-switch.spec.ts
+# Both drive the assisted-import reconciliation UI ("Conferma cosa applicare al form" /
+# "Applica al form" / "Crea Nuova Scheda"), which was redesigned (now a
+# PatientDocumentReviewList; submit is "Crea scheda"). They are test.fixme with a
+# one-line reason in each file and need a from-scratch rewrite against the new flow.
+# The remaining suite passed 3 consecutive local runs, so this is a normal blocking job.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_BASE_URL: http://127.0.0.1:3123
+      E2E_PIN: "1234"
+      MEDIFLOW_NEXT_DIST_DIR: .next-e2e
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # npm ci rebuilds better-sqlite3 for the Node 24 ABI so the server can boot.
+      - run: npm ci
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Seed ephemeral e2e database
+        run: |
+          E2E_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-e2e.XXXXXX")"
+          echo "MEDIFLOW_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
+          echo "MEDIFLOW_E2E_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
+          MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}" node scripts/prepare-e2e-db.mjs
+
+      - name: Start Next.js dev server
+        run: |
+          npx next dev --hostname 127.0.0.1 --port 3123 > "${RUNNER_TEMP}/next-dev.log" 2>&1 &
+          echo "$!" > "${RUNNER_TEMP}/next-dev.pid"
+
+      - name: Wait for server readiness
+        run: |
+          for i in $(seq 1 180); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3123/api/auth/check || echo 000)"
+            if [ "$code" = "200" ]; then
+              echo "Server ready after ${i}s (auth/check -> ${code})."
+              exit 0
+            fi
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null; then
+              echo "Dev server exited before readiness."
+              cat "${RUNNER_TEMP}/next-dev.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Server did not become ready in time."
+          tail -50 "${RUNNER_TEMP}/next-dev.log"
+          exit 1
+
+      - name: Run Playwright suite
+        run: npx playwright test --workers=1
+
+      - name: Stop Next.js dev server
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/next-dev.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null || true
+          fi
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

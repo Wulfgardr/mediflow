@@ -82,19 +82,19 @@ export function CollapsibleSection({
             >
                 <span className="min-w-0 flex-1">
                     {kicker ? <span className="section-kicker">{kicker}</span> : null}
-                    <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                        {Icon ? <Icon className="h-5 w-5 text-[color:var(--mf-muted)]" /> : null}
+                    <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-ink">
+                        {Icon ? <Icon className="h-5 w-5 text-muted" /> : null}
                         {title}
                     </span>
                     {!open && summary ? (
-                        <span className="mt-1 block truncate text-sm text-[color:var(--mf-muted)]">{summary}</span>
+                        <span className="mt-1 block truncate text-sm text-muted">{summary}</span>
                     ) : null}
                 </span>
                 {count !== undefined && count !== '' ? (
                     <span className="apple-chip shrink-0">{count}</span>
                 ) : null}
                 <ChevronDown
-                    className={`h-5 w-5 shrink-0 text-[color:var(--mf-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
                     aria-hidden
                 />
             </button>

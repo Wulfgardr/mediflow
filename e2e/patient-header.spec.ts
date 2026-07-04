@@ -22,6 +22,12 @@ async function createPatient(
   }, payload);
 }
 
+// WUL-274/Kree8: the patient header moved into the cockpit "Quadro" area
+// (components/kree8/areas/real-patient-area.tsx, caption "Quadro paziente"). The old
+// "Diagnosi in scheda" section with an "ICD-11 <code> · <desc>" label and an explicit
+// "Nessuna codifica ICD" empty-state was superseded. The Quadro identity dock renders
+// each diagnosis as a "<code> · <desc>" chip (patient-workspace parseDiagnosisLabels,
+// no system prefix); a diagnosis-free patient simply renders no such chip.
 test('patient header renders ICD chips and explicit empty state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -56,14 +62,16 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
     diagnoses: [],
   });
 
+  const diagnosisChip = `EF00 · ${diagnosisDescription}`;
+
   await page.goto(`/patients/${patientWithDiagnosisId}`);
-  await expect(page.getByText('Diagnosi in scheda')).toBeVisible();
-  await expect(page.getByText(`ICD-11 EF00 · ${diagnosisDescription}`)).toBeVisible();
+  await expect(page.getByText('Quadro paziente')).toBeVisible();
+  await expect(page.getByText(diagnosisChip)).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText(`ICD-11 EF00 · ${diagnosisDescription}`)).toBeVisible();
+  await expect(page.getByText(diagnosisChip)).toBeVisible();
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}`);
-  await expect(page.getByText('Diagnosi in scheda')).toBeVisible();
-  await expect(page.getByText('Nessuna codifica ICD associata alla scheda.')).toBeVisible();
+  await expect(page.getByText('Quadro paziente')).toBeVisible();
+  await expect(page.getByText(diagnosisChip)).toHaveCount(0);
 });

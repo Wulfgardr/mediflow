@@ -8,6 +8,8 @@ import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-a
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
 /* @Codex */
 import { normalizeSettingValue } from '@/lib/settings-value';
+/* @Codex */
+import { evaluateSettingsWrite } from '@/lib/settings-write-policy';
 
 export async function GET(
     request: Request,
@@ -47,6 +49,15 @@ export async function PUT(
 
         if (value === undefined) {
             return NextResponse.json({ error: "Value required" }, { status: 400 });
+        }
+
+        /* @Codex */
+        const decision = evaluateSettingsWrite(key, session);
+        if (!decision.allowed) {
+            return NextResponse.json({ error: decision.reason }, { status: decision.status });
+        }
+        if (decision.unregistered) {
+            console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/settings-write-policy.ts`);
         }
 
         /* @Codex */

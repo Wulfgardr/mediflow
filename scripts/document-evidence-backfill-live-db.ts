@@ -12,7 +12,7 @@ import {
     type DocumentEvidenceBackfillPlan,
 } from '../lib/document-evidence-backfill';
 import { serializeDocumentParseEvidenceArtifact } from '../lib/document-parse-evidence-artifact';
-import { decryptData, deriveKeyFromPin, encryptData, unwrapMasterKey } from '../lib/security';
+import { decryptData, encryptData, unwrapMasterKeyVersioned } from '../lib/security';
 
 type SqliteDatabase = {
     prepare(sql: string): {
@@ -437,8 +437,8 @@ function readPatientTaxCodeMap(db: SqliteDatabase): Map<string, string> {
 }
 
 async function unlockMasterKey(user: UserRow, pin: string): Promise<CryptoKey> {
-    const kek = await deriveKeyFromPin(pin, base64ToBytes(user.salt));
-    return unwrapMasterKey(user.encrypted_master_key, kek);
+    // Version-aware: handles both legacy v1 (unmarked) and v2 (v2:) wrapped blobs.
+    return unwrapMasterKeyVersioned(user.encrypted_master_key, pin, base64ToBytes(user.salt));
 }
 
 async function toPlannerInputs(

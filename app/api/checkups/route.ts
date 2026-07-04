@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
@@ -9,6 +9,19 @@ import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
+import { parseListParams } from '@/lib/list-query-params';
+/* @Codex */
+import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
+
+// Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
+const CHECKUP_SORT_COLUMNS = {
+    date: checkups.date,
+    createdAt: checkups.createdAt,
+    updatedAt: checkups.updatedAt,
+} as const;
 
 /* @Codex */
 function parseRequiredDate(value: unknown): Date | null {
@@ -26,22 +39,29 @@ export async function GET(request: Request) {
     const patientId = searchParams.get('patientId');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
-    try {
-        if (patientId) {
-            const whereClause = includeDeleted
-                ? eq(checkups.patientId, patientId)
-                : and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt));
-            const data = await dbServer.select().from(checkups).where(whereClause).orderBy(desc(checkups.date));
-            const normalizedData = data.map((checkup) => ({
-                ...checkup,
-                status: normalizeCheckupStatus(checkup.status),
-            }));
-            return NextResponse.json(normalizedData);
-        }
+    /* STREAM B */
+    const parsed = parseListParams(searchParams, {
+        sortableColumns: Object.keys(CHECKUP_SORT_COLUMNS),
+        defaultOrderBy: 'date',
+        defaultOrderDir: 'desc',
+    });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const { limit, offset, orderBy, orderDir } = parsed.params;
 
-        const data = includeDeleted
-            ? await dbServer.select().from(checkups).orderBy(desc(checkups.date))
-            : await dbServer.select().from(checkups).where(isNull(checkups.deletedAt)).orderBy(desc(checkups.date));
+    try {
+        const filters: SQL[] = [];
+        if (patientId) filters.push(eq(checkups.patientId, patientId));
+        if (!includeDeleted) filters.push(isNull(checkups.deletedAt));
+        const whereClause = filters.length > 0 ? and(...filters) : undefined;
+
+        const sortColumn = CHECKUP_SORT_COLUMNS[(orderBy ?? 'date') as keyof typeof CHECKUP_SORT_COLUMNS];
+        const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+        let query = dbServer.select().from(checkups).where(whereClause).orderBy(orderExpr).$dynamic();
+        if (typeof limit === 'number') query = query.limit(limit);
+        if (typeof offset === 'number') query = query.offset(offset);
+
+        const data = await query;
         const normalizedData = data.map((checkup) => ({
             ...checkup,
             status: normalizeCheckupStatus(checkup.status),
@@ -58,7 +78,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(checkupCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

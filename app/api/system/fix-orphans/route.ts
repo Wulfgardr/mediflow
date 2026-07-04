@@ -84,23 +84,16 @@ export async function POST(request: Request) {
             }
         }
 
-        // 2. Create Default if Missing (Emergency Restore)
-        if (!targetAmbId) {
-            console.log("No ambulatories found. Creating Default Ambulatory 'Sede Principale'...");
-            const newId = uuidv4();
-            await dbServer.insert(ambulatories).values({
-                id: newId,
-                name: "Sede Principale",
-                address: "Sede Centrale",
-                isDefault: true,
-                type: 'live',
-                createdAt: new Date()
-            });
-            targetAmbId = newId;
+        // 2. Reserve a default ambulatory id if none exists (Emergency Restore).
+        // The row is inserted inside the transaction below, together with the relink.
+        const mustCreateDefault = !targetAmbId;
+        if (mustCreateDefault) {
+            targetAmbId = uuidv4();
             targetAmbName = "Sede Principale";
         }
+        const relinkAmbulatoryId = targetAmbId as string;
 
-        // 3. Find Orphans
+        // 3. Find Orphans (reads outside the transaction)
         const allPatients = await dbServer.select({ id: patients.id }).from(patients);
         const allLinks = await dbServer.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories);
 
@@ -109,17 +102,37 @@ export async function POST(request: Request) {
 
         console.log(`Found ${orphanPids.length} orphans from ${allPatients.length} total patients.`);
 
-        // 4. Link Orphans
-        let fixed = 0;
-        for (const pid of orphanPids) {
-            await dbServer.insert(patientsToAmbulatories)
-                .values({
-                    patientId: pid,
-                    ambulatoryId: targetAmbId,
-                })
-                .onConflictDoNothing();
-            fixed++;
-        }
+        // 4. Create the emergency default (if needed) and link every orphan to it in
+        // one atomic step. WUL-268 (STREAM A): a mid-loop crash must never leave the
+        // default ambulatory committed with only some orphans relinked, nor relink
+        // orphans to an ambulatory that was never committed. Transaction is
+        // synchronous (no awaits inside).
+        const fixed = dbServer.transaction((tx) => {
+            if (mustCreateDefault) {
+                console.log("No ambulatories found. Creating Default Ambulatory 'Sede Principale'...");
+                tx.insert(ambulatories).values({
+                    id: relinkAmbulatoryId,
+                    name: "Sede Principale",
+                    address: "Sede Centrale",
+                    isDefault: true,
+                    type: 'live',
+                    createdAt: new Date()
+                }).run();
+            }
+
+            let linked = 0;
+            for (const pid of orphanPids) {
+                tx.insert(patientsToAmbulatories)
+                    .values({
+                        patientId: pid,
+                        ambulatoryId: relinkAmbulatoryId,
+                    })
+                    .onConflictDoNothing()
+                    .run();
+                linked++;
+            }
+            return linked;
+        });
 
         // 5. WUL-306 (ADR 0066): purge child rows whose patient_id no longer resolves,
         // only behind the explicit flag and AFTER the relink step above.

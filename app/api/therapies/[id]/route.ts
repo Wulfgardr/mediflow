@@ -8,6 +8,10 @@ import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
 import { parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+/* @Codex */
+import { therapyUpdateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 function parseDate(value: unknown): Date | undefined {
     if (value === null || value === undefined || value === '') return undefined;
@@ -24,7 +28,10 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(therapyUpdateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });

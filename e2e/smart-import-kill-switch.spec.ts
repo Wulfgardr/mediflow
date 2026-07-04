@@ -47,24 +47,30 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
   try {
     await disableSmartImport();
 
-    await page.goto('/patients/new');
-    await expect(page.getByPlaceholder('Es. Mario')).toBeVisible();
-    await page.getByPlaceholder('Es. Mario').fill(firstName);
-    await page.getByPlaceholder('Es. Rossi').fill(lastName);
-    await page.getByPlaceholder('RSSMRA80A01H501U').fill(taxCode);
-    await page.getByPlaceholder('Informazioni aggiuntive, contesto familiare, codici accesso, preferenze del paziente...').fill(patientNotes);
-    await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
-    await expect(page).toHaveURL(/\/$/);
+    // WUL-274/Kree8: create via API and open the primary Scheda route (/modules), where the
+    // smart-import panel mounts. The legacy new-patient submit ("Crea Nuova Scheda") and the
+    // cockpit patient-search navigation no longer expose a patients-search-input testid.
+    const patientId = await page.evaluate(async (body) => {
+      const response = await fetch('/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json() as { id?: string; error?: string };
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error || `Patient creation failed with HTTP ${response.status}`);
+      }
+      return payload.id;
+    }, { firstName, lastName, taxCode, address: 'Via Test 1', phone: '1234567890', notes: patientNotes });
 
-    const search = page.getByTestId('patients-search-input');
-    await search.fill(taxCode);
-    await page.getByText(taxCode).click();
-    await expect(page).toHaveURL(/\/patients\/.+/);
+    await page.goto(`/patients/${patientId}/modules`);
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
 
     const disabledCard = page.getByTestId('smart-import-disabled-card');
     await expect(disabledCard).toBeVisible();
     await expect(disabledCard).toContainText('Smart Import disabilitato');
     await expect(disabledCard).toContainText('Apri Impostazioni AI');
+    // When disabled the analysis trigger renders "Disabilitata", so "Analizza fonti" is absent.
     await expect(page.getByRole('button', { name: 'Analizza fonti' })).toHaveCount(0);
   } finally {
     await restoreSmartImport();

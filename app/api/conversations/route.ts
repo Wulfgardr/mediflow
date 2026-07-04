@@ -5,6 +5,10 @@ import { desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+/* @Codex */
+import { conversationCreateSchema } from '@/lib/api-schemas/conversations';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function GET() {
     /* @Codex */
@@ -25,7 +29,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(conversationCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         await dbServer.insert(conversations).values({
             id: body.id || uuidv4(),
             title: body.title,

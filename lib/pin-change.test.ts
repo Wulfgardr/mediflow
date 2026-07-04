@@ -3,7 +3,14 @@ import test from 'node:test';
 import { webcrypto } from 'node:crypto';
 
 import { createPinRotationBundle, validatePinChangeInput } from './pin-change';
-import { deriveKeyFromPin, generateMasterKey, unwrapMasterKey, wrapMasterKey } from './security';
+import {
+    deriveKeyFromPin,
+    generateMasterKey,
+    getKdfVersion,
+    unwrapMasterKey,
+    unwrapMasterKeyVersioned,
+    wrapMasterKey,
+} from './security';
 
 if (!globalThis.crypto) {
     Object.defineProperty(globalThis, 'crypto', {
@@ -27,13 +34,13 @@ test('createPinRotationBundle re-wraps the same master key with the new PIN', as
     const originalUnwrapped = await unwrapMasterKey(originalEncryptedMasterKey, originalKek);
 
     const rotation = await createPinRotationBundle(masterKey, '5678');
+    // The rotation bundle is now written at the current KDF version (v2).
+    assert.equal(getKdfVersion(rotation.encryptedMasterKey), 2);
     const rotatedSalt = new Uint8Array(Buffer.from(rotation.salt, 'base64'));
-    const rotatedKek = await deriveKeyFromPin('5678', rotatedSalt);
-    const rotatedMasterKey = await unwrapMasterKey(rotation.encryptedMasterKey, rotatedKek);
-    const reusedOriginalPinKek = await deriveKeyFromPin('1234', rotatedSalt);
+    const rotatedMasterKey = await unwrapMasterKeyVersioned(rotation.encryptedMasterKey, '5678', rotatedSalt);
 
     await assert.rejects(async () => {
-        await unwrapMasterKey(rotation.encryptedMasterKey, reusedOriginalPinKek);
+        await unwrapMasterKeyVersioned(rotation.encryptedMasterKey, '1234', rotatedSalt);
     });
 
     const originalRaw = new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', originalUnwrapped));

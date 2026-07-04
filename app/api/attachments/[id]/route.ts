@@ -4,11 +4,41 @@ import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { buildAttachmentPath } from '@/lib/attachment-path';
 import {
     canTransitionDocumentOcrQueueState,
     isDocumentOcrQueueState,
     type DocumentOcrQueueState,
 } from '@/lib/document-ocr-queue';
+/* @Codex */
+import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
+
+/* STREAM B: full attachment retrieval INCLUDING the base64 `data` blob. The list
+   endpoint (GET /api/attachments?metadata=true) omits the blob; this by-id read is
+   how the facade fetches the actual payload on demand. */
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
+    try {
+        const { id } = await params;
+        const row = await dbServer.select().from(attachments).where(eq(attachments.id, id)).get();
+        if (!row) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+        return NextResponse.json({
+            ...row,
+            path: buildAttachmentPath(row.path, row.name, row.id),
+        });
+    } catch (error) {
+        return NextResponse.json({ error: 'Failed to fetch attachment' }, { status: 500 });
+    }
+}
 
 export async function PUT(
     request: Request,
@@ -23,7 +53,9 @@ export async function PUT(
         if (!body || typeof body !== 'object') {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
-        const payload = body as Record<string, unknown>;
+        const parsedBody = parseApiBody(attachmentUpdateSchema, body);
+        if (!parsedBody.ok) return parsedBody.response;
+        const payload = parsedBody.data;
 
         const existing = await dbServer
             .select({ id: attachments.id, ocrQueueState: attachments.ocrQueueState })

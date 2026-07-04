@@ -52,6 +52,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Home-base client tests use a synthetic password literal only inside a mocked local login exchange and never against a live backend.',
         },
         {
+            path: 'lib/api-schemas/api-schemas.test.ts',
+            pattern: "username:\\s*'admin'",
+            reason: 'API-schema tests use a synthetic admin username fixture to exercise the authSetupSchema validation boundary without real credentials.',
+        },
+        {
+            path: 'lib/api-schemas/api-schemas.test.ts',
+            pattern: "password:\\s*'1234'",
+            reason: 'API-schema tests use a synthetic password fixture to exercise the authSetupSchema validation boundary without real credentials.',
+        },
+        {
             path: 'lib/network-identity.test.ts',
             pattern: "username:\\s*'solo-user'",
             reason: 'Network identity tests use a synthetic single-user fixture to validate login-hint derivation without real credentials.',
@@ -65,6 +75,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'lib/network-operating-mode.test.ts',
             pattern: "username:\\s*'paired-user'",
             reason: 'Network operating mode tests use a synthetic paired operator fixture to render the session-bound UI state without real credentials.',
+        },
+        {
+            path: 'lib/settings-write-policy.test.ts',
+            pattern: "username:\\s*'policy-user'",
+            reason: 'Settings write-policy tests build a synthetic ServerSession fixture to exercise the per-channel write allowlist matrix without real credentials.',
         },
     ],
     externalUrls: [
@@ -112,6 +127,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePairedStoreTests.swift',
             pattern: 'https://home-base\\.test',
             reason: 'Home-base paired-store tests use a synthetic .test server URL to verify trimmed persistence without contacting a live endpoint.',
+        },
+        {
+            path: 'lib/request-transport.test.ts',
+            pattern: 'http://mediflow-home\\.local:3000/api/auth/login',
+            reason: 'Request-transport tests use a synthetic LAN .local Host fixture to verify the TLS-proxy marker still asserts secure cookies on a non-loopback paired host; no runtime egress occurs.',
         },
         {
             path: 'native/MediFlowMac/Package.swift',
