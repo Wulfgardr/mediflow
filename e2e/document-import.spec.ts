@@ -21,6 +21,7 @@ test('document import review proposes extracted data and creates the scheda with
   // e2e DB from colliding with previously created patients.
   const taxCode = `TSTDOC${digits.slice(0, 2)}A01H${digits.slice(2)}X`;
   const diagnosisLabel = 'Diabete mellito tipo 2';
+  let synthesisCalled = false;
 
   // Local OCR endpoint: the same payload serves both 'patient' and 'full' modes.
   await page.route('**/api/ocr/extract', async (route) => {
@@ -83,6 +84,7 @@ test('document import review proposes extracted data and creates the scheda with
   // medications,diagnoses,problemStatements,therapyCandidates,servicePrescriptions}.
   // AIService accepts both native Ollama and OpenAI-style bodies; we answer OpenAI-style.
   await page.route('**/api/proxy/ollama/chat', async (route) => {
+    synthesisCalled = true;
     const request = route.request();
     const body = JSON.parse(request.postData() || '{}');
     const prompt = body?.messages?.[0]?.content || '';
@@ -190,6 +192,8 @@ test('document import review proposes extracted data and creates the scheda with
     page.getByRole('heading', { name: 'Documento pronto: scegli cosa portare nella scheda' })
   ).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('heading', { name: 'Scegli cosa portare nella scheda', exact: true })).toBeVisible();
+  // Witness route: with the lane enabled the synthesis endpoint must genuinely be hit.
+  expect(synthesisCalled).toBe(true);
 
   // Reconciled proposals: one AIFA-matched therapy card and one coded diagnosis card.
   await expect(page.getByPlaceholder('Nome farmaco')).toHaveValue('Humalog KwikPen');
