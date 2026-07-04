@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 
 const { subtle } = webcrypto;
 const utf8 = new TextEncoder();
-const ITERATIONS_V2 = 600000; // lib/security.ts KDF_ITERATIONS[2]
+const ITERATIONS_V2 = 600000; // lib/security/security.ts KDF_ITERATIONS[2]
 const KDF_VERSION = 2;
 
 const hex = (b) => Buffer.from(b).toString('hex');
@@ -68,7 +68,7 @@ assertEq(hex(unwrapped), RAW_MASTER_KEY_HEX, 'unwrapMasterKey round-trip');
 const out = {
     version: KDF_VERSION,
     purpose: 'Language-neutral byte-exact oracle for the MediFlow zero-knowledge wrapped-master-key at KDF v2 (PBKDF2-HMAC-SHA256 x600000). Every core (web TS reference / Swift MediFlowCore) must reproduce these exactly so paired clients survive the KDF upgrade.',
-    reference: 'lib/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)',
+    reference: 'lib/security/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)',
     algorithm: {
         kdf: 'PBKDF2-HMAC-SHA256',
         iterations: ITERATIONS_V2,

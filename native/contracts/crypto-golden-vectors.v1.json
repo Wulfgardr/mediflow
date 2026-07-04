@@ -1,7 +1,7 @@
 {
   "version": 1,
   "purpose": "Language-neutral byte-exact oracle for the MediFlow zero-knowledge field crypto (ADR 0071, Fase 0). Every core (web TS reference / Swift MediFlowCore / future Rust) must reproduce these exactly on macOS, Windows-MSVC and Linux.",
-  "reference": "lib/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)",
+  "reference": "lib/security/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)",
   "algorithm": {
     "fieldCipher": "AES-256-GCM, 12-byte IV, 16-byte tag appended to ciphertext",
     "kdf": "PBKDF2-HMAC-SHA256",
