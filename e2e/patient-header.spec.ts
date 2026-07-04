@@ -27,7 +27,9 @@ async function createPatient(
 // "Diagnosi in scheda" section with an "ICD-11 <code> · <desc>" label and an explicit
 // "Nessuna codifica ICD" empty-state was superseded. The Quadro identity dock renders
 // each diagnosis as a "<code> · <desc>" chip (patient-workspace parseDiagnosisLabels,
-// no system prefix); a diagnosis-free patient simply renders no such chip.
+// no system prefix); for a diagnosis-free patient mapPatientForKree8 substitutes the
+// "Profilo da completare" placeholder chip, which must be visible so the empty state
+// cannot pass trivially when nothing renders.
 test('patient header renders ICD chips and explicit empty state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -73,5 +75,6 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}`);
   await expect(page.getByText('Quadro paziente')).toBeVisible();
+  await expect(page.getByText('Profilo da completare')).toBeVisible();
   await expect(page.getByText(diagnosisChip)).toHaveCount(0);
 });

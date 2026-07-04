@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
 
 // This DB is shared across specs; leaving Patient Insight disabled would break
 // specs that expect it enabled. Restore the switch after the test.
@@ -19,9 +19,14 @@ test('patient insight kill switch disables generation on patient detail', async 
 
   await bootstrapUnlockedSession(page, pin);
 
-  // WUL-297: kill switches now live on the dedicated AI sub-route.
-  await page.goto('/settings/ai/funzioni');
-  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
+  // The lane is fail-closed when the setting row is absent (fresh e2e DB): pin it to
+  // 'enabled' so the toggle below always starts from the ON state.
+  await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+
+  // WUL-297: kill switches now live on the dedicated AI sub-route. The helper waits
+  // for the async settings load, whose completion resets the switches to the stored
+  // values and would otherwise undo a click that landed too early.
+  await openAiFunzioniSettings(page);
 
   const killSwitch = page.getByRole('switch', { name: 'Patient Insight locale' });
   await expect(killSwitch).toHaveAttribute('aria-checked', 'true');

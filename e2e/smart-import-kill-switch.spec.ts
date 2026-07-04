@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
 
 test('smart import kill switch disables analysis on patient detail', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -13,9 +13,14 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
   await bootstrapUnlockedSession(page, pin);
 
   const disableSmartImport = async () => {
-    // WUL-297: kill switches now live on the dedicated AI sub-route.
-    await page.goto('/settings/ai/funzioni');
-    await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
+    // The lane is fail-closed when the setting row is absent (fresh e2e DB): pin it to
+    // 'enabled' so the toggle below always starts from the ON state.
+    await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+
+    // WUL-297: kill switches now live on the dedicated AI sub-route. The helper waits
+    // for the async settings load, whose completion resets the switches to the stored
+    // values and would otherwise undo a click that landed too early.
+    await openAiFunzioniSettings(page);
 
     const killSwitch = page.getByRole('switch', { name: 'Smart Import locale' });
     await killSwitch.click();
