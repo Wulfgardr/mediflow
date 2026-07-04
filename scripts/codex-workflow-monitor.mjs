@@ -665,7 +665,7 @@ function readLastSnapshot(stateDir) {
 
 async function runOnce(options) {
   const snapshot = collectGitSnapshot(options.repo);
-  const previousVerdict = options.write ? readLastSnapshot(options.stateDir) : null;
+  const previousVerdict = readLastSnapshot(options.stateDir);
   const preliminaryVerdict = evaluateSnapshot(snapshot, {
     expectedIssue: options.expectedIssue,
     checks: {},
