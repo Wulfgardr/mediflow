@@ -3,27 +3,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 // WUL-274/Kree8: the cockpit patient search no longer exposes a patients-search-input
-// testid, and clicking a search result opens the Scheda (/modules) route. These two
-// helpers create via the patients API and reach the Scheda directly; their signatures
-// are preserved so the individual tests stay unchanged.
-async function createPatientFromForm(page: Page, values: {
-  firstName: string;
-  lastName: string;
-  taxCode: string;
-  notes: string;
-}) {
-  await page.evaluate(async (body) => {
-    const response = await fetch('/api/patients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to create patient: ${response.status}`);
-    }
-  }, values);
-}
-
+// testid, and clicking a search result opens the Scheda (/modules) route. Tests create
+// via the patients API and open the Scheda with the id returned by the POST, so nothing
+// re-finds a patient by tax code through the paginated list API.
 async function createPatientViaApi(page: Page, payload: Record<string, unknown>): Promise<string> {
   return await page.evaluate(async (body: Record<string, unknown>) => {
     const response = await fetch('/api/patients', {
@@ -58,21 +40,7 @@ async function createTherapyViaApi(page: Page, payload: Record<string, unknown>)
   }, payload);
 }
 
-async function openPatientFromHome(page: Page, taxCode: string) {
-  // Resolve the patient id by tax code via the list API, then open its Scheda (/modules).
-  const patientId = await page.evaluate(async (code: string) => {
-    const response = await fetch('/api/patients?limit=200');
-    if (!response.ok) {
-      throw new Error(`Failed to list patients: ${response.status}`);
-    }
-    const list = await response.json() as Array<{ id: string; taxCode?: string }>;
-    const match = list.find((p) => (p.taxCode || '').toUpperCase() === code.toUpperCase());
-    if (!match?.id) {
-      throw new Error(`No patient found for tax code ${code}`);
-    }
-    return match.id;
-  }, taxCode);
-
+async function openPatientScheda(page: Page, patientId: string) {
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
 }
@@ -421,14 +389,14 @@ test('smart import adds ICD diagnosis chips and therapy from patient notes after
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -548,14 +516,14 @@ test('smart import keeps transition and uncertain therapies visible without trun
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -647,19 +615,14 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
-
-  // openPatientFromHome lands on /patients/<id>/modules, so pull the id segment, not
-  // the trailing "modules" path component.
-  const patientId = page.url().match(/\/patients\/([^/?#]+)/)?.[1];
-  expect(patientId).toBeTruthy();
+  await openPatientScheda(page, patientId);
 
   await page.evaluate(async ({ id }) => {
     const response = await fetch('/api/therapies', {
@@ -737,14 +700,14 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -807,14 +770,14 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -895,14 +858,14 @@ test('smart import normalizes outgoing switch therapy to transition even when mo
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
