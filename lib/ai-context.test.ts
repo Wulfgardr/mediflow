@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import Module from 'node:module';
-import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './document-parse-evidence-artifact';
+import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './domain/documents/document-parse-evidence-artifact';
 
 const moduleWithResolve = Module as unknown as {
     _resolveFilename: (

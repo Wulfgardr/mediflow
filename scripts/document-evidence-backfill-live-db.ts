@@ -10,9 +10,9 @@ import {
     type DocumentEvidenceBackfillAttachmentInput,
     type DocumentEvidenceBackfillDecision,
     type DocumentEvidenceBackfillPlan,
-} from '../lib/document-evidence-backfill';
-import { serializeDocumentParseEvidenceArtifact } from '../lib/document-parse-evidence-artifact';
-import { decryptData, encryptData, unwrapMasterKeyVersioned } from '../lib/security';
+} from '../lib/domain/documents/document-evidence-backfill';
+import { serializeDocumentParseEvidenceArtifact } from '../lib/domain/documents/document-parse-evidence-artifact';
+import { decryptData, encryptData, unwrapMasterKeyVersioned } from '../lib/security/security';
 
 type SqliteDatabase = {
     prepare(sql: string): {

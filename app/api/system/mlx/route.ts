@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { PM2Manager } from '@/lib/pm2-manager';
 /* @Codex */
-import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
 
 // Note: Robust auth check should be added here using sessions.

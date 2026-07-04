@@ -5,7 +5,7 @@ import { buildStoredDocumentExcerpt } from './document-excerpt';
 /* @Codex */
 import { routeDocumentClassForSynthesis } from './document-synthesis-routing';
 /* @Codex */
-import { rememberPdfDocumentMetadata } from './pdf-document-metadata';
+import { rememberPdfDocumentMetadata } from '../../pdf-document-metadata';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
 import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 import {

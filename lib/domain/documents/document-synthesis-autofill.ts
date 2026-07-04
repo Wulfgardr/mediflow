@@ -3,7 +3,7 @@ import type {
     Diagnosis,
     DocumentDiagnosisSuggestion,
     DocumentQualityLevel,
-} from './db';
+} from '../../db';
 /* @Codex */
 import {
     applyDocumentDecisionGuardrails,
@@ -15,7 +15,7 @@ import {
     type DocumentDecisionForbiddenReason,
 } from './document-decision';
 /* @Codex */
-import { isEncryptedFieldValue, isLockedDataPlaceholder } from './locked-field-guard';
+import { isEncryptedFieldValue, isLockedDataPlaceholder } from '../../locked-field-guard';
 /* @Codex */
 import { normalizeDiagnosisSystem } from './document-synthesis-parser';
 

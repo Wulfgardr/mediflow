@@ -3,13 +3,13 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 /* @Codex */
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeSettingValue } from '@/lib/settings-value';
 /* @Codex */
-import { evaluateSettingsWrite } from '@/lib/settings-write-policy';
+import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: decision.reason }, { status: decision.status });
         }
         if (decision.unregistered) {
-            console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/settings-write-policy.ts`);
+            console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
         }
 
         /* @Codex */

@@ -7,8 +7,8 @@ import type {
     TherapySuggestionState,
 } from './ai-task-contracts';
 /* @Codex */
-import { normalizeDocumentInput } from './document-input-normalization';
-import { looksLikeLowSignalOcrText } from './document-ocr-queue';
+import { normalizeDocumentInput } from './domain/documents/document-input-normalization';
+import { looksLikeLowSignalOcrText } from './domain/documents/document-ocr-queue';
 /* @Codex */
 import {
     normalizePdfDocumentMetadata,

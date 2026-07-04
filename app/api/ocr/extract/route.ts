@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractDocumentWithAI, isLowSignalOcrText } from '@/lib/ocr-service';
+import { extractDocumentWithAI, isLowSignalOcrText } from '@/lib/domain/documents/ocr-service';
 import { AIService } from '@/lib/ai-service';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
@@ -15,7 +15,7 @@ import path from 'node:path';
 /* @Codex */
 import { promisify } from 'node:util';
 /* @Codex */
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { validateLocalTarget } from '@/lib/local-target';
 
 /* @Codex */

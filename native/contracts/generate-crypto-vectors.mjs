@@ -1,6 +1,6 @@
 // Claude 2026-06-30 (ADR 0071, Fase 0): generator for the language-neutral
 // zero-knowledge crypto golden vectors. Produces DETERMINISTIC, byte-exact
-// reference outputs using the same WebCrypto primitives lib/security.ts uses
+// reference outputs using the same WebCrypto primitives lib/security/security.ts uses
 // (AES-256-GCM, PBKDF2-HMAC-SHA256 x100000). Every core implementation
 // (web TS reference, Swift MediFlowCore today, a possible Rust core tomorrow)
 // MUST reproduce these on macOS, Windows-MSVC and Linux before any data flows.
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 const { subtle } = webcrypto;
 const utf8 = new TextEncoder();
-const ITERATIONS = 100000; // lib/security.ts SECURITY_CONFIG.ITERATIONS
+const ITERATIONS = 100000; // lib/security/security.ts SECURITY_CONFIG.ITERATIONS
 
 const hex = (b) => Buffer.from(b).toString('hex');
 const b64 = (b) => Buffer.from(b).toString('base64');
@@ -88,7 +88,7 @@ const fields = [
 const out = {
     version: 1,
     purpose: 'Language-neutral byte-exact oracle for the MediFlow zero-knowledge field crypto (ADR 0071, Fase 0). Every core (web TS reference / Swift MediFlowCore / future Rust) must reproduce these exactly on macOS, Windows-MSVC and Linux.',
-    reference: 'lib/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)',
+    reference: 'lib/security/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)',
     algorithm: {
         fieldCipher: 'AES-256-GCM, 12-byte IV, 16-byte tag appended to ciphertext',
         kdf: 'PBKDF2-HMAC-SHA256',

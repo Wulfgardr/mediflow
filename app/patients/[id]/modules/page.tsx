@@ -33,7 +33,7 @@ import { useLiveQuery } from '@/lib/live-query';
 import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
-import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
+import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';

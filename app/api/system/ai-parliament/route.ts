@@ -1,6 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { readAiModelParliamentArtifact } from '@/lib/ai-model-parliament-storage';
 
 export const dynamic = 'force-dynamic';

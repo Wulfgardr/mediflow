@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { asc, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import type { AifaDrug } from '@/lib/db';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { drugs } from '@/lib/schema';
 import {
     buildVisitTranscriptDraft,
@@ -11,7 +11,7 @@ import {
     type VisitSessionEvent,
     type VisitTranscriptSegment,
 } from '@/lib/visit-transcript-draft';
-import { sortDrugCatalogSearchResults } from '@/lib/patient-smart-import-matching';
+import { sortDrugCatalogSearchResults } from '@/lib/domain/documents/patient-smart-import-matching';
 
 const MAX_TRANSCRIPT_CHARS = 12_000;
 const MAX_DRUG_TERMS = 8;

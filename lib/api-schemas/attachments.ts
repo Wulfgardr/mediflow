@@ -8,7 +8,7 @@ import {
 import {
     DOCUMENT_OCR_QUEUE_REASONS,
     DOCUMENT_OCR_QUEUE_STATES,
-} from '../document-ocr-queue';
+} from '../domain/documents/document-ocr-queue';
 
 const ocrQueueStateSchema = z.enum(DOCUMENT_OCR_QUEUE_STATES).optional();
 const ocrQueueReasonSchema = z.enum(DOCUMENT_OCR_QUEUE_REASONS).optional();

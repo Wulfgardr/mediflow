@@ -1,5 +1,5 @@
 /* @Codex */
-import type { ServerSession } from '@/lib/server-session';
+import type { ServerSession } from '@/lib/security/server-session';
 
 /* @Codex */
 export function isWebAdminSession(session: ServerSession | null | undefined): session is ServerSession {

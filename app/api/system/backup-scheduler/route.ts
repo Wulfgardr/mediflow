@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
-import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
     applyBackupRetention,

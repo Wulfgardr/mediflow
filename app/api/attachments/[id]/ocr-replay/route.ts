@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
-import { canTransitionDocumentOcrQueueState, isDocumentOcrQueueState } from '@/lib/document-ocr-queue';
-import { applyDocumentOcrReplay } from '@/lib/document-ocr-replay';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { canTransitionDocumentOcrQueueState, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
+import { applyDocumentOcrReplay } from '@/lib/domain/documents/document-ocr-replay';
 import { attachmentOcrReplaySchema } from '@/lib/api-schemas/attachments';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 

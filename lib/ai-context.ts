@@ -4,25 +4,25 @@ import {
     getAIInsightRuntimeSettings,
 } from '@/lib/ai-insight-settings';
 /* @Codex */
-import { renderDocumentEvidencePackContext } from '@/lib/document-evidence-pack';
+import { renderDocumentEvidencePackContext } from '@/lib/domain/documents/document-evidence-pack';
 /* @Codex */
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 /* @Codex */
-import { dedupeDocumentInsightsForContext } from '@/lib/document-insight-context';
+import { dedupeDocumentInsightsForContext } from '@/lib/domain/documents/document-insight-context';
 /* @Codex */
-import { normalizeDocumentInput } from '@/lib/document-input-normalization';
+import { normalizeDocumentInput } from '@/lib/domain/documents/document-input-normalization';
 /* @Codex */
 import {
     parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentInsightFromArtifact,
-} from '@/lib/document-parse-evidence-artifact';
+} from '@/lib/domain/documents/document-parse-evidence-artifact';
 /* @Codex */
 import {
     MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION,
     buildEvidenceQueue,
     getIncludedEvidenceQueueItems,
     type EvidenceQueueCitation,
-} from '@/lib/evidence-queue-contract';
+} from '@/lib/domain/documents/evidence-queue-contract';
 /* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';

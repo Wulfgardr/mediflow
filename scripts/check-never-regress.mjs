@@ -250,22 +250,22 @@ function runZeroKnowledgeChecks(runtimeFiles) {
             message: 'Login flow must return salt for local unlock',
         },
         {
-            file: 'lib/security.ts',
+            file: 'lib/security/security.ts',
             token: "'PBKDF2'",
             message: 'Zero-knowledge flow must keep PBKDF2 key derivation',
         },
         {
-            file: 'lib/security.ts',
+            file: 'lib/security/security.ts',
             token: "'AES-GCM'",
             message: 'Zero-knowledge flow must keep AES-GCM wrapping/encryption',
         },
         {
-            file: 'lib/security.ts',
+            file: 'lib/security/security.ts',
             token: 'localStorage.setItem(SECURITY_CONFIG.PIN_SALT_KEY',
             message: 'Security storage must persist salt explicitly',
         },
         {
-            file: 'lib/security.ts',
+            file: 'lib/security/security.ts',
             token: 'localStorage.setItem(SECURITY_CONFIG.ENCRYPTED_MASTER_KEY',
             message: 'Security storage must persist encrypted master key explicitly',
         },

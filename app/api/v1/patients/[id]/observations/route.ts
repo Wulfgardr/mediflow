@@ -4,11 +4,11 @@ import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 

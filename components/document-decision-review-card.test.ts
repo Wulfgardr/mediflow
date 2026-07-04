@@ -13,7 +13,7 @@ import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
     createDocumentDecisionEvidenceRef,
-} from '../lib/document-decision';
+} from '../lib/domain/documents/document-decision';
 
 const baseSource = {
     documentId: 'synthetic-card-doc',

@@ -1,5 +1,5 @@
-import { refreshPatientSummaryIfEnabled } from './ai-summary-service';
-import { AIService } from './ai-service';
+import { refreshPatientSummaryIfEnabled } from '../../ai-summary-service';
+import { AIService } from '../../ai-service';
 import {
     buildSmartImportExtractionPrompt,
     parseSmartImportExtractionResponse,
@@ -8,16 +8,16 @@ import {
     type SmartImportExtractionData as ParsedAiPayload,
     type SmartImportTherapyExtraction as ParsedAiTherapy,
     type TherapySuggestionState,
-} from './ai-task-contracts';
-import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from './db';
+} from '../../ai-task-contracts';
+import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from '../../db';
 /* @Codex */
-import { clinicalRichTextToPlainText } from './clinical-rich-text';
+import { clinicalRichTextToPlainText } from '../../clinical-rich-text';
 /* @Codex */
 import { dedupeDocumentInsightsForContext } from './document-insight-context';
 /* @Codex */
 import { renderDocumentEvidencePackContext } from './document-evidence-pack';
-import { searchICDHybrid, type ICDSearchResult } from './icd-service';
-import { notifyDbChange } from './live-query';
+import { searchICDHybrid, type ICDSearchResult } from '../../icd-service';
+import { notifyDbChange } from '../../live-query';
 import {
     buildDiagnosisSearchQueries,
     classifyExtractedTherapyState,
@@ -33,11 +33,11 @@ import {
     type SmartImportReviewState,
 } from './patient-smart-import-matching';
 /* @Codex */
-import { isServicePrescriptionLikeTherapy } from './prescription-boundary';
+import { isServicePrescriptionLikeTherapy } from '../../prescription-boundary';
 import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
     assertAiSmartImportEnabledValue,
-} from './ai-smart-import-kill-switch';
+} from '../../ai-smart-import-kill-switch';
 
 export type { SmartImportConfidence, TherapySuggestionState, SmartImportReview, SmartImportReviewState };
 

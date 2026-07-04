@@ -4,7 +4,7 @@ import type { AifaDrug } from './db';
 import {
     buildDrugSearchTerms,
     selectTherapyCatalogMatch,
-} from './patient-smart-import-matching';
+} from './domain/documents/patient-smart-import-matching';
 
 export const VISIT_TRANSCRIPT_DRAFT_SCHEMA_VERSION = 'mediflow.visit_transcript_draft.v1';
 

@@ -18,11 +18,11 @@ import {
     applyPatientDocumentReview,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
-} from '@/lib/patient-document-review';
+} from '@/lib/domain/documents/patient-document-review';
 /* @Codex */
-import { buildPatientImportDecision } from '@/lib/patient-import-decision';
+import { buildPatientImportDecision } from '@/lib/domain/documents/patient-import-decision';
 /* @Codex */
-import { buildPatientDocumentDecision } from '@/lib/patient-document-decision';
+import { buildPatientDocumentDecision } from '@/lib/domain/documents/patient-document-decision';
 /* @Codex */
 import DocumentDecisionReviewCard from '@/components/document-decision-review-card';
 import { confidenceLabel } from '@/lib/ai-labels';

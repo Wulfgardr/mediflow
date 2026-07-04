@@ -13,8 +13,8 @@ import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css
 import { db, type Attachment, type ClinicalEntry } from '@/lib/db';
 /* @Codex */
 import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
-import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
+import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';

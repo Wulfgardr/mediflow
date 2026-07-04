@@ -16,7 +16,7 @@ import {
 } from '@/lib/network-patient-write';
 import { getNetworkModeGateResponse } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 /* @Codex */
 async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireSession>>) {

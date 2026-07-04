@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { servicePrescriptionItems } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { servicePrescriptionItemUpdateSchema } from '@/lib/api-schemas/prescriptions';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 

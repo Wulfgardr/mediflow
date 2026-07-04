@@ -3,13 +3,13 @@ import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 import {
     canTransitionDocumentOcrQueueState,
     isDocumentOcrQueueState,
     type DocumentOcrQueueState,
-} from '@/lib/document-ocr-queue';
+} from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
 import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */

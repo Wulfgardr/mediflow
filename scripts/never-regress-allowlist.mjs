@@ -2,7 +2,7 @@
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
         {
-            path: 'lib/audit.test.ts',
+            path: 'lib/security/audit.test.ts',
             pattern: "username:\\s*'admin'",
             reason: 'Audit tests use a synthetic native admin actor to verify attribution without relying on live credentials.',
         },
@@ -77,7 +77,7 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Network operating mode tests use a synthetic paired operator fixture to render the session-bound UI state without real credentials.',
         },
         {
-            path: 'lib/settings-write-policy.test.ts',
+            path: 'lib/security/settings-write-policy.test.ts',
             pattern: "username:\\s*'policy-user'",
             reason: 'Settings write-policy tests build a synthetic ServerSession fixture to exercise the per-channel write allowlist matrix without real credentials.',
         },
@@ -129,7 +129,7 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Home-base paired-store tests use a synthetic .test server URL to verify trimmed persistence without contacting a live endpoint.',
         },
         {
-            path: 'lib/request-transport.test.ts',
+            path: 'lib/security/request-transport.test.ts',
             pattern: 'http://mediflow-home\\.local:3000/api/auth/login',
             reason: 'Request-transport tests use a synthetic LAN .local Host fixture to verify the TLS-proxy marker still asserts secure cookies on a non-loopback paired host; no runtime egress occurs.',
         },

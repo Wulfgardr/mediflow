@@ -3,11 +3,11 @@ import type {
     ExtractedPatientData,
     ExtractedPatientReviewDiagnosis,
     ExtractedPatientReviewTherapy,
-} from './pdf-service';
+} from '../../pdf-service';
 /* @Codex */
-import { searchICDHybrid, type ICDSearchResult } from './icd-service';
+import { searchICDHybrid, type ICDSearchResult } from '../../icd-service';
 /* @Codex */
-import { type AifaDrug } from './db';
+import { type AifaDrug } from '../../db';
 /* @Codex */
 import {
     buildDiagnosisSearchQueries,
@@ -24,9 +24,9 @@ import { splitDocumentIntoLines } from './document-excerpt';
 import {
     type SmartImportDiagnosisExtraction,
     type SmartImportTherapyExtraction,
-} from './ai-task-contracts';
+} from '../../ai-task-contracts';
 /* @Codex */
-import { isServicePrescriptionLikeTherapy } from './prescription-boundary';
+import { isServicePrescriptionLikeTherapy } from '../../prescription-boundary';
 
 /* @Codex */
 const DOSAGE_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b(?:\s*[^\n,;]*)?/i;

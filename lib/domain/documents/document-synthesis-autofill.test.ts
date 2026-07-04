@@ -1,12 +1,12 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LOCKED_DATA_PLACEHOLDER } from './locked-field-guard';
+import { LOCKED_DATA_PLACEHOLDER } from '../../locked-field-guard';
 import {
     buildDocumentSynthesisAutofillPlan,
     parseExistingDocumentSynthesisDiagnoses,
 } from './document-synthesis-autofill';
-import type { Diagnosis, DocumentDiagnosisSuggestion } from './db';
+import type { Diagnosis, DocumentDiagnosisSuggestion } from '../../db';
 
 const baseSuggestion: DocumentDiagnosisSuggestion = {
     code: 'I10',

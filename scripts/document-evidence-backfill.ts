@@ -10,7 +10,7 @@ import {
     type DocumentEvidenceBackfillAttachmentInput,
     type DocumentEvidenceBackfillDecision,
     type DocumentEvidenceBackfillPlan,
-} from '../lib/document-evidence-backfill';
+} from '../lib/domain/documents/document-evidence-backfill';
 
 type CliArgs = {
     input: string | null;

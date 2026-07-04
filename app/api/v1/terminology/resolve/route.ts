@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { and, asc, isNotNull, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import {
     applyTerminologyRegistryVersion,
     findTerminologyRegistryEntry,

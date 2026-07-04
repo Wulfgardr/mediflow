@@ -6,7 +6,7 @@ import { routeDocumentClass } from './document-class-router';
 import {
     getRememberedPdfDocumentMetadata,
     type PdfDocumentMetadata,
-} from './pdf-document-metadata';
+} from '../../pdf-document-metadata';
 
 /* @Codex */
 export interface DocumentSynthesisRoutingOptions {

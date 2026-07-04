@@ -1,13 +1,13 @@
 /* @Codex */
-import type { DocumentQualityLevel } from './db';
+import type { DocumentQualityLevel } from '../../db';
 /* @Codex */
 import type {
     ExtractedPatientData,
     ExtractedPatientReviewDiagnosis,
     ExtractedPatientReviewTherapy,
-} from './pdf-service';
+} from '../../pdf-service';
 /* @Codex */
-import type { SmartImportServicePrescriptionExtraction, TherapySuggestionState } from './ai-task-contracts';
+import type { SmartImportServicePrescriptionExtraction, TherapySuggestionState } from '../../ai-task-contracts';
 /* @Codex */
 import { splitDocumentIntoLines } from './document-excerpt';
 /* @Codex */

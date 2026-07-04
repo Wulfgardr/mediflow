@@ -1,6 +1,6 @@
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { listAmbulatorySummaries } from '@/lib/ambulatory-read';
 
 export async function GET(request: Request) {

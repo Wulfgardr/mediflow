@@ -7,13 +7,13 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 /* @Codex */
 import { dbServer } from '@/lib/db-server';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 // Lazy KDF upgrade: persists a re-wrapped master-key blob (and its salt) without
 // touching the PIN. The client calls this after a successful login when the

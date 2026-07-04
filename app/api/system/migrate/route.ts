@@ -4,7 +4,7 @@ import { isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 
 export const dynamic = 'force-dynamic';
 

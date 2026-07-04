@@ -1,6 +1,6 @@
 /* @Codex */
-import type { ServerSession } from '@/lib/server-session';
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import type { ServerSession } from '@/lib/security/server-session';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
 // D2 (WAVE 2 security hardening): the settings write routes previously accepted
 // arbitrary key/value writes gated only by requireSessionOrLocalToken, which

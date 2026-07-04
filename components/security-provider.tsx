@@ -7,14 +7,14 @@ import {
     CURRENT_KDF_VERSION,
     wrapMasterKeyVersioned,
     unwrapMasterKeyVersioned,
-} from '@/lib/security';
+} from '@/lib/security/security';
 /* @Codex */
 import {
     createPinRotationBundle,
     formatPinChangeFailure,
     type PinChangeFailurePayload,
     validatePinChangeInput,
-} from '@/lib/pin-change';
+} from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
@@ -27,7 +27,7 @@ import {
     clearSecuritySession,
     persistSecuritySession,
     restoreSecuritySession,
-} from '@/lib/client-security-session';
+} from '@/lib/security/client-security-session';
 /* @Codex */
 import { notifyDbChange } from '@/lib/live-query';
 /* @Codex */
@@ -41,7 +41,7 @@ import {
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
-} from '@/lib/client-auth-api';
+} from '@/lib/security/client-auth-api';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
 

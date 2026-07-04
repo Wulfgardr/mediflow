@@ -9,7 +9,7 @@ Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-s
 ## Crittografia zero-knowledge per campo
 
 - `crypto-golden-vectors.v1.json` — vettori FROZEN, byte-exact, generati dalle
-  primitive WebCrypto del riferimento web ([lib/security.ts](../../lib/security.ts)):
+  primitive WebCrypto del riferimento web ([lib/security/security.ts](../../lib/security/security.ts)):
   KEK = PBKDF2-HMAC-SHA256(PIN, salt, 100000); master key AES-256-GCM wrappata
   `base64(iv12 || GCM(rawKey, KEK))`; campi `ENC:base64(iv12):base64(ct||tag)` con
   plaintext = `JSON.stringify(value)`.
@@ -24,7 +24,7 @@ Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-s
   fixture e verifica `deriveKEK`, `unwrapMasterKey`, `decryptField`.
   Esecuzione: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
   swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests`.
-- **Web (riferimento):** [lib/security.ts](../../lib/security.ts) e la sorgente da
+- **Web (riferimento):** [lib/security/security.ts](../../lib/security/security.ts) e la sorgente da
   cui i vettori sono derivati (verificato: `arrayBufferToBase64` produce gli stessi
   base64).
 - **Windows-MSVC / Linux (prossimo):** stessi vettori, stesso test, una volta

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseItalianDate } from './italian-date';
+import { parseItalianDate } from '../../italian-date';
 /* @Codex */
 import { extractDocumentWithAI } from './ocr-service';
 /* @Codex */
-import type { AIService, ChatMessage } from './ai-service';
+import type { AIService, ChatMessage } from '../../ai-service';
 
 function isoDate(value: Date | undefined): string | undefined {
     return value?.toISOString().slice(0, 10);

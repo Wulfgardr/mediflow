@@ -1,5 +1,5 @@
 // D2 security hardening: coverage for the settings write allowlist matrix.
-// Run with: node scripts/run-strip-types.mjs --test lib/settings-write-policy.test.ts
+// Run with: node scripts/run-strip-types.mjs --test lib/security/settings-write-policy.test.ts
 
 import assert from 'node:assert/strict';
 import test from 'node:test';

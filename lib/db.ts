@@ -1,7 +1,7 @@
 // API Client Facade for SQLite Backend
 // Replaces Dexie DB with Fetch calls
 
-import { encryptData, decryptData } from './security';
+import { encryptData, decryptData } from './security/security';
 import { notifyDbChange } from './live-query';
 import {
     LOCKED_DATA_PLACEHOLDER,
@@ -21,8 +21,8 @@ import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 /* @Codex */
-import type { DocumentEvidencePack } from './document-evidence-pack';
-import type { DocumentOcrQueueReason, DocumentOcrQueueState } from './document-ocr-queue';
+import type { DocumentEvidencePack } from './domain/documents/document-evidence-pack';
+import type { DocumentOcrQueueReason, DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
 /* @Codex */
 import {
     buildApiTableFetchErrorMessage,

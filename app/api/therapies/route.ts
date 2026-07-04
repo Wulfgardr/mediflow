@@ -4,11 +4,11 @@ import { therapies } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 /* @Codex */

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 /* @Codex */
 import { buildPatientDocumentReviewDraft } from './patient-document-review';
 /* @Codex */
-import type { ExtractedPatientData } from './pdf-service';
+import type { ExtractedPatientData } from '../../pdf-service';
 
 test('document review suggests only compact recent follow-up notes and leaves them opt-in', () => {
     const data: ExtractedPatientData = {

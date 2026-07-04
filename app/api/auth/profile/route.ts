@@ -3,7 +3,7 @@ import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { authProfileUpdateSchema } from '@/lib/api-schemas/auth';
 /* @Codex */

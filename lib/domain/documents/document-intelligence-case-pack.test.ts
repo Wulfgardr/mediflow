@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function readFixture(name: string): unknown {
-    const filePath = path.join(__dirname, '..', 'scripts', 'fixtures', name);
+    const filePath = path.join(__dirname, '..', '..', '..', 'scripts', 'fixtures', name);
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 

@@ -1,4 +1,4 @@
-import type { DocumentInsight } from './db';
+import type { DocumentInsight } from '../../db';
 
 /* @Codex */
 export type DedupedDocumentInsightsResult = {

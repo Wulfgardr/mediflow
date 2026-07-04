@@ -1,7 +1,7 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 /* @Codex */
 import { confirmNetworkPairingIntent } from '@/lib/network-home-base-server';
 

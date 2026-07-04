@@ -1146,8 +1146,8 @@ function getRepoTouchpoints(lane: DistillationLane, primaryLayer: EvolutionLayer
         }
         if (primaryLayer === 'retrieval-ranking') {
             touchpoints.add('lib/ai-context.ts');
-            touchpoints.add('lib/document-evidence-pack.ts');
-            touchpoints.add('lib/document-excerpt.ts');
+            touchpoints.add('lib/domain/documents/document-evidence-pack.ts');
+            touchpoints.add('lib/domain/documents/document-excerpt.ts');
         }
         if (primaryLayer === 'post-processing') {
             touchpoints.add('lib/ai-summary-service.ts');
@@ -1171,22 +1171,22 @@ function getRepoTouchpoints(lane: DistillationLane, primaryLayer: EvolutionLayer
     if (lane === 'smart_import' || lane === 'cross-lane') {
         if (primaryLayer === 'prompt-builder') {
             touchpoints.add('lib/ai-task-contracts.ts');
-            touchpoints.add('lib/patient-smart-import-service.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-service.ts');
         }
         if (primaryLayer === 'retrieval-ranking') {
-            touchpoints.add('lib/patient-smart-import-service.ts');
-            touchpoints.add('lib/patient-smart-import-matching.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-service.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-matching.ts');
         }
         if (primaryLayer === 'post-processing') {
-            touchpoints.add('lib/patient-smart-import-service.ts');
-            touchpoints.add('lib/patient-smart-import-matching.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-service.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-matching.ts');
         }
         if (primaryLayer === 'contract-renderer') {
             touchpoints.add('lib/ai-task-contracts.ts');
-            touchpoints.add('lib/patient-smart-import-service.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-service.ts');
         }
         if (primaryLayer === 'guardrails') {
-            touchpoints.add('lib/patient-smart-import-service.ts');
+            touchpoints.add('lib/domain/documents/patient-smart-import-service.ts');
             touchpoints.add('components/patient-smart-import-panel.tsx');
         }
         if (primaryLayer === 'benchmark-corpus') {

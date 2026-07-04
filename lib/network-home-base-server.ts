@@ -39,7 +39,7 @@ import { getNetworkAiRuntimeSummary as resolveNetworkAiRuntimeSummary } from '@/
 /* @Codex */
 import { getNetworkIdentitySummary as resolveNetworkIdentitySummary } from '@/lib/network-identity';
 /* @Codex */
-import type { ServerSession } from '@/lib/server-session';
+import type { ServerSession } from '@/lib/security/server-session';
 /* @Codex */
 import { authenticatePairedClientRequest } from '@/lib/network-paired-client-auth';
 

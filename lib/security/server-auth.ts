@@ -6,9 +6,9 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
-import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/server-session';
+import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
 /* @Codex */
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 
 export async function requireSession(): Promise<ServerSession | null> {
     const cookieStore = await cookies();

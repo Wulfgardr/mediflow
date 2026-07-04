@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
-import { ensureAuditSqliteSchema } from '@/lib/audit-db';
+import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';

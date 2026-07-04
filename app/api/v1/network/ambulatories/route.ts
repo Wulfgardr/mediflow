@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
 import { getNetworkModeGateResponse } from '@/lib/network-write-context';
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { listAmbulatorySummaries } from '@/lib/ambulatory-read';
 
 // A18: the paired Apple app needs the real ambulatory list to drive its scope

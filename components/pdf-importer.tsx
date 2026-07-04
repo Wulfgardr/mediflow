@@ -6,12 +6,12 @@ import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive }
 import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
-import { analyzeDocumentContent, synthesizeDocument } from '@/lib/document-synthesis-service';
+import { analyzeDocumentContent, synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
-import { enrichExtractedPatientDataForReview } from '@/lib/patient-document-import-service';
+import { enrichExtractedPatientDataForReview } from '@/lib/domain/documents/patient-document-import-service';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     AiDocumentSynthesisDisabledError,

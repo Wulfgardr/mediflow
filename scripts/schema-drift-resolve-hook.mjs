@@ -44,7 +44,7 @@ registerHooks({
             }
             const target = resolveAliasedPath(path.join(ROOT_DIR, specifier.slice(2)));
             // Short-circuit rather than delegating to nextResolve: db-server.ts
-            // imports "@/lib/audit-db" without a "./" prefix or extension, so the
+            // imports "@/lib/security/audit-db" without a "./" prefix or extension, so the
             // strip-types loader transpiles it to CommonJS and emits a require().
             // Handing a "file://.../audit-db.ts" URL back to the default CJS
             // resolver via nextResolve makes it throw MODULE_NOT_FOUND (it will

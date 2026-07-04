@@ -23,7 +23,7 @@ import {
     buildPatientDocumentReviewDraft,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
-} from '@/lib/patient-document-review';
+} from '@/lib/domain/documents/patient-document-review';
 
 /* @Codex */
 type ImportedServicePrescriptionDraft = NonNullable<ReviewedPatientImportDefaults['servicePrescriptions']>[number];

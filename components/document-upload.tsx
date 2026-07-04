@@ -20,13 +20,13 @@ import {
     evaluateDocumentOcrQueueCandidate,
     type DocumentOcrQueueReason,
     type DocumentOcrQueueState,
-} from '@/lib/document-ocr-queue';
+} from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 /* @Codex */
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
-import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
+import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';

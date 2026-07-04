@@ -3,13 +3,13 @@
  * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> prudent ICD autofill
  */
 
-import { AIService } from './ai-service';
+import { AIService } from '../../ai-service';
 import type {
     DocumentInsight,
-} from './db';
-import { db } from './db';
+} from '../../db';
+import { db } from '../../db';
 import { v4 as uuid } from 'uuid';
-import { buildDocumentSynthesisExtractionPrompt } from './ai-task-contracts';
+import { buildDocumentSynthesisExtractionPrompt } from '../../ai-task-contracts';
 import {
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
@@ -31,7 +31,7 @@ import {
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     assertAiDocumentSynthesisEnabledValue,
-} from './ai-document-synthesis-kill-switch';
+} from '../../ai-document-synthesis-kill-switch';
 /* @Codex */
 import {
     buildDocumentSynthesisAutofillPlan,

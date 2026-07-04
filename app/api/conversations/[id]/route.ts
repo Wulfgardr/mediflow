@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { conversations, messages } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { conversationUpdateSchema } from '@/lib/api-schemas/conversations';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
