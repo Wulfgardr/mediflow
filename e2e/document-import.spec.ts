@@ -1,26 +1,28 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, waitForUnlockedInteractiveShell } from './utils';
+import { bootstrapUnlockedSession, setAiLaneKillSwitch, waitForUnlockedInteractiveShell } from './utils';
 
 const TEST_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9X8gAAAABJRU5ErkJggg==';
 
-// WUL-274/Kree8 fixme: the assisted-import reconciliation UI this test drives was
-// redesigned. The "Importazione assistita pronta per review" / "Conferma cosa applicare
-// al form" / "Applica al form" review-modal flow no longer exists (now a
-// PatientDocumentReviewList with heading "Documento pronto: scegli cosa portare nella
-// scheda"), the submit button is "Crea scheda" (not "Crea Nuova Scheda"), and the
-// post-create cockpit dropped the patients-search-input navigation. Rewriting against
-// the new multi-component flow (and re-deriving the ollama document_synthesis mock
-// contract) is out of scope for this selector-repair pass.
-test.fixme('document import reconciles diagnoses and therapies before patient creation', async ({ page }) => {
+// WUL-274/Kree8 rewrite: drives the current assisted-import review flow on /patients/new.
+// PdfImporter (OCR mock) -> document_synthesis via /api/proxy/ollama/chat (envelope
+// mediflow.ai.extract.v1) -> local reconciliation (/api/icd/proxy + /api/drugs mocks) ->
+// PatientDocumentImportReview ("Scegli cosa portare nella scheda" / "Porta nella scheda")
+// -> PatientForm prefill -> "Crea scheda". The created patient id is taken from the
+// POST /api/patients response, so the verification never re-finds by tax code.
+test('document import review proposes extracted data and creates the scheda with them', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
-  const suffix = `${Date.now()}`.slice(-3);
+  const digits = `${Date.now()}`.slice(-5);
+  const suffix = digits.slice(-3);
   const firstName = `Smoke${suffix}`;
   const lastName = `Import${suffix}`;
-  const taxCode = `TSTDOC80A01H${suffix}X`;
+  // Valid codice fiscale shape; five timestamp digits keep reruns on a persistent
+  // e2e DB from colliding with previously created patients.
+  const taxCode = `TSTDOC${digits.slice(0, 2)}A01H${digits.slice(2)}X`;
   const diagnosisLabel = 'Diabete mellito tipo 2';
 
+  // Local OCR endpoint: the same payload serves both 'patient' and 'full' modes.
   await page.route('**/api/ocr/extract', async (route) => {
     await route.fulfill({
       status: 200,
@@ -41,6 +43,7 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
     });
   });
 
+  // Local ICD-11 resolution used by the review enrichment for problemStatements.
   await page.route('**/api/icd/proxy**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -56,6 +59,7 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
     });
   });
 
+  // Local AIFA catalog used to reconcile therapy candidates.
   await page.route('**/api/drugs**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -73,6 +77,11 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
     });
   });
 
+  // document_synthesis contract: the prompt embeds the JSON envelope template with
+  // "task": "document_synthesis"; the reply must carry the same envelope
+  // (schemaVersion mediflow.ai.extract.v1) with data.{qualityLevel,qualityReason,
+  // medications,diagnoses,problemStatements,therapyCandidates,servicePrescriptions}.
+  // AIService accepts both native Ollama and OpenAI-style bodies; we answer OpenAI-style.
   await page.route('**/api/proxy/ollama/chat', async (route) => {
     const request = route.request();
     const body = JSON.parse(request.postData() || '{}');
@@ -87,58 +96,55 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
           {
             message: {
               content: JSON.stringify({
-                ...(isDocumentSynthesis
+                schemaVersion: 'mediflow.ai.extract.v1',
+                task: 'document_synthesis',
+                summary: isDocumentSynthesis
+                  ? 'Diabete mellito tipo 2 con terapia insulinica documentata.'
+                  : 'Fallback',
+                data: isDocumentSynthesis
                   ? {
-                      schemaVersion: 'mediflow.ai.extract.v1',
-                      task: 'document_synthesis',
-                      summary: 'Diabete mellito tipo 2 con terapia insulinica documentata.',
-                      data: {
-                        qualityLevel: 'green',
-                        qualityReason: 'Documento leggibile con codice ICD esplicito',
-                        medications: ['Humalog 4 U ai pasti principali'],
-                        diagnoses: [
-                          {
-                            code: '5A11',
-                            description: diagnosisLabel,
-                            system: 'ICD-11',
-                            evidence: 'ICD-11 5A11',
-                            confidence: 'high',
-                          },
-                        ],
-                        problemStatements: [
-                          {
-                            label: diagnosisLabel,
-                            icdQuery: 'type 2 diabetes mellitus',
-                            confidence: 'high',
-                            evidence: 'ICD-11 5A11',
-                          },
-                        ],
-                        therapyCandidates: [
-                          {
-                            drugMention: 'Humalog',
-                            drugQuery: 'insulina lispro',
-                            activePrinciple: 'Insulina lispro',
-                            dosage: '4 U ai pasti principali',
-                            confidence: 'high',
-                            evidence: 'Terapia alla dimissione: Humalog 4 U ai pasti principali',
-                            therapyState: 'active',
-                          },
-                        ],
-                      },
+                      qualityLevel: 'green',
+                      qualityReason: 'Documento leggibile con codice ICD esplicito',
+                      medications: ['Humalog 4 U ai pasti principali'],
+                      diagnoses: [
+                        {
+                          code: '5A11',
+                          description: diagnosisLabel,
+                          system: 'ICD-11',
+                          evidence: 'ICD-11 5A11',
+                          confidence: 'high',
+                        },
+                      ],
+                      problemStatements: [
+                        {
+                          label: diagnosisLabel,
+                          icdQuery: 'type 2 diabetes mellitus',
+                          confidence: 'high',
+                          evidence: 'ICD-11 5A11',
+                        },
+                      ],
+                      therapyCandidates: [
+                        {
+                          drugMention: 'Humalog',
+                          drugQuery: 'insulina lispro',
+                          activePrinciple: 'Insulina lispro',
+                          dosage: '4 U ai pasti principali',
+                          confidence: 'high',
+                          evidence: 'Terapia alla dimissione: Humalog 4 U ai pasti principali',
+                          therapyState: 'active',
+                        },
+                      ],
+                      servicePrescriptions: [],
                     }
                   : {
-                      schemaVersion: 'mediflow.ai.extract.v1',
-                      task: 'document_synthesis',
-                      summary: 'Fallback',
-                      data: {
-                        qualityLevel: 'yellow',
-                        qualityReason: 'Fallback inatteso',
-                        medications: [],
-                        diagnoses: [],
-                        problemStatements: [],
-                        therapyCandidates: [],
-                      },
-                    }),
+                      qualityLevel: 'yellow',
+                      qualityReason: 'Fallback inatteso',
+                      medications: [],
+                      diagnoses: [],
+                      problemStatements: [],
+                      therapyCandidates: [],
+                      servicePrescriptions: [],
+                    },
               })
             }
           }
@@ -152,9 +158,25 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
   });
 
   await bootstrapUnlockedSession(page, pin);
+
+  // The document synthesis lane is fail-closed: on a fresh e2e DB the setting is
+  // absent, which counts as disabled. Enable it explicitly; the suite convention
+  // (see the smart-import specs) is that lanes stay 'enabled' after the specs run.
+  await setAiLaneKillSwitch(page, 'aiDocumentSynthesisKillSwitch', 'enabled');
+
+  // PdfImporter reads the kill switch through a live query on mount: wait for that
+  // settings read to land (plus hydration) before uploading, otherwise the drop
+  // handler can still run with the fail-closed default and skip the synthesis.
+  const killSwitchSettled = page.waitForResponse((response) =>
+    response.url().includes('/api/settings/aiDocumentSynthesisKillSwitch')
+    && response.request().method() === 'GET'
+  );
   await page.goto('/patients/new');
 
-  await expect(page.getByRole('heading', { name: /Nuova (Anagrafica|Paziente)/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Nuova scheda' })).toBeVisible();
+  await killSwitchSettled;
+  await waitForUnlockedInteractiveShell(page);
+  await expect(page.getByTestId('document-synthesis-disabled-note')).toHaveCount(0);
 
   const uploadInput = page.getByLabel('Carica documento');
   await uploadInput.setInputFiles({
@@ -163,37 +185,47 @@ test.fixme('document import reconciles diagnoses and therapies before patient cr
     buffer: Buffer.from(TEST_PNG_BASE64, 'base64')
   });
 
-  await expect(page.getByRole('heading', { name: 'Importazione assistita pronta per review' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('heading', { name: 'Conferma cosa applicare al form' })).toBeVisible();
-  await expect(page.locator('input[value="Humalog KwikPen"]').first()).toBeVisible();
-  await expect(page.locator('input[value="4 U ai pasti principali"]').first()).toBeVisible();
+  // The review flow surfaces both the status alert and the review panel.
+  await expect(
+    page.getByRole('heading', { name: 'Documento pronto: scegli cosa portare nella scheda' })
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Scegli cosa portare nella scheda', exact: true })).toBeVisible();
+
+  // Reconciled proposals: one AIFA-matched therapy card and one coded diagnosis card.
+  await expect(page.getByPlaceholder('Nome farmaco')).toHaveValue('Humalog KwikPen');
+  await expect(page.getByPlaceholder('Posologia')).toHaveValue('4 U ai pasti principali');
+  await expect(page.locator('input[value="5A11"]')).toBeVisible();
+  await expect(page.locator(`input[value="${diagnosisLabel}"]`)).toBeVisible();
+
   await waitForUnlockedInteractiveShell(page);
+  await page.getByRole('button', { name: 'Porta nella scheda' }).click();
 
-  await page.getByRole('button', { name: 'Applica al form' }).click();
-
+  // The reviewed defaults land in the patient form.
   await expect(page.getByPlaceholder('RSSMRA80A01H501U')).toHaveValue(taxCode);
-  await expect(page.getByPlaceholder('Es. 8A80.0').first()).toHaveValue('5A11');
-  await expect(page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)').first()).toHaveValue(
+  await expect(page.getByPlaceholder('Es. 8A80.0')).toHaveValue('5A11');
+  await expect(page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)')).toHaveValue(
     `5A11 - ${diagnosisLabel}`
   );
 
-  await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
-
-  await expect(page).toHaveURL(/\/$/);
-  const search = page.getByTestId('patients-search-input');
-  await search.fill(lastName);
-  const patientCard = page.getByRole('article').filter({ hasText: `${lastName} ${firstName}` }).first();
-  await expect(patientCard).toBeVisible();
-  const patientLink = patientCard.getByRole('link', { name: /Apri/ }).first();
-  await waitForUnlockedInteractiveShell(page);
-  await Promise.all([
-    page.waitForURL(/\/patients\/.+/, { timeout: 20_000 }),
-    patientLink.click(),
+  const [createResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().endsWith('/api/patients') && response.request().method() === 'POST',
+      { timeout: 20_000 },
+    ),
+    page.getByRole('button', { name: 'Crea scheda' }).click(),
   ]);
+  expect(createResponse.ok()).toBe(true);
+  const created = await createResponse.json() as { id?: string };
+  expect(created.id).toBeTruthy();
 
-  await expect(page.getByText('Caricamento cartella paziente...')).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByText('5A11', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(diagnosisLabel).first()).toBeVisible();
+  // Post-create the cockpit lands on the home shell with the new patient selected
+  // (/?area=turno&paziente=<id>): only require leaving the create form.
+  await page.waitForURL((url) => !url.pathname.startsWith('/patients/new'), { timeout: 20_000 });
+
+  // The created scheda carries the reviewed diagnosis and the structured therapy.
+  // The Scheda summary renders the lead diagnosis as "<code> · <descrizione>".
+  await page.goto(`/patients/${created.id}/modules`);
+  await expect(page.getByText(`5A11 · ${diagnosisLabel}`).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Humalog KwikPen').first()).toBeVisible();
   await expect(page.getByText('4 U ai pasti principali').first()).toBeVisible();
 });

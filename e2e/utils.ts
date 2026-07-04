@@ -114,6 +114,38 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
 }
 
 /* @Codex */
+export async function openAiFunzioniSettings(page: Page): Promise<void> {
+  // The funzioni page loads the stored kill-switch values asynchronously on mount and
+  // overwrites the optimistic switch defaults once the read lands (loadAiConfig in
+  // lib/hooks/use-ai-settings-controller.ts). A toggle clicked before that reset gets
+  // silently undone. Wait for the last settings read of the load (aiInsightManualConfig,
+  // fetched in the final Promise.all) plus a short stabilization delay before letting
+  // the caller interact with the switches.
+  const settingsSettled = page.waitForResponse((response) =>
+    response.url().includes('/api/settings/aiInsightManualConfig')
+    && response.request().method() === 'GET'
+  );
+  await page.goto('/settings/ai/funzioni');
+  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
+  await settingsSettled;
+  await page.waitForTimeout(250);
+}
+
+/* @Codex */
+export async function setAiLaneKillSwitch(page: Page, key: string, value: 'enabled' | 'disabled'): Promise<void> {
+  await page.evaluate(async ({ settingKey, settingValue }) => {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: settingKey, value: settingValue }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+  }, { settingKey: key, settingValue: value });
+}
+
+/* @Codex */
 export async function waitForUnlockedInteractiveShell(page: Page): Promise<void> {
   // WUL-274/Kree8: the lock shell is identified by aria-label="MediFlow lock screen"
   // (components/lock-screen.tsx). The setup and onboarding surfaces are keyed by their
