@@ -1,7 +1,7 @@
 'use client';
 
 /* WUL-262 compact "cosa rivedere adesso" summary for patient detail.
-   Thin renderer over lib/patient-review-queue-summary: every row anchors to an
+   Thin renderer over lib/domain/documents/patient-review-queue-summary: every row anchors to an
    existing panel (or states explicitly why the panel is not visible) without
    duplicating panel content. */
 
