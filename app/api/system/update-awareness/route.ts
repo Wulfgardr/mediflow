@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getAppBranch, getAppRevision } from '@/lib/app-revision';
 import { readUpdateAwarenessPayload } from '@/lib/update-awareness';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export const dynamic = 'force-dynamic';
 

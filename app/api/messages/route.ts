@@ -4,7 +4,7 @@ import { messages } from '@/lib/schema';
 import { eq, asc, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';

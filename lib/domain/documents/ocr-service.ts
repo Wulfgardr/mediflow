@@ -5,8 +5,8 @@
  * Part of the "Virtual Secretariat" in MediFlow's Clinical AI Team.
  */
 
-import { AIService, ChatMessageContent } from './ai-service';
-import { parseItalianDate } from './italian-date';
+import { AIService, ChatMessageContent } from '../../ai-service';
+import { parseItalianDate } from '../../italian-date';
 
 // Structured extraction result
 export interface ExtractedDocumentData {

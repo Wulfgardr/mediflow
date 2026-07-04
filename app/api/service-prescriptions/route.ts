@@ -4,8 +4,8 @@ import { desc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { servicePrescriptions } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { servicePrescriptionCreateSchema } from '@/lib/api-schemas/prescriptions';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 

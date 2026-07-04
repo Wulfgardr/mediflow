@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 /* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
-import { requireSession, requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import {
     getNetworkAiRuntimeSummary,

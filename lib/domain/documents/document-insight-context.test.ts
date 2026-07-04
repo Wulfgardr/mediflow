@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { DocumentInsight } from './db';
+import type { DocumentInsight } from '../../db';
 import { dedupeDocumentInsightsForContext } from './document-insight-context';
 
 test('dedupeDocumentInsightsForContext keeps the richer document for the same dated episode', () => {

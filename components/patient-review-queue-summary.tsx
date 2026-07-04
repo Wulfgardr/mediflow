@@ -12,7 +12,7 @@ import type {
     PatientReviewQueueRow,
     PatientReviewQueueSummary,
     ReviewQueueRowState,
-} from '@/lib/patient-review-queue-summary';
+} from '@/lib/domain/documents/patient-review-queue-summary';
 
 interface PatientReviewQueueSummaryProps {
     summary: PatientReviewQueueSummary;

@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { therapyUpdateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */

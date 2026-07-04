@@ -1,5 +1,5 @@
 /* @Codex */
-import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './audit';
+import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './security/audit';
 /* @Codex */
 import type { SissTransportMode } from './siss-adapter';
 

@@ -12,7 +12,7 @@ import {
 /* @Codex */
 import { buildPatientDocumentReviewDraft } from './patient-document-review';
 /* @Codex */
-import type { ExtractedPatientData } from './pdf-service';
+import type { ExtractedPatientData } from '../../pdf-service';
 
 test('patient import target prefers merge when tax code matches one existing patient', () => {
     const decision = decidePatientImportTarget({

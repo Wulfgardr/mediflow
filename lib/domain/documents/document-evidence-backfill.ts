@@ -1,5 +1,5 @@
 /* @Codex */
-import type { DocumentQualityLevel } from './db';
+import type { DocumentQualityLevel } from '../../db';
 /* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,

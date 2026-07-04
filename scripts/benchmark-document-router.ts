@@ -1,8 +1,8 @@
 /* @Codex */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { routeDocumentClass, type DocumentClassRouterInput } from '../lib/document-class-router';
-import type { DocumentDecisionClassification } from '../lib/document-decision';
+import { routeDocumentClass, type DocumentClassRouterInput } from '../lib/domain/documents/document-class-router';
+import type { DocumentDecisionClassification } from '../lib/domain/documents/document-decision';
 
 /* @Codex */
 export interface DocumentRouterBenchmarkEntry {

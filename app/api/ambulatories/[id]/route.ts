@@ -3,7 +3,7 @@ import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): only active patients block ambulatory deletion
 import { activePatients } from '@/lib/patient-lifecycle';
 

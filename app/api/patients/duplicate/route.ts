@@ -4,7 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing

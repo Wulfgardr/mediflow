@@ -4,11 +4,11 @@ import { users, settings } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 /* @Codex */
-import { auditSourceSurfaceFromRequest } from '@/lib/audit';
+import { auditSourceSurfaceFromRequest } from '@/lib/security/audit';
 /* @Codex */
-import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+import { createSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
-import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 /* @Codex */
 import { authSetupSchema } from '@/lib/api-schemas/auth';
 /* @Codex */

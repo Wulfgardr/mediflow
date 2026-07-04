@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { type AifaDrug, type Therapy } from './db';
+import { type AifaDrug, type Therapy } from '../../db';
 import {
     buildDiagnosisSearchQueries,
     classifyExtractedTherapyState,

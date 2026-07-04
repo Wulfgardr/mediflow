@@ -12,11 +12,11 @@ import {
     shouldRetainReviewTherapy,
 } from './patient-document-import-service';
 /* @Codex */
-import { mergeExtractedPatientDataWithTextFallback, parsePatientData } from './pdf-service';
+import { mergeExtractedPatientDataWithTextFallback, parsePatientData } from '../../pdf-service';
 /* @Codex */
-import type { ExtractedPatientReviewTherapy } from './pdf-service';
+import type { ExtractedPatientReviewTherapy } from '../../pdf-service';
 /* @Codex */
-import type { SmartImportTherapyExtraction } from './ai-task-contracts';
+import type { SmartImportTherapyExtraction } from '../../ai-task-contracts';
 
 const DISCHARGE_DOCUMENT = [
     'APR: Ipovisus, Disturbo psichiatrico non meglio precisato, Diabete mellito',

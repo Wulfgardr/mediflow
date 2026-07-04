@@ -6,7 +6,7 @@ import {
     type SmartImportTherapyExtraction,
     type DocumentDiagnosisSuggestionContract,
     type DocumentQualityLevel,
-} from './ai-task-contracts';
+} from '../../ai-task-contracts';
 
 /* @Codex */
 export type { DocumentQualityLevel };

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { observations, patients, therapies } from '@/lib/schema';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): soft-deleted patients are not addressable for FSE validation
 import { activePatients } from '@/lib/patient-lifecycle';
 import {

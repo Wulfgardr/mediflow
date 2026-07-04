@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { hasValidLocalApiToken } from './local-api-auth';
-import { auditEvents } from './schema';
+import { auditEvents } from '../schema';
 import type { ServerSession } from './server-session';
 
 /* @Codex */
@@ -298,7 +298,7 @@ export function classifyPatientMutationEvent(previousIsArchived: boolean | null,
 
 /* @Codex */
 export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
-    const { dbServer } = await import('./db-server');
+    const { dbServer } = await import('../db-server');
     const eventId = uuidv4();
     const occurredAt = input.occurredAt ?? new Date();
     const redactedMetadata = sanitizeAuditMetadata(input.redactedMetadata);
@@ -324,7 +324,7 @@ export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
 
 /* @Codex */
 export async function listAuditEvents(filters: AuditListFilters = {}): Promise<AuditRecord[]> {
-    const { dbServer } = await import('./db-server');
+    const { dbServer } = await import('../db-server');
     const limit = normalizeLimit(filters.limit);
     const clauses = [];
 

@@ -1,5 +1,5 @@
 /* @Codex */
-import type { DocumentDiagnosisSuggestion, DocumentInsight, DocumentQualityLevel } from './db';
+import type { DocumentDiagnosisSuggestion, DocumentInsight, DocumentQualityLevel } from '../../db';
 /* @Codex */
 import type { DocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 /* @Codex */

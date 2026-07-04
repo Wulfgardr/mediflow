@@ -1,12 +1,12 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { deleteSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/server-session';
+import { deleteSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
 /* @Codex */
-import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
-import { requireSession } from '@/lib/server-auth';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
+import { requireSession } from '@/lib/security/server-auth';
 /* @Codex */
-import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 export async function POST(request: Request) {
     const session: ServerSession | null = await requireSession();

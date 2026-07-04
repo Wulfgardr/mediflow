@@ -8,7 +8,7 @@ import {
     writeAuditEvent,
     type AuditEventType,
     type AuditRedactedMetadata,
-} from './audit';
+} from './security/audit';
 /* @Codex */
 import { dbServer } from './db-server';
 import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
@@ -23,7 +23,7 @@ import { patients, patientsToAmbulatories } from './schema';
 /* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 /* @Codex */
-import type { ServerSession } from './server-session';
+import type { ServerSession } from './security/server-session';
 
 /* @Codex */
 export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-profile';

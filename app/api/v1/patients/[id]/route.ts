@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { PatientDetail } from '@/lib/api/v1/types';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
@@ -21,7 +21,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;

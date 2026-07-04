@@ -4,7 +4,7 @@ import { conversations } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { conversationCreateSchema } from '@/lib/api-schemas/conversations';
 /* @Codex */

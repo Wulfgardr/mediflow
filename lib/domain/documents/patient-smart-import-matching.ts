@@ -1,8 +1,8 @@
 import {
     type SmartImportDiagnosisExtraction as ParsedAiDiagnosis,
     type SmartImportTherapyExtraction as ParsedAiTherapy,
-} from './ai-task-contracts';
-import { type AifaDrug, type Therapy } from './db';
+} from '../../ai-task-contracts';
+import { type AifaDrug, type Therapy } from '../../db';
 
 export type SmartImportReviewState =
     | 'new'

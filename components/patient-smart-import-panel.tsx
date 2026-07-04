@@ -30,8 +30,8 @@ import {
     type SmartImportReviewState,
     type TherapySmartImportSuggestion,
     type TherapySuggestionState,
-} from '@/lib/patient-smart-import-service';
-import type { SmartImportReviewSnapshot } from '@/lib/patient-review-queue-summary';
+} from '@/lib/domain/documents/patient-smart-import-service';
+import type { SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
 
 interface PatientSmartImportPanelProps {
     patient: Patient;

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
 import { activePatients } from '@/lib/patient-lifecycle';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
@@ -29,7 +29,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 
 /* @Codex */
 async function recordPatientAuditEvent(

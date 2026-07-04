@@ -11,7 +11,7 @@ import {
 import { listNetworkScopedPatients } from '@/lib/network-patient-read';
 import { getNetworkModeGateResponse } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 /* @Codex */
 export async function GET(request: Request) {

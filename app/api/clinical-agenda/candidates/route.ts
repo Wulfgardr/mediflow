@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { loadClinicalAgendaCandidates } from '@/lib/clinical-agenda-bridge';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

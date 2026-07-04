@@ -5,7 +5,7 @@ import { activePatients } from '@/lib/patient-lifecycle';
 import { and, asc, eq, desc, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 /* @Codex */
 import { getAttachmentPayloadByteSize } from '@/lib/attachment-payload';
@@ -50,7 +50,7 @@ function resolveMaxAttachmentBytes(): number {
     const configured = Number.parseInt(process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES ?? '', 10);
     return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ATTACHMENT_BYTES;
 }
-import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/document-ocr-queue';
+import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
 
 /* @Codex */
 function serializeAttachment<T extends { id: string; name: string; path: string }>(row: T): T {

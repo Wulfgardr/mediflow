@@ -4,16 +4,16 @@ import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 // WUL-306 (ADR 0066): historical orphan child rows (patient_id no longer resolves)
 import {
     countOrphanedClinicalRows,
     purgeOrphanedClinicalRows,
     totalPatientCascadeRows,
 } from '@/lib/patient-cascade';
-import { safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
 export const dynamic = 'force-dynamic';
 

@@ -3,13 +3,13 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 /* @Codex */
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeSettingValue } from '@/lib/settings-value';
 /* @Codex */
-import { evaluateSettingsWrite } from '@/lib/settings-write-policy';
+import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
 
 export async function POST(request: Request) {
     /* @Codex */
