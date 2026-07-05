@@ -9,7 +9,7 @@ import {
     writeAuditEvent,
     type AuditEventType,
     type AuditRedactedMetadata,
-} from './audit';
+} from './security/audit';
 /* @Codex */
 import { normalizeCheckupCreateInput, normalizeCheckupUpdateInput } from './api-v1-clinical-write-normalization';
 /* @Codex */

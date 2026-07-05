@@ -4,12 +4,16 @@ import { useState } from 'react';
 import { seedDatabase, nukeTestData } from '@/lib/seeder';
 import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const PANEL_CLASS = 'seeder-panel p-5';
 const SUBSECTION_CLASS = 'seeder-subsection p-4';
 const DANGER_SUBSECTION_CLASS = 'seeder-subsection seeder-subsection-danger';
 
 export default function DataSeeder() {
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [nuking, setNuking] = useState(false);
@@ -32,7 +36,13 @@ export default function DataSeeder() {
 
     const handleSeed = async () => {
         console.log("Seeder: Start requested", { patientCount, includeEntries });
-        if (!confirm(`Stai per generare ${patientCount} pazienti di test. Procedere?`)) return;
+        const seedConfirm = await confirm({
+            title: 'Genera pazienti di test',
+            message: `Stai per generare ${patientCount} pazienti di test. Procedere?`,
+            confirmLabel: 'Genera',
+            tone: 'danger'
+        });
+        if (!seedConfirm.confirmed) return;
 
         setLoading(true);
         setProgress({ current: 0, total: patientCount });
@@ -50,12 +60,12 @@ export default function DataSeeder() {
                 }
             });
             console.log("Seeder: Success", result);
-            alert(`✅ Generati ${patientCount} pazienti di test con successo!`);
-            window.location.reload();
+            showToast({ tone: 'success', title: 'Pazienti di test generati', description: `Generati ${patientCount} pazienti di test.` });
+            window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error("Seeder Error Caught:", e);
             const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : JSON.stringify(e);
-            alert("❌ Errore durante la generazione: " + msg);
+            showToast({ tone: 'error', title: 'Errore durante la generazione', description: msg });
             // Do not clear progress on error so user can see where it failed
         } finally {
             console.log("Seeder: finally block");
@@ -66,20 +76,24 @@ export default function DataSeeder() {
     };
 
     const handleNuke = async () => {
-        const msg = nukeAll
-            ? "⚠️ PERICOLO: Stai per eliminare TUTTO IL DATABASE (Pazienti Reali e Test).\n\nSei sicuro?"
-            : "⚠️ ATTENZIONE: Questo eliminerà i pazienti di test (codice fiscale TEST-...).\n\nProcedere?";
-
-        if (!confirm(msg)) return;
+        const nukeConfirm = await confirm({
+            title: nukeAll ? 'Reset totale del database' : 'Elimina dati di test',
+            message: nukeAll
+                ? 'Stai per eliminare TUTTO IL DATABASE (pazienti reali e di test). Sei sicuro?'
+                : 'Questo eliminerà i pazienti di test (codice fiscale TEST-...). Procedere?',
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
+        if (!nukeConfirm.confirmed) return;
 
         setNuking(true);
         try {
             const result = await nukeTestData(nukeAll);
-            alert(`🔥 Eliminati ${result.deleted} record.`);
-            window.location.reload();
+            showToast({ tone: 'success', title: 'Eliminazione completata', description: `Eliminati ${result.deleted} record.` });
+            window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error(e);
-            alert("❌ Errore durante l'eliminazione: " + e);
+            showToast({ tone: 'error', title: "Errore durante l'eliminazione", description: String(e) });
         } finally {
             setNuking(false);
         }

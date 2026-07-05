@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Database, Upload, Trash2, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 function ProgressBar({ progress, total }: { progress: number; total: number }) {
     const barRef = useRef<HTMLDivElement>(null);
@@ -25,6 +26,7 @@ function ProgressBar({ progress, total }: { progress: number; total: number }) {
 }
 
 export default function DrugDbManager() {
+    const confirm = useConfirm();
     const [stats, setStats] = useState<number | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -69,7 +71,13 @@ export default function DrugDbManager() {
     };
 
     const handleClear = async () => {
-        if (confirm("Sei sicuro di voler svuotare l'intero database farmaci? Questa azione non può essere annullata.")) {
+        const { confirmed } = await confirm({
+            title: 'Svuotare il database farmaci?',
+            message: "L'intero prontuario locale verrà cancellato. Questa azione non può essere annullata.",
+            confirmLabel: 'Svuota',
+            tone: 'danger',
+        });
+        if (confirmed) {
             await clearDrugDatabase();
             refreshStats();
             setMessage({ type: 'success', text: "Database farmaci svuotato." });

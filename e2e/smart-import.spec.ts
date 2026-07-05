@@ -2,24 +2,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
-async function createPatientFromForm(page: Page, values: {
-  firstName: string;
-  lastName: string;
-  taxCode: string;
-  notes: string;
-}) {
-  await page.goto('/patients/new');
-
-  await expect(page.getByPlaceholder('Es. Mario')).toBeVisible();
-  await page.getByPlaceholder('Es. Mario').fill(values.firstName);
-  await page.getByPlaceholder('Es. Rossi').fill(values.lastName);
-  await page.getByPlaceholder('RSSMRA80A01H501U').fill(values.taxCode);
-  await page.getByPlaceholder('Informazioni aggiuntive, contesto familiare, codici accesso, preferenze del paziente...').fill(values.notes);
-  await page.getByRole('button', { name: 'Crea Nuova Scheda' }).click();
-
-  await expect(page).toHaveURL(/\/$/);
-}
-
+// WUL-274/Kree8: the cockpit patient search no longer exposes a patients-search-input
+// testid, and clicking a search result opens the Scheda (/modules) route. Tests create
+// via the patients API and open the Scheda with the id returned by the POST, so nothing
+// re-finds a patient by tax code through the paginated list API.
 async function createPatientViaApi(page: Page, payload: Record<string, unknown>): Promise<string> {
   return await page.evaluate(async (body: Record<string, unknown>) => {
     const response = await fetch('/api/patients', {
@@ -54,11 +40,9 @@ async function createTherapyViaApi(page: Page, payload: Record<string, unknown>)
   }, payload);
 }
 
-async function openPatientFromHome(page: Page, taxCode: string) {
-  const search = page.getByTestId('patients-search-input');
-  await search.fill(taxCode);
-  await page.getByText(taxCode).click();
-  await expect(page).toHaveURL(/\/patients\/.+/);
+async function openPatientScheda(page: Page, patientId: string) {
+  await page.goto(`/patients/${patientId}/modules`);
+  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
 }
 
 function smartImportDiagnosisInputId(label: string, icdQuery: string) {
@@ -405,14 +389,14 @@ test('smart import adds ICD diagnosis chips and therapy from patient notes after
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -532,14 +516,14 @@ test('smart import keeps transition and uncertain therapies visible without trun
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -631,17 +615,14 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
-
-  const patientId = page.url().split('/').at(-1);
-  expect(patientId).toBeTruthy();
+  await openPatientScheda(page, patientId);
 
   await page.evaluate(async ({ id }) => {
     const response = await fetch('/api/therapies', {
@@ -719,14 +700,14 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -735,7 +716,8 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
   const therapyCheckbox = page.locator(`input[id="${therapyInputId}"]`);
 
   await expect(smartImportCardTitle(therapyCard, therapyInputId, 'Nutridrink')).toBeVisible({ timeout: 20_000 });
-  await expect(therapyCard.getByText('manual', { exact: true })).toBeVisible();
+  // The match-type badge is localised via lib/ai-labels matchTypeLabel: manual -> "manuale".
+  await expect(therapyCard.getByText('manuale', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('Match AIFA da confermare prima dell\'import')).toBeVisible();
   await expect(therapyCard.getByText('Nessun candidato AIFA locale affidabile.')).toBeVisible();
@@ -788,14 +770,14 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -804,7 +786,8 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
   const therapyCheckbox = page.locator(`input[id="${therapyInputId}"]`);
 
   await expect(smartImportCardTitle(therapyCard, therapyInputId, 'Forxiga')).toBeVisible({ timeout: 20_000 });
-  await expect(therapyCard.getByText('catalog', { exact: true })).toBeVisible();
+  // The match-type badge is localised via lib/ai-labels matchTypeLabel: catalog -> "match AIFA".
+  await expect(therapyCard.getByText('match AIFA', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('incerto', { exact: true })).toBeVisible();
   await expect(therapyCard.getByText('Posologia da verificare prima dell\'import')).toBeVisible();
   await expect(therapyCheckbox).toBeDisabled();
@@ -875,14 +858,14 @@ test('smart import normalizes outgoing switch therapy to transition even when mo
   });
 
   await bootstrapUnlockedSession(page, pin);
-  await createPatientFromForm(page, {
+  const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
     taxCode,
     notes: patientNotes,
   });
 
-  await openPatientFromHome(page, taxCode);
+  await openPatientScheda(page, patientId);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -983,7 +966,8 @@ test('smart import hides already-present referral duplicates when the source has
     startDate: new Date('2026-04-01T08:00:00Z').toISOString(),
   });
 
-  await page.goto(`/patients/${patientId}`);
+  // WUL-274/Kree8: the smart-import panel mounts on the primary Scheda route (/modules).
+  await page.goto(`/patients/${patientId}/modules`);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 

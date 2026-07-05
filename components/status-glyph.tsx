@@ -52,8 +52,10 @@ const GLYPH_MAP: Record<
     },
     high: {
         icon: AlertTriangle,
+        /* @Codex WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
+           ricetta tenue di 'archived'. Bordo e fondo a piena forza + ombra. */
         label: 'High',
-        className: 'border-[color:rgba(163,58,47,0.18)] bg-[color:rgba(163,58,47,0.1)] text-[color:var(--mf-critical)]',
+        className: 'border-[color:rgba(163,58,47,0.55)] bg-[color:rgba(163,58,47,0.16)] text-[color:var(--mf-critical)] shadow-[0_2px_10px_rgba(163,58,47,0.2)]',
     },
     'follow-up': {
         icon: Clock3,

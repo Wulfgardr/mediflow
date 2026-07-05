@@ -8,6 +8,13 @@ import Database from 'better-sqlite3';
 import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
 
 const SETTINGS_KEY = 'backupScheduler';
+const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup';
+const BACKUP_ARTIFACT_VERSION = 1;
+const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup';
+const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14;
+const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
+const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
+const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
 
 /* @Codex */
 const BACKUP_TABLES = {
@@ -28,6 +35,7 @@ const BACKUP_TABLES = {
   checkups: 'checkups',
   therapies: 'therapies',
 };
+const BACKUP_COLLECTIONS = Object.keys(BACKUP_TABLES);
 
 function getDefaultDataDir() {
   return process.env.MEDIFLOW_DATA_DIR
@@ -79,6 +87,153 @@ function readState(db) {
   } catch {
     return getDefaultState();
   }
+}
+
+function normalizeJson(value) {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map((entry) => normalizeJson(entry));
+  if (value && typeof value === 'object') {
+    const normalized = {};
+    for (const key of Object.keys(value).sort()) {
+      const entry = normalizeJson(value[key]);
+      if (entry !== undefined) normalized[key] = entry;
+    }
+    return normalized;
+  }
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean' || value === null) {
+    return value;
+  }
+  return undefined;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(normalizeJson(value));
+}
+
+async function sha256Hex(value) {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function serializeBackupArtifact(payload, createdAt = new Date()) {
+  const payloadSnapshot = normalizeJson(payload);
+  const checksum = await sha256Hex(stableStringify(payloadSnapshot));
+  const recordCounts = Object.fromEntries(
+    BACKUP_COLLECTIONS.map((collection) => [collection, payload[collection]?.length ?? 0]),
+  );
+  const artifact = {
+    format: BACKUP_ARTIFACT_FORMAT,
+    version: BACKUP_ARTIFACT_VERSION,
+    manifest: {
+      scope: BACKUP_ARTIFACT_SCOPE,
+      createdAt: createdAt.toISOString(),
+      checksumAlgorithm: 'sha256',
+      checksum,
+      collections: BACKUP_COLLECTIONS,
+      recordCounts,
+    },
+    payload,
+  };
+  return JSON.stringify(normalizeJson(artifact), null, 2);
+}
+
+function clampRetentionKeepArtifacts(value, fallback = DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.min(Math.max(parsed, 1), 365);
+}
+
+function classifyManagedBackupFile(name) {
+  if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_TEMP_SUFFIX)) {
+    return 'temp';
+  }
+  if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_FILE_SUFFIX)) {
+    return 'artifact';
+  }
+  return null;
+}
+
+function listManagedBackupFiles(destinationDir) {
+  if (!fs.existsSync(destinationDir)) return [];
+  return fs.readdirSync(destinationDir, { withFileTypes: true }).flatMap((entry) => {
+    if (!entry.isFile()) return [];
+    const kind = classifyManagedBackupFile(entry.name);
+    if (!kind) return [];
+    const filePath = path.join(destinationDir, entry.name);
+    const stats = fs.statSync(filePath);
+    return [{
+      path: filePath,
+      name: entry.name,
+      kind,
+      sizeBytes: stats.size,
+      modifiedAt: Number.isFinite(stats.mtimeMs) ? stats.mtime.toISOString() : null,
+      modifiedAtMs: Number.isFinite(stats.mtimeMs) ? stats.mtimeMs : 0,
+    }];
+  });
+}
+
+function applyBackupRetention(config, options = {}) {
+  const preservePaths = new Set((options.preservePaths ?? []).map((value) => path.resolve(value)));
+  const managedFiles = listManagedBackupFiles(config.destinationDir).sort((left, right) => {
+    if (left.modifiedAtMs !== right.modifiedAtMs) return right.modifiedAtMs - left.modifiedAtMs;
+    return right.name.localeCompare(left.name);
+  });
+  const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
+  const orphanTemps = managedFiles
+    .filter((file) => file.kind === 'temp')
+    .filter((file) => !preservePaths.has(path.resolve(file.path)));
+  const staleArtifacts = artifacts
+    .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
+    .filter((file) => !preservePaths.has(path.resolve(file.path)));
+  const items = [
+    ...staleArtifacts.map((file) => ({
+      path: file.path,
+      kind: file.kind,
+      reason: 'keep-last-n',
+      sizeBytes: file.sizeBytes,
+      modifiedAt: file.modifiedAt,
+    })),
+    ...orphanTemps.map((file) => ({
+      path: file.path,
+      kind: file.kind,
+      reason: 'orphan-temp',
+      sizeBytes: file.sizeBytes,
+      modifiedAt: file.modifiedAt,
+    })),
+  ];
+  for (const item of items) {
+    if (fs.existsSync(item.path)) fs.unlinkSync(item.path);
+  }
+  return {
+    destinationDir: config.destinationDir,
+    keepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
+    artifactCount: artifacts.length,
+    orphanTempCount: orphanTemps.length,
+    deleteCount: items.length,
+    deleteBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
+    items,
+    deletedCount: items.length,
+    deletedBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
+  };
+}
+
+function applyRetentionResultToState(current, result, mode, occurredAt = new Date()) {
+  const retainedArtifactPath = current.run.lastArtifactPath
+    && result.items.some((item) => item.path === current.run.lastArtifactPath)
+    ? null
+    : current.run.lastArtifactPath;
+  return {
+    ...current,
+    run: {
+      ...current.run,
+      lastArtifactPath: retainedArtifactPath,
+      lastRetentionAt: occurredAt.toISOString(),
+      lastRetentionDeletedCount: result.deletedCount,
+      lastRetentionDeletedBytes: result.deletedBytes,
+      lastRetentionMode: mode,
+    },
+  };
 }
 
 function saveState(db, state) {
@@ -142,11 +297,6 @@ function buildDataset(db, backupCollections) {
 }
 
 async function main() {
-  const artifactModule = await import(new URL('../lib/backup-artifact.ts', import.meta.url));
-  const schedulerModule = await import(new URL('../lib/backup-scheduler.ts', import.meta.url));
-  const { BACKUP_COLLECTIONS, serializeBackupArtifact } = artifactModule;
-  const { applyBackupRetention, applyRetentionResultToState } = schedulerModule;
-
   const dataDir = getDefaultDataDir();
   const dbPath = path.join(dataDir, 'medical.db');
   const forced = process.env.MEDIFLOW_BACKUP_FORCE === '1';

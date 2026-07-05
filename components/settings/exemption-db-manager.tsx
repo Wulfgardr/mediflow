@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, Database, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { clearExemptionDatabase, getExemptionStats, importExemptionFiles } from '@/lib/exemption-importer';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type MessageState = {
     type: 'success' | 'error';
@@ -12,6 +13,7 @@ type MessageState = {
 /* @Codex */
 export default function ExemptionDbManager() {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const confirm = useConfirm();
 
     const [stats, setStats] = useState<number | null>(null);
     const [isImporting, setIsImporting] = useState(false);
@@ -85,7 +87,13 @@ export default function ExemptionDbManager() {
     };
 
     const handleClear = async () => {
-        if (!confirm('Vuoi davvero svuotare l\'intero repertorio esenzioni?')) return;
+        const { confirmed } = await confirm({
+            title: 'Svuotare il repertorio esenzioni?',
+            message: "L'intero repertorio delle esenzioni verrà cancellato.",
+            confirmLabel: 'Svuota',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await clearExemptionDatabase();
             await refreshStats();

@@ -133,6 +133,25 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         assert.equal(patientDetail.json?.id, seededPatientId);
         assert.equal(patientDetail.json?.ambulatoryId, ambulatoryId);
 
+        // A18: the paired ambulatory scope list rides on the same read capability.
+        const ambulatoriesMissingClient = await request('GET', '/api/v1/network/ambulatories', {
+            headers: { Cookie: sessionCookie },
+        });
+        assert.equal(ambulatoriesMissingClient.response.status, 401);
+
+        const ambulatories = await request('GET', '/api/v1/network/ambulatories', {
+            headers: {
+                ...pairedHeaders,
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(ambulatories.response.status, 200);
+        assert.ok(Array.isArray(ambulatories.json));
+        assert.ok(
+            ambulatories.json.some((amb) => amb.id === ambulatoryId),
+            'Seeded ambulatory should be visible through the network scope list'
+        );
+
         scenarioResults.push({
             name: 'home-base read-only pairing flow',
             ambulatoryId,

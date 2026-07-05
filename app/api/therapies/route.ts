@@ -1,14 +1,28 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
+import { parseListParams } from '@/lib/list-query-params';
+/* @Codex */
+import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
+
+// motivation is ENC:, so it is not sortable. Only plaintext columns here.
+const THERAPY_SORT_COLUMNS = {
+    startDate: therapies.startDate,
+    endDate: therapies.endDate,
+    createdAt: therapies.createdAt,
+    updatedAt: therapies.updatedAt,
+} as const;
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -18,18 +32,28 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
 
+    /* STREAM B */
+    const parsed = parseListParams(searchParams, {
+        sortableColumns: Object.keys(THERAPY_SORT_COLUMNS),
+        defaultOrderBy: 'startDate',
+        defaultOrderDir: 'desc',
+    });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const { limit, offset, orderBy, orderDir } = parsed.params;
+
     try {
-        let query = dbServer.select().from(therapies);
+        const filters: SQL[] = [isNull(therapies.deletedAt)];
+        if (patientId) filters.push(eq(therapies.patientId, patientId));
+        const whereClause = and(...filters);
 
-        if (patientId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(and(eq(therapies.patientId, patientId), isNull(therapies.deletedAt))) as any;
-        } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(isNull(therapies.deletedAt)) as any;
-        }
+        const sortColumn = THERAPY_SORT_COLUMNS[(orderBy ?? 'startDate') as keyof typeof THERAPY_SORT_COLUMNS];
+        const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
 
-        const data = await query.orderBy(desc(therapies.startDate));
+        let query = dbServer.select().from(therapies).where(whereClause).orderBy(orderExpr).$dynamic();
+        if (typeof limit === 'number') query = query.limit(limit);
+        if (typeof offset === 'number') query = query.offset(offset);
+
+        const data = await query;
         const normalizedData = data.map((therapy) => ({
             ...therapy,
             status: normalizeTherapyStatus(therapy.status),
@@ -46,7 +70,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(therapyCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         /* @Codex */
         const auditBody = body as Record<string, unknown>;
         /* @Codex */

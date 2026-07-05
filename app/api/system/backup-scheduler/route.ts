@@ -3,22 +3,21 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
-import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/audit';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
     applyBackupRetention,
     applyRetentionResultToState,
-    getBackupSchedulerStatus,
-    installBackupLaunchAgent,
     mergeBackupSchedulerConfig,
     previewBackupRetention,
     readBackupSchedulerStateFromValue,
     runBackupSchedulerScript,
-    uninstallBackupLaunchAgent,
 } from '@/lib/backup-scheduler';
+/* @Codex */
+import { buildBackupSchedulerStatus, getSchedulerAdapter } from '@/lib/backup-scheduler-adapter';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +40,7 @@ export async function GET() {
 
     try {
         const value = await loadSchedulerSettingValue();
-        return NextResponse.json(getBackupSchedulerStatus(value));
+        return NextResponse.json(buildBackupSchedulerStatus(value));
     } catch (error) {
         console.error('GET backup scheduler status failed:', error);
         return NextResponse.json({ error: 'Failed to load backup scheduler status.' }, { status: 500 });
@@ -78,7 +77,7 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 {
                     result,
-                    status: getBackupSchedulerStatus(refreshedValue),
+                    status: buildBackupSchedulerStatus(refreshedValue),
                 },
                 { status: result.ok ? 200 : 500 },
             );
@@ -97,16 +96,28 @@ export async function POST(request: Request) {
 
             return NextResponse.json({
                 retention,
-                status: getBackupSchedulerStatus(JSON.stringify(nextState)),
+                status: buildBackupSchedulerStatus(JSON.stringify(nextState)),
             });
         }
 
         const nextState = draftState;
 
+        /* @Codex */
+        const adapter = getSchedulerAdapter();
         if (nextState.config.enabled) {
-            installBackupLaunchAgent(nextState);
+            if (!adapter.isSupported()) {
+                return NextResponse.json(
+                    {
+                        error: 'Scheduling automatico del backup non disponibile su questa piattaforma.',
+                        detail: `Nessuno scheduler supportato rilevato su ${process.platform} (launchd su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux). Il backup manuale "Esegui adesso" e la retention restano disponibili.`,
+                        supported: false,
+                    },
+                    { status: 501 },
+                );
+            }
+            adapter.install(nextState);
         } else {
-            uninstallBackupLaunchAgent();
+            adapter.uninstall();
         }
 
         await saveSchedulerSettingValue(JSON.stringify(nextState));
@@ -131,7 +142,7 @@ export async function POST(request: Request) {
             console.error('Audit backup scheduler write failed:', error);
         }
 
-        return NextResponse.json(getBackupSchedulerStatus(JSON.stringify(nextState)));
+        return NextResponse.json(buildBackupSchedulerStatus(JSON.stringify(nextState)));
     } catch (error) {
         console.error('POST backup scheduler failed:', error);
         const message = error instanceof Error ? error.message : 'Failed to save backup scheduler settings.';

@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { servicePrescriptionItems } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { servicePrescriptionItemUpdateSchema } from '@/lib/api-schemas/prescriptions';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -49,7 +51,10 @@ export async function PUT(request: Request, context: RouteContext) {
             .get();
         if (!existing) return NextResponse.json({ error: 'Service prescription item not found' }, { status: 404 });
 
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(servicePrescriptionItemUpdateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const updateData: Partial<typeof servicePrescriptionItems.$inferInsert> = { updatedAt: new Date() };
         const nullableTextFields = [
             'codeSystem',
@@ -113,7 +118,7 @@ export async function PUT(request: Request, context: RouteContext) {
             subjectType: 'service_prescription_item',
             subjectRef: id,
             redactedMetadata: {
-                changedFields: listChangedFields(body, []),
+                changedFields: listChangedFields(body as Record<string, unknown>, []),
             },
         }, '[MediFlow] Service prescription item audit write failed:');
 

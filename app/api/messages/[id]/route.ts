@@ -3,7 +3,7 @@ import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export async function DELETE(
     request: Request,

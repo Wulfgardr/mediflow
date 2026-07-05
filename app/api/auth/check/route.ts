@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
-import { classifyAuthHealthError } from '@/lib/auth-health-classifier';
+import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ function buildPublicDbState(
 /* @Codex */
 async function safeRequireSession(): Promise<boolean> {
     try {
-        const { requireSession } = await import('@/lib/server-auth');
+        const { requireSession } = await import('@/lib/security/server-auth');
         return !!(await requireSession());
     } catch {
         return false;

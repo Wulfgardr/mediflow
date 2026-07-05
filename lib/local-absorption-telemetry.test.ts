@@ -1,7 +1,7 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './document-parse-evidence-artifact';
+import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './domain/documents/document-parse-evidence-artifact';
 import { buildLocalAbsorptionTelemetryReportFromInputs } from './local-absorption-telemetry';
 
 test('buildLocalAbsorptionTelemetryReportFromInputs emits PHI-safe counts only', () => {

@@ -12,10 +12,12 @@ import { Home, Building2, Activity, BookOpenCheck, Save } from 'lucide-react';
 /* @Codex */
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+import { useToast } from '@/components/ui/toast-provider';
 
 export default function ScaleRunnerPage() {
     const params = useParams();
     const router = useRouter();
+    const { showToast } = useToast();
     const patientId = params.id as string;
     const scaleId = params.scaleId as string;
     const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
@@ -49,7 +51,7 @@ export default function ScaleRunnerPage() {
             router.push(`/patients/${patientId}`);
         } catch (error) {
             console.error("Failed to save scale", error);
-            alert("Errore nel salvataggio della valutazione.");
+            showToast({ tone: 'error', title: 'Errore nel salvataggio della valutazione', description: 'Il punteggio non è stato registrato. Riprova.' });
         }
     };
 

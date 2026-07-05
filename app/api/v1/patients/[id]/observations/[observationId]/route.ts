@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { observations } from '@/lib/schema';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from '@/lib/observation-concurrency';
@@ -64,6 +64,9 @@ export async function GET(
             unitCode: item.unitCode,
             value: item.value,
             notes: item.notes ?? null,
+            refLow: item.refLow ?? null,
+            refHigh: item.refHigh ?? null,
+            refText: item.refText ?? null,
             observedAt: toIsoString(item.observedAt) ?? new Date(0).toISOString(),
             source: item.source ?? null,
             version: item.version,

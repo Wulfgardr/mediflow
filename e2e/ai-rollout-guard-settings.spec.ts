@@ -54,6 +54,15 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   await bootstrapUnlockedSession(page, pin);
   await page.evaluate(async () => {
+    // Reset model selections so the clinical selector starts from a known
+    // recommended state; other specs share this DB and may leave a custom model.
+    for (const key of ['aiModel_clinical', 'aiModel_reasoning']) {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: '' }),
+      });
+    }
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -67,7 +76,8 @@ test('settings warns when selected AI model is still on hold in rollout readines
   const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('Patient Insight');
-  await expect(guardNotice).toContainText('disabled locally');
+  // WUL-297: the local-guard status is rendered in Italian ("disattivata localmente").
+  await expect(guardNotice).toContainText('disattivata localmente');
 
   const clinicalSelector = page.getByTestId('ai-model-selector-clinical');
   const resetToRecommended = clinicalSelector.getByRole('button', { name: 'Torna ai consigliati' });
@@ -79,10 +89,12 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('gemma4:e4b');
-  await expect(guardNotice).toContainText('hold');
+  // WUL-297: the "hold" status is rendered in Italian as "in attesa"
+  // (rollback-required renders as "rollback richiesto").
+  await expect(guardNotice).toContainText('in attesa');
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');
   await expect(guardNotice).toContainText('Patient Insight');
-  await expect(guardNotice).toContainText('disabled locally');
+  await expect(guardNotice).toContainText('disattivata localmente');
   await expect(page.getByTestId('ai-rollout-local-guard-patient_insight')).toBeVisible();
 });

@@ -9,7 +9,7 @@ import {
   getAppWorktreeHash,
 } from '@/lib/app-revision';
 /* @Codex */
-import { requireSession } from '@/lib/server-auth';
+import { requireSession } from '@/lib/security/server-auth';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';

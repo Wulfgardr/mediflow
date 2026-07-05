@@ -8,6 +8,8 @@ import PatientForm from '@/components/patient-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 import { useState } from 'react';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 /* @Codex */
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
@@ -25,6 +27,8 @@ export default function EditPatientPage() {
     const router = useRouter();
     const params = useParams();
     const id = params.id as string;
+    const { showToast } = useToast();
+    const confirm = useConfirm();
 
     const patient = useLiveQuery(async () => {
         const p = await db.patients.get(id);
@@ -38,7 +42,7 @@ export default function EditPatientPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {
         if (!patient || typeof patient.version !== 'number') {
-            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            showToast({ tone: 'error', title: 'Versione paziente non disponibile', description: 'Ricarica la pagina e riprova.' });
             return;
         }
 
@@ -106,7 +110,7 @@ export default function EditPatientPage() {
             router.push(`/patients/${id}`);
         } catch (error) {
             console.error("Failed to update patient", error);
-            alert(messageFromError(error, "Errore durante l'aggiornamento."));
+            showToast({ tone: 'error', title: 'Aggiornamento non riuscito', description: messageFromError(error, "Errore durante l'aggiornamento.") });
         }
     };
 
@@ -116,7 +120,7 @@ export default function EditPatientPage() {
     const handleAction = async (data: ActionData) => {
         if (!patient) return;
         if (typeof patient.version !== 'number') {
-            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            showToast({ tone: 'error', title: 'Versione paziente non disponibile', description: 'Ricarica la pagina e riprova.' });
             return;
         }
         const patientVersion = patient.version;
@@ -130,15 +134,18 @@ export default function EditPatientPage() {
                 const validation = await validationResponse.json() as ValidatePatientExportResponse;
 
                 if (validation.hasErrors) {
-                    alert(`Esportazione bloccata: risolvi gli errori di validazione FSE prima del download.\n\n${buildValidationMessage(validation)}`);
+                    showToast({ tone: 'error', title: 'Esportazione bloccata', description: `Risolvi gli errori di validazione FSE prima del download. ${buildValidationMessage(validation)}` });
                     return;
                 }
 
                 if (validation.hasWarnings) {
-                    const proceed = confirm(
-                        `Sono presenti warning di validazione FSE.\n\n${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
-                    );
-                    if (!proceed) return;
+                    const { confirmed } = await confirm({
+                        title: 'Warning di validazione FSE',
+                        message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                        confirmLabel: 'Prosegui',
+                        cancelLabel: 'Annulla',
+                    });
+                    if (!confirmed) return;
                 }
 
                 // Dynamic import for bundle generator
@@ -157,10 +164,10 @@ export default function EditPatientPage() {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                alert("Esportazione FHIR completata con successo!");
+                showToast({ tone: 'success', title: 'Esportazione FHIR completata' });
             } catch (error) {
                 console.error("Export failed", error);
-                alert("Errore durante l'esportazione.");
+                showToast({ tone: 'error', title: 'Errore durante l\'esportazione' });
             }
             return;
         }
@@ -170,7 +177,7 @@ export default function EditPatientPage() {
                 await db.patients.delete(id, { version: patientVersion });
                 router.push('/'); // Redirect to dashboard
             } catch (error) {
-                alert(messageFromError(error, "Errore durante l'eliminazione."));
+                showToast({ tone: 'error', title: 'Eliminazione non riuscita', description: messageFromError(error, "Errore durante l'eliminazione.") });
             }
         } else { // This is for archive
             try {
@@ -181,15 +188,21 @@ export default function EditPatientPage() {
                 });
                 router.push('/'); // Redirect to dashboard
             } catch (error) {
-                alert(messageFromError(error, "Errore durante l'archiviazione."));
+                showToast({ tone: 'error', title: 'Archiviazione non riuscita', description: messageFromError(error, "Errore durante l'archiviazione.") });
             }
         }
     };
 
     const handleRestore = async () => {
-        if (!confirm("Sei sicuro di voler ripristinare questo paziente tra quelli attivi?")) return;
+        const { confirmed } = await confirm({
+            title: 'Ripristinare il paziente?',
+            message: 'Il paziente tornerà tra quelli attivi.',
+            confirmLabel: 'Ripristina',
+            cancelLabel: 'Annulla',
+        });
+        if (!confirmed) return;
         if (!patient || typeof patient.version !== 'number') {
-            alert("Versione paziente non disponibile. Ricarica la pagina e riprova.");
+            showToast({ tone: 'error', title: 'Versione paziente non disponibile', description: 'Ricarica la pagina e riprova.' });
             return;
         }
 
@@ -200,7 +213,7 @@ export default function EditPatientPage() {
                 updatedAt: new Date()
             });
         } catch (error) {
-            alert(messageFromError(error, "Errore durante il ripristino."));
+            showToast({ tone: 'error', title: 'Ripristino non riuscito', description: messageFromError(error, "Errore durante il ripristino.") });
         }
         // Stay on page but refresh UI (automatic via liveQuery)
     };

@@ -3,17 +3,18 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
     generateMasterKey,
-    deriveKeyFromPin,
-    wrapMasterKey,
-    unwrapMasterKey
-} from '@/lib/security';
+    getKdfVersion,
+    CURRENT_KDF_VERSION,
+    wrapMasterKeyVersioned,
+    unwrapMasterKeyVersioned,
+} from '@/lib/security/security';
 /* @Codex */
 import {
     createPinRotationBundle,
     formatPinChangeFailure,
     type PinChangeFailurePayload,
     validatePinChangeInput,
-} from '@/lib/pin-change';
+} from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { LockScreen } from '@/components/lock-screen';
@@ -26,7 +27,7 @@ import {
     clearSecuritySession,
     persistSecuritySession,
     restoreSecuritySession,
-} from '@/lib/client-security-session';
+} from '@/lib/security/client-security-session';
 /* @Codex */
 import { notifyDbChange } from '@/lib/live-query';
 /* @Codex */
@@ -36,10 +37,11 @@ import {
     loginWithPinRequest,
     logoutSecuritySession,
     repairLegacyDbRequest,
+    rewrapMasterKeyRequest,
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
-} from '@/lib/client-auth-api';
+} from '@/lib/security/client-auth-api';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
 
@@ -122,6 +124,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
+    // WUL-UIUX: errore inline per i flussi setup/ripristino, al posto di alert() nativo.
+    // Il toast non e utilizzabile qui: ToastProvider e montato dentro SecurityProvider.
+    const [flowError, setFlowError] = useState<string | null>(null);
 
     /* @Codex */
     const setActiveMasterKey = (key: CryptoKey | null) => {
@@ -244,6 +249,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const repairFromLegacy = async () => {
         if (isRepairing) return;
         setIsRepairing(true);
+        setFlowError(null);
         try {
             const { response: res, payload } = await repairLegacyDbRequest();
             if (!res.ok) {
@@ -252,7 +258,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             await checkAuthStatus();
         } catch (e) {
             console.error('Repair failed', e);
-            alert('Ripristino fallito. Verifica i dettagli in console.');
+            setFlowError('Ripristino fallito. Verifica i dettagli in console.');
         } finally {
             setIsRepairing(false);
         }
@@ -309,8 +315,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 saltBytes = new Uint8Array(salt);
             }
 
-            const kek = await deriveKeyFromPin(pin, saltBytes);
-            const masterKey = await unwrapMasterKey(encryptedMasterKey, kek);
+            const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
 
             setActiveMasterKey(masterKey);
             setUser(userData);
@@ -323,6 +328,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (e) {
                 console.error("Failed to save session", e);
+            }
+
+            // Lazy KDF upgrade: if the stored blob is below the current version,
+            // re-wrap the (unchanged) master key at v2 and persist server-side.
+            // Best-effort: a failure here never blocks a valid login.
+            if (getKdfVersion(encryptedMasterKey) < CURRENT_KDF_VERSION) {
+                try {
+                    const newSalt = window.crypto.getRandomValues(new Uint8Array(16));
+                    const rewrapped = await wrapMasterKeyVersioned(masterKey, pin, newSalt);
+                    await rewrapMasterKeyRequest({
+                        encryptedMasterKey: rewrapped,
+                        salt: btoa(String.fromCharCode(...newSalt)),
+                    });
+                } catch (e) {
+                    console.error('KDF lazy upgrade failed', e);
+                }
             }
 
             return true;
@@ -378,13 +399,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     // New handler for Onboarding Wizard
     const handleWizardComplete = async (data: { displayName: string; ambulatoryName: string; pin: string }) => {
         const { displayName, ambulatoryName, pin } = data;
+        setFlowError(null);
 
         try {
-            // Generate crypto
+            // Generate crypto. New setups wrap at the current KDF version (v2, 600k).
             const salt = window.crypto.getRandomValues(new Uint8Array(16));
-            const kek = await deriveKeyFromPin(pin, salt);
             const masterKey = await generateMasterKey();
-            const encryptedMasterKey = await wrapMasterKey(masterKey, kek);
+            const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, pin, salt);
             const saltB64 = btoa(String.fromCharCode(...salt));
 
             // Send to Server
@@ -405,7 +426,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     if (!success) {
                         setIsAuthenticated(false);
                         setIsLocked(true);
-                        alert("Setup già completato. Inserisci il PIN esistente.");
+                        // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
+                        setAuthErrorMessage("Setup già completato. Inserisci il PIN esistente.");
                     }
                     return;
                 }
@@ -429,19 +451,30 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (e) {
             console.error("Setup failed", e);
-            alert("Errore configurazione: " + e);
+            const detail = e instanceof Error ? e.message : String(e);
+            setFlowError("Errore configurazione: " + detail);
         }
     };
 
     /* @Codex */
     if (authHealth?.status === 'error') {
         return (
-            <AuthHealthScreen
-                health={authHealth}
-                onRetry={() => checkAuthStatus()}
-                onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
-                isRepairing={isRepairing}
-            />
+            <>
+                {flowError && (
+                    <div
+                        role="alert"
+                        className="fixed top-4 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700 shadow-lg"
+                    >
+                        {flowError}
+                    </div>
+                )}
+                <AuthHealthScreen
+                    health={authHealth}
+                    onRetry={() => checkAuthStatus()}
+                    onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
+                    isRepairing={isRepairing}
+                />
+            </>
         );
     }
 
@@ -454,7 +487,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     if (requiresSetup) {
         return (
             <div className="h-screen w-screen fixed inset-0 z-[100] bg-gradient-to-br from-indigo-50 to-blue-100 flex items-center justify-center p-4">
-                <OnboardingWizard onComplete={handleWizardComplete} />
+                <div className="w-full max-w-2xl space-y-4">
+                    {flowError && (
+                        <div
+                            role="alert"
+                            className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            {flowError}
+                        </div>
+                    )}
+                    <OnboardingWizard onComplete={handleWizardComplete} />
+                </div>
             </div>
         );
     }

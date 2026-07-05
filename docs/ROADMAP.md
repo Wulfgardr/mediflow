@@ -1,7 +1,7 @@
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.0 (release corrente). Ultimo aggiornamento: 2026-06-16.
+> v0.7.1 (release corrente, in preparazione sopra il ramo Apple/native). Ultimo aggiornamento: 2026-07-03.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -39,7 +39,7 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 `v0.5.0` e la release che consolida lo snapshot oggi usato dal vivo: UI web piu leggibile e stack AI locale piu governato, senza riscrivere retroattivamente `v0.4.0`.
 
 * **Interfaccia clinica web piu coerente**: scheda paziente, lista, form e shell impostazioni convergono verso una gerarchia visiva piu leggibile e piu orientata all'azione.
-* **Governance AI locale piu esplicita**: task contract condiviso, benchmark headless, model stack/model parliament e separazione netta tra runtime operativo e lane `benchmark-only`.
+* **Governance AI locale piu esplicita**: task contract condiviso, benchmark headless, registro candidati locali e separazione netta tra runtime operativo e lane `benchmark-only`.
 * **Release hygiene ripristinata**: `lint` torna confinato ai sorgenti e i benchmark CLI generativi tornano eseguibili su `main`.
 * **Narrativa prodotto riallineata**: `v0.4.0` resta la baseline storica, `v0.5.0` chiude il consolidamento AI/UI e il ciclo successivo si sposta su home-base e client native.
 * **Boundary piu chiari**: SISS/FSE, multi-device e stack AI vengono raccontati per quello che sono davvero, senza attribuire a MediFlow integrazioni o automatismi non ancora dimostrati.
@@ -112,9 +112,36 @@ pubblica/OSS riallineata al prodotto reale.
 
 ---
 
-## 🚧 In corso (post-v0.7)
+## ✅ Fatto (v0.7.1)
 
-La lettura operativa piu completa del ciclo post-v0.7 e ora
+`v0.7.1` porta nel racconto di release il lavoro Apple/native e lo separa dai
+filoni di portabilita ancora iniziali. Il valore non e dichiarare tre app
+complete, ma rendere verificabile una direzione: web app locale solida, macOS
+come fronte nativo piu avanzato, iPhone/iPad come client paired e core Swift
+testato anche su Linux/Windows.
+
+* **macOS avanti nel percorso native**: shell Apple/home-base, workspace
+  paziente condiviso, design Vetro Clinico/Liquid Glass, privacy shield,
+  runtime panel e slice cliniche non-AI portate dentro un artifact Xcode
+  verificabile.
+* **Core Swift condiviso**: `MediFlowCore` porta fuori dalla UI logica
+  clinica, filtri, contratti, cifratura, conflict handling, clinical scales e
+  store SQLite locale.
+* **Gate tri-OS**: Linux, macOS e Windows costruiscono e testano il core
+  condiviso in CI. Questo prova la direzione di portabilita, ma non equivale a
+  parity applicativa Windows/Linux.
+* **OSS export piu disciplinato**: l'export pubblico resta applicativo e
+  prodotto-centrico; materiali di coordinamento, analisi interne, workspace
+  privati e artifact temporanei restano esclusi.
+
+> [!WARNING]
+> La 0.7.1 va taggata solo dopo merge del ramo Apple/native, CI verde sul
+
+---
+
+## 🚧 In corso (post-v0.7.1)
+
+La lettura operativa piu completa del ciclo post-v0.7.1 e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
 boundary, document intelligence, home-base, Apple clients e split private/OSS.
@@ -133,9 +160,15 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Esperienza nativa
 
-* **Nuova shell macOS `home-base`**: rebuild controllato dell'app nativa, packaged e capace di gestire il runtime locale senza dipendere dal terminale, preservando `/api/v1`, TLS locale e semantica security/sessione.
-* **Family Apple condivisa per contratto**: convergenza tramite core Swift condiviso e API versionate, con shell distinte per macOS, iPhone e iPad ma stesso comportamento clinico sui moduli condivisi.
-* **App iPadOS/iOS paired**: consultazione e workflow non-AI coerenti con il modello `home-base`, paired e read-only-first oggi, con write versionati gia limitati a profilo/status, diario, terapie, checkup e osservazioni, cache locale cifrata degradabile e nessun accesso diretto al file SQLite del Mac.
+* **Merge train Apple/native**: chiudere PR #271, far girare CI sul `main`
+  risultante e poi promuovere la release docs 0.7.1.
+* **Stack voice visit**: riconciliare #272, #273 e #274 in ordine, partendo
+  dall'ADR boundary e poi dalle superfici UI/backend sintetiche.
+* **Windows/Linux oltre il core**: trasformare il vecchio branch #266 in slice
+  piu piccole per launcher, floor hardware e distribuzione tri-OS, senza
+  promettere parity applicativa prima delle prove.
+* **Provider locali Apple**: rivalutare #259 dentro WUL-417/WUL-418, recuperando
+  solo kill-switch, test e decisioni compatibili con il gate benchmark-first.
 
 ### Shell ufficiale e sperimentazioni controllate
 

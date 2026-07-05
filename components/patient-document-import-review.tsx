@@ -18,13 +18,14 @@ import {
     applyPatientDocumentReview,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
-} from '@/lib/patient-document-review';
+} from '@/lib/domain/documents/patient-document-review';
 /* @Codex */
-import { buildPatientImportDecision } from '@/lib/patient-import-decision';
+import { buildPatientImportDecision } from '@/lib/domain/documents/patient-import-decision';
 /* @Codex */
-import { buildPatientDocumentDecision } from '@/lib/patient-document-decision';
+import { buildPatientDocumentDecision } from '@/lib/domain/documents/patient-document-decision';
 /* @Codex */
 import DocumentDecisionReviewCard from '@/components/document-decision-review-card';
+import { confidenceLabel } from '@/lib/ai-labels';
 
 interface PatientDocumentImportReviewProps {
     draft: PatientDocumentReviewDraft;
@@ -263,7 +264,7 @@ export default function PatientDocumentImportReview({
                                                 </span>
                                                 {diagnosis.confidence && (
                                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                                                        {diagnosis.confidence}
+                                                        {confidenceLabel(diagnosis.confidence)}
                                                     </span>
                                                 )}
                                             </div>
@@ -338,7 +339,7 @@ export default function PatientDocumentImportReview({
                                                 </span>
                                                 {item.confidence && (
                                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                                                        {item.confidence}
+                                                        {confidenceLabel(item.confidence)}
                                                     </span>
                                                 )}
                                             </div>
@@ -436,7 +437,7 @@ export default function PatientDocumentImportReview({
                                                 </span>
                                                 {medication.confidence && (
                                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                                                        {medication.confidence}
+                                                        {confidenceLabel(medication.confidence)}
                                                     </span>
                                                 )}
                                             </div>

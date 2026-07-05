@@ -41,14 +41,12 @@ printf 'keep me' > "$OUT_DIR/notes.txt"
 MEDIFLOW_DATA_DIR="$DATA_DIR" \
 MEDIFLOW_BACKUP_DEST_DIR="$OUT_DIR" \
 MEDIFLOW_BACKUP_FORCE=1 \
-node --experimental-strip-types "$ROOT_DIR/scripts/run-scheduled-backup.mjs" > "$TMP_DIR/result.json"
+node "$ROOT_DIR/scripts/run-scheduled-backup.mjs" > "$TMP_DIR/result.json"
 
-ROOT_DIR="$ROOT_DIR" TMP_DIR="$TMP_DIR" node --experimental-strip-types --input-type=module <<'NODE'
+cat > "$TMP_DIR/verify-backup-artifact.mjs" <<'NODE'
 import fs from 'fs';
 import path from 'path';
-import { pathToFileURL } from 'url';
 
-const rootDir = process.env.ROOT_DIR;
 const tmpDir = process.env.TMP_DIR;
 const result = JSON.parse(fs.readFileSync(path.join(tmpDir, 'result.json'), 'utf8'));
 if (!result.ok) {
@@ -67,13 +65,16 @@ if (!fs.existsSync(path.join(path.dirname(result.artifactPath), 'notes.txt'))) {
   throw new Error('Retention removed an unrelated file.');
 }
 
-const { parseBackupArtifact } = await import(pathToFileURL(path.join(rootDir, 'lib', 'backup-artifact.ts')).href);
 const artifact = JSON.parse(fs.readFileSync(result.artifactPath, 'utf8'));
-const parsed = await parseBackupArtifact(artifact);
 
-if (parsed.format !== 'mediflow-backup' || parsed.version !== 1) {
+if (artifact.format !== 'mediflow-backup' || artifact.version !== 1) {
   throw new Error('Unexpected backup artifact format.');
+}
+if (!artifact.manifest || !artifact.payload) {
+  throw new Error('Backup artifact is missing manifest or payload sections.');
 }
 NODE
 
-node --experimental-strip-types --test "$ROOT_DIR/lib/backup-scheduler.test.ts"
+TMP_DIR="$TMP_DIR" node "$TMP_DIR/verify-backup-artifact.mjs"
+
+node "$ROOT_DIR/scripts/run-strip-types.mjs" --test "$ROOT_DIR/lib/backup-scheduler.test.ts"

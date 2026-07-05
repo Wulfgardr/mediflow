@@ -10,7 +10,7 @@ import {
     rememberLockedCiphertext,
     takeLockedCiphertext,
 } from './locked-field-guard';
-import { decryptData, encryptData, generateMasterKey } from './security';
+import { decryptData, encryptData, generateMasterKey } from './security/security';
 import { db } from './db';
 
 type FetchCall = { url: string; method: string; body?: Record<string, unknown> };

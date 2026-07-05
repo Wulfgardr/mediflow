@@ -75,6 +75,17 @@ function normalizeNullableStringField(value: unknown): string | null | undefined
     return undefined;
 }
 
+/* @Codex */
+// Timestamp opzionale (es. aiSummaryGeneratedAt): stringa ISO/numero/Date -> Date,
+// null azzera, undefined e no-op. Un valore non valido viene ignorato (no-op)
+// perche e metadato derivato, non un campo critico che deve far fallire la PUT.
+function normalizeOptionalTimestampField(value: unknown): Date | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const parsed = new Date(value as string | number | Date);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
 function hasPatientUpdatableField(values: PatientUpdateValues): boolean {
     return Object.entries(values).some(
         ([key, value]) => key !== 'updatedAt' && key !== 'version' && value !== undefined
@@ -142,6 +153,8 @@ export function normalizePatientUpdateInput(
         monitoringProfile: normalizeNullableStringField(body.monitoringProfile),
         statusReason: normalizeNullableStringField(body.statusReason),
         aiSummary: normalizeNullableStringField(body.aiSummary),
+        aiSummaryGeneratedAt: normalizeOptionalTimestampField(body.aiSummaryGeneratedAt),
+        aiSummaryContextHash: normalizeNullableStringField(body.aiSummaryContextHash),
         documentInsights: normalizeNullableStringField(body.documentInsights),
         isAdi: typeof body.isAdi === 'boolean' ? body.isAdi : undefined,
         isArchived: typeof body.isArchived === 'boolean' ? body.isArchived : undefined,

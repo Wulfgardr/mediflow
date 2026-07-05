@@ -14,10 +14,10 @@
     "scripts/document-evidence-backfill.ts",
     "scripts/document-evidence-backfill-live-db.ts",
     "scripts/document-source-provenance-audit.ts",
-    "lib/document-evidence-backfill.ts",
-    "lib/document-source-provenance-audit.ts",
-    "lib/document-parse-evidence-artifact.ts",
-    "lib/document-evidence-pack.ts"
+    "lib/domain/documents/document-evidence-backfill.ts",
+    "lib/domain/documents/document-source-provenance-audit.ts",
+    "lib/domain/documents/document-parse-evidence-artifact.ts",
+    "lib/domain/documents/document-evidence-pack.ts"
   ],
   "exclude": [
     "node_modules",

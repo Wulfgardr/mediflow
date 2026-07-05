@@ -15,7 +15,8 @@
   --line: rgba(15, 23, 42, 0.05);
   --line-strong: rgba(15, 23, 42, 0.08);
   --rail-green: #2f7d4f;
-  --rail-blue: #1d4ed8;
+  /* @Codex WUL-UIUX: ex #1d4ed8, portato su slate per coerenza col focus globale */
+  --rail-blue: #334155;
   --rail-yellow: #b45309;
   --rail-coral: #dc2626;
   --rail-violet: #6d28d9;
@@ -36,7 +37,7 @@
   --accent-ai-fg: #ffffff;
   --solid-action-bg: #0f172a;
   --solid-action-fg: #ffffff;
-  --brand-dot-bg: #2563eb;
+  --brand-dot-bg: #0f172a;
   --brand-dot-fg: #ffffff;
   --rail-bg: linear-gradient(180deg, var(--surface-inset) 0%, var(--canvas) 100%);
   --rail-dot-shadow: rgba(71, 85, 105, 0.18);
@@ -52,7 +53,7 @@
   --toggle-track: #d1d5db;
   --sweep-tint: rgba(15, 23, 42, 0.04);
   --halo-green: rgba(22, 163, 74, 0.16);
-  --halo-blue: rgba(37, 99, 235, 0.14);
+  --halo-blue: rgba(15, 23, 42, 0.14);
   --ring-accept: rgba(21, 128, 61, 0.22);
   --ring-correct: rgba(29, 78, 216, 0.22);
   --ring-ignore: rgba(100, 116, 139, 0.18);
@@ -70,8 +71,7 @@
   background: var(--canvas);
   color: var(--ink);
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-    "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--mf-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   font-feature-settings: "cv11", "ss01";
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -93,7 +93,7 @@
   --line: rgba(226, 232, 240, 0.10);
   --line-strong: rgba(226, 232, 240, 0.16);
   --rail-green: #4ade80;
-  --rail-blue: #60a5fa;
+  --rail-blue: #cbd5e1;
   --rail-yellow: #fbbf24;
   --rail-coral: #f87171;
   --rail-violet: #a78bfa;
@@ -114,7 +114,7 @@
   --accent-ai-fg: #020617;
   --solid-action-bg: #e2e8f0;
   --solid-action-fg: #020617;
-  --brand-dot-bg: #93c5fd;
+  --brand-dot-bg: #e2e8f0;
   --brand-dot-fg: #0f172a;
   --rail-bg: linear-gradient(180deg, #111827 0%, #020617 100%);
   --rail-dot-shadow: rgba(148, 163, 184, 0.22);
@@ -125,7 +125,7 @@
   --toggle-track: rgba(148, 163, 184, 0.28);
   --sweep-tint: rgba(226, 232, 240, 0.07);
   --halo-green: rgba(74, 222, 128, 0.22);
-  --halo-blue: rgba(96, 165, 250, 0.20);
+  --halo-blue: rgba(203, 213, 225, 0.20);
   --ring-accept: rgba(74, 222, 128, 0.38);
   --ring-correct: rgba(96, 165, 250, 0.38);
   --ring-ignore: rgba(148, 163, 184, 0.32);
@@ -245,7 +245,7 @@
   gap: 10px;
   padding: 9px 12px;
   border-radius: var(--radius-chip);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-muted);
   cursor: pointer;
   border: 0;
@@ -463,6 +463,18 @@
 
 .aiButton:hover { transform: translateY(-1px); filter: brightness(1.04); }
 .aiButton:active { transform: scale(0.97); }
+
+/* @Codex WUL-UIUX: la chrome del cockpit (la superficie piu usata) era operabile
+   da tastiera ma senza indicatore di focus, una regressione WCAG 2.4.7 rispetto
+   alla Sidebar. Anello di focus condiviso, coerente con --mf-focus-ring. */
+.navItem:focus-visible,
+.search:focus-visible,
+.toolChip:focus-visible,
+.aiButton:focus-visible,
+.exit:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+}
 
 .avatarPill {
   display: inline-flex;
@@ -795,7 +807,7 @@
 }
 
 .rowMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rowTitle { font-size: 13px; color: var(--ink); font-weight: 500; }
+.rowTitle { font-size: 14px; color: var(--ink); font-weight: 500; }
 .rowSub { font-size: 12px; color: var(--ink-muted); }
 .rowEnd { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 
@@ -1075,7 +1087,7 @@
 }
 
 .fieldValue {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink);
   font-weight: 500;
 }
@@ -1463,6 +1475,14 @@
     0 0 0 1px var(--line);
 }
 
+/* @Codex WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
+   tastiera vive sul contenitore, coerente con l'anello condiviso. */
+.patientSearchField:focus-within {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+}
+
 .patientSearchField input {
   width: 100%;
   min-width: 0;
@@ -1584,8 +1604,8 @@
 .patientDotBlue { background: var(--rail-blue); box-shadow: 0 0 0 3px var(--halo-blue); }
 .patientDotMuted { background: var(--ink-faint); }
 
-.patientName { font-size: 13px; color: var(--ink); font-weight: 500; }
-.patientCode { font-size: 11px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.patientName { font-size: 14px; color: var(--ink); font-weight: 500; }
+.patientCode { font-size: 12px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
 /* @Codex */
 .patientMeta {
   min-width: 0;
@@ -1715,9 +1735,9 @@
 }
 .evidenceItem:last-child { border-bottom: 0; }
 
-.evidenceDate { font-size: 11px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
-.evidenceTitle { font-size: 13px; color: var(--ink); font-weight: 500; }
-.evidenceSnippet { font-size: 11px; color: var(--ink-muted); margin-top: 2px; line-height: 1.5; }
+.evidenceDate { font-size: 12px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.evidenceTitle { font-size: 14px; color: var(--ink); font-weight: 500; }
+.evidenceSnippet { font-size: 12px; color: var(--ink-muted); margin-top: 2px; line-height: 1.5; }
 
 .plannedItem {
   display: grid;
@@ -1988,4 +2008,54 @@
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* @Codex WUL-UIUX: tab contestuale delle sotto-aree paziente (Quadro / Documenti
+   / SISS) sotto la Toolbar: where-am-i persistente quando il rail marca
+   'Pazienti'. Stessi token slate del resto del cockpit. */
+.subareaTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px 0;
+}
+
+.subareaPatient {
+  margin-right: 6px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.subareaTab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.subareaTab:hover {
+  color: var(--ink);
+  border-color: var(--ink-subtle);
+}
+
+.subareaTab:focus-visible {
+  outline: none;
+  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+}
+
+.subareaTabActive {
+  color: var(--ink);
+  font-weight: 600;
+  border-color: var(--ink);
+  background: var(--surface-soft);
 }

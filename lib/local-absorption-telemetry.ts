@@ -5,7 +5,7 @@ import {
     type EvidenceQueue,
     type EvidenceQueueDecisionReason,
     type EvidenceQueueSourceType,
-} from './evidence-queue-contract';
+} from './domain/documents/evidence-queue-contract';
 
 /* @Codex */
 export const LOCAL_ABSORPTION_TELEMETRY_SCHEMA_VERSION = 'mediflow.local_absorption_telemetry.v1';

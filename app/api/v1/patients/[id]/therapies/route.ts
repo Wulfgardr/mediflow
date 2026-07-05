@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -15,7 +15,7 @@ import {
     therapyStatusFilterValues,
 } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;

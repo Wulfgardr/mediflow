@@ -5,10 +5,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_DIR="$ROOT_DIR/native/MediFlowMac"
 
+# swift test needs the XCTest module, which the bare Command Line Tools toolchain
+# does not ship. Auto-select a full Xcode if the active developer dir is CLT.
+if [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! xcrun --sdk macosx --find xctest >/dev/null 2>&1; then
+  for dev in /Applications/Xcode.app/Contents/Developer /Applications/Xcode-beta.app/Contents/Developer; do
+    if [[ -d "$dev" ]]; then export DEVELOPER_DIR="$dev"; break; fi
+  done
+fi
+
 # @Codex
 RUNNER="${MEDIFLOW_NATIVE_TEST_RUNNER:-swift}" # swift | xcode | both
 DERIVED_DATA_DIR="${MEDIFLOW_DERIVED_DATA_DIR:-$ROOT_DIR/tmp-native-derived-data}"
-XCODE_SCHEME="${MEDIFLOW_XCODE_SCHEME:-MediFlowMac}"
+# Sole surviving SPM scheme after the executables were retired (Fase 0).
+XCODE_SCHEME="${MEDIFLOW_XCODE_SCHEME:-MediFlowAppleShared}"
 XCODE_DESTINATION="${MEDIFLOW_XCODE_DESTINATION:-platform=macOS,arch=arm64}"
 
 run_swift_tests() {

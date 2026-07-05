@@ -106,7 +106,7 @@ export default function ScalesLibraryPage() {
             eyebrow="Scale"
             title="Scale cliniche"
             subtitle="Il punteggio viene registrato nella cartella del paziente."
-            backHref="/"
+            backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={selectedScaleDefinition
                 ? `${selectedScaleDefinition.title}: manca la scheda paziente.`

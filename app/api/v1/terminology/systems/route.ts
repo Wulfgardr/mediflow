@@ -1,6 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { loadTerminologyRegistry } from '@/lib/terminology-registry';
 
 /* @Codex */

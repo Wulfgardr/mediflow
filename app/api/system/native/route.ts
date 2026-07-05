@@ -5,7 +5,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 
 const execFileAsync = promisify(execFile);
 const APP_NAME = 'MediFlowMac';

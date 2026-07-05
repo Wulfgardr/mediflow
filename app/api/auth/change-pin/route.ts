@@ -8,7 +8,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 /* @Codex */
 import { dbServer } from '@/lib/db-server';
 /* @Codex */
@@ -17,11 +17,11 @@ import {
     PIN_CHANGE_INVALID_NEW_PIN_CODE,
     PIN_CHANGE_REUSE_NOT_ALLOWED_CODE,
     validatePinChangeInput,
-} from '@/lib/pin-change';
+} from '@/lib/security/pin-change';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 /* @Codex */
 function failureResponse(status: number, code: string, message: string) {

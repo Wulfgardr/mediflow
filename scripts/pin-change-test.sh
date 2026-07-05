@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT_DIR="$ROOT_DIR/tmp-pin-change-test"
 
-trap 'node -e "require('\''fs'\'').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"' EXIT
-node -e "require('fs').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"
-npx tsc -p "$ROOT_DIR/tsconfig.pin-change-test.json"
-node --test "$OUT_DIR/pin-change.test.js"
+node "$ROOT_DIR/scripts/run-strip-types.mjs" --test \
+  "$ROOT_DIR/lib/security/pin-change.test.ts"

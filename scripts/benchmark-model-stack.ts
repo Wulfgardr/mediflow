@@ -41,6 +41,7 @@ type ModelStackCandidate = {
     runtime: CandidateRuntime;
     runtimeModel?: string;
     executionStatus: CandidateExecutionStatus;
+    promotionStatus?: 'runtime_eligible' | 'benchmark_only';
     blockers?: string[];
     notes: string;
 };

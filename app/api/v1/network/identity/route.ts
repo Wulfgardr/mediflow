@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 /* @Codex */
-import { requireSession } from '@/lib/server-auth';
+import { requireSession } from '@/lib/security/server-auth';
 /* @Codex */
 import { getNetworkIdentitySummary } from '@/lib/network-home-base-server';
 

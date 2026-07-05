@@ -3,15 +3,15 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 /* @Codex */
 import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
 import { normalizeCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 

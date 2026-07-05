@@ -5,12 +5,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Database, Server, Upload } from 'lucide-react';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 /* @Codex */
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
 import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 
 export default function SettingsRepertoriPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { showToast } = useToast();
+    const confirm = useConfirm();
 
     // --- AIFA State ---
     const [drugStats, setDrugStats] = useState<number | null>(null);
@@ -36,7 +40,12 @@ export default function SettingsRepertoriPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (!confirm("Questa operazione potrebbe richiedere del tempo. Vuoi procedere con l'importazione?")) {
+        const { confirmed } = await confirm({
+            title: 'Importare il file AIFA?',
+            message: "Questa operazione potrebbe richiedere del tempo.",
+            confirmLabel: 'Importa',
+        });
+        if (!confirmed) {
             if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
@@ -53,11 +62,11 @@ export default function SettingsRepertoriPage() {
                 const perc = Math.round((count / total) * 100);
                 setProgress(perc);
             });
-            alert("Importazione completata con successo!");
+            showToast({ tone: 'success', title: 'Importazione completata' });
             loadStats();
         } catch (err) {
             console.error(err);
-            alert("Errore durante l'importazione.");
+            showToast({ tone: 'error', title: 'Errore durante l\'importazione' });
         } finally {
             setImporting(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -65,7 +74,13 @@ export default function SettingsRepertoriPage() {
     };
 
     const handleClearDrugs = async () => {
-        if (confirm("Sei sicuro di voler cancellare l'intero database farmaci?")) {
+        const { confirmed } = await confirm({
+            title: 'Svuotare il database farmaci?',
+            message: "L'intero elenco dei farmaci indicizzati verrà cancellato.",
+            confirmLabel: 'Svuota',
+            tone: 'danger',
+        });
+        if (confirmed) {
             await clearDrugDatabase();
             loadStats();
         }

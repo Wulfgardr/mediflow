@@ -103,6 +103,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                                     onClick={() => onRestore(entry)}
                                     className="mf-btn-secondary !p-1.5 !text-[color:var(--mf-success)]"
                                     title="Ripristina"
+                                    aria-label="Ripristina voce clinica"
                                 >
                                     <Undo className="w-4 h-4" />
                                 </button>
@@ -113,6 +114,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                                     onClick={() => onDelete(entry)}
                                     className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--mf-critical)]"
                                     title="Elimina con motivazione"
+                                    aria-label="Elimina voce clinica con motivazione"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>

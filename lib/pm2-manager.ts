@@ -54,6 +54,15 @@ export class PM2Manager {
     }
 
     static async start(): Promise<void> {
+        // @Codex
+        // The MLX inference server (ecosystem.config.js -> bash start-mlx.sh) only
+        // runs on macOS Apple Silicon. Fail fast with a clear message elsewhere
+        // instead of letting PM2 try to load a bash interpreter on Windows.
+        if (process.platform !== 'darwin') {
+            throw new Error(
+                `MLX inference server non supportato su ${process.platform}/${process.arch}: disponibile solo su macOS Apple Silicon. Usa Ollama come runtime AI cross-platform.`,
+            );
+        }
         return new Promise((resolve, reject) => {
             // We start using the ecosystem file to ensure config is loaded
             const cwd = process.cwd();

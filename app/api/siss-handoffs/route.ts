@@ -4,8 +4,10 @@ import { desc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { sissHandoffEvents } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { sissHandoffCreateSchema } from '@/lib/api-schemas/siss-handoffs';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 const OUTCOMES = new Set(['started', 'completed', 'blocked', 'cancelled']);
 const ACTION_LABELS: Record<string, string> = {
@@ -53,7 +55,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(sissHandoffCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const patientId = optionalText(body.patientId);
         const action = optionalText(body.action);
         const outcome = optionalText(body.outcome) ?? 'started';
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
             subjectType: 'siss_handoff',
             subjectRef: id,
             redactedMetadata: {
-                changedFields: listChangedFields(body, ['id']),
+                    changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
                 flags: [`action:${action}`, `outcome:${outcome}`],
             },
         }, '[MediFlow] SISS handoff audit write failed:');

@@ -2,10 +2,31 @@
 
 /* @Codex */
 import { useEffect, useRef, useState } from 'react';
-import { Bold, Heading1, Heading2, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
+import { Bold, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { cn } from '@/lib/utils';
+
+/*
+ * @Codex WUL-UIUX: document.execCommand e deprecato e incoerente cross-browser.
+ * Finche non si migra a un editor controllato (Lexical/TipTap), almeno si fa
+ * feature-detection, si controlla il valore di ritorno e si protegge da eccezioni.
+ */
+function execCommandSafe(command: string, value?: string, silent = false): boolean {
+    if (typeof document === 'undefined' || typeof document.execCommand !== 'function') {
+        return false;
+    }
+    try {
+        const ok = document.execCommand(command, false, value);
+        if (!ok && !silent) {
+            console.warn(`[ClinicalRichTextEditor] execCommand("${command}") non supportato o non applicabile`);
+        }
+        return ok;
+    } catch (error) {
+        console.warn(`[ClinicalRichTextEditor] execCommand("${command}") ha sollevato un errore`, error);
+        return false;
+    }
+}
 
 type ToolbarAction = {
     command: string;
@@ -52,7 +73,7 @@ export function ClinicalRichTextEditor({
 
     /* @Codex */
     useEffect(() => {
-        document.execCommand('defaultParagraphSeparator', false, 'p');
+        execCommandSafe('defaultParagraphSeparator', 'p', true);
     }, []);
 
     useEffect(() => {
@@ -77,14 +98,14 @@ export function ClinicalRichTextEditor({
         const editor = editorRef.current;
         if (!editor) return;
         editor.focus();
-        document.execCommand(command, false, value);
+        execCommandSafe(command, value);
         syncValue();
     };
 
     const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
         event.preventDefault();
         const text = event.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
+        execCommandSafe('insertText', text);
         syncValue();
     };
 
@@ -125,16 +146,20 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
-                        className="rounded-[14px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        aria-label="Riduci rientro"
+                        title="Riduci rientro"
                     >
-                        Out
+                        <IndentDecrease className="h-4 w-4" />
                     </button>
                     <button
                         type="button"
                         onClick={() => runCommand('indent')}
-                        className="rounded-[14px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        aria-label="Aumenta rientro"
+                        title="Aumenta rientro"
                     >
-                        In
+                        <IndentIncrease className="h-4 w-4" />
                     </button>
                 </div>
             </div>

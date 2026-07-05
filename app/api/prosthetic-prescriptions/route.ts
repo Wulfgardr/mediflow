@@ -4,8 +4,10 @@ import { desc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { prostheticPrescriptions } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { prostheticPrescriptionCreateSchema } from '@/lib/api-schemas/prescriptions';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 /* @Codex */
 const STATUSES = new Set(['draft', 'prescribed', 'submitted', 'authorized', 'delivered', 'tested', 'cancelled']);
@@ -49,7 +51,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(prostheticPrescriptionCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const patientId = optionalText(body.patientId);
         const description = optionalText(body.description);
         const prescribedAt = parseDate(body.prescribedAt);
@@ -95,7 +100,7 @@ export async function POST(request: Request) {
                 subjectType: 'prosthetic_prescription',
                 subjectRef: id,
                 redactedMetadata: {
-                    changedFields: listChangedFields(body, ['id']),
+                    changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
                     flags: [`source:${source}`, `status:${status}`, `category:${category}`],
                 },
             },

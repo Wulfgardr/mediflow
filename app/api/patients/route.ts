@@ -2,12 +2,24 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
 import { activePatients } from '@/lib/patient-lifecycle';
+/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
+import { parseListParams } from '@/lib/list-query-params';
+
+// address/phone/caregiver/notes etc are ENC:. firstName/lastName/taxCode/dates
+// are plaintext in the schema, so they are safe sort targets.
+const PATIENT_SORT_COLUMNS = {
+    updatedAt: patients.updatedAt,
+    createdAt: patients.createdAt,
+    lastName: patients.lastName,
+    firstName: patients.firstName,
+    birthDate: patients.birthDate,
+} as const;
 /* @Codex */
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
@@ -17,7 +29,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 
 /* @Codex */
 async function recordPatientAuditEvent(
@@ -45,10 +57,20 @@ async function recordPatientAuditEvent(
     }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+
+    /* STREAM B */
+    const { searchParams } = new URL(request.url);
+    const parsed = parseListParams(searchParams, {
+        sortableColumns: Object.keys(PATIENT_SORT_COLUMNS),
+        defaultOrderBy: 'updatedAt',
+        defaultOrderDir: 'desc',
+    });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const { limit, offset, orderBy, orderDir } = parsed.params;
 
     try {
         const cookieStore = await cookies();
@@ -67,15 +89,23 @@ export async function GET() {
             return NextResponse.json([]);
         }
 
+        const sortColumn = PATIENT_SORT_COLUMNS[(orderBy ?? 'updatedAt') as keyof typeof PATIENT_SORT_COLUMNS];
+        const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
         // MANY-TO-MANY JOIN
         // Select patients where there is a link in patientsToAmbulatories for this ambulatoryId
-        const rows = await dbServer.select({
+        let query = dbServer.select({
             patient: patients
         })
             .from(patients)
             .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
             .where(and(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId), activePatients()))
-            .orderBy(desc(patients.updatedAt));
+            .orderBy(orderExpr)
+            .$dynamic();
+        if (typeof limit === 'number') query = query.limit(limit);
+        if (typeof offset === 'number') query = query.offset(offset);
+
+        const rows = await query;
 
         // Flatten result
         const result = rows.map(r => r.patient);
@@ -116,14 +146,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(patients).values(normalized.values);
+        // WUL-268 (STREAM A): the patient row and its ambulatory membership must be
+        // created atomically. better-sqlite3 transactions are synchronous, so no
+        // awaits inside; the async audit write stays outside (separate audit DB).
+        dbServer.transaction((tx) => {
+            tx.insert(patients).values(normalized.values).run();
 
-        /* @Codex */
-        if (normalized.values.ambulatoryId) {
-            await dbServer.insert(patientsToAmbulatories)
-                .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
-                .onConflictDoNothing();
-        }
+            /* @Codex */
+            if (normalized.values.ambulatoryId) {
+                tx.insert(patientsToAmbulatories)
+                    .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
+                    .onConflictDoNothing()
+                    .run();
+            }
+        });
 
         /* @Codex */
         await recordPatientAuditEvent(request, session, 'patient.created', normalized.values.id, {

@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
+/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
+import { parseListParams } from '@/lib/list-query-params';
+
+// content/metadata/attachmentBase64/reasoning are ENC:. Only createdAt sortable.
+const MESSAGE_SORT_COLUMNS = {
+    createdAt: messages.createdAt,
+} as const;
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -15,15 +22,26 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
 
+    /* STREAM B: messages default to chronological (asc) order for chat rendering. */
+    const parsed = parseListParams(searchParams, {
+        sortableColumns: Object.keys(MESSAGE_SORT_COLUMNS),
+        defaultOrderBy: 'createdAt',
+        defaultOrderDir: 'asc',
+    });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const { limit, offset, orderBy, orderDir } = parsed.params;
+
     try {
-        let query = dbServer.select().from(messages);
+        const whereClause = conversationId ? eq(messages.conversationId, conversationId) : undefined;
 
-        if (conversationId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.where(eq(messages.conversationId, conversationId)) as any;
-        }
+        const sortColumn = MESSAGE_SORT_COLUMNS[(orderBy ?? 'createdAt') as keyof typeof MESSAGE_SORT_COLUMNS];
+        const orderExpr = orderDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
 
-        const data = await query.orderBy(asc(messages.createdAt));
+        let query = dbServer.select().from(messages).where(whereClause).orderBy(orderExpr).$dynamic();
+        if (typeof limit === 'number') query = query.limit(limit);
+        if (typeof offset === 'number') query = query.offset(offset);
+
+        const data = await query;
         return NextResponse.json(data);
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });

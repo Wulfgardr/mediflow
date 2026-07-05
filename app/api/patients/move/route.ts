@@ -3,7 +3,7 @@ import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
@@ -50,26 +50,34 @@ export async function POST(request: Request) {
             );
         }
 
-        /* @Codex */
-        if (sourceAmbulatoryId) {
-            await dbServer.delete(patientsToAmbulatories)
-                .where(and(
-                    eq(patientsToAmbulatories.ambulatoryId, sourceAmbulatoryId),
-                    inArray(patientsToAmbulatories.patientId, patientIds)
-                ));
-        }
+        // WUL-268 (STREAM A): membership delete + insert + primary-ownership update
+        // must land atomically. better-sqlite3 transactions are synchronous, so no
+        // awaits inside the callback (see app/api/system/backup-restore).
+        dbServer.transaction((tx) => {
+            /* @Codex */
+            if (sourceAmbulatoryId) {
+                tx.delete(patientsToAmbulatories)
+                    .where(and(
+                        eq(patientsToAmbulatories.ambulatoryId, sourceAmbulatoryId),
+                        inArray(patientsToAmbulatories.patientId, patientIds)
+                    ))
+                    .run();
+            }
 
-        /* @Codex */
-        await dbServer.insert(patientsToAmbulatories)
-            .values(patientIds.map((patientId: string) => ({
-                patientId,
-                ambulatoryId: targetAmbulatoryId
-            })))
-            .onConflictDoNothing();
+            /* @Codex */
+            tx.insert(patientsToAmbulatories)
+                .values(patientIds.map((patientId: string) => ({
+                    patientId,
+                    ambulatoryId: targetAmbulatoryId
+                })))
+                .onConflictDoNothing()
+                .run();
 
-        await dbServer.update(patients)
-            .set({ ambulatoryId: targetAmbulatoryId, updatedAt: new Date() })
-            .where(inArray(patients.id, patientIds));
+            tx.update(patients)
+                .set({ ambulatoryId: targetAmbulatoryId, updatedAt: new Date() })
+                .where(inArray(patients.id, patientIds))
+                .run();
+        });
 
         return NextResponse.json({
             success: true,

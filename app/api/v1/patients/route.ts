@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, desc, eq } from 'drizzle-orm';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
 import { activePatients } from '@/lib/patient-lifecycle';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,7 +18,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 
 /* @Codex */
 async function recordPatientAuditEvent(

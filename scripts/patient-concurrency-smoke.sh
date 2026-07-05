@@ -67,8 +67,8 @@ for (const relativePath of ['app/api/patients/route.ts', 'app/api/patients/[id]/
     );
   }
   source = source.replace(
-    "import { requireSession, unauthorizedResponse } from '@/lib/server-auth';",
-    "import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';"
+    "import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';",
+    "import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';"
   );
   source = source.replaceAll(
     "const session = await requireSession();",

@@ -136,6 +136,7 @@ La baseline pubblicata oggi copre:
 - `GET /api/v1/network/pairing-intents`
 - `POST /api/v1/network/pairing-intents`
 - `POST /api/v1/network/pairing-intents/{intentId}/confirm`
+- `GET /api/v1/network/ambulatories`
 - `GET /api/v1/network/patients`
 - `GET /api/v1/network/patients/{id}`
 - `PUT /api/v1/network/patients/{id}`

@@ -3,7 +3,7 @@ import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): soft-delete lifecycle helpers
@@ -20,7 +20,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 
 /* @Codex */
 async function recordPatientAuditEvent(

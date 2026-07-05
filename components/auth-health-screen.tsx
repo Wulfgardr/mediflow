@@ -4,7 +4,7 @@
 import React from 'react';
 import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
 /* @Codex */
-import type { AuthHealthPayload } from '@/lib/client-auth-api';
+import type { AuthHealthPayload } from '@/lib/security/client-auth-api';
 
 /* @Codex */
 type AuthDbState = NonNullable<NonNullable<AuthHealthPayload['db']>['state']>;

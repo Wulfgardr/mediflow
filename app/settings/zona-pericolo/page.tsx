@@ -5,27 +5,38 @@
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { SettingsSectionIntro } from '@/components/settings/settings-ui';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const RESET_CONFIRM_KEYWORD = 'RESET';
 
 export default function SettingsDangerZonePage() {
     const [confirmText, setConfirmText] = useState('');
     const [isResetting, setIsResetting] = useState(false);
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const confirmed = confirmText.trim().toUpperCase() === RESET_CONFIRM_KEYWORD;
 
     const resetOnboarding = async () => {
         if (!confirmed || isResetting) return;
+        const { confirmed: proceed } = await confirm({
+            title: 'Ripetere la configurazione iniziale?',
+            message: 'Il reset cancella profilo utente e chiavi e riporta la postazione all\'onboarding. I dati dei pazienti restano invariati.',
+            confirmLabel: 'Esegui reset',
+            tone: 'danger',
+        });
+        if (!proceed) return;
         setIsResetting(true);
         try {
             const res = await fetch('/api/auth/reset', { method: 'POST' });
             if (res.ok) {
                 window.location.href = '/';
             } else {
-                alert("Errore durante il reset.");
+                showToast({ tone: 'error', title: 'Errore durante il reset' });
             }
         } catch (e) {
             console.error(e);
-            alert("Errore di connessione.");
+            showToast({ tone: 'error', title: 'Errore di connessione', description: 'Impossibile completare il reset. Riprova.' });
         } finally {
             setIsResetting(false);
         }

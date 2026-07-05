@@ -1,7 +1,15 @@
 /* @Codex */
+import {
+    assertAiLaneEnabledValue,
+    isAiLaneEnabledValue,
+    resolveAiLaneKillSwitchState,
+    serializeAiLaneKillSwitchState,
+    type AiLaneKillSwitchState,
+} from './ai-lane-kill-switch';
+
 export const AI_PATIENT_INSIGHT_KILL_SWITCH_KEY = 'aiPatientInsightKillSwitch';
 
-export type AiPatientInsightKillSwitchState = 'enabled' | 'disabled';
+export type AiPatientInsightKillSwitchState = AiLaneKillSwitchState;
 
 export class AiPatientInsightDisabledError extends Error {
     constructor() {
@@ -11,23 +19,17 @@ export class AiPatientInsightDisabledError extends Error {
 }
 
 export function resolveAiPatientInsightKillSwitchState(value: unknown): AiPatientInsightKillSwitchState {
-    if (value === 'enabled' || value === true || value === 'true' || value === 1 || value === '1') {
-        return 'enabled';
-    }
-
-    return 'disabled';
+    return resolveAiLaneKillSwitchState(value);
 }
 
 export function isAiPatientInsightEnabledValue(value: unknown): boolean {
-    return resolveAiPatientInsightKillSwitchState(value) === 'enabled';
+    return isAiLaneEnabledValue(value);
 }
 
 export function serializeAiPatientInsightKillSwitchState(enabled: boolean): AiPatientInsightKillSwitchState {
-    return enabled ? 'enabled' : 'disabled';
+    return serializeAiLaneKillSwitchState(enabled);
 }
 
 export function assertAiPatientInsightEnabledValue(value: unknown): void {
-    if (!isAiPatientInsightEnabledValue(value)) {
-        throw new AiPatientInsightDisabledError();
-    }
+    assertAiLaneEnabledValue(value, () => new AiPatientInsightDisabledError());
 }

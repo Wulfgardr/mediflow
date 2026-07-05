@@ -207,8 +207,8 @@ export default function SettingsAiFunctionsPage() {
                                         style={{ background: patientInsightEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                     >
                                         <span
-                                            className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: patientInsightEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: patientInsightEnabled ? 'translateX(20px)' : 'translateX(0)' }}
                                         />
                                     </button>
                                 </div>
@@ -250,8 +250,8 @@ export default function SettingsAiFunctionsPage() {
                                         style={{ background: documentSynthesisEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                     >
                                         <span
-                                            className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: documentSynthesisEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: documentSynthesisEnabled ? 'translateX(20px)' : 'translateX(0)' }}
                                         />
                                     </button>
                                 </div>
@@ -293,8 +293,8 @@ export default function SettingsAiFunctionsPage() {
                                         style={{ background: smartImportEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
                                     >
                                         <span
-                                            className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: smartImportEnabled ? 'translateX(22px)' : 'translateX(4px)' }}
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: smartImportEnabled ? 'translateX(20px)' : 'translateX(0)' }}
                                         />
                                     </button>
                                 </div>

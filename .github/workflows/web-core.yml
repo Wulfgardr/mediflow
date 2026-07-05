@@ -1,0 +1,25 @@
+name: Web Core
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  web-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          # test:unit uses the strip-types/registerHooks runner; Node 20 is not enough for this gate.
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:unit

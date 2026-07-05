@@ -4,11 +4,15 @@ import { users, settings } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 /* @Codex */
-import { auditSourceSurfaceFromRequest } from '@/lib/audit';
+import { auditSourceSurfaceFromRequest } from '@/lib/security/audit';
 /* @Codex */
-import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+import { createSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
-import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
+/* @Codex */
+import { authSetupSchema } from '@/lib/api-schemas/auth';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function POST(request: Request) {
     try {
@@ -18,36 +22,39 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, { status: 403 });
         }
 
-        const body = await request.json();
-        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = body;
-
-        if (!username || !password || !encryptedMasterKey || !salt) {
-            return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-        }
+        const rawBody = await request.json();
+        const parsedBody = parseApiBody(authSetupSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Transaction-like insertion (SQLite doesn't support strict transactions in HTTP stateless easily without extensive logic, but sequential is fine here)
+        // WUL-268 (STREAM A): the admin user and its seed settings must be created
+        // atomically so a crash can never leave a user without settings (or vice
+        // versa). better-sqlite3 transactions are synchronous, so no awaits inside;
+        // bcrypt.hash already ran above and the values are plain.
         const userId = uuidv4();
-        await dbServer.insert(users).values({
-            id: userId,
-            username,
-            displayName,
-            ambulatoryName,
-            role: 'admin', // First user is always admin
-            passwordHash: hashedPassword,
-            encryptedMasterKey,
-            salt,
-            createdAt: new Date()
-        });
+        dbServer.transaction((tx) => {
+            tx.insert(users).values({
+                id: userId,
+                username,
+                displayName,
+                ambulatoryName,
+                role: 'admin', // First user is always admin
+                passwordHash: hashedPassword,
+                encryptedMasterKey,
+                salt,
+                createdAt: new Date()
+            }).run();
 
-        // Initialize Settings
-        if (displayName) {
-            await dbServer.insert(settings).values({ key: 'doctorName', value: displayName }).onConflictDoUpdate({ target: settings.key, set: { value: displayName } });
-        }
-        if (ambulatoryName) {
-            await dbServer.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } });
-        }
+            // Initialize Settings
+            if (displayName) {
+                tx.insert(settings).values({ key: 'doctorName', value: displayName }).onConflictDoUpdate({ target: settings.key, set: { value: displayName } }).run();
+            }
+            if (ambulatoryName) {
+                tx.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } }).run();
+            }
+        });
 
         /* @Codex */
         const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');

@@ -34,6 +34,10 @@ export type PatientDetail = {
     /* @Codex */
     aiSummary: string | null;
     /* @Codex */
+    aiSummaryGeneratedAt: string | null;
+    /* @Codex */
+    aiSummaryContextHash: string | null;
+    /* @Codex */
     documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
@@ -135,6 +139,12 @@ export type ObservationSummary = {
     unitCode: string;
     value: string;
     notes: string | null;
+    /* @Codex */
+    refLow: string | null;
+    /* @Codex */
+    refHigh: string | null;
+    /* @Codex */
+    refText: string | null;
     observedAt: string;
     source: string | null;
     /* @Codex */

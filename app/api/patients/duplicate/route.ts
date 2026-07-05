@@ -4,7 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
@@ -44,32 +44,38 @@ export async function POST(request: Request) {
             );
         }
 
-        let count = 0;
-        for (const p of originals) {
-            const newId = uuidv4();
+        // WUL-268 (STREAM A): each clone is a patient insert plus its membership
+        // link; wrap the whole batch so a mid-loop failure never leaves half-cloned
+        // patients without a membership row. Transaction is synchronous (no awaits).
+        const count = dbServer.transaction((tx) => {
+            let cloned = 0;
+            for (const p of originals) {
+                const newId = uuidv4();
 
-            // Clone patient data
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id: _oldId, createdAt: _c, updatedAt: _u, ambulatoryId: _oldAmb, ...data } = p;
+                // Clone patient data
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { id: _oldId, createdAt: _c, updatedAt: _u, ambulatoryId: _oldAmb, ...data } = p;
 
-            // Insert Clone
-            await dbServer.insert(patients).values({
-                id: newId,
-                ...data,
-                /* @Codex */
-                firstName: p.firstName,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                ambulatoryId: targetAmbulatoryId // Set primary ownership too for compat
-            });
+                // Insert Clone
+                tx.insert(patients).values({
+                    id: newId,
+                    ...data,
+                    /* @Codex */
+                    firstName: p.firstName,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    ambulatoryId: targetAmbulatoryId // Set primary ownership too for compat
+                }).run();
 
-            // Create Link
-            await dbServer.insert(patientsToAmbulatories).values({
-                patientId: newId,
-                ambulatoryId: targetAmbulatoryId
-            }).onConflictDoNothing();
-            count++;
-        }
+                // Create Link
+                tx.insert(patientsToAmbulatories).values({
+                    patientId: newId,
+                    ambulatoryId: targetAmbulatoryId
+                }).onConflictDoNothing().run();
+                cloned++;
+            }
+            return cloned;
+        });
 
         return NextResponse.json({ success: true, count });
     } catch (error) {

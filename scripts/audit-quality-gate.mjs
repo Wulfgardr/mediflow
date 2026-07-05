@@ -109,7 +109,7 @@ function addFinding(findings, code, message, details = {}) {
 }
 
 function checkAppendOnly(findings) {
-    const source = read('lib/audit-db.ts');
+    const source = read('lib/security/audit-db.ts');
     for (const token of [
         'CREATE TRIGGER IF NOT EXISTS audit_events_no_update',
         'BEFORE UPDATE ON audit_events',
@@ -124,7 +124,7 @@ function checkAppendOnly(findings) {
 }
 
 function checkAuditCatalog(findings) {
-    const source = read('lib/audit.ts');
+    const source = read('lib/security/audit.ts');
     for (const eventType of REQUIRED_EVENT_TYPES) {
         if (!source.includes(`'${eventType}'`)) {
             addFinding(findings, 'AUDIT_CATALOG', `Required audit event type is missing from AUDIT_EVENT_TYPES: ${eventType}`);
@@ -168,7 +168,7 @@ function sourceIncludesEvent(source, eventType) {
 
 function checkPhiSafeMetadata(findings) {
     const targets = [
-        'lib/audit.ts',
+        'lib/security/audit.ts',
         'lib/siss-audit.ts',
         ...REQUIRED_ROUTE_AUDIT.map((entry) => entry.route),
     ];

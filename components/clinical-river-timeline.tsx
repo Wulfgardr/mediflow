@@ -16,19 +16,35 @@ type RiverItem = {
     id: string;
     title: string;
     summary: string;
+    typeLabel?: string;
     date: Date;
     kind: 'entry' | 'checkup' | 'document';
 };
 
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+    visit: 'Visita',
+    phone: 'Telefonata',
+    exam: 'Esame',
+    hospitalization: 'Ricovero',
+    access: 'Accesso',
+    note: 'Nota',
+    scale: 'Scala',
+    remote: 'Da remoto',
+};
+
+/*
+ * @Codex Niente meta-testo: il riassunto usa SEMPRE il contenuto reale della voce
+ * (compactClinicalRichText). Il tipo viaggia come etichetta, non sostituisce il
+ * testo, cosi un esame patologico non appare identico a uno normale.
+ */
 function getEntrySummary(entry: ClinicalEntry): string {
-    if (entry.type === 'phone') return 'Contatto telefonico e riallineamento del percorso.';
-    if (entry.type === 'exam') return 'Evento diagnostico o esame con follow-up clinico.';
-    if (entry.type === 'hospitalization') return 'Passaggio ospedaliero rilevante per la timeline.';
-    if (entry.type === 'remote') return 'Interazione remota con elementi utili al contesto.';
-    if (entry.type === 'scale') return 'Valutazione strutturata inserita nel caso.';
-    /* @Codex */
-    return compactClinicalRichText(entry.content, 220) || 'Voce del diario clinico pronta alla revisione.';
+    return compactClinicalRichText(entry.content, 220);
 }
+
+const ENTRY_LIMIT = 4;
+const CHECKUP_LIMIT = 2;
+const DOCUMENT_LIMIT = 2;
+const RIVER_LIMIT = 6;
 
 function buildRiverItems(
     entries: ClinicalEntry[],
@@ -37,24 +53,25 @@ function buildRiverItems(
 ): RiverItem[] {
     const entryItems = entries
         .filter((entry) => !entry.deletedAt)
-        .slice(0, 4)
+        .slice(0, ENTRY_LIMIT)
         .map((entry) => ({
             id: `entry-${entry.id}`,
             title: entry.title || 'Voce clinica',
             summary: getEntrySummary(entry),
+            typeLabel: ENTRY_TYPE_LABELS[entry.type] ?? 'Clinico',
             date: new Date(entry.date),
             kind: 'entry' as const,
         }));
 
-    const checkupItems = checkups.slice(0, 2).map((checkup) => ({
+    const checkupItems = checkups.slice(0, CHECKUP_LIMIT).map((checkup) => ({
         id: `checkup-${checkup.id}`,
         title: checkup.title,
-        summary: checkup.notes?.trim() || 'Controllo programmato in agenda clinica.',
+        summary: checkup.notes?.trim() ?? '',
         date: new Date(checkup.date),
         kind: 'checkup' as const,
     }));
 
-    const documentItems = documentInsights.slice(0, 2).map((insight) => ({
+    const documentItems = documentInsights.slice(0, DOCUMENT_LIMIT).map((insight) => ({
         id: `document-${insight.id}`,
         title: insight.fileName,
         summary: insight.summary,
@@ -64,7 +81,7 @@ function buildRiverItems(
 
     return [...entryItems, ...checkupItems, ...documentItems]
         .sort((left, right) => right.date.getTime() - left.date.getTime())
-        .slice(0, 6);
+        .slice(0, RIVER_LIMIT);
 }
 
 function formatDate(date: Date) {
@@ -89,14 +106,14 @@ function getItemPresentation(kind: RiverItem['kind']) {
             icon: ScanText,
             tint: 'text-[color:var(--mf-plum)]',
             line: 'bg-[color:rgba(94,53,95,0.24)]',
-            label: 'Evidence',
+            label: 'Evidenza',
         };
     }
     return {
         icon: Stethoscope,
         tint: 'text-[color:var(--mf-primary)]',
         line: 'bg-[color:rgba(15,123,104,0.26)]',
-        label: 'Clinical',
+        label: 'Clinico',
     };
 }
 
@@ -106,6 +123,10 @@ export function ClinicalRiverTimeline({
     documentInsights,
 }: ClinicalRiverTimelineProps) {
     const items = buildRiverItems(entries, checkups, documentInsights);
+    /* @Codex Conteggio onesto: la river e una anteprima, non l'elenco completo. */
+    const totalAvailable =
+        entries.filter((entry) => !entry.deletedAt).length + checkups.length + documentInsights.length;
+    const hiddenCount = Math.max(totalAvailable - items.length, 0);
 
     if (items.length === 0) {
         return (
@@ -134,7 +155,7 @@ export function ClinicalRiverTimeline({
                         <article className="clinical-river-card rounded-[22px] border p-4">
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                    {presentation.label}
+                                    {item.typeLabel ?? presentation.label}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
                                     <FileText className="h-3.5 w-3.5" />
@@ -142,13 +163,21 @@ export function ClinicalRiverTimeline({
                                 </span>
                             </div>
                             <h3 className="mt-2 text-base font-semibold text-[color:var(--mf-ink)]">{item.title}</h3>
-                            <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--mf-muted)]">
-                                {item.summary}
-                            </p>
+                            {item.summary ? (
+                                <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                    {item.summary}
+                                </p>
+                            ) : null}
                         </article>
                     </div>
                 );
             })}
+
+            {hiddenCount > 0 ? (
+                <p className="pl-[44px] text-[12px] text-[color:var(--mf-muted)]">
+                    Mostrati gli ultimi {items.length} eventi di {totalAvailable}. La cronologia completa è nel diario e nei documenti del paziente.
+                </p>
+            ) : null}
         </div>
     );
 }

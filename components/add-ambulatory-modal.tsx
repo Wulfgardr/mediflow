@@ -6,6 +6,7 @@ import { X, Building2, Plus, Loader2, CornerDownRight } from 'lucide-react';
 import { db, Ambulatory } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useLiveQuery } from '@/lib/live-query';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface AddAmbulatoryModalProps {
     isOpen: boolean;
@@ -20,6 +21,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
     const [type, setType] = useState<'live' | 'test'>('live');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const { showToast } = useToast();
 
     const ambulatories = useLiveQuery(() => db.ambulatories.toArray());
 
@@ -54,7 +56,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
             setAddress('');
         } catch (error) {
             console.error(error);
-            alert("Errore durante la creazione");
+            showToast('Errore durante la creazione', 'error');
         } finally {
             setIsSubmitting(false);
         }

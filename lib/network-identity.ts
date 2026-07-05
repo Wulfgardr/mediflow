@@ -7,7 +7,7 @@ import { ambulatories, users } from './schema';
 /* @Codex */
 import type { NetworkIdentitySummary } from './api/v1/types';
 /* @Codex */
-import type { ServerSession } from './server-session';
+import type { ServerSession } from './security/server-session';
 /* @Codex */
 import { deriveNetworkIdentitySummary } from './network-identity-model';
 

@@ -1,6 +1,6 @@
 /* @Codex */
 import { randomUUID } from 'node:crypto';
-import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './audit';
+import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './security/audit';
 /* @Codex */
 import { SISS_ACTIONS, type SissAction } from './siss-actions';
 /* @Codex */

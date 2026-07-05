@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { validateLocalTarget } from '@/lib/local-target';
 
 export async function POST(req: NextRequest) {

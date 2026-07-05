@@ -10,6 +10,11 @@ interface OnboardingWizardProps {
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // WUL-UIUX (STREAM W2-B): finora un fallimento del setup finale non lasciava
+    // traccia a schermo. Stato inline: il wizard vive a tutto schermo prima che
+    // il resto della UI (e i toast) sia montato, quindi il posto onesto per
+    // l'errore e qui, sopra il pulsante di conferma.
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Form Data
     const [formData, setFormData] = useState({
@@ -33,6 +38,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
+        setSubmitError(null);
         try {
             // @Codex WUL-229: keep the historical encryption contract intact:
             // login password is for auth, PIN is for the encrypted master key.
@@ -44,6 +50,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             });
         } catch (e) {
             console.error(e);
+            setSubmitError(
+                e instanceof Error && e.message
+                    ? e.message
+                    : 'Impossibile completare il setup. Controlla i dati inseriti e riprova.',
+            );
             setIsSubmitting(false);
         }
     };
@@ -227,6 +238,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                     )}
                                 </div>
                             </div>
+                            {submitError && (
+                                <p className="mf-field-error mt-4" role="alert">{submitError}</p>
+                            )}
                             <div className="flex flex-col sm:flex-row gap-3 mt-6">
                                 <button onClick={() => setStep(3)} className="mf-btn-secondary sm:w-auto">Indietro</button>
                                 <button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="ui-btn-primary flex-1 py-3 disabled:opacity-50">

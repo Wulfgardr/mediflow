@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { and, asc, inArray, isNull, not, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { exemptions } from '@/lib/schema';
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 
 type ExemptionPayload = {
     code?: string;
