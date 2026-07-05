@@ -1,8 +1,10 @@
 name: Cross-platform (Win/Linux/macOS)
 
 # Safety net for WUL-375: prove that install, build and boot stay green on
-# Windows and Linux, not only macOS. Node is pinned to 20 to match .nvmrc,
-# the Mac launcher and the better-sqlite3 prebuild ABI.
+# Windows and Linux, not only macOS. Node is pinned to 20 here as the minimum
+# supported runtime target (better-sqlite3 prebuild ABI, Mac launcher); the
+# primary dev/test toolchain (.nvmrc, web-core, e2e) runs Node 24 because
+# run-strip-types requires >=22.6.
 
 on:
   pull_request:
@@ -29,7 +31,10 @@ jobs:
       - name: Verify better-sqlite3 native binding loads
         run: node -e "const db=require('better-sqlite3')(':memory:'); console.log('better-sqlite3 query result:', db.prepare('select 1 as x').get().x);"
       - name: Flag better-sqlite3 source compile (non-fatal visibility)
-        run: node -e "const fs=require('fs'); const compiled=fs.existsSync('node_modules/better-sqlite3/build/Release/obj'); console.log(compiled ? 'WARNING: better-sqlite3 compiled from source (no matching prebuild for this Node/OS)' : 'OK: better-sqlite3 prebuilt binary used');"
+        # Block scalar: the JS ternary contains ' : ' which a plain YAML scalar
+        # would parse as a mapping separator (this exact line broke the workflow).
+        run: >-
+          node -e "const fs=require('fs'); const compiled=fs.existsSync('node_modules/better-sqlite3/build/Release/obj'); console.log(compiled ? 'WARNING: better-sqlite3 compiled from source (no matching prebuild for this Node/OS)' : 'OK: better-sqlite3 prebuilt binary used');"
       - name: Build
         run: npm run build
       - name: Start smoke (boot on this OS)
