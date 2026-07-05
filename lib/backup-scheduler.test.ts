@@ -14,6 +14,13 @@ import {
     previewBackupRetention,
     readBackupSchedulerStateFromValue,
 } from './backup-scheduler.ts';
+import {
+    buildCronLine,
+    buildSchtasksCreateArgs,
+    buildSystemdServiceUnit,
+    buildSystemdTimerUnit,
+    buildWindowsWrapperCmd,
+} from './backup-scheduler-adapter.ts';
 
 test('reads default backup scheduler state when setting is missing', () => {
     const state = readBackupSchedulerStateFromValue(null);
@@ -142,4 +149,32 @@ test('applies retention and tracks the last cleanup state', async () => {
     assert.equal(trackedState.run.lastArtifactPath, preservedArtifact);
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
+});
+
+test('builds Windows schtasks args with zero-padded daily time', () => {
+    const args = buildSchtasksCreateArgs({ taskName: 'MediFlow Backup', wrapperPath: 'C:\\data\\b.cmd', hour: 2, minute: 5 });
+    assert.deepEqual(args, ['/Create', '/F', '/SC', 'DAILY', '/TN', 'MediFlow Backup', '/TR', '"C:\\data\\b.cmd"', '/ST', '02:05']);
+});
+
+test('builds Windows wrapper cmd carrying the backup env vars', () => {
+    const cmd = buildWindowsWrapperCmd({ nodePath: 'C:\\node.exe', runnerPath: 'C:\\app\\runner.mjs', dataDir: 'C:\\data', destinationDir: 'C:\\dest' });
+    assert.match(cmd, /set "MEDIFLOW_DATA_DIR=C:\\data"/);
+    assert.match(cmd, /set "MEDIFLOW_BACKUP_DEST_DIR=C:\\dest"/);
+    assert.match(cmd, /--experimental-strip-types/);
+});
+
+test('builds systemd service and timer units with OnCalendar', () => {
+    const service = buildSystemdServiceUnit({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/home/u/.mediflow', destinationDir: '/backups' });
+    assert.match(service, /Type=oneshot/);
+    assert.match(service, /Environment=MEDIFLOW_BACKUP_DEST_DIR=\/backups/);
+    const timer = buildSystemdTimerUnit({ hour: 3, minute: 30 });
+    assert.match(timer, /OnCalendar=\*-\*-\* 03:30:00/);
+    assert.match(timer, /WantedBy=timers\.target/);
+});
+
+test('builds cron line with marker and env', () => {
+    const line = buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/d', destinationDir: '/b', hour: 2, minute: 0 });
+    assert.match(line, /^0 2 \* \* \* /);
+    assert.match(line, /MEDIFLOW_BACKUP_DEST_DIR=\/b/);
+    assert.match(line, /# dev\.wulfgardr\.mediflow\.backup$/);
 });

@@ -41,10 +41,16 @@ export type BackupSchedulerState = {
     run: BackupSchedulerRunState;
 };
 
+export type BackupScheduleKind = 'launchd' | 'schtasks' | 'systemd-timer' | 'cron';
+
 export type BackupSchedulerStatus = {
     supported: boolean;
     installed: boolean;
     plistPath: string | null;
+    /** Cross-platform path of the registered schedule (plist/task/unit/crontab marker). */
+    schedulePath?: string | null;
+    /** Which scheduling backend is active on this platform, if any. */
+    scheduleKind?: BackupScheduleKind | null;
     state: BackupSchedulerState;
 };
 
@@ -87,7 +93,7 @@ type ManagedBackupFile = {
     modifiedAtMs: number;
 };
 
-function getDefaultDataDir(): string {
+export function getDefaultDataDir(): string {
     return process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
             ? path.join(os.homedir(), 'Library', 'Application Support', 'MediFlow')

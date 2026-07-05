@@ -160,6 +160,11 @@ export async function POST(request: NextRequest) {
         const ai = new AIService('ollama', validation.url.toString(), configuredModel);
         /* @Codex */
         let result = await extractDocumentWithAI(image, mode, ai, { signal: request.signal });
+        /* @Codex */
+        // Honest, OS-neutral observability: report whether the macOS-only Apple Vision
+        // second read was applied, attempted, or simply not available here. This is
+        // graceful degradation toward Ollama, not a claim of OCR parity on Windows/Linux.
+        let fallbackStatus: 'not_needed' | 'applied' | 'attempted_unavailable' | 'unavailable_on_this_platform' = 'not_needed';
         if (mode !== 'labs' && shouldFallbackToAppleVision(result)) {
             /* @Codex */
             if (request.signal.aborted) {
@@ -171,13 +176,19 @@ export async function POST(request: NextRequest) {
             const fallback = await extractWithAppleVisionFallback(image);
             if (fallback) {
                 result = fallback;
+                fallbackStatus = 'applied';
+            } else {
+                fallbackStatus = process.platform === 'darwin'
+                    ? 'attempted_unavailable'
+                    : 'unavailable_on_this_platform';
             }
         }
 
         return NextResponse.json({
             success: true,
             data: result,
-            confidence: result.confidence
+            confidence: result.confidence,
+            fallbackStatus,
         });
 
     } catch (error) {
