@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeEntryUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */

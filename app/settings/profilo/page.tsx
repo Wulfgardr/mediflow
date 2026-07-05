@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { Save, User } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
+import { useToast } from '@/components/ui/toast-provider';
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
@@ -16,6 +17,7 @@ import {
 export default function SettingsProfilePage() {
     // --- Profile State ---
     const { user, updateUser } = useSecurity();
+    const { showToast } = useToast();
     const [profile, setProfile] = useState({
         doctorName: '',
         clinicName: ''
@@ -53,10 +55,10 @@ export default function SettingsProfilePage() {
                 ambulatoryName: profile.clinicName
             });
 
-            alert("Profilo aggiornato con successo!");
+            showToast({ tone: 'success', title: 'Profilo aggiornato' });
         } catch (e) {
             console.error(e);
-            alert("Errore durante il salvataggio del profilo.");
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio del profilo' });
         } finally {
             setIsSavingProfile(false);
         }

@@ -12,9 +12,9 @@ import { evaluateNetworkDataPlaneModeGate } from './network-contract';
 /* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from './server-auth';
+import { forbiddenResponse, requireSession, unauthorizedResponse } from './security/server-auth';
 /* @Codex */
-import type { ServerSession } from './server-session';
+import type { ServerSession } from './security/server-session';
 
 /* @Codex */
 export type NetworkWriteContext = {

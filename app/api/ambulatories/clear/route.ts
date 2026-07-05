@@ -3,10 +3,10 @@ import { ambulatories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 // WUL-322 (ADR 0066 Slice 3): membership-based clear, soft-delete only
 import { clearTestContainerByMembership, TEST_CONTAINER_CLEAR_REASON } from '@/lib/test-container-clear';
-import { safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
 export async function POST(request: Request) {
     /* @Codex */

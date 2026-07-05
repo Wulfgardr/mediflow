@@ -13,7 +13,7 @@ import {
     resolveOpenMedRedactionConfig,
 } from '@/lib/openmed-redaction';
 import { settings } from '@/lib/schema';
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export const dynamic = 'force-dynamic';
 

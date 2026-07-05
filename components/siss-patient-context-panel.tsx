@@ -22,6 +22,7 @@ import {
 type Props = {
     patientId: string;
     patientTaxCode: string | null | undefined;
+    embedded?: boolean;
 };
 
 type FeedbackState = {
@@ -171,7 +172,7 @@ function healthLabel(health: SissSessionHealth, recent: string, stale: string, a
     return absent;
 }
 
-export default function SissPatientContextPanel({ patientId, patientTaxCode }: Props) {
+export default function SissPatientContextPanel({ patientId, patientTaxCode, embedded = false }: Props) {
     const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
     const [fseReadiness, setFseReadiness] = useState<FseReadinessState>({
@@ -396,30 +397,41 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode }: P
 
     const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
     const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
-    return (
-        <section className="patient-detail-section border p-5 md:p-6">
-            <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                    <p className="section-kicker">SISS / FSE</p>
-                    <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)] md:text-[17px]">
-                        <ShieldCheck className="h-4 w-4 text-[color:var(--mf-primary)]" />
-                        SISS e FSE
-                    </h2>
-                    <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
-                        Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
-                    </p>
-                </div>
+    const contextChips = (
+        <>
+            <span className="graphite-chip">{transportLabel}</span>
+            <span className={`graphite-chip ${hasTaxCode ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}>
+                {hasTaxCode ? 'CF pronto' : 'CF mancante'}
+            </span>
+            <span className={`graphite-chip graphite-chip-tone-${readinessTone}`}>
+                {readinessLabel}
+            </span>
+        </>
+    );
 
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="graphite-chip">{transportLabel}</span>
-                    <span className={`graphite-chip ${hasTaxCode ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}>
-                        {hasTaxCode ? 'CF pronto' : 'CF mancante'}
-                    </span>
-                    <span className={`graphite-chip graphite-chip-tone-${readinessTone}`}>
-                        {readinessLabel}
-                    </span>
-                </div>
-            </header>
+    return (
+        <section className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+            {embedded ? (
+                <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <p className="section-kicker">Apertura portali regionali</p>
+                    <div className="flex flex-wrap items-center gap-1.5">{contextChips}</div>
+                </header>
+            ) : (
+                <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                        <p className="section-kicker">SISS / FSE</p>
+                        <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)] md:text-[17px]">
+                            <ShieldCheck className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                            SISS e FSE
+                        </h2>
+                        <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
+                            Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">{contextChips}</div>
+                </header>
+            )}
 
             {!hasTaxCode && (
                 <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">

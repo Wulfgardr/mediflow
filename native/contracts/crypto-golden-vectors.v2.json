@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "purpose": "Language-neutral byte-exact oracle for the MediFlow zero-knowledge wrapped-master-key at KDF v2 (PBKDF2-HMAC-SHA256 x600000). Every core (web TS reference / Swift MediFlowCore) must reproduce these exactly so paired clients survive the KDF upgrade.",
+  "reference": "lib/security/security.ts (WebCrypto) and native/.../CryptoService.swift (CryptoKit)",
+  "algorithm": {
+    "kdf": "PBKDF2-HMAC-SHA256",
+    "iterations": 600000,
+    "masterKeyBits": 256,
+    "wrappedMasterKeyFormat": "v2:base64(iv12 || AES-GCM(rawMasterKey, KEK))"
+  },
+  "inputs": {
+    "pin": "1357",
+    "saltHex": "000102030405060708090a0b0c0d0e0f",
+    "rawMasterKeyHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "wrapIvHex": "a1a2a3a4a5a6a7a8a9aaabac"
+  },
+  "vectors": {
+    "kekFromPinHex": "e56afae72fce1d05b109e086c89f2c32f1663991f1a84169242db2491fd64cae",
+    "wrappedMasterKeyB64": "oaKjpKWmp6ipqquseNLFuhF40EaXwdulhvIUDc/t013d5Y1bMrMJM6CnOosk8ZZfbtBKVwFPd4X9ahOq",
+    "wrappedMasterKeyVersioned": "v2:oaKjpKWmp6ipqquseNLFuhF40EaXwdulhvIUDc/t013d5Y1bMrMJM6CnOosk8ZZfbtBKVwFPd4X9ahOq"
+  }
+}

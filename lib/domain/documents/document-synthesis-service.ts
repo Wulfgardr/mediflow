@@ -1,0 +1,185 @@
+/**
+ * Document Synthesis Service
+ * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> prudent ICD autofill
+ */
+
+import { AIService } from '../../ai-service';
+import type {
+    DocumentInsight,
+} from '../../db';
+import { db } from '../../db';
+import { v4 as uuid } from 'uuid';
+import { buildDocumentSynthesisExtractionPrompt } from '../../ai-task-contracts';
+import {
+    parseStructuredAnalysisResponse,
+    type DocumentStructuredAnalysis,
+} from './document-synthesis-parser';
+import {
+    buildDocumentExcerpt,
+    buildStoredDocumentExcerpt,
+} from './document-excerpt';
+/* @Codex */
+import { normalizeDocumentInput } from './document-input-normalization';
+/* @Codex */
+import { routeDocumentClassForSynthesis, type DocumentSynthesisRoutingOptions } from './document-synthesis-routing';
+/* @Codex */
+import {
+    buildDocumentParseEvidenceArtifact,
+    projectDocumentEvidencePack,
+    type DocumentParseEvidenceArtifact,
+} from './document-parse-evidence-artifact';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    assertAiDocumentSynthesisEnabledValue,
+} from '../../ai-document-synthesis-kill-switch';
+/* @Codex */
+import {
+    buildDocumentSynthesisAutofillPlan,
+    parseExistingDocumentSynthesisDiagnoses,
+} from './document-synthesis-autofill';
+
+/* @Codex */
+const MAX_SYNTHESIS_CHARS = 12000;
+
+/* @Codex */
+export interface SynthesizeDocumentOptions extends DocumentSynthesisRoutingOptions {
+    attachmentId?: string;
+}
+
+/* @Codex */
+export interface SynthesizeDocumentResult {
+    insight: DocumentInsight;
+    parseEvidenceArtifact: DocumentParseEvidenceArtifact;
+}
+
+/* @Codex */
+function parseExistingInsights(raw: unknown): DocumentInsight[] {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw as DocumentInsight[];
+    if (typeof raw !== 'string') return [];
+
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
+    } catch {
+        return [];
+    }
+}
+
+/* @Codex */
+/**
+ * Analyze OCR text without persisting anything.
+ */
+export async function analyzeDocumentContent(rawMarkdown: string): Promise<DocumentStructuredAnalysis> {
+    const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+    assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
+
+    // Ruolo 'reasoning': di default risolve allo stesso modello di 'clinical'
+    // (resolveTextModel con fallback), ma permette di instradare la sintesi
+    // documentale su un modello dedicato senza toccare patient_insight.
+    const ai = await AIService.create('reasoning');
+    const normalized = normalizeDocumentInput(rawMarkdown);
+    const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
+    const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
+    return parseStructuredAnalysisResponse(content, normalized.normalizedText);
+}
+
+/**
+ * Synthesize a document, persist the insight and auto-merge explicit ICD diagnoses.
+ */
+export async function synthesizeDocument(
+    rawMarkdown: string,
+    fileName: string,
+    patientId: string,
+    options: SynthesizeDocumentOptions = {},
+): Promise<SynthesizeDocumentResult> {
+    const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+    assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
+
+    const normalized = normalizeDocumentInput(rawMarkdown);
+    const analysis = await analyzeDocumentContent(rawMarkdown);
+
+    // Classificazione deterministica (nome file + metadata PDF + testata):
+    // segnale additivo per la review, non altera il flusso di sintesi.
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+
+    const patient = await db.patients.get(patientId);
+    if (!patient) {
+        throw new Error('Paziente non trovato');
+    }
+    if (typeof patient.version !== 'number') {
+        throw new Error('Missing patient version for document synthesis.');
+    }
+
+    const existingInsights = parseExistingInsights(patient.documentInsights);
+    const existingDiagnoses = parseExistingDocumentSynthesisDiagnoses(patient.diagnoses);
+    const autofillPlan = buildDocumentSynthesisAutofillPlan({
+        documentId: options.attachmentId ?? `${patientId}:${fileName}`,
+        attachmentId: options.attachmentId,
+        fileName,
+        rawMarkdown: normalized.normalizedText,
+        qualityLevel: analysis.quality?.level,
+        diagnoses: analysis.diagnoses,
+        existingDiagnoses: existingDiagnoses.diagnoses,
+        existingDiagnosesRaw: patient.diagnoses,
+    });
+    const { diagnoses, appliedCodes } = autofillPlan;
+
+    const insight: DocumentInsight = {
+        id: uuid(),
+        attachmentId: options.attachmentId,
+        date: new Date(),
+        fileName,
+        rawMarkdown: buildStoredDocumentExcerpt(normalized.normalizedText),
+        summary: analysis.summary,
+        quality: analysis.quality,
+        extractedData: analysis.diagnoses.length > 0 || analysis.medications.length > 0
+            ? {
+                ...(analysis.diagnoses.length > 0 ? { diagnoses: analysis.diagnoses } : {}),
+                ...(analysis.medications.length > 0 ? { medications: analysis.medications } : {}),
+            }
+            : undefined,
+        autofill: appliedCodes.length > 0
+            ? { appliedDiagnoses: appliedCodes }
+            : undefined,
+        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
+    };
+
+    const parseEvidenceArtifact = buildDocumentParseEvidenceArtifact({
+        documentInsightId: insight.id,
+        attachmentId: options.attachmentId,
+        fileName: insight.fileName,
+        documentDate: insight.date.toISOString(),
+        qualityLevel: insight.quality?.level,
+        qualityReason: insight.quality?.reason,
+        summary: insight.summary,
+        rawMarkdown: insight.rawMarkdown,
+        diagnoses: analysis.diagnoses,
+        medications: analysis.medications,
+    });
+    insight.evidencePack = projectDocumentEvidencePack(parseEvidenceArtifact);
+
+    existingInsights.unshift(insight);
+    const nextInsights = existingInsights.slice(0, 3);
+
+    await db.patients.update(patientId, {
+        documentInsights: nextInsights,
+        diagnoses: appliedCodes.length > 0 ? diagnoses : undefined,
+        version: patient.version,
+        updatedAt: new Date()
+    });
+
+    return {
+        insight,
+        parseEvidenceArtifact,
+    };
+}
+
+/**
+ * Get document insights for a patient.
+ */
+export async function getDocumentInsights(patientId: string): Promise<DocumentInsight[]> {
+    const patient = await db.patients.get(patientId);
+    return parseExistingInsights(patient?.documentInsights);
+}

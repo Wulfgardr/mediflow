@@ -7,7 +7,7 @@ import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
@@ -19,11 +19,11 @@ import {
     isLockoutActive,
     recordFailedLogin,
     resetLockoutState,
-} from '@/lib/auth-lockout';
+} from '@/lib/security/auth-lockout';
 /* @Codex */
-import { createSession, SESSION_COOKIE_NAME } from '@/lib/server-session';
+import { createSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
-import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 /* @Codex */
 function recordFailedLoginAttempt(request: Request, username: unknown): void {

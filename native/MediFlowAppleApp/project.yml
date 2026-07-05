@@ -17,6 +17,17 @@ targets:
     dependencies:
       - package: MediFlowMacPackage
         product: MediFlowAppleShared
+    info:
+      path: Sources/MediFlowMobileApp/Info.plist
+      properties:
+        CFBundleDisplayName: MediFlow
+        LSApplicationCategoryType: public.app-category.medical
+        UIApplicationSupportsIndirectInputEvents: true
+        # Local-network discovery: required so Bonjour home-base discovery and
+        # pairing work on a real device. Guarded by check-apple-network-entitlements.sh.
+        NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
+        NSBonjourServices:
+          - _mediflow-homebase._tcp
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile
@@ -24,8 +35,55 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: MediFlow
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.medical
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         SUPPORTS_MACCATALYST: NO
+  MediFlowMacApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/MediFlowMacApp
+    dependencies:
+      - package: MediFlowMacPackage
+        product: MediFlowAppleShared
+    info:
+      path: Sources/MediFlowMacApp/Info.plist
+      properties:
+        CFBundleDisplayName: MediFlow
+        LSApplicationCategoryType: public.app-category.medical
+        # Local-network discovery for the home-base Bonjour service. Guarded by
+        # check-apple-network-entitlements.sh.
+        NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
+        NSBonjourServices:
+          - _mediflow-homebase._tcp
+    settings:
+      base:
+        # Same bundle id as iOS for a single universal-purchase app record.
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile
+        PRODUCT_NAME: MediFlow
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+  MediFlowMobileAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests/MediFlowMobileAppUITests
+    dependencies:
+      - target: MediFlowMobileApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: MediFlowMobileApp
+schemes:
+  MediFlowMobileApp:
+    build:
+      targets:
+        MediFlowMobileApp: all
+    test:
+      targets:
+        - MediFlowMobileAppUITests
+  MediFlowMacApp:
+    build:
+      targets:
+        MediFlowMacApp: all

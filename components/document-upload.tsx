@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,14 +20,16 @@ import {
     evaluateDocumentOcrQueueCandidate,
     type DocumentOcrQueueReason,
     type DocumentOcrQueueState,
-} from '@/lib/document-ocr-queue';
+} from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
-import { synthesizeDocument } from '@/lib/document-synthesis-service';
+import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 /* @Codex */
-import { serializeDocumentParseEvidenceArtifact } from '@/lib/document-parse-evidence-artifact';
+import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface DocumentUploadProps {
     patientId: string;
@@ -39,6 +41,8 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
     const [replayingId, setReplayingId] = useState<string | null>(null);
@@ -72,7 +76,22 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
     // Logic to update Patient AI Summary REMOVED to avoid conflict with AIPatientInsight
 
+    /* @Codex WUL-UIUX: feedback inline sulle rejection (max 10 file, 25 MB)
+       invece del silenzio (la caption prometteva max 10 senza applicarlo). */
+    const [fileRejections, setFileRejections] = useState<string[]>([]);
+
+    const onDropRejected = useCallback((rejected: FileRejection[]) => {
+        const messages = rejected.map((entry) => {
+            const reason = entry.errors[0]?.code;
+            if (reason === 'too-many-files') return 'Puoi caricare al massimo 10 file per volta.';
+            if (reason === 'file-too-large') return `${entry.file.name}: supera il limite di 25 MB.`;
+            return `${entry.file.name}: file non accettato.`;
+        });
+        setFileRejections(Array.from(new Set(messages)));
+    }, []);
+
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        setFileRejections([]);
         setIsProcessing(true);
         /* @Codex */
         setAiStage("Inizializzazione AI...");
@@ -183,14 +202,14 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             } catch (e) {
                 console.error("Upload failed", e);
-                alert("Errore caricamento file: " + file.name);
+                showToast({ tone: 'error', title: 'Caricamento file non riuscito', description: file.name });
             }
         }
         /* @Codex */
         if (shouldRefreshSummary) {
             try {
                 setAiStage("Aggiornamento AI Patient Summary...");
-                await regeneratePatientSummary(patientId);
+                await refreshPatientSummaryIfEnabled(patientId);
             } catch (err) {
                 console.warn('[DocumentUpload] Aggiornamento summary fallito', err);
             }
@@ -198,12 +217,23 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         setIsProcessing(false);
         /* @Codex */
         setAiStage("");
-    }, [patientId, aiModels, documentSynthesisEnabled]);
+    }, [patientId, aiModels, documentSynthesisEnabled, showToast]);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        onDropRejected,
+        maxFiles: 10,
+        maxSize: 25 * 1024 * 1024,
+    });
 
     const handleDelete = async (id: string) => {
-        if (confirm("Sei sicuro di voler eliminare questo documento?")) {
+        const { confirmed } = await confirm({
+            title: 'Sei sicuro di voler eliminare questo documento?',
+            message: 'Il documento verra rimosso dagli allegati del paziente.',
+            confirmLabel: 'Elimina',
+            tone: 'danger',
+        });
+        if (confirmed) {
             await db.attachments.delete(id);
             // Re-calculate summary REMOVED
         }
@@ -252,7 +282,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             summarySnapshot: result.insight.summary,
                             parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),
                         });
-                        await regeneratePatientSummary(patientId);
+                        await refreshPatientSummaryIfEnabled(patientId);
                     } catch (synthesisError) {
                         if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
                             await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
@@ -306,8 +336,16 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
                 <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
-                <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file).</p>
+                <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file, 25 MB ciascuno).</p>
             </div>
+
+            {fileRejections.length > 0 && (
+                <ul className="mt-2 space-y-1 rounded-xl border border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.08)] px-3 py-2 text-xs text-[color:var(--mf-critical)]">
+                    {fileRejections.map((message) => (
+                        <li key={message}>{message}</li>
+                    ))}
+                </ul>
+            )}
 
             {/* @Codex */}
             {(isProcessing || aiStage) && (
@@ -382,8 +420,9 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrReplay(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Riprova OCR"
+                                    aria-label={`Riprova OCR su ${file.name}`}
                                 >
                                     <RefreshCw className={cn("w-4 h-4", replayingId === file.id && "animate-spin")} />
                                 </button>
@@ -392,24 +431,27 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrManualReview(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Segna per revisione manuale"
+                                    aria-label={`Segna ${file.name} per revisione manuale`}
                                 >
                                     <AlertTriangle className="w-4 h-4" />
                                 </button>
                             )}
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
+                                className="rounded-lg p-2 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(15,23,42,0.06)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/10"
                                 title="Visualizza"
+                                aria-label={`Visualizza ${file.name}`}
                             >
                                 <Eye className="w-4 h-4" />
                             </button>
 
                             <button
                                 onClick={() => handleDelete(file.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-2 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-critical)] hover:bg-[color:rgba(163,58,47,0.1)] rounded-lg transition-colors"
                                 title="Elimina"
+                                aria-label={`Elimina ${file.name}`}
                             >
                                 <X className="w-4 h-4" />
                             </button>

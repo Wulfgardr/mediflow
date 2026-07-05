@@ -11,11 +11,11 @@
   },
   "include": [
     "scripts/benchmark-evidence-absorption.ts",
-    "lib/evidence-absorption-benchmark.ts",
-    "lib/evidence-queue-contract.ts",
-    "lib/document-parse-evidence-artifact.ts",
-    "lib/document-evidence-pack.ts",
-    "lib/document-input-normalization.ts"
+    "lib/domain/documents/evidence-absorption-benchmark.ts",
+    "lib/domain/documents/evidence-queue-contract.ts",
+    "lib/domain/documents/document-parse-evidence-artifact.ts",
+    "lib/domain/documents/document-evidence-pack.ts",
+    "lib/domain/documents/document-input-normalization.ts"
   ],
   "exclude": [
     "node_modules",

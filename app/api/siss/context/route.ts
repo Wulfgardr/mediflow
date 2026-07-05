@@ -7,11 +7,11 @@ import { dbServer } from '@/lib/db-server';
 /* @Codex */
 import { patients } from '@/lib/schema';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): soft-deleted patients are not addressable for SISS handoffs
 import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
-import { safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { resolveSissPatientContextAction } from '@/lib/siss-patient-context-shared';
 /* @Codex */

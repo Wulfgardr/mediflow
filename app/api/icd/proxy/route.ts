@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { validateLocalTarget } from '@/lib/local-target';
 
 const ICD_LOCAL_URL = process.env.ICD_BASE_URL || 'http://127.0.0.1:8888';

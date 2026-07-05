@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 
 type ExemptionOption = {
@@ -23,6 +23,10 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [detailsByCode, setDetailsByCode] = useState<Record<string, ExemptionOption>>({});
+    /* @Codex WUL-UIUX (Fase 6-7): pattern combobox ARIA + navigazione da tastiera. */
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const listboxId = useId();
+    const optionId = (index: number) => `${listboxId}-opt-${index}`;
     /* @Codex */
     const [catalogCount, setCatalogCount] = useState<number | null>(null);
 
@@ -87,6 +91,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
         const trimmed = query.trim();
         if (trimmed.length < 2) {
             setResults([]);
+            setActiveIndex(-1);
             return;
         }
 
@@ -97,10 +102,12 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                 const response = await fetch(`/api/exemptions?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal });
                 if (!response.ok) {
                     setResults([]);
+                    setActiveIndex(-1);
                     return;
                 }
                 const items: ExemptionOption[] = await response.json();
                 setResults(items);
+                setActiveIndex(-1);
                 setIsOpen(true);
             } catch (error) {
                 if ((error as Error).name !== 'AbortError') {
@@ -123,61 +130,106 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
         setQuery('');
         setResults([]);
         setIsOpen(false);
+        setActiveIndex(-1);
     };
 
     const removeCode = (code: string) => {
         onChange(value.filter((item) => item !== code));
     };
 
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!isOpen && results.length > 0) {
+                setIsOpen(true);
+                return;
+            }
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev + 1) % results.length));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((prev) => (results.length === 0 ? -1 : (prev - 1 + results.length) % results.length));
+        } else if (event.key === 'Enter') {
+            if (isOpen && activeIndex >= 0 && activeIndex < results.length) {
+                event.preventDefault();
+                addCode(results[activeIndex].code);
+            }
+        } else if (event.key === 'Escape') {
+            if (isOpen) {
+                event.preventDefault();
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
+        }
+    };
+
     return (
         <div ref={rootRef} className="space-y-3">
             <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--mf-muted)]" />
                 <input
+                    type="text"
+                    role="combobox"
+                    aria-expanded={isOpen && results.length > 0}
+                    aria-controls={listboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={handleKeyDown}
                     onFocus={() => setIsOpen(results.length > 0)}
                     placeholder="Cerca codice o descrizione esenzione (min 2 caratteri)"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-gray-50 dark:bg-[#010409] border border-transparent dark:border-[#30363d] focus:bg-white dark:focus:bg-[#0d1117] focus:ring-2 focus:ring-blue-500 outline-none dark:text-[#c9d1d9]"
+                    className="mf-input"
+                    /* @Codex WUL-UIUX: .mf-input ha padding shorthand unlayered che
+                       batte la utility pl-*, quindi forziamo lo spazio per l'icona qui. */
+                    style={{ paddingLeft: '2.5rem' }}
                 />
 
                 {isOpen && (
-                    <div className="absolute z-30 mt-2 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-xl max-h-72 overflow-auto">
+                    <div
+                        className="mf-popover absolute z-30 mt-2 max-h-72 w-full overflow-auto"
+                        role="listbox"
+                        id={listboxId}
+                        aria-label="Risultati catalogo esenzioni"
+                    >
                         {isLoading ? (
-                            <p className="px-3 py-2 text-xs text-gray-500">Ricerca in corso...</p>
+                            <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Ricerca in corso...</p>
                         ) : catalogCount === 0 ? (
-                            <div className="px-3 py-2 text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                            <div className="space-y-1 px-3 py-2 text-xs text-[color:var(--mf-warning)] dark:text-[color:rgb(230,180,120)]">
                                 <p>Catalogo esenzioni vuoto.</p>
-                                <a href="/settings" className="underline text-blue-600 dark:text-blue-300">
+                                <a href="/settings" className="underline text-[color:var(--mf-primary)]">
                                     Vai in Impostazioni e importa i file esenzioni.
                                 </a>
                             </div>
                         ) : results.length === 0 ? (
-                            <p className="px-3 py-2 text-xs text-gray-500">Nessun codice trovato.</p>
+                            <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Nessun codice trovato.</p>
                         ) : (
-                            <div className="py-1">
-                                {results.map((result) => {
+                            <div className="space-y-0.5">
+                                {results.map((result, index) => {
                                     const selected = value.includes(result.code);
                                     return (
                                         <button
                                             key={result.code}
                                             type="button"
+                                            role="option"
+                                            id={optionId(index)}
+                                            aria-selected={index === activeIndex}
                                             onClick={() => addCode(result.code)}
+                                            onMouseEnter={() => setActiveIndex(index)}
                                             disabled={selected}
-                                            className={`w-full text-left px-3 py-2 border-l-2 transition-colors ${selected
-                                                ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 opacity-60'
-                                                : 'border-transparent hover:border-blue-300 hover:bg-blue-50/80 dark:hover:bg-blue-900/20'
+                                            className={`w-full rounded-xl px-3 py-2 text-left transition-colors ${selected
+                                                ? 'bg-[color:rgba(15,123,104,0.1)] opacity-60'
+                                                : `hover:bg-[color:rgba(15,23,42,0.06)] dark:hover:bg-white/5 ${index === activeIndex ? 'bg-[color:rgba(15,23,42,0.06)] dark:bg-white/5' : ''}`
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <p className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">{result.code}</p>
+                                                <p className="font-mono text-xs font-semibold text-[color:var(--mf-ink)]">{result.code}</p>
                                                 {result.type && (
-                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300">
+                                                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-[color:var(--mf-muted)] dark:bg-white/10">
                                                         {result.type}
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{result.description}</p>
+                                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">{result.description}</p>
                                         </button>
                                     );
                                 })}
@@ -194,24 +246,24 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                         return (
                             <span
                                 key={code}
-                                className="inline-flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 text-indigo-700 dark:text-indigo-300 text-xs"
+                                className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] py-1 pl-2.5 pr-2 text-xs text-[color:var(--mf-primary)] dark:border-[color:rgba(94,199,177,0.28)] dark:bg-[color:rgba(94,199,177,0.16)] dark:text-[color:rgb(150,224,204)]"
                             >
                                 <span className="font-mono font-semibold">{code}</span>
                                 <span className="max-w-[340px] truncate">{detail?.description || 'Descrizione non caricata'}</span>
                                 <button
                                     type="button"
                                     onClick={() => removeCode(code)}
-                                    className="text-indigo-500 hover:text-red-500 transition-colors"
+                                    className="text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-critical)]"
                                     aria-label={`Rimuovi ${code}`}
                                 >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="h-3.5 w-3.5" />
                                 </button>
                             </span>
                         );
                     })}
                 </div>
             ) : (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[color:var(--mf-muted)]">
                     {catalogCount === 0 ? 'Catalogo non ancora caricato: importa i file esenzioni nelle impostazioni.' : 'Nessuna esenzione associata.'}
                 </p>
             )}

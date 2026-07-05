@@ -55,6 +55,16 @@ test('patient insight renders structured stored markdown without fallback', asyn
 
   await bootstrapUnlockedSession(page, pin);
 
+  // Other specs share this DB and may leave Patient Insight disabled; ensure it is on
+  // so the structured summary renders instead of the disabled card.
+  await page.evaluate(async () => {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'enabled' }),
+    });
+  });
+
   const patientId = await createPatient(page, {
     firstName: `Insight${suffix}`,
     lastName: `Render${suffix}`,
@@ -64,26 +74,32 @@ test('patient insight renders structured stored markdown without fallback', asyn
     phone: '3330001122',
   });
 
+  // The insight parser (lib/ai-summary-service extractSection) recognises section
+  // markers as **Titolo**: (colon outside the bold markers), not **Titolo:**.
   await updatePatient(page, patientId, {
     aiSummary: [
-      '**Quadro attuale:** Follow-up post-dimissione ortopedica con programma riabilitativo domiciliare in corso. [S1]',
+      '**Quadro attuale**: Follow-up post-dimissione ortopedica con programma riabilitativo domiciliare in corso. [S1]',
       '',
-      '**Attenzioni:**',
+      '**Attenzioni**:',
       '- Mobilita ridotta con ausilio per la deambulazione. [S1]',
       '',
-      '**Prossimi passi:**',
+      '**Prossimi passi**:',
       '- Verificare avanzamento della FKT domiciliare. [S1]',
       '- Rivalutare controllo ortopedico programmato. [S1]',
     ].join('\n'),
   });
 
-  await page.goto(`/patients/${patientId}`);
-  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}$`));
+  // WUL-274/Kree8: the full AI insight lives on the primary Scheda route (/modules);
+  // /patients/:id lands on the cockpit "Quadro" which does not host the insight card.
+  await page.goto(`/patients/${patientId}/modules`);
+  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
 
-  await expect(page.getByRole('heading', { name: 'Insight clinico AI' })).toBeVisible();
-  await expect(page.getByText('Prossimi passi')).toBeVisible();
+  // Labels drifted: heading "Insight clinico AI" -> "Supporto al ragionamento clinico";
+  // "Prossimi passi" -> "Follow-up proposto"; "Quadro Clinico" -> "Sintesi clinica".
+  await expect(page.getByRole('heading', { name: 'Supporto al ragionamento clinico' })).toBeVisible();
+  await expect(page.getByText('Follow-up proposto')).toBeVisible();
   await expect(page.getByText('Attenzioni')).toBeVisible();
-  await expect(page.getByText('Quadro Clinico')).toBeVisible();
+  await expect(page.getByText('Sintesi clinica')).toBeVisible();
   await expect(page.getByText('programma riabilitativo domiciliare in corso', { exact: false })).toBeVisible();
   await expect(page.getByText('Mobilita ridotta con ausilio per la deambulazione.', { exact: false })).toBeVisible();
   await expect(page.getByText('Verificare avanzamento della FKT domiciliare.', { exact: false })).toBeVisible();

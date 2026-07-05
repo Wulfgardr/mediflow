@@ -4,8 +4,10 @@ import { asc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
 import { servicePrescriptionItems, servicePrescriptions } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { servicePrescriptionItemCreateSchema } from '@/lib/api-schemas/prescriptions';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 const STATUSES = new Set(['prescribed', 'booked', 'performed', 'report_received', 'cancelled']);
 const CATEGORIES = new Set(['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other']);
@@ -62,7 +64,10 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(servicePrescriptionItemCreateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const prescriptionId = optionalText(body.prescriptionId);
         const serviceName = optionalText(body.serviceName);
         const status = optionalText(body.status) ?? 'prescribed';
@@ -123,7 +128,7 @@ export async function POST(request: Request) {
             subjectType: 'service_prescription_item',
             subjectRef: id,
             redactedMetadata: {
-                changedFields: listChangedFields(body, ['id']),
+                    changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
                 flags: [`status:${status}`, `match:${matchStatus}`],
             },
         }, '[MediFlow] Service prescription item audit write failed:');

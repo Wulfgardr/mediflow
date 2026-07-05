@@ -227,6 +227,8 @@ export default function BackupSchedulerUI() {
     };
 
     const lastRun = status?.state.run;
+    /* @Codex: scheduling registration is platform-specific; manual run and retention stay available everywhere */
+    const schedulingUnsupported = Boolean(status && !status.supported);
 
     return (
         <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
@@ -238,7 +240,7 @@ export default function BackupSchedulerUI() {
                         Backup automatico notturno
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                        Thin slice `macOS home base`: usa un LaunchAgent utente e un runner headless locale.
+                        Schedulazione cross-platform: LaunchAgent su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux. Il runner headless locale e lo stesso ovunque.
                     </p>
                 </div>
                 {status && (
@@ -248,9 +250,9 @@ export default function BackupSchedulerUI() {
                 )}
             </div>
 
-            {!isLoading && status && !status.supported && (
+            {!isLoading && schedulingUnsupported && (
                 <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
-                    Il backup automatico di questa slice e supportato solo su macOS.
+                    Lo scheduling automatico non e disponibile su questa piattaforma. Puoi comunque eseguire il backup manuale con «Esegui adesso» e usare la pulizia retention.
                 </div>
             )}
 
@@ -259,8 +261,9 @@ export default function BackupSchedulerUI() {
                     <input
                         type="checkbox"
                         checked={enabled}
+                        disabled={schedulingUnsupported}
                         onChange={(event) => setEnabled(event.target.checked)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
                     />
                     Attiva backup notturno
                 </label>
@@ -270,6 +273,7 @@ export default function BackupSchedulerUI() {
                     <input
                         type="time"
                         value={time}
+                        disabled={schedulingUnsupported}
                         onChange={(event) => setTime(event.target.value)}
                         className={INPUT_CLASS}
                     />
@@ -281,7 +285,7 @@ export default function BackupSchedulerUI() {
                         type="text"
                         value={destinationDir}
                         onChange={(event) => setDestinationDir(event.target.value)}
-                        placeholder="/Users/.../Backups/MediFlow"
+                        placeholder="Percorso assoluto della cartella backup"
                         className={INPUT_CLASS}
                     />
                 </label>
@@ -306,7 +310,7 @@ export default function BackupSchedulerUI() {
             <div className="flex flex-wrap items-center gap-3">
                 <button
                     onClick={save}
-                    disabled={isSaving}
+                    disabled={isSaving || schedulingUnsupported}
                     className={PRIMARY_BUTTON_CLASS}
                 >
                     {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

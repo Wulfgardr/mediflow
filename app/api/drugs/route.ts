@@ -4,9 +4,9 @@ import { type AifaDrug } from '@/lib/db';
 import { drugs } from '@/lib/schema';
 import { asc, sql } from 'drizzle-orm';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { sortDrugCatalogSearchResults } from '@/lib/patient-smart-import-matching';
+import { sortDrugCatalogSearchResults } from '@/lib/domain/documents/patient-smart-import-matching';
 
 export async function GET(request: Request) {
     /* @Codex */

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
     buildParliamentScorecard,
     finalizeCandidateEconomics,
+    resolveProvisionalBaselineModel,
     type CandidateParliamentDecision,
 } from './benchmark-model-parliament.ts';
 
@@ -159,4 +160,20 @@ test('buildParliamentScorecard surfaces best quality, best value and lane state'
     const piiLane = scorecard.lanes.find((lane) => lane.lane === 'pii');
     assert.equal(piiLane?.state, 'benchmark_only');
     assert.match((piiLane?.blockers || []).join(' | '), /shadow_validation_failed/);
+});
+
+test('resolveProvisionalBaselineModel keeps protected baseline when roles are unset', () => {
+    assert.equal(resolveProvisionalBaselineModel({
+        clinical: null,
+        reasoning: null,
+        ocr: null,
+        legacy: null,
+    }), 'qwen3.5:35b-a3b');
+
+    assert.equal(resolveProvisionalBaselineModel({
+        clinical: ' qwen3.6:35b-a3b ',
+        reasoning: null,
+        ocr: null,
+        legacy: null,
+    }), 'qwen3.6:35b-a3b');
 });

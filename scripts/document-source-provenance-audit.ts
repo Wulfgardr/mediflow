@@ -11,7 +11,7 @@ import {
     type DocumentSourceProvenanceAttachmentInput,
     type DocumentSourceProvenanceAuditReport,
     type DocumentSourceProvenanceCategory,
-} from '../lib/document-source-provenance-audit';
+} from '../lib/domain/documents/document-source-provenance-audit';
 
 type CliArgs = {
     input: string | null;

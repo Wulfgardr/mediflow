@@ -22,7 +22,7 @@ export interface ScaleDefinition {
 
 interface ScaleEngineProps {
     scale: ScaleDefinition;
-    onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void;
+    onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void | Promise<void>;
     onCancel: () => void;
 }
 
@@ -55,6 +55,10 @@ function ProgressBar({ progress }: { progress: number }) {
 export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngineProps) {
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
     const [currentStep, setCurrentStep] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    /* @Codex WUL-UIUX: il ref blocca anche il doppio click nello stesso tick,
+       prima che lo stato isSubmitting si propaghi al disabled del bottone. */
+    const submittingRef = useRef(false);
 
     const handleAnswer = (questionId: string, value: string | number) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -64,14 +68,22 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
         if (currentStep < scale.questions.length - 1) {
             setCurrentStep(prev => prev + 1);
         } else {
-            finish();
+            void finish();
         }
     };
 
-    const finish = () => {
-        const score = scale.scoringLogic(answers);
-        const interpretation = scale.interpretation(score);
-        onComplete({ score, answers, interpretation });
+    const finish = async () => {
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+        setIsSubmitting(true);
+        try {
+            const score = scale.scoringLogic(answers);
+            const interpretation = scale.interpretation(score);
+            await onComplete({ score, answers, interpretation });
+        } finally {
+            submittingRef.current = false;
+            setIsSubmitting(false);
+        }
     };
 
     const currentQuestion = scale.questions[currentStep];
@@ -162,10 +174,14 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                     )}
                     <button
                         onClick={handleNext}
-                        disabled={answers[currentQuestion.id] === undefined}
+                        disabled={answers[currentQuestion.id] === undefined || isSubmitting}
                         className="ui-btn-primary px-8 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {currentStep === scale.questions.length - 1 ? 'Completa' : 'Avanti'}
+                        {currentStep === scale.questions.length - 1
+                            ? isSubmitting
+                                ? 'Salvataggio...'
+                                : 'Completa'
+                            : 'Avanti'}
                     </button>
                 </div>
             </div>

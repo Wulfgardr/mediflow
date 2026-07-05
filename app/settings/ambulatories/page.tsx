@@ -6,8 +6,12 @@ import { Building2, Plus, Trash2, MapPin, Loader2, CornerDownRight } from 'lucid
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { SettingsSectionIntro } from '@/components/settings/settings-ui';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export default function AmbulatoryManagerPage() {
+    const { showToast } = useToast();
+    const confirm = useConfirm();
     const [ambulatories, setAmbulatories] = useState<Ambulatory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
@@ -60,7 +64,7 @@ export default function AmbulatoryManagerPage() {
             setNewType('live');
             await loadAmbulatories();
         } catch {
-            alert("Errore durante la creazione");
+            showToast('Errore durante la creazione', 'error');
             console.error("Errore durante la creazione");
         } finally {
             setIsCreating(false);
@@ -69,7 +73,13 @@ export default function AmbulatoryManagerPage() {
 
     const handleClear = async (id: string) => {
         const target = ambulatoryById.get(id);
-        if (!confirm(`Svuotare "${target?.name || 'ambiente di test'}"? Verranno eliminati tutti i pazienti di questo ambiente di test.`)) return;
+        const { confirmed } = await confirm({
+            title: `Svuotare "${target?.name || 'ambiente di test'}"?`,
+            message: 'Verranno eliminati tutti i pazienti di questo ambiente di test.',
+            confirmLabel: 'Svuota',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
         setIsClearing(true);
         try {
             const res = await fetch('/api/ambulatories/clear', {
@@ -78,10 +88,10 @@ export default function AmbulatoryManagerPage() {
                 body: JSON.stringify({ ambulatoryId: id })
             });
             if (!res.ok) throw new Error("Failed to clear");
-            alert("Ambiente di test svuotato.");
+            showToast('Ambiente di test svuotato', 'success');
         } catch (e) {
             console.error(e);
-            alert("Errore durante lo svuotamento");
+            showToast('Errore durante lo svuotamento', 'error');
         } finally {
             setIsClearing(false);
         }
@@ -201,12 +211,18 @@ export default function AmbulatoryManagerPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Sei sicuro? Questo potrebbe causare problemi ai pazienti associati.")) return;
+        const { confirmed } = await confirm({
+            title: 'Eliminare la sede?',
+            message: 'Questo potrebbe causare problemi ai pazienti associati.',
+            confirmLabel: 'Elimina',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
         try {
             await db.ambulatories.delete(id);
             await loadAmbulatories();
         } catch {
-            alert("Errore durante l'eliminazione");
+            showToast("Errore durante l'eliminazione", 'error');
         }
     };
 

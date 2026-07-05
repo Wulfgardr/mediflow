@@ -5,14 +5,14 @@ import {
     type AuditEventType,
     type AuditOutcome,
     type AuditSubjectType,
-} from '@/lib/audit';
+} from '@/lib/security/audit';
 import {
     forbiddenResponse,
     requireSession,
     unauthorizedResponse,
-} from '@/lib/server-auth';
+} from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
 /* @Codex */
 function parseLimit(value: string | null, fallback: number, max: number): number {

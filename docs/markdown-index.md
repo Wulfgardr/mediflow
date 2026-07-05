@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-06-16
+Ultimo aggiornamento: 2026-07-03
 
 ## 📚 Come usare questo indice
 
@@ -30,6 +30,7 @@ Ultimo aggiornamento: 2026-06-16
 | [SECURITY.md](../SECURITY.md) | Policy sicurezza, threat model e regole redazione/logging. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Intended purpose e guard `check:claims` contro overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. | Quando si tocca copy prodotto, UI/help, README, materiale pubblico o confini AI/SISS/FSE. |
+| [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Boundary proposto `WUL-419` per visite registrabili Fluid-style: no raw audio/schema/API/UI runtime nella prima slice, transcript/draft PHI e provider esterni solo tramite decisione opt-in. | Quando si lavora su visite registrabili, trascrizione visita, UI web recording-aware, benchmark transcript o sidecar macOS audio. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 
 ## 🧱 Architettura, flussi e parity
@@ -125,6 +126,8 @@ Ultimo aggiornamento: 2026-06-16
 | [docs/adr/0064-service-prescription-itemization-and-catalog-matching.md](./adr/0064-service-prescription-itemization-and-catalog-matching.md) | Fissa `WUL-278`: contenitore prescrizione + item figli codificabili per esami/prestazioni e scaffold repertorio locale matchabile. |
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Fissa `WUL-279`: intended purpose, claim consentiti/esclusi e guard repo-local `check:claims` contro overclaim clinico/regolatorio. |
 | [docs/adr/0066-patient-soft-delete-lifecycle.md](./adr/0066-patient-soft-delete-lifecycle.md) | Fissa `WUL-306`: DELETE paziente come tombstone soft-delete version-guarded, cascade canonica `PATIENT_CHILD_TABLES` con guardia anti-drift, purge admin audited (`patient.purged`) e clear test-container per membership (WUL-322). |
+| [docs/adr/0068-cross-platform-runtime-windows-linux.md](./adr/0068-cross-platform-runtime-windows-linux.md) | Fissa `WUL-375`: runtime cross-platform Windows/Linux con adapter scheduler backup (launchd/Task Scheduler/systemd/cron), gating MLX/PM2 a macOS, launcher sottili per OS su helper condiviso e toolchain Node documentato (dev su Node 24, runtime minimo Node 20). |
+| [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Propone `WUL-419`: boundary local-first per visite registrabili Fluid-style, transcript/draft PHI, provider esterni solo tramite opt-in e no runtime audio nella prima slice. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |

@@ -122,8 +122,21 @@ if ! pgrep -x "ollama" > /dev/null; then
     echo "   ⚠️  Ollama non attivo. Avvio in corso..."
     if command -v ollama &> /dev/null; then
         ollama serve &
-        echo "   ✅ Ollama avviato."
-        sleep 3
+        # Probe di readiness reale invece di uno sleep fisso: poll su /api/tags
+        # (l'endpoint usato anche da getHealth) con backoff, fino a ~15s.
+        OLLAMA_READY=0
+        for _attempt in $(seq 1 15); do
+            if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:11434/api/tags"; then
+                OLLAMA_READY=1
+                break
+            fi
+            sleep 1
+        done
+        if [ "$OLLAMA_READY" = "1" ]; then
+            echo "   ✅ Ollama avviato e pronto."
+        else
+            echo "   ⚠️  Ollama avviato ma non ancora pronto dopo 15s: le funzioni AI potrebbero tardare."
+        fi
     else
         echo "   ❌ Ollama non trovato. Installa da https://ollama.com"
     fi

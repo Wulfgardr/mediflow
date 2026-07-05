@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import Module from 'node:module';
-import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './document-parse-evidence-artifact';
+import { buildDocumentParseEvidenceArtifact, serializeDocumentParseEvidenceArtifact } from './domain/documents/document-parse-evidence-artifact';
 
 const moduleWithResolve = Module as unknown as {
     _resolveFilename: (
@@ -41,6 +41,8 @@ function stubFilter(items: unknown[]) {
 interface HarnessOptions {
     attachments?: unknown[];
     documentInsights?: unknown;
+    therapyUpdatedAt?: Date;
+    observationUpdatedAt?: Date;
 }
 
 async function withHarness(options: HarnessOptions = {}) {
@@ -210,6 +212,7 @@ async function withHarness(options: HarnessOptions = {}) {
             startDate: new Date('2025-03-11T00:00:00Z'),
             endDate: null,
             createdAt: new Date('2025-03-11T00:00:00Z'),
+            updatedAt: options.therapyUpdatedAt ?? new Date('2025-03-11T00:00:00Z'),
         },
     ]) as typeof dbModule.db.therapies.filter;
 
@@ -226,6 +229,7 @@ async function withHarness(options: HarnessOptions = {}) {
             notes: 'Controllo domiciliare',
             observedAt: new Date('2025-03-13T00:00:00Z'),
             createdAt: new Date('2025-03-13T00:00:00Z'),
+            updatedAt: options.observationUpdatedAt ?? new Date('2025-03-13T00:00:00Z'),
         },
     ]) as typeof dbModule.db.observations.filter;
 
@@ -316,6 +320,37 @@ test('buildPatientInsightContext orders structured domains and documents determi
         assert.match(diaryRef?.promptLine ?? '', /Dolore toracico riferito in riduzione/i);
     } finally {
         restore();
+    }
+});
+
+test('buildPatientInsightContext hash tracks therapy and observation updatedAt changes', async () => {
+    const { buildPatientInsightContext } = await import('./ai-context');
+    const restoreInitial = await withHarness({
+        therapyUpdatedAt: new Date('2025-03-11T00:00:00Z'),
+        observationUpdatedAt: new Date('2025-03-13T00:00:00Z'),
+    });
+    let initialHash = '';
+    let initialPrompt = '';
+
+    try {
+        const snapshot = await buildPatientInsightContext('patient-1');
+        initialHash = snapshot.contextHash;
+        initialPrompt = snapshot.prompt;
+    } finally {
+        restoreInitial();
+    }
+
+    const restoreUpdated = await withHarness({
+        therapyUpdatedAt: new Date('2025-03-18T00:00:00Z'),
+        observationUpdatedAt: new Date('2025-03-19T00:00:00Z'),
+    });
+
+    try {
+        const snapshot = await buildPatientInsightContext('patient-1');
+        assert.notEqual(snapshot.contextHash, initialHash);
+        assert.equal(snapshot.prompt, initialPrompt);
+    } finally {
+        restoreUpdated();
     }
 });
 
