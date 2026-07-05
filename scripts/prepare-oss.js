@@ -130,6 +130,10 @@ const TO_EXCLUDE_FILE_EXTENSIONS = [
     '.sqlite3'
 ];
 
+const OSS_ALLOWED_BINARY_FIXTURES = new Set([
+    'native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db'
+]);
+
 const TO_EXCLUDE_RUNTIME_DIR_PATTERNS = [
     /^tmp-/,
     /^\.next/,
@@ -213,6 +217,7 @@ function normalizePathForMatch(inputPath) {
 
 function shouldExclude(relPath, itemName) {
     const normalizedRelPath = normalizePathForMatch(relPath);
+    if (OSS_ALLOWED_BINARY_FIXTURES.has(normalizedRelPath)) return false;
     if (TO_EXCLUDE_BY_NAME.includes(itemName)) return true;
     if (TO_EXCLUDE_FILE_EXTENSIONS.includes(path.extname(itemName))) return true;
     if (TO_EXCLUDE_RUNTIME_DIR_PATTERNS.some((pattern) => pattern.test(itemName))) return true;
