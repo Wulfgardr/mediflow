@@ -55,7 +55,7 @@ Ultimo aggiornamento: 2026-07-11
 | [docs/native-launch.md](./native-launch.md) | Avvio rapido app macOS via script/launcher. | Per esecuzione operativa locale. |
 | [docs/local-api-tls.md](./local-api-tls.md) | TLS proxy locale e trasporto sicuro per native API. | Per debug networking/certificate pinning. |
 | [docs/native-testing.md](./native-testing.md) | Strategia canonica test macOS (SwiftPM/XCTest/Xcode). | Per piani test e parity sweep. |
-| [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | Runbook smoke iPhone/iPad contro `home-base` reale con pairing temporaneo e sessione operatore. | Per verifiche mobili `home-base` paired su simulatori Apple. |
+| [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | Runbook del verify loop `home-base`: gate headless sintetici sul boundary di rete e smoke iPhone/iPad opzionale contro database reale. | Per modifiche a `/api/v1/network/*` o verifiche mobili `home-base` paired su simulatori Apple. |
 | [docs/icd-local-setup.md](./icd-local-setup.md) | Setup locale container ICD-11. | Quando si lavora su diagnostica ICD. |
 
 ## 🩺 Prodotto, compliance e contesto clinico
