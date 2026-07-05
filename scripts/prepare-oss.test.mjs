@@ -11,6 +11,7 @@ const {
     replaceBoundedSectionOrThrow,
     sanitizeContributingForOss,
     sanitizeSecurityForOss,
+    isAllowedPublicCreditLine,
 } = require('./prepare-oss.js');
 
 function withTempDir(fn) {
@@ -126,4 +127,20 @@ test('sanitizeSecurityForOss fails on an unclosed cloud comparator section', () 
             /Unclosed private OSS section in SECURITY\.md: Comparator cloud opt-in/
         );
     });
+});
+
+test('isAllowedPublicCreditLine allows exactly the public credit surfaces', () => {
+    // The three lines that legitimately name Codex in public output.
+    assert.equal(isAllowedPublicCreditLine(
+        'Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto.',
+    ), true);
+    assert.equal(isAllowedPublicCreditLine(
+        '[![Codex](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)',
+    ), true);
+    assert.equal(isAllowedPublicCreditLine(
+        '**19,6 miliardi di token** tra Codex CLI (16,0 miliardi, febbraio-luglio 2026) e',
+    ), true);
+    // Any other Codex-naming line stays private (fail-closed).
+    assert.equal(isAllowedPublicCreditLine('Codex ha implementato il merge del package.json.'), false);
+    assert.equal(isAllowedPublicCreditLine('vedi il playbook Linear/Codex interno'), false);
 });
