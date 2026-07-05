@@ -200,6 +200,26 @@ If a task exceeds:
   - continue only on explicit user direction
 - Before commit, run a scope check (`git diff --name-only main..HEAD`) and confirm touched files match the declared theme.
 
+### Multi-Environment Worktree Protocol (MANDATORY)
+
+Several agents operate on this clone concurrently (Codex.app autonomous tasks, Codex CLI, Claude Code, Antigravity). The git substrate (branches, refs, PRs, CI) is shared and hands off cleanly between them; the primary checkout is not a safe workspace.
+
+- Treat the primary checkout (`medical-record-app`) as a coordination surface, not a workspace. Codex.app runs autonomous Linear tasks in it and in its `codex/wul-*` worktrees, and has switched branches and left in-progress merges there mid-session.
+- One workstream = one dedicated sibling worktree: `git worktree add ../medical-record-app-<topic>-wt <base>`. Never implement in the primary checkout.
+- Verify `git branch --show-current` before every commit. A branch checked out in a dedicated worktree cannot be hijacked by a checkout elsewhere; that is the point of the worktree.
+- Hand off clean. Before abandoning work or switching environment, commit WIP to a branch (a `wip:` commit is fine). Never leave uncommitted, untracked-only, or conflicted state in the primary checkout: other agents cannot recover it, and a conflicted `package.json` there breaks webpack module resolution in every sibling worktree that symlinks `node_modules`.
+- If you find the primary checkout on an unexpected branch, or mid-merge with state you do not own, do not reset or resolve it. Preserve the state (copy untracked files, save diffs) and report.
+- Cross-environment model routing and verification-gate rules live in the operator-level orchestration files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`); this section covers only what is specific to this repository.
+
+### Local Sandbox Caveats (Node, Builds, Tests, Ports)
+
+Known local-environment artifacts. None of them is a defect in the change under review; CI (clean `npm ci` checkout) is authoritative.
+
+- Sibling worktrees symlink `node_modules` from the primary checkout. Turbopack refuses out-of-root symlinked `node_modules`, so build locally with `npx next build --webpack`.
+- `better-sqlite3` is a native module compiled for one Node ABI. Local `NODE_MODULE_VERSION` mismatch failures (native DB tests, build page-data collection) are sandbox artifacts; `npm ci` in CI resolves them.
+- `scripts/run-strip-types.mjs` requires Node >= 22.6 and is the only runner that resolves the `@/` path alias. `test:unit` and most `test:*` scripts go through it. Scripts run with bare `node` cannot resolve `@/`, including through transitive imports of `lib` modules. Do not pin `engines` or `.nvmrc` below 22.6; web CI runs Node 24.
+- `next dev` servers can survive worktree removal and keep holding their port. Before each local e2e cycle, kill stale `next dev` processes and confirm the e2e port is free.
+
 ### Delivery Hygiene Protocol (MANDATORY)
 
 - Codex owns the operational cadence of branch / commit / push / PR management for the active workstream unless the user explicitly overrides it.
