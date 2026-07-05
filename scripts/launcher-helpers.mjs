@@ -51,10 +51,10 @@ function openUrl(url) {
     return res?.status ?? 0;
 }
 
-/** Check the running Node satisfies the pinned >=20 <21 range. */
+/** Check the running Node is supported: >=20 (minimum runtime; the dev/test toolchain uses Node 24, see .nvmrc). */
 function checkNode() {
     const major = Number(process.versions.node.split('.')[0]);
-    return { ok: major >= 20 && major < 21, version: process.versions.node, required: '>=20 <21' };
+    return { ok: major >= 20, version: process.versions.node, required: '>=20' };
 }
 
 /** Short hash of the git worktree status (replaces macOS-only `shasum`). */
