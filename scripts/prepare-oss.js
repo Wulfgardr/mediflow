@@ -295,7 +295,14 @@ function collectFilesByExtension(baseDir, extension) {
 }
 
 function isAllowedPublicCreditLine(line) {
-    return /^Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto\.$/.test(line);
+    // Fail-closed allowlist: only these exact public-credit lines survive the
+    // "Codex" line-strip. Anything else naming Codex stays private.
+    if (/^Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto\.$/.test(line)) return true;
+    // Attribution badge in the OSS README header.
+    if (/^\[!\[Codex\]\(https:\/\/img\.shields\.io\/badge\/Codex-OpenAI-412991\?logo=openai&logoColor=white\)\]\(https:\/\/openai\.com\/codex\)$/.test(line)) return true;
+    // Measured AI-usage disclosure line (token floor) naming Codex CLI.
+    if (/^\*\*19,6 miliardi di token\*\* tra Codex CLI \(16,0 miliardi, febbraio-luglio 2026\) e$/.test(line)) return true;
+    return false;
 }
 
 function replaceBoundedSectionOrThrow(content, {
@@ -629,7 +636,14 @@ function prepareOssRelease() {
     if (fs.existsSync(path.join(SOURCE_DIR, 'oss-assets'))) {
         const assets = fs.readdirSync(path.join(SOURCE_DIR, 'oss-assets'));
         for (const asset of assets) {
-            fs.copyFileSync(path.join(SOURCE_DIR, 'oss-assets', asset), path.join(TARGET_DIR, asset));
+            const assetSource = path.join(SOURCE_DIR, 'oss-assets', asset);
+            const assetTarget = path.join(TARGET_DIR, asset);
+            if (fs.statSync(assetSource).isDirectory()) {
+                // e.g. oss-assets/screenshots/: copied as a directory at the target root.
+                copyRecursive(assetSource, assetTarget);
+            } else {
+                fs.copyFileSync(assetSource, assetTarget);
+            }
         }
     }
 
@@ -657,5 +671,6 @@ module.exports = {
     replaceBoundedSectionOrThrow,
     sanitizeContributingForOss,
     sanitizeSecurityForOss,
+    isAllowedPublicCreditLine,
     prepareOssRelease,
 };
