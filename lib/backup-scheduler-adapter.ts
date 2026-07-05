@@ -63,6 +63,38 @@ function backupEnv(state: BackupSchedulerState, dataDir: string): Record<string,
     };
 }
 
+function assertNoControlChars(value: string, label: string): void {
+    if (/[\0\r\n]/.test(value)) {
+        throw new Error(`${label} cannot contain control characters.`);
+    }
+}
+
+function quoteCmdArg(value: string, label: string): string {
+    assertNoControlChars(value, label);
+    if (value.includes('"')) {
+        throw new Error(`${label} cannot contain double quotes.`);
+    }
+    return `"${value}"`;
+}
+
+function quoteCmdSetValue(value: string, label: string): string {
+    assertNoControlChars(value, label);
+    if (value.includes('"')) {
+        throw new Error(`${label} cannot contain double quotes.`);
+    }
+    return value;
+}
+
+function quoteSystemdValue(value: string, label: string): string {
+    assertNoControlChars(value, label);
+    return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+}
+
+function quoteShellArg(value: string, label: string): string {
+    assertNoControlChars(value, label);
+    return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 // ---------------------------------------------------------------------------
 // Pure builders (exported for unit tests; no side effects)
 // ---------------------------------------------------------------------------
@@ -75,9 +107,9 @@ export function buildWindowsWrapperCmd(params: {
 }): string {
     return [
         '@echo off',
-        `set "MEDIFLOW_DATA_DIR=${params.dataDir}"`,
-        `set "MEDIFLOW_BACKUP_DEST_DIR=${params.destinationDir}"`,
-        `"${params.nodePath}" --experimental-strip-types "${params.runnerPath}"`,
+        `set "MEDIFLOW_DATA_DIR=${quoteCmdSetValue(params.dataDir, 'dataDir')}"`,
+        `set "MEDIFLOW_BACKUP_DEST_DIR=${quoteCmdSetValue(params.destinationDir, 'destinationDir')}"`,
+        `${quoteCmdArg(params.nodePath, 'nodePath')} ${quoteCmdArg(params.runnerPath, 'runnerPath')}`,
         '',
     ].join('\r\n');
 }
@@ -109,10 +141,10 @@ Description=MediFlow nightly backup
 
 [Service]
 Type=oneshot
-WorkingDirectory=${params.projectRoot}
-Environment=MEDIFLOW_DATA_DIR=${params.dataDir}
-Environment=MEDIFLOW_BACKUP_DEST_DIR=${params.destinationDir}
-ExecStart=${params.nodePath} --experimental-strip-types ${params.runnerPath}
+WorkingDirectory=${quoteSystemdValue(params.projectRoot, 'projectRoot')}
+Environment=${quoteSystemdValue(`MEDIFLOW_DATA_DIR=${params.dataDir}`, 'dataDir')}
+Environment=${quoteSystemdValue(`MEDIFLOW_BACKUP_DEST_DIR=${params.destinationDir}`, 'destinationDir')}
+ExecStart=${quoteSystemdValue(params.nodePath, 'nodePath')} ${quoteSystemdValue(params.runnerPath, 'runnerPath')}
 `;
 }
 
@@ -138,8 +170,8 @@ export function buildCronLine(params: {
     hour: number;
     minute: number;
 }): string {
-    const env = `MEDIFLOW_DATA_DIR=${params.dataDir} MEDIFLOW_BACKUP_DEST_DIR=${params.destinationDir}`;
-    const cmd = `cd ${params.projectRoot} && ${env} ${params.nodePath} --experimental-strip-types ${params.runnerPath}`;
+    const env = `MEDIFLOW_DATA_DIR=${quoteShellArg(params.dataDir, 'dataDir')} MEDIFLOW_BACKUP_DEST_DIR=${quoteShellArg(params.destinationDir, 'destinationDir')}`;
+    const cmd = `cd ${quoteShellArg(params.projectRoot, 'projectRoot')} && ${env} ${quoteShellArg(params.nodePath, 'nodePath')} ${quoteShellArg(params.runnerPath, 'runnerPath')}`;
     return `${params.minute} ${params.hour} * * * ${cmd} ${CRON_MARKER}`;
 }
 

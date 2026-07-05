@@ -63,9 +63,12 @@ Adottiamo l'opzione 3.
   `Start-MediFlow.ps1` (Windows), `scripts/start-mediflow.sh` (Linux).
 - La logica condivisa (rilevamento porta, hash worktree, apertura browser, check
   Node) vive in `scripts/launcher-helpers.mjs`, richiamato da tutti i launcher.
-- Node e pinnato (`.nvmrc` = `20.20.2`, `engines.node` = `>=20 <21`) per garantire
-  un binario precompilato `better-sqlite3` ed evitare il fallback `node-gyp` che
-  richiederebbe build-tools manuali.
+- `.nvmrc` resta sul toolchain di sviluppo corrente (`24`) per gli script basati
+  su `run-strip-types`, che richiedono Node >=22.6.
+- `package.json` non impone `engines.node`: la CI cross-platform verifica Node
+  20 come runtime minimo supportato per install/build/start, cosi da mantenere
+  coperto il path con binari precompilati `better-sqlite3` senza bloccare il
+  toolchain locale piu recente.
 - Lo scheduling del backup passa dietro un `SchedulerAdapter`
   (`lib/backup-scheduler-adapter.ts`): `launchd` su macOS, Task Scheduler via
   `schtasks` su Windows, `systemd-timer` (fallback `cron`) su Linux. Il runner
@@ -89,13 +92,13 @@ Adottiamo l'opzione 3.
   verificabile su tre OS via la CI matrix (`.github/workflows/cross-platform.yml`).
 - Positivo: il backup automatico non e piu solo-macOS.
 - Negativo: tre file di launcher da mantenere (mitigato dall'helper condiviso).
-- Nota: alcuni script di tooling che usano `--experimental-strip-types`
-  richiedono un Node piu recente del runtime applicativo pinnato; restano un
-  toolchain di sviluppo separato, da chiarire fuori da questa milestone.
+- Nota: alcuni script di tooling che usano `run-strip-types` richiedono un Node
+  piu recente del minimo runtime verificato in CI; per questo `.nvmrc` punta a
+  Node 24 mentre la matrix cross-platform continua a provare Node 20.
 
 ## First Thin Slice
 
-1. Pin Node + helper launcher condiviso + launcher Windows/Linux.
+1. Toolchain Node documentato + helper launcher condiviso + launcher Windows/Linux.
 2. `SchedulerAdapter` con refactor macOS invariato, poi Windows e Linux.
 3. CI matrix windows/ubuntu/macos su install, build, boot.
 4. Matrice di supporto per piattaforma nel README.

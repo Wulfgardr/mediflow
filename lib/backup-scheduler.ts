@@ -377,7 +377,6 @@ export function buildBackupLaunchAgentPlist(
   <key>ProgramArguments</key>
   <array>
     <string>${escapeXml(nodePath)}</string>
-    <string>--experimental-strip-types</string>
     <string>${escapeXml(runnerPath)}</string>
   </array>
   <key>WorkingDirectory</key>
@@ -470,7 +469,7 @@ export function runBackupSchedulerScript(options?: {
         ...(options?.destinationDir ? { MEDIFLOW_BACKUP_DEST_DIR: options.destinationDir } : {}),
     };
 
-    const result = spawnSync(process.execPath, ['--experimental-strip-types', scriptPath], {
+    const result = spawnSync(process.execPath, [scriptPath], {
         cwd: projectRoot,
         env,
         encoding: 'utf8',

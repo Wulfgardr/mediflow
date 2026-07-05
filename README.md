@@ -140,7 +140,11 @@ Situazione attuale:
 
 ### Prerequisiti minimi
 
-- Node.js **20 LTS** (vedi `.nvmrc`). Con questa versione `better-sqlite3` usa un binario precompilato; con altre versioni l'install puo ricadere su una compilazione nativa che richiede build-tools (Python e, su Windows, Visual Studio Build Tools).
+- Node.js **24** consigliato per lo sviluppo locale (vedi `.nvmrc`). La CI
+  cross-platform verifica anche Node 20 come runtime minimo supportato, per
+  coprire i binari precompilati `better-sqlite3`; con altre versioni l'install
+  puo ricadere su una compilazione nativa che richiede build-tools (Python e,
+  su Windows, Visual Studio Build Tools).
 - Docker Desktop (**opzionale**, solo per ICD-11)
 - Ollama (**opzionale**, runtime AI e OCR primario locale, cross-platform)
 

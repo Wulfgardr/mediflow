@@ -66,6 +66,7 @@ test('builds a launchd plist with the configured schedule and destination', () =
     assert.match(plist, /MEDIFLOW_BACKUP_DEST_DIR/);
     assert.match(plist, /\/Users\/demo\/Backups\/MediFlow/);
     assert.match(plist, /run-scheduled-backup\.mjs/);
+    assert.doesNotMatch(plist, /--experimental-strip-types/);
 });
 
 test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orphan temp files', async () => {
@@ -160,21 +161,41 @@ test('builds Windows wrapper cmd carrying the backup env vars', () => {
     const cmd = buildWindowsWrapperCmd({ nodePath: 'C:\\node.exe', runnerPath: 'C:\\app\\runner.mjs', dataDir: 'C:\\data', destinationDir: 'C:\\dest' });
     assert.match(cmd, /set "MEDIFLOW_DATA_DIR=C:\\data"/);
     assert.match(cmd, /set "MEDIFLOW_BACKUP_DEST_DIR=C:\\dest"/);
-    assert.match(cmd, /--experimental-strip-types/);
+    assert.match(cmd, /"C:\\node\.exe" "C:\\app\\runner\.mjs"/);
+    assert.doesNotMatch(cmd, /--experimental-strip-types/);
 });
 
 test('builds systemd service and timer units with OnCalendar', () => {
-    const service = buildSystemdServiceUnit({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/home/u/.mediflow', destinationDir: '/backups' });
+    const service = buildSystemdServiceUnit({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/home/u/.mediflow', destinationDir: '/backups with spaces' });
     assert.match(service, /Type=oneshot/);
-    assert.match(service, /Environment=MEDIFLOW_BACKUP_DEST_DIR=\/backups/);
+    assert.match(service, /Environment="MEDIFLOW_BACKUP_DEST_DIR=\/backups with spaces"/);
+    assert.match(service, /ExecStart="\/usr\/bin\/node" "\/app\/runner\.mjs"/);
+    assert.doesNotMatch(service, /--experimental-strip-types/);
     const timer = buildSystemdTimerUnit({ hour: 3, minute: 30 });
     assert.match(timer, /OnCalendar=\*-\*-\* 03:30:00/);
     assert.match(timer, /WantedBy=timers\.target/);
 });
 
 test('builds cron line with marker and env', () => {
-    const line = buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/d', destinationDir: '/b', hour: 2, minute: 0 });
+    const line = buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app root', dataDir: '/d', destinationDir: "/b's", hour: 2, minute: 0 });
     assert.match(line, /^0 2 \* \* \* /);
-    assert.match(line, /MEDIFLOW_BACKUP_DEST_DIR=\/b/);
+    assert.match(line, /cd '\/app root'/);
+    assert.match(line, /MEDIFLOW_BACKUP_DEST_DIR='\/b'\\''s'/);
+    assert.doesNotMatch(line, /--experimental-strip-types/);
     assert.match(line, /# dev\.wulfgardr\.mediflow\.backup$/);
+});
+
+test('rejects unsafe scheduler command values before writing OS job files', () => {
+    assert.throws(
+        () => buildWindowsWrapperCmd({ nodePath: 'C:\\node.exe', runnerPath: 'C:\\app\\runner.mjs', dataDir: 'C:\\data', destinationDir: 'C:\\bad"\r\ncalc' }),
+        /destinationDir/,
+    );
+    assert.throws(
+        () => buildSystemdServiceUnit({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app\nRoot', dataDir: '/d', destinationDir: '/b' }),
+        /projectRoot/,
+    );
+    assert.throws(
+        () => buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/d', destinationDir: '/b\n* * * * * bad', hour: 2, minute: 0 }),
+        /destinationDir/,
+    );
 });
