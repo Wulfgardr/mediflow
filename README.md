@@ -140,9 +140,13 @@ Situazione attuale:
 
 ### Prerequisiti minimi
 
-- Node.js (**v20+** consigliato)
+- Node.js **24** consigliato per lo sviluppo locale (vedi `.nvmrc`). La CI
+  cross-platform verifica anche Node 20 come runtime minimo supportato, per
+  coprire i binari precompilati `better-sqlite3`; con altre versioni l'install
+  puo ricadere su una compilazione nativa che richiede build-tools (Python e,
+  su Windows, Visual Studio Build Tools).
 - Docker Desktop (**opzionale**, solo per ICD-11)
-- Ollama (**opzionale**, runtime AI e OCR primario locale)
+- Ollama (**opzionale**, runtime AI e OCR primario locale, cross-platform)
 
 Su macOS, MediFlow puo usare Apple Vision come fallback OCR locale quando
 Ollama/DeepSeek OCR restituisce testo vuoto o degenerato. Su Windows e Linux non
@@ -157,14 +161,39 @@ git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
 
 npm install
-./Start_MediFlow.command
 ```
+
+Poi avvia con il launcher one-click della tua piattaforma:
+
+- **macOS**: doppio clic su `Start_MediFlow.command` (o `./Start_MediFlow.command`)
+- **Windows**: tasto destro su `Start-MediFlow.ps1` > Esegui con PowerShell. Se la Execution Policy lo blocca: `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1`
+- **Linux**: `./scripts/start-mediflow.sh`
+
+In alternativa, su qualsiasi OS: `npm run dev` (sviluppo) oppure `npm run build && npm start` (produzione locale).
 
 Apri: `http://localhost:3000`
 
-> Lo script avvia anche Ollama e ICD-11 se presenti.
+> Il launcher avvia anche Ollama se presente e apre il browser con gli strumenti nativi della piattaforma.
 > Non avvia i client Apple: macOS, iPadOS e iOS restano su un filone e su launcher separati.
-> Se non sono installati, MediFlow resta usabile con funzionalità ridotte.
+> Se Ollama, Docker o ICD-11 non sono installati, MediFlow resta usabile con funzionalità ridotte.
+
+### Matrice di supporto per piattaforma
+
+MediFlow e local-first e gira come web app locale su tutte e tre le piattaforme. Alcune funzioni restano enhancement opzionali solo-Mac, con degradazione graziosa verso le alternative cross-platform.
+
+| Capacità | macOS | Windows | Linux |
+| --- | --- | --- | --- |
+| Web app locale (Next.js + SQLite) | ✅ | ✅ | ✅ |
+| Launcher one-click | `.command` | `Start-MediFlow.ps1` | `start-mediflow.sh` |
+| Storage dati locale | `~/Library/Application Support/MediFlow` | `~/.mediflow` | `~/.mediflow` |
+| AI / OCR primario (Ollama) | ✅ | ✅ | ✅ |
+| OCR fallback Apple Vision | ✅ (solo-Mac) | non disponibile | non disponibile |
+| Inferenza locale MLX | ✅ (Apple Silicon) | non disponibile | non disponibile |
+| Backup notturno schedulato | `launchd` | Task Scheduler | `systemd-timer` / `cron` |
+| Backup manuale + retention | ✅ | ✅ | ✅ |
+
+> Apple Vision OCR e MLX sono opzionali e Apple-specifici: dove non ci sono, MediFlow usa Ollama come OCR/AI primario. Non viene dichiarata parita OCR certificata su Windows/Linux.
+> Dettagli architetturali in [ADR 0068](./docs/adr/0068-cross-platform-runtime-windows-linux.md).
 
 ### Verifiche rapide
 
@@ -172,6 +201,8 @@ Apri: `http://localhost:3000`
 npm run lint
 npm run build
 ```
+
+> `lint`, `typecheck`, `build` e `start` sono cross-platform. Molti script di test/benchmark in `package.json` invocano `bash`: su Windows nativo richiedono WSL2 o Git Bash. Gli script della lane MLX escono come no-op fuori da macOS Apple Silicon.
 
 ---
 
