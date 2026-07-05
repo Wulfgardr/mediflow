@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { and, asc, inArray, isNull, not, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { exemptions } from '@/lib/schema';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import type { ExemptionSummary } from '@/lib/api/v1/types';
 /* @Codex */
 import { parseApiV1Limit, parseApiV1NullableDate, toApiV1IsoString } from '@/lib/api-v1-route-helpers';

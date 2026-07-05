@@ -4,16 +4,16 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
     countPatientCascadeRows,
     purgePatientCascade,
     totalPatientCascadeRows,
     type PatientCascadeCounts,
 } from '@/lib/patient-cascade';
-import { safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
 export const dynamic = 'force-dynamic';
 

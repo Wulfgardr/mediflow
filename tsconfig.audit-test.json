@@ -10,12 +10,12 @@
     "isolatedModules": false
   },
   "include": [
-    "lib/audit.test.ts",
-    "lib/audit.ts",
-    "lib/audit-db.ts",
+    "lib/security/audit.test.ts",
+    "lib/security/audit.ts",
+    "lib/security/audit-db.ts",
     "lib/schema.ts",
-    "lib/local-api-auth.ts",
-    "lib/local-api-token.ts",
+    "lib/security/local-api-auth.ts",
+    "lib/security/local-api-token.ts",
     "lib/data-dir.ts"
   ]
 }

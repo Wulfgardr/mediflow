@@ -7,8 +7,14 @@ import type {
     TherapySuggestionState,
 } from './ai-task-contracts';
 /* @Codex */
-import { normalizeDocumentInput } from './document-input-normalization';
-import { looksLikeLowSignalOcrText } from './document-ocr-queue';
+import { normalizeDocumentInput } from './domain/documents/document-input-normalization';
+import { looksLikeLowSignalOcrText } from './domain/documents/document-ocr-queue';
+/* @Codex */
+import {
+    normalizePdfDocumentMetadata,
+    rememberPdfDocumentMetadata,
+    type PdfDocumentMetadata,
+} from './pdf-document-metadata';
 
 // Client-side text parsing only - Extraction happens on server via API
 
@@ -112,6 +118,11 @@ export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unkn
 
 /* @Codex */
 const OCR_PAGE_LIMIT = 6;
+/* @Codex */
+type RenderedPdfForOcr = {
+    images: string[];
+    metadata?: PdfDocumentMetadata;
+};
 /* @Codex */
 const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
 /* @Codex */
@@ -323,7 +334,18 @@ async function callOcr(imageBase64: string, mode: 'full' | 'patient' | 'labs' = 
 }
 
 /* @Codex */
-async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<string[]> {
+async function readPdfDocumentMetadata(pdf: any): Promise<PdfDocumentMetadata | undefined> {
+    try {
+        if (typeof pdf?.getMetadata !== 'function') return undefined;
+        const metadata = await pdf.getMetadata();
+        return normalizePdfDocumentMetadata(metadata?.info);
+    } catch {
+        return undefined;
+    }
+}
+
+/* @Codex */
+async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<RenderedPdfForOcr> {
     const buffer = await file.arrayBuffer();
     try {
         if (!(globalThis as any).pdfjsWorker) {
@@ -348,6 +370,7 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
         disableWorker: true
     });
     const pdf = await loadingTask.promise;
+    const metadata = await readPdfDocumentMetadata(pdf);
     const pagesToRender = await selectPdfPagesForOcr(pdf, maxPages);
 
     const images: string[] = [];
@@ -368,7 +391,7 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
         images.push(canvas.toDataURL('image/png'));
     }
 
-    return images;
+    return { images, metadata };
 }
 
 /* @Codex */
@@ -488,9 +511,12 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
     }
 
     if (isPdf) {
-        const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
+        const rendered = await renderPdfToImages(file, OCR_PAGE_LIMIT);
+        const { images } = rendered;
         if (!images.length) return "";
-        return normalizeDocumentInput(await extractOcrFullTextFromImages(images), { sourceKind: 'ocr' }).normalizedText;
+        const normalizedText = normalizeDocumentInput(await extractOcrFullTextFromImages(images), { sourceKind: 'ocr' }).normalizedText;
+        rememberPdfDocumentMetadata(file.name, normalizedText, rendered.metadata);
+        return normalizedText;
     }
 
     const base64 = await fileToBase64(file);
@@ -517,7 +543,8 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
     try {
         if (isPdf) {
-            const images = await renderPdfToImages(file, OCR_PAGE_LIMIT);
+            const rendered = await renderPdfToImages(file, OCR_PAGE_LIMIT);
+            const { images } = rendered;
             if (images.length) {
                 let patientData: any = null;
                 try {

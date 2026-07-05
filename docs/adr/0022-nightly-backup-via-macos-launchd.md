@@ -1,7 +1,12 @@
 # ADR 0022: Backup automatico notturno via `launchd` su macOS
 
 Date: 2026-03-18
-Status: Accepted
+Status: Superseded
+
+Superseded by: [ADR 0068](./0068-cross-platform-runtime-windows-linux.md), che
+porta lo scheduling backup dietro un `SchedulerAdapter` cross-platform (launchd
+su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux). La decisione
+sotto resta valida come thin slice macOS originaria.
 
 ## Problema
 

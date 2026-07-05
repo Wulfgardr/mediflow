@@ -24,9 +24,9 @@ import {
     forbiddenResponse,
     requireSession,
     unauthorizedResponse,
-} from '@/lib/server-auth';
+} from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
     BACKUP_COLLECTIONS,
     type BackupArtifact,

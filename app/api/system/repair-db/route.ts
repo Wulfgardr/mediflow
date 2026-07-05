@@ -6,9 +6,9 @@ import { resolveDataPath } from '@/lib/data-dir';
 import { swapDatabaseFromFile } from '@/lib/db-server';
 import { SqliteSwapInProgressError } from '@/lib/sqlite-repair';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';

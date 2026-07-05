@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { sissHandoffEvents } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { sissHandoffUpdateSchema } from '@/lib/api-schemas/siss-handoffs';
+import { parseApiBody } from '@/lib/api-schemas/parse';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -36,7 +38,10 @@ export async function PUT(request: Request, context: RouteContext) {
             .get();
         if (!existing) return NextResponse.json({ error: 'SISS handoff not found' }, { status: 404 });
 
-        const body = await request.json() as Record<string, unknown>;
+        const rawBody = await request.json() as Record<string, unknown>;
+        const parsedBody = parseApiBody(sissHandoffUpdateSchema, rawBody);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
         const updateData: Partial<typeof sissHandoffEvents.$inferInsert> = { updatedAt: new Date() };
         const nullableTextFields = ['reason', 'nextAction', 'notes', 'correlationId'] as const;
 
@@ -79,7 +84,7 @@ export async function PUT(request: Request, context: RouteContext) {
             subjectType: 'siss_handoff',
             subjectRef: id,
             redactedMetadata: {
-                changedFields: listChangedFields(body, []),
+                changedFields: listChangedFields(body as Record<string, unknown>, []),
             },
         }, '[MediFlow] SISS handoff audit write failed:');
 

@@ -3,11 +3,11 @@ import { cookies } from 'next/headers';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { clearAllSessions, SESSION_COOKIE_NAME } from '@/lib/server-session';
+import { clearAllSessions, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
-import { sessionCookieOptionsForRequest } from '@/lib/request-transport';
+import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 export async function POST(request: Request) {
     /* @Codex */

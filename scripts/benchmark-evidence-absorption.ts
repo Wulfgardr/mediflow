@@ -7,7 +7,7 @@ import {
     runEvidenceAbsorptionBenchmark,
     type EvidenceAbsorptionBenchmarkCase,
     type EvidenceAbsorptionBenchmarkReport,
-} from '../lib/evidence-absorption-benchmark';
+} from '../lib/domain/documents/evidence-absorption-benchmark';
 
 type CliArgs = {
     corpus: string;

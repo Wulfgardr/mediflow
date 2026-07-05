@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { regeneratePatientSummary } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
+import { useToast } from '@/components/ui/toast-provider';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -15,6 +18,14 @@ interface DocumentInsightsPanelProps {
 export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanelProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
+    // Modelli reali dalla config invece di nomi hardcoded nel footer.
+    const [modelLabels, setModelLabels] = useState<{ clinical: string; ocr: string } | null>(null);
+    const { showToast } = useToast();
+    const confirm = useConfirm();
+
+    useEffect(() => {
+        getAiModelLabels().then(setModelLabels).catch(() => setModelLabels(null));
+    }, []);
 
     // Parse insights from patient
     const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
@@ -52,14 +63,22 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             setExpandedId((current) => nextInsights.some((insight) => insight.id === current) ? current : null);
 
             try {
-                await regeneratePatientSummary(patient.id);
+                await refreshPatientSummaryIfEnabled(patient.id);
             } catch (refreshError) {
                 console.warn('[DocumentInsightsPanel] AI summary refresh failed', refreshError);
-                alert("Archivio aggiornato, ma non è stato possibile riallineare subito AI Patient Insight.");
+                showToast({
+                    tone: 'warning',
+                    title: 'Archivio aggiornato',
+                    description: 'Non è stato possibile riallineare subito AI Patient Insight.'
+                });
             }
         } catch (error) {
             console.error('[DocumentInsightsPanel] Archive update failed', error);
-            alert("Errore durante l'aggiornamento dell'Archivio Intelligente.");
+            showToast({
+                tone: 'error',
+                title: 'Aggiornamento non riuscito',
+                description: "Errore durante l'aggiornamento dell'Archivio Intelligente."
+            });
         } finally {
             setBusyAction(null);
         }
@@ -67,7 +86,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const handleRemoveInsight = async (insightId: string, fileName: string) => {
-        const confirmed = confirm(`Rimuovere "${fileName}" dall'Archivio Intelligente del paziente?`);
+        const { confirmed } = await confirm({
+            title: 'Rimuovere il documento?',
+            message: `"${fileName}" verrà rimosso dall'Archivio Intelligente del paziente.`,
+            tone: 'danger',
+            confirmLabel: 'Rimuovi'
+        });
         if (!confirmed) return;
 
         const nextInsights = insights.filter((insight) => insight.id !== insightId);
@@ -76,7 +100,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const handleClearArchive = async () => {
-        const confirmed = confirm("Svuotare completamente l'Archivio Intelligente di questo paziente?");
+        const { confirmed } = await confirm({
+            title: "Svuotare l'Archivio Intelligente?",
+            message: 'Tutti i documenti analizzati di questo paziente verranno rimossi.',
+            tone: 'danger',
+            confirmLabel: 'Svuota'
+        });
         if (!confirmed) return;
 
         await persistArchive([], 'all');
@@ -150,7 +179,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                             {formatDate(insight.date)}
                                             {insight.quality?.level && (
                                                 <span className={`ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${qualityTone(insight.quality.level)}`}>
-                                                    {insight.quality.level}
+                                                    {qualityLabel(insight.quality.level)}
+                                                </span>
+                                            )}
+                                            {insight.routedClass?.classification && insight.routedClass.classification !== 'unknown' && (
+                                                <span className="ml-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:border-white/10 dark:text-slate-300">
+                                                    {documentClassLabel(insight.routedClass.classification)}
                                                 </span>
                                             )}
                                         </div>
@@ -229,7 +263,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className="mt-4 flex items-center gap-2 border-t border-slate-200/80 pt-3 text-[10px] text-slate-400 dark:border-white/10">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Sintesi generata da IA locale (DeepSeek OCR 2 + Qwen 3.5 35B A3B). Verificare sempre.</span>
+                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.ocr} + ${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
             </div>
         </div>
     );

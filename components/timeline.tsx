@@ -1,8 +1,12 @@
+'use client';
+
 import { db, Attachment } from '@/lib/db';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import DocumentViewer from './document-viewer';
 import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
@@ -11,34 +15,50 @@ interface TimelineProps {
 export default function Timeline({ entries }: TimelineProps) {
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+    const confirm = useConfirm();
+    const { showToast } = useToast();
 
     const handleDelete = async (entry: TimelineEntryData) => {
-        const reason = prompt("Motivazione dell'eliminazione (obbligatoria):");
-        if (reason === null) return; // Cancelled
-        if (!reason.trim()) {
-            alert("La motivazione è obbligatoria per eliminare una voce clinica.");
-            return;
-        }
+        /* @Codex WUL-UIUX: motivazione obbligatoria raccolta in un dialogo
+           accessibile e tematizzato, non piu con prompt() nativo. */
+        const result = await confirm({
+            title: 'Elimina voce clinica',
+            message: "La voce verra spostata nel cestino. Indica la motivazione, richiesta per l'audit clinico.",
+            tone: 'danger',
+            confirmLabel: 'Elimina',
+            requireReason: true,
+            reasonLabel: 'Motivazione eliminazione',
+            reasonPlaceholder: 'Es. errore di inserimento, duplicato...',
+        });
+        if (!result.confirmed || !result.reason) return;
 
         try {
             if (typeof entry.version !== 'number') {
-                alert("Versione voce clinica non disponibile. Ricarica la pagina e riprova.");
+                showToast('Versione voce clinica non disponibile. Ricarica la pagina e riprova.', 'error');
                 return;
             }
             await db.entries.delete(entry.id, {
                 version: entry.version,
-                deletionReason: reason,
+                deletionReason: result.reason,
             });
+            showToast('Voce spostata nel cestino.', 'success');
         } catch (error) {
-            console.error("Delete failed", error);
-            alert("Errore nell'eliminazione.");
+            console.error('Delete failed', error);
+            showToast("Errore nell'eliminazione della voce.", 'error');
         }
     };
 
     const handleRestore = async (entry: TimelineEntryData) => {
-        if (confirm("Ripristinare questa voce?")) {
+        const result = await confirm({
+            title: 'Ripristina voce',
+            message: 'Vuoi ripristinare questa voce clinica dal cestino?',
+            confirmLabel: 'Ripristina',
+        });
+        if (!result.confirmed) return;
+
+        try {
             if (typeof entry.version !== 'number') {
-                alert("Versione voce clinica non disponibile. Ricarica la pagina e riprova.");
+                showToast('Versione voce clinica non disponibile. Ricarica la pagina e riprova.', 'error');
                 return;
             }
             await db.entries.update(entry.id, {
@@ -46,6 +66,10 @@ export default function Timeline({ entries }: TimelineProps) {
                 deletionReason: null,
                 version: entry.version,
             });
+            showToast('Voce ripristinata.', 'success');
+        } catch (error) {
+            console.error('Restore failed', error);
+            showToast('Errore nel ripristino della voce.', 'error');
         }
     };
 
@@ -54,36 +78,30 @@ export default function Timeline({ entries }: TimelineProps) {
         ? entries
         : entries.filter(e => !e.deletedAt);
 
+    const auditToggle = (
+        <button
+            onClick={() => setShowDeleted(!showDeleted)}
+            className="text-xs flex items-center gap-1 text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]"
+        >
+            {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            {showDeleted ? "Nascondi eliminati" : "Mostra cestino / audit"}
+        </button>
+    );
+
     if (!visibleEntries.length) {
         return (
             <div className="space-y-4">
-                <div className="flex justify-end">
-                    <button
-                        onClick={() => setShowDeleted(!showDeleted)}
-                        className="text-xs flex items-center gap-1 text-gray-500 hover:text-indigo-600 transition-colors"
-                    >
-                        {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        {showDeleted ? "Nascondi Eliminati" : "Mostra Cestino / Audit"}
-                    </button>
-                </div>
-                <div className="text-center py-10 text-gray-400 dark:text-gray-500 italic">Nessuna voce visibile nel diario clinico.</div>
+                <div className="flex justify-end">{auditToggle}</div>
+                <div className="text-center py-10 italic text-[color:var(--mf-muted)]">Nessuna voce visibile nel diario clinico.</div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-end">
-                <button
-                    onClick={() => setShowDeleted(!showDeleted)}
-                    className="text-xs flex items-center gap-1 text-gray-500 hover:text-indigo-600 transition-colors"
-                >
-                    {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    {showDeleted ? "Nascondi Eliminati" : "Mostra Cestino / Audit"}
-                </button>
-            </div>
+            <div className="flex justify-end">{auditToggle}</div>
 
-            <div className="relative border-l-2 border-indigo-100 dark:border-white/10 ml-3 space-y-8 pb-8">
+            <div className="relative border-l-2 border-[color:rgba(112,106,100,0.18)] dark:border-white/10 ml-3 space-y-8 pb-8">
                 {visibleEntries.map((entry) => (
                     <TimelineEntryCard
                         key={entry.id}

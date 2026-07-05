@@ -30,7 +30,7 @@ Questo significa:
 | Config provider native | Supportato | Supportato con fallback esplicito | Parity controllata |
 | OCR | Primario locale; fallback Apple Vision solo macOS | Escluso | MLX fuori dalla pipeline OCR deliberatamente |
 | Benchmark `ai-task-contracts` | `ollama_chat` | `mlx_chat` | Parity benchmark |
-| Model parliament | Runtime distinto | Runtime distinto | Parity reportistica |
+| Registry comparativo modelli | Runtime distinto | Runtime distinto | Parity reportistica |
 | Start/stop app-managed home-base | Non app-managed | Non app-managed | Parity di non gestione |
 | Runtime centralizzato paired | Gate su Ollama locale | Non promosso | Fuori scope |
 
@@ -49,6 +49,8 @@ mantenga i confini operativi dichiarati:
 - adapter benchmark simmetrici `ollama_chat` / `mlx_chat`;
 - diagnostica home-base read-only per MLX già attivo;
 - fallback native esplicito verso Ollama;
+- OCR resta Ollama-only per MLX: DeepSeek/Ollama resta primario e Apple Vision
+  resta l'unica eccezione macOS-only;
 - OCR primario Ollama/DeepSeek con sola eccezione Apple Vision macOS-only
   dichiarata da ADR 0059;
 - documentazione del boundary benchmark-only.

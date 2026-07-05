@@ -3,7 +3,7 @@ import { patients, patientsToAmbulatories } from '@/lib/schema';
 import { eq, isNotNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 
 export async function POST() {
     /* @Codex */

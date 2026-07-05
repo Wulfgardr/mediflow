@@ -1,0 +1,95 @@
+name: Apple Native
+
+# Builds and tests the universal Apple app (iOS/iPadOS/macOS). The Liquid Glass
+# code uses .glassEffect under an iOS 26 / macOS 26 availability guard, so the
+# macOS job needs an Xcode with the 26 (or newer) SDK; it selects the latest
+# stable Xcode on the runner.
+
+on:
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'scripts/check-apple-*.sh'
+      - 'scripts/generate-apple-xcodeproj.sh'
+      - 'scripts/native-test.sh'
+      - '.github/workflows/apple-native.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/**'
+  workflow_dispatch:
+
+# macOS runner minutes are billed at 10x. Cancel superseded runs on the same ref
+# so a burst of pushes does not pile up parallel macOS runs.
+concurrency:
+  group: apple-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structure-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Structure guard (no SPM app executables / dead roots)
+        run: scripts/check-apple-structure.sh
+
+  native-build-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Toolchain diagnostics
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -iE 'ios |macos ' || true
+      - name: Install xcodegen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Generate project + guards (structure + entitlements)
+        run: scripts/generate-apple-xcodeproj.sh
+      - name: SwiftPM tests
+        run: scripts/native-test.sh
+      - name: Build macOS app
+        run: |
+          xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMacApp -destination 'platform=macOS' \
+            build CODE_SIGNING_ALLOWED=NO
+      - name: Build iOS app
+        run: |
+          xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' \
+            build CODE_SIGNING_ALLOWED=NO
+
+  ui-tests:
+    # Expensive (~10 min of macOS runner time, billed at 10x). Run only on merge
+    # to main or on demand (workflow_dispatch), not on every PR push - the XCUITest
+    # suite is run locally on each change.
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install xcodegen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Generate project
+        run: scripts/generate-apple-xcodeproj.sh
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          NAME=$(xcrun simctl list devices available --json | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next((x['name'] for rt in sorted(d) for x in d[rt] if x['name'].startswith('iPhone')), ''))")
+          [ -n "$NAME" ] || { echo "No iPhone simulator available" >&2; exit 1; }
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME"
+      - name: Run XCUITest interaction tests
+        run: |
+          # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
+          # "Timed out while acquiring background assertion" launch flake) without
+          # masking real failures: a test must pass within the retries.
+          xcodebuild test \
+            -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
+            -scheme MediFlowMobileApp \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -retry-tests-on-failure -test-iterations 2 \
+            CODE_SIGNING_ALLOWED=NO

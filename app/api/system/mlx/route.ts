@@ -1,19 +1,38 @@
 import { NextResponse } from 'next/server';
 import { PM2Manager } from '@/lib/pm2-manager';
 /* @Codex */
-import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/server-auth';
+import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { isWebAdminSession } from '@/lib/server-auth-policy';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
 
 // Note: Robust auth check should be added here using sessions.
 // For now relying on API route protection if any.
+
+/* @Codex */
+// MLX (mlx_lm) and the PM2-managed inference server run only on macOS Apple Silicon.
+// On Windows/Linux return a structured 501 instead of letting PM2 throw a cryptic 500.
+const MLX_SUPPORTED = process.platform === 'darwin';
+
+/* @Codex */
+function mlxUnsupportedResponse() {
+    return NextResponse.json(
+        {
+            error: 'MLX non disponibile su questa piattaforma.',
+            detail: `Il runtime MLX/PM2 e supportato solo su macOS Apple Silicon (rilevato ${process.platform}/${process.arch}). Su Windows e Linux usa Ollama come runtime AI locale.`,
+            supported: false,
+        },
+        { status: 501 },
+    );
+}
 
 export async function GET(request: Request) {
     /* @Codex */
     const session = await requireSessionOrLocalToken(request);
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();
+    /* @Codex */
+    if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
         await PM2Manager.connect();
@@ -36,6 +55,8 @@ export async function POST() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    /* @Codex */
+    if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
         await PM2Manager.connect();
@@ -53,6 +74,8 @@ export async function DELETE() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    /* @Codex */
+    if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
         await PM2Manager.connect();

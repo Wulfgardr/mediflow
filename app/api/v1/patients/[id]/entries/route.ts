@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
-import { requireLocalApiToken } from '@/lib/local-api-auth';
-import { requireLocalApiActorSession } from '@/lib/server-auth';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/audit';
+import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;

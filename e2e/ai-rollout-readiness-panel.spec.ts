@@ -90,7 +90,8 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');
-  await expect(panel.getByRole('heading', { name: 'AI rollout readiness' })).toBeVisible();
+  // WUL-297: the panel heading is now Italian ("Stato rilascio AI locale").
+  await expect(panel.getByRole('heading', { name: 'Stato rilascio AI locale' })).toBeVisible();
 
   await expect(page.getByTestId('ai-rollout-metric-ready')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-hold')).toContainText('1');
@@ -102,7 +103,8 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
 
   const missingRedactionLane = page.getByTestId('ai-rollout-lane-redaction');
   await expect(missingRedactionLane).toContainText('Redaction');
-  await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('Artifact locale mancante');
+  // WUL-297: the missing-artifact copy is now "Report locale mancante".
+  await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('Report locale mancante');
 
   const patientInsightLane = page.getByTestId('ai-rollout-lane-patient_insight');
   await expect(patientInsightLane).toContainText('qwen3.5:35b-a3b');

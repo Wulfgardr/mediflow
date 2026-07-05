@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { asc, eq, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { serviceCatalogEntries } from '@/lib/schema';
-import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 
 type CatalogPayload = {
     id?: string;

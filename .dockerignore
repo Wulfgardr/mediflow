@@ -1,4 +1,6 @@
 # Build context hygiene: keep PHI, secrets, and build artifacts out of Docker layers
+# ecosystem.config.js drives the macOS-only Apple MLX/PM2 lane; never ship it in the Linux bundle
+ecosystem.config.js
 medical.db
 medical.db-*
 *.db

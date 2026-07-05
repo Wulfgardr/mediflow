@@ -18,6 +18,8 @@
 /tmp-e2e-data
 /tmp-concurrency-data
 /tmp-native-derived-data
+/tmp-ios-sim-dd
+/tmp-mac-derived-data
 /tmp-parity-smoke
 /tmp-audit-test
 /tmp-auth-lockout-test
@@ -28,10 +30,12 @@
 /tmp-manual-browser
 /tmp-network-home-base-readonly
 /tmp-api-v1-put-negative-routes
+/tmp-*
 /tmp/
 
 # next.js
 /.next/
+/.next-e2e/
 /.next-manual-browser/
 /.next-real-import/
 /.next-api-v1-put-negative/
@@ -81,3 +85,6 @@ logs/
 docs/private/
 /prompt-exports/
 /tmp-locked-field-guard-test
+
+# Test fixture DB is intentionally tracked (read via #filePath by the SQLite store tests)
+!native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db

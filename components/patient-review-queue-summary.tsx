@@ -1,30 +1,36 @@
 'use client';
 
 /* WUL-262 compact "cosa rivedere adesso" summary for patient detail.
-   Thin renderer over lib/patient-review-queue-summary: every row anchors to an
+   Thin renderer over lib/domain/documents/patient-review-queue-summary: every row anchors to an
    existing panel (or states explicitly why the panel is not visible) without
    duplicating panel content. */
 
 import { ListChecks } from 'lucide-react';
 
+import { Badge, type BadgePalette } from '@/components/ui/badge';
 import type {
     PatientReviewQueueRow,
     PatientReviewQueueSummary,
     ReviewQueueRowState,
-} from '@/lib/patient-review-queue-summary';
+} from '@/lib/domain/documents/patient-review-queue-summary';
 
 interface PatientReviewQueueSummaryProps {
     summary: PatientReviewQueueSummary;
+    /* @Codex WUL-UIUX: senza card e header propri, per vivere dentro una
+       CollapsibleSection che fornisce gia superficie e intestazione. */
+    embedded?: boolean;
 }
 
-const STATE_CHIP_CLASSES: Record<ReviewQueueRowState, string> = {
-    'da-rivedere': 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-900/20 dark:text-amber-300',
-    'bloccato': 'border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-950/20 dark:text-red-300',
-    'serve-testo': 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-950/20 dark:text-blue-300',
-    'pronto-da-applicare': 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-950/20 dark:text-emerald-300',
-    'gia-applicato': 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300',
-    'disponibile': 'border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300',
-    'vuoto': 'border-dashed border-slate-300 bg-transparent text-slate-500 dark:border-white/15 dark:text-slate-400',
+/* @Codex WUL-UIUX (STREAM W2-B): le sette tinte legacy mappate 1:1 sulla
+   dimensione `palette` di Badge (stessa resa, dark-mode inclusa). */
+const STATE_PALETTE: Record<ReviewQueueRowState, BadgePalette> = {
+    'da-rivedere': 'amber',
+    'bloccato': 'red',
+    'serve-testo': 'blue',
+    'pronto-da-applicare': 'emerald',
+    'gia-applicato': 'slate',
+    'disponibile': 'slate-plain',
+    'vuoto': 'dashed',
 };
 
 function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
@@ -36,9 +42,9 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-[color:var(--mf-ink)]">{row.panelLabel}</span>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATE_CHIP_CLASSES[row.state]}`}>
+                    <Badge palette={STATE_PALETTE[row.state]} size="xs">
                         {row.stateLabel}
-                    </span>
+                    </Badge>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">{row.detail}</p>
                 {row.blockedReason ? (
@@ -64,7 +70,17 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
     );
 }
 
-export default function PatientReviewQueueSummaryPanel({ summary }: PatientReviewQueueSummaryProps) {
+export default function PatientReviewQueueSummaryPanel({ summary, embedded = false }: PatientReviewQueueSummaryProps) {
+    if (embedded) {
+        return (
+            <ul className="grid gap-2" data-testid="patient-review-queue-summary">
+                {summary.rows.map((row) => (
+                    <ReviewQueueRow key={row.id} row={row} />
+                ))}
+            </ul>
+        );
+    }
+
     return (
         <section
             id="coda-revisione"

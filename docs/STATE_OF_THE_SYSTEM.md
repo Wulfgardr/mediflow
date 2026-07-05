@@ -17,7 +17,7 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-06-16 (`v0.7.0` mainline)
+Ultimo aggiornamento: 2026-07-03 (`v0.7.1` mainline)
 
 ---
 
@@ -26,9 +26,9 @@ Ultimo aggiornamento: 2026-06-16 (`v0.7.0` mainline)
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.
 Lo stato corrente non va letto come una semplice web app con AI aggiunta: e un
 sistema locale ibrido in cui il Mac resta il nodo autorevole, il database e
-SQLite cifrato, la web app e la superficie primaria, i client Apple futuri si
-appoggiano a contratti locali versionati e ogni integrazione esterna resta
-dentro boundary documentati.
+SQLite locale con campi clinici sensibili cifrati lato client, la web app e la
+superficie primaria, la family Apple/native cresce sopra contratti locali
+versionati e ogni integrazione esterna resta dentro boundary documentati.
 
 La fotografia corrente e questa:
 
@@ -37,9 +37,12 @@ La fotografia corrente e questa:
   selector o preview profiles persistiti. Kree8 resta ispirazione visuale
   esterna e grammatica di riferimento, non un prodotto MediFlow a se.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
-  server via Drizzle e cifratura client-side dei campi clinici.
-- **Sicurezza di default**: local-only, zero-knowledge a riposo, nessun cloud o
-  telemetry default-on.
+  server via Drizzle e cifratura client-side dei campi clinici sensibili.
+- **Sicurezza di default**: local-only, campi clinici sensibili cifrati lato
+  client, nessun cloud o telemetry default-on. Il claim pubblico non deve
+  descrivere l'intero file SQLite come completamente zero-knowledge finché
+  identificativi, metadati e backup non sono coperti dallo stesso perimetro
+  verificato.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
@@ -48,11 +51,12 @@ La fotografia corrente e questa:
   modalita e disattivata i pairing restano salvati ma i token dei client paired
   diventano inerti: il data plane risponde `403 NETWORK_MODE_DISABLED` finche
   la modalita non viene riattivata.
-- **Mac Apple shell**: il bundle macOS apre ora Apple Foundation/home-base come
-  superficie primaria, mostra readiness runtime locale e puo gestire
+- **Apple/native**: macOS e il fronte nativo piu maturo. Il bundle Apple/home-base
+  apre la shell condivisa, mostra readiness runtime locale e puo gestire
   esplicitamente backend web production e proxy TLS con stop bounded/escalation.
-  Ollama e Docker/ICD sono solo health diagnostico read-only quando gia attivi;
-  il prototype oncologico e separato e non definisce MediFlow prodotto.
+  `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
+  clinical scales e store SQLite locale; Linux e Windows oggi verificano la
+  portabilita del core in CI, non una parity applicativa completa.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
@@ -70,7 +74,9 @@ La fotografia corrente e questa:
   integrazione regionale nativa certificata dichiarata senza `SSI/A2A` e scenari
   approvati.
 - **OSS**: la repo pubblica deve restare prodotto-centrica, senza materiale
-  interno di coordinamento, attribuzione agentica, piani privati o runtime data.
+  interno di coordinamento, analisi, piani privati o runtime data. I crediti
+  pubblici agli strumenti di sviluppo assistito restano ammessi se separati dai
+  materiali operativi interni.
 
 ---
 
@@ -208,9 +214,9 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | WUL-192 | Entry point del bundle macOS: shell Apple/home-base con pannello runtime, start/stop esplicito di backend web production e proxy TLS, stop bounded/escalation, health diagnostico read-only per Ollama e Docker/ICD | Rebuild controllato, firma/notarizzazione esplicite, Ollama/Docker non app-managed |
-| macOS storico | Snapshot congelato | Riferimento di parity e compat, non base del prossimo sviluppo | Non rilanciare come shell prodotto |
-| iPhone/iPad | Slice `v0.6.0` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
+| macOS Apple shell | `v0.7.1` | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel, Vetro Clinico/Liquid Glass e store locale verificabile | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| `MediFlowCore` tri-OS | `v0.7.1` | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
+| iPhone/iPad | `v0.7.1` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost; OCR primario |
 | Apple Vision OCR | macOS-only fallback | Seconda lettura locale quando DeepSeek/Ollama OCR restituisce output blank/low-signal | Solo macOS, nessun equivalente certificato Windows/Linux |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
@@ -502,11 +508,13 @@ Fuori scope:
 - scraping aggressivo;
 - bypass di autenticazioni o vincoli regionali.
 
-### 7.5 Apple/native
+### 7.5 Apple/native e tri-OS
 
 Disponibile:
 
-- bundle macOS home-base packaged e shell macOS storica come snapshot/parity;
+- macOS come fronte nativo piu maturo: shell Apple/home-base, workspace
+  paziente, runtime panel e store locale verificabile;
+- `MediFlowCore` condiviso e testato su macOS, Linux e Windows;
 - contratto `/api/v1`;
 - TLS proxy locale;
 - runbook native/testing/parity;
@@ -515,7 +523,7 @@ Disponibile:
 
 Direzione:
 
-- shared core Swift;
+- app Windows/Linux e launcher dedicati oltre il core;
 - parity non-AI tramite API;
 - cache locale cifrata derivata e riconciliazione esplicita.
 

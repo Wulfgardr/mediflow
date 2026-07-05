@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // --- Users (Auth) ---
@@ -52,6 +52,9 @@ export const patients = sqliteTable('patients', {
     statusReason: text('status_reason'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
+    // Ciclo di vita dell'insight (S1): quando generato + hash del contesto clinico.
+    aiSummaryGeneratedAt: integer('ai_summary_generated_at', { mode: 'timestamp' }),
+    aiSummaryContextHash: text('ai_summary_context_hash'),
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
@@ -63,7 +66,11 @@ export const patients = sqliteTable('patients', {
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): secondary indices mirror the runtime guards in db-server.ts.
+    deletedIdx: index('patients_deleted_idx').on(t.deletedAt),
+    lastNameIdx: index('patients_last_name_idx').on(t.lastName),
+}));
 
 // --- Patient <-> Ambulatory (Many-to-Many) ---
 export const patientsToAmbulatories = sqliteTable('patients_to_ambulatories', {
@@ -98,7 +105,11 @@ export const entries = sqliteTable('entries', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    patientIdx: index('entries_patient_idx').on(t.patientId),
+    patientDeletedIdx: index('entries_patient_deleted_idx').on(t.patientId, t.deletedAt),
+}));
 
 // --- Therapies ---
 export const therapies = sqliteTable('therapies', {
@@ -130,7 +141,11 @@ export const therapies = sqliteTable('therapies', {
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     /* @Codex */
     deletionReason: text('deletion_reason'),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    patientIdx: index('therapies_patient_idx').on(t.patientId),
+    patientDeletedIdx: index('therapies_patient_deleted_idx').on(t.patientId, t.deletedAt),
+}));
 
 /* @Codex */
 export const observations = sqliteTable('observations', {
@@ -145,6 +160,11 @@ export const observations = sqliteTable('observations', {
     notes: text('notes'),
     observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
     source: text('source').default('manual'),
+    // S6: range di riferimento. refLow/refHigh solo se numerici, refText per range
+    // grezzi/qualitativi ("< 200", "Negativo"). Non cifrati (metadati come value).
+    refLow: text('ref_low'),
+    refHigh: text('ref_high'),
+    refText: text('ref_text'),
     /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -154,7 +174,12 @@ export const observations = sqliteTable('observations', {
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     /* @Codex */
     deletionReason: text('deletion_reason'),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    patientIdx: index('observations_patient_idx').on(t.patientId),
+    codeIdx: index('observations_code_idx').on(t.codeSystem, t.code),
+    patientDeletedIdx: index('observations_patient_deleted_idx').on(t.patientId, t.deletedAt),
+}));
 
 /* @Codex */
 export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
@@ -281,7 +306,11 @@ export const checkups = sqliteTable('checkups', {
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     /* @Codex */
     deletionReason: text('deletion_reason'),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    patientIdx: index('checkups_patient_idx').on(t.patientId),
+    patientDeletedIdx: index('checkups_patient_deleted_idx').on(t.patientId, t.deletedAt),
+}));
 
 // --- Conversations (AI Chat) ---
 export const conversations = sqliteTable('conversations', {
@@ -304,7 +333,10 @@ export const messages = sqliteTable('messages', {
     attachmentType: text('attachment_type'),
     attachmentBase64: text('attachment_base64'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    conversationIdx: index('messages_conversation_idx').on(t.conversationId),
+}));
 
 // --- Settings ---
 export const settings = sqliteTable('settings', {
@@ -347,7 +379,10 @@ export const attachments = sqliteTable('attachments', {
     ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
     ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-});
+}, (t) => ({
+    // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
+    patientIdx: index('attachments_patient_idx').on(t.patientId),
+}));
 
 // --- AIFA Drugs (Local Cache) ---
 export const drugs = sqliteTable('drugs', {

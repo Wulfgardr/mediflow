@@ -4,7 +4,7 @@ import { desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 /* @Codex */
 function normalizeType(value: unknown): 'live' | 'test' | null {

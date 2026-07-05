@@ -1,7 +1,15 @@
 /* @Codex */
+import {
+    assertAiLaneEnabledValue,
+    isAiLaneEnabledValue,
+    resolveAiLaneKillSwitchState,
+    serializeAiLaneKillSwitchState,
+    type AiLaneKillSwitchState,
+} from './ai-lane-kill-switch';
+
 export const AI_SMART_IMPORT_KILL_SWITCH_KEY = 'aiSmartImportKillSwitch';
 
-export type AiSmartImportKillSwitchState = 'enabled' | 'disabled';
+export type AiSmartImportKillSwitchState = AiLaneKillSwitchState;
 
 export class AiSmartImportDisabledError extends Error {
     constructor() {
@@ -11,23 +19,17 @@ export class AiSmartImportDisabledError extends Error {
 }
 
 export function resolveAiSmartImportKillSwitchState(value: unknown): AiSmartImportKillSwitchState {
-    if (value === 'enabled' || value === true || value === 'true' || value === 1 || value === '1') {
-        return 'enabled';
-    }
-
-    return 'disabled';
+    return resolveAiLaneKillSwitchState(value);
 }
 
 export function isAiSmartImportEnabledValue(value: unknown): boolean {
-    return resolveAiSmartImportKillSwitchState(value) === 'enabled';
+    return isAiLaneEnabledValue(value);
 }
 
 export function serializeAiSmartImportKillSwitchState(enabled: boolean): AiSmartImportKillSwitchState {
-    return enabled ? 'enabled' : 'disabled';
+    return serializeAiLaneKillSwitchState(enabled);
 }
 
 export function assertAiSmartImportEnabledValue(value: unknown): void {
-    if (!isAiSmartImportEnabledValue(value)) {
-        throw new AiSmartImportDisabledError();
-    }
+    assertAiLaneEnabledValue(value, () => new AiSmartImportDisabledError());
 }

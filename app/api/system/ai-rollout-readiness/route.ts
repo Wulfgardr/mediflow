@@ -1,6 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { requireSession, unauthorizedResponse } from '@/lib/server-auth';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { inArray } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';

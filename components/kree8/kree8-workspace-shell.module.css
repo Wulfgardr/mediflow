@@ -23,10 +23,12 @@
   --k8-pill-critical-fg: #9a3412;
   --k8-primary-bg: #0f172a;
   --k8-primary-fg: #ffffff;
-  --k8-accent: #2563eb;
-  --k8-accent-soft: #dbeafe;
-  --k8-accent-line: rgba(37, 99, 235, 0.18);
-  --k8-focus: rgba(37, 99, 235, 0.34);
+  /* @Codex WUL-UIUX: accent e focus allineati allo slate del focus ring globale
+     (rgba(15, 23, 42, ...)): un solo colore di focus per pagina. */
+  --k8-accent: #334155;
+  --k8-accent-soft: rgba(15, 23, 42, 0.07);
+  --k8-accent-line: rgba(15, 23, 42, 0.18);
+  --k8-focus: rgba(15, 23, 42, 0.34);
   --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
   --mf-ink: var(--k8-ink);
   --mf-muted: var(--k8-muted);
@@ -42,7 +44,7 @@
   padding: 14px;
   background: var(--k8-canvas);
   color: var(--k8-ink);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--mf-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -68,10 +70,10 @@
   --k8-pill-critical-fg: #fecaca;
   --k8-primary-bg: #e2e8f0;
   --k8-primary-fg: #020617;
-  --k8-accent: #93c5fd;
-  --k8-accent-soft: rgba(59, 130, 246, 0.18);
-  --k8-accent-line: rgba(147, 197, 253, 0.28);
-  --k8-focus: rgba(147, 197, 253, 0.42);
+  --k8-accent: #cbd5e1;
+  --k8-accent-soft: rgba(148, 163, 184, 0.16);
+  --k8-accent-line: rgba(203, 213, 225, 0.28);
+  --k8-focus: rgba(203, 213, 225, 0.42);
   --k8-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
 }
 
@@ -266,6 +268,19 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--k8-subtle);
+}
+
+/* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
+   piu marcato, cosi su una Scheda lunga si vede dove si e. */
+.sectionLink[aria-current='location'] {
+  border-color: var(--k8-accent-line);
+  background: var(--k8-control-bg);
+  color: var(--k8-ink);
+  font-weight: 700;
+}
+
+.sectionLink[aria-current='location'] small {
+  color: var(--k8-ink);
 }
 
 .workspaceBody,

@@ -1,7 +1,15 @@
 /* @Codex */
+import {
+    assertAiLaneEnabledValue,
+    isAiLaneEnabledValue,
+    resolveAiLaneKillSwitchState,
+    serializeAiLaneKillSwitchState,
+    type AiLaneKillSwitchState,
+} from './ai-lane-kill-switch';
+
 export const AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY = 'aiDocumentSynthesisKillSwitch';
 
-export type AiDocumentSynthesisKillSwitchState = 'enabled' | 'disabled';
+export type AiDocumentSynthesisKillSwitchState = AiLaneKillSwitchState;
 
 export class AiDocumentSynthesisDisabledError extends Error {
     constructor() {
@@ -11,23 +19,17 @@ export class AiDocumentSynthesisDisabledError extends Error {
 }
 
 export function resolveAiDocumentSynthesisKillSwitchState(value: unknown): AiDocumentSynthesisKillSwitchState {
-    if (value === 'enabled' || value === true || value === 'true' || value === 1 || value === '1') {
-        return 'enabled';
-    }
-
-    return 'disabled';
+    return resolveAiLaneKillSwitchState(value);
 }
 
 export function isAiDocumentSynthesisEnabledValue(value: unknown): boolean {
-    return resolveAiDocumentSynthesisKillSwitchState(value) === 'enabled';
+    return isAiLaneEnabledValue(value);
 }
 
 export function serializeAiDocumentSynthesisKillSwitchState(enabled: boolean): AiDocumentSynthesisKillSwitchState {
-    return enabled ? 'enabled' : 'disabled';
+    return serializeAiLaneKillSwitchState(enabled);
 }
 
 export function assertAiDocumentSynthesisEnabledValue(value: unknown): void {
-    if (!isAiDocumentSynthesisEnabledValue(value)) {
-        throw new AiDocumentSynthesisDisabledError();
-    }
+    assertAiLaneEnabledValue(value, () => new AiDocumentSynthesisDisabledError());
 }
