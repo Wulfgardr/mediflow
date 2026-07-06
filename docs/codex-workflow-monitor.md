@@ -26,6 +26,8 @@ Il monitor legge solo metadati:
 - branch Git e issue id nel nome branch;
 - path modificati da `git status` e `git diff --name-only main...HEAD`;
 - check dichiarati con `--check nome=pass|fail|skip`;
+- eventuale sidecar locale `.codex/workflow-checks.json` (solo branch, SHA breve,
+  timestamp e nome/esito dei check dichiarati);
 - eventuale snapshot precedente del monitor.
 
 Non legge:
@@ -69,6 +71,11 @@ riusare quei check anche in modalita read-only solo se `HEAD`, branch, path e
 dirty state sono invariati e il working tree e pulito. Qualunque nuovo edit o
 commit li invalida.
 
+Ordine di precedenza nella risoluzione dei check: `--check` espliciti da CLI,
+poi dichiarazioni persistite nel sidecar (vedi sotto), poi riuso dello snapshot
+precedente. Il verdetto espone la provenienza in `checksSource`
+(`cli`, `persisted`, `previous-snapshot`, `none`).
+
 Snapshot salvato fuori repo:
 
 ```bash
@@ -82,6 +89,60 @@ Stato ultimo snapshot:
 
 ```bash
 npm run workflow-monitor -- status
+```
+
+## Persistenza delle dichiarazioni di verifica
+
+I `--check` passati da CLI valgono solo per il singolo run. Per far vedere la
+stessa verifica anche ai run schedulati (LaunchAgent o `watch`), che girano
+senza hint, aggiungi `--persist-checks` al run manuale:
+
+```bash
+npm run workflow-monitor -- --once --json \
+  --check prepare-oss=pass \
+  --persist-checks
+```
+
+La dichiarazione viene salvata in `.codex/workflow-checks.json` nella radice
+del worktree, una entry per branch. I run successivi senza `--check` la
+rileggono e la applicano con `checksSource: "persisted"` nel verdetto.
+
+Regole di validita:
+
+- la dichiarazione e legata al branch e allo SHA di `HEAD` al momento del run:
+  un nuovo commit, amend o rebase la invalida automaticamente;
+- viene salvata solo se il working tree e pulito; con modifiche non committate
+  il persist viene saltato (`checksPersistence: {status: "skipped",
+  reason: "dirty-tree"}`) perche lo SHA da solo non identifica il contenuto.
+  Flusso consigliato: commit, poi verifica, poi dichiarazione;
+- viene riletta solo se il working tree e pulito: nuovi edit non committati
+  riportano il verdetto a `tests_not_declared`;
+- i `--check` espliciti da CLI hanno sempre precedenza;
+- anche gli esiti `fail` e `skip` vengono persistiti: un `fail` dichiarato
+  continua a produrre `blocked` finche non arriva un nuovo commit o un
+  `clear-checks`.
+
+Il sidecar e git-ignorato di proposito, non committabile: la dichiarazione e
+legata allo SHA di `HEAD`, quindi committarla cambierebbe lo SHA stesso e la
+invaliderebbe; inoltre e stato locale della macchina, non parte del codice, e
+se comparisse in `git status` sporcherebbe il dirty state osservato dal monitor
+stesso. Oltre all'entry `/.codex/` in `.gitignore`, il monitor scrive
+`.codex/.gitignore` con `*`, cosi il sidecar resta invisibile a `git status`
+anche su branch piu vecchi che non hanno ancora l'entry di root.
+
+Contenuto del sidecar: solo metadati (branch, SHA breve, timestamp, nome ed
+esito dei check). Nessun contenuto diff, nessun dato clinico.
+
+Opt-out della lettura per un singolo run:
+
+```bash
+npm run workflow-monitor -- --once --no-persisted-checks
+```
+
+Rimozione della dichiarazione del branch corrente:
+
+```bash
+npm run workflow-monitor -- clear-checks
 ```
 
 ## Automazione macOS
@@ -154,6 +215,11 @@ npm run test:workflow-monitor
 npm run workflow-monitor -- --once --json --expected-issue WUL-283 \
   --check test:workflow-monitor=pass
 ```
+
+La suite copre anche la persistenza: un test end-to-end crea un repo Git
+temporaneo, dichiara un check con `--persist-checks`, verifica che il run
+successivo senza hint lo riusi (`checksSource: "persisted"`) e che un nuovo
+commit o `clear-checks` lo facciano scadere.
 
 Complexity check: not applicable. Il monitor non e un hot path runtime e non
 tocca query, rendering o cicli su dati clinici.

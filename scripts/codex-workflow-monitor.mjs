@@ -14,6 +14,11 @@ const DEFAULT_MODEL = "batiai/gemma4-e4b:q4";
 const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 const LAUNCH_AGENT_LABEL = "com.mediflow.workflow-monitor";
 const MAX_SNAPSHOTS_JSONL_BYTES = 10 * 1024 * 1024;
+const CHECKS_SIDECAR_DIR = ".codex";
+const CHECKS_SIDECAR_FILENAME = "workflow-checks.json";
+const CHECKS_SIDECAR_VERSION = 1;
+const MAX_CHECKS_SIDECAR_BYTES = 64 * 1024;
+const MAX_PERSISTED_CHECKS = 32;
 
 function defaultStateDir() {
   if (process.platform === "darwin") {
@@ -27,14 +32,18 @@ function usage() {
 
 Usage:
   npm run workflow-monitor -- --once [--json] [--write] [--check lint=pass]
+  npm run workflow-monitor -- --once --check lint=pass --persist-checks
   npm run workflow-monitor -- watch [--interval-seconds 300] [--quiet]
   npm run workflow-monitor -- status [--json]
+  npm run workflow-monitor -- clear-checks
   npm run workflow-monitor -- install-launch-agent [--launch-interval-seconds 300]
   npm run workflow-monitor -- install-global-runner [--launch-interval-seconds 300]
   npm run workflow-monitor -- uninstall-launch-agent
 
 Privacy boundary:
   Reads Git metadata only: branch, status paths, changed path names and explicit check results.
+  The optional sidecar ${CHECKS_SIDECAR_DIR}/${CHECKS_SIDECAR_FILENAME} stores metadata only:
+  branch, short HEAD sha, timestamp and declared check names/statuses.
   Does not read diff contents, SQLite, docs/private contents, mail, attachments or patient data.
 
 Options:
@@ -42,6 +51,9 @@ Options:
   --state-dir <path>                    Snapshot directory. Defaults to Application Support.
   --expected-issue <WUL-123>            Optional guard for the intended issue.
   --check <name=pass|fail|skip>         Repeatable verification hints.
+  --persist-checks                      Persist --check declarations per branch, bound to the current HEAD sha.
+                                        Requires a clean working tree. Scheduled runs without --check reuse them.
+  --no-persisted-checks                 Ignore persisted check declarations for this run.
   --model-mode <off|auto|always>        Local Ollama digest mode. Defaults to env or off.
   --model <ollama-model>                Defaults to ${DEFAULT_MODEL}.
   --ollama-url <url>                    Defaults to ${DEFAULT_OLLAMA_URL}.
@@ -62,6 +74,8 @@ export function parseArgs(argv) {
     stateDir: process.env.MEDIFLOW_WORKFLOW_MONITOR_STATE_DIR || defaultStateDir(),
     expectedIssue: process.env.MEDIFLOW_WORKFLOW_MONITOR_EXPECTED_ISSUE || "",
     checks: {},
+    persistChecks: false,
+    usePersistedChecks: true,
     json: false,
     quiet: false,
     write: false,
@@ -95,6 +109,10 @@ export function parseArgs(argv) {
       if (!parsed) throw new Error("--check must use name=pass|fail|skip");
       options.checks[parsed.name] = parsed.status;
       index += 1;
+    } else if (arg === "--persist-checks") {
+      options.persistChecks = true;
+    } else if (arg === "--no-persisted-checks") {
+      options.usePersistedChecks = false;
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "--quiet") {
@@ -158,6 +176,7 @@ function runGit(repoRoot, args, fallback = "", options = {}) {
 
 function collectGitSnapshot(repoRoot) {
   const root = path.resolve(repoRoot);
+  const toplevel = runGit(root, ["rev-parse", "--show-toplevel"], root);
   const branch = runGit(root, ["rev-parse", "--abbrev-ref", "HEAD"], "unknown");
   const upstream = runGit(root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], "");
   const statusOutput = runGit(root, ["status", "--porcelain=v1"], "", { trim: false });
@@ -170,6 +189,7 @@ function collectGitSnapshot(repoRoot) {
 
   return {
     root,
+    toplevel,
     branch,
     branchIssue,
     upstream,
@@ -487,16 +507,163 @@ function buildWorkflowSignature(verdict) {
     .slice(0, 16);
 }
 
-export function resolveEffectiveChecks(preliminaryVerdict, explicitChecks, previousVerdict = null) {
-  if (Object.keys(explicitChecks || {}).length > 0) return explicitChecks;
+export function resolveChecksWithProvenance(preliminaryVerdict, explicitChecks, previousVerdict = null, persistedDeclaration = null) {
+  if (Object.keys(explicitChecks || {}).length > 0) {
+    return { checks: explicitChecks, source: "cli" };
+  }
+  if (
+    persistedDeclaration
+    && preliminaryVerdict.changeSummary.dirtyCount === 0
+    && persistedDeclaration.branch === preliminaryVerdict.repo.branch
+    && persistedDeclaration.headRef === preliminaryVerdict.repo.headRef
+    && Object.keys(persistedDeclaration.checks || {}).length > 0
+  ) {
+    return {
+      checks: persistedDeclaration.checks,
+      source: "persisted",
+      declaredAt: persistedDeclaration.declaredAt || "",
+    };
+  }
   if (
     preliminaryVerdict.changeSummary.dirtyCount === 0
     && previousVerdict?.changeSignature === preliminaryVerdict.changeSignature
     && previousVerdict?.checks
+    && Object.keys(previousVerdict.checks).length > 0
   ) {
-    return previousVerdict.checks;
+    return { checks: previousVerdict.checks, source: "previous-snapshot" };
   }
-  return {};
+  return { checks: {}, source: "none" };
+}
+
+export function resolveEffectiveChecks(preliminaryVerdict, explicitChecks, previousVerdict = null) {
+  return resolveChecksWithProvenance(preliminaryVerdict, explicitChecks, previousVerdict, null).checks;
+}
+
+export function checksSidecarPath(repoRoot) {
+  return path.join(repoRoot, CHECKS_SIDECAR_DIR, CHECKS_SIDECAR_FILENAME);
+}
+
+export function sanitizePersistedChecks(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const checks = {};
+  for (const [name, status] of Object.entries(value)) {
+    if (Object.keys(checks).length >= MAX_PERSISTED_CHECKS) break;
+    const cleanName = String(name).trim();
+    const cleanStatus = String(status).toLowerCase();
+    if (!cleanName || cleanName.length > 100) continue;
+    if (!["pass", "fail", "skip"].includes(cleanStatus)) continue;
+    checks[cleanName] = cleanStatus;
+  }
+  return checks;
+}
+
+export function selectPersistedDeclaration(fileData, snapshot) {
+  if (!fileData || typeof fileData !== "object" || fileData.version !== CHECKS_SIDECAR_VERSION) return null;
+  const declarations = fileData.declarations;
+  if (!declarations || typeof declarations !== "object") return null;
+  const entry = declarations[snapshot.branch];
+  if (!entry || typeof entry !== "object") return null;
+  if (!entry.headRef || entry.headRef !== snapshot.headRef) return null;
+  const checks = sanitizePersistedChecks(entry.checks);
+  if (Object.keys(checks).length === 0) return null;
+  return {
+    branch: snapshot.branch,
+    headRef: entry.headRef,
+    declaredAt: typeof entry.declaredAt === "string" ? entry.declaredAt : "",
+    checks,
+  };
+}
+
+export function upsertPersistedDeclaration(fileData, declaration) {
+  const base = fileData?.version === CHECKS_SIDECAR_VERSION && fileData.declarations && typeof fileData.declarations === "object"
+    ? fileData.declarations
+    : {};
+  return {
+    version: CHECKS_SIDECAR_VERSION,
+    declarations: {
+      ...base,
+      [declaration.branch]: {
+        headRef: declaration.headRef,
+        declaredAt: declaration.declaredAt,
+        checks: declaration.checks,
+      },
+    },
+  };
+}
+
+export function removePersistedDeclaration(fileData, branch) {
+  const base = fileData?.version === CHECKS_SIDECAR_VERSION && fileData.declarations && typeof fileData.declarations === "object"
+    ? { ...fileData.declarations }
+    : {};
+  if (!(branch in base)) {
+    return { data: { version: CHECKS_SIDECAR_VERSION, declarations: base }, removed: false };
+  }
+  delete base[branch];
+  return { data: { version: CHECKS_SIDECAR_VERSION, declarations: base }, removed: true };
+}
+
+export function readChecksSidecar(repoRoot) {
+  const filePath = checksSidecarPath(repoRoot);
+  try {
+    const stats = fs.statSync(filePath);
+    if (!stats.isFile() || stats.size > MAX_CHECKS_SIDECAR_BYTES) return null;
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeChecksSidecar(repoRoot, data) {
+  const filePath = checksSidecarPath(repoRoot);
+  const dirPath = path.dirname(filePath);
+  fs.mkdirSync(dirPath, { recursive: true });
+  const selfIgnorePath = path.join(dirPath, ".gitignore");
+  if (!fs.existsSync(selfIgnorePath)) {
+    fs.writeFileSync(selfIgnorePath, "*\n");
+  }
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpPath, `${JSON.stringify(data, null, 2)}\n`);
+  fs.renameSync(tmpPath, filePath);
+}
+
+export function persistDeclaredChecks(snapshot, checks) {
+  const checksToPersist = sanitizePersistedChecks(checks);
+  if (Object.keys(checksToPersist).length === 0) return { status: "skipped", reason: "no-cli-checks" };
+  if (snapshot.onMain) return { status: "skipped", reason: "on-main" };
+  if (!snapshot.branch || snapshot.branch === "unknown") return { status: "skipped", reason: "unknown-branch" };
+  if (!snapshot.headRef) return { status: "skipped", reason: "no-head" };
+  if ((snapshot.statusFiles || []).length > 0) return { status: "skipped", reason: "dirty-tree" };
+
+  const repoRoot = snapshot.toplevel || snapshot.root;
+  const declaration = {
+    branch: snapshot.branch,
+    headRef: snapshot.headRef,
+    declaredAt: new Date().toISOString(),
+    checks: checksToPersist,
+  };
+  writeChecksSidecar(repoRoot, upsertPersistedDeclaration(readChecksSidecar(repoRoot), declaration));
+  return {
+    status: "written",
+    path: checksSidecarPath(repoRoot),
+    branch: snapshot.branch,
+    headRef: snapshot.headRef,
+    checks: checksToPersist,
+  };
+}
+
+function clearPersistedChecksForBranch(repoRoot) {
+  const root = path.resolve(repoRoot);
+  const toplevel = runGit(root, ["rev-parse", "--show-toplevel"], root);
+  const branch = runGit(root, ["rev-parse", "--abbrev-ref", "HEAD"], "unknown");
+  const { data, removed } = removePersistedDeclaration(readChecksSidecar(toplevel), branch);
+  if (removed) {
+    if (Object.keys(data.declarations).length === 0) {
+      fs.rmSync(checksSidecarPath(toplevel), { force: true });
+    } else {
+      writeChecksSidecar(toplevel, data);
+    }
+  }
+  return { branch, removed, path: checksSidecarPath(toplevel) };
 }
 
 function buildModelInput(verdict) {
@@ -604,6 +771,16 @@ function renderMarkdown(verdict) {
     `Branch: ${verdict.repo.branch || "unknown"}`,
     `Issue: ${verdict.repo.branchIssue || "none"}`,
     `Decision: ${verdict.decision.status} (${verdict.decision.severity})`,
+  ];
+  if (Object.keys(verdict.checks || {}).length > 0) {
+    const declaredAt = verdict.persistedChecks?.declaredAt ? `, declared ${verdict.persistedChecks.declaredAt}` : "";
+    lines.push(`Checks: ${JSON.stringify(verdict.checks)} (source: ${verdict.checksSource || "cli"}${declaredAt})`);
+  }
+  if (verdict.checksPersistence) {
+    const reason = verdict.checksPersistence.reason ? ` (${verdict.checksPersistence.reason})` : "";
+    lines.push(`Check persistence: ${verdict.checksPersistence.status}${reason}`);
+  }
+  lines.push(
     "",
     "## Reasons",
     ...verdict.decision.reasons.map((reason) => `- ${reason}`),
@@ -624,7 +801,7 @@ function renderMarkdown(verdict) {
     "- Diff contents read: no",
     "- Clinical DB read: no",
     "- Mail/private document contents read: no",
-  ];
+  );
   if (verdict.localModelDigest) {
     lines.push("", "## Local Model Digest", "", `Status: ${verdict.localModelDigest.status}`);
     if (verdict.localModelDigest.digest) {
@@ -670,11 +847,22 @@ async function runOnce(options) {
     expectedIssue: options.expectedIssue,
     checks: {},
   });
-  const effectiveChecks = resolveEffectiveChecks(preliminaryVerdict, options.checks, previousVerdict);
+  const sidecarRoot = snapshot.toplevel || snapshot.root;
+  const persistedDeclaration = options.usePersistedChecks
+    ? selectPersistedDeclaration(readChecksSidecar(sidecarRoot), snapshot)
+    : null;
+  const resolved = resolveChecksWithProvenance(preliminaryVerdict, options.checks, previousVerdict, persistedDeclaration);
   let verdict = evaluateSnapshot(snapshot, {
     expectedIssue: options.expectedIssue,
-    checks: effectiveChecks,
+    checks: resolved.checks,
   });
+  verdict.checksSource = resolved.source;
+  if (resolved.source === "persisted") {
+    verdict.persistedChecks = { declaredAt: resolved.declaredAt, headRef: snapshot.headRef };
+  }
+  if (options.persistChecks) {
+    verdict.checksPersistence = persistDeclaredChecks(snapshot, options.checks);
+  }
   verdict = await attachLocalModelDigest(verdict, options, previousVerdict);
 
   if (options.write) {
@@ -868,6 +1056,11 @@ async function main() {
       }
       if (options.json) console.log(JSON.stringify(last, null, 2));
       else process.stdout.write(renderMarkdown(last));
+      return;
+    }
+    if (options.command === "clear-checks") {
+      const result = clearPersistedChecksForBranch(options.repo);
+      if (!options.quiet) console.log(JSON.stringify(result, null, 2));
       return;
     }
     if (options.command === "install-launch-agent") {
