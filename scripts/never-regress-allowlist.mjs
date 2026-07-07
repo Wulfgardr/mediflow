@@ -84,6 +84,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/athena-model-identity.ts',
+            pattern: 'https://huggingface\\.co/mims-harvard/ATHENA-R1-Qwen3-8B',
+            reason: 'The ATHENA model card URL is provenance documentation inside a comment; the MLX runtime resolves only pre-downloaded local artifacts and never performs network egress.',
+        },
+        {
             path: 'lib/siss-urls.ts',
             pattern: 'https://operatorisiss.servizirl.it/',
             reason: 'The canonical SISS URL registry is an explicit, user-driven integration boundary and is documented as such.',

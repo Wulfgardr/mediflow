@@ -32,6 +32,8 @@ export default function SettingsAiFunctionsPage() {
         setDocumentSynthesisEnabled,
         smartImportEnabled,
         setSmartImportEnabled,
+        treatmentReasoningEnabled,
+        setTreatmentReasoningEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         updateManualInsightConfig,
@@ -295,6 +297,49 @@ export default function SettingsAiFunctionsPage() {
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
                                             style={{ transform: smartImportEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={treatmentReasoningEnabled
+                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
+                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                            data-testid="treatment-reasoning-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Treatment Reasoning</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
+                                        Se spento, il pannello terapie non genera nuove bozze con ATHENA-R1-Qwen3-8B via MLX locale. Le bozze restano consultive, richiedono verifica clinica e non scrivono in scheda.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="treatmentReasoningKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={treatmentReasoningEnabled
+                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-ink)' }
+                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
+                                    >
+                                        {treatmentReasoningEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="treatmentReasoningKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={treatmentReasoningEnabled}
+                                        aria-label="Treatment Reasoning locale"
+                                        onClick={() => setTreatmentReasoningEnabled(!treatmentReasoningEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
+                                        style={{ background: treatmentReasoningEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: treatmentReasoningEnabled ? 'translateX(20px)' : 'translateX(0)' }}
                                         />
                                     </button>
                                 </div>

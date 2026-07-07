@@ -80,6 +80,7 @@
         "report:local-absorption-telemetry": "bash scripts/local-absorption-telemetry.sh",
         "test:local-absorption-telemetry": "node scripts/run-strip-types.mjs --test lib/local-absorption-telemetry.test.ts",
         "test:ai-task-contracts": "node scripts/run-strip-types.mjs --test lib/ai-task-contracts.test.ts",
+        "test:treatment-reasoning": "node scripts/run-strip-types.mjs --test lib/treatment-reasoning-contract.test.ts lib/ai-treatment-reasoning-kill-switch.test.ts lib/treatment-reasoning-context.test.ts lib/treatment-reasoning-service.test.ts lib/athena-mlx-runtime.test.ts scripts/treatment-reasoning-route-boundary.test.mjs",
         "test:report-service": "node scripts/run-strip-types.mjs --test lib/report-service.test.ts",
         "test:fse-validation": "node scripts/run-strip-types.mjs --test lib/fse-validation.test.ts",
         "test:ai-insight-settings": "node scripts/run-strip-types.mjs --test lib/ai-insight-settings.test.ts",
@@ -109,6 +110,7 @@
         "benchmark:patient-insight": "node scripts/run-strip-types.mjs scripts/benchmark-patient-insight.ts",
         "benchmark:evidence-absorption": "bash scripts/evidence-absorption-benchmark.sh",
         "benchmark:smart-import": "node scripts/run-strip-types.mjs scripts/benchmark-smart-import.ts",
+        "benchmark:treatment-reasoning": "node scripts/run-strip-types.mjs scripts/benchmark-treatment-reasoning.ts",
         "benchmark:redaction": "node scripts/run-strip-types.mjs scripts/benchmark-redaction.ts",
         "benchmark:redaction:email": "node scripts/run-strip-types.mjs scripts/benchmark-redaction.ts --corpus scripts/fixtures/redaction-benchmark-email-corpus.json",
         "benchmark:redaction:openmed": "node scripts/run-strip-types.mjs scripts/benchmark-redaction.ts --adapter-module scripts/openmed-redaction-adapter.ts",
@@ -132,6 +134,8 @@
         "benchmark:cloud-comparator": "node scripts/run-strip-types.mjs scripts/cloud-comparator-shadow-eval.ts",
         "validate:ai-rollout-readiness": "node scripts/run-strip-types.mjs scripts/benchmark-rollout-readiness.ts",
         "validate:ai-task-contracts": "node scripts/run-strip-types.mjs scripts/benchmark-ai-task-contracts.ts --validate --min-contract-rate 0.9",
+        "validate:treatment-reasoning": "node scripts/run-strip-types.mjs scripts/benchmark-treatment-reasoning.ts --validate --min-contract-rate 1",
+        "smoke:treatment-reasoning:live": "node scripts/run-strip-types.mjs scripts/treatment-reasoning-live-db-smoke.ts",
         "validate:patient-insight": "node scripts/run-strip-types.mjs scripts/benchmark-patient-insight.ts --validate --models qwen3.5:35b-a3b",
         "validate:evidence-absorption": "bash scripts/evidence-absorption-benchmark.sh --validate",
         "test:cloud-comparator": "node scripts/run-strip-types.mjs --test lib/cloud-comparator-case-pack.test.ts scripts/cloud-comparator-shadow-eval.test.ts",
@@ -167,7 +171,7 @@
         "test:parity:smoke": "bash scripts/parity-smoke.sh",
         "e2e:web": "npx playwright test e2e/web-smoke.spec.ts",
         "e2e:ai-rollout-readiness": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts' bash scripts/e2e-smoke.sh",
-        "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
+        "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
         "e2e:smoke": "bash scripts/e2e-smoke.sh"
     },
     "dependencies": {
