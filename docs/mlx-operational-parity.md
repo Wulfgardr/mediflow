@@ -27,7 +27,7 @@ Questo significa:
 | --- | --- | --- | --- |
 | Runtime app (`lib/ai-service.ts`) | Operativo standard | Non operativo | Differenza intenzionale |
 | Health/status locale | Diagnostica `11434` | Diagnostica `8080/v1/models` | Parity read-only |
-| Config provider native | Supportato | Supportato con fallback esplicito | Parity controllata |
+| Runtime app nativa (WebRuntime bundled, `lib/ai-service.ts`) | Operativo standard | Fallback esplicito verso Ollama | Parity controllata |
 | OCR | Primario locale; fallback Apple Vision solo macOS | Escluso | MLX fuori dalla pipeline OCR deliberatamente |
 | Benchmark `ai-task-contracts` | `ollama_chat` | `mlx_chat` | Parity benchmark |
 | Registry comparativo modelli | Runtime distinto | Runtime distinto | Parity reportistica |
@@ -48,7 +48,8 @@ mantenga i confini operativi dichiarati:
 - runtime applicativo generativo ancora Ollama-only;
 - adapter benchmark simmetrici `ollama_chat` / `mlx_chat`;
 - diagnostica home-base read-only per MLX già attivo;
-- fallback native esplicito verso Ollama;
+- fallback esplicito verso Ollama nel runtime bundled dell'app nativa
+  (`lib/ai-service.ts`; dalla Fase 0 non esiste piu un resolver Swift dedicato);
 - OCR resta Ollama-only per MLX: DeepSeek/Ollama resta primario e Apple Vision
   resta l'unica eccezione macOS-only;
 - OCR primario Ollama/DeepSeek con sola eccezione Apple Vision macOS-only
