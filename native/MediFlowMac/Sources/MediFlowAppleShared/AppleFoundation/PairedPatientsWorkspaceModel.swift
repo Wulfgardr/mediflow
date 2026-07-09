@@ -13,6 +13,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// held only in memory (never @Published, never persisted in clear). nil until
     /// a successful login delivers and unwraps it.
     private var masterKey: SymmetricKey?
+    /// Identity of the operator from the last successful login, kept in memory
+    /// only so the settings profile section can prefill and target
+    /// PUT /api/auth/profile. Cleared wherever session and master key are cleared.
+    struct OperatorIdentity: Equatable {
+        let userId: String
+        let displayName: String?
+        let ambulatoryName: String?
+    }
+    @Published private(set) var operatorIdentity: OperatorIdentity?
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL
     @Published var tlsPin = ""
     @Published var pairedClientId = ""
@@ -484,6 +493,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 password: self.password
             )
             self.sessionCookie = result.sessionCookie
+            self.operatorIdentity = result.id.map {
+                OperatorIdentity(
+                    userId: $0,
+                    displayName: result.displayName,
+                    ambulatoryName: result.ambulatoryName
+                )
+            }
             self.unlockFieldCrypto(with: result, pin: self.password)
             self.resetCatalogAvailability()
             self.statusMessage = self.masterKey == nil
@@ -563,10 +579,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
         sessionCookie = nil
         masterKey = nil
+        operatorIdentity = nil
         connectionState = .sessionExpired
         statusMessage = remoteLogoutConfirmed
             ? "Sessione bloccata. Accedi di nuovo per continuare."
             : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+    }
+
+    /// Keeps the in-memory operator identity aligned after a successful
+    /// PUT /api/auth/profile, so the profile form reopens with saved values.
+    func noteProfileUpdated(displayName: String?, ambulatoryName: String?) {
+        guard let identity = operatorIdentity else { return }
+        operatorIdentity = OperatorIdentity(
+            userId: identity.userId,
+            displayName: displayName,
+            ambulatoryName: ambulatoryName
+        )
     }
 
     /// Derive the field-crypto master key from the operator PIN + the wrapped key
@@ -2516,6 +2544,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             discoveryMessage = nil
             sessionCookie = nil
             masterKey = nil
+            operatorIdentity = nil
             try cacheStore.clear()
             statusMessage = "Configurazione paired rimossa da questo dispositivo."
         } catch {
@@ -3208,6 +3237,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 connectionState = .sessionExpired
                 sessionCookie = nil
                 masterKey = nil
+                operatorIdentity = nil
                 statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
