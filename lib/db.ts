@@ -111,6 +111,8 @@ export interface Patient {
     createdAt: Date;
     deletedAt?: Date;
     deletionReason?: string;
+    archiveReason?: string | null;
+    archiveNote?: string | null;
     aiSummary?: string;
     // Ciclo di vita dell'insight: quando e stato generato e hash deterministico del
     // contesto clinico su cui poggia. Non PHI (id + timestamp), quindi non cifrati.
@@ -192,7 +194,7 @@ export interface SissHandoffEvent {
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
-    patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveNote', 'deletionReason'],
+    patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveReason', 'archiveNote', 'deletionReason'],
     entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes'],
@@ -441,10 +443,13 @@ class ApiTable<T> {
 
         const init: RequestInit = { method: 'DELETE' };
         if (typeof options?.version === 'number' || typeof options?.deletionReason === 'string') {
+            const deletionReason = typeof options?.deletionReason === 'string'
+                ? await this.encryptDeleteField('deletionReason', options.deletionReason)
+                : undefined;
             init.headers = { 'Content-Type': 'application/json' };
             init.body = JSON.stringify({
                 ...(typeof options?.version === 'number' ? { version: options.version } : {}),
-                ...(typeof options?.deletionReason === 'string' ? { deletionReason: options.deletionReason } : {}),
+                ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
             });
         }
 
@@ -628,6 +633,16 @@ class ApiTable<T> {
     }
 
     // --- Encryption Helpers ---
+
+    /* @Codex */
+    private async encryptDeleteField(field: string, value: string): Promise<string> {
+        const fields = ENCRYPTED_FIELDS[this.tableName];
+        const key = this.getMasterKey();
+        if (!fields?.includes(field) || !key || !value) return value;
+
+        const { iv, data } = await encryptData(value, key);
+        return `ENC:${iv}:${data}`;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async encryptItem(item: any, isPartial = false): Promise<any> {

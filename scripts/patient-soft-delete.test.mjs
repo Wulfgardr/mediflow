@@ -30,7 +30,8 @@ test('patient DELETE routes write a version-guarded tombstone instead of a hard 
         assert.doesNotMatch(source, /\.delete\(patients\)/, `${route.file} must not hard-delete patients`);
 
         const deleteBlock = handlerSource(source, 'DELETE');
-        assert.match(deleteBlock, new RegExp(`buildPatientTombstoneValues\\(expectedVersion, '${route.deletionReason}'\\)`), `${route.file} DELETE must tombstone with reason ${route.deletionReason}`);
+        assert.match(deleteBlock, new RegExp(`const deletionReason = parsePatientDeletionReason\\(body, '${route.deletionReason}'\\)`), `${route.file} DELETE must parse the optional delete reason with default ${route.deletionReason}`);
+        assert.match(deleteBlock, /buildPatientTombstoneValues\(expectedVersion, deletionReason\)/, `${route.file} DELETE must tombstone with the parsed reason`);
         assert.match(deleteBlock, /eq\(patients\.version, expectedVersion\)/, `${route.file} DELETE must stay version-guarded`);
         assert.match(deleteBlock, /activePatients\(\)/, `${route.file} DELETE must not re-delete tombstones`);
         assert.match(deleteBlock, /buildPatientVersionConflictPayload\(/, `${route.file} DELETE must keep the 409 payload`);

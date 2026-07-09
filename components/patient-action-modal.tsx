@@ -79,8 +79,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                         <div className="mf-alert mf-alert-critical">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                             <p>
-                                Il paziente verrà spostato nel <strong>Cestino</strong>.
-                                Potrai ripristinarlo entro 30 giorni, dopodiché verrà eliminato definitivamente.
+                                Il paziente verrà spostato nel <strong>Cestino</strong> e potrà essere ripristinato da lì.
                             </p>
                         </div>
                         <div>

@@ -23,6 +23,13 @@ import {
 } from '@/lib/security/audit';
 
 /* @Codex */
+function parsePatientDeletionReason(body: Record<string, unknown>, fallback: string): string | null {
+    if (!Object.prototype.hasOwnProperty.call(body, 'deletionReason')) return fallback;
+    if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) return null;
+    return body.deletionReason;
+}
+
+/* @Codex */
 async function recordPatientAuditEvent(
     request: Request,
     session: Awaited<ReturnType<typeof requireSession>>,
@@ -151,6 +158,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
+        const deletionReason = parsePatientDeletionReason(body, 'web-delete');
+        if (deletionReason === null) {
+            return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
+        }
 
         const existing = await dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
         if (!existing) {
@@ -161,7 +172,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         // stay linked for the audited admin purge. Wire contract unchanged.
         const deleteResult = await dbServer
             .update(patients)
-            .set(buildPatientTombstoneValues(expectedVersion, 'web-delete'))
+            .set(buildPatientTombstoneValues(expectedVersion, deletionReason))
             .where(and(eq(patients.id, id), eq(patients.version, expectedVersion), activePatients()))
             .run();
 
