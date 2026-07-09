@@ -98,8 +98,8 @@ MediFlow espone due superfici API:
   - protetta da **token locale** (trasporto su HTTPS locale via TLS proxy)
 - **Network API** (`/api/v1/network/*`):
   - si attiva solo in modalita `network-home-base`
-  - resta read-only-first, con write limitati a profilo/status paziente, diario clinico, terapie, checkup e osservazioni versionati
-  - esclude hard delete remoto, attachment remoti, cataloghi, sync, cache offline e campi AI/documentali
+  - resta read-only-first, con write versionati su ciclo di vita paziente (creazione, cestino, ripristino), profilo/status, diario clinico, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR generato lato client (nodo keyless), validazione FSE, guardia di revisione e discovery capabilities/identity/node in dual-auth
+  - i cataloghi (farmaci, esenzioni, terminologia, prestazioni) sono esposti in sola lettura; restano esclusi hard delete remoto, attachment remoti, sync, cache offline e campi AI/documentali
   - disattivare la modalita non revoca i pairing: i token dei client paired
     diventano inerti e il data plane risponde `403 NETWORK_MODE_DISABLED`
     finche la modalita non viene riattivata

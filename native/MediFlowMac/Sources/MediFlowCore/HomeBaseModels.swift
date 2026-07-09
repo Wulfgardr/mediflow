@@ -60,8 +60,8 @@ public struct HomeBasePairedCredentials: Hashable, Sendable {
 }
 
 public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
     }
     public let id: String
     public let firstName: String
@@ -72,11 +72,13 @@ public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable 
     public let isArchived: Bool?
     public let version: Int
     public let updatedAt: Date?
+    public let deletedAt: Date?
+    public let deletionReason: String?
 }
 
 public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
     }
     public let id: String
     public let firstName: String
@@ -99,6 +101,8 @@ public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
     public let ambulatoryId: String?
     public let createdAt: Date?
     public let updatedAt: Date?
+    public let deletedAt: Date?
+    public let deletionReason: String?
 }
 
 /* @Codex */
@@ -189,6 +193,239 @@ public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Senda
     public let deletionReason: String?
 }
 
+/* @Codex */
+public struct HomeBaseServicePrescriptionSummary: Identifiable, Codable, Hashable, Sendable {
+    public init(id: String, patientId: String, prescribedAt: Date, status: String, category: String,
+                priority: String?, codeSystem: String?, serviceCode: String?, serviceName: String,
+                clinicalQuestion: String?, provider: String?, scheduledAt: Date?, performedAt: Date?,
+                reportReceivedAt: Date?, outcomeNote: String?, requestReference: String?, source: String,
+                documentRefs: String?, notes: String?, version: Int, createdAt: Date?, updatedAt: Date?) {
+        self.id = id; self.patientId = patientId; self.prescribedAt = prescribedAt; self.status = status; self.category = category; self.priority = priority; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.serviceName = serviceName; self.clinicalQuestion = clinicalQuestion; self.provider = provider; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote; self.requestReference = requestReference; self.source = source; self.documentRefs = documentRefs; self.notes = notes; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt
+    }
+    public let id: String
+    public let patientId: String
+    public let prescribedAt: Date
+    public let status: String
+    public let category: String
+    public let priority: String?
+    public let codeSystem: String?
+    public let serviceCode: String?
+    public let serviceName: String
+    public let clinicalQuestion: String?
+    public let provider: String?
+    public let scheduledAt: Date?
+    public let performedAt: Date?
+    public let reportReceivedAt: Date?
+    public let outcomeNote: String?
+    public let requestReference: String?
+    public let source: String
+    public let documentRefs: String?
+    public let notes: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+}
+
+/* @Codex */
+public struct HomeBaseServicePrescriptionItemSummary: Identifiable, Codable, Hashable, Sendable {
+    public init(id: String, patientId: String, prescriptionId: String, ordinal: Int, status: String,
+                category: String?, codeSystem: String?, serviceCode: String?, serviceName: String,
+                catalogEntryId: String?, catalogDisplayName: String?, matchStatus: String,
+                confidence: String?, evidence: String?, notes: String?, scheduledAt: Date?,
+                performedAt: Date?, reportReceivedAt: Date?, outcomeNote: String?, version: Int,
+                createdAt: Date?, updatedAt: Date?) {
+        self.id = id; self.patientId = patientId; self.prescriptionId = prescriptionId; self.ordinal = ordinal; self.status = status; self.category = category; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.serviceName = serviceName; self.catalogEntryId = catalogEntryId; self.catalogDisplayName = catalogDisplayName; self.matchStatus = matchStatus; self.confidence = confidence; self.evidence = evidence; self.notes = notes; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt
+    }
+    public let id: String
+    public let patientId: String
+    public let prescriptionId: String
+    public let ordinal: Int
+    public let status: String
+    public let category: String?
+    public let codeSystem: String?
+    public let serviceCode: String?
+    public let serviceName: String
+    public let catalogEntryId: String?
+    public let catalogDisplayName: String?
+    public let matchStatus: String
+    public let confidence: String?
+    public let evidence: String?
+    public let notes: String?
+    public let scheduledAt: Date?
+    public let performedAt: Date?
+    public let reportReceivedAt: Date?
+    public let outcomeNote: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+}
+
+/* @Codex */
+public struct HomeBaseProstheticPrescriptionSummary: Identifiable, Codable, Hashable, Sendable {
+    public init(id: String, patientId: String, prescribedAt: Date, status: String, category: String,
+                isoCode: String?, description: String, measures: String?, clinicalReason: String?,
+                regionalPrescriptionId: String?, supplier: String?, collaudoAt: Date?,
+                collaudoOutcome: String?, source: String, documentRefs: String?, notes: String?,
+                version: Int, createdAt: Date?, updatedAt: Date?) {
+        self.id = id; self.patientId = patientId; self.prescribedAt = prescribedAt; self.status = status; self.category = category; self.isoCode = isoCode; self.description = description; self.measures = measures; self.clinicalReason = clinicalReason; self.regionalPrescriptionId = regionalPrescriptionId; self.supplier = supplier; self.collaudoAt = collaudoAt; self.collaudoOutcome = collaudoOutcome; self.source = source; self.documentRefs = documentRefs; self.notes = notes; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt
+    }
+    public let id: String
+    public let patientId: String
+    public let prescribedAt: Date
+    public let status: String
+    public let category: String
+    public let isoCode: String?
+    public let description: String
+    public let measures: String?
+    public let clinicalReason: String?
+    public let regionalPrescriptionId: String?
+    public let supplier: String?
+    public let collaudoAt: Date?
+    public let collaudoOutcome: String?
+    public let source: String
+    public let documentRefs: String?
+    public let notes: String?
+    public let version: Int
+    public let createdAt: Date?
+    public let updatedAt: Date?
+}
+
+/* @Codex */
+public struct HomeBaseServiceCatalogEntrySummary: Identifiable, Codable, Hashable, Sendable {
+    public init(id: String, codeSystem: String, serviceCode: String, displayName: String,
+                category: String, branchCode: String?, synonyms: String?, source: String,
+                version: String?, active: Bool, importedAt: Date?, updatedAt: Date?) {
+        self.id = id; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.displayName = displayName; self.category = category; self.branchCode = branchCode; self.synonyms = synonyms; self.source = source; self.version = version; self.active = active; self.importedAt = importedAt; self.updatedAt = updatedAt
+    }
+    public let id: String
+    public let codeSystem: String
+    public let serviceCode: String
+    public let displayName: String
+    public let category: String
+    public let branchCode: String?
+    public let synonyms: String?
+    public let source: String
+    public let version: String?
+    public let active: Bool
+    public let importedAt: Date?
+    public let updatedAt: Date?
+}
+
+/* @Codex */
+public struct HomeBaseCatalogCountResponse: Codable, Hashable, Sendable {
+    public let count: Int
+
+    public init(count: Int) {
+        self.count = count
+    }
+}
+
+/* @Codex */
+public struct NetworkRevisionSummary: Codable, Hashable, Sendable {
+    public let revision: String
+    public let sourceFingerprint: String
+    public let fingerprint: String
+
+    public init(revision: String, sourceFingerprint: String, fingerprint: String) {
+        self.revision = revision
+        self.sourceFingerprint = sourceFingerprint
+        self.fingerprint = fingerprint
+    }
+}
+
+/* @Codex */
+public struct NetworkCapability: Codable, Hashable, Sendable {
+    public let key: String
+    public let status: String
+    public let requiresPairing: Bool
+    public let description: String
+
+    public init(key: String, status: String, requiresPairing: Bool, description: String) {
+        self.key = key
+        self.status = status
+        self.requiresPairing = requiresPairing
+        self.description = description
+    }
+}
+
+/* @Codex */
+public struct NetworkCapabilitiesResponse: Codable, Hashable, Sendable {
+    public let nodeId: String
+    public let operatingMode: String
+    public let protocolVersion: String
+    public let capabilities: [NetworkCapability]
+
+    public init(nodeId: String, operatingMode: String, protocolVersion: String, capabilities: [NetworkCapability]) {
+        self.nodeId = nodeId
+        self.operatingMode = operatingMode
+        self.protocolVersion = protocolVersion
+        self.capabilities = capabilities
+    }
+}
+
+/* @Codex */
+public struct NetworkNodeSummary: Codable, Hashable, Sendable {
+    public struct Transport: Codable, Hashable, Sendable {
+        public let apiBasePath: String
+        public let tlsRequired: Bool
+        public let localTlsPort: Int
+
+        public init(apiBasePath: String, tlsRequired: Bool, localTlsPort: Int) {
+            self.apiBasePath = apiBasePath
+            self.tlsRequired = tlsRequired
+            self.localTlsPort = localTlsPort
+        }
+    }
+
+    public let nodeId: String
+    public let displayName: String
+    public let role: String
+    public let operatingMode: String
+    public let protocolVersion: String
+    public let transport: Transport
+
+    public init(nodeId: String, displayName: String, role: String, operatingMode: String,
+                protocolVersion: String, transport: Transport) {
+        self.nodeId = nodeId; self.displayName = displayName; self.role = role; self.operatingMode = operatingMode; self.protocolVersion = protocolVersion; self.transport = transport
+    }
+}
+
+/* @Codex */
+public struct NetworkIdentitySummary: Codable, Hashable, Sendable {
+    public struct OperatorSummary: Codable, Hashable, Sendable {
+        public let userId: String?
+        public let username: String?
+        public let displayName: String?
+        public let role: String?
+        public let authChannel: String
+    }
+
+    public struct ScopeSummary: Codable, Hashable, Sendable {
+        public let policy: String
+        public let effectiveAmbulatoryId: String?
+        public let effectiveAmbulatoryName: String?
+        public let defaultAmbulatoryId: String?
+        public let defaultAmbulatoryName: String?
+        public let source: String
+    }
+
+    public struct AuditSummary: Codable, Hashable, Sendable {
+        public let actorType: String
+        public let actorBinding: String
+    }
+
+    public let identityModel: String
+    public let pairingBoundary: String
+    public let credentialState: String
+    public let loginMode: String
+    public let usernameHint: String?
+    public let displayNameHint: String?
+    public let `operator`: OperatorSummary
+    public let scope: ScopeSummary
+    public let audit: AuditSummary
+    public let limitations: [String]
+}
+
 // A18: paired ambulatory scope option, mirrors AmbulatorySummary from the web
 // contract (createdAt arrives as an ISO string).
 public struct NetworkAmbulatorySummary: Identifiable, Codable, Hashable, Sendable {
@@ -238,6 +475,8 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
     public let setting: String?
     public let deletedAt: Date?
     public let deletionReason: String?
+    private let shouldEncodeDeletedAt: Bool
+    private let shouldEncodeDeletionReason: Bool
     // NOTE: metadata (an ENCRYPTED structured field) is intentionally absent here:
     // its update input shape (plaintext-to-seal vs pre-encrypted) is unresolved, so
     // metadata edits stay create-only on-device. attachments is excluded by design
@@ -251,7 +490,9 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         date: Date? = nil,
         setting: String? = nil,
         deletedAt: Date? = nil,
-        deletionReason: String? = nil
+        deletionReason: String? = nil,
+        shouldEncodeDeletedAt: Bool = false,
+        shouldEncodeDeletionReason: Bool = false
     ) {
         self.version = version
         self.type = type
@@ -261,6 +502,47 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         self.setting = setting
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
+        self.shouldEncodeDeletedAt = shouldEncodeDeletedAt
+        self.shouldEncodeDeletionReason = shouldEncodeDeletionReason
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case type
+        case title
+        case content
+        case date
+        case setting
+        case deletedAt
+        case deletionReason
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(type, forKey: .type)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(content, forKey: .content)
+        try container.encodeIfPresent(date, forKey: .date)
+        try container.encodeIfPresent(setting, forKey: .setting)
+        if shouldEncodeDeletedAt {
+            if let deletedAt {
+                try container.encode(deletedAt, forKey: .deletedAt)
+            } else {
+                try container.encodeNil(forKey: .deletedAt)
+            }
+        } else {
+            try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
+        }
+        if shouldEncodeDeletionReason {
+            if let deletionReason {
+                try container.encode(deletionReason, forKey: .deletionReason)
+            } else {
+                try container.encodeNil(forKey: .deletionReason)
+            }
+        } else {
+            try container.encodeIfPresent(deletionReason, forKey: .deletionReason)
+        }
     }
 }
 
@@ -400,6 +682,36 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
         self.notes = notes
         self.isAdi = isAdi
         self.isArchived = isArchived
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case firstName, lastName, taxCode, birthDate, address, phone, caregiver
+        case exemptions, diagnoses, monitoringProfile, statusReason, notes, isAdi
+    }
+
+    // isArchived is intentionally absent from CodingKeys: the create boundary
+    // rejects every server-controlled field by presence (spec D6), so the wire
+    // payload must omit it. The local authority path reads the property directly
+    // from the struct, not from its JSON encoding.
+}
+
+/* @Codex */
+public struct HomeBasePatientSoftDeletePayload: Encodable, Sendable {
+    public let version: Int
+    public let deletionReason: String?
+
+    public init(version: Int, deletionReason: String? = nil) {
+        self.version = version
+        self.deletionReason = deletionReason
+    }
+}
+
+/* @Codex */
+public struct HomeBasePatientRestorePayload: Encodable, Sendable {
+    public let version: Int
+
+    public init(version: Int) {
+        self.version = version
     }
 }
 
@@ -663,6 +975,397 @@ public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
         self.source = source
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
+    }
+}
+
+/* @Codex */
+public struct HomeBaseServicePrescriptionCreatePayload: Encodable, Sendable {
+    public let id: String?
+    public let patientId: String
+    public let prescribedAt: Date
+    public let status: String?
+    public let category: String?
+    public let priority: String?
+    public let codeSystem: String?
+    public let serviceCode: String?
+    public let serviceName: String
+    public let clinicalQuestion: String?
+    public let provider: String?
+    public let scheduledAt: Date?
+    public let performedAt: Date?
+    public let reportReceivedAt: Date?
+    public let outcomeNote: String?
+    public let requestReference: String?
+    public let source: String?
+    public let documentRefs: String?
+    public let notes: String?
+
+    public init(id: String? = nil, patientId: String, prescribedAt: Date, serviceName: String,
+                status: String? = nil, category: String? = nil, priority: String? = nil,
+                codeSystem: String? = nil, serviceCode: String? = nil, clinicalQuestion: String? = nil,
+                provider: String? = nil, scheduledAt: Date? = nil, performedAt: Date? = nil,
+                reportReceivedAt: Date? = nil, outcomeNote: String? = nil, requestReference: String? = nil,
+                source: String? = nil, documentRefs: String? = nil, notes: String? = nil) {
+        self.id = id; self.patientId = patientId; self.prescribedAt = prescribedAt; self.serviceName = serviceName; self.status = status; self.category = category; self.priority = priority; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.clinicalQuestion = clinicalQuestion; self.provider = provider; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote; self.requestReference = requestReference; self.source = source; self.documentRefs = documentRefs; self.notes = notes
+    }
+}
+
+/* @Codex */
+public struct HomeBaseServicePrescriptionUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let prescribedAt: Date?
+    public let status: String?
+    public let category: String?
+    public let priority: PatchValue<String>
+    public let codeSystem: PatchValue<String>
+    public let serviceCode: PatchValue<String>
+    public let serviceName: String?
+    public let clinicalQuestion: PatchValue<String>
+    public let provider: PatchValue<String>
+    public let scheduledAt: PatchValue<Date>
+    public let performedAt: PatchValue<Date>
+    public let reportReceivedAt: PatchValue<Date>
+    public let outcomeNote: PatchValue<String>
+    public let requestReference: PatchValue<String>
+    public let source: String?
+    public let documentRefs: PatchValue<String>
+    public let notes: PatchValue<String>
+
+    public init(version: Int, prescribedAt: Date? = nil, status: String? = nil, category: String? = nil,
+                priority: PatchValue<String> = .omit, codeSystem: PatchValue<String> = .omit,
+                serviceCode: PatchValue<String> = .omit, serviceName: String? = nil,
+                clinicalQuestion: PatchValue<String> = .omit, provider: PatchValue<String> = .omit,
+                scheduledAt: PatchValue<Date> = .omit, performedAt: PatchValue<Date> = .omit,
+                reportReceivedAt: PatchValue<Date> = .omit, outcomeNote: PatchValue<String> = .omit,
+                requestReference: PatchValue<String> = .omit, source: String? = nil,
+                documentRefs: PatchValue<String> = .omit, notes: PatchValue<String> = .omit) {
+        self.version = version; self.prescribedAt = prescribedAt; self.status = status; self.category = category; self.priority = priority; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.serviceName = serviceName; self.clinicalQuestion = clinicalQuestion; self.provider = provider; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote; self.requestReference = requestReference; self.source = source; self.documentRefs = documentRefs; self.notes = notes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, prescribedAt, status, category, priority, codeSystem, serviceCode, serviceName
+        case clinicalQuestion, provider, scheduledAt, performedAt, reportReceivedAt, outcomeNote
+        case requestReference, source, documentRefs, notes
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(prescribedAt, forKey: .prescribedAt)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodePatch(priority, forKey: .priority)
+        try container.encodePatch(codeSystem, forKey: .codeSystem)
+        try container.encodePatch(serviceCode, forKey: .serviceCode)
+        try container.encodeIfPresent(serviceName, forKey: .serviceName)
+        try container.encodePatch(clinicalQuestion, forKey: .clinicalQuestion)
+        try container.encodePatch(provider, forKey: .provider)
+        try container.encodePatch(scheduledAt, forKey: .scheduledAt)
+        try container.encodePatch(performedAt, forKey: .performedAt)
+        try container.encodePatch(reportReceivedAt, forKey: .reportReceivedAt)
+        try container.encodePatch(outcomeNote, forKey: .outcomeNote)
+        try container.encodePatch(requestReference, forKey: .requestReference)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodePatch(documentRefs, forKey: .documentRefs)
+        try container.encodePatch(notes, forKey: .notes)
+    }
+}
+
+/* @Codex */
+public struct HomeBaseServicePrescriptionItemCreatePayload: Encodable, Sendable {
+    public let id: String?
+    public let prescriptionId: String
+    public let ordinal: Int?
+    public let status: String?
+    public let category: String?
+    public let codeSystem: String?
+    public let serviceCode: String?
+    public let serviceName: String
+    public let catalogEntryId: String?
+    public let catalogDisplayName: String?
+    public let matchStatus: String?
+    public let confidence: String?
+    public let evidence: String?
+    public let notes: String?
+    public let scheduledAt: Date?
+    public let performedAt: Date?
+    public let reportReceivedAt: Date?
+    public let outcomeNote: String?
+
+    public init(id: String? = nil, prescriptionId: String, serviceName: String, ordinal: Int? = nil,
+                status: String? = nil, category: String? = nil, codeSystem: String? = nil,
+                serviceCode: String? = nil, catalogEntryId: String? = nil, catalogDisplayName: String? = nil,
+                matchStatus: String? = nil, confidence: String? = nil, evidence: String? = nil,
+                notes: String? = nil, scheduledAt: Date? = nil, performedAt: Date? = nil,
+                reportReceivedAt: Date? = nil, outcomeNote: String? = nil) {
+        self.id = id; self.prescriptionId = prescriptionId; self.serviceName = serviceName; self.ordinal = ordinal; self.status = status; self.category = category; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.catalogEntryId = catalogEntryId; self.catalogDisplayName = catalogDisplayName; self.matchStatus = matchStatus; self.confidence = confidence; self.evidence = evidence; self.notes = notes; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote
+    }
+}
+
+/* @Codex */
+public struct HomeBaseServicePrescriptionItemUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let ordinal: Int?
+    public let status: String?
+    public let category: PatchValue<String>
+    public let codeSystem: PatchValue<String>
+    public let serviceCode: PatchValue<String>
+    public let serviceName: String?
+    public let catalogEntryId: PatchValue<String>
+    public let catalogDisplayName: PatchValue<String>
+    public let matchStatus: String?
+    public let confidence: PatchValue<String>
+    public let evidence: PatchValue<String>
+    public let notes: PatchValue<String>
+    public let scheduledAt: PatchValue<Date>
+    public let performedAt: PatchValue<Date>
+    public let reportReceivedAt: PatchValue<Date>
+    public let outcomeNote: PatchValue<String>
+
+    public init(version: Int, ordinal: Int? = nil, status: String? = nil, category: PatchValue<String> = .omit,
+                codeSystem: PatchValue<String> = .omit, serviceCode: PatchValue<String> = .omit,
+                serviceName: String? = nil, catalogEntryId: PatchValue<String> = .omit,
+                catalogDisplayName: PatchValue<String> = .omit, matchStatus: String? = nil,
+                confidence: PatchValue<String> = .omit, evidence: PatchValue<String> = .omit,
+                notes: PatchValue<String> = .omit, scheduledAt: PatchValue<Date> = .omit,
+                performedAt: PatchValue<Date> = .omit, reportReceivedAt: PatchValue<Date> = .omit,
+                outcomeNote: PatchValue<String> = .omit) {
+        self.version = version; self.ordinal = ordinal; self.status = status; self.category = category; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.serviceName = serviceName; self.catalogEntryId = catalogEntryId; self.catalogDisplayName = catalogDisplayName; self.matchStatus = matchStatus; self.confidence = confidence; self.evidence = evidence; self.notes = notes; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, ordinal, status, category, codeSystem, serviceCode, serviceName
+        case catalogEntryId, catalogDisplayName, matchStatus, confidence, evidence, notes
+        case scheduledAt, performedAt, reportReceivedAt, outcomeNote
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(ordinal, forKey: .ordinal)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodePatch(category, forKey: .category)
+        try container.encodePatch(codeSystem, forKey: .codeSystem)
+        try container.encodePatch(serviceCode, forKey: .serviceCode)
+        try container.encodeIfPresent(serviceName, forKey: .serviceName)
+        try container.encodePatch(catalogEntryId, forKey: .catalogEntryId)
+        try container.encodePatch(catalogDisplayName, forKey: .catalogDisplayName)
+        try container.encodeIfPresent(matchStatus, forKey: .matchStatus)
+        try container.encodePatch(confidence, forKey: .confidence)
+        try container.encodePatch(evidence, forKey: .evidence)
+        try container.encodePatch(notes, forKey: .notes)
+        try container.encodePatch(scheduledAt, forKey: .scheduledAt)
+        try container.encodePatch(performedAt, forKey: .performedAt)
+        try container.encodePatch(reportReceivedAt, forKey: .reportReceivedAt)
+        try container.encodePatch(outcomeNote, forKey: .outcomeNote)
+    }
+}
+
+/* @Codex */
+public struct HomeBaseProstheticPrescriptionCreatePayload: Encodable, Sendable {
+    public let id: String?
+    public let patientId: String
+    public let prescribedAt: Date
+    public let status: String?
+    public let category: String?
+    public let isoCode: String?
+    public let description: String
+    public let measures: String?
+    public let clinicalReason: String?
+    public let regionalPrescriptionId: String?
+    public let supplier: String?
+    public let collaudoAt: Date?
+    public let collaudoOutcome: String?
+    public let source: String?
+    public let documentRefs: String?
+    public let notes: String?
+
+    public init(id: String? = nil, patientId: String, prescribedAt: Date, description: String,
+                status: String? = nil, category: String? = nil, isoCode: String? = nil,
+                measures: String? = nil, clinicalReason: String? = nil, regionalPrescriptionId: String? = nil,
+                supplier: String? = nil, collaudoAt: Date? = nil, collaudoOutcome: String? = nil,
+                source: String? = nil, documentRefs: String? = nil, notes: String? = nil) {
+        self.id = id; self.patientId = patientId; self.prescribedAt = prescribedAt; self.description = description; self.status = status; self.category = category; self.isoCode = isoCode; self.measures = measures; self.clinicalReason = clinicalReason; self.regionalPrescriptionId = regionalPrescriptionId; self.supplier = supplier; self.collaudoAt = collaudoAt; self.collaudoOutcome = collaudoOutcome; self.source = source; self.documentRefs = documentRefs; self.notes = notes
+    }
+}
+
+/* @Codex */
+public struct HomeBaseProstheticPrescriptionUpdatePayload: Encodable, Sendable {
+    public let version: Int
+    public let prescribedAt: Date?
+    public let status: String?
+    public let category: String?
+    public let isoCode: PatchValue<String>
+    public let description: String?
+    public let measures: PatchValue<String>
+    public let clinicalReason: PatchValue<String>
+    public let regionalPrescriptionId: PatchValue<String>
+    public let supplier: PatchValue<String>
+    public let collaudoAt: PatchValue<Date>
+    public let collaudoOutcome: PatchValue<String>
+    public let source: String?
+    public let documentRefs: PatchValue<String>
+    public let notes: PatchValue<String>
+
+    public init(version: Int, prescribedAt: Date? = nil, status: String? = nil, category: String? = nil,
+                isoCode: PatchValue<String> = .omit, description: String? = nil,
+                measures: PatchValue<String> = .omit, clinicalReason: PatchValue<String> = .omit,
+                regionalPrescriptionId: PatchValue<String> = .omit, supplier: PatchValue<String> = .omit,
+                collaudoAt: PatchValue<Date> = .omit, collaudoOutcome: PatchValue<String> = .omit,
+                source: String? = nil, documentRefs: PatchValue<String> = .omit,
+                notes: PatchValue<String> = .omit) {
+        self.version = version; self.prescribedAt = prescribedAt; self.status = status; self.category = category; self.isoCode = isoCode; self.description = description; self.measures = measures; self.clinicalReason = clinicalReason; self.regionalPrescriptionId = regionalPrescriptionId; self.supplier = supplier; self.collaudoAt = collaudoAt; self.collaudoOutcome = collaudoOutcome; self.source = source; self.documentRefs = documentRefs; self.notes = notes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, prescribedAt, status, category, isoCode, description, measures
+        case clinicalReason, regionalPrescriptionId, supplier, collaudoAt, collaudoOutcome
+        case source, documentRefs, notes
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(prescribedAt, forKey: .prescribedAt)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodePatch(isoCode, forKey: .isoCode)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodePatch(measures, forKey: .measures)
+        try container.encodePatch(clinicalReason, forKey: .clinicalReason)
+        try container.encodePatch(regionalPrescriptionId, forKey: .regionalPrescriptionId)
+        try container.encodePatch(supplier, forKey: .supplier)
+        try container.encodePatch(collaudoAt, forKey: .collaudoAt)
+        try container.encodePatch(collaudoOutcome, forKey: .collaudoOutcome)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodePatch(documentRefs, forKey: .documentRefs)
+        try container.encodePatch(notes, forKey: .notes)
+    }
+}
+
+/* @Codex */
+public enum HomeBaseJSONValue: Codable, Equatable, Sendable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: HomeBaseJSONValue])
+    case array([HomeBaseJSONValue])
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode([HomeBaseJSONValue].self) {
+            self = .array(value)
+        } else {
+            self = .object(try container.decode([String: HomeBaseJSONValue].self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .bool(let value): try container.encode(value)
+        case .object(let value): try container.encode(value)
+        case .array(let value): try container.encode(value)
+        case .null: try container.encodeNil()
+        }
+    }
+}
+
+/* @Codex */
+public struct HomeBaseFseDocumentValidationPayload: Encodable, Sendable {
+    public let profile: String
+    public let document: HomeBaseJSONValue?
+    public let payload: HomeBaseJSONValue?
+
+    public init(profile: String, document: HomeBaseJSONValue? = nil, payload: HomeBaseJSONValue? = nil) {
+        self.profile = profile
+        self.document = document
+        self.payload = payload
+    }
+}
+
+/* @Codex */
+public struct HomeBaseFseValidationIssue: Codable, Hashable, Sendable {
+    public let field: String
+    public let code: String
+    public let message: String
+
+    public init(field: String, code: String, message: String) {
+        self.field = field
+        self.code = code
+        self.message = message
+    }
+}
+
+/* @Codex */
+public struct HomeBaseFseValidationItem: Codable, Hashable, Sendable {
+    public let id: String
+    public let ok: Bool
+    public let errors: [HomeBaseFseValidationIssue]
+    public let warnings: [HomeBaseFseValidationIssue]
+
+    public init(id: String, ok: Bool, errors: [HomeBaseFseValidationIssue], warnings: [HomeBaseFseValidationIssue]) {
+        self.id = id
+        self.ok = ok
+        self.errors = errors
+        self.warnings = warnings
+    }
+}
+
+/* @Codex */
+public struct HomeBaseFseValidationSummary: Codable, Hashable, Sendable {
+    public let total: Int
+    public let ok: Int
+    public let withErrors: Int
+    public let withWarnings: Int
+    public let errorCount: Int
+    public let warningCount: Int
+    public let items: [HomeBaseFseValidationItem]
+
+    public init(total: Int, ok: Int, withErrors: Int, withWarnings: Int,
+                errorCount: Int, warningCount: Int, items: [HomeBaseFseValidationItem]) {
+        self.total = total; self.ok = ok; self.withErrors = withErrors; self.withWarnings = withWarnings; self.errorCount = errorCount; self.warningCount = warningCount; self.items = items
+    }
+}
+
+/* @Codex */
+public struct HomeBaseValidatePatientExportResponse: Codable, Hashable, Sendable {
+    public let patientId: String
+    public let hasErrors: Bool
+    public let hasWarnings: Bool
+    public let therapyMedication: HomeBaseFseValidationSummary
+    public let observationVitals: HomeBaseFseValidationSummary
+
+    public init(patientId: String, hasErrors: Bool, hasWarnings: Bool,
+                therapyMedication: HomeBaseFseValidationSummary,
+                observationVitals: HomeBaseFseValidationSummary) {
+        self.patientId = patientId; self.hasErrors = hasErrors; self.hasWarnings = hasWarnings; self.therapyMedication = therapyMedication; self.observationVitals = observationVitals
+    }
+}
+
+/* @Codex */
+public struct HomeBaseFseDocumentValidationResponse: Codable, Hashable, Sendable {
+    public let ok: Bool
+    public let profile: String
+    public let errors: [HomeBaseFseValidationIssue]
+    public let warnings: [HomeBaseFseValidationIssue]
+
+    public init(ok: Bool, profile: String, errors: [HomeBaseFseValidationIssue], warnings: [HomeBaseFseValidationIssue]) {
+        self.ok = ok
+        self.profile = profile
+        self.errors = errors
+        self.warnings = warnings
     }
 }
 

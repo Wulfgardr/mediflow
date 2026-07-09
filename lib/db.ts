@@ -17,6 +17,8 @@ import type { EntryVersionConflictPayload } from './entry-concurrency';
 /* @Codex */
 import type { CheckupVersionConflictPayload } from './checkup-concurrency';
 /* @Codex */
+import { isVersionConflictPayload, type VersionConflictPayload } from './version-concurrency';
+/* @Codex */
 import { revivePatientStructuredFields } from './patient-structured-fields';
 /* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
@@ -35,11 +37,13 @@ import {
 export type ApiVersionConflictPayload =
     | PatientVersionConflictPayload
     | EntryVersionConflictPayload
-    | CheckupVersionConflictPayload;
+    | CheckupVersionConflictPayload
+    | VersionConflictPayload;
 
 /* @Codex */
 function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflictPayload {
     if (isPatientVersionConflictPayload(value)) return true;
+    if (isVersionConflictPayload(value)) return true;
     if (!value || typeof value !== 'object') return false;
 
     const payload = value as Record<string, unknown>;
@@ -544,7 +548,12 @@ class ApiTable<T> {
 
     /* @Codex */
     private requiresVersionedWrite(): boolean {
-        return this.tableName === 'patients' || this.tableName === 'entries' || this.tableName === 'checkups';
+        return this.tableName === 'patients'
+            || this.tableName === 'entries'
+            || this.tableName === 'checkups'
+            || this.tableName === 'service_prescriptions'
+            || this.tableName === 'service_prescription_items'
+            || this.tableName === 'prosthetic_prescriptions';
     }
 
     /* @Codex */
@@ -552,6 +561,9 @@ class ApiTable<T> {
         if (this.tableName === 'patients') return 'patient';
         if (this.tableName === 'entries') return 'entry';
         if (this.tableName === 'checkups') return 'checkup';
+        if (this.tableName === 'service_prescriptions') return 'service prescription';
+        if (this.tableName === 'service_prescription_items') return 'service prescription item';
+        if (this.tableName === 'prosthetic_prescriptions') return 'prosthetic prescription';
         return this.tableName;
     }
 
@@ -935,6 +947,8 @@ export interface ProstheticPrescription {
     source: 'manual' | 'document_review';
     documentRefs?: string;
     notes?: string;
+    /* @Codex */
+    version: number;
     createdAt: Date;
     updatedAt?: Date;
 }
@@ -969,6 +983,8 @@ export interface ServicePrescription {
     source: 'manual' | 'document_review' | 'legacy_therapy_cleanup';
     documentRefs?: string;
     notes?: string;
+    /* @Codex */
+    version: number;
     createdAt: Date;
     updatedAt?: Date;
 }
@@ -997,6 +1013,8 @@ export interface ServicePrescriptionItem {
     performedAt?: Date;
     reportReceivedAt?: Date;
     outcomeNote?: string;
+    /* @Codex */
+    version: number;
     createdAt: Date;
     updatedAt?: Date;
 }

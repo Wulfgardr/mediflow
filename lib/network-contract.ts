@@ -29,6 +29,8 @@ export const NETWORK_SETTINGS_KEYS = [
 ] as const;
 /* @Codex */
 export const NETWORK_PAIRING_INTENT_TTL_MINUTES = 10;
+/* @Codex */
+export const NETWORK_FSE_VALIDATE_CAPABILITY = 'network.fse.validate';
 
 type NetworkSettingsSnapshot = Partial<Record<(typeof NETWORK_SETTINGS_KEYS)[number], string>>;
 
@@ -294,6 +296,12 @@ export function buildNetworkCapabilitiesResponse(input: {
                 'Paired patient profile/status update boundary with optimistic concurrency; excludes AI, document, child clinical CRUD, and remote delete.'
             ),
             capability(
+                'network.replica.write-patient-lifecycle',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired patient lifecycle create, soft-delete, restore, and tombstone listing boundary with optimistic concurrency.'
+            ),
+            capability(
                 'network.replica.write-clinical-diary',
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
@@ -334,6 +342,42 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Paired observation create/update/soft-delete boundary with optimistic concurrency; excludes hard delete, AI, and document-derived writes.'
+            ),
+            capability(
+                'network.replica.readonly-service-prescriptions',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only service prescription, service item, and service catalog access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-service-prescriptions',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired service prescription and service item create/update boundary with optimistic concurrency; excludes remote hard delete and regional submission.'
+            ),
+            capability(
+                'network.replica.readonly-prosthetic-prescriptions',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only prosthetic prescription access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.write-prosthetic-prescriptions',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired prosthetic prescription create/update boundary with optimistic concurrency; excludes remote hard delete and regional submission.'
+            ),
+            capability(
+                NETWORK_FSE_VALIDATE_CAPABILITY,
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired FSE validation boundary for patient export pre-checks and single-document validation; performs no regional submission.'
+            ),
+            capability(
+                'network.catalogs.readonly',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only access to local reference catalogs and terminology lookup from a paired client with a valid operator session; excludes catalog sync and offline distribution.'
             ),
             capability(
                 'network.replica.sync',

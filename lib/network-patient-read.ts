@@ -24,6 +24,8 @@ function toPatientSummary(patient: typeof patients.$inferSelect): PatientSummary
         taxCode: patient.taxCode,
         isAdi: patient.isAdi ?? null,
         isArchived: patient.isArchived ?? null,
+        deletedAt: toIsoString(patient.deletedAt),
+        deletionReason: patient.deletionReason ?? null,
         version: patient.version,
         updatedAt: toIsoString(patient.updatedAt),
     };
@@ -50,6 +52,8 @@ function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
         documentInsights: patient.documentInsights ?? null,
         isAdi: patient.isAdi ?? null,
         isArchived: patient.isArchived ?? null,
+        deletedAt: toIsoString(patient.deletedAt),
+        deletionReason: patient.deletionReason ?? null,
         version: patient.version,
         ambulatoryId: patient.ambulatoryId ?? null,
         createdAt: toIsoString(patient.createdAt),
@@ -58,12 +62,20 @@ function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
 }
 
 /* @Codex */
-export async function listNetworkScopedPatients(scopeAmbulatoryId: string): Promise<PatientSummary[]> {
+export async function listNetworkScopedPatients(
+    scopeAmbulatoryId: string,
+    options: { includeDeleted?: boolean } = {}
+): Promise<PatientSummary[]> {
+    const filters = [eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId)];
+    if (!options.includeDeleted) {
+        filters.push(activePatients());
+    }
+
     const rows = await dbServer
         .select({ patient: patients })
         .from(patients)
         .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-        .where(and(eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId), activePatients()))
+        .where(and(...filters))
         .orderBy(desc(patients.updatedAt));
 
     return rows.map((row) => toPatientSummary(row.patient));

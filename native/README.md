@@ -6,18 +6,18 @@ No long dash in this repo's text by convention.
 
 ## Layout
 
-- `MediFlowAppleApp/` — the single shippable artifact: an Xcode project generated
+- `MediFlowAppleApp/`: the single shippable artifact: an Xcode project generated
   from `project.yml` (xcodegen). Two app targets, same bundle id
   `com.mediflow.mobile` (universal purchase):
   - `MediFlowMobileApp` (iOS/iPadOS, device family 1,2)
   - `MediFlowMacApp` (native macOS)
   Both mount `AppleFoundationMobileRootView` from the shared library.
-- `MediFlowMac/` — the SwiftPM package. Library + tests only (no app executables):
-  - `Sources/MediFlowAppleShared/` — the shared module: SwiftUI root + view models
+- `MediFlowMac/`: the SwiftPM package. Library + tests only (no app executables):
+  - `Sources/MediFlowAppleShared/`: the shared module: SwiftUI root + view models
     (`AppleFoundation/`), home-base networking / Bonjour / pairing / cache, the
     `VetroClinico` Liquid Glass design kit, and the `/api/v1` contract primitives
     (`APIPatchValue`, `APIVersionConflict`).
-  - `Tests/MediFlowAppleSharedTests/` — XCTest suite.
+  - `Tests/MediFlowAppleSharedTests/`: XCTest suite.
 
 The two former SPM executables (`MediFlowMac`, `MediFlowMobile`) and ~12k lines of
 unmounted "rich Mac UI" were removed in Fase 0; see

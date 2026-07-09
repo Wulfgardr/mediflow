@@ -9,6 +9,10 @@ export type PatientSummary = {
     isAdi: boolean | null;
     isArchived: boolean | null;
     /* @Codex */
+    deletedAt?: string | null;
+    /* @Codex */
+    deletionReason?: string | null;
+    /* @Codex */
     version: number;
     updatedAt: string | null;
 };
@@ -41,6 +45,10 @@ export type PatientDetail = {
     documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
+    deletedAt?: string | null;
+    /* @Codex */
+    deletionReason?: string | null;
     /* @Codex */
     version: number;
     ambulatoryId: string | null;
@@ -181,6 +189,97 @@ export type ExemptionSummary = {
     isPharma: boolean | null;
     isSpecialist: boolean | null;
     isNational: boolean | null;
+    updatedAt: string | null;
+};
+
+/* @Codex */
+export type ServicePrescriptionSummary = {
+    id: string;
+    patientId: string;
+    prescribedAt: string;
+    status: string;
+    category: string;
+    priority: string | null;
+    codeSystem: string | null;
+    serviceCode: string | null;
+    serviceName: string;
+    clinicalQuestion: string | null;
+    provider: string | null;
+    scheduledAt: string | null;
+    performedAt: string | null;
+    reportReceivedAt: string | null;
+    outcomeNote: string | null;
+    requestReference: string | null;
+    source: string;
+    documentRefs: string | null;
+    notes: string | null;
+    version: number;
+    createdAt: string | null;
+    updatedAt: string | null;
+};
+
+/* @Codex */
+export type ServicePrescriptionItemSummary = {
+    id: string;
+    patientId: string;
+    prescriptionId: string;
+    ordinal: number;
+    status: string;
+    category: string | null;
+    codeSystem: string | null;
+    serviceCode: string | null;
+    serviceName: string;
+    catalogEntryId: string | null;
+    catalogDisplayName: string | null;
+    matchStatus: string;
+    confidence: string | null;
+    evidence: string | null;
+    notes: string | null;
+    scheduledAt: string | null;
+    performedAt: string | null;
+    reportReceivedAt: string | null;
+    outcomeNote: string | null;
+    version: number;
+    createdAt: string | null;
+    updatedAt: string | null;
+};
+
+/* @Codex */
+export type ProstheticPrescriptionSummary = {
+    id: string;
+    patientId: string;
+    prescribedAt: string;
+    status: string;
+    category: string;
+    isoCode: string | null;
+    description: string;
+    measures: string | null;
+    clinicalReason: string | null;
+    regionalPrescriptionId: string | null;
+    supplier: string | null;
+    collaudoAt: string | null;
+    collaudoOutcome: string | null;
+    source: string;
+    documentRefs: string | null;
+    notes: string | null;
+    version: number;
+    createdAt: string | null;
+    updatedAt: string | null;
+};
+
+/* @Codex */
+export type ServiceCatalogEntrySummary = {
+    id: string;
+    codeSystem: string;
+    serviceCode: string;
+    displayName: string;
+    category: string;
+    branchCode: string | null;
+    synonyms: string | null;
+    source: string;
+    version: string | null;
+    active: boolean;
+    importedAt: string | null;
     updatedAt: string | null;
 };
 
@@ -333,6 +432,8 @@ export type NetworkCapabilityKey =
     /* @Codex */
     | 'network.replica.write-patient-profile'
     /* @Codex */
+    | 'network.replica.write-patient-lifecycle'
+    /* @Codex */
     | 'network.replica.write-clinical-diary'
     /* @Codex */
     | 'network.replica.readonly-therapies'
@@ -346,6 +447,18 @@ export type NetworkCapabilityKey =
     | 'network.replica.readonly-observations'
     /* @Codex */
     | 'network.replica.write-observations'
+    /* @Codex */
+    | 'network.replica.readonly-service-prescriptions'
+    /* @Codex */
+    | 'network.replica.write-service-prescriptions'
+    /* @Codex */
+    | 'network.replica.readonly-prosthetic-prescriptions'
+    /* @Codex */
+    | 'network.replica.write-prosthetic-prescriptions'
+    /* @Codex */
+    | 'network.fse.validate'
+    /* @Codex */
+    | 'network.catalogs.readonly'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

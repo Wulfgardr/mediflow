@@ -27,6 +27,8 @@ import type { ServerSession } from './security/server-session';
 
 /* @Codex */
 export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-profile';
+/* @Codex */
+export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights']);
 
 type NetworkPatientMutationResponse =
     | { status: 200; value: { success: true } }
@@ -50,8 +52,6 @@ type PatientMutationSnapshot = {
     updatedAt: Date | string | number | null;
     isArchived: boolean | null;
 };
-
-const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights']);
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
@@ -102,7 +102,8 @@ function selectPatientConflictSnapshot(
     return current ?? null;
 }
 
-async function writeNetworkPatientAuditEvent(input: {
+/* @Codex */
+export async function writeNetworkPatientAuditEvent(input: {
     context: NetworkPatientMutationContext;
     eventType: AuditEventType;
     metadata?: AuditRedactedMetadata | null;

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 /* @Codex */
 import { getNetworkNodeSummary } from '@/lib/network-home-base-server';
+/* @Codex */
+import { requireNetworkDiscoveryAuth } from '@/lib/network-write-context';
 
 /* @Codex */
 export async function GET(request: Request) {
-    const authError = requireLocalApiToken(request);
-    if (authError) return authError;
+    const auth = await requireNetworkDiscoveryAuth(request);
+    if (!auth.ok) return auth.response;
 
     try {
         const summary = await getNetworkNodeSummary();

@@ -1,7 +1,9 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { asc, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
+/* @Codex */
+import { readServiceCatalog } from '@/lib/service-prescription-write';
 import { serviceCatalogEntries } from '@/lib/schema';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 
@@ -70,43 +72,7 @@ export async function GET(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const { searchParams } = new URL(request.url);
-        const q = searchParams.get('q')?.trim();
-        const code = searchParams.get('code')?.trim().toUpperCase();
-        const countOnly = searchParams.get('count') === '1';
-        const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '40', 10) || 40, 1), 100);
-
-        if (countOnly) {
-            const row = await dbServer.select({ total: sql<number>`count(*)` }).from(serviceCatalogEntries).get();
-            return NextResponse.json({ count: Number(row?.total || 0) });
-        }
-
-        if (code) {
-            const row = await dbServer
-                .select()
-                .from(serviceCatalogEntries)
-                .where(eq(serviceCatalogEntries.serviceCode, code))
-                .get();
-            return row ? NextResponse.json([row]) : NextResponse.json([]);
-        }
-
-        if (q) {
-            const pattern = `%${q}%`;
-            const rows = await dbServer
-                .select()
-                .from(serviceCatalogEntries)
-                .where(sql`${serviceCatalogEntries.serviceCode} LIKE ${pattern} OR ${serviceCatalogEntries.displayName} LIKE ${pattern} OR ${serviceCatalogEntries.synonyms} LIKE ${pattern}`)
-                .orderBy(asc(serviceCatalogEntries.displayName))
-                .limit(limit);
-            return NextResponse.json(rows);
-        }
-
-        const rows = await dbServer
-            .select()
-            .from(serviceCatalogEntries)
-            .orderBy(asc(serviceCatalogEntries.displayName))
-            .limit(limit);
-        return NextResponse.json(rows);
+        return NextResponse.json(await readServiceCatalog(new URL(request.url).searchParams));
     } catch (error) {
         console.error('API GET /service-catalog error:', error);
         return NextResponse.json({ error: 'Failed to fetch service catalog' }, { status: 500 });

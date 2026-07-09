@@ -71,7 +71,7 @@ public struct SQLitePatientStore {
     /// columns are plaintext. `scopeAmbulatoryId` (when provided) filters via the
     /// patients_to_ambulatories membership join (1:1 with the web's listNetworkScopedPatients,
     /// the same scope model every store read/write uses); unscoped lists every active patient.
-    public func listPatients(scopeAmbulatoryId: String? = nil) throws -> [HomeBasePatientSummary] {
+    public func listPatients(scopeAmbulatoryId: String? = nil, includeDeleted: Bool = false) throws -> [HomeBasePatientSummary] {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         // Scope via the patients_to_ambulatories membership join (1:1 with the web,
@@ -80,9 +80,10 @@ public struct SQLitePatientStore {
         // primary; unscoped lists every active patient.
         let scopeJoin = scopeAmbulatoryId == nil ? "" :
             "JOIN patients_to_ambulatories pa ON p.id = pa.patient_id AND pa.ambulatory_id = ? "
+        let deletedFilter = includeDeleted ? "" : "WHERE p.deleted_at IS NULL "
         let sql = """
-        SELECT p.id, p.first_name, p.last_name, p.tax_code, p.birth_date, p.is_adi, p.is_archived, p.version, p.updated_at
-        FROM patients p \(scopeJoin)WHERE p.deleted_at IS NULL ORDER BY p.updated_at DESC
+        SELECT p.id, p.first_name, p.last_name, p.tax_code, p.birth_date, p.is_adi, p.is_archived, p.version, p.updated_at, p.deleted_at, p.deletion_reason
+        FROM patients p \(scopeJoin)\(deletedFilter)ORDER BY p.updated_at DESC
         """
         let binds: [SQLiteBind] = scopeAmbulatoryId.map { [.text($0)] } ?? []
         return try db.run(sql, bind: binds) { row in
@@ -95,7 +96,9 @@ public struct SQLitePatientStore {
                 isAdi: row.bool(5),
                 isArchived: row.bool(6),
                 version: row.int(7) ?? 1,
-                updatedAt: row.date(8))
+                updatedAt: row.date(8),
+                deletedAt: row.date(9),
+                deletionReason: row.text(10))
         }
     }
 
@@ -113,7 +116,7 @@ public struct SQLitePatientStore {
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, address, phone, caregiver, notes,
                ai_summary, is_adi, is_archived, ambulatory_id, created_at, updated_at, document_insights,
-               exemptions, diagnoses, monitoring_profile, status_reason, version
+               exemptions, diagnoses, monitoring_profile, status_reason, version, deleted_at, deletion_reason
         FROM patients WHERE id = ? AND deleted_at IS NULL \(scopeClause)
         """
         var binds: [SQLiteBind] = [.text(id)]
@@ -129,7 +132,8 @@ public struct SQLitePatientStore {
                 statusReason: row.text(19), notes: row.text(8), aiSummary: row.text(9),
                 documentInsights: row.text(15), isAdi: row.bool(10), isArchived: row.bool(11),
                 version: row.int(20) ?? 1, ambulatoryId: row.text(12),
-                createdAt: row.date(13), updatedAt: row.date(14))
+                createdAt: row.date(13), updatedAt: row.date(14),
+                deletedAt: row.date(21), deletionReason: row.text(22))
         }
         guard let raw = rows.first else { return nil }
         return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
@@ -279,12 +283,13 @@ public struct SQLitePatientStore {
         version: Int,
         deletionReason: String = "api-v1-delete",
         masterKey: SymmetricKey,
+        scopeAmbulatoryId: String? = nil,
         now: Date = Date()
     ) throws -> PatientWriteOutcome {
         guard let expected = PatientConcurrency.parseExpectedVersion(version) else {
             return .versionRequired
         }
-        guard case .sealed(let sealedReason?) = CryptoService.seal(deletionReason, masterKey: masterKey) else {
+        guard case .sealed(let sealedReason?) = CryptoService.sealOrPassthrough(deletionReason, masterKey: masterKey) else {
             return .encryptionFailed
         }
 
@@ -292,7 +297,10 @@ public struct SQLitePatientStore {
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         try db.execute("BEGIN IMMEDIATE")
         do {
-            // Unscoped existence read (id + active), matching the operator route.
+            // Scoped like the network boundary: out-of-scope patients read as 404.
+            guard try isMemberOfScope(db, patientId: id, scopeAmbulatoryId: scopeAmbulatoryId) else {
+                try db.execute("ROLLBACK"); return .notFound
+            }
             let snapshot = try selectConflictSnapshot(db, id: id)
             switch PatientConcurrency.evaluate(rawVersion: version, recordId: id, current: snapshot) {
             case .versionRequired:
@@ -311,6 +319,57 @@ public struct SQLitePatientStore {
                                            .int(stamp), .text(id), .int(expected)]) { _ in 0 }
                 if db.changes == 0 {
                     let raced = try selectConflictSnapshot(db, id: id)
+                    try db.execute("ROLLBACK")
+                    return .conflict(PatientConcurrency.buildVersionConflictPayload(
+                        expectedVersion: expected, recordId: id, current: raced))
+                }
+                try db.execute("COMMIT")
+                return .updated(version: nextVersion)
+            }
+        } catch {
+            try? db.execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    /// Restore a tombstoned patient, mirroring POST /api/v1/network/patients/[id]/restore.
+    /// The restore is version-guarded, clears deleted_at/deletion_reason, bumps version
+    /// and leaves archive state untouched.
+    public func restorePatient(
+        id: String,
+        version: Int,
+        scopeAmbulatoryId: String? = nil,
+        now: Date = Date()
+    ) throws -> PatientWriteOutcome {
+        guard let expected = PatientConcurrency.parseExpectedVersion(version) else {
+            return .versionRequired
+        }
+
+        let db = try SQLiteConnection(readWritePath: path)
+        try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            // Scoped like the network boundary: out-of-scope patients read as 404.
+            guard try isMemberOfScope(db, patientId: id, scopeAmbulatoryId: scopeAmbulatoryId) else {
+                try db.execute("ROLLBACK"); return .notFound
+            }
+            let tombstone = try selectTombstonedSnapshot(db, id: id)
+            switch PatientConcurrency.evaluate(rawVersion: version, recordId: id, current: tombstone) {
+            case .versionRequired:
+                try db.execute("ROLLBACK"); return .versionRequired
+            case .notFound:
+                try db.execute("ROLLBACK"); return .notFound
+            case .conflict(let conflict):
+                try db.execute("ROLLBACK"); return .conflict(conflict)
+            case .ok(let nextVersion):
+                let stamp = Int(now.timeIntervalSince1970)
+                let sql = """
+                UPDATE patients SET deleted_at = NULL, deletion_reason = NULL, version = ?, updated_at = ?
+                WHERE id = ? AND version = ? AND deleted_at IS NOT NULL
+                """
+                _ = try db.run(sql, bind: [.int(nextVersion), .int(stamp), .text(id), .int(expected)]) { _ in 0 }
+                if db.changes == 0 {
+                    let raced = try selectTombstonedSnapshot(db, id: id)
                     try db.execute("ROLLBACK")
                     return .conflict(PatientConcurrency.buildVersionConflictPayload(
                         expectedVersion: expected, recordId: id, current: raced))
@@ -365,26 +424,29 @@ public struct SQLitePatientStore {
         return out
     }
 
-    /// Seal an optional plaintext string field into the assignments (nil -> NULL).
-    /// Returns false if a present value fails to encrypt.
+    /// Seal an optional string field into the assignments (nil -> NULL).
+    /// sealOrPassthrough, like the update path: the model pre-seals the wire
+    /// payload, so a value can arrive here already ENC: and must not be
+    /// encrypted twice. Returns false if a present value fails to encrypt.
     private func sealInto(
         _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: String?, _ key: SymmetricKey
     ) -> Bool {
         guard let value else { out.append((column, .null)); return true }
-        guard case .sealed(let enc?) = CryptoService.seal(value, masterKey: key) else { return false }
+        guard case .sealed(let enc?) = CryptoService.sealOrPassthrough(value, masterKey: key) else { return false }
         out.append((column, .text(enc)))
         return true
     }
 
     /// Seal an optional STRUCTURED field (array/object JSON string) into the
     /// assignments by encrypting the JSON directly (no JSON.stringify wrap).
+    /// encryptOrPassthrough for the same no-double-encryption reason above.
     private func sealStructuredInto(
         _ out: inout [(column: String, bind: SQLiteBind)], _ column: String,
         _ value: String?, _ key: SymmetricKey
     ) -> Bool {
         guard let value else { out.append((column, .null)); return true }
-        guard let enc = CryptoService.encryptField(value, masterKey: key) else { return false }
+        guard case .sealed(let enc?) = CryptoService.encryptOrPassthrough(value, masterKey: key) else { return false }
         out.append((column, .text(enc)))
         return true
     }
@@ -532,5 +594,26 @@ public struct SQLitePatientStore {
                 id: row.text(0) ?? "", version: row.int(1) ?? 1,
                 updatedAt: row.date(2), isArchived: row.bool(3))
         }.first
+    }
+
+    private func selectTombstonedSnapshot(
+        _ db: SQLiteConnection, id: String
+    ) throws -> PatientConcurrency.ConflictSource? {
+        let sql = "SELECT id, version, updated_at, is_archived FROM patients WHERE id = ? AND deleted_at IS NOT NULL"
+        return try db.run(sql, bind: [.text(id)]) { row in
+            PatientConcurrency.ConflictSource(
+                id: row.text(0) ?? "", version: row.int(1) ?? 1,
+                updatedAt: row.date(2), isArchived: row.bool(3))
+        }.first
+    }
+
+    /// Membership guard for scoped lifecycle writes: no scope means no restriction
+    /// (operator-route semantics), a scope requires the patients_to_ambulatories row.
+    private func isMemberOfScope(
+        _ db: SQLiteConnection, patientId: String, scopeAmbulatoryId: String?
+    ) throws -> Bool {
+        guard let scope = scopeAmbulatoryId else { return true }
+        let sql = "SELECT 1 FROM patients_to_ambulatories WHERE patient_id = ? AND ambulatory_id = ?"
+        return try db.run(sql, bind: [.text(patientId), .text(scope)]) { _ in 1 }.first != nil
     }
 }

@@ -1,0 +1,178 @@
+[
+  {
+    "id": "tr-metformin-ckd-synthetic",
+    "question": "Rivedere appropriatezza e monitoraggio di metformina in CKD?",
+    "patientContext": "Caso sintetico: diabete tipo 2, CKD moderata, nessuna informazione su allergie nel case pack.",
+    "diagnoses": [
+      "Diabete mellito tipo 2",
+      "Malattia renale cronica stadio 3"
+    ],
+    "activeTherapies": [
+      "Metformina 1000 mg x2/die"
+    ],
+    "observations": [
+      "eGFR 35 ml/min/1.73m2",
+      "HbA1c 7.8%"
+    ],
+    "sources": [
+      {
+        "id": "dx-t2dm",
+        "sourceKind": "diagnosis",
+        "label": "Diagnosi codificata",
+        "excerpt": "Diabete mellito tipo 2"
+      },
+      {
+        "id": "therapy-metformin",
+        "sourceKind": "therapy",
+        "label": "Terapia attiva",
+        "excerpt": "Metformina 1000 mg due volte al giorno"
+      },
+      {
+        "id": "obs-egfr",
+        "sourceKind": "observation",
+        "label": "Funzione renale recente",
+        "excerpt": "eGFR 35 ml/min/1.73m2"
+      }
+    ],
+    "expectedResponse": {
+      "schemaVersion": "mediflow.treatment_reasoning.v1",
+      "task": "treatment_reasoning",
+      "summary": "Revisione terapeutica review-only per metformina in CKD moderata.",
+      "data": {
+        "recommendation": "Rivalutare metformina e monitoraggio renale in visita; non applicare modifiche automatiche.",
+        "keyEvidence": [
+          {
+            "id": "e1",
+            "statement": "Metformina e attiva nel case pack.",
+            "evidenceRefs": ["therapy-metformin"]
+          },
+          {
+            "id": "e2",
+            "statement": "eGFR recente pari a 35 ml/min/1.73m2.",
+            "evidenceRefs": ["obs-egfr"]
+          }
+        ],
+        "reasoning": [
+          "La funzione renale condiziona appropriatezza, dose e frequenza di monitoraggio.",
+          "Il case pack non contiene allergie, eventi avversi o trend seriale creatinina."
+        ],
+        "caveats": [
+          "Mancano allergie, eventi avversi, trend eGFR e preferenze del paziente.",
+          "Questo output e supporto review-only e non una prescrizione."
+        ],
+        "safetyFlags": [
+          {
+            "id": "s1",
+            "severity": "caution",
+            "label": "Monitoraggio renale necessario",
+            "rationale": "La terapia va interpretata alla luce di eGFR ridotto.",
+            "evidenceRefs": ["obs-egfr", "therapy-metformin"]
+          }
+        ],
+        "suggestedActions": [
+          {
+            "id": "a1",
+            "intent": "open_therapy_form_prefill",
+            "label": "Apri revisione terapia",
+            "rationale": "Serve revisione medica, non auto-write.",
+            "writePolicy": "form_prefill_only",
+            "evidenceRefs": ["therapy-metformin", "obs-egfr"],
+            "prefill": {
+              "motivation": "Rivalutazione per CKD moderata"
+            }
+          }
+        ],
+        "trace": {
+          "mode": "local_contract",
+          "model": "synthetic-fixture",
+          "toolsUsed": ["local-chart"],
+          "limitations": ["Fixture sintetica senza lookup guideline esterno."]
+        }
+      }
+    }
+  },
+  {
+    "id": "tr-nsaid-anticoagulant-synthetic",
+    "question": "Valutare richiesta di FANS in paziente anticoagulato?",
+    "patientContext": "Caso sintetico: fibrillazione atriale in terapia anticoagulante, dolore osteoarticolare riferito.",
+    "diagnoses": [
+      "Fibrillazione atriale",
+      "Gonartrosi"
+    ],
+    "activeTherapies": [
+      "Apixaban 5 mg x2/die"
+    ],
+    "observations": [
+      "Hb 12 g/dL",
+      "Creatinina nei limiti nel case pack"
+    ],
+    "sources": [
+      {
+        "id": "therapy-apixaban",
+        "sourceKind": "therapy",
+        "label": "Terapia anticoagulante",
+        "excerpt": "Apixaban 5 mg due volte al giorno"
+      },
+      {
+        "id": "entry-pain",
+        "sourceKind": "clinical-entry",
+        "label": "Nota dolore",
+        "excerpt": "Dolore al ginocchio, richiesta analgesia"
+      }
+    ],
+    "expectedResponse": {
+      "schemaVersion": "mediflow.treatment_reasoning.v1",
+      "task": "treatment_reasoning",
+      "summary": "Valutazione review-only di analgesia in paziente anticoagulato.",
+      "data": {
+        "recommendation": "Evitare conclusioni automatiche; rivedere rischio emorragico e alternative analgesiche in visita.",
+        "keyEvidence": [
+          {
+            "id": "e1",
+            "statement": "Il paziente sintetico assume apixaban.",
+            "evidenceRefs": ["therapy-apixaban"]
+          },
+          {
+            "id": "e2",
+            "statement": "La richiesta riguarda dolore osteoarticolare.",
+            "evidenceRefs": ["entry-pain"]
+          }
+        ],
+        "reasoning": [
+          "La co-presenza di anticoagulante aumenta la necessita di valutare sicurezza prima di FANS.",
+          "Il case pack non include anamnesi di sanguinamento o gastroprotezione."
+        ],
+        "caveats": [
+          "Mancano anamnesi emorragica, terapia gastroprotettiva e severita del dolore.",
+          "Non generare prescrizione automatica."
+        ],
+        "safetyFlags": [
+          {
+            "id": "s1",
+            "severity": "urgent_review",
+            "label": "Rischio emorragico da rivedere",
+            "rationale": "La richiesta analgesica avviene in presenza di anticoagulante.",
+            "evidenceRefs": ["therapy-apixaban", "entry-pain"]
+          }
+        ],
+        "suggestedActions": [
+          {
+            "id": "a1",
+            "intent": "review_only",
+            "label": "Rivedi analgesia e rischio emorragico",
+            "rationale": "Serve decisione medica documentata prima di qualsiasi terapia.",
+            "writePolicy": "review_only",
+            "evidenceRefs": ["therapy-apixaban", "entry-pain"],
+            "prefill": {}
+          }
+        ],
+        "trace": {
+          "mode": "local_contract",
+          "model": "synthetic-fixture",
+          "toolsUsed": ["local-chart"],
+          "limitations": ["Fixture sintetica senza tool esterni."]
+        }
+      }
+    }
+  }
+]

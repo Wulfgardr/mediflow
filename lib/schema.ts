@@ -199,6 +199,8 @@ export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
     source: text('source').notNull().default('manual'),
     documentRefs: text('document_refs'),
     notes: text('notes'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
@@ -224,6 +226,8 @@ export const servicePrescriptions = sqliteTable('service_prescriptions', {
     source: text('source').notNull().default('manual'),
     documentRefs: text('document_refs'),
     notes: text('notes'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
@@ -249,6 +253,8 @@ export const servicePrescriptionItems = sqliteTable('service_prescription_items'
     performedAt: integer('performed_at', { mode: 'timestamp' }),
     reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
     outcomeNote: text('outcome_note'),
+    /* @Codex */
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });

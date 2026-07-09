@@ -89,4 +89,92 @@ final class APIVersionConflictEncodeTests: XCTestCase {
         let decoded = try JSONDecoder().decode(VersionConflictPayload.self, from: data)
         XCTAssertEqual(decoded, original)
     }
+
+    /* @Codex */
+    func testDecodesGeneralizedPrescriptionConflictFixture() throws {
+        let data = Data("""
+        {
+          "error": "Conflict",
+          "code": "VERSION_CONFLICT",
+          "entity": "service_prescription",
+          "recordId": "sp-1",
+          "expectedVersion": 2,
+          "currentVersion": 3,
+          "currentUpdatedAt": "2026-07-08T08:00:00.000Z",
+          "currentState": "present",
+          "currentSnapshot": {
+            "id": "sp-1",
+            "patientId": "patient-1",
+            "version": 3,
+            "updatedAt": "2026-07-08T08:00:00.000Z"
+          }
+        }
+        """.utf8)
+
+        let payload = try JSONDecoder().decode(VersionConflictPayload.self, from: data)
+
+        XCTAssertEqual(payload.entity, "service_prescription")
+        XCTAssertEqual(payload.currentSnapshot?.patientId, "patient-1")
+        XCTAssertEqual(payload.currentSnapshot?.version, 3)
+        XCTAssertNil(payload.currentSnapshot?.deletedAt)
+        XCTAssertNil(payload.currentSnapshot?.isArchived)
+    }
+
+    /* @Codex */
+    func testDecodesPatientConflictFixture() throws {
+        let data = Data("""
+        {
+          "error": "Conflict",
+          "code": "VERSION_CONFLICT",
+          "entity": "patient",
+          "recordId": "patient-1",
+          "expectedVersion": 4,
+          "currentVersion": 5,
+          "currentUpdatedAt": "2026-07-08T08:00:00.000Z",
+          "currentState": "present",
+          "currentSnapshot": {
+            "id": "patient-1",
+            "version": 5,
+            "updatedAt": "2026-07-08T08:00:00.000Z",
+            "isArchived": false
+          }
+        }
+        """.utf8)
+
+        let payload = try JSONDecoder().decode(VersionConflictPayload.self, from: data)
+
+        XCTAssertEqual(payload.entity, "patient")
+        XCTAssertEqual(payload.currentSnapshot?.isArchived, false)
+        XCTAssertNil(payload.currentSnapshot?.patientId)
+        XCTAssertNil(payload.currentSnapshot?.deletedAt)
+    }
+
+    /* @Codex */
+    func testGeneralizedPrescriptionEncodeOmitsAbsentOptionalSnapshotKeys() throws {
+        let payload = VersionConflictPayload(
+            error: "Conflict",
+            code: "VERSION_CONFLICT",
+            entity: "service_prescription",
+            recordId: "sp-1",
+            expectedVersion: 2,
+            currentVersion: 3,
+            currentUpdatedAt: "2026-07-08T08:00:00.000Z",
+            currentState: "present",
+            currentSnapshot: VersionConflictSnapshot(
+                id: "sp-1",
+                patientId: "patient-1",
+                version: 3,
+                updatedAt: "2026-07-08T08:00:00.000Z",
+                deletedAt: nil,
+                isArchived: nil
+            )
+        )
+
+        let object = try encodeToObject(payload)
+        let snapshot = try XCTUnwrap(object["currentSnapshot"] as? [String: Any])
+
+        XCTAssertEqual(Set(snapshot.keys), ["id", "patientId", "version", "updatedAt"])
+        XCTAssertFalse(snapshot.keys.contains("deletedAt"))
+        XCTAssertFalse(snapshot.keys.contains("isArchived"))
+    }
 }

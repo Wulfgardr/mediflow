@@ -2,11 +2,13 @@
 
 # MediFlow
 
+_by Ordito & Concilio_
+
 **Cartella clinica territoriale local-first.**
 
 Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 
-[![Versione](https://img.shields.io/badge/versione-0.7.1-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-0.7.2-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
 [![Core tri-OS](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#la-071-in-breve)
@@ -14,7 +16,7 @@ Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Anthropic-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
 [![Codex](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)
 
-[Perché](#perché-mediflow) · [Screenshot](#come-si-presenta) · [Architettura](#come-è-fatto) · [0.7.1](#la-071-in-breve) · [Confini](#confini-dichiarati) · [Avvio](#avvio-rapido) · [AI e trasparenza](#come-è-stato-costruito)
+[Perché](#perché-mediflow) · [Screenshot](#come-si-presenta) · [Architettura](#come-è-fatto) · [0.7.2](#la-072-in-breve) · [Confini](#confini-dichiarati) · [Avvio](#avvio-rapido) · [AI e trasparenza](#come-è-stato-costruito)
 
 </div>
 
@@ -106,13 +108,17 @@ flowchart LR
 
 Il cloud non compare nel diagramma: nessun egress di default, il percorso resta local-first.
 
-## La 0.7.1 in breve
+## La 0.7.2 in breve
 
-La `0.7.1` consolida il ramo Apple/native e lo porta sul mainline: macOS diventa
-il fronte più avanzato dell'app nativa, iPhone e iPad restano client paired sul
-modello `home-base`, e Linux e Windows entrano come gate di portabilità del core
-condiviso, non come promessa di app complete.
+La `0.7.2` chiude la parità del boundary paired: il client Apple raggiunge la web
+app sul ciclo di vita del paziente e sulle famiglie cliniche mancanti
+(prestazioni, protesica, export FHIR), sempre entro i confini local-first e senza
+hard delete remoto. Restano le fondamenta della `0.7.1`, che ha portato il ramo
+Apple/native sul mainline con macOS come fronte più avanzato e iPhone e iPad come
+client paired sul modello `home-base`.
 
+- **ciclo di vita paziente sul boundary paired**: creazione, cestino con soft-delete e ripristino dal client Apple, con concorrenza ottimistica e senza accesso diretto al database;
+- **prestazioni, protesica ed export FHIR sul client paired**: nuove famiglie cliniche sul boundary con concorrenza ottimistica, e bundle FHIR generato on-device con pre-check di validazione FSE;
 - **web app locale** come superficie primaria di lavoro sul Mac;
 - **Kree8 cockpit** come root web live, con una direzione visuale unica e senza selector persistiti: copy asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
 - **database SQLite cifrato**, con approccio zero-knowledge;
@@ -133,7 +139,7 @@ MediFlow non vuole raccontare più di quanto possa dimostrare.
 
 - **Nessun cloud obbligatorio**: il default resta locale.
 - **Nessuna app iPad/iPhone dichiarata come già completa**: la direzione multi-device esiste, ma il perimetro operativo attuale è `home-base + paired client`, con approccio read-only-first, cache cifrata e write online limitati a profilo/status, diario, terapie, checkup e osservazioni.
-- **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.1 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
+- **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.2 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
 - **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali; MediFlow non dichiara sincronizzazione FSE, writeback regionale o invio prescrittivo diretto.
 - **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
 
@@ -158,6 +164,7 @@ Open source, in questo caso, significa soprattutto:
 | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) | La fotografia completa e aggiornata |
 | [Roadmap](./docs/ROADMAP.md) | Dove sta andando il progetto |
 | [Compliance](./docs/COMPLIANCE.md) | Privacy, GDPR e confini regolatori |
+| [Crediti](./CREDITS.md) | Fonti, modelli, librerie e ispirazioni con licenze |
 | [Document map](./docs/README.md) | La mappa di tutta la documentazione |
 
 ## Avvio rapido
@@ -179,6 +186,24 @@ Poi il launcher della tua piattaforma:
 Apri `http://localhost:3000`. Ollama, Docker e ICD-11 sono opzionali: senza,
 MediFlow resta usabile con funzionalità ridotte.
 
+## Fonti e attribuzioni
+
+MediFlow dichiara in chiaro le sue fonti.
+
+[![Kree8](https://img.shields.io/badge/look-Kree8-8957e5)](https://www.kree8.studio/)
+[![ATHENA](https://img.shields.io/badge/modello-ATHENA-181717?logo=github&logoColor=white)](https://github.com/mims-harvard/ATHENA)
+[![Fluid](https://img.shields.io/badge/visita-Fluid-a42e2b)](https://github.com/altic-dev/FluidVoice)
+[![Crediti](https://img.shields.io/badge/crediti%20completi-CREDITS.md-2ea043)](./CREDITS.md)
+
+Il **look** del cockpit è derivato da [Kree8](https://www.kree8.studio/),
+ispirazione esterna resa in una implementazione clinica originale. Il ragionamento
+terapeutico review-only usa il modello [ATHENA](https://github.com/mims-harvard/ATHENA)
+(mims-harvard, licenza MIT). Il motore della visita registrabile prende a
+riferimento l'ecosistema Fluid.
+
+Modelli, librerie, runtime e ispirazioni con URL e licenze:
+**[CREDITS.md](./CREDITS.md)**.
+
 ## Come è stato costruito
 
 Questo progetto è scritto da un medico con un aiuto sostanziale, e dichiarato,
@@ -186,11 +211,9 @@ di strumenti di sviluppo assistito da AI.
 
 Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto.
 
-I numeri, misurati dai log locali delle sessioni e non stimati: almeno
-**19,6 miliardi di token** tra Codex CLI (16,0 miliardi, febbraio-luglio 2026) e
-Claude Code (3,6 miliardi, maggio-luglio 2026). È un pavimento, non un totale:
-esclude gli strumenti che non lasciano log misurabili e il lavoro precedente
-all'inizio della registrazione.
+Tengo il conto dai log locali delle sessioni: **19,6 miliardi di token**, 16,0 con Codex CLI (febbraio-luglio 2026) e 3,6 con Claude Code (maggio-luglio 2026). Mancano gli strumenti che non lasciano traccia e il lavoro prima che iniziassi a contare.
+
+<img src="./screenshots/token-models.svg" alt="Modelli usati nello sviluppo di MediFlow: Codex CLI con gpt-5.5 a 16 miliardi di token, Claude Code con Opus 4.8, Sonnet 5 e Fable 5 a 3,6 miliardi" width="720" loading="lazy"/>
 
 Il metodo conta più del volume: ogni modifica passa da review incrociata tra
 modelli diversi, test locali e guard automatici in CI che bloccano regressioni

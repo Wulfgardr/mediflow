@@ -8,12 +8,12 @@ Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-s
 
 ## Crittografia zero-knowledge per campo
 
-- `crypto-golden-vectors.v1.json` — vettori FROZEN, byte-exact, generati dalle
+- `crypto-golden-vectors.v1.json`: vettori FROZEN, byte-exact, generati dalle
   primitive WebCrypto del riferimento web ([lib/security/security.ts](../../lib/security/security.ts)):
   KEK = PBKDF2-HMAC-SHA256(PIN, salt, 100000); master key AES-256-GCM wrappata
   `base64(iv12 || GCM(rawKey, KEK))`; campi `ENC:base64(iv12):base64(ct||tag)` con
   plaintext = `JSON.stringify(value)`.
-- `generate-crypto-vectors.mjs` — rigenera il fixture in modo deterministico e si
+- `generate-crypto-vectors.mjs`: rigenera il fixture in modo deterministico e si
   auto-verifica (ogni vettore viene anche decifrato/unwrapped per controllo):
   `node native/contracts/generate-crypto-vectors.mjs`.
 

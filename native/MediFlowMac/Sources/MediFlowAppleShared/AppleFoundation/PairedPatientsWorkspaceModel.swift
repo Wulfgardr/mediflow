@@ -27,6 +27,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var therapies: [HomeBaseTherapySummary] = []
     @Published private(set) var checkups: [HomeBaseCheckupSummary] = []
     @Published private(set) var observations: [HomeBaseObservationSummary] = []
+    @Published private(set) var patientReportURL: URL?
+    @Published private(set) var servicePrescriptions: [HomeBaseServicePrescriptionSummary] = []
+    @Published private(set) var servicePrescriptionItems: [HomeBaseServicePrescriptionItemSummary] = []
+    @Published private(set) var prostheticPrescriptions: [HomeBaseProstheticPrescriptionSummary] = []
+    @Published private(set) var patientFHIRExportURL: URL?
+    @Published private(set) var pendingFHIRWarningValidation: HomeBaseValidatePatientExportResponse?
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     @Published var newEntryContent = ""
@@ -35,6 +41,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
     @Published var editEntryContent = ""
+    private var editingEntryOriginalContent: String?
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
@@ -47,6 +54,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     @Published var newExemptionCode = ""
+    /* @Codex */
+    @Published private(set) var exemptionCatalogResults: [HomeBaseExemptionSummary] = []
+    /* @Codex */
+    @Published private(set) var isSearchingExemptionCatalog = false
+    /* @Codex */
+    @Published private(set) var exemptionCatalogStatusMessage: String?
     // Patient CREATE form (ADR 0071: served only by the on-device local authority).
     @Published var isCreatingPatient = false
     @Published var newPatientFirstName = ""
@@ -61,6 +74,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newDiagnosisDescription = ""
     @Published private(set) var isEditingPatient = false
     @Published var newTherapyDrugName = ""
+    @Published var newTherapyAIC = ""
+    @Published var newTherapyATC = ""
     @Published var newTherapyActivePrinciple = ""
     @Published var newTherapyDosage = ""
     @Published var newTherapyMotivation = ""
@@ -69,9 +84,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newTherapyHasEndDate = false
     @Published var newTherapyEndDate = Date()
     @Published var newTherapyDiagnosisCode = ""
+    /* @Codex */
+    @Published private(set) var newTherapyDrugCatalogResults: [HomeBaseDrugSummary] = []
+    /* @Codex */
+    @Published private(set) var isSearchingNewTherapyDrugCatalog = false
     @Published private(set) var editingTherapyId: String?
     @Published private(set) var editingTherapyVersion: Int?
     @Published var editTherapyDrugName = ""
+    @Published var editTherapyAIC = ""
+    @Published var editTherapyATC = ""
     @Published var editTherapyActivePrinciple = ""
     @Published var editTherapyDosage = ""
     @Published var editTherapyMotivation = ""
@@ -80,6 +101,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
     @Published var editTherapyDiagnosisCode = ""
+    /* @Codex */
+    @Published private(set) var editTherapyDrugCatalogResults: [HomeBaseDrugSummary] = []
+    /* @Codex */
+    @Published private(set) var isSearchingEditTherapyDrugCatalog = false
+    /* @Codex */
+    @Published private(set) var drugCatalogStatusMessage: String?
     @Published var newCheckupTitle = ""
     @Published var newCheckupNotes = ""
     @Published var newCheckupStatus: PairedCheckupStatus = .pending
@@ -96,6 +123,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newObservationUnitCode = ""
     @Published var newObservationNotes = ""
     @Published var newObservationObservedAt = Date()
+    @Published private(set) var newObservationCodeTerminologyResults: [HomeBaseTerminologyItem] = []
+    @Published private(set) var newObservationUnitTerminologyResults: [HomeBaseTerminologyItem] = []
+    @Published private(set) var isSearchingNewObservationCodeTerminology = false
+    @Published private(set) var isSearchingNewObservationUnitTerminology = false
     @Published private(set) var editingObservationId: String?
     @Published private(set) var editingObservationVersion: Int?
     @Published var editObservationDisplay = ""
@@ -104,6 +135,46 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editObservationUnitCode = ""
     @Published var editObservationNotes = ""
     @Published var editObservationObservedAt = Date()
+    @Published private(set) var editObservationCodeTerminologyResults: [HomeBaseTerminologyItem] = []
+    @Published private(set) var editObservationUnitTerminologyResults: [HomeBaseTerminologyItem] = []
+    @Published private(set) var isSearchingEditObservationCodeTerminology = false
+    @Published private(set) var isSearchingEditObservationUnitTerminology = false
+    @Published var newServicePrescribedAt = Date()
+    @Published var newServiceStatus: PairedServicePrescriptionStatus = .prescribed
+    @Published var newServiceCategory: PairedServicePrescriptionCategory = .specialistica
+    @Published var newServicePriority: PairedServicePrescriptionPriority = .p
+    @Published var newServiceCodeSystem = "NTR"
+    @Published var newServiceCode = ""
+    @Published var newServiceName = ""
+    @Published var newServiceClinicalQuestion = ""
+    @Published var newServiceProvider = ""
+    @Published var newServiceHasScheduledAt = false
+    @Published var newServiceScheduledAt = Date()
+    @Published var newServiceHasPerformedAt = false
+    @Published var newServicePerformedAt = Date()
+    @Published var newServiceHasReportReceivedAt = false
+    @Published var newServiceReportReceivedAt = Date()
+    @Published var newServiceOutcomeNote = ""
+    @Published var newServiceRequestReference = ""
+    @Published var newServiceSource: PairedPrescriptionSource = .manual
+    @Published var newServiceDocumentRefs = ""
+    @Published var newServiceNotes = ""
+    @Published var newServiceItemsText = ""
+    @Published var newProstheticPrescribedAt = Date()
+    @Published var newProstheticStatus: PairedProstheticPrescriptionStatus = .prescribed
+    @Published var newProstheticCategory: PairedProstheticPrescriptionCategory = .ausilio
+    @Published var newProstheticISOCode = ""
+    @Published var newProstheticDescription = ""
+    @Published var newProstheticMeasures = ""
+    @Published var newProstheticClinicalReason = ""
+    @Published var newProstheticRegionalPrescriptionId = ""
+    @Published var newProstheticSupplier = ""
+    @Published var newProstheticHasCollaudoAt = false
+    @Published var newProstheticCollaudoAt = Date()
+    @Published var newProstheticCollaudoOutcome = ""
+    @Published var newProstheticSource: PairedPrescriptionSource = .manual
+    @Published var newProstheticDocumentRefs = ""
+    @Published var newProstheticNotes = ""
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -126,13 +197,38 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private var didPerformAutomaticActions = false
     private var sessionCookie: String?
     private var newEntryDraftId = UUID().uuidString
+    /* @Codex */
+    private var newTherapyDrugCatalogTask: Task<Void, Never>?
+    /* @Codex */
+    private var editTherapyDrugCatalogTask: Task<Void, Never>?
+    /* @Codex */
+    private var exemptionCatalogTask: Task<Void, Never>?
+    /* @Codex */
+    private var newObservationCodeTerminologyTask: Task<Void, Never>?
+    /* @Codex */
+    private var newObservationUnitTerminologyTask: Task<Void, Never>?
+    /* @Codex */
+    private var editObservationCodeTerminologyTask: Task<Void, Never>?
+    /* @Codex */
+    private var editObservationUnitTerminologyTask: Task<Void, Never>?
+    /* @Codex */
+    private var isDrugCatalogAvailable = true
+    /* @Codex */
+    private var isExemptionCatalogAvailable = true
+    /* @Codex */
+    private var isTerminologySearchAvailable = true
+    /* @Codex */
+    private var lastSeenNetworkFingerprint: String?
+    private let dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)?
 
     init(
         pairedStore: HomeBasePairedStore = .shared,
-        cacheStore: HomeBasePatientCacheStore = .shared
+        cacheStore: HomeBasePatientCacheStore = .shared,
+        dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)? = nil
     ) {
         self.pairedStore = pairedStore
         self.cacheStore = cacheStore
+        self.dataSourceFactory = dataSourceFactory
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
         do {
@@ -155,6 +251,25 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         applyLaunchOverrides(launchOverrides)
         restoreCachedPatientList()
     }
+
+    #if DEBUG
+    /* @Codex */
+    func configurePairedOnlineForTests(
+        credentials: HomeBasePairedCredentials = HomeBasePairedCredentials(clientId: "test-client", clientToken: "test-token"),
+        sessionCookie: String = "sid=test",
+        masterKey: SymmetricKey? = nil,
+        patients: [HomeBasePatientSummary] = [],
+        selectedPatient: HomeBasePatientDetail? = nil
+    ) {
+        self.pairedClientId = credentials.clientId
+        self.pairedClientToken = credentials.clientToken
+        self.sessionCookie = sessionCookie
+        self.masterKey = masterKey
+        self.patients = patients
+        self.selectedPatient = selectedPatient
+        self.connectionState = .pairedOnline
+    }
+    #endif
 
     func performAutomaticActionsIfNeeded() async {
         guard !didPerformAutomaticActions else { return }
@@ -370,6 +485,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             self.sessionCookie = result.sessionCookie
             self.unlockFieldCrypto(with: result, pin: self.password)
+            self.resetCatalogAvailability()
             self.statusMessage = self.masterKey == nil
                 ? "Sessione operatore attiva. Cifratura campi non disponibile."
                 : "Sessione operatore attiva."
@@ -389,7 +505,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         masterKey = CryptoService.unwrapMasterKey(wrappedBase64: wrapped, kek: kek)
     }
 
-    func loadPatients() async {
+    func loadPatients(includeDeleted: Bool = false) async {
         guard let sessionCookie else {
             errorMessage = "Esegui prima la login operatore."
             return
@@ -403,8 +519,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 self.patients = try await self.makeClient().fetchPatients(
                     credentials: credentials,
                     sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                    includeDeleted: includeDeleted
                 )
+                .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             } catch {
                 if self.restoreCachedPatientList(markOffline: true) {
                     self.errorMessage = error.localizedDescription
@@ -417,6 +535,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.therapies = []
             self.checkups = []
             self.observations = []
+            self.patientReportURL = nil
+            self.servicePrescriptions = []
+            self.servicePrescriptionItems = []
+            self.prostheticPrescriptions = []
+            self.patientFHIRExportURL = nil
+            self.pendingFHIRWarningValidation = nil
             self.cancelEditingEntry()
             self.cancelEditingTherapy()
             self.cancelEditingCheckup()
@@ -440,10 +564,27 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             self.connectionState = .pairedOnline
             self.reconciliationLine = "Snapshot locale aggiornato. Scritture online con sessione operatore."
-            self.statusMessage = self.patients.isEmpty
-                ? "Nessun paziente nello scope corrente."
-                : "\(self.patients.count) pazienti caricati in lettura."
+            let visibleCount = includeDeleted ? self.patients.filter { $0.deletedAt != nil }.count : self.patients.count
+            self.statusMessage = visibleCount == 0
+                ? (includeDeleted ? "Nessun paziente nel cestino." : "Nessun paziente nello scope corrente.")
+                : "\(visibleCount) pazienti caricati in lettura."
         }
+    }
+
+    /* @Codex */
+    func loadPatientTrash() async {
+        await loadPatients(includeDeleted: true)
+        selectedPatient = nil
+        entries = []
+        therapies = []
+        checkups = []
+        observations = []
+        patientReportURL = nil
+        servicePrescriptions = []
+        servicePrescriptionItems = []
+        prostheticPrescriptions = []
+        patientFHIRExportURL = nil
+        pendingFHIRWarningValidation = nil
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
@@ -454,11 +595,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
             observations = Self.uiTestSeededObservations(patientId: patient.id)
+            patientReportURL = nil
+            patientFHIRExportURL = nil
             return
         }
         #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
         await runTask {
+            self.patientReportURL = nil
+            self.patientFHIRExportURL = nil
+            self.pendingFHIRWarningValidation = nil
             let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: patient.id,
                 credentials: credentials,
@@ -485,6 +631,24 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.observations = try await self.fetchDecryptedObservations(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.servicePrescriptions = try await self.fetchServicePrescriptions(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -519,6 +683,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 id: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
+            self.patientReportURL = nil
+            self.patientFHIRExportURL = nil
+            self.pendingFHIRWarningValidation = nil
             self.entries = try await self.fetchDecryptedEntries(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
@@ -529,6 +696,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.observations = try await self.fetchDecryptedObservations(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.servicePrescriptions = try await self.fetchServicePrescriptions(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
+                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
                 patientId: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
@@ -676,6 +852,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editEntryTitle = entry.title
         editEntryType = PairedDiaryEntryType(rawValue: entry.type) ?? .note
         editEntryContent = entry.content
+        editingEntryOriginalContent = entry.content
         statusMessage = "Modifica voce diario pronta."
     }
 
@@ -686,11 +863,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editEntryTitle = ""
         editEntryType = .note
         editEntryContent = ""
+        editingEntryOriginalContent = nil
     }
 
-    // ADR 0071: patient CREATE. Only functions under the on-device local authority
-    // (makeClient() returns the local adapter only when MEDIFLOW_LOCAL_AUTHORITY + a
-    // master key are present); over the paired HTTP wire it fails fast with a 405.
+    /* @Codex */
+    func insertNewEntrySOAPTemplate() {
+        newEntryContent = ClinicalSOAPTemplate.html
+        statusMessage = "Template S/O/A/P inserito."
+    }
+
+    // ADR 0071 update: patient CREATE still works through the on-device local
+    // authority when available, and now also has a paired HTTP wire path gated by
+    // network.replica.write-patient-lifecycle.
     var canCreatePatient: Bool {
         !isWorking
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -721,21 +905,24 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima una sessione paired online."
             return
         }
-        // Refuse to create without the key: the store seals the ENCRYPTED_FIELDS in-core.
+        // Refuse to create without the key: the sensitive fields are sealed here
+        // before the payload leaves the model, so both the wire boundary (which
+        // rejects plaintext with 400) and the local store (sealOrPassthrough,
+        // never double-encrypts) receive ENC: values.
         guard masterKey != nil else {
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
             return
         }
-        let payload = HomeBasePatientCreatePayload(
-            firstName: newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
-            lastName: newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-            taxCode: newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
-            birthDate: newPatientHasBirthDate ? newPatientBirthDate : nil,
-            address: newPatientAddress.trimmedOrNil,
-            phone: newPatientPhone.trimmedOrNil,
-            caregiver: newPatientCaregiver.trimmedOrNil
-        )
         await runTask {
+            let payload = HomeBasePatientCreatePayload(
+                firstName: self.newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: self.newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                taxCode: self.newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+                birthDate: self.newPatientHasBirthDate ? self.newPatientBirthDate : nil,
+                address: try self.sealField(self.newPatientAddress.trimmedOrNil),
+                phone: try self.sealField(self.newPatientPhone.trimmedOrNil),
+                caregiver: try self.sealField(self.newPatientCaregiver.trimmedOrNil)
+            )
             let created = try await self.makeClient().createPatient(
                 payload: payload, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
@@ -762,6 +949,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
         editPatientExemptions = ExemptionCodesCodec.decode(patient.exemptions)
         newExemptionCode = ""
+        resetExemptionCatalogSearch(clearAvailability: false)
         newDiagnosisCode = ""
         newDiagnosisDescription = ""
         isEditingPatient = true
@@ -779,6 +967,35 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         guard !code.isEmpty, !editPatientExemptions.contains(code) else { return }
         editPatientExemptions.append(code)
         newExemptionCode = ""
+        resetExemptionCatalogSearch(clearAvailability: false)
+    }
+
+    /* @Codex */
+    func scheduleExemptionCatalogSearch() {
+        exemptionCatalogTask?.cancel()
+        guard isExemptionCatalogAvailable else {
+            exemptionCatalogResults = []
+            isSearchingExemptionCatalog = false
+            return
+        }
+        let query = newExemptionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= Self.catalogMinimumQueryLength else {
+            exemptionCatalogResults = []
+            isSearchingExemptionCatalog = false
+            return
+        }
+        exemptionCatalogTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.catalogSearchDebounceNanoseconds)
+            guard !Task.isCancelled else { return }
+            await self?.performExemptionCatalogSearch(query: query)
+        }
+    }
+
+    /* @Codex */
+    func selectExemptionCatalogResult(_ exemption: HomeBaseExemptionSummary) {
+        editPatientExemptions = CatalogSelection.adding(exemption, to: editPatientExemptions)
+        newExemptionCode = ""
+        resetExemptionCatalogSearch(clearAvailability: false)
     }
 
     func removeExemption(_ code: String) {
@@ -801,6 +1018,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     func cancelEditingPatient() {
         isEditingPatient = false
+        resetExemptionCatalogSearch(clearAvailability: false)
     }
 
     func savePatient() async {
@@ -859,6 +1077,154 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    var isFieldCryptoUnlocked: Bool {
+        masterKey != nil
+    }
+
+    /* @Codex */
+    var canArchivePatient: Bool {
+        guard let patient = selectedPatient else { return false }
+        return patient.deletedAt == nil
+            && patient.isArchived != true
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canUnarchivePatient: Bool {
+        guard let patient = selectedPatient else { return false }
+        return patient.deletedAt == nil
+            && patient.isArchived == true
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canSoftDeletePatient: Bool {
+        guard let patient = selectedPatient else { return false }
+        return patient.deletedAt == nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canRestorePatient(_ patient: HomeBasePatientSummary) -> Bool {
+        patient.deletedAt != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func setSelectedPatientArchived(_ isArchived: Bool) async {
+        guard let current = selectedPatient else { return }
+        guard (isArchived && canArchivePatient) || (!isArchived && canUnarchivePatient) else { return }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let payload = HomeBasePatientUpdatePayload(version: current.version, isArchived: isArchived)
+        await runTask {
+            let acknowledgement = try await self.makeClient().updatePatient(
+                patientId: current.id,
+                payload: payload,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            let fetchedDetail = try await self.makeClient().fetchPatient(
+                id: current.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: self.masterKey)
+            self.patients = try await self.makeClient().fetchPatients(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            self.statusMessage = isArchived
+                ? "Paziente archiviato sull'home-base."
+                : "Paziente riattivato sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func softDeleteSelectedPatient(reason: String?) async {
+        guard let patient = selectedPatient, canSoftDeletePatient else { return }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let trimmedReason = reason?.trimmingCharacters(in: .whitespacesAndNewlines).trimmedOrNil
+        if trimmedReason != nil && masterKey == nil {
+            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore oppure lascia vuota la motivazione."
+            return
+        }
+        await runTask {
+            let sealedReason = trimmedReason == nil ? nil : try self.sealField(trimmedReason)
+            let acknowledgement = try await self.makeClient().softDeletePatient(
+                id: patient.id,
+                version: patient.version,
+                sealedReason: sealedReason,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.selectedPatient = nil
+            self.entries = []
+            self.therapies = []
+            self.checkups = []
+            self.observations = []
+            self.patientReportURL = nil
+            self.patients = try await self.makeClient().fetchPatients(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                includeDeleted: true
+            )
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            self.statusMessage = "Paziente spostato nel cestino (versione \(acknowledgement.version ?? patient.version + 1))."
+        }
+    }
+
+    /* @Codex */
+    func restorePatient(_ patient: HomeBasePatientSummary) async {
+        guard canRestorePatient(patient) else { return }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima una sessione paired online."
+            return
+        }
+        await runTask {
+            _ = try await self.makeClient().restorePatient(
+                id: patient.id,
+                version: patient.version,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.patients = try await self.makeClient().fetchPatients(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                includeDeleted: true
+            )
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            self.statusMessage = "Paziente ripristinato dall'home-base."
         }
     }
 
@@ -973,7 +1339,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let title = editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let content = editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let content = editEntryContent == editingEntryOriginalContent
+            ? nil
+            : editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
         let type = editEntryType.rawValue
         await runTask {
             let acknowledgement = try await self.makeClient().updateEntry(
@@ -983,7 +1351,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     version: version,
                     type: type,
                     title: try self.sealField(title),
-                    content: try self.sealField(content)
+                    content: content == nil ? nil : try self.sealField(content)
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1002,7 +1370,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    func softDeleteEntry(id entryId: String) async {
+    func softDeleteEntry(id entryId: String, reason: String?) async {
         guard let entry = entries.first(where: { $0.id == entryId }),
               canMutateEntry(entry) else { return }
         guard let patientId = selectedPatient?.id,
@@ -1011,6 +1379,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
+        let trimmedReason = reason?.trimmingCharacters(in: .whitespacesAndNewlines).trimmedOrNil
         await runTask {
             let acknowledgement = try await self.makeClient().updateEntry(
                 patientId: patientId,
@@ -1018,7 +1387,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseEntryUpdatePayload(
                     version: entry.version,
                     deletedAt: Date(),
-                    deletionReason: try self.sealField("mobile-paired-operator-cancelled")
+                    deletionReason: try self.sealField(trimmedReason),
+                    shouldEncodeDeletionReason: true
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1035,6 +1405,42 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             self.statusMessage = "Voce diario annullata sull'home-base."
+        }
+    }
+
+    /* @Codex */
+    func restoreEntry(id entryId: String) async {
+        guard let entry = entries.first(where: { $0.id == entryId }),
+              canRestoreEntry(entry) else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateEntry(
+                patientId: patientId,
+                entryId: entry.id,
+                payload: HomeBaseEntryUpdatePayload(
+                    version: entry.version,
+                    deletedAt: nil,
+                    deletionReason: nil,
+                    shouldEncodeDeletedAt: true,
+                    shouldEncodeDeletionReason: true
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.entries = try await self.fetchDecryptedEntries(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Voce diario ripristinata sull'home-base."
         }
     }
 
@@ -1073,6 +1479,52 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return currentPatientDiagnoses.first { $0.code == code }?.description
     }
 
+    /* @Codex */
+    func scheduleNewTherapyDrugCatalogSearch() {
+        scheduleDrugCatalogSearch(target: .newTherapy)
+    }
+
+    /* @Codex */
+    func scheduleEditTherapyDrugCatalogSearch() {
+        scheduleDrugCatalogSearch(target: .editTherapy)
+    }
+
+    /* @Codex */
+    func selectNewTherapyDrugCatalogResult(_ drug: HomeBaseDrugSummary) {
+        let draft = CatalogSelection.applying(
+            drug,
+            to: TherapyCatalogDraft(
+                drugName: newTherapyDrugName,
+                aic: newTherapyAIC,
+                atc: newTherapyATC,
+                activePrinciple: newTherapyActivePrinciple
+            )
+        )
+        newTherapyDrugName = draft.drugName
+        newTherapyAIC = draft.aic
+        newTherapyATC = draft.atc
+        newTherapyActivePrinciple = draft.activePrinciple
+        resetNewTherapyDrugCatalogSearch(clearAvailability: false)
+    }
+
+    /* @Codex */
+    func selectEditTherapyDrugCatalogResult(_ drug: HomeBaseDrugSummary) {
+        let draft = CatalogSelection.applying(
+            drug,
+            to: TherapyCatalogDraft(
+                drugName: editTherapyDrugName,
+                aic: editTherapyAIC,
+                atc: editTherapyATC,
+                activePrinciple: editTherapyActivePrinciple
+            )
+        )
+        editTherapyDrugName = draft.drugName
+        editTherapyAIC = draft.aic
+        editTherapyATC = draft.atc
+        editTherapyActivePrinciple = draft.activePrinciple
+        resetEditTherapyDrugCatalogSearch(clearAvailability: false)
+    }
+
     func createTherapyForSelectedPatient() async {
         guard canCreateTherapy else { return }
         guard let patientId = selectedPatient?.id,
@@ -1082,6 +1534,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let drugName = newTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let aic = newTherapyAIC.trimmedOrNil
+        let atc = newTherapyATC.trimmedOrNil
         let activePrinciple = newTherapyActivePrinciple.trimmedOrNil
         let dosage = newTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
         let motivation = newTherapyMotivation.trimmedOrNil
@@ -1093,6 +1547,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 patientId: patientId,
                 payload: HomeBaseTherapyCreatePayload(
                     drugName: drugName,
+                    aic: aic,
+                    atc: atc,
                     activePrinciple: activePrinciple,
                     diagnosisCode: diagnosisCode,
                     diagnosisName: diagnosisName,
@@ -1123,6 +1579,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editingTherapyId = therapy.id
         editingTherapyVersion = therapy.version
         editTherapyDrugName = therapy.drugName
+        editTherapyAIC = therapy.aic ?? ""
+        editTherapyATC = therapy.atc ?? ""
         editTherapyActivePrinciple = therapy.activePrinciple ?? ""
         editTherapyDosage = therapy.dosage
         editTherapyMotivation = therapy.motivation ?? ""
@@ -1131,6 +1589,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editTherapyHasEndDate = therapy.endDate != nil
         editTherapyEndDate = therapy.endDate ?? Date()
         editTherapyDiagnosisCode = therapy.diagnosisCode ?? ""
+        resetEditTherapyDrugCatalogSearch(clearAvailability: false)
         statusMessage = "Modifica terapia pronta."
     }
 
@@ -1139,6 +1598,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editingTherapyId = nil
         editingTherapyVersion = nil
         editTherapyDrugName = ""
+        editTherapyAIC = ""
+        editTherapyATC = ""
         editTherapyActivePrinciple = ""
         editTherapyDosage = ""
         editTherapyMotivation = ""
@@ -1147,6 +1608,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editTherapyHasEndDate = false
         editTherapyEndDate = Date()
         editTherapyDiagnosisCode = ""
+        resetEditTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
     /* @Codex */
@@ -1161,6 +1623,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let drugName = editTherapyDrugName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let aic = editTherapyAIC.trimmingCharacters(in: .whitespacesAndNewlines)
+        let atc = editTherapyATC.trimmingCharacters(in: .whitespacesAndNewlines)
         let activePrinciple = editTherapyActivePrinciple.trimmingCharacters(in: .whitespacesAndNewlines)
         let dosage = editTherapyDosage.trimmingCharacters(in: .whitespacesAndNewlines)
         let motivation = editTherapyMotivation.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1173,6 +1637,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseTherapyUpdatePayload(
                     version: version,
                     drugName: drugName,
+                    aic: aic,
+                    atc: atc,
                     activePrinciple: activePrinciple,
                     diagnosisCode: diagnosisCode,
                     diagnosisName: diagnosisName,
@@ -1562,6 +2028,370 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    /* @Codex */
+    func scheduleNewObservationCodeTerminologySearch() {
+        scheduleObservationTerminologySearch(target: .newCode)
+    }
+
+    /* @Codex */
+    func scheduleNewObservationUnitTerminologySearch() {
+        scheduleObservationTerminologySearch(target: .newUnit)
+    }
+
+    /* @Codex */
+    func scheduleEditObservationCodeTerminologySearch() {
+        scheduleObservationTerminologySearch(target: .editCode)
+    }
+
+    /* @Codex */
+    func scheduleEditObservationUnitTerminologySearch() {
+        scheduleObservationTerminologySearch(target: .editUnit)
+    }
+
+    /* @Codex */
+    func selectNewObservationCodeTerminology(_ item: HomeBaseTerminologyItem) {
+        newObservationCode = item.code
+        newObservationDisplay = item.display
+        resetObservationTerminologySearch(target: .newCode)
+    }
+
+    /* @Codex */
+    func selectNewObservationUnitTerminology(_ item: HomeBaseTerminologyItem) {
+        newObservationUnitCode = item.code
+        resetObservationTerminologySearch(target: .newUnit)
+    }
+
+    /* @Codex */
+    func selectEditObservationCodeTerminology(_ item: HomeBaseTerminologyItem) {
+        editObservationCode = item.code
+        editObservationDisplay = item.display
+        resetObservationTerminologySearch(target: .editCode)
+    }
+
+    /* @Codex */
+    func selectEditObservationUnitTerminology(_ item: HomeBaseTerminologyItem) {
+        editObservationUnitCode = item.code
+        resetObservationTerminologySearch(target: .editUnit)
+    }
+
+    /* @Codex */
+    func loadSelectedPatientServicePrescriptions() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.servicePrescriptions = try await self.fetchServicePrescriptions(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "\(self.servicePrescriptions.count) prescrizioni di prestazioni caricate."
+        }
+    }
+
+    /* @Codex */
+    func createServicePrescriptionForSelectedPatient() async {
+        guard canCreateServicePrescription else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let serviceName = newServiceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let itemDrafts = ServicePrescriptionParsing.parseItemDrafts(newServiceItemsText, fallbackName: serviceName)
+        let inheritedCode = itemDrafts.count == 1 ? newServiceCode.trimmedOrNil : nil
+        let parentId = UUID().uuidString
+        await runTask {
+            let created = try await self.makeClient().createServicePrescription(
+                payload: HomeBaseServicePrescriptionCreatePayload(
+                    id: parentId,
+                    patientId: patientId,
+                    prescribedAt: self.newServicePrescribedAt,
+                    serviceName: serviceName,
+                    status: self.newServiceStatus.rawValue,
+                    category: self.newServiceCategory.rawValue,
+                    priority: self.newServicePriority.rawValue,
+                    codeSystem: self.newServiceCodeSystem.trimmedOrNil,
+                    serviceCode: self.newServiceCode.trimmedOrNil,
+                    clinicalQuestion: self.newServiceClinicalQuestion.trimmedOrNil,
+                    provider: self.newServiceProvider.trimmedOrNil,
+                    scheduledAt: self.newServiceHasScheduledAt ? self.newServiceScheduledAt : nil,
+                    performedAt: self.newServiceHasPerformedAt ? self.newServicePerformedAt : nil,
+                    reportReceivedAt: self.newServiceHasReportReceivedAt ? self.newServiceReportReceivedAt : nil,
+                    outcomeNote: self.newServiceOutcomeNote.trimmedOrNil,
+                    requestReference: self.newServiceRequestReference.trimmedOrNil,
+                    source: self.newServiceSource.rawValue,
+                    documentRefs: self.newServiceDocumentRefs.trimmedOrNil,
+                    notes: self.newServiceNotes.trimmedOrNil
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            let prescriptionId = created.id
+            for (index, draft) in itemDrafts.enumerated() {
+                _ = try await self.makeClient().createServicePrescriptionItem(
+                    payload: HomeBaseServicePrescriptionItemCreatePayload(
+                        prescriptionId: prescriptionId,
+                        serviceName: draft.serviceName,
+                        ordinal: index + 1,
+                        status: self.newServiceStatus.rawValue,
+                        category: self.newServiceCategory.rawValue,
+                        codeSystem: self.newServiceCodeSystem.trimmedOrNil,
+                        serviceCode: ServicePrescriptionParsing.childServiceCode(
+                            for: draft,
+                            inheritedServiceCode: inheritedCode
+                        ),
+                        matchStatus: draft.serviceCode == nil ? "unmatched" : "manual",
+                        scheduledAt: self.newServiceHasScheduledAt ? self.newServiceScheduledAt : nil,
+                        performedAt: self.newServiceHasPerformedAt ? self.newServicePerformedAt : nil,
+                        reportReceivedAt: self.newServiceHasReportReceivedAt ? self.newServiceReportReceivedAt : nil,
+                        outcomeNote: self.newServiceOutcomeNote.trimmedOrNil
+                    ),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                )
+            }
+            self.resetNewServicePrescriptionForm()
+            self.servicePrescriptions = try await self.fetchServicePrescriptions(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "Prescrizione prestazioni registrata."
+        }
+    }
+
+    /* @Codex */
+    func bookServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
+        let scheduledAt = prescription.scheduledAt ?? Date()
+        await updateServicePrescriptionWithItems(
+            prescription,
+            status: .booked,
+            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
+                version: prescription.version,
+                status: PairedServicePrescriptionStatus.booked.rawValue,
+                scheduledAt: .value(scheduledAt)
+            ),
+            childPayload: { item in
+                HomeBaseServicePrescriptionItemUpdatePayload(
+                    version: item.version,
+                    status: PairedServicePrescriptionStatus.booked.rawValue,
+                    scheduledAt: .value(item.scheduledAt ?? scheduledAt)
+                )
+            },
+            successMessage: "Prestazione prenotata."
+        )
+    }
+
+    /* @Codex */
+    func performServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
+        let performedAt = prescription.performedAt ?? Date()
+        await updateServicePrescriptionWithItems(
+            prescription,
+            status: .performed,
+            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
+                version: prescription.version,
+                status: PairedServicePrescriptionStatus.performed.rawValue,
+                performedAt: .value(performedAt)
+            ),
+            childPayload: { item in
+                HomeBaseServicePrescriptionItemUpdatePayload(
+                    version: item.version,
+                    status: PairedServicePrescriptionStatus.performed.rawValue,
+                    performedAt: .value(item.performedAt ?? performedAt)
+                )
+            },
+            successMessage: "Prestazione eseguita."
+        )
+    }
+
+    /* @Codex */
+    func receiveServicePrescriptionReport(_ prescription: HomeBaseServicePrescriptionSummary) async {
+        let reportReceivedAt = prescription.reportReceivedAt ?? Date()
+        await updateServicePrescriptionWithItems(
+            prescription,
+            status: .reportReceived,
+            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
+                version: prescription.version,
+                status: PairedServicePrescriptionStatus.reportReceived.rawValue,
+                reportReceivedAt: .value(reportReceivedAt)
+            ),
+            childPayload: { item in
+                HomeBaseServicePrescriptionItemUpdatePayload(
+                    version: item.version,
+                    status: PairedServicePrescriptionStatus.reportReceived.rawValue,
+                    reportReceivedAt: .value(item.reportReceivedAt ?? reportReceivedAt)
+                )
+            },
+            successMessage: "Referto prestazione ricevuto."
+        )
+    }
+
+    /* @Codex */
+    func cancelServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
+        await updateServicePrescriptionWithItems(
+            prescription,
+            status: .cancelled,
+            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
+                version: prescription.version,
+                status: PairedServicePrescriptionStatus.cancelled.rawValue
+            ),
+            childPayload: { item in
+                HomeBaseServicePrescriptionItemUpdatePayload(
+                    version: item.version,
+                    status: PairedServicePrescriptionStatus.cancelled.rawValue
+                )
+            },
+            successMessage: "Prescrizione prestazioni annullata."
+        )
+    }
+
+    /* @Codex */
+    func loadSelectedPatientProstheticPrescriptions() async {
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "\(self.prostheticPrescriptions.count) prescrizioni protesiche caricate."
+        }
+    }
+
+    /* @Codex */
+    func createProstheticPrescriptionForSelectedPatient() async {
+        guard canCreateProstheticPrescription else { return }
+        guard let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let description = newProstheticDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            _ = try await self.makeClient().createProstheticPrescription(
+                payload: HomeBaseProstheticPrescriptionCreatePayload(
+                    patientId: patientId,
+                    prescribedAt: self.newProstheticPrescribedAt,
+                    description: description,
+                    status: self.newProstheticStatus.rawValue,
+                    category: self.newProstheticCategory.rawValue,
+                    isoCode: self.newProstheticISOCode.trimmedOrNil,
+                    measures: self.newProstheticMeasures.trimmedOrNil,
+                    clinicalReason: self.newProstheticClinicalReason.trimmedOrNil,
+                    regionalPrescriptionId: self.newProstheticRegionalPrescriptionId.trimmedOrNil,
+                    supplier: self.newProstheticSupplier.trimmedOrNil,
+                    collaudoAt: self.newProstheticHasCollaudoAt ? self.newProstheticCollaudoAt : nil,
+                    collaudoOutcome: self.newProstheticCollaudoOutcome.trimmedOrNil,
+                    source: self.newProstheticSource.rawValue,
+                    documentRefs: self.newProstheticDocumentRefs.trimmedOrNil,
+                    notes: self.newProstheticNotes.trimmedOrNil
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.resetNewProstheticPrescriptionForm()
+            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "Prescrizione protesica registrata."
+        }
+    }
+
+    /* @Codex */
+    func markProstheticPrescriptionTested(_ prescription: HomeBaseProstheticPrescriptionSummary) async {
+        guard canTestProstheticPrescription(prescription),
+              let patientId = selectedPatient?.id,
+              let sessionCookie,
+              let credentials = pairedCredentials else { return }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateProstheticPrescription(
+                prescriptionId: prescription.id,
+                payload: HomeBaseProstheticPrescriptionUpdatePayload(
+                    version: prescription.version,
+                    status: PairedProstheticPrescriptionStatus.tested.rawValue,
+                    collaudoAt: .value(prescription.collaudoAt ?? Date()),
+                    collaudoOutcome: .value(prescription.collaudoOutcome ?? "Collaudo registrato in MediFlow.")
+                ),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
+                patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = "Collaudo registrato."
+        }
+    }
+
+    /* @Codex */
+    func dismissFHIRWarningValidation() {
+        pendingFHIRWarningValidation = nil
+    }
+
+    /* @Codex */
+    func prepareFHIRExport(confirmWarnings: Bool = false) async {
+        guard canPrepareFHIRExport,
+              let patient = selectedPatient,
+              let sessionCookie,
+              let credentials = pairedCredentials else { return }
+        await runTask {
+            let validation = try await self.makeClient().fetchFseValidatePatient(
+                patientId: patient.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            let errorCount = validation.totalErrorCount
+            let warningCount = validation.totalWarningCount
+            if validation.hasErrors {
+                self.pendingFHIRWarningValidation = nil
+                self.patientFHIRExportURL = nil
+                self.statusMessage = "Export FHIR bloccato: \(errorCount) errori FSE da correggere."
+                return
+            }
+            if validation.hasWarnings && !confirmWarnings {
+                self.pendingFHIRWarningValidation = validation
+                self.statusMessage = "Export FHIR richiede conferma: \(warningCount) avvisi FSE."
+                return
+            }
+            self.pendingFHIRWarningValidation = nil
+            let input = FHIRBundleDTOAdapter.input(
+                patient: patient,
+                entries: self.entries,
+                therapies: self.therapies,
+                checkups: self.checkups,
+                observations: self.observations,
+                generatedAt: Self.fhirTimestamp(Date())
+            )
+            let data = try FHIRBundleDTOAdapter.encodedBundleData(input: input)
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(FHIRBundleDTOAdapter.exportFileName(patient: patient))
+            try data.write(to: url, options: [.atomic])
+            self.patientFHIRExportURL = url
+            self.statusMessage = "Export FHIR pronto per la condivisione."
+        }
+    }
+
+    /* @Codex */
+    func checkNetworkRevisionOnForeground() async {
+        await checkNetworkRevision(refreshOnChange: true)
+    }
+
     func savePairing() async {
         guard pairedCredentials != nil else {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
@@ -1593,6 +2423,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             therapies = []
             checkups = []
             observations = []
+            patientReportURL = nil
             newEntryTitle = ""
             newEntryType = .note
             newEntryContent = ""
@@ -1623,6 +2454,376 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return HomeBasePairedCredentials(clientId: clientId, clientToken: clientToken)
     }
 
+    /* @Codex */
+    private enum TherapyCatalogTarget {
+        case newTherapy
+        case editTherapy
+    }
+
+    /* @Codex */
+    private enum ObservationTerminologyTarget {
+        case newCode
+        case newUnit
+        case editCode
+        case editUnit
+
+        var system: String {
+            switch self {
+            case .newCode, .editCode:
+                return "LOINC"
+            case .newUnit, .editUnit:
+                return "UCUM"
+            }
+        }
+    }
+
+    /* @Codex */
+    private struct CatalogLookupContext {
+        let credentials: HomeBasePairedCredentials
+        let sessionCookie: String
+        let ambulatoryId: String?
+    }
+
+    /* @Codex */
+    private static let catalogSearchDebounceNanoseconds: UInt64 = 300_000_000
+
+    /* @Codex */
+    private static let catalogMinimumQueryLength = 2
+
+    /* @Codex */
+    private var catalogLookupContext: CatalogLookupContext? {
+        guard let sessionCookie,
+              let credentials = pairedCredentials,
+              connectionState == .pairedOnline else {
+            return nil
+        }
+        return CatalogLookupContext(
+            credentials: credentials,
+            sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId.trimmedOrNil
+        )
+    }
+
+    /* @Codex */
+    private func scheduleDrugCatalogSearch(target: TherapyCatalogTarget) {
+        cancelDrugCatalogTask(target)
+        guard isDrugCatalogAvailable else {
+            setDrugCatalogResults([], target: target)
+            setDrugCatalogLoading(false, target: target)
+            return
+        }
+        let query = drugCatalogQuery(target)
+        guard query.count >= Self.catalogMinimumQueryLength else {
+            setDrugCatalogResults([], target: target)
+            setDrugCatalogLoading(false, target: target)
+            return
+        }
+        let task = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.catalogSearchDebounceNanoseconds)
+            guard !Task.isCancelled else { return }
+            await self?.performDrugCatalogSearch(query: query, target: target)
+        }
+        switch target {
+        case .newTherapy:
+            newTherapyDrugCatalogTask = task
+        case .editTherapy:
+            editTherapyDrugCatalogTask = task
+        }
+    }
+
+    /* @Codex */
+    private func performDrugCatalogSearch(query: String, target: TherapyCatalogTarget) async {
+        guard drugCatalogQuery(target) == query,
+              let context = catalogLookupContext else {
+            setDrugCatalogResults([], target: target)
+            setDrugCatalogLoading(false, target: target)
+            return
+        }
+        setDrugCatalogLoading(true, target: target)
+        defer { setDrugCatalogLoading(false, target: target) }
+        do {
+            let results = try await makeClient().searchDrugs(
+                query: query,
+                limit: HomeBaseCatalogSearchLimit.defaultMaximum,
+                credentials: context.credentials,
+                sessionCookie: context.sessionCookie,
+                ambulatoryId: context.ambulatoryId
+            )
+            guard drugCatalogQuery(target) == query else { return }
+            setDrugCatalogResults(results, target: target)
+            drugCatalogStatusMessage = nil
+        } catch {
+            markDrugCatalogUnavailable()
+        }
+    }
+
+    /* @Codex */
+    private func performExemptionCatalogSearch(query: String) async {
+        guard newExemptionCode.trimmingCharacters(in: .whitespacesAndNewlines) == query,
+              let context = catalogLookupContext else {
+            exemptionCatalogResults = []
+            isSearchingExemptionCatalog = false
+            return
+        }
+        isSearchingExemptionCatalog = true
+        defer { isSearchingExemptionCatalog = false }
+        do {
+            let results = try await makeClient().searchExemptions(
+                query: query,
+                limit: HomeBaseCatalogSearchLimit.defaultMaximum,
+                credentials: context.credentials,
+                sessionCookie: context.sessionCookie,
+                ambulatoryId: context.ambulatoryId
+            )
+            guard newExemptionCode.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
+            exemptionCatalogResults = results
+            exemptionCatalogStatusMessage = nil
+        } catch {
+            markExemptionCatalogUnavailable()
+        }
+    }
+
+    /* @Codex */
+    private func scheduleObservationTerminologySearch(target: ObservationTerminologyTarget) {
+        cancelObservationTerminologyTask(target)
+        guard isTerminologySearchAvailable else {
+            setObservationTerminologyResults([], target: target)
+            setObservationTerminologyLoading(false, target: target)
+            return
+        }
+        let query = observationTerminologyQuery(target)
+        guard query.count >= 2 else {
+            setObservationTerminologyResults([], target: target)
+            setObservationTerminologyLoading(false, target: target)
+            return
+        }
+        let task = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.performObservationTerminologySearch(query: query, target: target)
+        }
+        setObservationTerminologyTask(task, target: target)
+    }
+
+    /* @Codex */
+    private func performObservationTerminologySearch(query: String, target: ObservationTerminologyTarget) async {
+        guard observationTerminologyQuery(target) == query,
+              let context = catalogLookupContext else {
+            setObservationTerminologyResults([], target: target)
+            setObservationTerminologyLoading(false, target: target)
+            return
+        }
+        setObservationTerminologyLoading(true, target: target)
+        defer { setObservationTerminologyLoading(false, target: target) }
+        do {
+            let results = try await makeClient().searchTerminology(
+                system: target.system,
+                query: query,
+                limit: HomeBaseCatalogSearchLimit.defaultMaximum,
+                credentials: context.credentials,
+                sessionCookie: context.sessionCookie,
+                ambulatoryId: context.ambulatoryId
+            )
+            guard observationTerminologyQuery(target) == query else { return }
+            setObservationTerminologyResults(results, target: target)
+        } catch {
+            markTerminologySearchUnavailable()
+        }
+    }
+
+    /* @Codex */
+    private func drugCatalogQuery(_ target: TherapyCatalogTarget) -> String {
+        let raw = target == .newTherapy ? newTherapyDrugName : editTherapyDrugName
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /* @Codex */
+    private func observationTerminologyQuery(_ target: ObservationTerminologyTarget) -> String {
+        switch target {
+        case .newCode:
+            return newObservationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .newUnit:
+            return newObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .editCode:
+            return editObservationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .editUnit:
+            return editObservationUnitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /* @Codex */
+    private func setDrugCatalogResults(_ results: [HomeBaseDrugSummary], target: TherapyCatalogTarget) {
+        switch target {
+        case .newTherapy:
+            newTherapyDrugCatalogResults = results
+        case .editTherapy:
+            editTherapyDrugCatalogResults = results
+        }
+    }
+
+    /* @Codex */
+    private func setDrugCatalogLoading(_ isLoading: Bool, target: TherapyCatalogTarget) {
+        switch target {
+        case .newTherapy:
+            isSearchingNewTherapyDrugCatalog = isLoading
+        case .editTherapy:
+            isSearchingEditTherapyDrugCatalog = isLoading
+        }
+    }
+
+    /* @Codex */
+    private func setObservationTerminologyResults(_ results: [HomeBaseTerminologyItem], target: ObservationTerminologyTarget) {
+        switch target {
+        case .newCode:
+            newObservationCodeTerminologyResults = results
+        case .newUnit:
+            newObservationUnitTerminologyResults = results
+        case .editCode:
+            editObservationCodeTerminologyResults = results
+        case .editUnit:
+            editObservationUnitTerminologyResults = results
+        }
+    }
+
+    /* @Codex */
+    private func setObservationTerminologyLoading(_ isLoading: Bool, target: ObservationTerminologyTarget) {
+        switch target {
+        case .newCode:
+            isSearchingNewObservationCodeTerminology = isLoading
+        case .newUnit:
+            isSearchingNewObservationUnitTerminology = isLoading
+        case .editCode:
+            isSearchingEditObservationCodeTerminology = isLoading
+        case .editUnit:
+            isSearchingEditObservationUnitTerminology = isLoading
+        }
+    }
+
+    /* @Codex */
+    private func cancelDrugCatalogTask(_ target: TherapyCatalogTarget) {
+        switch target {
+        case .newTherapy:
+            newTherapyDrugCatalogTask?.cancel()
+            newTherapyDrugCatalogTask = nil
+        case .editTherapy:
+            editTherapyDrugCatalogTask?.cancel()
+            editTherapyDrugCatalogTask = nil
+        }
+    }
+
+    /* @Codex */
+    private func setObservationTerminologyTask(_ task: Task<Void, Never>?, target: ObservationTerminologyTarget) {
+        switch target {
+        case .newCode:
+            newObservationCodeTerminologyTask = task
+        case .newUnit:
+            newObservationUnitTerminologyTask = task
+        case .editCode:
+            editObservationCodeTerminologyTask = task
+        case .editUnit:
+            editObservationUnitTerminologyTask = task
+        }
+    }
+
+    /* @Codex */
+    private func cancelObservationTerminologyTask(_ target: ObservationTerminologyTarget) {
+        switch target {
+        case .newCode:
+            newObservationCodeTerminologyTask?.cancel()
+            newObservationCodeTerminologyTask = nil
+        case .newUnit:
+            newObservationUnitTerminologyTask?.cancel()
+            newObservationUnitTerminologyTask = nil
+        case .editCode:
+            editObservationCodeTerminologyTask?.cancel()
+            editObservationCodeTerminologyTask = nil
+        case .editUnit:
+            editObservationUnitTerminologyTask?.cancel()
+            editObservationUnitTerminologyTask = nil
+        }
+    }
+
+    /* @Codex */
+    private func markDrugCatalogUnavailable() {
+        isDrugCatalogAvailable = false
+        newTherapyDrugCatalogResults = []
+        editTherapyDrugCatalogResults = []
+        isSearchingNewTherapyDrugCatalog = false
+        isSearchingEditTherapyDrugCatalog = false
+        drugCatalogStatusMessage = "Catalogo non disponibile, inserimento manuale"
+    }
+
+    /* @Codex */
+    private func markExemptionCatalogUnavailable() {
+        isExemptionCatalogAvailable = false
+        exemptionCatalogResults = []
+        isSearchingExemptionCatalog = false
+        exemptionCatalogStatusMessage = "Catalogo non disponibile, inserimento manuale"
+    }
+
+    /* @Codex */
+    private func markTerminologySearchUnavailable() {
+        isTerminologySearchAvailable = false
+        for target in [ObservationTerminologyTarget.newCode, .newUnit, .editCode, .editUnit] {
+            setObservationTerminologyResults([], target: target)
+            setObservationTerminologyLoading(false, target: target)
+        }
+    }
+
+    /* @Codex */
+    private func resetNewTherapyDrugCatalogSearch(clearAvailability: Bool) {
+        newTherapyDrugCatalogTask?.cancel()
+        newTherapyDrugCatalogTask = nil
+        newTherapyDrugCatalogResults = []
+        isSearchingNewTherapyDrugCatalog = false
+        if clearAvailability {
+            isDrugCatalogAvailable = true
+            drugCatalogStatusMessage = nil
+        }
+    }
+
+    /* @Codex */
+    private func resetEditTherapyDrugCatalogSearch(clearAvailability: Bool) {
+        editTherapyDrugCatalogTask?.cancel()
+        editTherapyDrugCatalogTask = nil
+        editTherapyDrugCatalogResults = []
+        isSearchingEditTherapyDrugCatalog = false
+        if clearAvailability {
+            isDrugCatalogAvailable = true
+            drugCatalogStatusMessage = nil
+        }
+    }
+
+    /* @Codex */
+    private func resetExemptionCatalogSearch(clearAvailability: Bool) {
+        exemptionCatalogTask?.cancel()
+        exemptionCatalogTask = nil
+        exemptionCatalogResults = []
+        isSearchingExemptionCatalog = false
+        if clearAvailability {
+            isExemptionCatalogAvailable = true
+            exemptionCatalogStatusMessage = nil
+        }
+    }
+
+    /* @Codex */
+    private func resetObservationTerminologySearch(target: ObservationTerminologyTarget) {
+        cancelObservationTerminologyTask(target)
+        setObservationTerminologyResults([], target: target)
+        setObservationTerminologyLoading(false, target: target)
+    }
+
+    /* @Codex */
+    private func resetCatalogAvailability() {
+        resetNewTherapyDrugCatalogSearch(clearAvailability: true)
+        resetEditTherapyDrugCatalogSearch(clearAvailability: true)
+        resetExemptionCatalogSearch(clearAvailability: true)
+        for target in [ObservationTerminologyTarget.newCode, .newUnit, .editCode, .editUnit] {
+            resetObservationTerminologySearch(target: target)
+        }
+        isTerminologySearchAvailable = true
+    }
+
     // ADR 0071 Fase 3: returns the data-source SEAM (any HomeBasePatientsDataSource),
     // not the concrete HTTP actor, so the implementation can be swapped for the
     // in-process SQLite-backed adapter without touching the call sites.
@@ -1633,6 +2834,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // everything else still delegates to the HTTP client. OFF by default -> the app's
     // behavior is unchanged unless the flag is set.
     private func makeClient() -> any HomeBasePatientsDataSource {
+        if let dataSourceFactory {
+            return dataSourceFactory(self)
+        }
         let http = HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
         guard Self.localAuthorityEnabled, let masterKey else { return http }
         let dbPath = HomeBaseRuntimeStatusLoader.defaultDataDirectoryURL()
@@ -1643,6 +2847,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private static var localAuthorityEnabled: Bool {
         let raw = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]?.lowercased()
         return raw == "1" || raw == "true" || raw == "yes"
+    }
+
+    /* @Codex */
+    private static func fhirTimestamp(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 
     // Fetch + decrypt the clinical sub-resources so their encrypted fields display
@@ -1666,6 +2877,162 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func fetchDecryptedObservations(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseObservationSummary] {
         try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
             .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
+    }
+
+    /* @Codex */
+    private func fetchServicePrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionSummary] {
+        let rows = try await makeClient().fetchServicePrescriptions(
+            patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        return ServicePrescriptionFiltering.sorted(rows)
+    }
+
+    /* @Codex */
+    private func fetchServicePrescriptionItems(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionItemSummary] {
+        let rows = try await makeClient().fetchServicePrescriptionItems(
+            patientId: patientId, prescriptionId: nil,
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        return ServicePrescriptionFiltering.sortedItems(rows)
+    }
+
+    /* @Codex */
+    private func fetchProstheticPrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseProstheticPrescriptionSummary] {
+        let rows = try await makeClient().fetchProstheticPrescriptions(
+            patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        return ProstheticPrescriptionFiltering.sorted(rows)
+    }
+
+    /* @Codex */
+    func generatePatientReportPDF() {
+        guard let detail = selectedPatient else {
+            errorMessage = "Apri prima un paziente."
+            return
+        }
+        do {
+            let now = Date()
+            let content = PatientReportDocument.build(
+                patient: detail,
+                entries: entries,
+                therapies: therapies,
+                checkups: checkups,
+                observations: observations,
+                generatedAt: now,
+                referenceDate: now
+            )
+            patientReportURL = try PatientReportPDFRenderer.render(content)
+            statusMessage = "Report PDF pronto per la condivisione."
+        } catch {
+            errorMessage = "Report PDF non generato: \(error.localizedDescription)"
+        }
+    }
+
+    /* @Codex */
+    private func updateServicePrescriptionWithItems(
+        _ prescription: HomeBaseServicePrescriptionSummary,
+        status: PairedServicePrescriptionStatus,
+        parentPayload: HomeBaseServicePrescriptionUpdatePayload,
+        childPayload: @escaping (HomeBaseServicePrescriptionItemSummary) -> HomeBaseServicePrescriptionItemUpdatePayload,
+        successMessage: String
+    ) async {
+        guard canMutateServicePrescription(prescription),
+              selectedPatient?.id == prescription.patientId,
+              let sessionCookie,
+              let credentials = pairedCredentials else { return }
+        switch status {
+        case .booked where !canBookServicePrescription(prescription): return
+        case .performed where !canPerformServicePrescription(prescription): return
+        case .reportReceived where !canReceiveReportServicePrescription(prescription): return
+        case .cancelled where !canCancelServicePrescription(prescription): return
+        default: break
+        }
+        await runTask {
+            let acknowledgement = try await self.makeClient().updateServicePrescription(
+                prescriptionId: prescription.id,
+                payload: parentPayload,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            let children = self.servicePrescriptionItems.filter { $0.prescriptionId == prescription.id }
+            for item in children {
+                let itemAcknowledgement = try await self.makeClient().updateServicePrescriptionItem(
+                    itemId: item.id,
+                    payload: childPayload(item),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                )
+                guard itemAcknowledgement.success else { throw HomeBaseClientError.contract }
+            }
+            self.servicePrescriptions = try await self.fetchServicePrescriptions(
+                patientId: prescription.patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
+                patientId: prescription.patientId, credentials: credentials, sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+            self.statusMessage = successMessage
+        }
+    }
+
+    /* @Codex */
+    private func checkNetworkRevision(refreshOnChange: Bool) async {
+        guard connectionState == .pairedOnline,
+              let sessionCookie,
+              let credentials = pairedCredentials else { return }
+        do {
+            let revision = try await makeClient().fetchNetworkRevision(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: ambulatoryId.trimmedOrNil
+            )
+            guard self.lastSeenNetworkFingerprint != nil else {
+                lastSeenNetworkFingerprint = revision.fingerprint
+                return
+            }
+            guard refreshOnChange, lastSeenNetworkFingerprint != revision.fingerprint else { return }
+            lastSeenNetworkFingerprint = revision.fingerprint
+            try await refreshCurrentWorkspaceAfterRevision(
+                credentials: credentials,
+                sessionCookie: sessionCookie
+            )
+            statusMessage = "Home-base aggiornato, dati ricaricati."
+        } catch {
+            // Revision polling must not interrupt manual work when the Mac is offline.
+        }
+    }
+
+    /* @Codex */
+    private func refreshCurrentWorkspaceAfterRevision(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws {
+        if let current = selectedPatient {
+            let patientId = current.id
+            let fetchedDetail = try await makeClient().fetchPatient(
+                id: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: ambulatoryId.trimmedOrNil
+            )
+            selectedPatient = PatientFieldCrypto.decryptDetail(fetchedDetail, masterKey: masterKey)
+            entries = try await fetchDecryptedEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            therapies = try await fetchDecryptedTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            checkups = try await fetchDecryptedCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            observations = try await fetchDecryptedObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            servicePrescriptions = try await fetchServicePrescriptions(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            servicePrescriptionItems = try await fetchServicePrescriptionItems(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            prostheticPrescriptions = try await fetchProstheticPrescriptions(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
+            patientReportURL = nil
+            patientFHIRExportURL = nil
+        } else {
+            patients = try await makeClient().fetchPatients(
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: ambulatoryId.trimmedOrNil,
+                includeDeleted: false
+            )
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
+        }
     }
 
     private func applyLaunchOverrides(_ launchOverrides: AppleFoundationLaunchOverrides) {
@@ -1773,6 +3140,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private func resetNewTherapyForm() {
         newTherapyDrugName = ""
+        newTherapyAIC = ""
+        newTherapyATC = ""
         newTherapyActivePrinciple = ""
         newTherapyDosage = ""
         newTherapyMotivation = ""
@@ -1781,6 +3150,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
         newTherapyDiagnosisCode = ""
+        resetNewTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
     /* @Codex */
@@ -1799,6 +3169,52 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newObservationUnitCode = ""
         newObservationNotes = ""
         newObservationObservedAt = Date()
+        resetObservationTerminologySearch(target: .newCode)
+        resetObservationTerminologySearch(target: .newUnit)
+    }
+
+    /* @Codex */
+    private func resetNewServicePrescriptionForm() {
+        newServicePrescribedAt = Date()
+        newServiceStatus = .prescribed
+        newServiceCategory = .specialistica
+        newServicePriority = .p
+        newServiceCodeSystem = "NTR"
+        newServiceCode = ""
+        newServiceName = ""
+        newServiceClinicalQuestion = ""
+        newServiceProvider = ""
+        newServiceHasScheduledAt = false
+        newServiceScheduledAt = Date()
+        newServiceHasPerformedAt = false
+        newServicePerformedAt = Date()
+        newServiceHasReportReceivedAt = false
+        newServiceReportReceivedAt = Date()
+        newServiceOutcomeNote = ""
+        newServiceRequestReference = ""
+        newServiceSource = .manual
+        newServiceDocumentRefs = ""
+        newServiceNotes = ""
+        newServiceItemsText = ""
+    }
+
+    /* @Codex */
+    private func resetNewProstheticPrescriptionForm() {
+        newProstheticPrescribedAt = Date()
+        newProstheticStatus = .prescribed
+        newProstheticCategory = .ausilio
+        newProstheticISOCode = ""
+        newProstheticDescription = ""
+        newProstheticMeasures = ""
+        newProstheticClinicalReason = ""
+        newProstheticRegionalPrescriptionId = ""
+        newProstheticSupplier = ""
+        newProstheticHasCollaudoAt = false
+        newProstheticCollaudoAt = Date()
+        newProstheticCollaudoOutcome = ""
+        newProstheticSource = .manual
+        newProstheticDocumentRefs = ""
+        newProstheticNotes = ""
     }
 
     /* @Codex */
@@ -1905,6 +3321,35 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
+    var canCreateServicePrescription: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newServiceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canCreateProstheticPrescription: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newProstheticDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isWorking
+    }
+
+    /* @Codex */
+    var canPrepareFHIRExport: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
     var canUpdateEditingObservation: Bool {
         editingObservationId != nil
             && editingObservationVersion != nil
@@ -1922,6 +3367,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     func canMutateEntry(_ entry: HomeBaseEntrySummary) -> Bool {
         entry.deletedAt == nil
+            && selectedPatient?.id == entry.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canRestoreEntry(_ entry: HomeBaseEntrySummary) -> Bool {
+        entry.deletedAt != nil
             && selectedPatient?.id == entry.patientId
             && sessionCookie != nil
             && pairedCredentials != nil
@@ -1958,6 +3413,56 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !isWorking
     }
+
+    /* @Codex */
+    func canMutateServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
+        selectedPatient?.id == prescription.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !isWorking
+    }
+
+    /* @Codex */
+    func canBookServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
+        canMutateServicePrescription(prescription)
+            && prescription.status == PairedServicePrescriptionStatus.prescribed.rawValue
+    }
+
+    /* @Codex */
+    func canPerformServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
+        canMutateServicePrescription(prescription)
+            && [
+                PairedServicePrescriptionStatus.prescribed.rawValue,
+                PairedServicePrescriptionStatus.booked.rawValue,
+            ].contains(prescription.status)
+    }
+
+    /* @Codex */
+    func canReceiveReportServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
+        canMutateServicePrescription(prescription)
+            && prescription.status != PairedServicePrescriptionStatus.reportReceived.rawValue
+            && prescription.status != PairedServicePrescriptionStatus.cancelled.rawValue
+    }
+
+    /* @Codex */
+    func canCancelServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
+        canMutateServicePrescription(prescription)
+            && prescription.status != PairedServicePrescriptionStatus.cancelled.rawValue
+            && prescription.status != PairedServicePrescriptionStatus.performed.rawValue
+            && prescription.status != PairedServicePrescriptionStatus.reportReceived.rawValue
+    }
+
+    /* @Codex */
+    func canTestProstheticPrescription(_ prescription: HomeBaseProstheticPrescriptionSummary) -> Bool {
+        selectedPatient?.id == prescription.patientId
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && prescription.status != PairedProstheticPrescriptionStatus.tested.rawValue
+            && prescription.status != PairedProstheticPrescriptionStatus.cancelled.rawValue
+            && !isWorking
+    }
 }
 
 /// Field-crypto failures surfaced to the operator when a write cannot be sealed.
@@ -1972,5 +3477,16 @@ enum PairedCryptoError: LocalizedError {
         case .sealFailed:
             return "Cifratura del campo non riuscita: riprova."
         }
+    }
+}
+
+/* @Codex */
+extension HomeBaseValidatePatientExportResponse {
+    var totalErrorCount: Int {
+        therapyMedication.errorCount + observationVitals.errorCount
+    }
+
+    var totalWarningCount: Int {
+        therapyMedication.warningCount + observationVitals.warningCount
     }
 }

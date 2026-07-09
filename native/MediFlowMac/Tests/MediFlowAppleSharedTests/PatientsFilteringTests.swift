@@ -8,19 +8,24 @@ final class PatientsFilteringTests: XCTestCase {
         first: String,
         tax: String,
         archived: Bool = false,
-        updated: TimeInterval = 0
+        updated: TimeInterval = 0,
+        deleted: Bool = false,
+        deletionReason: String? = nil
     ) -> HomeBasePatientSummary {
         HomeBasePatientSummary(
             id: id, firstName: first, lastName: last, birthDate: nil, taxCode: tax,
             isAdi: false, isArchived: archived, version: 1,
-            updatedAt: Date(timeIntervalSince1970: updated)
+            updatedAt: Date(timeIntervalSince1970: updated),
+            deletedAt: deleted ? Date(timeIntervalSince1970: 600) : nil,
+            deletionReason: deletionReason
         )
     }
 
     private lazy var sample: [HomeBasePatientSummary] = [
         patient("1", last: "Rossi", first: "Mario", tax: "RSSMRA80A01H501U", updated: 300),
         patient("2", last: "Bianchi", first: "Anna", tax: "BNCNNA85M41F205X", updated: 200),
-        patient("3", last: "Verdi", first: "Luigi", tax: "VRDLGU70T10L219Z", archived: true, updated: 100)
+        patient("3", last: "Verdi", first: "Luigi", tax: "VRDLGU70T10L219Z", archived: true, updated: 100),
+        patient("4", last: "Neri", first: "Carla", tax: "NRECRL75P41F205Y", archived: true, updated: 400, deleted: true, deletionReason: "duplicato")
     ]
 
     func testActiveFilterExcludesArchived() {
@@ -31,6 +36,18 @@ final class PatientsFilteringTests: XCTestCase {
     func testArchivedFilterShowsOnlyArchived() {
         let result = PatientsFiltering.apply(patients: sample, query: "", viewMode: .archived, sortMode: .alpha)
         XCTAssertEqual(result.map(\.id), ["3"])
+    }
+
+    func testTrashFilterShowsOnlyTombstonedPatients() {
+        let result = PatientsFiltering.apply(patients: sample, query: "", viewMode: .trash, sortMode: .alpha)
+        XCTAssertEqual(result.map(\.id), ["4"])
+    }
+
+    func testActiveFilterExcludesTombstonedEvenWhenNotArchived() {
+        let deletedActive = patient("d", last: "A", first: "B", tax: "DDD", deleted: true)
+        let active = patient("a", last: "C", first: "D", tax: "AAA")
+        let result = PatientsFiltering.apply(patients: [deletedActive, active], query: "", viewMode: .active, sortMode: .alpha)
+        XCTAssertEqual(result.map(\.id), ["a"])
     }
 
     func testSearchByNameIsCaseInsensitiveAndMultiTerm() {

@@ -1,10 +1,10 @@
-import { Diagnosis, ClinicalEntry, Therapy, Observation as ClinicalObservation } from '../db';
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
+import type { FhirClinicalEntryInput, FhirDiagnosisInput, FhirObservationInput, FhirTherapyInput } from './types';
 
-export function toFhirCondition(diagnosis: Diagnosis, patientId: string): Condition {
+export function toFhirCondition(diagnosis: FhirDiagnosisInput, patientId: string): Condition {
     return {
         resourceType: "Condition",
-        id: crypto.randomUUID(), // DB doesn't have IDs for diagnoses nested items, generating one or hash
+        id: diagnosis.id ?? crypto.randomUUID(), // DB doesn't have IDs for diagnoses nested items, generating one or hash
         subject: { reference: `Patient/${patientId}` },
         clinicalStatus: {
             coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "active" }]
@@ -22,7 +22,7 @@ export function toFhirCondition(diagnosis: Diagnosis, patientId: string): Condit
     };
 }
 
-export function toFhirEncounter(entry: ClinicalEntry, patientId: string): Encounter {
+export function toFhirEncounter(entry: FhirClinicalEntryInput, patientId: string): Encounter {
     return {
         resourceType: "Encounter",
         id: entry.id,
@@ -45,7 +45,7 @@ export function toFhirEncounter(entry: ClinicalEntry, patientId: string): Encoun
     };
 }
 
-export function toFhirObservation(entry: ClinicalEntry, patientId: string): Observation | null {
+export function toFhirObservation(entry: FhirClinicalEntryInput, patientId: string): Observation | null {
     if (entry.type !== 'scale' || !entry.metadata?.score) return null;
 
     return {
@@ -63,7 +63,7 @@ export function toFhirObservation(entry: ClinicalEntry, patientId: string): Obse
     };
 }
 
-export function toFhirMedicationStatement(therapy: Therapy, patientId: string): MedicationStatement {
+export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientId: string): MedicationStatement {
     return {
         resourceType: "MedicationStatement",
         id: therapy.id,
@@ -84,7 +84,7 @@ export function toFhirMedicationStatement(therapy: Therapy, patientId: string): 
 }
 
 /* @Codex */
-export function toFhirStructuredObservation(observation: ClinicalObservation, patientId: string): Observation {
+export function toFhirStructuredObservation(observation: FhirObservationInput, patientId: string): Observation {
     const numericValue = Number(observation.value);
     const isNumeric = Number.isFinite(numericValue);
 

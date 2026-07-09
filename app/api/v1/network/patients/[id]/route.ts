@@ -11,10 +11,15 @@ import {
 import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read';
 /* @Codex */
 import {
+    deleteNetworkScopedPatient,
+    NETWORK_PATIENT_LIFECYCLE_CAPABILITY,
+} from '@/lib/network-patient-lifecycle';
+/* @Codex */
+import {
     NETWORK_PATIENT_WRITE_CAPABILITY,
     updateNetworkScopedPatient,
 } from '@/lib/network-patient-write';
-import { getNetworkModeGateResponse } from '@/lib/network-write-context';
+import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 /* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
@@ -116,5 +121,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     } catch (error) {
         console.error('API PUT /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update patient' }, { status: 500 });
+    }
+}
+
+/* @Codex */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
+        if (!resolved.ok) return resolved.response;
+
+        const body = await request.json() as Record<string, unknown>;
+        const result = await deleteNetworkScopedPatient(
+            {
+                ...resolved.context,
+                patientId: id,
+            },
+            body,
+        );
+        return NextResponse.json(result.value, { status: result.status });
+    } catch (error) {
+        console.error('API DELETE /api/v1/network/patients/[id] error:', error);
+        return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 });
     }
 }

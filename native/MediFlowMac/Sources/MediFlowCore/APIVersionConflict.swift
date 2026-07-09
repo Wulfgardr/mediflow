@@ -85,6 +85,16 @@ public struct VersionConflictPayload: Codable, Equatable {
             try snap.encode(snapshot.version, forKey: .version)
             try encodeOrNull(&snap, snapshot.updatedAt, forKey: .updatedAt)
             try encodeOrNull(&snap, snapshot.isArchived, forKey: .isArchived)
+        } else if Self.usesGeneralizedVersionConflictShape(entity) {
+            // lib/version-concurrency.ts: {id, patientId?, version, updatedAt, deletedAt?}
+            if let patientId = snapshot.patientId {
+                try snap.encode(patientId, forKey: .patientId)
+            }
+            try snap.encode(snapshot.version, forKey: .version)
+            try encodeOrNull(&snap, snapshot.updatedAt, forKey: .updatedAt)
+            if let deletedAt = snapshot.deletedAt {
+                try snap.encode(deletedAt, forKey: .deletedAt)
+            }
         } else {
             // clinical (entry/therapy/checkup/observation): {id, patientId, version, updatedAt, deletedAt}
             try encodeOrNull(&snap, snapshot.patientId, forKey: .patientId)
@@ -100,6 +110,12 @@ public struct VersionConflictPayload: Codable, Equatable {
     ) throws {
         if let value { try container.encode(value, forKey: key) }
         else { try container.encodeNil(forKey: key) }
+    }
+
+    private static func usesGeneralizedVersionConflictShape(_ entity: String) -> Bool {
+        entity == "service_prescription"
+            || entity == "service_prescription_item"
+            || entity == "prosthetic_prescription"
     }
 }
 

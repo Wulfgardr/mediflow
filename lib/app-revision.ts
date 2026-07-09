@@ -64,3 +64,19 @@ export function getAppSourceFingerprint() {
 export function getAppFingerprint() {
   return APP_FINGERPRINT;
 }
+
+/* @Codex */
+export type PublicAppRevisionSummary = {
+  revision: string;
+  sourceFingerprint: string;
+  fingerprint: string;
+};
+
+/* @Codex */
+export function getPublicAppRevisionSummary(): PublicAppRevisionSummary {
+  return {
+    revision: getAppRevision(),
+    sourceFingerprint: getAppSourceFingerprint(),
+    fingerprint: getAppFingerprint(),
+  };
+}

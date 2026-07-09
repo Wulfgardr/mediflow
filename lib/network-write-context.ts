@@ -12,6 +12,16 @@ import { evaluateNetworkDataPlaneModeGate } from './network-contract';
 /* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 /* @Codex */
+import { requireLocalApiToken } from './security/local-api-auth';
+/* @Codex */
+export {
+    resolveNetworkDiscoveryAuth,
+} from './network-discovery-auth';
+/* @Codex */
+import type { NetworkDiscoveryAuthContext } from './network-discovery-auth';
+/* @Codex */
+import { resolveNetworkDiscoveryAuth } from './network-discovery-auth';
+/* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from './security/server-auth';
 /* @Codex */
 import type { ServerSession } from './security/server-session';
@@ -80,3 +90,13 @@ export async function requireNetworkCapabilityContext(
 
 /* @Codex */
 export const requireNetworkWriteContext = requireNetworkCapabilityContext;
+
+export async function requireNetworkDiscoveryAuth(
+    request: Request
+): Promise<{ ok: true; context: NetworkDiscoveryAuthContext } | { ok: false; response: NextResponse }> {
+    return resolveNetworkDiscoveryAuth(request, {
+        requireLocalApiToken,
+        authenticateNetworkPairedClient,
+        getNetworkModeGateResponse,
+    });
+}

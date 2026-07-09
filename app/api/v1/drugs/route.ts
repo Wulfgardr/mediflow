@@ -1,12 +1,10 @@
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
-import { asc, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
-import type { DrugSummary } from '@/lib/api/v1/types';
-/* @Codex */
-import { parseApiV1Limit } from '@/lib/api-v1-route-helpers';
+import { readDrugCatalog } from '@/lib/network-catalog-read';
 
 type DrugPayload = {
     aic?: string;
@@ -40,55 +38,14 @@ function normalizeDrug(item: DrugPayload): typeof drugs.$inferInsert | null {
     };
 }
 
-function toSummary(item: typeof drugs.$inferSelect): DrugSummary {
-    return {
-        aic: item.aic,
-        name: item.name,
-        activePrinciple: item.activePrinciple ?? null,
-        company: item.company ?? null,
-        packaging: item.packaging ?? null,
-        class: item.class ?? null,
-        price: item.price ?? null,
-        atc: item.atc ?? null
-    };
-}
-
 export async function GET(request: Request) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
 
     try {
         const { searchParams } = new URL(request.url);
-        const q = searchParams.get('q')?.trim();
-        const countOnly = searchParams.get('count') === '1';
-        const limit = parseApiV1Limit(searchParams.get('limit'), q ? 60 : 200, 500);
-
-        if (countOnly) {
-            const row = await dbServer
-                .select({ total: sql<number>`count(*)` })
-                .from(drugs)
-                .get();
-            return NextResponse.json({ count: Number(row?.total || 0) });
-        }
-
-        if (q) {
-            const pattern = `%${q}%`;
-            const rows = await dbServer
-                .select()
-                .from(drugs)
-                .where(sql`${drugs.name} LIKE ${pattern} OR ${drugs.activePrinciple} LIKE ${pattern} OR ${drugs.aic} LIKE ${pattern}`)
-                .orderBy(asc(drugs.name))
-                .limit(limit);
-            return NextResponse.json(rows.map(toSummary));
-        }
-
-        const rows = await dbServer
-            .select()
-            .from(drugs)
-            .orderBy(asc(drugs.name))
-            .limit(limit);
-
-        return NextResponse.json(rows.map(toSummary));
+        const result = await readDrugCatalog(searchParams);
+        return NextResponse.json(result.body, { status: result.status ?? 200 });
     } catch (error) {
         console.error('API GET /api/v1/drugs error:', error);
         return NextResponse.json({ error: 'Failed to fetch drugs' }, { status: 500 });

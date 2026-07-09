@@ -1,9 +1,9 @@
-import { Patient } from '../db';
 import { Patient as FhirPatient } from 'fhir/r4';
+import type { FhirPatientInput } from './types';
 
 export const CODICE_FISCALE_SYSTEM = "http://hl7.it/sid/codice-fiscale";
 
-export function toFhirPatient(patient: Patient): FhirPatient {
+export function toFhirPatient(patient: FhirPatientInput, generatedAt: Date | string = new Date()): FhirPatient {
     return {
         resourceType: "Patient",
         id: patient.id,
@@ -47,7 +47,7 @@ export function toFhirPatient(patient: Patient): FhirPatient {
             }
         ] : undefined,
         meta: {
-            lastUpdated: new Date().toISOString() // Assuming export time is update time for the resource view
+            lastUpdated: new Date(generatedAt).toISOString() // Assuming export time is update time for the resource view
         }
     };
 }

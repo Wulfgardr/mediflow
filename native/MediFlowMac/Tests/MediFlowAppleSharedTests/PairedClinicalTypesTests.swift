@@ -16,4 +16,27 @@ final class PairedClinicalTypesTests: XCTestCase {
         XCTAssertEqual(PairedCheckupStatus.completed.tone, .positive)
         XCTAssertEqual(PairedCheckupStatus.cancelled.tone, .neutral)
     }
+
+    /* @Codex */
+    func testClinicalSignalCountBelowLimitIsExact() {
+        let signal = ClinicalSignalCount.fromLoadedList(count: 12, loadedCount: 12, limit: 100)
+
+        XCTAssertEqual(signal, ClinicalSignalCount(count: 12, atCap: false))
+        XCTAssertEqual(signal.displayText, "12")
+    }
+
+    /* @Codex */
+    func testClinicalSignalCountAtLimitIsPartial() {
+        let signal = ClinicalSignalCount.fromLoadedList(count: 42, loadedCount: 100, limit: 100)
+
+        XCTAssertTrue(signal.atCap)
+        XCTAssertEqual(signal.displayText, "42+")
+    }
+
+    /* @Codex */
+    func testClinicalSignalCountFormatsHundredPlus() {
+        let signal = ClinicalSignalCount.fromLoadedList(count: 100, loadedCount: 100, limit: 100)
+
+        XCTAssertEqual(signal.displayText, "100+")
+    }
 }

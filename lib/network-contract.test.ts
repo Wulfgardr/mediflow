@@ -101,6 +101,11 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.equal(patientWrite.status, 'available');
     assert.equal(patientWrite.requiresPairing, true);
 
+    const patientLifecycle = response.capabilities.find((item) => item.key === 'network.replica.write-patient-lifecycle');
+    assert.ok(patientLifecycle);
+    assert.equal(patientLifecycle.status, 'available');
+    assert.equal(patientLifecycle.requiresPairing, true);
+
     const diaryRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-clinical-diary');
     assert.ok(diaryRead);
     assert.equal(diaryRead.status, 'available');
@@ -140,6 +145,41 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.ok(observationWrite);
     assert.equal(observationWrite.status, 'available');
     assert.equal(observationWrite.requiresPairing, true);
+
+    const serviceRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-service-prescriptions');
+    assert.ok(serviceRead);
+    assert.equal(serviceRead.status, 'available');
+    assert.equal(serviceRead.requiresPairing, true);
+
+    const serviceWrite = response.capabilities.find((item) => item.key === 'network.replica.write-service-prescriptions');
+    assert.ok(serviceWrite);
+    assert.equal(serviceWrite.status, 'available');
+    assert.equal(serviceWrite.requiresPairing, true);
+
+    const prostheticRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-prosthetic-prescriptions');
+    assert.ok(prostheticRead);
+    assert.equal(prostheticRead.status, 'available');
+    assert.equal(prostheticRead.requiresPairing, true);
+
+    const prostheticWrite = response.capabilities.find((item) => item.key === 'network.replica.write-prosthetic-prescriptions');
+    assert.ok(prostheticWrite);
+    assert.equal(prostheticWrite.status, 'available');
+    assert.equal(prostheticWrite.requiresPairing, true);
+
+    const fseValidate = response.capabilities.find((item) => item.key === 'network.fse.validate');
+    assert.ok(fseValidate);
+    assert.equal(fseValidate.status, 'available');
+    assert.equal(fseValidate.requiresPairing, true);
+
+    const catalogRead = response.capabilities.find((item) => item.key === 'network.catalogs.readonly');
+    assert.ok(catalogRead);
+    assert.equal(catalogRead.status, 'available');
+    assert.equal(catalogRead.requiresPairing, true);
+
+    const catalogSync = response.capabilities.find((item) => item.key === 'network.catalogs.sync');
+    assert.ok(catalogSync);
+    assert.equal(catalogSync.status, 'planned');
+    assert.equal(catalogSync.requiresPairing, true);
 });
 
 test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states', () => {

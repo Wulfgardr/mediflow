@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.13.0
-  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, diary, therapy, checkup, and observation access/write boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.16.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, diary, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
@@ -13,9 +13,10 @@ info:
     remote patient data plane, the first paired patient profile/status write
     boundary, the first paired clinical diary read/create/update boundary, the
     first paired therapy read/create/update/soft-delete boundary, the first
-    paired checkup read/create/update/soft-delete boundary, and the first
-    paired observation read/create/update/soft-delete boundary behind dedicated
-    paired-client auth capabilities.
+    paired checkup read/create/update/soft-delete boundary, the first paired
+    observation read/create/update/soft-delete boundary, and the first paired
+    read-only catalog boundary for global drug, exemption, and terminology
+    reference data behind dedicated paired-client auth capabilities.
     Apple-native discovery may advertise the same PHI-safe node summary over
     Bonjour `_mediflow-homebase._tcp`, while `/api/v1/network/node` remains the
     reviewable HTTP summary contract for node identity and transport metadata.
@@ -207,6 +208,8 @@ paths:
         home-base candidate. This is not a trust bootstrap by itself.
       security:
         - bearerAuth: []
+        - pairedClientId: []
+          pairedClientToken: []
       responses:
         '200':
           description: PHI-safe home-base candidate summary.
@@ -254,6 +257,8 @@ paths:
         cache, and broader replica flows remain follow-up workstreams.
       security:
         - bearerAuth: []
+        - pairedClientId: []
+          pairedClientToken: []
       responses:
         '200':
           description: Versionable capability matrix for the current node.
@@ -277,6 +282,9 @@ paths:
         declares the effective ambulatory scope resolved by the node.
       security:
         - bearerAuth: []
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
       responses:
         '200':
           description: Current PHI-safe network identity summary.
@@ -286,6 +294,37 @@ paths:
                 $ref: '#/components/schemas/NetworkIdentitySummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/revision:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkRevision
+      summary: Get public home-base revision fingerprint
+      description: |
+        Returns only the public revision tuple a paired client needs to detect
+        that the home-base source changed. Branch and worktree hash remain
+        limited to the session-gated web revision route.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+      responses:
+        '200':
+          description: Public revision tuple for the paired home-base.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRevisionSummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/NetworkModeDisabled'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ai-runtime:
@@ -450,6 +489,687 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/drugs:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkDrugs
+      summary: List drug catalog entries through the paired home-base data plane
+      description: |
+        Returns the same global drug reference catalog shape exposed by the
+        host `/api/v1/drugs` read route. This paired route requires the
+        `network.catalogs.readonly` capability plus a valid paired client
+        credential and operator session cookie. Drug catalog data is global
+        reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Optional case-insensitive search over drug name, active principle, or AIC.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of rows to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: count
+          in: query
+          required: false
+          description: Return only the catalog count when set to `1`.
+          schema:
+            type: string
+            enum:
+              - '1'
+      responses:
+        '200':
+          description: Drug catalog entries, or a count-only payload when requested.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/DrugSummary'
+                  - $ref: '#/components/schemas/CatalogCountResponse'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/exemptions:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkExemptions
+      summary: List exemption catalog entries through the paired home-base data plane
+      description: |
+        Returns the same global exemption reference catalog shape exposed by
+        the host `/api/v1/exemptions` read route. This paired route requires
+        the `network.catalogs.readonly` capability plus a valid paired client
+        credential and operator session cookie. Exemption catalog data is
+        global reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Optional case-insensitive search over exemption code or description.
+          schema:
+            type: string
+        - name: codes
+          in: query
+          required: false
+          description: Optional comma-separated exemption codes to resolve in bulk.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of rows to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: count
+          in: query
+          required: false
+          description: Return only the catalog count when set to `1`.
+          schema:
+            type: string
+            enum:
+              - '1'
+      responses:
+        '200':
+          description: Exemption catalog entries, or a count-only payload when requested.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ExemptionSummary'
+                  - $ref: '#/components/schemas/CatalogCountResponse'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/terminology/search:
+    get:
+      tags:
+        - Network
+      operationId: searchNetworkTerminology
+      summary: Search terminology catalog entries through the paired home-base data plane
+      description: |
+        Returns the same global terminology search shape exposed by the host
+        `/api/v1/terminology/search` read route. This paired route requires
+        the `network.catalogs.readonly` capability plus a valid paired client
+        credential and operator session cookie. Terminology catalog data is
+        global reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: system
+          in: query
+          required: true
+          description: Terminology system to search.
+          schema:
+            $ref: '#/components/schemas/TerminologySystemCode'
+        - name: q
+          in: query
+          required: false
+          description: Optional search text.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of rows to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: Matching terminology entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TerminologyItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/terminology/resolve:
+    get:
+      tags:
+        - Network
+      operationId: resolveNetworkTerminology
+      summary: Resolve a terminology code through the paired home-base data plane
+      description: |
+        Returns the same global terminology resolve shape exposed by the host
+        `/api/v1/terminology/resolve` read route. This paired route requires
+        the `network.catalogs.readonly` capability plus a valid paired client
+        credential and operator session cookie. Terminology catalog data is
+        global reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: system
+          in: query
+          required: true
+          description: Terminology system to resolve.
+          schema:
+            $ref: '#/components/schemas/TerminologySystemCode'
+        - name: code
+          in: query
+          required: true
+          description: Code to resolve within the requested terminology system.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved terminology entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminologyItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/terminology/systems:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkTerminologySystems
+      summary: List terminology systems through the paired home-base data plane
+      description: |
+        Returns the same global terminology registry shape exposed by the host
+        `/api/v1/terminology/systems` read route. This paired route requires
+        the `network.catalogs.readonly` capability plus a valid paired client
+        credential and operator session cookie. Terminology catalog data is
+        global reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Terminology registry entries exposed by the home-base node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TerminologyRegistryEntry'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/service-prescriptions:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkServicePrescriptions
+      summary: List service prescriptions through the paired home-base data plane
+      description: |
+        Lists service prescriptions for a patient in the paired client's
+        effective ambulatory scope. This route requires
+        `network.replica.readonly-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: patientId
+          in: query
+          required: true
+          description: Patient identifier scoped to the paired client's ambulatory.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped service prescriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServicePrescriptionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkServicePrescription
+      summary: Create service prescription through the paired boundary
+      description: |
+        Creates a service prescription for a patient in the paired client's
+        effective ambulatory scope. This route requires
+        `network.replica.write-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicePrescriptionCreateRequest'
+      responses:
+        '201':
+          description: Created service prescription identifier and version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/service-prescriptions/{id}:
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkServicePrescription
+      summary: Update service prescription through the paired boundary
+      description: |
+        Applies a compare-on-write update to a service prescription in scope.
+        `version` is required and stale versions return `VERSION_CONFLICT`.
+        This route requires `network.replica.write-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Service prescription identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicePrescriptionMutationRequest'
+      responses:
+        '200':
+          description: Service prescription updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PrescriptionVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/service-prescription-items:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkServicePrescriptionItems
+      summary: List service prescription items through the paired home-base data plane
+      description: |
+        Lists service prescription items either by prescriptionId or patientId
+        within the paired client's effective ambulatory scope. This route
+        requires `network.replica.readonly-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: prescriptionId
+          in: query
+          required: false
+          description: Service prescription identifier.
+          schema:
+            type: string
+        - name: patientId
+          in: query
+          required: false
+          description: Patient identifier scoped to the paired client's ambulatory.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped service prescription items.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServicePrescriptionItemDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkServicePrescriptionItem
+      summary: Create service prescription item through the paired boundary
+      description: |
+        Creates an item for a scoped parent service prescription. The item
+        inherits patientId from its parent. This route requires
+        `network.replica.write-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicePrescriptionItemCreateRequest'
+      responses:
+        '201':
+          description: Created service prescription item identifier and version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/service-prescription-items/{id}:
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkServicePrescriptionItem
+      summary: Update service prescription item through the paired boundary
+      description: |
+        Applies a compare-on-write update to a service prescription item in
+        scope. `version` is required and stale versions return
+        `VERSION_CONFLICT`. This route requires
+        `network.replica.write-service-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Service prescription item identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicePrescriptionItemMutationRequest'
+      responses:
+        '200':
+          description: Service prescription item updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PrescriptionVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/service-catalog:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkServiceCatalog
+      summary: Search service catalog through the paired home-base data plane
+      description: |
+        Returns the host service catalog read shape for paired clients with
+        `network.replica.readonly-service-prescriptions`. Catalog data is
+        reference data and is not filtered by ambulatory scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term.
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: false
+          description: Exact catalog code.
+          schema:
+            type: string
+        - name: count
+          in: query
+          required: false
+          description: Return only the catalog count when set to true.
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          required: false
+          description: Maximum result count.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        '200':
+          description: Service catalog entries or count.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCatalogEntry'
+                  - $ref: '#/components/schemas/CatalogCountResponse'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/prosthetic-prescriptions:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkProstheticPrescriptions
+      summary: List prosthetic prescriptions through the paired home-base data plane
+      description: |
+        Lists prosthetic prescriptions for a patient in the paired client's
+        effective ambulatory scope. This route requires
+        `network.replica.readonly-prosthetic-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: patientId
+          in: query
+          required: true
+          description: Patient identifier scoped to the paired client's ambulatory.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped prosthetic prescriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProstheticPrescriptionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkProstheticPrescription
+      summary: Create prosthetic prescription through the paired boundary
+      description: |
+        Creates a prosthetic prescription for a patient in the paired client's
+        effective ambulatory scope. This route requires
+        `network.replica.write-prosthetic-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProstheticPrescriptionCreateRequest'
+      responses:
+        '201':
+          description: Created prosthetic prescription identifier and version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/prosthetic-prescriptions/{id}:
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkProstheticPrescription
+      summary: Update prosthetic prescription through the paired boundary
+      description: |
+        Applies a compare-on-write update to a prosthetic prescription in
+        scope. `version` is required and stale versions return
+        `VERSION_CONFLICT`. This route requires
+        `network.replica.write-prosthetic-prescriptions`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Prosthetic prescription identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProstheticPrescriptionMutationRequest'
+      responses:
+        '200':
+          description: Prosthetic prescription updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PrescriptionVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients:
     get:
       tags:
@@ -459,11 +1179,20 @@ paths:
       description: |
         Returns read-only patient summaries scoped by the effective ambulatory
         resolved on the home-base node. This route requires both a valid paired
-        client credential and an operator session cookie.
+        client credential and an operator session cookie. `includeDeleted=true`
+        also requires `network.replica.write-patient-lifecycle` and returns
+        tombstoned patients with their deletion metadata.
       security:
         - pairedClientId: []
           pairedClientToken: []
           sessionCookieAuth: []
+      parameters:
+        - name: includeDeleted
+          in: query
+          required: false
+          description: Include soft-deleted patients when set to `true`.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Read-only scoped patient summaries from the paired node.
@@ -473,6 +1202,53 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PatientSummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatient
+      summary: Create patient through the paired lifecycle boundary
+      description: |
+        Creates a patient and its ambulatory membership atomically from a paired
+        client with `network.replica.write-patient-lifecycle`. The insert always
+        targets the effective ambulatory scope resolved for the paired session,
+        the same resolution used by the other network patient routes; a body
+        `ambulatoryId` that differs from that scope is rejected.
+        Sensitive optional fields must already be sealed with the `ENC:` format.
+        AI/document fields are rejected.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPatientCreateRequest'
+            examples:
+              createNetworkPatient:
+                value:
+                  firstName: Ada
+                  lastName: Lovelace
+                  taxCode: LVLDAA85A01F205X
+                  birthDate: '1985-01-01T00:00:00.000Z'
+                  address: ENC:iv:ciphertext
+                  notes: ENC:iv:notes
+      responses:
+        '201':
+          description: Patient created through the paired lifecycle boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
@@ -562,6 +1338,108 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MutationSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Network
+      operationId: deleteNetworkPatient
+      summary: Soft-delete patient through the paired lifecycle boundary
+      description: |
+        Soft-deletes an active patient using optimistic concurrency. Requires
+        `network.replica.write-patient-lifecycle`, paired client credentials,
+        an active operator session, and membership in the effective ambulatory
+        scope. `deletionReason`, when provided, must be sealed with `ENC:`.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPatientDeleteRequest'
+            examples:
+              deleteNetworkPatient:
+                value:
+                  version: 7
+                  deletionReason: ENC:iv:reason
+      responses:
+        '200':
+          description: Patient soft-deleted through the paired lifecycle boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/PatientVersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/restore:
+    post:
+      tags:
+        - Network
+      operationId: restoreNetworkPatient
+      summary: Restore soft-deleted patient through the paired lifecycle boundary
+      description: |
+        Restores a tombstoned patient using optimistic concurrency. Requires
+        `network.replica.write-patient-lifecycle`, paired client credentials,
+        an active operator session, and membership in the effective ambulatory
+        scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDeleteRequest'
+            examples:
+              restoreNetworkPatient:
+                value:
+                  version: 8
+      responses:
+        '200':
+          description: Patient restored through the paired lifecycle boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedVersionedResource'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1457,6 +2335,79 @@ paths:
           $ref: '#/components/responses/ObservationVersionConflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/fse/validate-patient:
+    get:
+      tags:
+        - Network
+      operationId: validateNetworkFsePatientExport
+      summary: Validate patient FSE export readiness through the paired boundary
+      description: |
+        Runs the same local FSE export pre-check used by the web surface for a
+        patient inside the paired client's effective ambulatory scope. The route
+        requires paired credentials, an operator session, and
+        `network.fse.validate`; patients outside scope return 404.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: patientId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient export validation summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidatePatientExportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/fse/validate-document:
+    post:
+      tags:
+        - Network
+      operationId: validateNetworkFseDocument
+      summary: Validate one FSE document payload through the paired boundary
+      description: |
+        Validates one local FSE profile payload through the paired boundary.
+        This is a local validation/pre-check operation only and performs no
+        regional submission or writeback.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FseDocumentValidationRequest'
+      responses:
+        '200':
+          description: Single-document validation result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FseDocumentValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
@@ -1750,6 +2701,41 @@ components:
                 currentUpdatedAt: null
                 currentState: missing
                 currentSnapshot: null
+    PrescriptionVersionConflict:
+      description: |
+        Prescription compare-on-write conflict. The payload exposes only
+        PHI-safe metadata so clients can refresh and decide whether to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PrescriptionVersionConflictResponse'
+          examples:
+            outdatedVersion:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: service_prescription
+                recordId: prescription_123
+                expectedVersion: 2
+                currentVersion: 3
+                currentUpdatedAt: '2026-05-02T10:15:00.000Z'
+                currentState: present
+                currentSnapshot:
+                  id: prescription_123
+                  patientId: patient_123
+                  version: 3
+                  updatedAt: '2026-05-02T10:15:00.000Z'
+            missingPrescription:
+              value:
+                error: Conflict
+                code: VERSION_CONFLICT
+                entity: service_prescription
+                recordId: prescription_123
+                expectedVersion: 2
+                currentVersion: null
+                currentUpdatedAt: null
+                currentState: missing
+                currentSnapshot: null
     InternalServerError:
       description: Unexpected server-side failure.
       content:
@@ -1771,6 +2757,302 @@ components:
         - error
       properties:
         error:
+          type: string
+    FseValidationIssue:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - code
+        - message
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+    FseValidationItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - ok
+        - errors
+        - warnings
+      properties:
+        id:
+          type: string
+        ok:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FseValidationIssue'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/FseValidationIssue'
+    FseValidationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - total
+        - ok
+        - withErrors
+        - withWarnings
+        - errorCount
+        - warningCount
+        - items
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        ok:
+          type: integer
+          minimum: 0
+        withErrors:
+          type: integer
+          minimum: 0
+        withWarnings:
+          type: integer
+          minimum: 0
+        errorCount:
+          type: integer
+          minimum: 0
+        warningCount:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FseValidationItem'
+    ValidatePatientExportResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - patientId
+        - hasErrors
+        - hasWarnings
+        - therapyMedication
+        - observationVitals
+      properties:
+        patientId:
+          type: string
+        hasErrors:
+          type: boolean
+        hasWarnings:
+          type: boolean
+        therapyMedication:
+          $ref: '#/components/schemas/FseValidationSummary'
+        observationVitals:
+          $ref: '#/components/schemas/FseValidationSummary'
+    FseDocumentValidationRequest:
+      type: object
+      additionalProperties: true
+      required:
+        - profile
+      properties:
+        profile:
+          type: string
+        document:
+          type: object
+          additionalProperties: true
+        payload:
+          type: object
+          additionalProperties: true
+    FseDocumentValidationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - profile
+        - errors
+        - warnings
+      properties:
+        ok:
+          type: boolean
+        profile:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FseValidationIssue'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/FseValidationIssue'
+    CatalogCountResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+    DrugSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - aic
+        - name
+        - activePrinciple
+        - company
+        - packaging
+        - class
+        - price
+        - atc
+      properties:
+        aic:
+          type: string
+        name:
+          type: string
+        activePrinciple:
+          type:
+            - string
+            - 'null'
+        company:
+          type:
+            - string
+            - 'null'
+        packaging:
+          type:
+            - string
+            - 'null'
+        class:
+          type:
+            - string
+            - 'null'
+        price:
+          type:
+            - integer
+            - 'null'
+        atc:
+          type:
+            - string
+            - 'null'
+    ExemptionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - description
+        - type
+        - source
+        - startDate
+        - endDate
+        - isPharma
+        - isSpecialist
+        - isNational
+        - updatedAt
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        type:
+          type:
+            - string
+            - 'null'
+        source:
+          type:
+            - string
+            - 'null'
+        startDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        endDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        isPharma:
+          type:
+            - boolean
+            - 'null'
+        isSpecialist:
+          type:
+            - boolean
+            - 'null'
+        isNational:
+          type:
+            - boolean
+            - 'null'
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    TerminologySystemCode:
+      type: string
+      enum:
+        - AIC
+        - ATC
+        - ICD-11
+        - LOINC
+        - UCUM
+        - SNOMED-CT
+        - CND
+    TerminologyItem:
+      type: object
+      additionalProperties: false
+      required:
+        - system
+        - code
+        - display
+        - source
+      properties:
+        system:
+          $ref: '#/components/schemas/TerminologySystemCode'
+        code:
+          type: string
+        display:
+          type: string
+        displayIt:
+          type: string
+        defaultUnit:
+          type: string
+        version:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+    TerminologyRegistryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - system
+        - display
+        - version
+        - source
+        - status
+        - updatedAt
+      properties:
+        system:
+          $ref: '#/components/schemas/TerminologySystemCode'
+        display:
+          type: string
+        version:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+        status:
+          type: string
+          enum:
+            - active
+            - planned
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        notes:
           type: string
     NetworkErrorResponse:
       type: object
@@ -2203,6 +3485,7 @@ components:
             - network.replica.readonly-patients
             - network.replica.readonly-clinical-diary
             - network.replica.write-patient-profile
+            - network.replica.write-patient-lifecycle
             - network.replica.write-clinical-diary
             - network.replica.readonly-therapies
             - network.replica.write-therapies
@@ -2210,6 +3493,12 @@ components:
             - network.replica.write-checkups
             - network.replica.readonly-observations
             - network.replica.write-observations
+            - network.replica.readonly-service-prescriptions
+            - network.replica.write-service-prescriptions
+            - network.replica.readonly-prosthetic-prescriptions
+            - network.replica.write-prosthetic-prescriptions
+            - network.fse.validate
+            - network.catalogs.readonly
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync
@@ -2248,6 +3537,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NetworkCapability'
+    NetworkRevisionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+        - sourceFingerprint
+        - fingerprint
+      properties:
+        revision:
+          type: string
+        sourceFingerprint:
+          type: string
+        fingerprint:
+          type: string
     NetworkPairingIntentRequest:
       type: object
       additionalProperties: false
@@ -2483,6 +3786,15 @@ components:
           type:
             - boolean
             - 'null'
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
+            - 'null'
         version:
           type: integer
           minimum: 1
@@ -2570,6 +3882,15 @@ components:
         isArchived:
           type:
             - boolean
+            - 'null'
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deletionReason:
+          type:
+            - string
             - 'null'
         version:
           type: integer
@@ -3419,12 +4740,96 @@ components:
           type:
             - string
             - 'null'
+    NetworkPatientCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - firstName
+        - lastName
+        - taxCode
+      description: |
+        Patient create payload for paired lifecycle writes. Sensitive optional
+        fields must be sealed strings beginning with `ENC:`. Server-controlled
+        fields and AI/document fields are rejected.
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        taxCode:
+          type: string
+        birthDate:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        address:
+          type:
+            - string
+            - 'null'
+        phone:
+          type:
+            - string
+            - 'null'
+        caregiver:
+          type:
+            - string
+            - 'null'
+        exemptions:
+          type:
+            - string
+            - 'null'
+        diagnoses:
+          type:
+            - string
+            - 'null'
+        monitoringProfile:
+          type:
+            - string
+            - 'null'
+        statusReason:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        isAdi:
+          type: boolean
+        ambulatoryId:
+          type:
+            - string
+            - 'null'
     PatientDeleteRequest:
       type: object
       additionalProperties: false
       required:
         - version
       properties:
+        version:
+          type: integer
+          minimum: 1
+    NetworkPatientDeleteRequest:
+      allOf:
+        - $ref: '#/components/schemas/PatientDeleteRequest'
+        - type: object
+          additionalProperties: false
+          properties:
+            deletionReason:
+              type: string
+              description: Sealed optional deletion reason beginning with `ENC:`.
+    CreatedVersionedResource:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+      properties:
+        id:
+          type: string
         version:
           type: integer
           minimum: 1
@@ -3437,6 +4842,818 @@ components:
         success:
           type: boolean
           const: true
+    ServicePrescriptionDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - prescribedAt
+        - status
+        - category
+        - serviceName
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type: string
+          enum: [lab, imaging, visit, rehab, screening, procedure, other]
+        priority:
+          type:
+            - string
+            - 'null'
+          enum: [U, B, D, P, routine, unknown, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        clinicalQuestion:
+          type:
+            - string
+            - 'null'
+        provider:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+        requestReference:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review, legacy_therapy_cleanup]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ServicePrescriptionCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - patientId
+        - prescribedAt
+        - serviceName
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type: string
+          enum: [lab, imaging, visit, rehab, screening, procedure, other]
+        priority:
+          type:
+            - string
+            - 'null'
+          enum: [U, B, D, P, routine, unknown, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        clinicalQuestion:
+          type:
+            - string
+            - 'null'
+        provider:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+        requestReference:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review, legacy_therapy_cleanup]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+    ServicePrescriptionMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type: string
+          enum: [lab, imaging, visit, rehab, screening, procedure, other]
+        priority:
+          type:
+            - string
+            - 'null'
+          enum: [U, B, D, P, routine, unknown, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        clinicalQuestion:
+          type:
+            - string
+            - 'null'
+        provider:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+        requestReference:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review, legacy_therapy_cleanup]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+    ServicePrescriptionItemDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - prescriptionId
+        - ordinal
+        - status
+        - serviceName
+        - matchStatus
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        prescriptionId:
+          type: string
+        ordinal:
+          type: integer
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type:
+            - string
+            - 'null'
+          enum: [lab, imaging, visit, rehab, screening, procedure, other, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        catalogEntryId:
+          type:
+            - string
+            - 'null'
+        catalogDisplayName:
+          type:
+            - string
+            - 'null'
+        matchStatus:
+          type: string
+          enum: [unmatched, candidate, matched, manual, not_found]
+        confidence:
+          type:
+            - string
+            - 'null'
+          enum: [high, medium, low, null]
+        evidence:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ServicePrescriptionItemCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - prescriptionId
+        - serviceName
+      properties:
+        id:
+          type: string
+        prescriptionId:
+          type: string
+        ordinal:
+          type: integer
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type:
+            - string
+            - 'null'
+          enum: [lab, imaging, visit, rehab, screening, procedure, other, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        catalogEntryId:
+          type:
+            - string
+            - 'null'
+        catalogDisplayName:
+          type:
+            - string
+            - 'null'
+        matchStatus:
+          type: string
+          enum: [unmatched, candidate, matched, manual, not_found]
+        confidence:
+          type:
+            - string
+            - 'null'
+          enum: [high, medium, low, null]
+        evidence:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+    ServicePrescriptionItemMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        ordinal:
+          type: integer
+        status:
+          type: string
+          enum: [prescribed, booked, performed, report_received, cancelled]
+        category:
+          type:
+            - string
+            - 'null'
+          enum: [lab, imaging, visit, rehab, screening, procedure, other, null]
+        codeSystem:
+          type:
+            - string
+            - 'null'
+        serviceCode:
+          type:
+            - string
+            - 'null'
+        serviceName:
+          type: string
+        catalogEntryId:
+          type:
+            - string
+            - 'null'
+        catalogDisplayName:
+          type:
+            - string
+            - 'null'
+        matchStatus:
+          type: string
+          enum: [unmatched, candidate, matched, manual, not_found]
+        confidence:
+          type:
+            - string
+            - 'null'
+          enum: [high, medium, low, null]
+        evidence:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        scheduledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        performedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reportReceivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcomeNote:
+          type:
+            - string
+            - 'null'
+    ServiceCatalogEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - codeSystem
+        - serviceCode
+        - displayName
+        - category
+        - source
+        - active
+      properties:
+        id:
+          type: string
+        codeSystem:
+          type: string
+        serviceCode:
+          type: string
+        displayName:
+          type: string
+        category:
+          type: string
+        branchCode:
+          type:
+            - string
+            - 'null'
+        synonyms:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+        version:
+          type:
+            - string
+            - 'null'
+        active:
+          type: boolean
+        importedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ProstheticPrescriptionDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - prescribedAt
+        - status
+        - category
+        - description
+        - version
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [draft, prescribed, submitted, authorized, delivered, tested, cancelled]
+        category:
+          type: string
+          enum: [standard, oxygen, repair, replacement, trial, other]
+        isoCode:
+          type:
+            - string
+            - 'null'
+        description:
+          type: string
+        measures:
+          type:
+            - string
+            - 'null'
+        clinicalReason:
+          type:
+            - string
+            - 'null'
+        regionalPrescriptionId:
+          type:
+            - string
+            - 'null'
+        supplier:
+          type:
+            - string
+            - 'null'
+        collaudoAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        collaudoOutcome:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ProstheticPrescriptionCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - patientId
+        - prescribedAt
+        - description
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [draft, prescribed, submitted, authorized, delivered, tested, cancelled]
+        category:
+          type: string
+          enum: [standard, oxygen, repair, replacement, trial, other]
+        isoCode:
+          type:
+            - string
+            - 'null'
+        description:
+          type: string
+        measures:
+          type:
+            - string
+            - 'null'
+        clinicalReason:
+          type:
+            - string
+            - 'null'
+        regionalPrescriptionId:
+          type:
+            - string
+            - 'null'
+        supplier:
+          type:
+            - string
+            - 'null'
+        collaudoAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        collaudoOutcome:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+    ProstheticPrescriptionMutationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        prescribedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [draft, prescribed, submitted, authorized, delivered, tested, cancelled]
+        category:
+          type: string
+          enum: [standard, oxygen, repair, replacement, trial, other]
+        isoCode:
+          type:
+            - string
+            - 'null'
+        description:
+          type: string
+        measures:
+          type:
+            - string
+            - 'null'
+        clinicalReason:
+          type:
+            - string
+            - 'null'
+        regionalPrescriptionId:
+          type:
+            - string
+            - 'null'
+        supplier:
+          type:
+            - string
+            - 'null'
+        collaudoAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        collaudoOutcome:
+          type:
+            - string
+            - 'null'
+        source:
+          type: string
+          enum: [manual, document_review]
+        documentRefs:
+          type:
+            - string
+            - 'null'
+        notes:
+          type:
+            - string
+            - 'null'
+    PrescriptionConflictSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - version
+        - updatedAt
+      description: PHI-safe server snapshot for a prescription row.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PrescriptionVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+        - entity
+        - recordId
+        - expectedVersion
+        - currentVersion
+        - currentUpdatedAt
+        - currentState
+        - currentSnapshot
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          enum:
+            - service_prescription
+            - service_prescription_item
+            - prosthetic_prescription
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        currentUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        currentState:
+          type: string
+          enum:
+            - present
+            - missing
+        currentSnapshot:
+          oneOf:
+            - $ref: '#/components/schemas/PrescriptionConflictSnapshot'
+            - type: 'null'
     PatientConflictSnapshot:
       type: object
       additionalProperties: false

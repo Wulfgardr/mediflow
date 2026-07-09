@@ -32,6 +32,11 @@ import {
     isAiSmartImportEnabledValue,
     serializeAiSmartImportKillSwitchState,
 } from '@/lib/ai-smart-import-kill-switch';
+import {
+    AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
+    isAiTreatmentReasoningEnabledValue,
+    serializeAiTreatmentReasoningKillSwitchState,
+} from '@/lib/ai-treatment-reasoning-kill-switch';
 
 type HardwareProfile = 'low' | 'medium' | 'high' | 'custom';
 
@@ -73,6 +78,7 @@ export function useAiSettingsController() {
     const [patientInsightEnabled, setPatientInsightEnabled] = useState(true);
     const [documentSynthesisEnabled, setDocumentSynthesisEnabled] = useState(true);
     const [smartImportEnabled, setSmartImportEnabled] = useState(true);
+    const [treatmentReasoningEnabled, setTreatmentReasoningEnabled] = useState(false);
 
     useEffect(() => {
         void loadAiConfig();
@@ -108,6 +114,7 @@ export function useAiSettingsController() {
             const patientInsightKillSwitch = await safeGet(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
             const documentSynthesisKillSwitch = await safeGet(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
             const smartImportKillSwitch = await safeGet(AI_SMART_IMPORT_KILL_SWITCH_KEY);
+            const treatmentReasoningKillSwitch = await safeGet(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
@@ -129,6 +136,7 @@ export function useAiSettingsController() {
             setPatientInsightEnabled(isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value));
             setDocumentSynthesisEnabled(isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value));
             setSmartImportEnabled(isAiSmartImportEnabledValue(smartImportKillSwitch?.value));
+            setTreatmentReasoningEnabled(isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value));
         } catch (e) {
             console.error('Failed to load AI config:', e);
         }
@@ -188,6 +196,10 @@ export function useAiSettingsController() {
             await db.settings.put({
                 key: AI_SMART_IMPORT_KILL_SWITCH_KEY,
                 value: serializeAiSmartImportKillSwitchState(smartImportEnabled),
+            });
+            await db.settings.put({
+                key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
+                value: serializeAiTreatmentReasoningKillSwitchState(treatmentReasoningEnabled),
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
@@ -282,6 +294,8 @@ export function useAiSettingsController() {
         setDocumentSynthesisEnabled,
         smartImportEnabled,
         setSmartImportEnabled,
+        treatmentReasoningEnabled,
+        setTreatmentReasoningEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         applyHardwareProfile,

@@ -2,11 +2,13 @@ import XCTest
 @testable import MediFlowAppleShared
 
 final class EntryFilteringTests: XCTestCase {
-    private func entry(_ id: String, type: String) -> HomeBaseEntrySummary {
+    private func entry(_ id: String, type: String, deleted: Bool = false) -> HomeBaseEntrySummary {
         HomeBaseEntrySummary(
             id: id, patientId: "p", type: type, title: "T", date: Date(timeIntervalSince1970: 0),
-            content: "c", setting: nil, metadata: nil, attachments: nil, deletedAt: nil,
-            deletionReason: nil, version: 1, createdAt: nil, updatedAt: nil
+            content: "c", setting: nil, metadata: nil, attachments: nil,
+            deletedAt: deleted ? Date(timeIntervalSince1970: 10) : nil,
+            deletionReason: deleted ? "duplicata" : nil,
+            version: 1, createdAt: nil, updatedAt: nil
         )
     }
 
@@ -15,15 +17,24 @@ final class EntryFilteringTests: XCTestCase {
         entry("v", type: "visit"),
         entry("p", type: "phone"),
         entry("o", type: "other"),
-        entry("u", type: "legacy-unknown")
+        entry("u", type: "legacy-unknown"),
+        entry("d", type: "note", deleted: true)
     ]
 
-    func testAllReturnsEverything() {
+    func testAllExcludesDeletedByDefault() {
         XCTAssertEqual(EntryFiltering.apply(sample, filter: .all).map(\.id), ["n", "v", "p", "o", "u"])
+    }
+
+    func testAllCanIncludeDeleted() {
+        XCTAssertEqual(EntryFiltering.apply(sample, filter: .all, includeDeleted: true).map(\.id), ["n", "v", "p", "o", "u", "d"])
     }
 
     func testNoteFilter() {
         XCTAssertEqual(EntryFiltering.apply(sample, filter: .note).map(\.id), ["n"])
+    }
+
+    func testNoteFilterCanIncludeDeleted() {
+        XCTAssertEqual(EntryFiltering.apply(sample, filter: .note, includeDeleted: true).map(\.id), ["n", "d"])
     }
 
     func testVisitFilter() {

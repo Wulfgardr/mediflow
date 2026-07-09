@@ -1,13 +1,6 @@
 import { Bundle } from 'fhir/r4';
 import { db } from '../db';
-import { toFhirPatient } from './patient-adapter';
-import {
-    toFhirCondition,
-    toFhirEncounter,
-    toFhirMedicationStatement,
-    toFhirObservation,
-    toFhirStructuredObservation,
-} from './clinical-adapter';
+import { buildFhirBundleFromRecords } from './bundle-mapper';
 
 export async function generatePatientBundle(patientId: string): Promise<Bundle> {
     const patient = await db.patients.get(patientId);
@@ -18,60 +11,16 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const therapies = await db.therapies.filter((t: any) => t.patientId === patientId).toArray();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const checkups = await db.checkups.filter((c: any) => c.patientId === patientId).toArray();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const observations = await db.observations.filter((o: any) => o.patientId === patientId).toArray();
 
-    const bundle: Bundle = {
-        resourceType: "Bundle",
-        type: "collection",
-        entry: []
-    };
-
-    // 1. Patient Resource
-    bundle.entry?.push({
-        resource: toFhirPatient(patient)
+    return buildFhirBundleFromRecords({
+        generatedAt: new Date(),
+        patient,
+        entries,
+        therapies,
+        checkups,
+        observations,
     });
-
-    // 2. Conditions (Diagnoses)
-    if (patient.diagnoses) {
-        patient.diagnoses.forEach(d => {
-            bundle.entry?.push({
-                resource: toFhirCondition(d, patientId)
-            });
-        });
-    }
-
-    // 3. Encounters & Observations
-    entries.forEach(e => {
-        if (e.deletedAt) return;
-
-        // Add Encounter
-        bundle.entry?.push({
-            resource: toFhirEncounter(e, patientId)
-        });
-
-        // Add Observation if applicable
-        const obs = toFhirObservation(e, patientId);
-        if (obs) {
-            bundle.entry?.push({
-                resource: obs
-            });
-        }
-    });
-
-    // 4. Medications
-    therapies.forEach(t => {
-
-        bundle.entry?.push({
-            resource: toFhirMedicationStatement(t, patientId)
-        });
-    });
-
-    // 5. Structured Observations (LOINC + UCUM)
-    observations.forEach((o) => {
-        bundle.entry?.push({
-            resource: toFhirStructuredObservation(o, patientId)
-        });
-    });
-
-    return bundle;
 }
