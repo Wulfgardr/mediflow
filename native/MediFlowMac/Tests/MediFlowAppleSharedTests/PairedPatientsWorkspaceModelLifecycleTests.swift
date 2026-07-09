@@ -268,6 +268,17 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         includeDeleted ? summaries : summaries.filter { $0.deletedAt == nil }
     }
 
+    func fetchPatients(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        includeDiagnoses: Bool
+    ) async throws -> [HomeBasePatientSummary] {
+        try await fetchPatients(
+            credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, includeDeleted: false)
+    }
+
     func fetchNetworkAmbulatories(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -530,6 +541,9 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     ) async throws -> [HomeBaseCheckupSummary] {
         []
     }
+
+    func fetchScopedCheckups(dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseCheckupSummary] { [] }
+    func fetchScopedEntries(type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseEntrySummary] { [] }
 
     func createCheckup(
         patientId: String,

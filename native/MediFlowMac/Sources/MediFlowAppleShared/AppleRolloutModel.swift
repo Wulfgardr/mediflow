@@ -70,6 +70,51 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
     }
 }
 
+/* @Codex */
+public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendable {
+    case patients, agenda, diary, analytics, scales, runtime, overview, milestones
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .patients: "Pazienti"
+        case .agenda: "Agenda"
+        case .diary: "Diario"
+        case .analytics: "Analytics"
+        case .scales: "Scale"
+        case .runtime: "Runtime"
+        case .overview: "Panoramica"
+        case .milestones: "Tappe"
+        }
+    }
+
+    public var symbolName: String {
+        switch self {
+        case .patients: "person.text.rectangle"
+        case .agenda: "calendar"
+        case .diary: "book.closed"
+        case .analytics: "chart.bar"
+        case .scales: "checklist"
+        case .runtime: "server.rack"
+        case .overview: "square.grid.2x2"
+        case .milestones: "flag.pattern.checkered"
+        }
+    }
+
+    static var clinicalSections: [ClinicalWorkspaceSection] { [.patients, .agenda, .diary, .analytics, .scales] }
+    static var projectSections: [ClinicalWorkspaceSection] { [.runtime, .overview, .milestones] }
+
+    init(legacy section: AppleFoundationSection) {
+        switch section {
+        case .modules: self = .patients
+        case .overview: self = .overview
+        case .runtime: self = .runtime
+        case .milestones: self = .milestones
+        }
+    }
+}
+
 public struct ApplePlatformStatus: Hashable, Sendable {
     public let phase: AppleDeliveryPhase
     public let detail: String

@@ -42,7 +42,8 @@ public enum PatientFieldCrypto {
             version: summary.version,
             updatedAt: summary.updatedAt,
             deletedAt: summary.deletedAt,
-            deletionReason: decryptStringField(summary.deletionReason, masterKey: masterKey)
+            deletionReason: decryptStringField(summary.deletionReason, masterKey: masterKey),
+            diagnoses: decryptStructuredField(summary.diagnoses, masterKey: masterKey)
         )
     }
 

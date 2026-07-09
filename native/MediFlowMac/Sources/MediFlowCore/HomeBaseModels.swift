@@ -60,8 +60,8 @@ public struct HomeBasePairedCredentials: Hashable, Sendable {
 }
 
 public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, diagnoses: String? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.diagnoses = diagnoses
     }
     public let id: String
     public let firstName: String
@@ -74,6 +74,7 @@ public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable 
     public let updatedAt: Date?
     public let deletedAt: Date?
     public let deletionReason: String?
+    public let diagnoses: String?
 }
 
 public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
