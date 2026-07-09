@@ -50,6 +50,8 @@ const NETWORK_CREATE_SENSITIVE_FIELDS = [
     'diagnoses',
     'statusReason',
     'notes',
+    'archiveReason',
+    'archiveNote',
 ] as const;
 
 const NETWORK_CREATE_SERVER_CONTROLLED_FIELDS = [
