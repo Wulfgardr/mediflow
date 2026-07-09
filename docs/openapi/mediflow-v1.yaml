@@ -1457,7 +1457,7 @@ paths:
               updateNetworkPhone:
                 value:
                   version: 7
-                  phone: "+39 333 1234567"
+                  phone: ENC:opaque-phone
               archiveNetworkPatient:
                 value:
                   version: 7
@@ -3966,22 +3966,27 @@ components:
           type:
             - string
             - 'null'
+          description: Sealed opaque address beginning with `ENC:`; the paired network boundary rejects plaintext.
         phone:
           type:
             - string
             - 'null'
+          description: Sealed opaque phone beginning with `ENC:`; the paired network boundary rejects plaintext.
         caregiver:
           type:
             - string
             - 'null'
+          description: Sealed opaque caregiver beginning with `ENC:`; the paired network boundary rejects plaintext.
         exemptions:
           type:
             - string
             - 'null'
+          description: Sealed opaque exemptions payload beginning with `ENC:`; the paired network boundary rejects plaintext.
         diagnoses:
           type:
             - string
             - 'null'
+          description: Sealed opaque diagnoses payload beginning with `ENC:`; the paired network boundary rejects plaintext.
         monitoringProfile:
           type:
             - string
@@ -3990,20 +3995,22 @@ components:
           type:
             - string
             - 'null'
+          description: Sealed opaque status reason beginning with `ENC:`; the paired network boundary rejects plaintext.
         archiveReason:
           type:
             - string
             - 'null'
-          description: Sealed opaque archive reason beginning with `ENC:`.
+          description: Sealed opaque archive reason beginning with `ENC:`; the paired network boundary rejects plaintext.
         archiveNote:
           type:
             - string
             - 'null'
-          description: Sealed optional archive note beginning with `ENC:`.
+          description: Sealed optional archive note beginning with `ENC:`; the paired network boundary rejects plaintext.
         notes:
           type:
             - string
             - 'null'
+          description: Sealed opaque notes beginning with `ENC:`; the paired network boundary rejects plaintext.
         aiSummary:
           type:
             - string
@@ -4833,22 +4840,27 @@ components:
           type:
             - string
             - 'null'
+          description: Sealed opaque address beginning with `ENC:`; the paired network boundary rejects plaintext.
         phone:
           type:
             - string
             - 'null'
+          description: Sealed opaque phone beginning with `ENC:`; the paired network boundary rejects plaintext.
         caregiver:
           type:
             - string
             - 'null'
+          description: Sealed opaque caregiver beginning with `ENC:`; the paired network boundary rejects plaintext.
         exemptions:
           type:
             - string
             - 'null'
+          description: Sealed opaque exemptions payload beginning with `ENC:`; the paired network boundary rejects plaintext.
         diagnoses:
           type:
             - string
             - 'null'
+          description: Sealed opaque diagnoses payload beginning with `ENC:`; the paired network boundary rejects plaintext.
         monitoringProfile:
           type:
             - string
@@ -4857,20 +4869,22 @@ components:
           type:
             - string
             - 'null'
+          description: Sealed opaque status reason beginning with `ENC:`; the paired network boundary rejects plaintext.
         archiveReason:
           type:
             - string
             - 'null'
-          description: Sealed opaque archive reason beginning with `ENC:`.
+          description: Sealed opaque archive reason beginning with `ENC:`; the paired network boundary rejects plaintext.
         archiveNote:
           type:
             - string
             - 'null'
-          description: Sealed optional archive note beginning with `ENC:`.
+          description: Sealed optional archive note beginning with `ENC:`; the paired network boundary rejects plaintext.
         notes:
           type:
             - string
             - 'null'
+          description: Sealed opaque notes beginning with `ENC:`; the paired network boundary rejects plaintext.
         aiSummary:
           type:
             - string
