@@ -7,13 +7,51 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-09
+
+> Nota release: la `0.7.2` chiude la parità del boundary paired per il client
+> Apple. Il client nativo raggiunge la web app sul ciclo di vita del paziente e
+> sulle famiglie cliniche mancanti, sempre entro i confini local-first e senza
+> hard delete remoto.
+
 ### Aggiunto
 
-- **Visita review-first da transcript sintetico (`WUL-419`/`WUL-420`/`WUL-421`)**:
-  boundary ADR 0072, workspace web per bozza visita manuale/dettata, endpoint
-  interno `POST /api/visit-session/draft` e test deterministico su transcript
-  sintetico. La slice non acquisisce audio reale, non persiste raw audio e non
-  scrive terapie/diagnosi/checkup/osservazioni senza revisione esplicita.
+- **Ciclo di vita paziente sul boundary paired**: creazione via wire, cestino
+  con soft-delete e motivazione cifrata, ripristino, tutti con concorrenza
+  ottimistica e capability dedicata. Il client Apple crea e gestisce lo stato
+  del paziente senza accesso diretto al database.
+- **Prestazioni e protesica sul boundary**: nuove famiglie
+  `/api/v1/network/service-prescriptions`, `service-prescription-items`,
+  `service-catalog` e `prosthetic-prescriptions`, con concorrenza ottimistica
+  (nuova colonna `version`) e superfici native corrispondenti. Nessun hard
+  delete remoto.
+- **Export FHIR del paziente lato client**: il bundle FHIR viene generato sul
+  dispositivo dai dati già decifrati, con pre-check di validazione FSE che
+  blocca gli errori e chiede conferma sui warning. Il server non vede mai il
+  contenuto in chiaro, e un contratto golden garantisce l'equivalenza tra la
+  generazione web e quella nativa.
+- **Discovery e guardia di revisione paired**: `capabilities`, `identity` e
+  `node` accettano l'autenticazione del client paired oltre al token locale, e
+  una nuova rotta di revisione espone solo l'impronta pubblica della build per
+  rilevare disallineamenti di versione dopo un aggiornamento.
+- **Terminologia nativa**: autocomplete LOINC e UCUM nel form osservazioni del
+  client Apple, appoggiato al boundary di terminologia.
+- **Visita review-first da transcript sintetico**: boundary ADR 0072, workspace
+  web per bozza visita manuale o dettata, endpoint interno
+  `POST /api/visit-session/draft` e test deterministico su transcript sintetico.
+  Nessuna acquisizione di audio reale, nessun raw audio persistito e nessuna
+  scrittura clinica senza revisione esplicita.
+
+### Migliorato
+
+- **Concorrenza ottimistica generalizzata**: contratto `VERSION_CONFLICT`
+  condiviso e PHI-safe esteso alle famiglie prestazioni e protesica, con le
+  cancellazioni host protette dalla versione.
+
+### Crediti
+
+- Aggiunta la pagina [CREDITS.md](./CREDITS.md) con le attribuzioni in chiaro di
+  ogni fonte di ispirazione, modello, libreria e runtime, con URL e licenze.
 
 ## [0.7.1] - 2026-07-03
 

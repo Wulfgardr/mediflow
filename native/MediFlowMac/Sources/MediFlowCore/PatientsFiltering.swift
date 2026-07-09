@@ -6,6 +6,7 @@ import Foundation
 public enum PatientListViewMode: String, CaseIterable {
     case active
     case archived
+    case trash
 }
 
 public enum PatientListSortMode: String, CaseIterable {
@@ -28,9 +29,11 @@ public enum PatientsFiltering {
         let statusFiltered = patients.filter { patient in
             switch viewMode {
             case .active:
-                return patient.isArchived != true
+                return patient.deletedAt == nil && patient.isArchived != true
             case .archived:
-                return patient.isArchived == true
+                return patient.deletedAt == nil && patient.isArchived == true
+            case .trash:
+                return patient.deletedAt != nil
             }
         }
 

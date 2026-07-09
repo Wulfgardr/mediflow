@@ -17,7 +17,7 @@ read_when:
 > [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
 > nel piano engineering del workspace sorgente.
 
-Ultimo aggiornamento: 2026-07-03 (`v0.7.1` mainline)
+Ultimo aggiornamento: 2026-07-09 (`v0.7.2` mainline)
 
 ---
 
@@ -214,9 +214,9 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | `v0.7.1` | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel, Vetro Clinico/Liquid Glass e store locale verificabile | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
-| `MediFlowCore` tri-OS | `v0.7.1` | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
-| iPhone/iPad | `v0.7.1` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
+| macOS Apple shell | `v0.7.2` | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel, Vetro Clinico/Liquid Glass e store locale verificabile | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| `MediFlowCore` tri-OS | `v0.7.2` | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
+| iPhone/iPad | `v0.7.2` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost; OCR primario |
 | Apple Vision OCR | macOS-only fallback | Seconda lettura locale quando DeepSeek/Ollama OCR restituisce output blank/low-signal | Solo macOS, nessun equivalente certificato Windows/Linux |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |

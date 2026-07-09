@@ -22,6 +22,7 @@ import ServicePrescriptionManager from '@/components/service-prescription-manage
 import SissHandoffDiary from '@/components/siss-handoff-diary';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
+import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
@@ -575,7 +576,16 @@ export default function PatientDetailPage() {
                         summary={workspace?.activeTherapiesCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
                         keepMounted
                     >
-                        <TherapyManager patientId={id} embedded />
+                        <div className="space-y-4">
+                            <TherapyManager patientId={id} embedded />
+                            <TreatmentReasoningPanel
+                                patient={patient}
+                                entries={entries}
+                                therapies={therapies}
+                                observations={observations}
+                                attachments={attachments}
+                            />
+                        </div>
                     </CollapsibleSection>
 
                     <CollapsibleSection

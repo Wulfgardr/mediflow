@@ -7,22 +7,26 @@ import UIKit
 #endif
 
 struct PairedPatientsWorkspaceView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = PairedPatientsWorkspaceModel()
     @State private var confirmsClearingPairing = false
-    @State private var confirmsDeletingEntry = false
-    @State private var deletionCandidateId: String?
+    @State private var entryDeletionCandidate: HomeBaseEntrySummary?
     @State private var confirmsDeletingTherapy = false
     @State private var therapyDeletionCandidateId: String?
     @State private var confirmsDeletingCheckup = false
     @State private var checkupDeletionCandidateId: String?
     @State private var confirmsDeletingObservation = false
     @State private var observationDeletionCandidateId: String?
+    @State private var patientLifecycleSheet: PatientLifecycleSheet?
     @State private var patientQuery = ""
     @State private var patientViewMode: PatientListViewMode = .active
     @State private var patientSortMode: PatientListSortMode = .recent
     @State private var therapyStatusFilter: TherapyStatusFilter = .all
     @State private var checkupStatusFilter: CheckupStatusFilter = .all
     @State private var entryTypeFilter: EntryTypeFilter = .all
+    @State private var showsDeletedDiaryEntries = false
+    @State private var confirmsReplacingEntryTemplate = false
+    @State private var confirmsFHIRExport = false
     @State private var presentingScale: ClinicalScaleDefinition?
     @State private var icdQuery = ""
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
@@ -53,19 +57,69 @@ struct PairedPatientsWorkspaceView: View {
         .sheet(isPresented: $model.isCreatingPatient) {
             createPatientForm
         }
+        .sheet(item: $entryDeletionCandidate) { entry in
+            PairedDiaryDeleteSheet(entry: entry, model: model)
+        }
+        .sheet(item: $patientLifecycleSheet) { sheet in
+            switch sheet {
+            case .archive:
+                PairedPatientArchiveSheet(model: model, isArchived: true)
+            case .unarchive:
+                PairedPatientArchiveSheet(model: model, isArchived: false)
+            case .delete:
+                PairedPatientDeleteSheet(model: model)
+            }
+        }
+        .onChange(of: patientViewMode) { newValue in
+            guard newValue == .trash else { return }
+            Task { await model.loadPatientTrash() }
+        }
+        .onChange(of: scenePhase) { newValue in
+            guard newValue == .active else { return }
+            Task { await model.checkNetworkRevisionOnForeground() }
+        }
         .confirmationDialog(
-            "Annullare questa voce diario?",
-            isPresented: $confirmsDeletingEntry,
+            "Esportare dati FHIR?",
+            isPresented: $confirmsFHIRExport,
             titleVisibility: .visible
         ) {
-            Button("Annulla voce", role: .destructive) {
-                guard let deletionCandidateId else { return }
-                self.deletionCandidateId = nil
-                Task { await model.softDeleteEntry(id: deletionCandidateId) }
+            Button("Valida ed esporta") {
+                Task { await model.prepareFHIRExport() }
             }
-            Button("Mantieni", role: .cancel) {}
+            Button("Annulla", role: .cancel) {}
         } message: {
-            Text("La voce resta nello storico come annullata. Nessun hard delete viene eseguito dal client mobile.")
+            Text("Include anagrafica, diagnosi, diario non eliminato, terapie e osservazioni già decifrati nella scheda. I controlli non fanno parte del bundle FHIR. Non invia dati al FSE e non pubblica nulla fuori dal dispositivo.")
+        }
+        .confirmationDialog(
+            "Validazione FSE con avvisi",
+            isPresented: Binding(
+                get: { model.pendingFHIRWarningValidation != nil },
+                set: { if !$0 { model.dismissFHIRWarningValidation() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Esporta comunque") {
+                Task { await model.prepareFHIRExport(confirmWarnings: true) }
+            }
+            Button("Annulla", role: .cancel) {
+                model.dismissFHIRWarningValidation()
+            }
+        } message: {
+            if let validation = model.pendingFHIRWarningValidation {
+                Text("\(validation.totalWarningCount) avvisi FSE. Errori: \(validation.totalErrorCount). Controlla terapie e osservazioni prima di condividere se non sei sicuro.")
+            }
+        }
+        .confirmationDialog(
+            "Sostituire il contenuto?",
+            isPresented: $confirmsReplacingEntryTemplate,
+            titleVisibility: .visible
+        ) {
+            Button("Sostituisci con template", role: .destructive) {
+                model.insertNewEntrySOAPTemplate()
+            }
+            Button("Mantieni contenuto", role: .cancel) {}
+        } message: {
+            Text("Il campo contiene gia testo. Il template S/O/A/P sostituisce il contenuto corrente.")
         }
         .confirmationDialog(
             "Annullare questa terapia?",
@@ -366,54 +420,94 @@ struct PairedPatientsWorkspaceView: View {
             patientSearchControls
             let results = filteredPatients
             if results.isEmpty {
-                Text("Nessun paziente per questi filtri.")
+                Text(patientViewMode == .trash ? "Nessun paziente nel cestino." : "Nessun paziente per questi filtri.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-search-empty")
             } else {
                 ForEach(results) { patient in
-                    Button {
-                        Task { await model.loadPatient(patient) }
-                    } label: {
+                    if patientViewMode == .trash {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
                                     Text("\(patient.lastName) \(patient.firstName)")
                                         .font(.subheadline.weight(.semibold))
-                                    if patient.isAdi == true { flagChip("ADI", tone: .info) }
-                                    if patient.isArchived == true { flagChip("Archiviato", tone: .neutral) }
+                                    flagChip("Nel cestino", tone: .attention)
                                 }
                                 HStack(spacing: 6) {
                                     Text(patient.taxCode)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
-                                    if let age = Self.age(from: patient.birthDate) {
-                                        Text("· \(age) anni")
+                                    if let deletedAt = patient.deletedAt {
+                                        Text("Eliminato il \(Self.birthDateFormatter.string(from: deletedAt))")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                            .accessibilityIdentifier("patient-cell-age-\(patient.id)")
                                     }
+                                }
+                                if let reason = cleaned(patient.deletionReason) {
+                                    Text("Motivo: \(reason)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                             Spacer(minLength: 8)
-                            VStack(alignment: .trailing, spacing: 4) {
-                                if let updated = patient.updatedAt {
-                                    Text(Self.relativeUpdated(updated))
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                        .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
+                            if model.canRestorePatient(patient) {
+                                Button {
+                                    Task { await model.restorePatient(patient) }
+                                } label: {
+                                    Label("Ripristina", systemImage: "arrow.uturn.backward.circle")
                                 }
-                                if model.selectedPatient?.id == patient.id {
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.tint)
-                                }
+                                .font(.caption)
+                                .accessibilityIdentifier("restore-patient-button-\(patient.id)")
                             }
                         }
+                        .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("patient-trash-row-\(patient.id)")
+                    } else {
+                        Button {
+                            Task { await model.loadPatient(patient) }
+                        } label: {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text("\(patient.lastName) \(patient.firstName)")
+                                            .font(.subheadline.weight(.semibold))
+                                        if patient.isAdi == true { flagChip("ADI", tone: .info) }
+                                        if patient.isArchived == true { flagChip("Archiviato", tone: .neutral) }
+                                    }
+                                    HStack(spacing: 6) {
+                                        Text(patient.taxCode)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if let age = Self.age(from: patient.birthDate) {
+                                            Text("· \(age) anni")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .accessibilityIdentifier("patient-cell-age-\(patient.id)")
+                                        }
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    if let updated = patient.updatedAt {
+                                        Text(Self.relativeUpdated(updated))
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                            .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
+                                    }
+                                    if model.selectedPatient?.id == patient.id {
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("patient-cell-\(patient.id)")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("patient-cell-\(patient.id)")
                 }
             }
         }
@@ -429,7 +523,7 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private var filteredDiaryEntries: [HomeBaseEntrySummary] {
-        EntryFiltering.apply(model.entries, filter: entryTypeFilter)
+        EntryFiltering.apply(model.entries, filter: entryTypeFilter, includeDeleted: showsDeletedDiaryEntries)
     }
 
     private var createPatientForm: some View {
@@ -457,7 +551,7 @@ struct PairedPatientsWorkspaceView: View {
                     TextField("Caregiver (opzionale)", text: $model.newPatientCaregiver)
                         .accessibilityIdentifier("new-patient-caregiver")
                 }
-                Text("Creazione on-device (autorita locale). Richiede il PIN operatore per cifrare i campi.")
+                Text("Crea in locale quando l'autorità on-device è attiva, oppure tramite l'home-base collegato se il permesso è concesso. Richiede il PIN operatore per cifrare i campi.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -500,6 +594,7 @@ struct PairedPatientsWorkspaceView: View {
                 Picker("Stato", selection: $patientViewMode) {
                     Text("Attivi").tag(PatientListViewMode.active)
                     Text("Archiviati").tag(PatientListViewMode.archived)
+                    Text("Cestino").tag(PatientListViewMode.trash)
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("patient-view-mode")
@@ -522,9 +617,12 @@ struct PairedPatientsWorkspaceView: View {
         VStack(alignment: .leading, spacing: 10) {
             patientDetailSection(detail)
             diarySection
+            scalesSection
             therapiesSection
             checkupsSection
             observationsSection
+            servicePrescriptionsSection
+            prostheticPrescriptionsSection
         }
     }
 
@@ -544,6 +642,48 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isEditingPatient)
                 .accessibilityIdentifier("edit-patient-button")
+                if detail.isArchived == true {
+                    Button {
+                        patientLifecycleSheet = .unarchive
+                    } label: {
+                        Label("Riattiva", systemImage: "archivebox")
+                    }
+                    .font(.caption)
+                    .disabled(!model.canUnarchivePatient)
+                    .accessibilityIdentifier("unarchive-patient-button")
+                } else {
+                    Button {
+                        patientLifecycleSheet = .archive
+                    } label: {
+                        Label("Archivia", systemImage: "archivebox")
+                    }
+                    .font(.caption)
+                    .disabled(!model.canArchivePatient)
+                    .accessibilityIdentifier("archive-patient-button")
+                }
+                Button(role: .destructive) {
+                    patientLifecycleSheet = .delete
+                } label: {
+                    Label("Elimina", systemImage: "trash")
+                }
+                .font(.caption)
+                .disabled(!model.canSoftDeletePatient)
+                .accessibilityIdentifier("soft-delete-patient-button")
+                Button {
+                    confirmsFHIRExport = true
+                } label: {
+                    Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
+                }
+                .font(.caption)
+                .disabled(!model.canPrepareFHIRExport)
+                .accessibilityIdentifier("patient-export-fhir-button")
+                if let fhirURL = model.patientFHIRExportURL {
+                    ShareLink(item: fhirURL) {
+                        Label("Condividi FHIR", systemImage: "square.and.arrow.up")
+                            .font(.caption)
+                    }
+                    .accessibilityIdentifier("patient-share-fhir-button")
+                }
             }
             Text("\(detail.lastName) \(detail.firstName)")
                 .font(.title3.weight(.semibold))
@@ -727,6 +867,9 @@ struct PairedPatientsWorkspaceView: View {
                     TextField("Codice esenzione", text: $model.newExemptionCode)
                         .accessibilityIdentifier("new-exemption-code")
                         .frame(maxWidth: 160)
+                        .onChange(of: model.newExemptionCode) { _ in
+                            model.scheduleExemptionCatalogSearch()
+                        }
                     Button {
                         model.addExemption()
                     } label: {
@@ -734,6 +877,7 @@ struct PairedPatientsWorkspaceView: View {
                     }
                     .accessibilityIdentifier("add-exemption-button")
                 }
+                exemptionCatalogResultsList
             }
 
             HStack(spacing: 10) {
@@ -750,6 +894,48 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .textFieldStyle(.roundedBorder)
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private var exemptionCatalogResultsList: some View {
+        if model.isSearchingExemptionCatalog
+            || model.exemptionCatalogStatusMessage != nil
+            || !model.exemptionCatalogResults.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                if model.isSearchingExemptionCatalog {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Ricerca catalogo esenzioni")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let status = model.exemptionCatalogStatusMessage {
+                    Text(status)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(model.exemptionCatalogResults) { exemption in
+                    Button {
+                        model.selectExemptionCatalogResult(exemption)
+                    } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(exemption.code)
+                                .font(.caption.monospaced().weight(.semibold))
+                            Text(exemption.description)
+                                .font(.caption)
+                                .lineLimit(2)
+                            Spacer(minLength: 4)
+                            Image(systemName: "plus.circle")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("exemption-catalog-result-\(exemption.code)")
+                }
+            }
+        }
     }
 
     private func cleaned(_ value: String?) -> String? {
@@ -805,17 +991,17 @@ struct PairedPatientsWorkspaceView: View {
             .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
     }
 
-    // Clinical lists are fetched capped (see HomeBasePatientsClient limit: 20), so a
-    // count that hits the cap is a floor, shown as "N+".
-    static let clinicalPreviewCap = 20
+    // Clinical lists are fetched capped by the paired boundary, so a count that
+    // hits the cap is a floor, shown as "N+".
+    static let clinicalPreviewCap = HomeBaseClinicalListLimit.boundaryMaximum
 
-    private func signalTile(_ icon: String, _ count: Int, _ label: String, atCap: Bool = false) -> some View {
+    private func signalTile(_ icon: String, _ signal: ClinicalSignalCount, _ label: String) -> some View {
         VStack(spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text(atCap ? "\(count)+" : "\(count)")
+                Text(signal.displayText)
                     .font(.callout.weight(.semibold))
                     .monospacedDigit()
             }
@@ -837,16 +1023,34 @@ struct PairedPatientsWorkspaceView: View {
         let terapie = model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count
         let parametri = model.observations.filter { $0.deletedAt == nil }.count
         let diario = model.entries.filter { $0.deletedAt == nil }.count
+        let scale = model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count
         let nextCheckup = model.checkups
             .filter { $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() }
             .min(by: { $0.date < $1.date })
         VStack(alignment: .leading, spacing: 6) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
-                signalTile("cross.case", problemi, "Problemi")
-                signalTile("pills", terapie, "Terapie", atCap: model.therapies.count >= cap)
-                signalTile("waveform.path.ecg", parametri, "Parametri", atCap: model.observations.count >= cap)
-                signalTile("list.bullet.clipboard", diario, "Diario", atCap: model.entries.count >= cap)
-                signalTile("seal", exemptionsCount, "Esenzioni")
+                signalTile("cross.case", .exact(problemi), "Problemi")
+                signalTile(
+                    "pills",
+                    .fromLoadedList(count: terapie, loadedCount: model.therapies.count, limit: cap),
+                    "Terapie"
+                )
+                signalTile(
+                    "waveform.path.ecg",
+                    .fromLoadedList(count: parametri, loadedCount: model.observations.count, limit: cap),
+                    "Parametri"
+                )
+                signalTile(
+                    "list.bullet.clipboard",
+                    .fromLoadedList(count: diario, loadedCount: model.entries.count, limit: cap),
+                    "Diario"
+                )
+                signalTile(
+                    "checklist",
+                    .fromLoadedList(count: scale, loadedCount: model.entries.count, limit: cap),
+                    "Scale"
+                )
+                signalTile("seal", .exact(exemptionsCount), "Esenzioni")
             }
             .accessibilityIdentifier("patient-clinical-signals")
             if let next = nextCheckup {
@@ -897,7 +1101,7 @@ struct PairedPatientsWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Diario clinico", systemImage: "list.bullet.clipboard")
                         .font(.subheadline.weight(.semibold))
-                    Text("Ultime 20 voci")
+                    Text("Ultime \(Self.clinicalPreviewCap) voci")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -938,6 +1142,11 @@ struct PairedPatientsWorkspaceView: View {
                         .font(.caption)
                 }
                 .accessibilityIdentifier("entry-type-filter")
+
+                Toggle("Mostra eliminate", isOn: $showsDeletedDiaryEntries)
+                    .font(.caption)
+                    .disabled(model.entries.allSatisfy { $0.deletedAt == nil })
+                    .accessibilityIdentifier("show-deleted-entries-toggle")
             }
 
             if model.entries.isEmpty {
@@ -954,22 +1163,42 @@ struct PairedPatientsWorkspaceView: View {
                         HStack(alignment: .firstTextBaseline) {
                             Text(entry.title)
                                 .font(.caption.weight(.semibold))
+                                .strikethrough(entry.deletedAt != nil, color: .secondary)
                             if let type = PairedDiaryEntryType(rawValue: entry.type) {
                                 flagChip(type.title, tone: .info)
+                            }
+                            if entry.deletedAt != nil {
+                                flagChip("Eliminata", tone: .attention)
                             }
                             Spacer(minLength: 8)
                             Text(Self.entryDateFormatter.string(from: entry.date))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        Text(entry.content)
+                        Text(ClinicalContentRendering.attributedString(from: entry.content))
                             .font(.caption)
                             .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
                             .lineLimit(4)
-                        if entry.deletedAt != nil {
-                            Text("Voce annullata")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.orange)
+                        if let deletedAt = entry.deletedAt {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Eliminata il \(Self.entryDateFormatter.string(from: deletedAt))")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                                if let reason = entry.deletionReason?.trimmedOrNil {
+                                    Text("Motivo: \(reason)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            if model.canRestoreEntry(entry) {
+                                Button {
+                                    Task { await model.restoreEntry(id: entry.id) }
+                                } label: {
+                                    Label("Ripristina", systemImage: "arrow.uturn.backward.circle")
+                                }
+                                .font(.caption)
+                                .accessibilityIdentifier("homebase-restore-entry-button-\(entry.id)")
+                            }
                         } else if model.canMutateEntry(entry) {
                             HStack(spacing: 8) {
                                 Button {
@@ -981,8 +1210,7 @@ struct PairedPatientsWorkspaceView: View {
                                 .accessibilityIdentifier("homebase-edit-entry-button-\(entry.id)")
 
                                 Button(role: .destructive) {
-                                    deletionCandidateId = entry.id
-                                    confirmsDeletingEntry = true
+                                    entryDeletionCandidate = entry
                                 } label: {
                                     Label("Annulla", systemImage: "xmark.circle")
                                 }
@@ -1059,6 +1287,18 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("homebase-new-entry-type-picker")
+                Button {
+                    if model.newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        model.insertNewEntrySOAPTemplate()
+                    } else {
+                        confirmsReplacingEntryTemplate = true
+                    }
+                } label: {
+                    Label("Template S/O/A/P", systemImage: "doc.text")
+                }
+                .font(.caption)
+                .disabled(model.isWorking)
+                .accessibilityIdentifier("homebase-new-entry-soap-template-button")
                 TextEditor(text: $model.newEntryContent)
                     .frame(minHeight: 90)
                     .overlay(
@@ -1084,13 +1324,28 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     /* @Codex */
+    private var scalesSection: some View {
+        PairedScalesSection(
+            entries: model.entries,
+            isWorking: model.isWorking,
+            hasSelectedPatient: model.selectedPatient != nil,
+            onRefresh: {
+                Task { await model.loadSelectedPatientEntries() }
+            },
+            onStartScale: { scale in
+                presentingScale = scale
+            }
+        )
+    }
+
+    /* @Codex */
     private var therapiesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Terapie", systemImage: "pills")
                         .font(.subheadline.weight(.semibold))
-                    Text("Ultime 20 terapie")
+                    Text("Ultime \(Self.clinicalPreviewCap) terapie")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1103,6 +1358,23 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking || model.selectedPatient == nil)
                 .accessibilityIdentifier("homebase-refresh-therapies-button")
+
+                Button {
+                    model.generatePatientReportPDF()
+                } label: {
+                    Label("Report PDF", systemImage: "doc.richtext")
+                        .font(.caption)
+                }
+                .disabled(model.selectedPatient == nil)
+                .accessibilityIdentifier("patient-report-pdf-button")
+
+                if let reportURL = model.patientReportURL {
+                    ShareLink(item: reportURL) {
+                        Label("Condividi", systemImage: "square.and.arrow.up")
+                            .font(.caption)
+                    }
+                    .accessibilityIdentifier("share-patient-report-pdf-button")
+                }
 
                 if !model.therapies.isEmpty {
                     ShareLink(item: TherapyPlanDocument.plainText(
@@ -1152,6 +1424,8 @@ struct PairedPatientsWorkspaceView: View {
                 therapyForm(
                     title: "Modifica terapia online",
                     drugName: $model.editTherapyDrugName,
+                    aic: $model.editTherapyAIC,
+                    atc: $model.editTherapyATC,
                     activePrinciple: $model.editTherapyActivePrinciple,
                     dosage: $model.editTherapyDosage,
                     motivation: $model.editTherapyMotivation,
@@ -1161,9 +1435,14 @@ struct PairedPatientsWorkspaceView: View {
                     endDate: $model.editTherapyEndDate,
                     diagnosisCode: $model.editTherapyDiagnosisCode,
                     diagnosisOptions: model.currentPatientDiagnoses,
+                    drugCatalogResults: model.editTherapyDrugCatalogResults,
+                    isSearchingDrugCatalog: model.isSearchingEditTherapyDrugCatalog,
+                    drugCatalogStatusMessage: model.drugCatalogStatusMessage,
                     primaryLabel: "Salva modifiche",
                     primaryIdentifier: "homebase-update-therapy-button",
                     canSubmit: model.canUpdateEditingTherapy,
+                    onDrugQueryChanged: { model.scheduleEditTherapyDrugCatalogSearch() },
+                    onSelectDrug: { model.selectEditTherapyDrugCatalogResult($0) },
                     onCancel: { model.cancelEditingTherapy() },
                     onSubmit: { Task { await model.updateEditingTherapy() } }
                 )
@@ -1177,6 +1456,8 @@ struct PairedPatientsWorkspaceView: View {
             therapyForm(
                 title: "Nuova terapia online",
                 drugName: $model.newTherapyDrugName,
+                aic: $model.newTherapyAIC,
+                atc: $model.newTherapyATC,
                 activePrinciple: $model.newTherapyActivePrinciple,
                 dosage: $model.newTherapyDosage,
                 motivation: $model.newTherapyMotivation,
@@ -1186,9 +1467,14 @@ struct PairedPatientsWorkspaceView: View {
                 endDate: $model.newTherapyEndDate,
                 diagnosisCode: $model.newTherapyDiagnosisCode,
                 diagnosisOptions: model.currentPatientDiagnoses,
+                drugCatalogResults: model.newTherapyDrugCatalogResults,
+                isSearchingDrugCatalog: model.isSearchingNewTherapyDrugCatalog,
+                drugCatalogStatusMessage: model.drugCatalogStatusMessage,
                 primaryLabel: "Salva terapia",
                 primaryIdentifier: "homebase-create-therapy-button",
                 canSubmit: model.canCreateTherapy,
+                onDrugQueryChanged: { model.scheduleNewTherapyDrugCatalogSearch() },
+                onSelectDrug: { model.selectNewTherapyDrugCatalogResult($0) },
                 onCancel: nil,
                 onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
             )
@@ -1232,6 +1518,20 @@ struct PairedPatientsWorkspaceView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            if therapy.aic?.trimmedOrNil != nil || therapy.atc?.trimmedOrNil != nil {
+                HStack(spacing: 6) {
+                    if let aic = therapy.aic?.trimmedOrNil {
+                        Text("AIC \(aic)")
+                            .font(.caption2.monospaced().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    if let atc = therapy.atc?.trimmedOrNil {
+                        Text("ATC \(atc)")
+                            .font(.caption2.monospaced().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             if let motivation = therapy.motivation, !motivation.isEmpty {
                 Text(motivation)
                     .font(.caption2)
@@ -1274,6 +1574,8 @@ struct PairedPatientsWorkspaceView: View {
     private func therapyForm(
         title: String,
         drugName: Binding<String>,
+        aic: Binding<String>,
+        atc: Binding<String>,
         activePrinciple: Binding<String>,
         dosage: Binding<String>,
         motivation: Binding<String>,
@@ -1283,9 +1585,14 @@ struct PairedPatientsWorkspaceView: View {
         endDate: Binding<Date>,
         diagnosisCode: Binding<String>,
         diagnosisOptions: [ClinicalDiagnosis],
+        drugCatalogResults: [HomeBaseDrugSummary],
+        isSearchingDrugCatalog: Bool,
+        drugCatalogStatusMessage: String?,
         primaryLabel: String,
         primaryIdentifier: String,
         canSubmit: Bool,
+        onDrugQueryChanged: @escaping () -> Void,
+        onSelectDrug: @escaping (HomeBaseDrugSummary) -> Void,
         onCancel: (() -> Void)?,
         onSubmit: @escaping () -> Void
     ) -> some View {
@@ -1295,6 +1602,22 @@ struct PairedPatientsWorkspaceView: View {
                 .foregroundStyle(.secondary)
             TextField("Farmaco", text: drugName)
                 .accessibilityIdentifier("\(primaryIdentifier)-drug-name")
+                .onChange(of: drugName.wrappedValue) { _ in
+                    onDrugQueryChanged()
+                }
+            drugCatalogResultsList(
+                results: drugCatalogResults,
+                isLoading: isSearchingDrugCatalog,
+                statusMessage: drugCatalogStatusMessage,
+                primaryIdentifier: primaryIdentifier,
+                onSelect: onSelectDrug
+            )
+            TextField("Codice AIC (opzionale)", text: aic)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("\(primaryIdentifier)-aic")
+            TextField("Codice ATC (opzionale)", text: atc)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("\(primaryIdentifier)-atc")
             TextField("Principio attivo (opzionale)", text: activePrinciple)
                 .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
             TextField("Posologia", text: dosage)
@@ -1341,6 +1664,66 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(!canSubmit)
                 .accessibilityIdentifier(primaryIdentifier)
+            }
+        }
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private func drugCatalogResultsList(
+        results: [HomeBaseDrugSummary],
+        isLoading: Bool,
+        statusMessage: String?,
+        primaryIdentifier: String,
+        onSelect: @escaping (HomeBaseDrugSummary) -> Void
+    ) -> some View {
+        if isLoading || statusMessage != nil || !results.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                if isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Ricerca catalogo AIFA")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let statusMessage {
+                    Text(statusMessage)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(results) { drug in
+                    Button {
+                        onSelect(drug)
+                    } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(drug.name)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(2)
+                                if let principle = drug.activePrinciple?.trimmedOrNil {
+                                    Text(principle)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                HStack(spacing: 6) {
+                                    Text("AIC \(drug.aic)")
+                                    if let atc = drug.atc?.trimmedOrNil {
+                                        Text("ATC \(atc)")
+                                    }
+                                }
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "checkmark.circle")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("\(primaryIdentifier)-drug-catalog-result-\(drug.aic)")
+                }
             }
         }
     }
@@ -1433,7 +1816,7 @@ struct PairedPatientsWorkspaceView: View {
         VStack(alignment: .leading, spacing: 10) {
             pairedSectionHeader(
                 title: "Osservazioni",
-                subtitle: "Ultime 20 osservazioni",
+                subtitle: "Ultime \(Self.clinicalPreviewCap) osservazioni",
                 systemImage: "waveform.path.ecg",
                 refreshIdentifier: "homebase-refresh-observations-button"
             ) {
@@ -1461,9 +1844,17 @@ struct PairedPatientsWorkspaceView: View {
                     unitCode: $model.editObservationUnitCode,
                     notes: $model.editObservationNotes,
                     observedAt: $model.editObservationObservedAt,
+                    codeResults: model.editObservationCodeTerminologyResults,
+                    unitResults: model.editObservationUnitTerminologyResults,
+                    isSearchingCode: model.isSearchingEditObservationCodeTerminology,
+                    isSearchingUnit: model.isSearchingEditObservationUnitTerminology,
                     primaryLabel: "Salva modifiche",
                     primaryIdentifier: "homebase-update-observation-button",
                     canSubmit: model.canUpdateEditingObservation,
+                    onCodeQueryChanged: { model.scheduleEditObservationCodeTerminologySearch() },
+                    onUnitQueryChanged: { model.scheduleEditObservationUnitTerminologySearch() },
+                    onSelectCode: { model.selectEditObservationCodeTerminology($0) },
+                    onSelectUnit: { model.selectEditObservationUnitTerminology($0) },
                     onCancel: { model.cancelEditingObservation() },
                     onSubmit: { Task { await model.updateEditingObservation() } }
                 )
@@ -1482,15 +1873,424 @@ struct PairedPatientsWorkspaceView: View {
                 unitCode: $model.newObservationUnitCode,
                 notes: $model.newObservationNotes,
                 observedAt: $model.newObservationObservedAt,
+                codeResults: model.newObservationCodeTerminologyResults,
+                unitResults: model.newObservationUnitTerminologyResults,
+                isSearchingCode: model.isSearchingNewObservationCodeTerminology,
+                isSearchingUnit: model.isSearchingNewObservationUnitTerminology,
                 primaryLabel: "Salva osservazione",
                 primaryIdentifier: "homebase-create-observation-button",
                 canSubmit: model.canCreateObservation,
+                onCodeQueryChanged: { model.scheduleNewObservationCodeTerminologySearch() },
+                onUnitQueryChanged: { model.scheduleNewObservationUnitTerminologySearch() },
+                onSelectCode: { model.selectNewObservationCodeTerminology($0) },
+                onSelectUnit: { model.selectNewObservationUnitTerminology($0) },
                 onCancel: nil,
                 onSubmit: { Task { await model.createObservationForSelectedPatient() } }
             )
             Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private var servicePrescriptionsSection: some View {
+        let counters = ServicePrescriptionFiltering.counters(
+            prescriptions: model.servicePrescriptions,
+            items: model.servicePrescriptionItems
+        )
+        return VStack(alignment: .leading, spacing: 10) {
+            pairedSectionHeader(
+                title: "Prestazioni",
+                subtitle: "Prescrizioni ordinate per data",
+                systemImage: "cross.case",
+                refreshIdentifier: "homebase-refresh-services-button"
+            ) {
+                Task { await model.loadSelectedPatientServicePrescriptions() }
+            }
+            counterStrip([
+                ("Totale", counters.total),
+                ("Voci", counters.items),
+                ("Aperte", counters.open),
+                ("Referti", counters.reports),
+            ], identifier: "service-prescription-counters")
+
+            if model.servicePrescriptions.isEmpty {
+                Text("Nessuna prestazione registrata.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.servicePrescriptions) { prescription in
+                    servicePrescriptionRow(prescription)
+                        .accessibilityIdentifier("service-prescription-row-\(prescription.id)")
+                }
+            }
+
+            Divider()
+            servicePrescriptionForm
+            Text("Creazione unica. Dopo il salvataggio la modifica testuale resta sul web; dal client nativo sono disponibili solo le transizioni di stato previste.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private var prostheticPrescriptionsSection: some View {
+        let counters = ProstheticPrescriptionFiltering.counters(model.prostheticPrescriptions)
+        return VStack(alignment: .leading, spacing: 10) {
+            pairedSectionHeader(
+                title: "Protesica",
+                subtitle: "Prescrizioni e collaudi",
+                systemImage: "figure.walk.motion",
+                refreshIdentifier: "homebase-refresh-prosthetics-button"
+            ) {
+                Task { await model.loadSelectedPatientProstheticPrescriptions() }
+            }
+            counterStrip([
+                ("Totale", counters.total),
+                ("Collaudi", counters.tests),
+            ], identifier: "prosthetic-prescription-counters")
+
+            if model.prostheticPrescriptions.isEmpty {
+                Text("Nessuna prescrizione protesica.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.prostheticPrescriptions) { prescription in
+                    prostheticPrescriptionRow(prescription)
+                        .accessibilityIdentifier("prosthetic-prescription-row-\(prescription.id)")
+                }
+            }
+
+            Divider()
+            prostheticPrescriptionForm
+            Text("Creazione manuale completa. Nessun edit post-create e nessun hard delete dal client nativo.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /* @Codex */
+    private func counterStrip(_ values: [(String, Int)], identifier: String) -> some View {
+        HStack(spacing: 8) {
+            ForEach(values, id: \.0) { label, value in
+                VStack(spacing: 2) {
+                    Text("\(value)")
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(minWidth: 58)
+                .padding(.vertical, 6)
+                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
+    /* @Codex */
+    private func servicePrescriptionRow(_ prescription: HomeBaseServicePrescriptionSummary) -> some View {
+        let children = model.servicePrescriptionItems.filter { $0.prescriptionId == prescription.id }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(prescription.serviceName)
+                        .font(.caption.weight(.semibold))
+                    Text(Self.entryDateFormatter.string(from: prescription.prescribedAt))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                flagChip(
+                    PairedServicePrescriptionStatus.title(for: prescription.status),
+                    tone: PairedServicePrescriptionStatus.tone(for: prescription.status)
+                )
+            }
+            HStack(spacing: 6) {
+                flagChip(prescription.category, tone: .neutral)
+                if let priority = prescription.priority?.trimmedOrNil {
+                    flagChip("Priorità \(priority.uppercased())", tone: .info)
+                }
+                if let code = prescription.serviceCode?.trimmedOrNil {
+                    Text(code)
+                        .font(.caption2.monospaced().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let question = prescription.clinicalQuestion?.trimmedOrNil {
+                Text(question)
+                    .font(.caption)
+                    .lineLimit(2)
+            }
+            if let provider = prescription.provider?.trimmedOrNil {
+                Text("Erogatore: \(provider)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            serviceDatesLine(prescription)
+            ForEach(children) { item in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(item.ordinal).")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.serviceName)
+                            .font(.caption)
+                        if let code = item.serviceCode?.trimmedOrNil {
+                            Text(code)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 6)
+                    flagChip(Self.serviceMatchLabel(item.matchStatus), tone: .info)
+                }
+                .accessibilityIdentifier("service-prescription-item-row-\(item.id)")
+            }
+            LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
+                Button("Prenota") {
+                    Task { await model.bookServicePrescription(prescription) }
+                }
+                .font(.caption)
+                .disabled(!model.canBookServicePrescription(prescription))
+                .accessibilityIdentifier("service-prescription-book-\(prescription.id)")
+                Button("Esegui") {
+                    Task { await model.performServicePrescription(prescription) }
+                }
+                .font(.caption)
+                .disabled(!model.canPerformServicePrescription(prescription))
+                .accessibilityIdentifier("service-prescription-perform-\(prescription.id)")
+                Button("Referto ricevuto") {
+                    Task { await model.receiveServicePrescriptionReport(prescription) }
+                }
+                .font(.caption)
+                .disabled(!model.canReceiveReportServicePrescription(prescription))
+                .accessibilityIdentifier("service-prescription-report-\(prescription.id)")
+                Button("Annulla") {
+                    Task { await model.cancelServicePrescription(prescription) }
+                }
+                .font(.caption)
+                .disabled(!model.canCancelServicePrescription(prescription))
+                .accessibilityIdentifier("service-prescription-cancel-\(prescription.id)")
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private var servicePrescriptionForm: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Nuova prestazione", systemImage: "cross.case")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Prestazione principale", text: $model.newServiceName)
+                .accessibilityIdentifier("new-service-name")
+            HStack(spacing: 8) {
+                TextField("Sistema codice", text: $model.newServiceCodeSystem)
+                    .accessibilityIdentifier("new-service-code-system")
+                TextField("Codice", text: $model.newServiceCode)
+                    .accessibilityIdentifier("new-service-code")
+            }
+            Picker("Stato", selection: $model.newServiceStatus) {
+                ForEach(PairedServicePrescriptionStatus.allCases) { status in
+                    Text(status.title).tag(status)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("new-service-status")
+            HStack(spacing: 8) {
+                Picker("Categoria", selection: $model.newServiceCategory) {
+                    ForEach(PairedServicePrescriptionCategory.allCases) { category in
+                        Text(category.title).tag(category)
+                    }
+                }
+                .accessibilityIdentifier("new-service-category")
+                Picker("Priorità", selection: $model.newServicePriority) {
+                    ForEach(PairedServicePrescriptionPriority.allCases) { priority in
+                        Text(priority.title).tag(priority)
+                    }
+                }
+                .accessibilityIdentifier("new-service-priority")
+            }
+            DatePicker("Prescritta", selection: $model.newServicePrescribedAt, displayedComponents: [.date, .hourAndMinute])
+                .accessibilityIdentifier("new-service-prescribed-at")
+            TextField("Quesito clinico", text: $model.newServiceClinicalQuestion)
+                .accessibilityIdentifier("new-service-clinical-question")
+            TextField("Erogatore", text: $model.newServiceProvider)
+                .accessibilityIdentifier("new-service-provider")
+            Toggle("Prenotata", isOn: $model.newServiceHasScheduledAt)
+                .accessibilityIdentifier("new-service-has-scheduled-at")
+            if model.newServiceHasScheduledAt {
+                DatePicker("Prenotazione", selection: $model.newServiceScheduledAt, displayedComponents: [.date, .hourAndMinute])
+                    .accessibilityIdentifier("new-service-scheduled-at")
+            }
+            Toggle("Eseguita", isOn: $model.newServiceHasPerformedAt)
+                .accessibilityIdentifier("new-service-has-performed-at")
+            if model.newServiceHasPerformedAt {
+                DatePicker("Esecuzione", selection: $model.newServicePerformedAt, displayedComponents: [.date, .hourAndMinute])
+                    .accessibilityIdentifier("new-service-performed-at")
+            }
+            Toggle("Referto ricevuto", isOn: $model.newServiceHasReportReceivedAt)
+                .accessibilityIdentifier("new-service-has-report-at")
+            if model.newServiceHasReportReceivedAt {
+                DatePicker("Referto", selection: $model.newServiceReportReceivedAt, displayedComponents: [.date, .hourAndMinute])
+                    .accessibilityIdentifier("new-service-report-at")
+            }
+            TextField("Esito o note referto", text: $model.newServiceOutcomeNote)
+                .accessibilityIdentifier("new-service-outcome")
+            TextField("Numero richiesta", text: $model.newServiceRequestReference)
+                .accessibilityIdentifier("new-service-request-reference")
+            Picker("Fonte", selection: $model.newServiceSource) {
+                ForEach(PairedPrescriptionSource.allCases) { source in
+                    Text(source.title).tag(source)
+                }
+            }
+            .accessibilityIdentifier("new-service-source")
+            TextField("Riferimenti documento", text: $model.newServiceDocumentRefs)
+                .accessibilityIdentifier("new-service-document-refs")
+            TextField("Note", text: $model.newServiceNotes)
+                .accessibilityIdentifier("new-service-notes")
+            TextField("Voci, una per riga: CODICE NOME", text: $model.newServiceItemsText, axis: .vertical)
+                .lineLimit(3...8)
+                .accessibilityIdentifier("new-service-items")
+            Button {
+                Task { await model.createServicePrescriptionForSelectedPatient() }
+            } label: {
+                Label("Salva prestazione", systemImage: "checkmark.circle")
+            }
+            .font(.caption)
+            .disabled(!model.canCreateServicePrescription)
+            .accessibilityIdentifier("create-service-prescription-button")
+        }
+    }
+
+    /* @Codex */
+    private func prostheticPrescriptionRow(_ prescription: HomeBaseProstheticPrescriptionSummary) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(prescription.description)
+                        .font(.caption.weight(.semibold))
+                    Text(Self.entryDateFormatter.string(from: prescription.prescribedAt))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                flagChip(
+                    PairedProstheticPrescriptionStatus.title(for: prescription.status),
+                    tone: PairedProstheticPrescriptionStatus.tone(for: prescription.status)
+                )
+            }
+            HStack(spacing: 6) {
+                flagChip(prescription.category, tone: .neutral)
+                if let iso = prescription.isoCode?.trimmedOrNil {
+                    Text(iso)
+                        .font(.caption2.monospaced().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let reason = prescription.clinicalReason?.trimmedOrNil {
+                Text(reason)
+                    .font(.caption)
+                    .lineLimit(2)
+            }
+            if let measures = prescription.measures?.trimmedOrNil {
+                Text("Misure: \(measures)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let supplier = prescription.supplier?.trimmedOrNil {
+                Text("Fornitore: \(supplier)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let collaudo = prescription.collaudoAt {
+                Text("Collaudo: \(Self.entryDateFormatter.string(from: collaudo))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let outcome = prescription.collaudoOutcome?.trimmedOrNil {
+                Text(outcome)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                Task { await model.markProstheticPrescriptionTested(prescription) }
+            } label: {
+                Label("Collaudo", systemImage: "checkmark.seal")
+            }
+            .font(.caption)
+            .disabled(!model.canTestProstheticPrescription(prescription))
+            .accessibilityIdentifier("prosthetic-test-\(prescription.id)")
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    private var prostheticPrescriptionForm: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Nuova prescrizione protesica", systemImage: "figure.walk.motion")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Descrizione", text: $model.newProstheticDescription)
+                .accessibilityIdentifier("new-prosthetic-description")
+            HStack(spacing: 8) {
+                TextField("Codice ISO", text: $model.newProstheticISOCode)
+                    .accessibilityIdentifier("new-prosthetic-iso-code")
+                Picker("Categoria", selection: $model.newProstheticCategory) {
+                    ForEach(PairedProstheticPrescriptionCategory.allCases) { category in
+                        Text(category.title).tag(category)
+                    }
+                }
+                .accessibilityIdentifier("new-prosthetic-category")
+            }
+            Picker("Stato", selection: $model.newProstheticStatus) {
+                ForEach(PairedProstheticPrescriptionStatus.allCases) { status in
+                    Text(status.title).tag(status)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("new-prosthetic-status")
+            DatePicker("Prescritta", selection: $model.newProstheticPrescribedAt, displayedComponents: [.date, .hourAndMinute])
+                .accessibilityIdentifier("new-prosthetic-prescribed-at")
+            TextField("Misure", text: $model.newProstheticMeasures)
+                .accessibilityIdentifier("new-prosthetic-measures")
+            TextField("Motivo clinico", text: $model.newProstheticClinicalReason)
+                .accessibilityIdentifier("new-prosthetic-clinical-reason")
+            TextField("Numero regionale", text: $model.newProstheticRegionalPrescriptionId)
+                .accessibilityIdentifier("new-prosthetic-regional-id")
+            TextField("Fornitore", text: $model.newProstheticSupplier)
+                .accessibilityIdentifier("new-prosthetic-supplier")
+            Toggle("Collaudo già registrato", isOn: $model.newProstheticHasCollaudoAt)
+                .accessibilityIdentifier("new-prosthetic-has-collaudo")
+            if model.newProstheticHasCollaudoAt {
+                DatePicker("Collaudo", selection: $model.newProstheticCollaudoAt, displayedComponents: [.date, .hourAndMinute])
+                    .accessibilityIdentifier("new-prosthetic-collaudo-at")
+                TextField("Esito collaudo", text: $model.newProstheticCollaudoOutcome)
+                    .accessibilityIdentifier("new-prosthetic-collaudo-outcome")
+            }
+            Picker("Fonte", selection: $model.newProstheticSource) {
+                ForEach(PairedPrescriptionSource.allCases) { source in
+                    Text(source.title).tag(source)
+                }
+            }
+            .accessibilityIdentifier("new-prosthetic-source")
+            TextField("Riferimenti documento", text: $model.newProstheticDocumentRefs)
+                .accessibilityIdentifier("new-prosthetic-document-refs")
+            TextField("Note", text: $model.newProstheticNotes)
+                .accessibilityIdentifier("new-prosthetic-notes")
+            Button {
+                Task { await model.createProstheticPrescriptionForSelectedPatient() }
+            } label: {
+                Label("Salva protesica", systemImage: "checkmark.circle")
+            }
+            .font(.caption)
+            .disabled(!model.canCreateProstheticPrescription)
+            .accessibilityIdentifier("create-prosthetic-prescription-button")
         }
     }
 
@@ -1729,9 +2529,17 @@ struct PairedPatientsWorkspaceView: View {
         unitCode: Binding<String>,
         notes: Binding<String>,
         observedAt: Binding<Date>,
+        codeResults: [HomeBaseTerminologyItem],
+        unitResults: [HomeBaseTerminologyItem],
+        isSearchingCode: Bool,
+        isSearchingUnit: Bool,
         primaryLabel: String,
         primaryIdentifier: String,
         canSubmit: Bool,
+        onCodeQueryChanged: @escaping () -> Void,
+        onUnitQueryChanged: @escaping () -> Void,
+        onSelectCode: @escaping (HomeBaseTerminologyItem) -> Void,
+        onSelectUnit: @escaping (HomeBaseTerminologyItem) -> Void,
         onCancel: (() -> Void)?,
         onSubmit: @escaping () -> Void
     ) -> some View {
@@ -1743,12 +2551,32 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("\(primaryIdentifier)-display")
             TextField("Codice LOINC", text: code)
                 .accessibilityIdentifier("\(primaryIdentifier)-code")
+                .onChange(of: code.wrappedValue) { _ in
+                    onCodeQueryChanged()
+                }
+            terminologyResultsList(
+                title: "LOINC",
+                results: codeResults,
+                isLoading: isSearchingCode,
+                primaryIdentifier: primaryIdentifier,
+                onSelect: onSelectCode
+            )
             HStack(spacing: 8) {
                 TextField("Valore", text: value)
                     .accessibilityIdentifier("\(primaryIdentifier)-value")
-                TextField("Unita UCUM", text: unitCode)
+                TextField("Unità UCUM", text: unitCode)
                     .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
+                    .onChange(of: unitCode.wrappedValue) { _ in
+                        onUnitQueryChanged()
+                    }
             }
+            terminologyResultsList(
+                title: "UCUM",
+                results: unitResults,
+                isLoading: isSearchingUnit,
+                primaryIdentifier: primaryIdentifier,
+                onSelect: onSelectUnit
+            )
             DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
                 .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
             TextField("Note (opzionale)", text: notes)
@@ -1760,6 +2588,47 @@ struct PairedPatientsWorkspaceView: View {
                 onCancel: onCancel,
                 onSubmit: onSubmit
             )
+        }
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private func terminologyResultsList(
+        title: String,
+        results: [HomeBaseTerminologyItem],
+        isLoading: Bool,
+        primaryIdentifier: String,
+        onSelect: @escaping (HomeBaseTerminologyItem) -> Void
+    ) -> some View {
+        if isLoading || !results.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                if isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Ricerca \(title)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                ForEach(results) { item in
+                    Button {
+                        onSelect(item)
+                    } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(item.code)
+                                .font(.caption.monospaced().weight(.semibold))
+                            Text(item.display)
+                                .font(.caption)
+                                .lineLimit(2)
+                            Spacer(minLength: 4)
+                            Image(systemName: "checkmark.circle")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("\(primaryIdentifier)-terminology-\(title)-\(item.code)")
+                }
+            }
         }
     }
 
@@ -1810,4 +2679,40 @@ struct PairedPatientsWorkspaceView: View {
         guard let endDate = therapy.endDate else { return "Dal \(start)" }
         return "Dal \(start) al \(therapyDayFormatter.string(from: endDate))"
     }
+
+    /* @Codex */
+    private func serviceDatesLine(_ prescription: HomeBaseServicePrescriptionSummary) -> some View {
+        let values: [String] = [
+            prescription.scheduledAt.map { "Prenotata \(Self.entryDateFormatter.string(from: $0))" },
+            prescription.performedAt.map { "Eseguita \(Self.entryDateFormatter.string(from: $0))" },
+            prescription.reportReceivedAt.map { "Referto \(Self.entryDateFormatter.string(from: $0))" },
+        ].compactMap { $0 }
+        return Text(values.joined(separator: " · "))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .opacity(values.isEmpty ? 0 : 1)
+    }
+
+    /* @Codex */
+    private static func serviceMatchLabel(_ rawValue: String) -> String {
+        switch rawValue {
+        case "matched":
+            return "match"
+        case "candidate":
+            return "candidato"
+        case "manual":
+            return "manuale"
+        default:
+            return "da codificare"
+        }
+    }
+}
+
+/* @Codex */
+private enum PatientLifecycleSheet: String, Identifiable {
+    case archive
+    case unarchive
+    case delete
+
+    var id: String { rawValue }
 }

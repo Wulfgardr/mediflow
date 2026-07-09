@@ -8,8 +8,7 @@ import Foundation
 // clinical create/update for all 4 sub-resources (slice 5) - every write path uses
 // sealOrPassthrough (SQLitePatientStore + SQLiteClinicalStore.AssignmentBuilder) so
 // the model's pre-sealed HTTP payloads are never double-encrypted. Only login,
-// ambulatories, and patient create/soft-delete (NOT exposed on the paired-client wire
-// protocol at all - no web peer to wire) still DELEGATE to the HTTP `fallback`. The
+// ambulatories, and unscoped operations still delegate to the HTTP `fallback`. The
 // masterKey crosses only Swift call frames inside the app process (no FFI / loopback /
 // IPC), per the KeyStore rule. Every local write/read needs a non-empty ambulatoryId
 // scope (joined against the patients_to_ambulatories membership); without one, the
@@ -31,10 +30,13 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     // MARK: Local patient reads (the reversed-flow read path)
 
     public func fetchPatients(
-        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?,
+        includeDeleted: Bool
     ) async throws -> [HomeBasePatientSummary] {
         // Scoped by the patients_to_ambulatories membership when present; else all active.
-        try patientStore.listPatients(scopeAmbulatoryId: ambulatoryId?.isEmpty == false ? ambulatoryId : nil)
+        try patientStore.listPatients(
+            scopeAmbulatoryId: ambulatoryId?.isEmpty == false ? ambulatoryId : nil,
+            includeDeleted: includeDeleted)
     }
 
     public func fetchPatient(
@@ -50,7 +52,7 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         return detail
     }
 
-    // MARK: Delegated to HTTP (not yet local) — login, ambulatories, all writes, clinical reads
+    // MARK: Delegated to HTTP when local authority cannot serve the operation
 
     public func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
         try await fallback.login(username: username, password: password)
@@ -60,6 +62,54 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [NetworkAmbulatorySummary] {
         try await fallback.fetchNetworkAmbulatories(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func searchDrugs(
+        query: String, limit: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseDrugSummary] {
+        try await fallback.searchDrugs(
+            query: query, limit: limit, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func searchExemptions(
+        query: String, limit: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseExemptionSummary] {
+        try await fallback.searchExemptions(
+            query: query, limit: limit, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func searchTerminology(
+        system: String, query: String, limit: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseTerminologyItem] {
+        try await fallback.searchTerminology(
+            system: system, query: query, limit: limit, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func resolveTerminology(
+        system: String, code: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseTerminologyItem {
+        try await fallback.resolveTerminology(
+            system: system, code: code, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchTerminologySystems(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseTerminologyRegistryEntry] {
+        try await fallback.fetchTerminologySystems(
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
@@ -101,6 +151,43 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             payload, scopeAmbulatoryId: scope, masterKey: masterKey))
     }
 
+    public func softDeletePatient(
+        id: String,
+        version: Int,
+        sealedReason: String?,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        guard ambulatoryId?.isEmpty == false else {
+            return try await fallback.softDeletePatient(
+                id: id, version: version, sealedReason: sealedReason,
+                credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        }
+        let reason = sealedReason ?? "paired-delete"
+        let outcome = try patientStore.softDeletePatient(
+            id: id, version: version, deletionReason: reason, masterKey: masterKey,
+            scopeAmbulatoryId: ambulatoryId)
+        return try mappedResource(outcome, id: id)
+    }
+
+    public func restorePatient(
+        id: String,
+        version: Int,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        guard ambulatoryId?.isEmpty == false else {
+            return try await fallback.restorePatient(
+                id: id, version: version, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        }
+        return try mappedResource(
+            try patientStore.restorePatient(id: id, version: version, scopeAmbulatoryId: ambulatoryId),
+            id: id)
+    }
+
     // MARK: Outcome -> wire-error mapping (shared by every local write below)
 
     private func mapped(_ outcome: SQLitePatientStore.PatientWriteOutcome) throws -> HomeBaseMutationAcknowledgement {
@@ -121,6 +208,18 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             return HomeBaseCreatedResource(id: id, version: version)
         case .encryptionFailed:
             throw HomeBaseClientError.httpStatus(500, "Cifratura non disponibile: riaccedi con il PIN operatore.")
+        }
+    }
+
+    private func mappedResource(_ outcome: SQLitePatientStore.PatientWriteOutcome, id: String) throws -> HomeBaseCreatedResource {
+        switch outcome {
+        case .updated(let version):
+            return HomeBaseCreatedResource(id: id, version: version)
+        case .conflict(let payload):
+            throw HomeBaseClientError.versionConflict(payload)
+        case .versionRequired, .noValidFields, .notFound, .boundaryRejected, .encryptionFailed:
+            let wire = outcome.wireResponse
+            throw HomeBaseClientError.httpStatus(wire.status, wire.error)
         }
     }
 
@@ -305,5 +404,155 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         }
         return try mapped(try clinicalStore.updateObservation(
             id: observationId, patientId: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey))
+    }
+
+    /* @Codex */
+    public func fetchServicePrescriptions(
+        patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseServicePrescriptionSummary] {
+        try await fallback.fetchServicePrescriptions(
+            patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func createServicePrescription(
+        payload: HomeBaseServicePrescriptionCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        try await fallback.createServicePrescription(
+            payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func updateServicePrescription(
+        prescriptionId: String, payload: HomeBaseServicePrescriptionUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.updateServicePrescription(
+            prescriptionId: prescriptionId, payload: payload, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchServicePrescriptionItems(
+        patientId: String?, prescriptionId: String?,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseServicePrescriptionItemSummary] {
+        try await fallback.fetchServicePrescriptionItems(
+            patientId: patientId, prescriptionId: prescriptionId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func createServicePrescriptionItem(
+        payload: HomeBaseServicePrescriptionItemCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        try await fallback.createServicePrescriptionItem(
+            payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func updateServicePrescriptionItem(
+        itemId: String, payload: HomeBaseServicePrescriptionItemUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.updateServicePrescriptionItem(
+            itemId: itemId, payload: payload, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchServiceCatalog(
+        query: String?, code: String?, limit: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseServiceCatalogEntrySummary] {
+        try await fallback.fetchServiceCatalog(
+            query: query, code: code, limit: limit, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchServiceCatalogCount(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCatalogCountResponse {
+        try await fallback.fetchServiceCatalogCount(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchProstheticPrescriptions(
+        patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseProstheticPrescriptionSummary] {
+        try await fallback.fetchProstheticPrescriptions(
+            patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func createProstheticPrescription(
+        payload: HomeBaseProstheticPrescriptionCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        try await fallback.createProstheticPrescription(
+            payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func updateProstheticPrescription(
+        prescriptionId: String, payload: HomeBaseProstheticPrescriptionUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.updateProstheticPrescription(
+            prescriptionId: prescriptionId, payload: payload, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchNetworkCapabilities(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> NetworkCapabilitiesResponse {
+        try await fallback.fetchNetworkCapabilities(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchNetworkIdentity(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> NetworkIdentitySummary {
+        try await fallback.fetchNetworkIdentity(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchNetworkNode(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> NetworkNodeSummary {
+        try await fallback.fetchNetworkNode(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchNetworkRevision(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> NetworkRevisionSummary {
+        try await fallback.fetchNetworkRevision(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchFseValidatePatient(
+        patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseValidatePatientExportResponse {
+        try await fallback.fetchFseValidatePatient(
+            patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func validateFseDocument(
+        payload: HomeBaseFseDocumentValidationPayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseFseDocumentValidationResponse {
+        try await fallback.validateFseDocument(
+            payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 }

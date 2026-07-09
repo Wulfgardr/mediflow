@@ -62,7 +62,8 @@ function buildCurrentRoutes() {
         const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
         const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
             || source.includes('requireNetworkCapabilityContext(')
-            || source.includes('requireNetworkWriteContext(');
+            || source.includes('requireNetworkWriteContext(')
+            || source.includes('requireNetworkDiscoveryAuth(');
         if (!hasLocalTokenGuard && !hasPairedClientGuard) {
             throw new Error(
                 `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`

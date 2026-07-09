@@ -201,6 +201,7 @@ export default function NewPatientPage() {
                         requestReference: item.requestReference,
                         source: 'document_review' as const,
                         notes: item.evidence ? `Evidenza documento: ${item.evidence}` : undefined,
+                        version: 1,
                         createdAt: now,
                         updatedAt: now,
                     }));

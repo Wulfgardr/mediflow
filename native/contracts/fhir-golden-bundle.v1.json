@@ -1,0 +1,301 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-fhir-golden",
+        "active": true,
+        "identifier": [
+          {
+            "use": "official",
+            "system": "http://hl7.it/sid/codice-fiscale",
+            "value": "BNCGLI80A41F205X"
+          }
+        ],
+        "name": [
+          {
+            "use": "official",
+            "family": "Bianchi",
+            "given": [
+              "Giulia"
+            ]
+          }
+        ],
+        "gender": "unknown",
+        "birthDate": "1980-01-01",
+        "address": [
+          {
+            "use": "home",
+            "text": "Via Verdi 12, Milano",
+            "country": "IT"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "+39 02 1234567",
+            "use": "mobile"
+          }
+        ],
+        "contact": [
+          {
+            "relationship": [
+              {
+                "text": "Caregiver"
+              }
+            ],
+            "name": {
+              "text": "Marco Bianchi, marito"
+            }
+          }
+        ],
+        "meta": {
+          "lastUpdated": "2026-07-08T09:00:00.000Z"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-golden-diabetes",
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/icd-10",
+              "code": "E11.9",
+              "display": "Diabete mellito tipo 2 senza complicanze"
+            }
+          ],
+          "text": "Diabete mellito tipo 2 senza complicanze"
+        },
+        "onsetDateTime": "2025-01-15T08:30:00.000Z"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-golden-hypertension",
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/icd-10",
+              "code": "I10",
+              "display": "Ipertensione essenziale"
+            }
+          ],
+          "text": "Ipertensione essenziale"
+        },
+        "onsetDateTime": "2024-11-20T10:15:00.000Z"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "entry-visit-2026-01-10",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "period": {
+          "start": "2026-01-10T08:45:00.000Z",
+          "end": "2026-01-10T08:45:00.000Z"
+        },
+        "type": [
+          {
+            "text": "visit"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "entry-scale-adl-2026-02-05",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "HH",
+          "display": "home health"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "period": {
+          "start": "2026-02-05T14:30:00.000Z",
+          "end": "2026-02-05T14:30:00.000Z"
+        },
+        "type": [
+          {
+            "text": "scale"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-entry-scale-adl-2026-02-05",
+        "status": "final",
+        "code": {
+          "text": "ADL (Indice di Katz)"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "effectiveDateTime": "2026-02-05T14:30:00.000Z",
+        "valueInteger": 6,
+        "interpretation": [
+          {
+            "text": "Autonomia Conservata (6/6)"
+          }
+        ],
+        "note": [
+          {
+            "text": "Somministrata ADL con autonomia conservata."
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "therapy-metformin",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "text": "Metformina 500 mg"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "effectivePeriod": {
+          "start": "2025-02-01T00:00:00.000Z"
+        },
+        "dosage": [
+          {
+            "text": "1 compressa dopo pranzo e cena"
+          }
+        ],
+        "note": [
+          {
+            "text": "Controllo glicemico nel diabete tipo 2"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "therapy-ramipril",
+        "status": "on-hold",
+        "medicationCodeableConcept": {
+          "text": "Ramipril 5 mg"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "effectivePeriod": {
+          "start": "2024-12-01T00:00:00.000Z",
+          "end": "2026-03-01T00:00:00.000Z"
+        },
+        "dosage": [
+          {
+            "text": "1 compressa al mattino"
+          }
+        ],
+        "note": [
+          {
+            "text": "Ipertensione arteriosa"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-structured-observation-hba1c",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "4548-4",
+              "display": "Hemoglobin A1c/Hemoglobin.total in Blood"
+            }
+          ],
+          "text": "Hemoglobin A1c/Hemoglobin.total in Blood"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "effectiveDateTime": "2026-03-10T07:15:00.000Z",
+        "valueQuantity": {
+          "value": 7.2,
+          "system": "http://unitsofmeasure.org",
+          "code": "%",
+          "unit": "%"
+        },
+        "note": [
+          {
+            "text": "Valore da laboratorio territoriale."
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-structured-observation-creatinine",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2160-0",
+              "display": "Creatinine [Mass/volume] in Serum or Plasma"
+            }
+          ],
+          "text": "Creatinine [Mass/volume] in Serum or Plasma"
+        },
+        "subject": {
+          "reference": "Patient/patient-fhir-golden"
+        },
+        "effectiveDateTime": "2026-03-10T07:16:00.000Z",
+        "valueString": "non dosabile",
+        "note": [
+          {
+            "text": "Campione emolizzato, ripetere."
+          }
+        ]
+      }
+    }
+  ]
+}

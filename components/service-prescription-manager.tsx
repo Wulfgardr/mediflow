@@ -260,6 +260,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 source: form.source,
                 documentRefs: optionalValue(form.documentRefs),
                 notes: optionalValue(form.notes),
+                version: 1,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -288,6 +289,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     performedAt: optionalDate(form.performedAt),
                     reportReceivedAt: optionalDate(form.reportReceivedAt),
                     outcomeNote: optionalValue(form.outcomeNote),
+                    version: 1,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 });
@@ -309,11 +311,13 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     ) => {
         await db.servicePrescriptions.update(item.id, {
             ...update,
+            version: item.version,
             updatedAt: new Date(),
         });
         const children = itemsByPrescription.get(item.id) ?? [];
         await Promise.all(children.map((child) => db.servicePrescriptionItems.update(child.id, {
             ...childUpdate,
+            version: child.version,
             updatedAt: new Date(),
         })));
     };
@@ -367,8 +371,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         });
         if (!confirmed) return;
         const children = itemsByPrescription.get(item.id) ?? [];
-        await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true })));
-        await db.servicePrescriptions.delete(item.id);
+        await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true, version: child.version })));
+        await db.servicePrescriptions.delete(item.id, { version: item.version });
     };
 
     const headerActions = (

@@ -1,7 +1,7 @@
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.1 (release corrente, in preparazione sopra il ramo Apple/native). Ultimo aggiornamento: 2026-07-03.
+> v0.7.2 (release corrente, chiude la parità del boundary paired sopra il ramo Apple/native). Ultimo aggiornamento: 2026-07-09.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -139,9 +139,9 @@ testato anche su Linux/Windows.
 
 ---
 
-## 🚧 In corso (post-v0.7.1)
+## 🚧 In corso (post-v0.7.2)
 
-La lettura operativa piu completa del ciclo post-v0.7.1 e ora
+La lettura operativa piu completa del ciclo post-v0.7.2 e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
 boundary, document intelligence, home-base, Apple clients e split private/OSS.

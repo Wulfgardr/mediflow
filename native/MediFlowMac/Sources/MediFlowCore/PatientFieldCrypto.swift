@@ -28,6 +28,24 @@ public enum PatientFieldCrypto {
         return CryptoService.decryptField(value, masterKey: masterKey)
     }
 
+    /// Return a copy of the summary with its ENCRYPTED_FIELDS decrypted. With no
+    /// master key, ENC values become nil (hidden) and plaintext stays visible.
+    public static func decryptSummary(_ summary: HomeBasePatientSummary, masterKey: SymmetricKey?) -> HomeBasePatientSummary {
+        HomeBasePatientSummary(
+            id: summary.id,
+            firstName: summary.firstName,
+            lastName: summary.lastName,
+            birthDate: summary.birthDate,
+            taxCode: summary.taxCode,
+            isAdi: summary.isAdi,
+            isArchived: summary.isArchived,
+            version: summary.version,
+            updatedAt: summary.updatedAt,
+            deletedAt: summary.deletedAt,
+            deletionReason: decryptStringField(summary.deletionReason, masterKey: masterKey)
+        )
+    }
+
     /// Return a copy of the detail with its ENCRYPTED_FIELDS decrypted. With no
     /// master key, ENC values become nil (hidden) and plaintext stays visible.
     public static func decryptDetail(_ detail: HomeBasePatientDetail, masterKey: SymmetricKey?) -> HomeBasePatientDetail {
@@ -52,7 +70,9 @@ public enum PatientFieldCrypto {
             version: detail.version,
             ambulatoryId: detail.ambulatoryId,
             createdAt: detail.createdAt,
-            updatedAt: detail.updatedAt
+            updatedAt: detail.updatedAt,
+            deletedAt: detail.deletedAt,
+            deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey)
         )
     }
 }

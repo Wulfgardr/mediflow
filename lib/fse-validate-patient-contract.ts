@@ -1,10 +1,22 @@
+import type { FseValidationIssue } from './terminology';
+
+/* @Codex */
+export type ValidationItem = {
+    id: string;
+    ok: boolean;
+    errors: FseValidationIssue[];
+    warnings: FseValidationIssue[];
+};
+
 /* @Codex */
 export type ValidationSummary = {
     total: number;
+    ok: number;
     withErrors: number;
     withWarnings: number;
     errorCount: number;
     warningCount: number;
+    items: ValidationItem[];
 };
 
 /* @Codex */

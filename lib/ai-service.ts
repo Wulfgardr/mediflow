@@ -18,6 +18,11 @@ export interface AIStats {
     tokensOut: number;
 }
 
+/* @Codex */
+export interface AIChatOptions {
+    responseFormat?: 'json';
+}
+
 export interface ChatMessage {
     role: string;
     content: string | ChatMessageContent[];
@@ -150,12 +155,13 @@ export class AIService {
     /**
      * Unified chat entrypoint backed by the native Ollama chat API.
      */
-    async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number): Promise<{ content: string; stats: AIStats }> {
+    async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> {
         const start = Date.now();
         const body = {
             model: this.model,
             messages: toOllamaMessages(messages),
             stream: false,
+            ...(options?.responseFormat === 'json' ? { format: 'json' } : {}),
             keep_alive: MODEL_KEEP_ALIVE,
             options: {
                 temperature: 0.4,

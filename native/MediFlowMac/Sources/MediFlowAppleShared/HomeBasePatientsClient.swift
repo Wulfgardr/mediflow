@@ -43,11 +43,15 @@ public actor HomeBasePatientsClient {
     public func fetchPatients(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
-        ambulatoryId: String?
+        ambulatoryId: String?,
+        includeDeleted: Bool = false
     ) async throws -> [HomeBasePatientSummary] {
-        let url = try configuration.apiBaseURL()
+        var url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
+        if includeDeleted {
+            url = url.appending(queryItems: [URLQueryItem(name: "includeDeleted", value: "true")])
+        }
         let (data, _) = try await send(
             to: url,
             headers: [
@@ -80,6 +84,115 @@ public actor HomeBasePatientsClient {
         return try decode([NetworkAmbulatorySummary].self, from: data)
     }
 
+    /* @Codex */
+    public func searchDrugs(
+        query: String,
+        limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseDrugSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("drugs")
+            .appending(queryItems: [
+                URLQueryItem(name: "q", value: query.trimmingCharacters(in: .whitespacesAndNewlines)),
+                URLQueryItem(name: "limit", value: String(HomeBaseCatalogSearchLimit.clamped(limit))),
+            ])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseDrugSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func searchExemptions(
+        query: String,
+        limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseExemptionSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("exemptions")
+            .appending(queryItems: [
+                URLQueryItem(name: "q", value: query.trimmingCharacters(in: .whitespacesAndNewlines)),
+                URLQueryItem(name: "limit", value: String(HomeBaseCatalogSearchLimit.clamped(limit))),
+            ])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseExemptionSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func searchTerminology(
+        system: String,
+        query: String,
+        limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseTerminologyItem] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("terminology")
+            .appendingPathComponent("search")
+            .appending(queryItems: [
+                URLQueryItem(name: "system", value: system.trimmingCharacters(in: .whitespacesAndNewlines)),
+                URLQueryItem(name: "q", value: query.trimmingCharacters(in: .whitespacesAndNewlines)),
+                URLQueryItem(name: "limit", value: String(HomeBaseCatalogSearchLimit.clamped(limit))),
+            ])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseTerminologyItem].self, from: data)
+    }
+
+    /* @Codex */
+    public func resolveTerminology(
+        system: String,
+        code: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseTerminologyItem {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("terminology")
+            .appendingPathComponent("resolve")
+            .appending(queryItems: [
+                URLQueryItem(name: "system", value: system.trimmingCharacters(in: .whitespacesAndNewlines)),
+                URLQueryItem(name: "code", value: code.trimmingCharacters(in: .whitespacesAndNewlines)),
+            ])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(HomeBaseTerminologyItem.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchTerminologySystems(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseTerminologyRegistryEntry] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("terminology")
+            .appendingPathComponent("systems")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseTerminologyRegistryEntry].self, from: data)
+    }
+
     public func fetchPatient(
         id: String,
         credentials: HomeBasePairedCredentials,
@@ -102,19 +215,84 @@ public actor HomeBasePatientsClient {
     }
 
     /* @Codex */
+    public func createPatient(
+        payload: HomeBasePatientCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func softDeletePatient(
+        id: String,
+        version: Int,
+        sealedReason: String?,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(id)
+        let (data, _) = try await send(
+            to: url,
+            method: "DELETE",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(HomeBasePatientSoftDeletePayload(version: version, deletionReason: sealedReason))
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func restorePatient(
+        id: String,
+        version: Int,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(id)
+            .appendingPathComponent("restore")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(HomeBasePatientRestorePayload(version: version))
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
     public func fetchEntries(
         patientId: String,
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
         ambulatoryId: String?,
-        limit: Int = 20
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseEntrySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
             .appendingPathComponent(patientId)
             .appendingPathComponent("entries")
-            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+            .appending(queryItems: [
+                URLQueryItem(name: "limit", value: String(HomeBaseClinicalListLimit.clamped(limit)))
+            ])
         let (data, _) = try await send(
             to: url,
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -194,14 +372,16 @@ public actor HomeBasePatientsClient {
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
         ambulatoryId: String?,
-        limit: Int = 20
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseTherapySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
             .appendingPathComponent(patientId)
             .appendingPathComponent("therapies")
-            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+            .appending(queryItems: [
+                URLQueryItem(name: "limit", value: String(HomeBaseClinicalListLimit.clamped(limit)))
+            ])
         let (data, _) = try await send(
             to: url,
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -261,14 +441,16 @@ public actor HomeBasePatientsClient {
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
         ambulatoryId: String?,
-        limit: Int = 20
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseCheckupSummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
             .appendingPathComponent(patientId)
             .appendingPathComponent("checkups")
-            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+            .appending(queryItems: [
+                URLQueryItem(name: "limit", value: String(HomeBaseClinicalListLimit.clamped(limit)))
+            ])
         let (data, _) = try await send(
             to: url,
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -328,14 +510,16 @@ public actor HomeBasePatientsClient {
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
         ambulatoryId: String?,
-        limit: Int = 20
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseObservationSummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
             .appendingPathComponent(patientId)
             .appendingPathComponent("observations")
-            .appending(queryItems: [URLQueryItem(name: "limit", value: String(max(1, min(limit, 100))))])
+            .appending(queryItems: [
+                URLQueryItem(name: "limit", value: String(HomeBaseClinicalListLimit.clamped(limit)))
+            ])
         let (data, _) = try await send(
             to: url,
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -387,6 +571,337 @@ public actor HomeBasePatientsClient {
             body: encode(payload)
         )
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchServicePrescriptions(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseServicePrescriptionSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescriptions")
+            .appending(queryItems: [URLQueryItem(name: "patientId", value: patientId)])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseServicePrescriptionSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createServicePrescription(
+        payload: HomeBaseServicePrescriptionCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescriptions")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateServicePrescription(
+        prescriptionId: String,
+        payload: HomeBaseServicePrescriptionUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescriptions")
+            .appendingPathComponent(prescriptionId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchServicePrescriptionItems(
+        patientId: String? = nil,
+        prescriptionId: String? = nil,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseServicePrescriptionItemSummary] {
+        var queryItems: [URLQueryItem] = []
+        if let prescriptionId {
+            queryItems.append(URLQueryItem(name: "prescriptionId", value: prescriptionId))
+        }
+        if let patientId {
+            queryItems.append(URLQueryItem(name: "patientId", value: patientId))
+        }
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescription-items")
+            .appending(queryItems: queryItems)
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseServicePrescriptionItemSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createServicePrescriptionItem(
+        payload: HomeBaseServicePrescriptionItemCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescription-items")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateServicePrescriptionItem(
+        itemId: String,
+        payload: HomeBaseServicePrescriptionItemUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-prescription-items")
+            .appendingPathComponent(itemId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchServiceCatalog(
+        query: String? = nil,
+        code: String? = nil,
+        limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseServiceCatalogEntrySummary] {
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: String(HomeBaseCatalogSearchLimit.clamped(limit)))
+        ]
+        if let query {
+            queryItems.append(URLQueryItem(name: "q", value: query.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        if let code {
+            queryItems.append(URLQueryItem(name: "code", value: code.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-catalog")
+            .appending(queryItems: queryItems)
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseServiceCatalogEntrySummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchServiceCatalogCount(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCatalogCountResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("service-catalog")
+            .appending(queryItems: [URLQueryItem(name: "count", value: "1")])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(HomeBaseCatalogCountResponse.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchProstheticPrescriptions(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseProstheticPrescriptionSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("prosthetic-prescriptions")
+            .appending(queryItems: [URLQueryItem(name: "patientId", value: patientId)])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseProstheticPrescriptionSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func createProstheticPrescription(
+        payload: HomeBaseProstheticPrescriptionCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("prosthetic-prescriptions")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    /* @Codex */
+    public func updateProstheticPrescription(
+        prescriptionId: String,
+        payload: HomeBaseProstheticPrescriptionUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("prosthetic-prescriptions")
+            .appendingPathComponent(prescriptionId)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchNetworkCapabilities(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> NetworkCapabilitiesResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("capabilities")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(NetworkCapabilitiesResponse.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchNetworkIdentity(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> NetworkIdentitySummary {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("identity")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(NetworkIdentitySummary.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchNetworkNode(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> NetworkNodeSummary {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("node")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(NetworkNodeSummary.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchNetworkRevision(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> NetworkRevisionSummary {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("revision")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(NetworkRevisionSummary.self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchFseValidatePatient(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseValidatePatientExportResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("fse")
+            .appendingPathComponent("validate-patient")
+            .appending(queryItems: [URLQueryItem(name: "patientId", value: patientId)])
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(HomeBaseValidatePatientExportResponse.self, from: data)
+    }
+
+    /* @Codex */
+    public func validateFseDocument(
+        payload: HomeBaseFseDocumentValidationPayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseFseDocumentValidationResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("fse")
+            .appendingPathComponent("validate-document")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseFseDocumentValidationResponse.self, from: data)
     }
 
     static func cookieHeader(sessionCookie: String, ambulatoryId: String?) -> String {
@@ -447,7 +962,7 @@ public actor HomeBasePatientsClient {
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = HomeBaseDateCoding.tolerantISO8601Strategy
         do {
             return try decoder.decode(type, from: data)
         } catch {

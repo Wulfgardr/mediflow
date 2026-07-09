@@ -154,7 +154,7 @@ struct HomeBasePatientCacheStore {
 
     private static var decoder: JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = HomeBaseDateCoding.tolerantISO8601Strategy
         return decoder
     }
 

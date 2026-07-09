@@ -101,7 +101,37 @@
     {
       "change": "GET /api/v1/network/capabilities response 200 changed",
       "trackingIssue": "WUL-190",
-      "reason": "OpenAPI guard treats capability-key enum extensions as response shape drift; adding paired patient, clinical diary, therapy, checkup, and observation capabilities is additive capability advertisement for paired clients, not a removal or stricter client requirement."
+      "reason": "OpenAPI guard treats capability-key enum extensions as response shape drift; adding paired patient, clinical diary, therapy, checkup, observation, prescription, prosthetic prescription, and Wave 2b patient lifecycle capabilities is additive capability advertisement for paired clients, not a removal or stricter client requirement."
+    },
+    {
+      "change": "GET /api/v1/network/node changed auth requirements",
+      "trackingIssue": "WUL-194",
+      "reason": "W2-finale D5 adds paired-client credentials as an alternative discovery auth mode. Existing local token clients remain valid; no stricter requirement is introduced."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities changed auth requirements",
+      "trackingIssue": "WUL-194",
+      "reason": "W2-finale D5 adds paired-client credentials as an alternative discovery auth mode. Existing local token clients remain valid; no stricter requirement is introduced."
+    },
+    {
+      "change": "GET /api/v1/network/identity changed auth requirements",
+      "trackingIssue": "WUL-194",
+      "reason": "W2-finale D5 adds paired-client credentials plus operator session as an alternative identity discovery mode. Existing local token clients remain valid and keep the null ambulatory cookie behavior."
+    },
+    {
+      "change": "GET /api/v1/patients response 200 changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 2b extends the shared PatientSummary schema with optional patient tombstone metadata. Existing local patient list clients are not required to send or consume new fields."
+    },
+    {
+      "change": "GET /api/v1/network/patients changed parameters",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 2b adds optional includeDeleted=true for paired tombstone listing. The default patient list behavior and auth remain unchanged."
+    },
+    {
+      "change": "GET /api/v1/network/patients response 200 changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 2b extends network patient summaries with optional tombstone metadata for includeDeleted=true. Existing default list clients can ignore the additive fields."
     },
     {
       "change": "GET /api/v1/patients/{id} response 200 changed",

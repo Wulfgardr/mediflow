@@ -153,6 +153,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                 source: form.source,
                 documentRefs: optionalValue(form.documentRefs),
                 notes: optionalValue(form.notes),
+                version: 1,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -170,6 +171,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             status: 'tested',
             collaudoAt: item.collaudoAt ?? new Date(),
             collaudoOutcome: item.collaudoOutcome ?? 'Collaudo registrato in MediFlow.',
+            version: item.version,
             updatedAt: new Date(),
         });
     };
@@ -181,7 +183,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             tone: 'danger'
         });
         if (!confirmed) return;
-        await db.prostheticPrescriptions.delete(item.id);
+        await db.prostheticPrescriptions.delete(item.id, { version: item.version });
     };
 
     const headerActions = (

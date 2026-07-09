@@ -379,6 +379,11 @@ final class SQLitePatientStoreTests: XCTestCase {
         // The tombstoned patient drops out of every active read path.
         XCTAssertTrue(try store.listPatients().isEmpty)
         XCTAssertNil(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+
+        let tombstones = try store.listPatients(includeDeleted: true)
+        XCTAssertEqual(tombstones.map(\.id), ["fixture-1"])
+        XCTAssertNotNil(tombstones.first?.deletedAt)
+        XCTAssertNotNil(tombstones.first?.deletionReason)
     }
 
     func testSoftDeletePatientVersionMismatchConflictsAndRollsBack() throws {
@@ -412,6 +417,89 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertEqual(
             try store.softDeletePatient(id: "ghost", version: 1, masterKey: masterKey),
             .notFound)
+    }
+
+    // MARK: Restore
+
+    /* @Codex */
+    func testRestorePatientClearsTombstoneAndBumpsVersion() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", version: 1, deletionReason: "restore-test", masterKey: masterKey),
+            .updated(version: 2))
+        XCTAssertTrue(try store.listPatients().isEmpty)
+
+        XCTAssertEqual(
+            try store.restorePatient(id: "fixture-1", version: 2),
+            .updated(version: 3))
+
+        let detail = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(detail.version, 3)
+        XCTAssertNil(detail.deletedAt)
+        XCTAssertNil(detail.deletionReason)
+        XCTAssertEqual(try store.listPatients().map(\.id), ["fixture-1"])
+        XCTAssertNil(try store.listPatients(includeDeleted: true).first?.deletedAt)
+    }
+
+    /* @Codex */
+    func testRestorePatientVersionMismatchConflictsAndKeepsTombstone() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", version: 1, masterKey: masterKey),
+            .updated(version: 2))
+
+        guard case .conflict(let conflict) = try store.restorePatient(id: "fixture-1", version: 99) else {
+            return XCTFail("expected a version conflict")
+        }
+        XCTAssertEqual(conflict.entity, "patient")
+        XCTAssertEqual(conflict.expectedVersion, 99)
+        XCTAssertEqual(conflict.currentVersion, 2)
+        XCTAssertTrue(try store.listPatients().isEmpty)
+        XCTAssertNotNil(try store.listPatients(includeDeleted: true).first?.deletedAt)
+    }
+
+    /* @Codex */
+    func testRestorePatientActiveOrMissingReturnsNotFound() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        XCTAssertEqual(try store.restorePatient(id: "fixture-1", version: 1), .notFound)
+        XCTAssertEqual(try store.restorePatient(id: "ghost", version: 1), .notFound)
+    }
+
+    /// Regressione review Wave 2b: le mutazioni lifecycle scoped replicano il
+    /// boundary di rete, un paziente fuori dalla membership dello scope risponde
+    /// notFound e non viene toccato.
+    func testLifecycleWritesEnforceAmbulatoryScopeMembership() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", version: 1, masterKey: masterKey, scopeAmbulatoryId: "AMB-OTHER"),
+            .notFound)
+        XCTAssertEqual(try store.listPatients().map(\.id), ["fixture-1"])
+
+        XCTAssertEqual(
+            try store.softDeletePatient(id: "fixture-1", version: 1, masterKey: masterKey, scopeAmbulatoryId: "AMB-1"),
+            .updated(version: 2))
+
+        XCTAssertEqual(
+            try store.restorePatient(id: "fixture-1", version: 2, scopeAmbulatoryId: "AMB-OTHER"),
+            .notFound)
+        XCTAssertNotNil(try store.listPatients(includeDeleted: true).first?.deletedAt)
+
+        XCTAssertEqual(
+            try store.restorePatient(id: "fixture-1", version: 2, scopeAmbulatoryId: "AMB-1"),
+            .updated(version: 3))
+        XCTAssertEqual(try store.listPatients().map(\.id), ["fixture-1"])
     }
 }
 

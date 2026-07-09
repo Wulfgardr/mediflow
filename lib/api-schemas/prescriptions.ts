@@ -9,17 +9,29 @@ import {
     optionalTextSchema,
     requiredTextSchema,
 } from './common';
+/* @Codex */
+import {
+    PROSTHETIC_PRESCRIPTION_CATEGORIES,
+    PROSTHETIC_PRESCRIPTION_SOURCES,
+    PROSTHETIC_PRESCRIPTION_STATUSES,
+    SERVICE_PRESCRIPTION_CATEGORIES,
+    SERVICE_PRESCRIPTION_ITEM_CONFIDENCES,
+    SERVICE_PRESCRIPTION_ITEM_MATCH_STATUSES,
+    SERVICE_PRESCRIPTION_PRIORITIES,
+    SERVICE_PRESCRIPTION_SOURCES,
+    SERVICE_PRESCRIPTION_STATUSES,
+} from '../prescription-domain';
 
-const prostheticStatusSchema = z.enum(['draft', 'prescribed', 'submitted', 'authorized', 'delivered', 'tested', 'cancelled']);
-const prostheticCategorySchema = z.enum(['standard', 'oxygen', 'repair', 'replacement', 'trial', 'other']);
-const prostheticSourceSchema = z.enum(['manual', 'document_review']);
+const prostheticStatusSchema = z.enum(PROSTHETIC_PRESCRIPTION_STATUSES);
+const prostheticCategorySchema = z.enum(PROSTHETIC_PRESCRIPTION_CATEGORIES);
+const prostheticSourceSchema = z.enum(PROSTHETIC_PRESCRIPTION_SOURCES);
 
-const serviceStatusSchema = z.enum(['prescribed', 'booked', 'performed', 'report_received', 'cancelled']);
-const serviceCategorySchema = z.enum(['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other']);
-const servicePrioritySchema = z.enum(['U', 'B', 'D', 'P', 'routine', 'unknown']);
-const serviceSourceSchema = z.enum(['manual', 'document_review', 'legacy_therapy_cleanup']);
-const serviceMatchStatusSchema = z.enum(['unmatched', 'candidate', 'matched', 'manual', 'not_found']);
-const serviceConfidenceSchema = z.enum(['high', 'medium', 'low']);
+const serviceStatusSchema = z.enum(SERVICE_PRESCRIPTION_STATUSES);
+const serviceCategorySchema = z.enum(SERVICE_PRESCRIPTION_CATEGORIES);
+const servicePrioritySchema = z.enum(SERVICE_PRESCRIPTION_PRIORITIES);
+const serviceSourceSchema = z.enum(SERVICE_PRESCRIPTION_SOURCES);
+const serviceMatchStatusSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_MATCH_STATUSES);
+const serviceConfidenceSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_CONFIDENCES);
 
 export const prostheticPrescriptionCreateSchema = z.object({
     id: optionalIdSchema,
@@ -41,6 +53,8 @@ export const prostheticPrescriptionCreateSchema = z.object({
 });
 
 export const prostheticPrescriptionUpdateSchema = z.object({
+    /* @Codex */
+    version: z.number().int().positive(),
     prescribedAt: optionalDateInputSchema,
     status: prostheticStatusSchema.optional(),
     category: prostheticCategorySchema.optional(),
@@ -80,6 +94,8 @@ export const servicePrescriptionCreateSchema = z.object({
 });
 
 export const servicePrescriptionUpdateSchema = z.object({
+    /* @Codex */
+    version: z.number().int().positive(),
     prescribedAt: optionalDateInputSchema,
     status: serviceStatusSchema.optional(),
     category: serviceCategorySchema.optional(),
@@ -121,6 +137,8 @@ export const servicePrescriptionItemCreateSchema = z.object({
 });
 
 export const servicePrescriptionItemUpdateSchema = z.object({
+    /* @Codex */
+    version: z.number().int().positive(),
     ordinal: optionalIntegerInputSchema,
     status: serviceStatusSchema.optional(),
     category: serviceCategorySchema.nullable().optional(),
@@ -145,4 +163,3 @@ export type ServicePrescriptionCreatePayload = z.infer<typeof servicePrescriptio
 export type ServicePrescriptionUpdatePayload = z.infer<typeof servicePrescriptionUpdateSchema>;
 export type ServicePrescriptionItemCreatePayload = z.infer<typeof servicePrescriptionItemCreateSchema>;
 export type ServicePrescriptionItemUpdatePayload = z.infer<typeof servicePrescriptionItemUpdateSchema>;
-

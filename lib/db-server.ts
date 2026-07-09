@@ -272,11 +272,13 @@ function applySchemaGuards() {
                 source TEXT NOT NULL DEFAULT 'manual',
                 document_refs TEXT,
                 notes TEXT,
+                version INTEGER NOT NULL DEFAULT 1,
                 created_at INTEGER DEFAULT (unixepoch()),
                 updated_at INTEGER DEFAULT (unixepoch()),
                 FOREIGN KEY (patient_id) REFERENCES patients(id)
             )
         `).run();
+        ensureColumn('prosthetic_prescriptions', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_patient_idx ON prosthetic_prescriptions(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_prescribed_idx ON prosthetic_prescriptions(prescribed_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();
@@ -306,11 +308,13 @@ function applySchemaGuards() {
                 source TEXT NOT NULL DEFAULT 'manual',
                 document_refs TEXT,
                 notes TEXT,
+                version INTEGER NOT NULL DEFAULT 1,
                 created_at INTEGER DEFAULT (unixepoch()),
                 updated_at INTEGER DEFAULT (unixepoch()),
                 FOREIGN KEY (patient_id) REFERENCES patients(id)
             )
         `).run();
+        ensureColumn('service_prescriptions', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_patient_idx ON service_prescriptions(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_prescribed_idx ON service_prescriptions(prescribed_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescriptions_status_idx ON service_prescriptions(status)').run();
@@ -336,6 +340,7 @@ function applySchemaGuards() {
                 performed_at INTEGER,
                 report_received_at INTEGER,
                 outcome_note TEXT,
+                version INTEGER NOT NULL DEFAULT 1,
                 created_at INTEGER DEFAULT (unixepoch()),
                 updated_at INTEGER DEFAULT (unixepoch()),
                 FOREIGN KEY (patient_id) REFERENCES patients(id),
@@ -343,6 +348,7 @@ function applySchemaGuards() {
             )
         `).run();
         ensureColumn('service_prescription_items', 'patient_id', 'patient_id TEXT');
+        ensureColumn('service_prescription_items', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_patient_idx ON service_prescription_items(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_prescription_idx ON service_prescription_items(prescription_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_prescription_items_order_idx ON service_prescription_items(prescription_id, ordinal)').run();

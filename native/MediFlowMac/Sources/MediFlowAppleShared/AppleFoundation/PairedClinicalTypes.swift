@@ -38,6 +38,182 @@ extension PairedCheckupStatus {
     }
 }
 
+/* @Codex */
+enum PairedServicePrescriptionStatus: String, CaseIterable, Identifiable {
+    case prescribed
+    case booked
+    case performed
+    case reportReceived = "report_received"
+    case cancelled
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .prescribed: "Prescritta"
+        case .booked: "Prenotata"
+        case .performed: "Eseguita"
+        case .reportReceived: "Referto ricevuto"
+        case .cancelled: "Annullata"
+        }
+    }
+
+    var tone: VetroTone {
+        switch self {
+        case .prescribed: .info
+        case .booked: .attention
+        case .performed: .positive
+        case .reportReceived: .positive
+        case .cancelled: .neutral
+        }
+    }
+
+    static func title(for rawValue: String) -> String {
+        PairedServicePrescriptionStatus(rawValue: rawValue)?.title ?? rawValue
+    }
+
+    static func tone(for rawValue: String) -> VetroTone {
+        PairedServicePrescriptionStatus(rawValue: rawValue)?.tone ?? .neutral
+    }
+}
+
+/* @Codex */
+enum PairedServicePrescriptionCategory: String, CaseIterable, Identifiable {
+    case specialistica
+    case laboratorio
+    case diagnostica
+    case riabilitazione
+    case altro
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .specialistica: "Specialistica"
+        case .laboratorio: "Laboratorio"
+        case .diagnostica: "Diagnostica"
+        case .riabilitazione: "Riabilitazione"
+        case .altro: "Altro"
+        }
+    }
+}
+
+/* @Codex */
+enum PairedServicePrescriptionPriority: String, CaseIterable, Identifiable {
+    case u
+    case b
+    case d
+    case p
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .u: "U"
+        case .b: "B"
+        case .d: "D"
+        case .p: "P"
+        }
+    }
+}
+
+/* @Codex */
+enum PairedPrescriptionSource: String, CaseIterable, Identifiable {
+    case manual
+    case importato
+    case integrazione
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .manual: "Manuale"
+        case .importato: "Importato"
+        case .integrazione: "Integrazione"
+        }
+    }
+}
+
+/* @Codex */
+enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
+    case prescribed
+    case ordered
+    case delivered
+    case tested
+    case cancelled
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .prescribed: "Prescritta"
+        case .ordered: "Ordinata"
+        case .delivered: "Consegnata"
+        case .tested: "Collaudata"
+        case .cancelled: "Annullata"
+        }
+    }
+
+    var tone: VetroTone {
+        switch self {
+        case .prescribed: .info
+        case .ordered: .attention
+        case .delivered: .positive
+        case .tested: .positive
+        case .cancelled: .neutral
+        }
+    }
+
+    static func title(for rawValue: String) -> String {
+        PairedProstheticPrescriptionStatus(rawValue: rawValue)?.title ?? rawValue
+    }
+
+    static func tone(for rawValue: String) -> VetroTone {
+        PairedProstheticPrescriptionStatus(rawValue: rawValue)?.tone ?? .neutral
+    }
+}
+
+/* @Codex */
+enum PairedProstheticPrescriptionCategory: String, CaseIterable, Identifiable {
+    case protesi
+    case ortesi
+    case ausilio
+    case altro
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .protesi: "Protesi"
+        case .ortesi: "Ortesi"
+        case .ausilio: "Ausilio"
+        case .altro: "Altro"
+        }
+    }
+}
+
+/* @Codex */
+struct ClinicalSignalCount: Equatable, Sendable {
+    let count: Int
+    let atCap: Bool
+
+    var displayText: String {
+        atCap ? "\(count)+" : "\(count)"
+    }
+
+    static func exact(_ count: Int) -> ClinicalSignalCount {
+        ClinicalSignalCount(count: max(0, count), atCap: false)
+    }
+
+    static func fromLoadedList(
+        count: Int,
+        loadedCount: Int,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
+    ) -> ClinicalSignalCount {
+        ClinicalSignalCount(count: max(0, count), atCap: loadedCount >= max(1, limit))
+    }
+}
+
 enum PairedPatientsConnectionState {
     case notLoaded
     case cached

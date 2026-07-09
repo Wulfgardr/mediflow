@@ -18,9 +18,17 @@ public enum NetworkWriteBoundary {
     // MARK: Patient (lib/network-patient-write.ts validateNetworkPatientMutationBoundary)
 
     public static let patientWriteCapability = "network.replica.write-patient-profile"
+    public static let patientLifecycleCapability = "network.replica.write-patient-lifecycle"
     /// Ordered to match the web Set's insertion order (the copy is field-agnostic,
     /// but the order keeps the port faithful).
     public static let forbiddenPatientWriteFields = ["aiSummary", "documentInsights"]
+    public static let patientCreateServerControlledFields = [
+        "version", "createdAt", "updatedAt", "isArchived", "deletedAt",
+    ]
+    public static let patientCreateSensitiveFields = [
+        "address", "phone", "caregiver", "exemptions", "diagnoses",
+        "statusReason", "notes",
+    ]
 
     /// `presentFields`: names present in the write body. `ambulatoryIdInBody`:
     /// `.omit` when 'ambulatoryId' is absent, else `.null`/`.value` mirroring the
@@ -41,6 +49,25 @@ public enum NetworkWriteBoundary {
         case .value(let value):
             if value != scopeAmbulatoryId {
                 return .rejected(status: 403, error: "Network scope violation")
+            }
+        }
+        return .allowed
+    }
+
+    public static func validatePatientCreate(
+        presentFields: Set<String>,
+        sensitiveValues: [String: String?]
+    ) -> Verdict {
+        for field in forbiddenPatientWriteFields where presentFields.contains(field) {
+            return .rejected(status: 403, error: "Network patient write boundary excludes AI fields")
+        }
+        for field in patientCreateServerControlledFields where presentFields.contains(field) {
+            return .rejected(status: 400, error: "Network patient create boundary rejects client-controlled \(field)")
+        }
+        for field in patientCreateSensitiveFields where presentFields.contains(field) {
+            guard let encoded = sensitiveValues[field], let value = encoded else { continue }
+            if !value.hasPrefix("ENC:") {
+                return .rejected(status: 400, error: "Network create requires sealed sensitive fields")
             }
         }
         return .allowed
@@ -96,6 +123,48 @@ public enum NetworkWriteBoundary {
         }
         if resource == .entry, presentFields.contains("attachments"), attachmentsNonEmpty {
             return .rejected(status: 403, error: "Network diary write boundary excludes attachment writes")
+        }
+        return .allowed
+    }
+
+    // MARK: Prescriptions and FSE validation
+
+    public static let servicePrescriptionReadCapability = "network.replica.readonly-service-prescriptions"
+    public static let servicePrescriptionWriteCapability = "network.replica.write-service-prescriptions"
+    public static let prostheticPrescriptionReadCapability = "network.replica.readonly-prosthetic-prescriptions"
+    public static let prostheticPrescriptionWriteCapability = "network.replica.write-prosthetic-prescriptions"
+    public static let fseValidateCapability = "network.fse.validate"
+
+    public enum PrescriptionFamily: String {
+        case servicePrescription = "service prescription"
+        case servicePrescriptionItem = "service prescription item"
+        case prostheticPrescription = "prosthetic prescription"
+    }
+
+    public static let forbiddenPrescriptionWriteFields =
+        ["aiSummary", "documentInsights", "documentInsightId", "sourceDocumentId"]
+
+    public static let prescriptionCreateServerControlledFields = [
+        "version", "createdAt", "updatedAt",
+    ]
+
+    public static let prescriptionUpdateServerControlledFields = [
+        "createdAt", "updatedAt",
+    ]
+
+    public static func validatePrescription(
+        _ family: PrescriptionFamily,
+        mode: Mode,
+        presentFields: Set<String>
+    ) -> Verdict {
+        for field in forbiddenPrescriptionWriteFields where presentFields.contains(field) {
+            return .rejected(status: 403, error: "Network \(family.rawValue) write boundary excludes AI/document-derived fields")
+        }
+        let serverControlled = mode == .create
+            ? prescriptionCreateServerControlledFields
+            : prescriptionUpdateServerControlledFields
+        for field in serverControlled where presentFields.contains(field) {
+            return .rejected(status: 400, error: "Network \(family.rawValue) write boundary rejects client-controlled \(field)")
         }
         return .allowed
     }

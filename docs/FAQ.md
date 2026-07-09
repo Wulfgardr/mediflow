@@ -11,10 +11,12 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## 🧭 Che cosa porta `v0.7.1`?
+## 🧭 Che cosa porta `v0.7.2`?
 
-`v0.7.1` consolida MediFlow come sistema locale multi-superficie:
+`v0.7.2` chiude la parità del boundary paired sopra la base multi-superficie
+consolidata con la `0.7.1`:
 
+- ciclo di vita paziente, prestazioni, protesica ed export FHIR dal client Apple paired;
 - storage e sicurezza più solidi;
 - contratto locale `/api/v1` più chiaro;
 - backup, audit e guardrail più espliciti;
@@ -49,7 +51,7 @@ native più avanzata. La direzione attiva è:
 
 ## 🖥️ E Windows/Linux?
 
-`v0.7.1` aggiunge una prova importante: il core Swift condiviso viene costruito
+Una prova importante: il core Swift condiviso viene costruito
 e testato anche su Linux e Windows in CI. Questo e un passo di portabilita reale,
 ma non significa che esistano gia app Windows/Linux complete.
 

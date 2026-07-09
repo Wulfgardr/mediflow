@@ -93,7 +93,7 @@ Le superfici principali sono tre:
 | --- | --- | --- |
 | `/api/*` | sessione web | CRUD web e overview locale |
 | `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
-| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con primi write limitati paziente/diario/terapie/checkup/osservazioni versionati |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
 
 Le sotto-risorse cliniche (diario, terapie, checkup, osservazioni) condividono
 un ciclo di vita unificato: version guard con `409` sulle scritture, liste che

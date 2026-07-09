@@ -44,7 +44,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertEqual(detail.address, "Via Roma 1, Milano")  // decrypted in-core, no HTTP
     }
 
-    // MARK: Local clinical reads (Fase 3 slice 4) — read-only against the committed
+    // MARK: Local clinical reads (Fase 3 slice 4) - read-only against the committed
     // fixture, which ships one pre-seeded row per sub-resource (fixture-entry-1 etc.)
 
     func testFetchEntriesServedLocallyAndDecrypted() async throws {
@@ -103,7 +103,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         }
     }
 
-    // MARK: Local writes (Fase 3 slice 3) — on a writable fixture copy
+    // MARK: Local writes (Fase 3 slice 3) - on a writable fixture copy
 
     private func writableFixtureCopy() throws -> String {
         let destination = NSTemporaryDirectory() + "mediflow-localds-\(UUID().uuidString).db"
@@ -179,7 +179,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertEqual(detail.taxCode, "NVOPZT80A01H501Z")
     }
 
-    func testCreatePatientWithoutScopeFallsBackToUnsupportedHTTP() async throws {
+    func testCreatePatientWithoutScopeFallsBackToHTTPPeer() async throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
         let source = writableSource(path)
@@ -187,9 +187,9 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             _ = try await source.createPatient(
                 payload: HomeBasePatientCreatePayload(firstName: "X", lastName: "Y", taxCode: "T"),
                 credentials: credentials, sessionCookie: "", ambulatoryId: nil)
-            XCTFail("expected the HTTP create stub to throw (no paired create peer)")
-        } catch let HomeBaseClientError.httpStatus(status, _) {
-            XCTAssertEqual(status, 405)
+            XCTFail("expected the HTTP fallback to be used")
+        } catch let HomeBaseClientError.transport(issue) {
+            XCTAssertEqual(issue, .unreachable)
         }
     }
 

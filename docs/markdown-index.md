@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-03
+Ultimo aggiornamento: 2026-07-07
 
 ## 📚 Come usare questo indice
 
@@ -75,6 +75,7 @@ Ultimo aggiornamento: 2026-07-03
 | [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md) | Nota canonica su SGDT/PAI e COT per MMG/SSI: restringe SGDT ai casi PAI/CE-MMG e COT/transizioni documentati e separa quel perimetro da launcher generici, feed PAI o dispatch COT non dimostrati. | Quando si valuta SGDT oltre il boundary SISS/FSE attuale. |
 | [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md) | Nota canonica sui Certificati di malattia: separa Web Application / handoff governato da UI custom o backend-first non ancora dimostrati. | Quando si valuta il dominio certificati oltre il boundary SISS attuale. |
 | [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md) | Runbook canonico del corpus documentale locale SISS/FSE: manifest sorgenti, fetch/sync fuori Git, placeholder `manual-import` e report di freshness. | Quando si lavora su `WUL-176`, `WUL-179` o sulla base documentale delle integrazioni regionali. |
+| [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md) | Mappa operativa per la lane `treatment_reasoning` ATHENA-style: ADR boundary, contratto, pannello review-only, ATHENA-R1 MLX locale, smoke live DB redatto, benchmark Q4/BF16 e crediti ATHENA. | Quando si valuta gestione trattamenti, ragionamento terapeutico su contesto paziente, runtime ATHENA locale o sidecar ATHENA/ToolUniverse senza promuovere prescrizione automatica. |
 | [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | Matrice operativa `WUL-165` che rende MLX benchmark-visible e diagnosticabile senza promuoverlo a runtime clinico. | Quando serve distinguere parity di visibilita/guardrail MLX da promozione runtime o dal boundary OCR primario Ollama/DeepSeek con fallback Apple Vision solo macOS. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
@@ -128,6 +129,7 @@ Ultimo aggiornamento: 2026-07-03
 | [docs/adr/0066-patient-soft-delete-lifecycle.md](./adr/0066-patient-soft-delete-lifecycle.md) | Fissa `WUL-306`: DELETE paziente come tombstone soft-delete version-guarded, cascade canonica `PATIENT_CHILD_TABLES` con guardia anti-drift, purge admin audited (`patient.purged`) e clear test-container per membership (WUL-322). |
 | [docs/adr/0068-cross-platform-runtime-windows-linux.md](./adr/0068-cross-platform-runtime-windows-linux.md) | Fissa `WUL-375`: runtime cross-platform Windows/Linux con adapter scheduler backup (launchd/Task Scheduler/systemd/cron), gating MLX/PM2 a macOS, launcher sottili per OS su helper condiviso e toolchain Node documentato (dev su Node 24, runtime minimo Node 20). |
 | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Propone `WUL-419`: boundary local-first per visite registrabili Fluid-style, transcript/draft PHI, provider esterni solo tramite opt-in e no runtime audio nella prima slice. |
+| [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md) | Fissa la boundary `mediflow.treatment_reasoning.v1`: runtime locale ATHENA/MLX review-only con kill switch fail-closed, report/trace ATHENA-style e suggested actions solo review/form-prefill senza auto-write clinici. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |

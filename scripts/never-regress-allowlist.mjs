@@ -77,12 +77,22 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Network operating mode tests use a synthetic paired operator fixture to render the session-bound UI state without real credentials.',
         },
         {
+            path: 'lib/prescription-delete-concurrency.test.ts',
+            pattern: "username:\\s*'prescription-delete-user'",
+            reason: 'Prescription delete concurrency tests build a synthetic ServerSession fixture to exercise version-guarded hard deletes without real credentials.',
+        },
+        {
             path: 'lib/security/settings-write-policy.test.ts',
             pattern: "username:\\s*'policy-user'",
             reason: 'Settings write-policy tests build a synthetic ServerSession fixture to exercise the per-channel write allowlist matrix without real credentials.',
         },
     ],
     externalUrls: [
+        {
+            path: 'lib/athena-model-identity.ts',
+            pattern: 'https://huggingface\\.co/mims-harvard/ATHENA-R1-Qwen3-8B',
+            reason: 'The ATHENA model card URL is provenance documentation inside a comment; the MLX runtime resolves only pre-downloaded local artifacts and never performs network egress.',
+        },
         {
             path: 'lib/siss-urls.ts',
             pattern: 'https://operatorisiss.servizirl.it/',
@@ -107,6 +117,46 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'lib/siss-session-observer.test.ts',
             pattern: 'https://idpcrlmain.crs.lombardia.it/',
             reason: 'SISS session observer tests use documented IdPC checkpoints only as synthetic fixtures for remote-sign detection.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://id\\.who\\.int/icd/release/11/mms',
+            reason: 'FHIR coding-system URI identifier inside generated resources, mirroring lib/fhir/clinical-adapter.ts (directory exempted by the scanner); never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://hl7\\.org/fhir/sid/icd-10',
+            reason: 'FHIR coding-system URI identifier inside generated resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://hl7\\.org/fhir/sid/icd-9',
+            reason: 'FHIR coding-system URI identifier inside generated resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://hl7\\.it/sid/codice-fiscale',
+            reason: 'FHIR identifier-system URI inside generated resources, mirroring lib/fhir/patient-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://loinc\\.org',
+            reason: 'FHIR coding-system URI inside generated resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://terminology\\.hl7\\.org/CodeSystem/condition-clinical',
+            reason: 'FHIR coding-system URI inside generated resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://terminology\\.hl7\\.org/CodeSystem/v3-ActCode',
+            reason: 'FHIR coding-system URI inside generated resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
+            pattern: 'http://unitsofmeasure\\.org',
+            reason: 'UCUM system URI inside generated observation resources, mirroring lib/fhir/clinical-adapter.ts; never fetched at runtime.',
         },
         {
             path: 'lib/siss.test.ts',
@@ -152,6 +202,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/ObservationTrendTests.swift',
             pattern: 'http://unitsofmeasure\\.org',
             reason: 'UCUM appears as a terminology system identifier in synthetic observation trend tests and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientReportDocumentTests.swift',
+            pattern: 'http://loinc\\.org',
+            reason: 'LOINC appears as a terminology system identifier in synthetic patient report fixtures and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientReportDocumentTests.swift',
+            pattern: 'http://unitsofmeasure\\.org',
+            reason: 'UCUM appears as a terminology system identifier in synthetic patient report fixtures and does not initiate network access.',
         },
         {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',

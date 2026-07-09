@@ -35,9 +35,14 @@ public enum EntryTypeFilter: String, CaseIterable, Identifiable {
 }
 
 public enum EntryFiltering {
-    public static func apply(_ entries: [HomeBaseEntrySummary], filter: EntryTypeFilter) -> [HomeBaseEntrySummary] {
-        guard let target = filter.matchingType else { return entries }
-        return entries.filter { entry in
+    public static func apply(
+        _ entries: [HomeBaseEntrySummary],
+        filter: EntryTypeFilter,
+        includeDeleted: Bool = false
+    ) -> [HomeBaseEntrySummary] {
+        let visibleEntries = includeDeleted ? entries : entries.filter { $0.deletedAt == nil }
+        guard let target = filter.matchingType else { return visibleEntries }
+        return visibleEntries.filter { entry in
             PairedDiaryEntryType(rawValue: entry.type)?.rawValue == target.rawValue
         }
     }
