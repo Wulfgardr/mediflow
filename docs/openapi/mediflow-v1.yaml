@@ -176,7 +176,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatientDeleteRequest'
+              $ref: '#/components/schemas/PatientSoftDeleteRequest'
             examples:
               deletePatient:
                 value:
@@ -4968,10 +4968,16 @@ components:
         version:
           type: integer
           minimum: 1
-        deletionReason:
-          type: string
-          minLength: 1
-          description: Sealed optional deletion reason beginning with `ENC:`.
+    PatientSoftDeleteRequest:
+      allOf:
+        - $ref: '#/components/schemas/PatientDeleteRequest'
+        - type: object
+          additionalProperties: false
+          properties:
+            deletionReason:
+              type: string
+              minLength: 1
+              description: Sealed optional deletion reason beginning with `ENC:`.
     NetworkPatientDeleteRequest:
       allOf:
         - $ref: '#/components/schemas/PatientDeleteRequest'
