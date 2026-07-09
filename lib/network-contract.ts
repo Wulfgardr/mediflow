@@ -278,6 +278,12 @@ export function buildNetworkCapabilitiesResponse(input: {
                 'Explicit pairing bootstrap for trusted LAN clients. Disabled while the node stays in local-only mode.'
             ),
             capability(
+                'network.ambulatories.write',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired ambulatory create, update, default promotion, delete, and test-container clear boundary with optimistic concurrency.'
+            ),
+            capability(
                 'network.replica.readonly-patients',
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,

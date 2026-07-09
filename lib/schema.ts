@@ -29,6 +29,7 @@ export const ambulatories = sqliteTable('ambulatories', {
     type: text('type').default('live'), // 'live' | 'test'
     description: text('description'),
     isDefault: integer('is_default', { mode: 'boolean' }).default(false),
+    version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 

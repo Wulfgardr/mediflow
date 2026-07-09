@@ -55,6 +55,7 @@ export default function AmbulatoryManagerPage() {
                 parentId: newParentId || null,
                 type: newType,
                 isDefault: ambulatories.length === 0, // First one is default
+                version: 1,
                 createdAt: new Date()
             };
             await db.ambulatories.add(newAmbulatory);
@@ -80,12 +81,16 @@ export default function AmbulatoryManagerPage() {
             tone: 'danger'
         });
         if (!confirmed) return;
+        if (typeof target?.version !== 'number') {
+            showToast('Versione della sede non disponibile. Aggiorna la pagina e riprova.', 'error');
+            return;
+        }
         setIsClearing(true);
         try {
             const res = await fetch('/api/ambulatories/clear', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ambulatoryId: id })
+                body: JSON.stringify({ ambulatoryId: id, version: target.version })
             });
             if (!res.ok) throw new Error("Failed to clear");
             showToast('Ambiente di test svuotato', 'success');
@@ -219,7 +224,9 @@ export default function AmbulatoryManagerPage() {
         });
         if (!confirmed) return;
         try {
-            await db.ambulatories.delete(id);
+            const target = ambulatoryById.get(id);
+            if (typeof target?.version !== 'number') throw new Error('Missing ambulatory version');
+            await db.ambulatories.delete(id, { version: target?.version });
             await loadAmbulatories();
         } catch {
             showToast("Errore durante l'eliminazione", 'error');
@@ -227,13 +234,10 @@ export default function AmbulatoryManagerPage() {
     };
 
     const handleSetDefault = async (id: string) => {
-        // This logic is tricky client-side without transactions, but fine for prototype
         try {
-            const currentDefault = ambulatories.find(a => a.isDefault);
-            if (currentDefault) {
-                await db.ambulatories.update(currentDefault.id, { isDefault: false });
-            }
-            await db.ambulatories.update(id, { isDefault: true });
+            const target = ambulatoryById.get(id);
+            if (typeof target?.version !== 'number') throw new Error('Missing ambulatory version');
+            await db.ambulatories.update(id, { isDefault: true, version: target.version });
             await loadAmbulatories();
         } catch (e) {
             console.error(e);

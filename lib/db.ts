@@ -143,6 +143,7 @@ export interface Ambulatory {
     type?: 'live' | 'test';
     description?: string;
     isDefault?: boolean;
+    version?: number;
     createdAt: Date;
 }
 
@@ -554,6 +555,7 @@ class ApiTable<T> {
     /* @Codex */
     private requiresVersionedWrite(): boolean {
         return this.tableName === 'patients'
+            || this.tableName === 'ambulatories'
             || this.tableName === 'entries'
             || this.tableName === 'checkups'
             || this.tableName === 'service_prescriptions'
@@ -564,6 +566,7 @@ class ApiTable<T> {
     /* @Codex */
     private versionedEntityLabel(): string {
         if (this.tableName === 'patients') return 'patient';
+        if (this.tableName === 'ambulatories') return 'ambulatory';
         if (this.tableName === 'entries') return 'entry';
         if (this.tableName === 'checkups') return 'checkup';
         if (this.tableName === 'service_prescriptions') return 'service prescription';
