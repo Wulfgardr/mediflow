@@ -66,8 +66,11 @@ export type AmbulatorySummary = {
     id: string;
     name: string;
     address: string | null;
+    parentId: string | null;
     type: string | null;
+    description: string | null;
     isDefault: boolean | null;
+    version: number;
     createdAt: string | null;
 };
 
@@ -432,6 +435,7 @@ export type NetworkCapabilityStatus = 'available' | 'disabled' | 'planned' | 'un
 /* @Codex */
 export type NetworkCapabilityKey =
     | 'network.pairing.bootstrap'
+    | 'network.ambulatories.write'
     | 'network.replica.readonly-patients'
     /* @Codex */
     | 'network.replica.readonly-clinical-diary'

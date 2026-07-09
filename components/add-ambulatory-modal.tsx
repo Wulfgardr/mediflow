@@ -47,6 +47,7 @@ export function AddAmbulatoryModal({ isOpen, onClose, parentId: initialParentId 
                 parentId: parentId || null,
                 type: type,
                 isDefault: false,
+                version: 1,
                 createdAt: new Date()
             };
 

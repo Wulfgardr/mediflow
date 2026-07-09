@@ -87,6 +87,11 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
 // Schema guards run on every (re)open so older DB files gain the tables and
 // columns the current code expects (re-applied after a repair swaps the file).
 function applySchemaGuards() {
+    try {
+        ensureColumn('ambulatories', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    } catch (error) {
+        console.warn('[MediFlow] Ambulatories schema check skipped:', error);
+    }
     /* @Codex */
     try {
         ensureColumn('users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
