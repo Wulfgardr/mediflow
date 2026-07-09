@@ -56,7 +56,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: '+39 333 0000001',
+                phone: 'ENC:smoke:phone-1',
             },
         });
         assert.equal(readOnlyWrite.response.status, 403);
@@ -65,7 +65,7 @@ test('paired patient profile write requires write capability, session, scope, an
             headers: pairedHeaders(writeClient),
             body: {
                 version: 1,
-                phone: '+39 333 0000001',
+                phone: 'ENC:smoke:phone-1',
             },
         });
         assert.equal(missingSession.response.status, 401);
@@ -77,7 +77,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: '+39 333 0000001',
+                phone: 'ENC:smoke:phone-1',
                 isArchived: true,
             },
         });
@@ -91,7 +91,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
         });
         assert.equal(detail.response.status, 200);
-        assert.equal(detail.json?.phone, '+39 333 0000001');
+        assert.equal(detail.json?.phone, 'ENC:smoke:phone-1');
         assert.equal(detail.json?.isArchived, true);
         assert.equal(detail.json?.version, 2);
 
@@ -102,7 +102,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: '+39 333 0000002',
+                phone: 'ENC:smoke:phone-2',
             },
         });
         assert.equal(conflict.response.status, 409);
@@ -181,7 +181,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
             },
             body: {
                 version: 1,
-                phone: '+39 333 0000009',
+                phone: 'ENC:smoke:phone-9',
             },
         });
         assert.equal(gatedWrite.response.status, 403);
@@ -205,7 +205,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
             },
             body: {
                 version: 1,
-                phone: '+39 333 0000009',
+                phone: 'ENC:smoke:phone-9',
             },
         });
         assert.equal(update.response.status, 200);

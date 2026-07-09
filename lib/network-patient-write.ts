@@ -32,9 +32,19 @@ export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-p
 /* @Codex */
 export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights']);
 
-// I campi motivazione arrivano sigillati dal client (ENC:); l'host non li
+// I campi sensibili arrivano sigillati dal client (ENC:); l'host non li
 // decodifica e non deve accettarli in chiaro da un client paired.
-export const NETWORK_UPDATE_SEALED_PATIENT_FIELDS = ['archiveReason', 'archiveNote'] as const;
+export const NETWORK_UPDATE_SEALED_PATIENT_FIELDS = [
+    'address',
+    'phone',
+    'caregiver',
+    'exemptions',
+    'diagnoses',
+    'notes',
+    'statusReason',
+    'archiveReason',
+    'archiveNote',
+] as const;
 
 type NetworkPatientMutationResponse =
     | { status: 200; value: { success: true } }
@@ -92,7 +102,7 @@ function validateNetworkPatientMutationBoundary(
         if (value !== undefined && value !== null && !isSealedValue(value)) {
             return {
                 status: 400,
-                value: { error: 'Network update requires sealed archive fields' },
+                value: { error: 'Network update requires sealed sensitive fields' },
             };
         }
     }
