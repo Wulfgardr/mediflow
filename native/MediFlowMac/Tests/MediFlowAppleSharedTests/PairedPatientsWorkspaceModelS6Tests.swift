@@ -129,7 +129,7 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
     }
 }
 
-private actor S6MockDataSource: HomeBasePatientsDataSource {
+actor S6MockDataSource: HomeBasePatientsDataSource {
     struct ServiceUpdate {
         let id: String
         let payload: HomeBaseServicePrescriptionUpdatePayload
@@ -146,6 +146,10 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
     private let prosthetics: [HomeBaseProstheticPrescriptionSummary]
     private let validationResponse: HomeBaseValidatePatientExportResponse
     private var revisions: [NetworkRevisionSummary]
+    private let scopedCheckups: [HomeBaseCheckupSummary]
+    private let scopedEntries: [HomeBaseEntrySummary]
+    private let capabilities: [NetworkCapability]
+    private let shouldFail: Bool
     private(set) var lastServiceUpdate: ServiceUpdate?
     private(set) var itemUpdates: [ItemUpdate] = []
     private(set) var fetchPatientCount = 0
@@ -156,7 +160,11 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
         serviceItems: [HomeBaseServicePrescriptionItemSummary] = [],
         prosthetics: [HomeBaseProstheticPrescriptionSummary] = [],
         validation: HomeBaseValidatePatientExportResponse = PairedPatientsWorkspaceModelS6Tests.validation(),
-        revisions: [NetworkRevisionSummary] = []
+        revisions: [NetworkRevisionSummary] = [],
+        scopedCheckups: [HomeBaseCheckupSummary] = [],
+        scopedEntries: [HomeBaseEntrySummary] = [],
+        capabilities: [NetworkCapability] = [],
+        shouldFail: Bool = false
     ) {
         self.details = details
         self.services = services
@@ -164,6 +172,10 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
         self.prosthetics = prosthetics
         self.validationResponse = validation
         self.revisions = revisions
+        self.scopedCheckups = scopedCheckups
+        self.scopedEntries = scopedEntries
+        self.capabilities = capabilities
+        self.shouldFail = shouldFail
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
@@ -176,7 +188,8 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?,
         includeDeleted: Bool
     ) async throws -> [HomeBasePatientSummary] {
-        details.values.map { detail in
+        if shouldFail { throw HomeBaseClientError.contract }
+        return details.values.map { detail in
             HomeBasePatientSummary(
                 id: detail.id,
                 firstName: detail.firstName,
@@ -188,9 +201,21 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
                 version: detail.version,
                 updatedAt: detail.updatedAt,
                 deletedAt: detail.deletedAt,
-                deletionReason: detail.deletionReason
+                deletionReason: detail.deletionReason,
+                diagnoses: detail.diagnoses
             )
         }
+    }
+
+    func fetchPatients(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        includeDiagnoses: Bool
+    ) async throws -> [HomeBasePatientSummary] {
+        try await fetchPatients(
+            credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, includeDeleted: false)
     }
 
     func fetchNetworkAmbulatories(
@@ -373,6 +398,9 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
         []
     }
 
+    func fetchScopedCheckups(dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseCheckupSummary] { if shouldFail { throw HomeBaseClientError.contract }; return scopedCheckups }
+    func fetchScopedEntries(type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseEntrySummary] { if shouldFail { throw HomeBaseClientError.contract }; return scopedEntries }
+
     func createCheckup(
         patientId: String,
         payload: HomeBaseCheckupCreatePayload,
@@ -536,7 +564,8 @@ private actor S6MockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> NetworkCapabilitiesResponse {
-        NetworkCapabilitiesResponse(nodeId: "node", operatingMode: "network-home-base", protocolVersion: "1", capabilities: [])
+        if shouldFail { throw HomeBaseClientError.contract }
+        return NetworkCapabilitiesResponse(nodeId: "node", operatingMode: "network-home-base", protocolVersion: "1", capabilities: capabilities)
     }
 
     func fetchNetworkIdentity(
