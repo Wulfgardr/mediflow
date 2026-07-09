@@ -19,9 +19,9 @@ Qui si lavora su **dati sanitari**: privacy e sicurezza non sono opzionali.
 ## Repository e consegna
 
 La repository pubblica
-[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow) e l'unica fonte
+[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow) è l'unica fonte
 operativa. Issue, branch, pull request, tag e release devono nascere qui; la
-precedente repository privata e archiviata e non va usata come mirror o
+precedente repository privata è archiviata e non va usata come mirror o
 destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 [`SECURITY.md`](./SECURITY.md) e
 [`docs/repository-topology.md`](./docs/repository-topology.md).

@@ -13,12 +13,14 @@ Prima di ogni attivita nel repository, leggere nell'ordine:
 1. `AGENTS.md`
 2. `README.md`
 3. `docs/README.md`
-4. `docs/markdown-index.md`
-5. `ARCHITECTURE.md`
-6. `CONTRIBUTING.md`
-7. `SECURITY.md`
-8. gli ADR piu recenti in `docs/adr/`
-9. `docs/walkthrough.md` quando serve una vista end-to-end
+4. `docs/STATE_OF_THE_SYSTEM.md`
+5. `docs/repository-topology.md`
+6. `docs/markdown-index.md`
+7. `ARCHITECTURE.md`
+8. `CONTRIBUTING.md`
+9. `SECURITY.md`
+10. gli ADR piu recenti in `docs/adr/`
+11. `docs/walkthrough.md` quando serve una vista end-to-end
 
 Non dedurre intenti architetturali dal solo codice quando esiste una fonte
 documentale canonica.
