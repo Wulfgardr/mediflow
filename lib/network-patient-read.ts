@@ -15,7 +15,7 @@ function toIsoString(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function toPatientSummary(patient: typeof patients.$inferSelect): PatientSummary {
+function toPatientSummary(patient: typeof patients.$inferSelect, includeDiagnoses = false): PatientSummary {
     return {
         id: patient.id,
         firstName: patient.firstName,
@@ -28,6 +28,7 @@ function toPatientSummary(patient: typeof patients.$inferSelect): PatientSummary
         deletionReason: patient.deletionReason ?? null,
         version: patient.version,
         updatedAt: toIsoString(patient.updatedAt),
+        ...(includeDiagnoses ? { diagnoses: patient.diagnoses ?? null } : {}),
     };
 }
 
@@ -64,7 +65,7 @@ function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
 /* @Codex */
 export async function listNetworkScopedPatients(
     scopeAmbulatoryId: string,
-    options: { includeDeleted?: boolean } = {}
+    options: { includeDeleted?: boolean; includeDiagnoses?: boolean } = {}
 ): Promise<PatientSummary[]> {
     const filters = [eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId)];
     if (!options.includeDeleted) {
@@ -78,7 +79,7 @@ export async function listNetworkScopedPatients(
         .where(and(...filters))
         .orderBy(desc(patients.updatedAt));
 
-    return rows.map((row) => toPatientSummary(row.patient));
+    return rows.map((row) => toPatientSummary(row.patient, options.includeDiagnoses));
 }
 
 /* @Codex */
