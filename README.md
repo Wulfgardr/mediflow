@@ -206,19 +206,32 @@ Modelli, librerie, runtime e ispirazioni con URL e licenze:
 
 ## Come è stato costruito
 
-Questo progetto è scritto da un medico con un aiuto sostanziale, e dichiarato,
-di strumenti di sviluppo assistito da AI.
+Scrivo MediFlow da medico, con un aiuto sostanziale e dichiarato di strumenti di sviluppo assistito da AI.
 
-Sviluppo assistito: Codex come principale copilota di implementazione e verifica; Claude Code come seconda corsia di review e supporto.
+Due copiloti, ruoli distinti. **Codex** (OpenAI) è la mia corsia principale di implementazione e verifica; **Claude Code** (Anthropic) è la seconda corsia: review, coordinamento e i controlli che decidono cosa entra nel codice. Chi scrive non è chi approva.
 
-Tengo il conto dai log locali delle sessioni: **19,6 miliardi di token**, 16,0 con Codex CLI (febbraio-luglio 2026) e 3,6 con Claude Code (maggio-luglio 2026). Mancano gli strumenti che non lasciano traccia e il lavoro prima che iniziassi a contare.
+Aggiornato al 9 luglio 2026, tengo il conto dai log locali delle sessioni: **circa 20 miliardi di token** per MediFlow, 16,4 con Codex e 4,0 con Claude Code. Sono token di sessione, quindi in gran parte contesto riletto a ogni passaggio: misurano il volume del lavoro assistito, non quanto ho scritto.
 
-<img src="./screenshots/token-models.svg" alt="Modelli usati nello sviluppo di MediFlow: Codex CLI con gpt-5.5 a 16 miliardi di token, Claude Code con Opus 4.8, Sonnet 5 e Fable 5 a 3,6 miliardi" width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex CLI con gpt-5.5 a 16,4 miliardi di token, Claude Code (Opus 4.8, Fable 5, Sonnet 5) a 4,0 miliardi" width="720" loading="lazy"/>
 
-Il metodo conta più del volume: ogni modifica passa da review incrociata tra
-modelli diversi, test locali e guard automatici in CI che bloccano regressioni
-di sicurezza e affermazioni non dimostrate. L'AI scrive, ma non decide: la
-responsabilità del progetto resta umana.
+### Lo stack
+
+Il metodo conta più del volume.
+
+- **Review incrociata tra modelli.** Un modello propone, un altro prova a smontarlo. Le due corsie si controllano a vicenda invece di darsi ragione.
+- **Verifica con prove.** Prima di chiudere un lavoro giro davvero i test e i controlli in locale. Niente "fatto" sulla parola del modello.
+- **Diagnosi in parallelo.** Per bug e regressioni, più letture in sola lettura sullo stesso codice da angoli diversi.
+- **Guard automatici in CI.** Bloccano il merge se rientrano regressioni di sicurezza o affermazioni non dimostrate.
+- **Il modello giusto per il compito.** Lavoro meccanico ai modelli economici, giudizio e architettura a quelli capaci.
+
+Gli strumenti, in chiaro:
+
+- **[Codex CLI](https://openai.com/codex)** (OpenAI) e **[Claude Code](https://claude.com/claude-code)** (Anthropic): i due copiloti.
+- **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): lo spazio di contesto, open source. Serve a costruire il contesto giusto da dare agli agenti, quali file, quali diff, quale struttura del repo, prima che agiscano, e a far dialogare più modelli sullo stesso problema senza sprecare contesto.
+- **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): il conteggio d'uso da cui vengono i numeri qui sopra.
+- Parte del flusso di review deriva da **[steipete/agent-scripts](https://github.com/steipete/agent-scripts)** (MIT).
+
+L'AI scrive, ma non decide. La responsabilità di MediFlow resta mia.
 
 ## Licenza
 

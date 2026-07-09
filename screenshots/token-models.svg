@@ -1,21 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 372" width="760" height="372" role="img" aria-label="Modelli usati nello sviluppo di MediFlow e token misurati per strumento">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 372" width="760" height="372" role="img" aria-label="Modelli usati per MediFlow: Codex CLI (gpt-5.5) 16,4 miliardi di token, Claude Code (Opus 4.8, Fable 5, Sonnet 5) 4,0 miliardi">
+  <defs>
+    <clipPath id="claudeBar">
+      <rect x="36" y="258" width="126" height="34" rx="8"/>
+    </clipPath>
+  </defs>
   <rect x="6" y="6" width="748" height="360" rx="18" fill="#fbfbfd" stroke="#e5e7eb" stroke-width="1.5"/>
-  <text x="36" y="54" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="21" font-weight="700" fill="#111418">Modelli usati nello sviluppo di MediFlow</text>
-  <text x="36" y="80" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" fill="#6b7280">Token registrati dai log locali delle sessioni</text>
+  <text x="36" y="54" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="21" font-weight="700" fill="#111418">Modelli usati per MediFlow</text>
+  <text x="36" y="80" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" fill="#6b7280">Token di sessione registrati dai log locali, febbraio-luglio 2026</text>
 
-  <!-- Codex CLI -->
+  <!-- Codex CLI: singolo modello, barra piena -->
   <text x="36" y="132" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#111418">Codex CLI · OpenAI</text>
   <rect x="36" y="144" width="520" height="34" rx="8" fill="#eef0f2"/>
   <rect x="36" y="144" width="520" height="34" rx="8" fill="#412991"/>
-  <text x="544" y="166" text-anchor="end" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#ffffff">16,0 mld</text>
+  <text x="544" y="166" text-anchor="end" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#ffffff">16,4 mld</text>
   <text x="36" y="200" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" fill="#57606a">gpt-5.5</text>
 
-  <!-- Claude Code -->
+  <!-- Claude Code: barra scalata, segmentata per modello -->
   <text x="36" y="246" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#111418">Claude Code · Anthropic</text>
   <rect x="36" y="258" width="520" height="34" rx="8" fill="#eef0f2"/>
-  <rect x="36" y="258" width="117" height="34" rx="8" fill="#d97757"/>
-  <text x="165" y="280" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#111418">3,6 mld</text>
-  <text x="36" y="314" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" fill="#57606a">Opus 4.8 · Sonnet 5 · Fable 5</text>
+  <g clip-path="url(#claudeBar)">
+    <rect x="36" y="258" width="85" height="34" fill="#d97757"/>
+    <rect x="121" y="258" width="33" height="34" fill="#e8a389"/>
+    <rect x="154" y="258" width="8" height="34" fill="#f2cdbc"/>
+  </g>
+  <text x="172" y="280" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#111418">4,0 mld</text>
+  <text x="36" y="314" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" fill="#57606a">Opus 4.8 · Fable 5 · Sonnet 5</text>
 
-  <text x="36" y="350" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5" fill="#8b949e">Totale 19,6 mld token registrati, febbraio-luglio 2026</text>
+  <text x="36" y="350" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5" fill="#8b949e">Totale ~20 miliardi di token di sessione, aggiornato al 9 luglio 2026</text>
 </svg>
