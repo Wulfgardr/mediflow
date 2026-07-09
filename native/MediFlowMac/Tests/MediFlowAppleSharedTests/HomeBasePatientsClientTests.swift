@@ -31,7 +31,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
                     "Set-Cookie": "mediflow_session=session-123; Path=/; HttpOnly; SameSite=Lax",
                 ]
             )!
-            return (response, Data(#"{"success":true,"encryptedMasterKey":"d3JhcHBlZE1L","salt":"c2FsdA=="}"#.utf8))
+            return (response, Data(#"{"success":true,"id":"user-1","username":"doctor","displayName":"Dott.ssa Ada","ambulatoryName":"Centro Salute","role":"admin","encryptedMasterKey":"d3JhcHBlZE1L","salt":"c2FsdA=="}"#.utf8))
         }
 
         let result = try await client.login(username: "doctor", password: "1992")
@@ -39,6 +39,11 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
         XCTAssertEqual(result.encryptedMasterKey, "d3JhcHBlZE1L", "login must surface the wrapped master key")
         XCTAssertEqual(result.salt, "c2FsdA==", "login must surface the PBKDF2 salt for the field crypto")
+        XCTAssertEqual(result.id, "user-1")
+        XCTAssertEqual(result.username, "doctor")
+        XCTAssertEqual(result.displayName, "Dott.ssa Ada")
+        XCTAssertEqual(result.ambulatoryName, "Centro Salute")
+        XCTAssertEqual(result.role, "admin")
     }
 
     func testFetchPatientsUsesPairedHeadersAndAmbulatoryCookie() async throws {
@@ -86,6 +91,24 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(patients.count, 1)
         XCTAssertEqual(patients.first?.id, "patient-1")
         XCTAssertEqual(patients.first?.version, 7)
+    }
+
+    func testFetchNetworkAmbulatoriesDecodesVersionedContractFields() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ambulatories")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"[{"id":"amb-1","name":"Centro","address":"Via Roma 1","parentId":"amb-parent","type":"live","description":"Sede principale","isDefault":true,"version":7,"createdAt":"2026-07-10T08:00:00.000Z"}]"#.utf8))
+        }
+
+        let ambulatories = try await client.fetchNetworkAmbulatories(
+            credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+
+        XCTAssertEqual(ambulatories.first?.parentId, "amb-parent")
+        XCTAssertEqual(ambulatories.first?.description, "Sede principale")
+        XCTAssertEqual(ambulatories.first?.version, 7)
     }
 
     /* @Codex */
@@ -1512,6 +1535,58 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
+    func testChangePinConflictDecodesDedicatedServerCode() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/auth/change-pin")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"error":"Il PIN è stato modificato da un’altra sessione. Ricarica e riprova.","code":"PIN_CHANGE_CONFLICT","message":"Il PIN è stato modificato da un’altra sessione. Ricarica e riprova."}"#.utf8))
+        }
+
+        do {
+            _ = try await client.changePin(
+                currentPin: "1357",
+                newPin: "2468",
+                encryptedMasterKey: "v2:wrapped",
+                salt: "AAECAwQFBgcICQoLDA0ODw==",
+                credentials: creds,
+                sessionCookie: cookie
+            )
+            XCTFail("Expected PIN_CHANGE_CONFLICT")
+        } catch HomeBaseClientError.pinChangeConflict(let message) {
+            XCTAssertEqual(message, "Il PIN è stato modificato da un’altra sessione. Ricarica e riprova.")
+        }
+    }
+
+    func testAmbulatoryVersionConflictDecodesRealBoundaryPayload() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ambulatories/amb-1")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"error":"Conflict","code":"VERSION_CONFLICT","entity":"ambulatory","recordId":"amb-1","expectedVersion":2,"currentVersion":3,"currentUpdatedAt":null,"currentState":"present","currentSnapshot":{"id":"amb-1","version":3,"isDefault":true,"type":"live"}}"#.utf8))
+        }
+
+        do {
+            _ = try await client.updateAmbulatory(
+                id: "amb-1",
+                payload: HomeBaseAmbulatoryUpdatePayload(expectedVersion: 2, name: "Sede"),
+                credentials: creds,
+                sessionCookie: cookie
+            )
+            XCTFail("Expected VERSION_CONFLICT")
+        } catch HomeBaseClientError.versionConflict(let conflict) {
+            XCTAssertEqual(conflict.entity, "ambulatory")
+            XCTAssertEqual(conflict.recordId, "amb-1")
+            XCTAssertEqual(conflict.expectedVersion, 2)
+            XCTAssertEqual(conflict.currentVersion, 3)
+            XCTAssertEqual(conflict.currentSnapshot?.version, 3)
+        }
+    }
+
     func testUpdatePatientPutsNetworkPatientPayloadWithPatchSemantics() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1699,9 +1774,10 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
             )!
             let body = """
-            [{"id":"AMB-1","name":"Centrale","address":"Via Roma 1","type":"principale",\
-            "isDefault":true,"createdAt":"2026-06-01T00:00:00.000Z"},\
-            {"id":"AMB-2","name":"Nord","address":null,"type":null,"isDefault":false,"createdAt":null}]
+            [{"id":"AMB-1","name":"Centrale","address":"Via Roma 1","parentId":null,"type":"live",\
+            "description":"Sede principale","isDefault":true,"version":3,"createdAt":"2026-06-01T00:00:00.000Z"},\
+            {"id":"AMB-2","name":"Nord","address":null,"parentId":"AMB-1","type":"test",\
+            "description":null,"isDefault":false,"version":2,"createdAt":null}]
             """
             return (response, Data(body.utf8))
         }
@@ -1715,6 +1791,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result[0].id, "AMB-1")
         XCTAssertEqual(result[0].name, "Centrale")
         XCTAssertEqual(result[0].isDefault, true)
+        XCTAssertEqual(result[0].version, 3)
+        XCTAssertEqual(result[1].parentId, "AMB-1")
         XCTAssertNil(result[1].address, "a null address must decode as nil")
         XCTAssertNil(result[1].createdAt)
     }
@@ -1933,8 +2011,49 @@ final class HomeBasePatientsClientTests: XCTestCase {
             let method = request.httpMethod ?? "GET"
             let url = try XCTUnwrap(request.url)
             requests.append("\(method) \(url.absoluteString)")
-            let response = HTTPURLResponse(url: url, statusCode: (method == "POST" ? 201 : 200), httpVersion: nil, headerFields: nil)!
+            let statusCode = method == "POST" && url.path == "/api/v1/network/ambulatories" ? 201 : 200
+            let response = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
             switch (method, url.path) {
+            case ("POST", "/api/auth/change-pin"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["currentPin"] as? String, "1357")
+                XCTAssertEqual(payload["newPin"] as? String, "2468")
+                XCTAssertEqual(payload["encryptedMasterKey"] as? String, "v2:wrapped")
+                XCTAssertEqual(payload["salt"] as? String, "AAECAwQFBgcICQoLDA0ODw==")
+                return (response, Data(#"{"success":true,"message":"PIN aggiornato con successo."}"#.utf8))
+            case ("POST", "/api/auth/logout"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                return (response, Data(#"{"success":true}"#.utf8))
+            case ("PUT", "/api/auth/profile"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["id"] as? String, "user-1")
+                XCTAssertEqual(payload["displayName"] as? String, "Dott.ssa Ada")
+                XCTAssertEqual(payload["ambulatoryName"] as? String, "Centro Salute")
+                return (response, Data(#"{"success":true}"#.utf8))
+            case ("POST", "/api/v1/network/ambulatories"):
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["id"] as? String, "amb-new")
+                XCTAssertEqual(payload["name"] as? String, "Sede Nuova")
+                XCTAssertEqual(payload["type"] as? String, "test")
+                XCTAssertEqual(payload["isDefault"] as? Bool, false)
+                return (response, Data(#"{"success":true,"id":"amb-new","version":1,"affectedAmbulatories":[{"id":"amb-new","version":1}]}"#.utf8))
+            case ("PUT", "/api/v1/network/ambulatories/amb-new"):
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["version"] as? Int, 1)
+                XCTAssertEqual(payload["name"] as? String, "Sede Aggiornata")
+                XCTAssertTrue(payload.keys.contains("description"))
+                XCTAssertEqual(payload["description"] as? NSNull, NSNull())
+                return (response, Data(#"{"success":true,"version":2,"affectedAmbulatories":[{"id":"amb-old","version":4},{"id":"amb-new","version":2}]}"#.utf8))
+            case ("DELETE", "/api/v1/network/ambulatories/amb-new"):
+                XCTAssertEqual(try self.requestObject(request)["version"] as? Int, 2)
+                return (response, Data(#"{"success":true,"affectedAmbulatories":[{"id":"amb-old","version":5}]}"#.utf8))
+            case ("POST", "/api/v1/network/ambulatories/clear"):
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["ambulatoryId"] as? String, "amb-test")
+                XCTAssertEqual(payload["version"] as? Int, 7)
+                return (response, Data(#"{"success":true,"version":8,"clearedPatients":3,"preservedLivePatients":1,"removedMembershipRows":4}"#.utf8))
             case ("GET", "/api/v1/network/checkups"):
                 return (response, Data(#"[]"#.utf8))
             case ("GET", "/api/v1/network/entries"):
@@ -1982,6 +2101,13 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
         let source: any HomeBasePatientsDataSource = client
 
+        _ = try await source.changePin(currentPin: "1357", newPin: "2468", encryptedMasterKey: "v2:wrapped", salt: "AAECAwQFBgcICQoLDA0ODw==", credentials: creds, sessionCookie: cookie)
+        _ = try await source.logout(credentials: creds, sessionCookie: cookie)
+        _ = try await source.updateProfile(userId: "user-1", displayName: "Dott.ssa Ada", ambulatoryName: "Centro Salute", credentials: creds, sessionCookie: cookie)
+        _ = try await source.createAmbulatory(payload: HomeBaseAmbulatoryCreatePayload(id: "amb-new", name: "Sede Nuova", type: "test"), credentials: creds, sessionCookie: cookie)
+        _ = try await source.updateAmbulatory(id: "amb-new", payload: HomeBaseAmbulatoryUpdatePayload(expectedVersion: 1, name: "Sede Aggiornata", description: .null), credentials: creds, sessionCookie: cookie)
+        _ = try await source.deleteAmbulatory(id: "amb-new", expectedVersion: 2, credentials: creds, sessionCookie: cookie)
+        _ = try await source.clearAmbulatory(id: "amb-test", expectedVersion: 7, credentials: creds, sessionCookie: cookie)
         _ = try await source.fetchScopedCheckups(dateFrom: fixtureDate, dateTo: fixtureDate, status: ["pending", "completed"], limit: 500, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchScopedEntries(type: "note", dateFrom: fixtureDate, dateTo: fixtureDate, limit: 100, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchPatients(credentials: creds, sessionCookie: cookie, ambulatoryId: nil, includeDiagnoses: true)
@@ -2004,6 +2130,13 @@ final class HomeBasePatientsClientTests: XCTestCase {
         _ = try await source.validateFseDocument(payload: HomeBaseFseDocumentValidationPayload(profile: "FSE_TEST", payload: .object(["id": .string("doc-1")])), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
 
         XCTAssertEqual(requests, [
+            "POST https://localhost:3443/api/auth/change-pin",
+            "POST https://localhost:3443/api/auth/logout",
+            "PUT https://localhost:3443/api/auth/profile",
+            "POST https://localhost:3443/api/v1/network/ambulatories",
+            "PUT https://localhost:3443/api/v1/network/ambulatories/amb-new",
+            "DELETE https://localhost:3443/api/v1/network/ambulatories/amb-new",
+            "POST https://localhost:3443/api/v1/network/ambulatories/clear",
             "GET https://localhost:3443/api/v1/network/checkups?dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&status=pending&status=completed&limit=500",
             "GET https://localhost:3443/api/v1/network/entries?type=note&dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&limit=100",
             "GET https://localhost:3443/api/v1/network/patients?include=diagnoses",

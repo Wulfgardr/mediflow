@@ -492,6 +492,83 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    func changePin(currentPin: String, newPin: String) async {
+        guard let masterKey else {
+            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di cambiarlo."
+            return
+        }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Sessione operatore non attiva. Accedi di nuovo prima di cambiare il PIN."
+            return
+        }
+        guard !currentPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Inserisci il PIN attuale."
+            return
+        }
+        guard (4...8).contains(newPin.count) else {
+            errorMessage = "Il nuovo PIN deve avere tra 4 e 8 caratteri."
+            return
+        }
+        guard newPin != currentPin else {
+            errorMessage = "Il nuovo PIN deve essere diverso dal PIN attuale."
+            return
+        }
+
+        let salt = Data((0..<16).map { _ in UInt8.random(in: .min ... .max) })
+        guard let wrappedMasterKey = CryptoService.wrapMasterKeyVersioned(
+            masterKey,
+            pin: newPin,
+            salt: salt,
+            version: CryptoService.currentKdfVersion
+        ) else {
+            errorMessage = "Cifratura della chiave non riuscita: il PIN non e stato modificato."
+            return
+        }
+
+        await runTask {
+            let acknowledgement = try await self.makeClient().changePin(
+                currentPin: currentPin,
+                newPin: newPin,
+                encryptedMasterKey: wrappedMasterKey,
+                salt: salt.base64EncodedString(),
+                credentials: credentials,
+                sessionCookie: sessionCookie
+            )
+            guard acknowledgement.success else { throw HomeBaseClientError.contract }
+            // Deliberately keep the exact same masterKey instance in RAM. A PIN
+            // rotation changes only the KEK + salt + wrapped blob on the home-base.
+            self.statusMessage = "PIN aggiornato. La chiave clinica in memoria resta invariata."
+        }
+    }
+
+    func lockSessionNow() async {
+        isWorking = true
+        errorMessage = nil
+        pendingConflict = nil
+        defer { isWorking = false }
+
+        var remoteLogoutConfirmed = false
+        if let sessionCookie, let credentials = pairedCredentials {
+            do {
+                let acknowledgement = try await makeClient().logout(
+                    credentials: credentials,
+                    sessionCookie: sessionCookie
+                )
+                remoteLogoutConfirmed = acknowledgement.success
+            } catch {
+                // D10: remote logout is best-effort. Local key/session destruction
+                // below is unconditional and must never be skipped by transport errors.
+            }
+        }
+
+        sessionCookie = nil
+        masterKey = nil
+        connectionState = .sessionExpired
+        statusMessage = remoteLogoutConfirmed
+            ? "Sessione bloccata. Accedi di nuovo per continuare."
+            : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+    }
+
     /// Derive the field-crypto master key from the operator PIN + the wrapped key
     /// material returned by login (same as the web client). Kept only in memory.
     private func unlockFieldCrypto(with result: HomeBaseLoginResult, pin: String) {
@@ -501,8 +578,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             masterKey = nil
             return
         }
-        let kek = CryptoService.deriveKEK(pin: pin, salt: salt)
-        masterKey = CryptoService.unwrapMasterKey(wrappedBase64: wrapped, kek: kek)
+        masterKey = CryptoService.unwrapMasterKeyVersioned(blob: wrapped, pin: pin, salt: salt)
     }
 
     func loadPatients(includeDeleted: Bool = false) async {
@@ -3140,6 +3216,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 // Typed 409: surface the structured conflict so the reconciliation
                 // banner can show expected-vs-current and offer a reload.
                 pendingConflict = payload
+                statusMessage = error.localizedDescription
+                errorMessage = nil
+                return
+            } else if case HomeBaseClientError.pinChangeConflict = error {
                 statusMessage = error.localizedDescription
                 errorMessage = nil
                 return

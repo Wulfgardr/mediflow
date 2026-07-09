@@ -430,15 +430,149 @@ public struct NetworkIdentitySummary: Codable, Hashable, Sendable {
 // A18: paired ambulatory scope option, mirrors AmbulatorySummary from the web
 // contract (createdAt arrives as an ISO string).
 public struct NetworkAmbulatorySummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, name: String, address: String?, type: String?, isDefault: Bool?, createdAt: String?) {
-        self.id = id; self.name = name; self.address = address; self.type = type; self.isDefault = isDefault; self.createdAt = createdAt
+    public init(
+        id: String,
+        name: String,
+        address: String?,
+        parentId: String? = nil,
+        type: String?,
+        description: String? = nil,
+        isDefault: Bool?,
+        version: Int = 1,
+        createdAt: String?
+    ) {
+        self.id = id
+        self.name = name
+        self.address = address
+        self.parentId = parentId
+        self.type = type
+        self.description = description
+        self.isDefault = isDefault
+        self.version = version
+        self.createdAt = createdAt
     }
     public let id: String
     public let name: String
     public let address: String?
+    public let parentId: String?
     public let type: String?
+    public let description: String?
     public let isDefault: Bool?
+    public let version: Int
     public let createdAt: String?
+}
+
+/* @Codex */
+public struct HomeBaseAmbulatoryCreatePayload: Encodable, Sendable {
+    public let id: String?
+    public let name: String
+    public let address: String?
+    public let parentId: String?
+    public let type: String
+    public let description: String?
+    public let isDefault: Bool
+
+    public init(
+        id: String? = nil,
+        name: String,
+        address: String? = nil,
+        parentId: String? = nil,
+        type: String = "live",
+        description: String? = nil,
+        isDefault: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.address = address
+        self.parentId = parentId
+        self.type = type
+        self.description = description
+        self.isDefault = isDefault
+    }
+}
+
+/* @Codex */
+public struct HomeBaseAmbulatoryUpdatePayload: Encodable, Sendable {
+    public let expectedVersion: Int
+    public let name: String?
+    public let address: PatchValue<String>
+    public let parentId: PatchValue<String>
+    public let type: String?
+    public let description: PatchValue<String>
+    public let isDefault: Bool?
+
+    public init(
+        expectedVersion: Int,
+        name: String? = nil,
+        address: PatchValue<String> = .omit,
+        parentId: PatchValue<String> = .omit,
+        type: String? = nil,
+        description: PatchValue<String> = .omit,
+        isDefault: Bool? = nil
+    ) {
+        self.expectedVersion = expectedVersion
+        self.name = name
+        self.address = address
+        self.parentId = parentId
+        self.type = type
+        self.description = description
+        self.isDefault = isDefault
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, name, address, parentId, type, description, isDefault
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(expectedVersion, forKey: .version)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodePatch(address, forKey: .address)
+        try container.encodePatch(parentId, forKey: .parentId)
+        try container.encodeIfPresent(type, forKey: .type)
+        try container.encodePatch(description, forKey: .description)
+        try container.encodeIfPresent(isDefault, forKey: .isDefault)
+    }
+}
+
+/* @Codex */
+public struct HomeBaseAffectedAmbulatory: Decodable, Equatable, Sendable {
+    public let id: String
+    public let version: Int
+
+    public init(id: String, version: Int) {
+        self.id = id
+        self.version = version
+    }
+}
+
+/* @Codex */
+public struct HomeBaseAmbulatoryMutationResponse: Decodable, Equatable, Sendable {
+    public let success: Bool
+    public let id: String?
+    public let version: Int?
+    public let affectedAmbulatories: [HomeBaseAffectedAmbulatory]?
+    public let clearedPatients: Int?
+    public let preservedLivePatients: Int?
+    public let removedMembershipRows: Int?
+
+    public init(
+        success: Bool,
+        id: String? = nil,
+        version: Int? = nil,
+        affectedAmbulatories: [HomeBaseAffectedAmbulatory]? = nil,
+        clearedPatients: Int? = nil,
+        preservedLivePatients: Int? = nil,
+        removedMembershipRows: Int? = nil
+    ) {
+        self.success = success
+        self.id = id
+        self.version = version
+        self.affectedAmbulatories = affectedAmbulatories
+        self.clearedPatients = clearedPatients
+        self.preservedLivePatients = preservedLivePatients
+        self.removedMembershipRows = removedMembershipRows
+    }
 }
 
 /* @Codex */
@@ -1385,7 +1519,9 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
     case missingSessionCookie
     case transport(HomeBaseTransportIssue)
     case httpStatus(Int, String?)
+    case pinChangeConflict(String?)
     case versionConflict(VersionConflictPayload)
+    case localAuthorityUnsupported(String)
     case contract
 
     public var errorDescription: String? {
@@ -1400,9 +1536,13 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return issue.localizedDescription
         case .httpStatus(_, let message):
             return message ?? "La richiesta verso l'home-base non e andata a buon fine."
+        case .pinChangeConflict(let message):
+            return message ?? "Il PIN e stato modificato da un'altra sessione. Ricarica e riprova."
         case .versionConflict(let conflict):
             let current = conflict.currentVersion.map(String.init) ?? "piu recente"
             return "Conflitto di versione su \(conflict.entity): la versione \(conflict.expectedVersion) e superata dalla \(current). Ricarica e confronta prima di salvare."
+        case .localAuthorityUnsupported(let operation):
+            return "\(operation) non supportata in modalita autorita locale."
         case .contract:
             return "La risposta dell'home-base non rispetta il contratto atteso."
         }
