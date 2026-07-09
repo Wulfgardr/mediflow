@@ -1,5 +1,5 @@
 /* @Codex */
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 /* @Codex */
 import { dbServer } from './db-server';
 /* @Codex */
@@ -11,13 +11,15 @@ import { normalizeCheckupStatus, checkupStatusFilterValues } from './status-norm
 
 type NetworkCheckupListFilters = {
     limit?: number | null;
-    status?: string | null;
+    status?: string | string[] | null;
     dateFrom?: Date | null;
     dateTo?: Date | null;
 };
 
 /* @Codex */
 export const NETWORK_CHECKUP_READ_CAPABILITY = 'network.replica.readonly-checkups';
+/* @Codex */
+export const NETWORK_AGENDA_READ_CAPABILITY = 'network.replica.readonly-agenda';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -48,7 +50,9 @@ export async function listNetworkScopedCheckups(
     scopeAmbulatoryId: string,
     filters: NetworkCheckupListFilters = {}
 ): Promise<CheckupSummary[]> {
-    const statusFilterValues = filters.status ? checkupStatusFilterValues(filters.status) : null;
+    const statusFilterValues = typeof filters.status === 'string' && filters.status
+        ? checkupStatusFilterValues(filters.status)
+        : null;
     const whereFilters = [
         eq(checkups.patientId, patientId),
         eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
@@ -63,6 +67,31 @@ export async function listNetworkScopedCheckups(
         .innerJoin(patientsToAmbulatories, eq(checkups.patientId, patientsToAmbulatories.patientId))
         .where(and(...whereFilters))
         .orderBy(desc(checkups.date));
+
+    const rows = filters.limit ? await query.limit(filters.limit) : await query;
+    return rows.map((row) => toCheckupSummary(row.checkup));
+}
+
+/* @Codex */
+export async function listNetworkScopedCheckupsForAmbulatory(
+    scopeAmbulatoryId: string,
+    filters: NetworkCheckupListFilters = {}
+): Promise<CheckupSummary[]> {
+    const statusValues = Array.isArray(filters.status) ? filters.status : [filters.status];
+    const statusFilterValues = statusValues
+        .filter((status): status is string => Boolean(status))
+        .flatMap((status) => checkupStatusFilterValues(status));
+    const whereFilters = [eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId)];
+    if (statusFilterValues.length > 0) whereFilters.push(inArray(checkups.status, statusFilterValues));
+    if (filters.dateFrom) whereFilters.push(gte(checkups.date, filters.dateFrom));
+    if (filters.dateTo) whereFilters.push(lte(checkups.date, filters.dateTo));
+
+    const query = dbServer
+        .select({ checkup: checkups })
+        .from(checkups)
+        .innerJoin(patientsToAmbulatories, eq(checkups.patientId, patientsToAmbulatories.patientId))
+        .where(and(...whereFilters))
+        .orderBy(asc(checkups.date));
 
     const rows = filters.limit ? await query.limit(filters.limit) : await query;
     return rows.map((row) => toCheckupSummary(row.checkup));

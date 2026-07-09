@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.16.0
-  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, diary, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
+  version: 1.17.0
+  summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
     Current thin slice covers stable patient reads plus compare-on-write patient
@@ -1193,6 +1193,14 @@ paths:
           description: Include soft-deleted patients when set to `true`.
           schema:
             type: boolean
+        - name: include
+          in: query
+          required: false
+          description: Add sealed diagnoses to each summary when set to `diagnoses`.
+          schema:
+            type: string
+            enum:
+              - diagnoses
       responses:
         '200':
           description: Read-only scoped patient summaries from the paired node.
@@ -1249,6 +1257,127 @@ paths:
                 $ref: '#/components/schemas/CreatedVersionedResource'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/checkups:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkScopedCheckups
+      summary: List cross-patient checkups through the paired home-base data plane
+      description: |
+        Returns read-only checkups for patients in the effective ambulatory scope,
+        ordered by date ascending. Requires
+        `network.replica.readonly-agenda`, paired client credentials, and an
+        operator session. Filters and ordering use plaintext columns only; notes
+        remain opaque ciphertext for client-side decryption.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum result count, default 200 and capped at 500.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: status
+          in: query
+          required: false
+          description: Repeatable plaintext checkup status filter.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Read-only ambulatory-scoped checkups from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CheckupDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/entries:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkScopedEntries
+      summary: List cross-patient clinical diary entries through the paired home-base data plane
+      description: |
+        Returns read-only clinical diary entries for patients in the effective
+        ambulatory scope, including soft-deleted rows and ordered by date
+        descending. Requires `network.replica.readonly-clinical-diary-global`,
+        paired client credentials, and an operator session. Sealed title,
+        content, metadata, attachments, and deletion reason remain opaque
+        ciphertext for client-side decryption.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum result count, default 50 and capped at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: type
+          in: query
+          required: false
+          description: Plaintext entry type filter.
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Read-only ambulatory-scoped entries from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EntryDetail'
         '401':
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
@@ -3803,6 +3932,10 @@ components:
             - string
             - 'null'
           format: date-time
+        diagnoses:
+          type:
+            - string
+            - 'null'
     PatientDetail:
       type: object
       additionalProperties: false

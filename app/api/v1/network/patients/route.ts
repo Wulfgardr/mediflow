@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     }
 
     const includeDeleted = new URL(request.url).searchParams.get('includeDeleted') === 'true';
+    const includeDiagnoses = new URL(request.url).searchParams.get('include') === 'diagnoses';
     if (includeDeleted && !pairedClient.grantedCapabilities.includes(NETWORK_PATIENT_LIFECYCLE_CAPABILITY)) {
         return forbiddenResponse();
     }
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Network scope unavailable' }, { status: 403 });
         }
 
-        const result = await listNetworkScopedPatients(scopeAmbulatoryId, { includeDeleted });
+        const result = await listNetworkScopedPatients(scopeAmbulatoryId, { includeDeleted, includeDiagnoses });
         return NextResponse.json(result);
     } catch (error) {
         console.error('API GET /api/v1/network/patients error:', error);
