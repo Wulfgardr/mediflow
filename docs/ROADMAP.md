@@ -130,9 +130,9 @@ testato anche su Linux/Windows.
 * **Gate tri-OS**: Linux, macOS e Windows costruiscono e testano il core
   condiviso in CI. Questo prova la direzione di portabilita, ma non equivale a
   parity applicativa Windows/Linux.
-* **OSS export piu disciplinato**: l'export pubblico resta applicativo e
-  prodotto-centrico; materiali di coordinamento, analisi interne, workspace
-  privati e artifact temporanei restano esclusi.
+* **Convergenza pubblica completata**: questo punto storico sull'export OSS e
+  superato da `WUL-477`; la repository pubblica e ora l'unica fonte operativa,
+  mentre materiali sensibili e artifact temporanei restano fuori da Git.
 
 > [!WARNING]
 > La 0.7.1 va taggata solo dopo merge del ramo Apple/native, CI verde sul
@@ -144,7 +144,8 @@ testato anche su Linux/Windows.
 La lettura operativa piu completa del ciclo post-v0.7.2 e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
-boundary, document intelligence, home-base, Apple clients e split private/OSS.
+boundary, document intelligence, home-base, Apple clients e governance della
+repository pubblica.
 
 ### Modalita network home-base
 

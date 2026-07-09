@@ -14,8 +14,9 @@ read_when:
 >
 > Per i principi stabili prevalgono sempre [ARCHITECTURE.md](../ARCHITECTURE.md)
 > e [SECURITY.md](../SECURITY.md). Per il flusso operativo end-to-end prevale
-> [docs/walkthrough.md](./walkthrough.md). Le priorita operative a breve restano
-> nel piano engineering del workspace sorgente.
+> [docs/walkthrough.md](./walkthrough.md). Per la governance della repository
+> prevalgono [AGENTS.md](../AGENTS.md) e
+> [docs/repository-topology.md](./repository-topology.md).
 
 Ultimo aggiornamento: 2026-07-09 (`v0.7.2` mainline)
 
@@ -43,6 +44,9 @@ La fotografia corrente e questa:
   descrivere l'intero file SQLite come completamente zero-knowledge finché
   identificativi, metadati e backup non sono coperti dallo stesso perimetro
   verificato.
+- **Repository operativa**: `Wulfgardr/mediflow` pubblica e l'unica fonte per
+  sviluppo e release; la precedente repository privata e archiviata e gli
+  artefatti sensibili restano fuori da Git.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
 - **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
@@ -360,46 +364,39 @@ non scrive dati paziente e non cambia il default local-first.
 ### 6.1 Percorso consigliato per capire tutto
 
 1. [README.md](../README.md): ingresso prodotto.
-2. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): lettura completa
+2. [AGENTS.md](../AGENTS.md): regole operative e repository canonica.
+3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): lettura completa
    dello stato corrente.
-3. [ARCHITECTURE.md](../ARCHITECTURE.md): principi stabili.
-4. [SECURITY.md](../SECURITY.md): threat model, privacy, logging e redazione.
-5. [docs/walkthrough.md](./walkthrough.md): flusso end-to-end.
-6. [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md): percorsi dati
+4. [ARCHITECTURE.md](../ARCHITECTURE.md): principi stabili.
+5. [SECURITY.md](../SECURITY.md): threat model, privacy, logging e redazione.
+6. [docs/walkthrough.md](./walkthrough.md): flusso end-to-end.
+7. [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md): percorsi dati
    e trust boundaries.
-7. [docs/README.md](./README.md): mappa canonica e fonti autorevoli per tema.
-8. [docs/markdown-index.md](./markdown-index.md): inventario completo.
-9. [docs/adr/README.md](./adr/README.md): decisioni architetturali.
-10. Piano engineering privato: priorita operative a breve, disponibile solo nel
-    workspace sorgente quando presente.
+8. [docs/repository-topology.md](./repository-topology.md): governance della
+   repository e confine Git/fuori-Git.
+9. [docs/README.md](./README.md): mappa canonica e fonti autorevoli per tema.
+10. [docs/markdown-index.md](./markdown-index.md): inventario completo.
+11. [docs/adr/README.md](./adr/README.md): decisioni architetturali.
 
-### 6.2 Documenti pubblici vs documenti privati
+### 6.2 Repository pubblica e artefatti locali
 
-Il workspace sorgente puo contenere:
-
-- piani operativi a breve;
-- attribution agentica;
-- playbook interni di delivery e tracciabilita;
-- runbook interni di benchmark e shadow evaluation;
-- riferimenti a vault o workspace locali privati, sempre senza PHI in Git.
-
-La repo OSS deve contenere:
+La repository pubblica `Wulfgardr/mediflow` contiene tutto cio che serve allo
+sviluppo e al rilascio del progetto:
 
 - prodotto e installazione;
 - architettura e sicurezza;
 - roadmap pubblica;
 - FAQ;
-- walkthrough e documenti canonici non interni;
-- ADR pubblicabili;
-- script runtime necessari alla app nuda.
+- walkthrough, ADR e documenti canonici;
+- regole agentiche, workflow contributivo e script necessari allo sviluppo.
 
-La repo OSS non deve contenere:
+Restano fuori da Git, senza usare la repository privata archiviata come
+destinazione alternativa:
 
 - database reali o runtime artifacts;
 - `medical.db`, `.sqlite`, `.sqlite3`, `.next`, `tmp-*`;
-- piani interni e attribution agentica;
-- riferimenti a tracker interni, branch interni, coordinamento agentico o materiali non
-  esportabili;
+- PHI/PII, credenziali, log o screenshot con dati clinici;
+- note personali di account, billing o limiti di spesa;
 - documenti riservati o fonti autenticate del corpus SISS/FSE.
 
 ---
@@ -567,7 +564,7 @@ Quando cambia una feature runtime:
 - aggiorna [docs/README.md](./README.md) se cambia la fonte autorevole;
 - aggiorna [docs/markdown-index.md](./markdown-index.md) se aggiungi, rimuovi o
   rinomini Markdown;
-- aggiorna il piano engineering privato se cambia priorita operativa.
+- aggiorna issue e roadmap pubbliche se cambia una priorita operativa.
 
 Quando cambia un boundary:
 
@@ -576,11 +573,14 @@ Quando cambia un boundary:
 - verifica impatto OpenAPI se riguarda `/api/v1`;
 - dichiara esplicitamente cosa resta fuori scope.
 
-Quando esporti OSS:
+Quando cambia la topologia della repository:
 
-  destinazione di prova;
-- verifica che non compaiano DB, runtime artifacts o documenti interni;
-- cerca termini interni e riferimenti privati;
+- aggiorna [AGENTS.md](../AGENTS.md) e
+  [docs/repository-topology.md](./repository-topology.md);
+- verifica che remote, branch, PR, tag e release puntino alla repository
+  pubblica canonica;
+- verifica che DB, runtime artifact, credenziali e materiali riservati restino
+  fuori da Git.
 
 ---
 

@@ -44,6 +44,16 @@ Non nasce per sostituire i canali istituzionali, né per promettere integrazioni
 che non sono ancora dimostrate. Nasce per dare ordine, continuità e controllo al
 lavoro clinico di tutti i giorni.
 
+## Repository canonica
+
+Lo sviluppo di MediFlow avviene interamente in questa repository pubblica.
+Branch, pull request, issue, tag e release fanno capo a
+[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow); la precedente
+repository privata e archiviata e non costituisce piu una fonte operativa.
+Gli artefatti sensibili o locali restano fuori da Git secondo
+[`SECURITY.md`](./SECURITY.md) e
+[`docs/repository-topology.md`](./docs/repository-topology.md).
+
 ## Come si presenta
 
 <img src="./screenshots/01-worklist.png" alt="Cockpit Kree8: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
