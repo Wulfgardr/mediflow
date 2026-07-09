@@ -182,6 +182,54 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         HomeBaseLoginResult(sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil)
     }
 
+    func changePin(
+        currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func logout(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func updateProfile(
+        userId: String, displayName: String, ambulatoryName: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, id: payload.id ?? "amb", version: 1)
+    }
+
+    func updateAmbulatory(
+        id: String, payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, version: payload.expectedVersion + 1)
+    }
+
+    func deleteAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true)
+    }
+
+    func clearAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, version: expectedVersion + 1)
+    }
+
     func fetchPatients(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,

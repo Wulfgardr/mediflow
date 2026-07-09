@@ -58,11 +58,72 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         try await fallback.login(username: username, password: password)
     }
 
+    public func changePin(
+        currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.changePin(
+            currentPin: currentPin,
+            newPin: newPin,
+            encryptedMasterKey: encryptedMasterKey,
+            salt: salt,
+            credentials: credentials,
+            sessionCookie: sessionCookie
+        )
+    }
+
+    public func logout(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.logout(credentials: credentials, sessionCookie: sessionCookie)
+    }
+
+    public func updateProfile(
+        userId: String, displayName: String, ambulatoryName: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        try await fallback.updateProfile(
+            userId: userId,
+            displayName: displayName,
+            ambulatoryName: ambulatoryName,
+            credentials: credentials,
+            sessionCookie: sessionCookie
+        )
+    }
+
     public func fetchNetworkAmbulatories(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [NetworkAmbulatorySummary] {
         try await fallback.fetchNetworkAmbulatories(
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    public func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        throw HomeBaseClientError.localAuthorityUnsupported("Creazione ambulatorio")
+    }
+
+    public func updateAmbulatory(
+        id: String, payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        throw HomeBaseClientError.localAuthorityUnsupported("Aggiornamento ambulatorio")
+    }
+
+    public func deleteAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        throw HomeBaseClientError.localAuthorityUnsupported("Eliminazione ambulatorio")
+    }
+
+    public func clearAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        throw HomeBaseClientError.localAuthorityUnsupported("Pulizia ambulatorio")
     }
 
     /* @Codex */
