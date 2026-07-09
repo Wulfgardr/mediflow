@@ -77,10 +77,9 @@ La fotografia corrente e questa:
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
   integrazione regionale nativa certificata dichiarata senza `SSI/A2A` e scenari
   approvati.
-- **OSS**: la repo pubblica deve restare prodotto-centrica, senza materiale
-  interno di coordinamento, analisi, piani privati o runtime data. I crediti
-  pubblici agli strumenti di sviluppo assistito restano ammessi se separati dai
-  materiali operativi interni.
+- **Repository pubblica**: contiene prodotto, documentazione e governance di
+  sviluppo. PHI/PII, credenziali, runtime data, corpus autenticati e note
+  personali di account restano fuori da Git.
 
 ---
 
@@ -637,5 +636,6 @@ Fermati e apri/spezza workstream se:
 
 - il diff supera un singolo tema;
 - una doc pubblica richiede materiale privato per restare comprensibile;
-- una modifica OSS trascina riferimenti interni;
+- una modifica alla repository trascina dati o artefatti che devono restare
+  fuori da Git;
 - il worktree contiene cambi non correlati.

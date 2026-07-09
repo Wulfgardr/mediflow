@@ -49,7 +49,7 @@ lavoro clinico di tutti i giorni.
 Lo sviluppo di MediFlow avviene interamente in questa repository pubblica.
 Branch, pull request, issue, tag e release fanno capo a
 [`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow); la precedente
-repository privata e archiviata e non costituisce piu una fonte operativa.
+repository privata è archiviata e non costituisce più una fonte operativa.
 Gli artefatti sensibili o locali restano fuori da Git secondo
 [`SECURITY.md`](./SECURITY.md) e
 [`docs/repository-topology.md`](./docs/repository-topology.md).
