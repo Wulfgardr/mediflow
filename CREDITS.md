@@ -135,9 +135,16 @@ Fallback OCR disponibile solo su macOS, framework di sistema Apple.
 
 Strumenti del processo di scrittura del codice, non fonti del prodotto.
 
+[![Codex: OpenAI](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)
 [![Claude Code: Anthropic](https://img.shields.io/badge/Claude%20Code-Anthropic-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+[![Repo Prompt CE](https://img.shields.io/badge/contesto-Repo%20Prompt%20CE-2ea043)](https://github.com/repoprompt/repoprompt-ce)
+[![CodexBar](https://img.shields.io/badge/uso-CodexBar-181717?logo=github&logoColor=white)](https://github.com/steipete/CodexBar)
 
-seconda corsia di review e supporto.
+Codex e Claude Code sono i due copiloti: Codex come corsia principale di implementazione e verifica, Claude Code come seconda corsia di review e supporto.
+
+- **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, per costruire il contesto giusto da dare agli agenti e far dialogare più modelli sullo stesso problema.
+- **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): conteggio locale dell'uso dei modelli, da cui vengono i numeri nel README.
+- **[steipete/agent-scripts](https://github.com/steipete/agent-scripts)** (MIT): parte del flusso di review deriva da qui.
 
 ---
 
