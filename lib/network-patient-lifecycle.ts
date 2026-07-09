@@ -64,7 +64,7 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
 }
 
-function isSealedValue(value: unknown): boolean {
+export function isSealedValue(value: unknown): boolean {
     return typeof value === 'string' && value.startsWith('ENC:');
 }
 
