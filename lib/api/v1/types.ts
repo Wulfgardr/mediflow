@@ -36,6 +36,10 @@ export type PatientDetail = {
     monitoringProfile: string | null;
     /* @Codex */
     statusReason: string | null;
+    /* @Codex */
+    archiveReason: string | null;
+    /* @Codex */
+    archiveNote: string | null;
     notes: string | null;
     /* @Codex */
     aiSummary: string | null;

@@ -152,6 +152,8 @@ export function normalizePatientUpdateInput(
         notes: normalizeNullableStringField(body.notes),
         monitoringProfile: normalizeNullableStringField(body.monitoringProfile),
         statusReason: normalizeNullableStringField(body.statusReason),
+        archiveReason: normalizeNullableStringField(body.archiveReason),
+        archiveNote: normalizeNullableStringField(body.archiveNote),
         aiSummary: normalizeNullableStringField(body.aiSummary),
         aiSummaryGeneratedAt: normalizeOptionalTimestampField(body.aiSummaryGeneratedAt),
         aiSummaryContextHash: normalizeNullableStringField(body.aiSummaryContextHash),
@@ -174,6 +176,11 @@ export function normalizePatientUpdateInput(
     const normalizedDiagnoses = normalizeStructuredPatientField(body.diagnoses, { allowUndefined: true });
     if (normalizedDiagnoses !== undefined) {
         updateValues.diagnoses = normalizedDiagnoses;
+    }
+
+    if (body.isArchived === false) {
+        updateValues.archiveReason = null;
+        updateValues.archiveNote = null;
     }
 
     if (!hasPatientUpdatableField(updateValues)) {
