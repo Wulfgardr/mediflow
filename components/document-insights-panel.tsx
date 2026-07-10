@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
-import { db, DocumentInsight, Patient } from '@/lib/db';
+import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
+import { notifyDbChange } from '@/lib/live-query';
+import { persistDocumentInsightsArchive } from '@/lib/domain/documents/document-insights-archive';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -52,13 +54,21 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const persistArchive = async (nextInsights: DocumentInsight[], action: string | 'all') => {
+        if (typeof patient.version !== 'number') {
+            showToast({
+                tone: 'error',
+                title: 'Versione paziente non disponibile',
+                description: 'Ricarica la pagina e riprova.'
+            });
+            return;
+        }
+
         setBusyAction(action);
 
         try {
-            await db.patients.update(patient.id, {
-                documentInsights: nextInsights,
-                updatedAt: new Date()
-            });
+            await persistDocumentInsightsArchive({
+                updatePatient: db.patients.update.bind(db.patients),
+            }, patient, nextInsights);
 
             setExpandedId((current) => nextInsights.some((insight) => insight.id === current) ? current : null);
 
@@ -74,6 +84,15 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             }
         } catch (error) {
             console.error('[DocumentInsightsPanel] Archive update failed', error);
+            if (error instanceof ApiConflictError) {
+                notifyDbChange('patients');
+                showToast({
+                    tone: 'error',
+                    title: 'Archivio non aggiornato',
+                    description: 'Il paziente è stato aggiornato altrove. La scheda viene ricaricata, poi riprova.'
+                });
+                return;
+            }
             showToast({
                 tone: 'error',
                 title: 'Aggiornamento non riuscito',
