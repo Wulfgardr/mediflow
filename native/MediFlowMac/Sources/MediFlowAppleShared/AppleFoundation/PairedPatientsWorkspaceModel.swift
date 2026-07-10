@@ -44,13 +44,37 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var pendingFHIRWarningValidation: HomeBaseValidatePatientExportResponse?
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
-    @Published var newEntryContent = ""
+    // S7 (Wave 5, D10/D11): the editor's typed model, never a raw string. The
+    // content sealed on save is always ClinicalRichText.render(document:) of
+    // this model (see createEntryForSelectedPatient/updateEditingEntry) so no
+    // save path can bypass the transcoder. The 2000-char limit is gone (web
+    // parity, D11); canCreateEntry/canUpdateEditingEntry gate on emptiness only.
+    @Published var newEntryEditorDocument = ClinicalRichTextEditorDocument()
+    // S7 (D4, ADR 0076 Classe B): ids of already-uploaded patient attachments to
+    // reference from this entry. Validated against model.attachments via
+    // HomeBaseAttachmentReferenceValidator immediately before sealing.
+    @Published var newEntryAttachmentIds: Set<String> = []
+    // S7 (D5, ADR 0076 Classe E): system dictation transcript -> compute
+    // visit-draft-only, never auto-saved. See computeVisitDraftForNewEntry.
+    @Published var newEntryVisitTranscript = ""
+    @Published private(set) var newEntryVisitDraftResponse: HomeBaseVisitDraftResponse?
+    // Mandatory review gate (ADR 0073 form_prefill_only): flips back to false
+    // every time a NEW draft is computed, so a stale review never authorizes a
+    // later, different draft.
+    @Published var newEntryVisitDraftReviewed = false
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
-    @Published var editEntryContent = ""
+    @Published var editEntryEditorDocument = ClinicalRichTextEditorDocument()
+    @Published var editEntryAttachmentIds: Set<String> = []
     private var editingEntryOriginalContent: String?
+    // Lets updateEditingEntry() reseal attachment references ONLY when the
+    // operator actually changed the selection: model.attachments may still be
+    // empty this session (Documenti section never opened, or the capability
+    // isn't granted), which would otherwise make every edit of an entry that
+    // already references attachments fail re-validation for no reason.
+    private var editingEntryOriginalAttachmentIds: Set<String>?
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
@@ -891,8 +915,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         let title = newEntryTitle.trimmedOrNil
         let type = newEntryType.rawValue
-        let content = newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Non-negotiable (D11): the sealed content is ALWAYS the transcoder's
+        // render of the editor model, never raw operator input.
+        let content = newEntryEditorDocument.renderedHTML
+        let attachmentIds = Array(newEntryAttachmentIds)
+        let patientAttachmentIds = Set(self.attachments.map(\.id))
         await runTask {
+            guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
+            let attachmentReferences = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
+                patientAttachmentIds: patientAttachmentIds,
+                referencedAttachmentIds: attachmentIds,
+                masterKey: masterKey
+            )
             _ = try await self.makeClient().createEntry(
                 patientId: patientId,
                 payload: HomeBaseEntryCreatePayload(
@@ -900,7 +934,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     type: type,
                     title: try self.sealField(title),
                     date: Date(),
-                    content: try self.sealField(content) ?? ""
+                    content: try self.sealField(content) ?? "",
+                    attachmentReferences: attachmentReferences
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -908,7 +943,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )
             self.newEntryTitle = ""
             self.newEntryType = .note
-            self.newEntryContent = ""
+            self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
+            self.newEntryAttachmentIds = []
             self.newEntryDraftId = UUID().uuidString
             self.statusMessage = "Voce diario inviata all'home-base."
             do {
@@ -980,7 +1016,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editingEntryVersion = entry.version
         editEntryTitle = entry.title
         editEntryType = PairedDiaryEntryType(rawValue: entry.type) ?? .note
-        editEntryContent = entry.content
+        // Existing voices open through the transcoder's parse (D11): any
+        // structure the editor's simpler model cannot represent losslessly
+        // (mixed inline styles, nested lists/blockquotes, an unclosed/crossed
+        // tag the web sanitizer preserved) degrades to a preserved, literal-text
+        // block instead of being silently rewritten or dropped.
+        editEntryEditorDocument = ClinicalRichTextEditorDocument.load(html: entry.content)
+        let originalAttachmentIds = Set(HomeBaseEntryAttachmentReferencesCodec.decode(entry.attachments))
+        editEntryAttachmentIds = originalAttachmentIds
+        editingEntryOriginalAttachmentIds = originalAttachmentIds
         editingEntryOriginalContent = entry.content
         statusMessage = "Modifica voce diario pronta."
     }
@@ -991,14 +1035,132 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editingEntryVersion = nil
         editEntryTitle = ""
         editEntryType = .note
-        editEntryContent = ""
+        editEntryEditorDocument = ClinicalRichTextEditorDocument()
+        editEntryAttachmentIds = []
         editingEntryOriginalContent = nil
+        editingEntryOriginalAttachmentIds = nil
     }
 
     /* @Codex */
     func insertNewEntrySOAPTemplate() {
-        newEntryContent = ClinicalSOAPTemplate.html
+        // Passes the template through the transcoder too (D11): parse it into
+        // the same editor model as any other content, rather than assigning raw
+        // HTML into what used to be a plain-text field.
+        newEntryEditorDocument = ClinicalRichTextEditorDocument.load(html: ClinicalSOAPTemplate.html)
         statusMessage = "Template S/O/A/P inserito."
+    }
+
+    // MARK: - S7 (Wave 5): attachment references in entry, visit-draft flow
+
+    /// D4/D7-bis: the reference picker only lists attachments the patient
+    /// actually has loaded (model.attachments, S6). Toggling here never talks
+    /// to the network; ownership is (re-)validated right before sealing in
+    /// createEntryForSelectedPatient/updateEditingEntry.
+    func toggleNewEntryAttachmentReference(_ attachmentId: String) {
+        if newEntryAttachmentIds.contains(attachmentId) {
+            newEntryAttachmentIds.remove(attachmentId)
+        } else {
+            newEntryAttachmentIds.insert(attachmentId)
+        }
+    }
+
+    func clearNewEntryAttachmentReferences() {
+        newEntryAttachmentIds = []
+    }
+
+    func toggleEditEntryAttachmentReference(_ attachmentId: String) {
+        if editEntryAttachmentIds.contains(attachmentId) {
+            editEntryAttachmentIds.remove(attachmentId)
+        } else {
+            editEntryAttachmentIds.insert(attachmentId)
+        }
+    }
+
+    func clearEditEntryAttachmentReferences() {
+        editEntryAttachmentIds = []
+    }
+
+    /// Resolves an entry's referenced attachment ids (decrypted, D4) against
+    /// the currently loaded patient attachment list (S6) for display: decrypted
+    /// name + type, the same pairing the web timeline-entry-card shows. An id
+    /// that does not resolve (attachments not loaded yet this session, or the
+    /// attachment was removed) is silently omitted rather than shown as a raw
+    /// id or a fabricated placeholder.
+    func referencedAttachments(for entry: HomeBaseEntrySummary) -> [HomeBaseAttachmentSummary] {
+        let ids = HomeBaseEntryAttachmentReferencesCodec.decode(entry.attachments)
+        guard !ids.isEmpty else { return [] }
+        let byId = Dictionary(uniqueKeysWithValues: attachments.map { ($0.id, $0) })
+        return ids.compactMap { byId[$0] }
+    }
+
+    /// D5/ADR 0076 Classe E: transcript char limit mirrors the web route's own
+    /// limit (lib/visit-draft-service.ts MAX_VISIT_DRAFT_TRANSCRIPT_CHARS) so the
+    /// operator gets the same honest ceiling before sending, not just a 413
+    /// after the fact.
+    static let maxVisitDraftTranscriptChars = 12_000
+
+    var canComputeVisitDraft: Bool {
+        selectedPatient != nil
+            && sessionCookie != nil
+            && pairedCredentials != nil
+            && connectionState == .pairedOnline
+            && !newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && newEntryVisitTranscript.count <= Self.maxVisitDraftTranscriptChars
+            && !isWorking
+    }
+
+    /// Compute-only (Classe E): no persistence, no patientId sent (the web
+    /// route ignores it too, D5), nothing writes here. Every fresh computation
+    /// resets the mandatory review flag so a stale review can never authorize
+    /// a different draft's insertion.
+    func computeVisitDraftForNewEntry() async {
+        guard canComputeVisitDraft else { return }
+        guard let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let transcript = newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runTask {
+            let response = try await self.makeClient().computeVisitDraft(
+                input: HomeBaseVisitDraftInput(transcript: transcript),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.newEntryVisitDraftResponse = response
+            self.newEntryVisitDraftReviewed = false
+            self.statusMessage = "Bozza visita elaborata: rivedi il contenuto prima di inserirlo nella voce."
+        }
+    }
+
+    func discardVisitDraft() {
+        newEntryVisitDraftResponse = nil
+        newEntryVisitDraftReviewed = false
+    }
+
+    var canInsertVisitDraftIntoNewEntry: Bool {
+        newEntryVisitDraftResponse != nil && newEntryVisitDraftReviewed
+    }
+
+    /// ADR 0073 form_prefill_only: without the explicit review checkbox this is
+    /// a no-op, exactly like the web ("senza spunta niente inserimento"). Only
+    /// the S/O/A/P section LINES are turned into paragraphs (via the
+    /// transcoder, so any HTML-looking text in the transcript is escaped, never
+    /// interpreted); medication candidates and safety stay display-only in the
+    /// review UI. This only edits the in-memory editor document: saving still
+    /// requires the operator to separately tap "Salva voce".
+    func insertVisitDraftIntoNewEntry() {
+        guard canInsertVisitDraftIntoNewEntry, let draft = newEntryVisitDraftResponse else { return }
+        let draftBlocks = ClinicalRichTextEditorDocument.blocksFromVisitDraftSections(draft.sections)
+        guard !draftBlocks.isEmpty else {
+            errorMessage = "La bozza non contiene righe da inserire."
+            return
+        }
+        newEntryEditorDocument.blocks.append(contentsOf: draftBlocks)
+        newEntryVisitTranscript = ""
+        newEntryVisitDraftResponse = nil
+        newEntryVisitDraftReviewed = false
+        statusMessage = "Bozza inserita nella voce: rivedi il contenuto prima di salvare."
     }
 
     // ADR 0071 update: patient CREATE still works through the on-device local
@@ -1468,11 +1630,31 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let title = editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let content = editEntryContent == editingEntryOriginalContent
-            ? nil
-            : editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Non-negotiable (D11): re-derive content from the transcoder's render
+        // of the editor model, compared against the ORIGINAL decrypted HTML to
+        // decide whether it actually changed (omit = untouched field).
+        let renderedContent = editEntryEditorDocument.renderedHTML
+        let content = renderedContent == editingEntryOriginalContent ? nil : renderedContent
         let type = editEntryType.rawValue
+        // Only touch the sealed attachments field when the operator actually
+        // changed the selection in this session (see
+        // editingEntryOriginalAttachmentIds above): otherwise omit it so the
+        // update never depends on model.attachments having been loaded.
+        let attachmentIdsChanged = editEntryAttachmentIds != (editingEntryOriginalAttachmentIds ?? [])
+        let attachmentIds = Array(editEntryAttachmentIds)
+        let patientAttachmentIds = Set(self.attachments.map(\.id))
         await runTask {
+            let attachmentReferences: HomeBaseSealedEntryAttachmentReferences?
+            if attachmentIdsChanged {
+                guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
+                attachmentReferences = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
+                    patientAttachmentIds: patientAttachmentIds,
+                    referencedAttachmentIds: attachmentIds,
+                    masterKey: masterKey
+                )
+            } else {
+                attachmentReferences = nil
+            }
             let acknowledgement = try await self.makeClient().updateEntry(
                 patientId: patientId,
                 entryId: entryId,
@@ -1480,7 +1662,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     version: version,
                     type: type,
                     title: try self.sealField(title),
-                    content: content == nil ? nil : try self.sealField(content)
+                    content: content == nil ? nil : try self.sealField(content),
+                    attachmentReferences: attachmentReferences
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -2799,7 +2982,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             fseDocumentValidationTargetLabel = nil
             newEntryTitle = ""
             newEntryType = .note
-            newEntryContent = ""
+            newEntryEditorDocument = ClinicalRichTextEditorDocument()
+            newEntryAttachmentIds = []
+            newEntryVisitTranscript = ""
+            newEntryVisitDraftResponse = nil
+            newEntryVisitDraftReviewed = false
             newEntryDraftId = UUID().uuidString
             cancelEditingEntry()
             resetNewTherapyForm()
@@ -3623,8 +3810,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && sessionCookie != nil
             && pairedCredentials != nil
             && connectionState == .pairedOnline
-            && !newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && newEntryContent.count <= 2000
+            && !newEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
     }
 
@@ -3666,8 +3852,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !editEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && editEntryContent.count <= 2000
+            && !editEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
     }
 

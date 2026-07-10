@@ -1205,6 +1205,26 @@ struct PairedPatientsWorkspaceView: View {
                             .font(.caption)
                             .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
                             .lineLimit(4)
+                        // S7 (D4): resolves the entry's referenced attachment ids
+                        // against the loaded patient attachment list (S6), same
+                        // pairing as the web timeline-entry-card. An id that does
+                        // not resolve (Documenti section not loaded yet, or the
+                        // attachment is gone) is simply omitted, never shown raw.
+                        let entryAttachments = model.referencedAttachments(for: entry)
+                        if !entryAttachments.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: "paperclip")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                ForEach(entryAttachments) { attachment in
+                                    Text("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
+                        }
                         if let deletedAt = entry.deletedAt {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Eliminata il \(Self.entryDateFormatter.string(from: deletedAt))")
@@ -1266,17 +1286,19 @@ struct PairedPatientsWorkspaceView: View {
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("homebase-edit-entry-type-picker")
-                    TextEditor(text: $model.editEntryContent)
-                        .frame(minHeight: 90)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(PlatformColors.separator, lineWidth: 1)
+                    ClinicalRichTextEditorView(
+                        document: $model.editEntryEditorDocument,
+                        accessibilityPrefix: "homebase-edit-entry-content"
+                    )
+                    .accessibilityIdentifier("homebase-edit-entry-content-field")
+                    if capabilities.hasCapability("network.replica.readonly-documents") {
+                        EntryAttachmentReferencePicker(
+                            attachments: model.attachments,
+                            selectedIds: $model.editEntryAttachmentIds,
+                            accessibilityPrefix: "homebase-edit-entry-attachments"
                         )
-                        .accessibilityIdentifier("homebase-edit-entry-content-field")
+                    }
                     HStack(spacing: 8) {
-                        Text("\(model.editEntryContent.count)/2000")
-                            .font(.caption2)
-                            .foregroundStyle(model.editEntryContent.count <= 2000 ? Color.secondary : Color.red)
                         Spacer(minLength: 8)
                         Button("Annulla") {
                             model.cancelEditingEntry()
@@ -1314,7 +1336,7 @@ struct PairedPatientsWorkspaceView: View {
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("homebase-new-entry-type-picker")
                 Button {
-                    if model.newEntryContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if model.newEntryEditorDocument.isEffectivelyEmpty {
                         model.insertNewEntrySOAPTemplate()
                     } else {
                         confirmsReplacingEntryTemplate = true
@@ -1325,16 +1347,27 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.caption)
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("homebase-new-entry-soap-template-button")
-                TextEditor(text: $model.newEntryContent)
-                    .frame(minHeight: 90)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(PlatformColors.separator, lineWidth: 1)
+                ClinicalRichTextEditorView(
+                    document: $model.newEntryEditorDocument,
+                    accessibilityPrefix: "homebase-new-entry-content"
+                )
+                .accessibilityIdentifier("homebase-new-entry-content-field")
+                if capabilities.hasCapability("network.replica.readonly-documents") {
+                    Divider()
+                    EntryAttachmentReferencePicker(
+                        attachments: model.attachments,
+                        selectedIds: $model.newEntryAttachmentIds,
+                        accessibilityPrefix: "homebase-new-entry-attachments"
                     )
-                    .accessibilityIdentifier("homebase-new-entry-content-field")
-                Text("\(model.newEntryContent.count)/2000")
-                    .font(.caption2)
-                    .foregroundStyle(model.newEntryContent.count <= 2000 ? Color.secondary : Color.red)
+                }
+                if capabilities.hasCapability("network.compute.visit-draft") {
+                    Divider()
+                    VisitDraftComposerView(model: model)
+                } else if let message = capabilities.unavailableMessage(for: "network.compute.visit-draft") {
+                    Text(message)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Button {
                     Task { await model.createEntryForSelectedPatient() }
                 } label: {
@@ -1346,6 +1379,13 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+        // S7 (D4): loads the patient's attachment list so the reference picker
+        // and the entry rows' resolved attachment chips have names to show,
+        // even if the operator never opens the separate Documenti section.
+        .task(id: model.selectedPatient?.id) {
+            guard capabilities.hasCapability("network.replica.readonly-documents") else { return }
+            await model.loadSelectedPatientAttachments()
         }
     }
 
