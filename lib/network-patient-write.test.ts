@@ -66,26 +66,36 @@ function resetDatabase(): void {
     dbServer.insert(patientsToAmbulatories).values([{ patientId: PATIENT_ID, ambulatoryId: SCOPE_AMBULATORY }]).run();
 }
 
-test('network update rejects plaintext archive reason and note', async () => {
+test('network update rejects plaintext sensitive fields', async () => {
     resetDatabase();
-    for (const body of [
-        { version: 3, archiveReason: 'motivo in chiaro' },
-        { version: 3, archiveNote: 'nota in chiaro' },
+    for (const field of [
+        'address',
+        'phone',
+        'caregiver',
+        'exemptions',
+        'diagnoses',
+        'notes',
+        'statusReason',
+        'archiveReason',
+        'archiveNote',
     ]) {
+        const body = { version: 3, [field]: 'valore in chiaro' };
         const result = await updateNetworkScopedPatient(makeContext(), body);
         assert.equal(result.status, 400);
-        assert.deepEqual(result.value, { error: 'Network update requires sealed archive fields' });
+        assert.deepEqual(result.value, { error: 'Network update requires sealed sensitive fields' });
     }
     const row = dbServer.select().from(patients).all()[0];
     assert.equal(row.archiveReason, 'ENC:iv:previous-reason');
     assert.equal(row.version, 3);
 });
 
-test('network update accepts sealed archive fields and null clearing', async () => {
+test('network update accepts sealed sensitive fields and null clearing', async () => {
     resetDatabase();
     const sealed = await updateNetworkScopedPatient(makeContext(), {
         version: 3,
         isArchived: true,
+        phone: 'ENC:iv:new-phone',
+        diagnoses: 'ENC:iv:new-diagnoses',
         archiveReason: 'ENC:iv:new-reason',
         archiveNote: 'ENC:iv:new-note',
     });
@@ -93,6 +103,8 @@ test('network update accepts sealed archive fields and null clearing', async () 
     let row = dbServer.select().from(patients).all()[0];
     assert.equal(row.archiveReason, 'ENC:iv:new-reason');
     assert.equal(row.archiveNote, 'ENC:iv:new-note');
+    assert.equal(row.phone, 'ENC:iv:new-phone');
+    assert.equal(row.diagnoses, 'ENC:iv:new-diagnoses');
     assert.equal(row.version, 4);
 
     const cleared = await updateNetworkScopedPatient(makeContext(), {

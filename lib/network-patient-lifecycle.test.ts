@@ -45,6 +45,25 @@ test('validateNetworkPatientCreateBody rejects plaintext sensitive create fields
     assert.deepEqual(result.value, { error: 'Network create requires sealed sensitive fields' });
 });
 
+test('validateNetworkPatientCreateBody rejects plaintext archive fields', () => {
+    for (const field of ['archiveReason', 'archiveNote']) {
+        const result = validateNetworkPatientCreateBody(
+            {
+                firstName: 'Ada',
+                lastName: 'Lovelace',
+                taxCode: 'LVLDAA',
+                [field]: 'valore in chiaro',
+            },
+            'amb-1',
+        );
+
+        assert.equal(result.ok, false);
+        if (result.ok) return;
+        assert.equal(result.status, 400);
+        assert.deepEqual(result.value, { error: 'Network create requires sealed sensitive fields' });
+    }
+});
+
 test('validateNetworkPatientCreateBody rejects AI and server-controlled fields', () => {
     const aiResult = validateNetworkPatientCreateBody(
         {
