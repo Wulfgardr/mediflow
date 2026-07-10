@@ -187,6 +187,7 @@ public struct AppleCapabilityLaneCard: View {
 
 public struct AppleFoundationMobileRootView: View {
     public let snapshot: AppleFoundationSnapshot
+    @ObservedObject private var appearance: AppleAppearanceStore
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -196,8 +197,9 @@ public struct AppleFoundationMobileRootView: View {
     @StateObject private var workspaceModel = PairedPatientsWorkspaceModel()
     @StateObject private var capabilitiesStore = ClinicalWorkspaceCapabilitiesStore()
 
-    public init(snapshot: AppleFoundationSnapshot) {
+    public init(snapshot: AppleFoundationSnapshot, appearance: AppleAppearanceStore) {
         self.snapshot = snapshot
+        _appearance = ObservedObject(wrappedValue: appearance)
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         _section = State(initialValue: launchOverrides.initialSection.map(ClinicalWorkspaceSection.init(legacy:)) ?? .patients)
     }
@@ -240,7 +242,9 @@ public struct AppleFoundationMobileRootView: View {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
-        .privacyShield()
+        .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
+        .respectsAppleMotionPreference()
+        .privacyShield(appearance: appearance)
     }
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
@@ -292,7 +296,11 @@ public struct AppleFoundationMobileRootView: View {
             ClinicalScalesWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
                 .accessibilityIdentifier("clinical-workspace-scales-view")
         case .settings:
-            SettingsWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+            SettingsWorkspaceView(
+                capabilities: capabilitiesStore,
+                workspaceModel: workspaceModel,
+                appearance: appearance
+            )
                 .accessibilityIdentifier("clinical-workspace-settings-view")
         case .overview:
             AppleFoundationOverviewView(snapshot: snapshot)
