@@ -75,6 +75,7 @@
     "test:ai-insight-settings": "node scripts/run-strip-types.mjs --test lib/ai-insight-settings.test.ts",
     "test:auth-lockout": "node scripts/run-strip-types.mjs --test lib/security/auth-lockout.test.ts",
     "test:clinical-rich-text": "node scripts/run-strip-types.mjs --test lib/clinical-rich-text.test.ts",
+    "generate:clinical-rich-text-fixtures": "node scripts/generate-clinical-rich-text-fixtures.mjs",
     "test:visit-transcript-draft": "node scripts/run-strip-types.mjs --test lib/visit-transcript-draft.test.ts",
     "test:patient-write-normalization": "node scripts/run-strip-types.mjs --test lib/patient-write-normalization.test.ts",
     "test:patient-ambulatory-membership": "bash scripts/patient-ambulatory-membership-test.sh",
