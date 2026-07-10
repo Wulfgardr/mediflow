@@ -136,6 +136,31 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(patients.first?.deletionReason, "ENC:iv:cipher")
     }
 
+    /* @Codex */
+    func testFetchPatientsIncludeDiagnosesPreservesCiphertextAndOptInDefault() async throws {
+        var requests = 0
+        let client = makeClient { request in
+            requests += 1
+            XCTAssertEqual(request.httpMethod, "GET")
+            let url = try XCTUnwrap(request.url)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if requests == 1 {
+                XCTAssertEqual(url.absoluteString, "https://localhost:3443/api/v1/network/patients?include=diagnoses")
+                return (response, Data(#"[{"id":"patient-1","firstName":"Anna","lastName":"Rossi","birthDate":"1970-01-01T00:00:00.000Z","taxCode":"RSSANN70A41F205X","isAdi":false,"isArchived":false,"version":2,"updatedAt":"2026-07-09T08:30:00Z","diagnoses":"ENC:iv:ciphertext"}]"#.utf8))
+            }
+            XCTAssertEqual(url.absoluteString, "https://localhost:3443/api/v1/network/patients")
+            return (response, Data(#"[{"id":"patient-1","firstName":"Anna","lastName":"Rossi","birthDate":"1970-01-01T00:00:00.000Z","taxCode":"RSSANN70A41F205X","isAdi":false,"isArchived":false,"version":2,"updatedAt":"2026-07-09T08:30:00Z"}]"#.utf8))
+        }
+
+        let withDiagnoses = try await client.fetchPatients(
+            credentials: creds, sessionCookie: cookie, ambulatoryId: nil, includeDiagnoses: true)
+        let withoutDiagnoses = try await client.fetchPatients(
+            credentials: creds, sessionCookie: cookie, ambulatoryId: nil, includeDiagnoses: false)
+
+        XCTAssertEqual(withDiagnoses.first?.diagnoses, "ENC:iv:ciphertext")
+        XCTAssertNil(withoutDiagnoses.first?.diagnoses)
+    }
+
     func testFetchPatientSurfacesHomeBaseStatusMessage() async {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -478,6 +503,33 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(entries.count, 1)
         XCTAssertEqual(entries.first?.id, "entry-1")
         XCTAssertEqual(entries.first?.version, 4)
+    }
+
+    /* @Codex */
+    func testFetchScopedEntriesUsesGlobalRouteAndTolerantDates() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/entries?type=note&dateFrom=2026-07-01T00:00:00Z&dateTo=2026-07-09T00:00:00Z&limit=100"
+            )
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"[{"id":"entry-1","patientId":"patient-1","type":"note","title":"Controllo","date":"2026-07-09T08:30:00.000Z","content":"ENC:iv:entry","setting":null,"metadata":null,"attachments":null,"deletedAt":"2026-07-09T09:00:00Z","deletionReason":"ENC:iv:reason","version":3,"createdAt":"2026-07-09T08:00:00Z","updatedAt":"2026-07-09T08:31:00.000Z"}]"#.utf8))
+        }
+
+        let entries = try await client.fetchScopedEntries(
+            type: "note",
+            dateFrom: Date(timeIntervalSince1970: 1_782_864_000),
+            dateTo: Date(timeIntervalSince1970: 1_783_555_200),
+            limit: 100,
+            credentials: creds,
+            sessionCookie: cookie,
+            ambulatoryId: nil
+        )
+
+        XCTAssertEqual(entries.first?.id, "entry-1")
+        XCTAssertEqual(entries.first?.content, "ENC:iv:entry")
+        XCTAssertNotNil(entries.first?.updatedAt)
     }
 
     /* @Codex */
@@ -1028,6 +1080,33 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(checkups.first?.id, "checkup-1")
         XCTAssertEqual(checkups.first?.version, 3)
         XCTAssertEqual(checkups.first?.status, "pending")
+    }
+
+    /* @Codex */
+    func testFetchScopedCheckupsUsesGlobalRouteAndTolerantDates() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(
+                request.url?.absoluteString,
+                "https://localhost:3443/api/v1/network/checkups?dateFrom=2026-07-01T00:00:00Z&dateTo=2026-07-09T00:00:00Z&status=pending&status=completed&limit=500"
+            )
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"[{"id":"checkup-1","patientId":"patient-1","date":"2026-07-09T08:30:00.000Z","title":"Controllo","notes":"ENC:iv:notes","status":"pending","source":"manual","version":3,"createdAt":"2026-07-09T08:00:00Z","updatedAt":"2026-07-09T08:31:00.000Z","deletedAt":null,"deletionReason":null}]"#.utf8))
+        }
+
+        let checkups = try await client.fetchScopedCheckups(
+            dateFrom: Date(timeIntervalSince1970: 1_782_864_000),
+            dateTo: Date(timeIntervalSince1970: 1_783_555_200),
+            status: ["pending", "completed"],
+            limit: 500,
+            credentials: creds,
+            sessionCookie: cookie,
+            ambulatoryId: nil
+        )
+
+        XCTAssertEqual(checkups.first?.id, "checkup-1")
+        XCTAssertEqual(checkups.first?.notes, "ENC:iv:notes")
+        XCTAssertNotNil(checkups.first?.date)
     }
 
     /* @Codex */
@@ -1856,6 +1935,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
             requests.append("\(method) \(url.absoluteString)")
             let response = HTTPURLResponse(url: url, statusCode: (method == "POST" ? 201 : 200), httpVersion: nil, headerFields: nil)!
             switch (method, url.path) {
+            case ("GET", "/api/v1/network/checkups"):
+                return (response, Data(#"[]"#.utf8))
+            case ("GET", "/api/v1/network/entries"):
+                return (response, Data(#"[]"#.utf8))
+            case ("GET", "/api/v1/network/patients"):
+                return (response, Data(#"[]"#.utf8))
             case ("GET", "/api/v1/network/service-prescriptions"):
                 return (response, Data(#"[]"#.utf8))
             case ("POST", "/api/v1/network/service-prescriptions"):
@@ -1897,6 +1982,9 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
         let source: any HomeBasePatientsDataSource = client
 
+        _ = try await source.fetchScopedCheckups(dateFrom: fixtureDate, dateTo: fixtureDate, status: ["pending", "completed"], limit: 500, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        _ = try await source.fetchScopedEntries(type: "note", dateFrom: fixtureDate, dateTo: fixtureDate, limit: 100, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        _ = try await source.fetchPatients(credentials: creds, sessionCookie: cookie, ambulatoryId: nil, includeDiagnoses: true)
         _ = try await source.fetchServicePrescriptions(patientId: "patient-1", credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.createServicePrescription(payload: HomeBaseServicePrescriptionCreatePayload(patientId: "patient-1", prescribedAt: fixtureDate, serviceName: "Visita"), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.updateServicePrescription(prescriptionId: "sp-1", payload: HomeBaseServicePrescriptionUpdatePayload(version: 1, status: "booked"), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
@@ -1916,6 +2004,9 @@ final class HomeBasePatientsClientTests: XCTestCase {
         _ = try await source.validateFseDocument(payload: HomeBaseFseDocumentValidationPayload(profile: "FSE_TEST", payload: .object(["id": .string("doc-1")])), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
 
         XCTAssertEqual(requests, [
+            "GET https://localhost:3443/api/v1/network/checkups?dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&status=pending&status=completed&limit=500",
+            "GET https://localhost:3443/api/v1/network/entries?type=note&dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&limit=100",
+            "GET https://localhost:3443/api/v1/network/patients?include=diagnoses",
             "GET https://localhost:3443/api/v1/network/service-prescriptions?patientId=patient-1",
             "POST https://localhost:3443/api/v1/network/service-prescriptions",
             "PUT https://localhost:3443/api/v1/network/service-prescriptions/sp-1",

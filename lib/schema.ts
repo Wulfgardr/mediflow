@@ -109,6 +109,7 @@ export const entries = sqliteTable('entries', {
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
     patientIdx: index('entries_patient_idx').on(t.patientId),
     patientDeletedIdx: index('entries_patient_deleted_idx').on(t.patientId, t.deletedAt),
+    dateIdx: index('entries_date_idx').on(t.date),
 }));
 
 // --- Therapies ---
@@ -316,6 +317,7 @@ export const checkups = sqliteTable('checkups', {
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
     patientIdx: index('checkups_patient_idx').on(t.patientId),
     patientDeletedIdx: index('checkups_patient_deleted_idx').on(t.patientId, t.deletedAt),
+    dateIdx: index('checkups_date_idx').on(t.date),
 }));
 
 // --- Conversations (AI Chat) ---

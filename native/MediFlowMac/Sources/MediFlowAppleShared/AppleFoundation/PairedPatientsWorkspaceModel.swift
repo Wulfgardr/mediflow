@@ -2455,6 +2455,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
+    var clinicalWorkspaceConnection: ClinicalWorkspaceConnection? {
+        guard connectionState == .pairedOnline,
+              let sessionCookie,
+              let credentials = pairedCredentials else {
+            return nil
+        }
+        return ClinicalWorkspaceConnection(
+            dataSource: makeClient(),
+            credentials: credentials,
+            sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId.trimmedOrNil,
+            masterKey: masterKey
+        )
+    }
+
+    /* @Codex */
     private enum TherapyCatalogTarget {
         case newTherapy
         case editTherapy

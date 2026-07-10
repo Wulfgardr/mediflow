@@ -458,10 +458,12 @@ function applySchemaGuards() {
     try {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS entries_patient_idx ON entries(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS entries_patient_deleted_idx ON entries(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS entries_date_idx ON entries(date)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS therapies_patient_idx ON therapies(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS therapies_patient_deleted_idx ON therapies(patient_id, deleted_at)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS checkups_patient_idx ON checkups(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS checkups_patient_deleted_idx ON checkups(patient_id, deleted_at)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS checkups_date_idx ON checkups(date)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS observations_patient_deleted_idx ON observations(patient_id, deleted_at)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS attachments_patient_idx ON attachments(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id)').run();

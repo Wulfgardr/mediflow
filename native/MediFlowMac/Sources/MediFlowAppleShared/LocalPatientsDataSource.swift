@@ -66,6 +66,35 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     }
 
     /* @Codex */
+    public func fetchPatients(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool
+    ) async throws -> [HomeBasePatientSummary] {
+        try await fallback.fetchPatients(
+            credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, includeDiagnoses: includeDiagnoses)
+    }
+
+    /* @Codex */
+    public func fetchScopedCheckups(
+        dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseCheckupSummary] {
+        try await fallback.fetchScopedCheckups(
+            dateFrom: dateFrom, dateTo: dateTo, status: status, limit: limit,
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
+    public func fetchScopedEntries(
+        type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseEntrySummary] {
+        try await fallback.fetchScopedEntries(
+            type: type, dateFrom: dateFrom, dateTo: dateTo, limit: limit,
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    /* @Codex */
     public func searchDrugs(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
