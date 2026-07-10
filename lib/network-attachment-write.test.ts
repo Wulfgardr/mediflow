@@ -106,7 +106,9 @@ test('network attachment create accepts the real paired projection and applies s
     assert.equal(row?.data, SEALED_DATA);
     assert.equal(row?.type, 'application/pdf');
     assert.equal(row?.size, 2048);
-    assert.match(row?.path ?? '', new RegExp(`^attachments/${result.value.id}-`));
+    // path is persisted verbatim (sealed by the client, opaque to the host):
+    // no server-side de-sealing via buildAttachmentPath.
+    assert.equal(row?.path, SEALED_PATH);
     assert.equal(row?.summarySnapshot, null);
     assert.equal(row?.parseEvidenceArtifactSnapshot, null);
     assert.equal(row?.ocrQueueState, 'pending');
@@ -126,25 +128,31 @@ test('network attachment create accepts the real paired projection and applies s
     ]);
 });
 
-test('network attachment create rejects every field forbidden by presence', async () => {
+test('network attachment create rejects every field outside the allowlist', async () => {
     resetDatabase();
 
-    const forbiddenFieldValues: Record<string, unknown> = {
+    // Allowlist enforcement (not a denylist): server-controlled fields,
+    // document-derived Classe C fields, and any unknown key alike must be
+    // rejected by presence, matching OpenAPI additionalProperties: false.
+    const rejectedFieldValues: Record<string, unknown> = {
         patientId: PATIENT_ID,
         id: 'client-supplied-id',
         summarySnapshot: 'ENC:aXY=:c3VtbWFyeQ==',
         parseEvidenceArtifactSnapshot: 'ENC:aXY=:ZXZpZGVuY2U=',
         ocrQueueState: 'pending',
         ocrQueueReason: 'text_layer_absent',
+        ocrReplayArtifactSnapshot: 'ENC:aXY=:cmVwbGF5',
+        ocrQueueUpdatedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        unexpectedFutureField: 'anything',
     };
 
-    for (const [field, value] of Object.entries(forbiddenFieldValues)) {
+    for (const [field, value] of Object.entries(rejectedFieldValues)) {
         const result = await createNetworkScopedAttachment(makeContext(), validCreateBody({ [field]: value }));
-        assert.equal(result.status, 400, `expected 400 for forbidden field ${field}`);
+        assert.equal(result.status, 400, `expected 400 for rejected field ${field}`);
         assert.deepEqual(result.value, {
-            error: `Network document write boundary rejects client-controlled ${field}`,
+            error: `Network document write boundary rejects unexpected field ${field}`,
         });
     }
 

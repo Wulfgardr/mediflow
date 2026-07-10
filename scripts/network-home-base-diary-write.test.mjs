@@ -155,7 +155,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             content: 'prima nota',
             setting: 'ambulatory',
             metadata: { lane: 'network-diary-write-smoke' },
-            attachments: 'ENC:sealed-network-attachment-references',
+            attachments: 'ENC:aXY=:c2VhbGVkcmVmcw==',
         };
         const create = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
