@@ -46,6 +46,8 @@ function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
         diagnoses: patient.diagnoses ?? null,
         monitoringProfile: patient.monitoringProfile ?? null,
         statusReason: patient.statusReason ?? null,
+        archiveReason: patient.archiveReason ?? null,
+        archiveNote: patient.archiveNote ?? null,
         notes: patient.notes ?? null,
         aiSummary: patient.aiSummary ?? null,
         aiSummaryGeneratedAt: toIsoString(patient.aiSummaryGeneratedAt),

@@ -115,6 +115,8 @@ test('normalizePatientUpdateInput clears nullable string fields when null is sen
         documentInsights: null,
         monitoringProfile: null,
         statusReason: null,
+        archiveReason: null,
+        archiveNote: null,
         ambulatoryId: null,
     }, {
         expectedVersion: 5,
@@ -131,8 +133,44 @@ test('normalizePatientUpdateInput clears nullable string fields when null is sen
     assert.equal(result.values.documentInsights, null);
     assert.equal(result.values.monitoringProfile, null);
     assert.equal(result.values.statusReason, null);
+    assert.equal(result.values.archiveReason, null);
+    assert.equal(result.values.archiveNote, null);
     assert.equal(result.values.ambulatoryId, null);
     assert.equal(result.values.version, 6);
+});
+
+test('normalizePatientUpdateInput accepts archive reason fields', () => {
+    const result = normalizePatientUpdateInput({
+        version: 5,
+        isArchived: true,
+        archiveReason: 'assigned_mmg',
+        archiveNote: 'Cambio medico',
+    }, {
+        expectedVersion: 5,
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+
+    assert.equal(result.values.isArchived, true);
+    assert.equal(result.values.archiveReason, 'assigned_mmg');
+    assert.equal(result.values.archiveNote, 'Cambio medico');
+});
+
+test('normalizePatientUpdateInput clears archive reason fields on unarchive', () => {
+    const result = normalizePatientUpdateInput({
+        version: 5,
+        isArchived: false,
+    }, {
+        expectedVersion: 5,
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+
+    assert.equal(result.values.isArchived, false);
+    assert.equal(result.values.archiveReason, null);
+    assert.equal(result.values.archiveNote, null);
 });
 
 test('normalizePatientUpdateInput leaves omitted nullable fields untouched', () => {

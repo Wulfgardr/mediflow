@@ -194,3 +194,35 @@ test('deletedAt and deletionReason are not forgeable through the PUT whitelist',
     assert.equal('deletedAt' in normalized.values, false, 'PUT must never write deletedAt');
     assert.equal('deletionReason' in normalized.values, false, 'PUT must never write deletionReason');
 });
+
+test('archive reason fields are writeable and cleared on restore from archive', () => {
+    const archived = normalizePatientUpdateInput(
+        {
+            version: 4,
+            isArchived: true,
+            archiveReason: 'deceased',
+            archiveNote: null,
+        },
+        { expectedVersion: 4 }
+    );
+
+    assert.equal(archived.ok, true);
+    if (!archived.ok) return;
+    assert.equal(archived.values.archiveReason, 'deceased');
+    assert.equal(archived.values.archiveNote, null);
+
+    const restored = normalizePatientUpdateInput(
+        {
+            version: 5,
+            isArchived: false,
+            archiveReason: 'deceased',
+            archiveNote: 'stale',
+        },
+        { expectedVersion: 5 }
+    );
+
+    assert.equal(restored.ok, true);
+    if (!restored.ok) return;
+    assert.equal(restored.values.archiveReason, null);
+    assert.equal(restored.values.archiveNote, null);
+});

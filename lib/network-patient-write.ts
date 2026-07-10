@@ -11,6 +11,8 @@ import {
 } from './security/audit';
 /* @Codex */
 import { dbServer } from './db-server';
+import { isSealedValue } from './network-patient-lifecycle';
+
 import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
 /* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from './patient-concurrency';
@@ -29,6 +31,10 @@ import type { ServerSession } from './security/server-session';
 export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-profile';
 /* @Codex */
 export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights']);
+
+// I campi motivazione arrivano sigillati dal client (ENC:); l'host non li
+// decodifica e non deve accettarli in chiaro da un client paired.
+export const NETWORK_UPDATE_SEALED_PATIENT_FIELDS = ['archiveReason', 'archiveNote'] as const;
 
 type NetworkPatientMutationResponse =
     | { status: 200; value: { success: true } }
@@ -79,6 +85,16 @@ function validateNetworkPatientMutationBoundary(
                 error: 'Network scope violation',
             },
         };
+    }
+
+    for (const field of NETWORK_UPDATE_SEALED_PATIENT_FIELDS) {
+        const value = body[field];
+        if (value !== undefined && value !== null && !isSealedValue(value)) {
+            return {
+                status: 400,
+                value: { error: 'Network update requires sealed archive fields' },
+            };
+        }
     }
 
     return null;
