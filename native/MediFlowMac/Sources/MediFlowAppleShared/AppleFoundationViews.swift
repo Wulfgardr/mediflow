@@ -208,6 +208,7 @@ public struct AppleFoundationMobileRootView: View {
                 NavigationSplitView {
                     List {
                         Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
+                        Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
                         Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
                     }
                     .navigationTitle("MediFlow")
@@ -217,7 +218,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
             } else {
                 TabView(selection: $section) {
-                    ForEach(ClinicalWorkspaceSection.clinicalSections) { item in
+                    ForEach(ClinicalWorkspaceSection.clinicalSections + ClinicalWorkspaceSection.settingsSections) { item in
                         NavigationStack {
                             detailView(for: item)
                                 .navigationTitle(item.title)
@@ -290,6 +291,9 @@ public struct AppleFoundationMobileRootView: View {
         case .scales:
             ClinicalScalesWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
                 .accessibilityIdentifier("clinical-workspace-scales-view")
+        case .settings:
+            SettingsWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-settings-view")
         case .overview:
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)

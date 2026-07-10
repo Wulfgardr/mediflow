@@ -17,4 +17,10 @@ final class AppleRolloutModelTests: XCTestCase {
             XCTAssertFalse(milestone.issue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
+
+    func testSettingsSectionUsesDedicatedNavigationMetadata() {
+        XCTAssertEqual(ClinicalWorkspaceSection.settings.title, "Impostazioni")
+        XCTAssertEqual(ClinicalWorkspaceSection.settings.symbolName, "gearshape")
+        XCTAssertEqual(ClinicalWorkspaceSection.settingsSections, [.settings])
+    }
 }
