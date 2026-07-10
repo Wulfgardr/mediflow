@@ -44,6 +44,37 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertEqual(detail.address, "Via Roma 1, Milano")  // decrypted in-core, no HTTP
     }
 
+    /* @Codex */
+    func testNewDataPlaneMethodsDelegateToHTTPFallback() async throws {
+        let source = makeSource()
+
+        do {
+            _ = try await source.fetchPatients(
+                credentials: credentials, sessionCookie: "", ambulatoryId: nil, includeDiagnoses: true)
+            XCTFail("expected the HTTP fallback to be used")
+        } catch let HomeBaseClientError.transport(issue) {
+            XCTAssertEqual(issue, .unreachable)
+        }
+
+        do {
+            _ = try await source.fetchScopedCheckups(
+                dateFrom: nil, dateTo: nil, status: [], limit: nil,
+                credentials: credentials, sessionCookie: "", ambulatoryId: nil)
+            XCTFail("expected the HTTP fallback to be used")
+        } catch let HomeBaseClientError.transport(issue) {
+            XCTAssertEqual(issue, .unreachable)
+        }
+
+        do {
+            _ = try await source.fetchScopedEntries(
+                type: nil, dateFrom: nil, dateTo: nil, limit: nil,
+                credentials: credentials, sessionCookie: "", ambulatoryId: nil)
+            XCTFail("expected the HTTP fallback to be used")
+        } catch let HomeBaseClientError.transport(issue) {
+            XCTAssertEqual(issue, .unreachable)
+        }
+    }
+
     // MARK: Local clinical reads (Fase 3 slice 4) - read-only against the committed
     // fixture, which ships one pre-seeded row per sub-resource (fixture-entry-1 etc.)
 

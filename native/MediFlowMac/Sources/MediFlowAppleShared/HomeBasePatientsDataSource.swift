@@ -26,6 +26,11 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDeleted: Bool
     ) async throws -> [HomeBasePatientSummary]
 
+    /* @Codex */
+    func fetchPatients(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool
+    ) async throws -> [HomeBasePatientSummary]
+
     func fetchNetworkAmbulatories(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [NetworkAmbulatorySummary]
@@ -122,6 +127,18 @@ public protocol HomeBasePatientsDataSource: Sendable {
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String,
         ambulatoryId: String?, limit: Int
     ) async throws -> [HomeBaseCheckupSummary]
+
+    /* @Codex */
+    func fetchScopedCheckups(
+        dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseCheckupSummary]
+
+    /* @Codex */
+    func fetchScopedEntries(
+        type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseEntrySummary]
 
     func createCheckup(
         patientId: String, payload: HomeBaseCheckupCreatePayload,

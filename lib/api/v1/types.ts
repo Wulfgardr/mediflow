@@ -15,6 +15,8 @@ export type PatientSummary = {
     /* @Codex */
     version: number;
     updatedAt: string | null;
+    /* @Codex */
+    diagnoses?: string | null;
 };
 
 export type PatientDetail = {
@@ -441,6 +443,10 @@ export type NetworkCapabilityKey =
     | 'network.replica.write-therapies'
     /* @Codex */
     | 'network.replica.readonly-checkups'
+    /* @Codex */
+    | 'network.replica.readonly-agenda'
+    /* @Codex */
+    | 'network.replica.readonly-clinical-diary-global'
     /* @Codex */
     | 'network.replica.write-checkups'
     /* @Codex */

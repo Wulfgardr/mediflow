@@ -326,6 +326,18 @@ export function buildNetworkCapabilitiesResponse(input: {
                 'Read-only checkup access scoped to the active ambulatory from a paired client with a valid operator session.'
             ),
             capability(
+                'network.replica.readonly-agenda',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only cross-patient agenda access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
+                'network.replica.readonly-clinical-diary-global',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only cross-patient clinical diary access scoped to the active ambulatory from a paired client with a valid operator session.'
+            ),
+            capability(
                 'network.replica.write-checkups',
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,

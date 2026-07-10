@@ -214,7 +214,7 @@ struct ClinicalSignalCount: Equatable, Sendable {
     }
 }
 
-enum PairedPatientsConnectionState {
+enum PairedPatientsConnectionState: Equatable {
     case notLoaded
     case cached
     case pairedOnline

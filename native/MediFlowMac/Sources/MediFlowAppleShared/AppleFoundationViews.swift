@@ -191,12 +191,15 @@ public struct AppleFoundationMobileRootView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
-    @State private var section: AppleFoundationSection
+    @State private var section: ClinicalWorkspaceSection
+    @State private var showsProjectSurfaces = false
+    @StateObject private var workspaceModel = PairedPatientsWorkspaceModel()
+    @StateObject private var capabilitiesStore = ClinicalWorkspaceCapabilitiesStore()
 
     public init(snapshot: AppleFoundationSnapshot) {
         self.snapshot = snapshot
         let launchOverrides = AppleFoundationLaunchOverrides.load()
-        _section = State(initialValue: launchOverrides.initialSection ?? .overview)
+        _section = State(initialValue: launchOverrides.initialSection.map(ClinicalWorkspaceSection.init(legacy:)) ?? .patients)
     }
 
     public var body: some View {
@@ -204,22 +207,8 @@ public struct AppleFoundationMobileRootView: View {
             if usesSplitLayout {
                 NavigationSplitView {
                     List {
-                        ForEach(AppleFoundationSection.allCases) { item in
-                            Button {
-                                section = item
-                            } label: {
-                                HStack {
-                                    Label(item.title, systemImage: item.symbolName)
-                                    Spacer(minLength: 12)
-                                    if item == section {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(.tint)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("apple-foundation-section-\(item.rawValue)-button")
-                        }
+                        Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
+                        Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
                     }
                     .navigationTitle("MediFlow")
                 } detail: {
@@ -228,36 +217,51 @@ public struct AppleFoundationMobileRootView: View {
                 }
             } else {
                 TabView(selection: $section) {
-                    NavigationStack {
-                        detailView(for: .overview)
-                            .navigationTitle(AppleFoundationSection.overview.title)
-                    }
-                    .tag(AppleFoundationSection.overview)
-                    .tabItem {
-                        Label(AppleFoundationSection.overview.title, systemImage: AppleFoundationSection.overview.symbolName)
-                    }
-
-                    NavigationStack {
-                        detailView(for: .modules)
-                            .navigationTitle(AppleFoundationSection.modules.title)
-                    }
-                    .tag(AppleFoundationSection.modules)
-                    .tabItem {
-                        Label(AppleFoundationSection.modules.title, systemImage: AppleFoundationSection.modules.symbolName)
-                    }
-
-                    NavigationStack {
-                        detailView(for: .milestones)
-                            .navigationTitle(AppleFoundationSection.milestones.title)
-                    }
-                    .tag(AppleFoundationSection.milestones)
-                    .tabItem {
-                        Label(AppleFoundationSection.milestones.title, systemImage: AppleFoundationSection.milestones.symbolName)
+                    ForEach(ClinicalWorkspaceSection.clinicalSections) { item in
+                        NavigationStack {
+                            detailView(for: item)
+                                .navigationTitle(item.title)
+                                .toolbar {
+                                    if item == .patients {
+                                        ToolbarItem(placement: .automatic) {
+                                            Button("Progetto", systemImage: "ellipsis.circle") { showsProjectSurfaces = true }
+                                        }
+                                    }
+                                }
+                        }
+                        .tag(item)
+                        .tabItem { Label(item.title, systemImage: item.symbolName) }
                     }
                 }
             }
         }
+        .task(id: workspaceModel.connectionState) {
+            await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
+        }
+        .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .privacyShield()
+    }
+
+    private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
+        Button { section = item } label: {
+            HStack {
+                Label(item.title, systemImage: item.symbolName)
+                Spacer(minLength: 12)
+                if item == section { Image(systemName: "checkmark").foregroundStyle(.tint) }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
+    }
+
+    private var projectSurfaceSheet: some View {
+        NavigationStack {
+            List(ClinicalWorkspaceSection.projectSections) { item in
+                Button { showsProjectSurfaces = false; section = item } label: { Label(item.title, systemImage: item.symbolName) }
+            }
+            .navigationTitle("Progetto")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }
+        }
     }
 
     private var usesSplitLayout: Bool {
@@ -269,8 +273,23 @@ public struct AppleFoundationMobileRootView: View {
     }
 
     @ViewBuilder
-    private func detailView(for section: AppleFoundationSection) -> some View {
+    private func detailView(for section: ClinicalWorkspaceSection) -> some View {
         switch section {
+        case .patients:
+            PairedPatientsWorkspaceView(model: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-patients-view")
+        case .agenda:
+            AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-agenda-view")
+        case .diary:
+            GlobalDiaryWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-diary-view")
+        case .analytics:
+            PopulationAnalyticsWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-analytics-view")
+        case .scales:
+            ClinicalScalesWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .accessibilityIdentifier("clinical-workspace-scales-view")
         case .overview:
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)
@@ -283,9 +302,6 @@ public struct AppleFoundationMobileRootView: View {
             }
             .background(PlatformColors.groupedBackground)
             .accessibilityIdentifier("apple-foundation-runtime-view")
-        case .modules:
-            PairedPatientsWorkspaceView()
-                .accessibilityIdentifier("apple-foundation-modules-view")
         case .milestones:
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {

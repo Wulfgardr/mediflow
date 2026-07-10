@@ -8,7 +8,7 @@ import UIKit
 
 struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var model = PairedPatientsWorkspaceModel()
+    @ObservedObject private var model: PairedPatientsWorkspaceModel
     @State private var confirmsClearingPairing = false
     @State private var entryDeletionCandidate: HomeBaseEntrySummary?
     @State private var confirmsDeletingTherapy = false
@@ -30,6 +30,10 @@ struct PairedPatientsWorkspaceView: View {
     @State private var presentingScale: ClinicalScaleDefinition?
     @State private var icdQuery = ""
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
+
+    init(model: PairedPatientsWorkspaceModel) {
+        self.model = model
+    }
 
     var body: some View {
         layoutBody

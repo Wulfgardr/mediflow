@@ -16,6 +16,8 @@ type NetworkEntryListFilters = {
 
 /* @Codex */
 export const NETWORK_ENTRY_READ_CAPABILITY = 'network.replica.readonly-clinical-diary';
+/* @Codex */
+export const NETWORK_GLOBAL_ENTRY_READ_CAPABILITY = 'network.replica.readonly-clinical-diary-global';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -52,6 +54,27 @@ export async function listNetworkScopedEntries(
         eq(entries.patientId, patientId),
         eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
     ];
+    if (filters.type) whereFilters.push(eq(entries.type, filters.type));
+    if (filters.dateFrom) whereFilters.push(gte(entries.date, filters.dateFrom));
+    if (filters.dateTo) whereFilters.push(lte(entries.date, filters.dateTo));
+
+    const query = dbServer
+        .select({ entry: entries })
+        .from(entries)
+        .innerJoin(patientsToAmbulatories, eq(entries.patientId, patientsToAmbulatories.patientId))
+        .where(and(...whereFilters))
+        .orderBy(desc(entries.date));
+
+    const rows = filters.limit ? await query.limit(filters.limit) : await query;
+    return rows.map((row) => toEntrySummary(row.entry));
+}
+
+/* @Codex */
+export async function listNetworkScopedEntriesForAmbulatory(
+    scopeAmbulatoryId: string,
+    filters: NetworkEntryListFilters = {}
+): Promise<EntrySummary[]> {
+    const whereFilters = [eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId)];
     if (filters.type) whereFilters.push(eq(entries.type, filters.type));
     if (filters.dateFrom) whereFilters.push(gte(entries.date, filters.dateFrom));
     if (filters.dateTo) whereFilters.push(lte(entries.date, filters.dateTo));

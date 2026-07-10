@@ -131,6 +131,16 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.equal(checkupRead.status, 'available');
     assert.equal(checkupRead.requiresPairing, true);
 
+    const agendaRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-agenda');
+    assert.ok(agendaRead);
+    assert.equal(agendaRead.status, 'available');
+    assert.equal(agendaRead.requiresPairing, true);
+
+    const globalDiaryRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-clinical-diary-global');
+    assert.ok(globalDiaryRead);
+    assert.equal(globalDiaryRead.status, 'available');
+    assert.equal(globalDiaryRead.requiresPairing, true);
+
     const checkupWrite = response.capabilities.find((item) => item.key === 'network.replica.write-checkups');
     assert.ok(checkupWrite);
     assert.equal(checkupWrite.status, 'available');

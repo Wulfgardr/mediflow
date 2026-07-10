@@ -143,7 +143,7 @@ struct PairedScalesSection: View {
             .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
     }
 
-    private static func area(for scaleId: String) -> String {
+    static func area(for scaleId: String) -> String {
         switch scaleId {
         case "tinetti":
             return "Equilibrio"

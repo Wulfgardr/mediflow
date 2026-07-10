@@ -63,6 +63,26 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBasePatientSummary].self, from: data)
     }
 
+    /* @Codex */
+    public func fetchPatients(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        includeDiagnoses: Bool
+    ) async throws -> [HomeBasePatientSummary] {
+        var url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+        if includeDiagnoses {
+            url = url.appending(queryItems: [URLQueryItem(name: "include", value: "diagnoses")])
+        }
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBasePatientSummary].self, from: data)
+    }
+
     // A18: fetch the ambulatory scope options for the picker. Rides on the same
     // read capability + auth headers as the patient list.
     public func fetchNetworkAmbulatories(
@@ -456,6 +476,72 @@ public actor HomeBasePatientsClient {
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
         )
         return try decode([HomeBaseCheckupSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchScopedCheckups(
+        dateFrom: Date?,
+        dateTo: Date?,
+        status: [String],
+        limit: Int?,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseCheckupSummary] {
+        var queryItems = [URLQueryItem]()
+        if let dateFrom {
+            queryItems.append(URLQueryItem(name: "dateFrom", value: Self.queryDateValue(dateFrom)))
+        }
+        if let dateTo {
+            queryItems.append(URLQueryItem(name: "dateTo", value: Self.queryDateValue(dateTo)))
+        }
+        queryItems.append(contentsOf: status.map { URLQueryItem(name: "status", value: $0) })
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("checkups")
+            .appending(queryItems: queryItems)
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseCheckupSummary].self, from: data)
+    }
+
+    /* @Codex */
+    public func fetchScopedEntries(
+        type: String?,
+        dateFrom: Date?,
+        dateTo: Date?,
+        limit: Int?,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseEntrySummary] {
+        var queryItems = [URLQueryItem]()
+        if let type {
+            queryItems.append(URLQueryItem(name: "type", value: type))
+        }
+        if let dateFrom {
+            queryItems.append(URLQueryItem(name: "dateFrom", value: Self.queryDateValue(dateFrom)))
+        }
+        if let dateTo {
+            queryItems.append(URLQueryItem(name: "dateTo", value: Self.queryDateValue(dateTo)))
+        }
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("entries")
+            .appending(queryItems: queryItems)
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseEntrySummary].self, from: data)
     }
 
     /* @Codex */
@@ -920,6 +1006,12 @@ public actor HomeBasePatientsClient {
             "x-mediflow-paired-client-token": credentials.clientToken,
             "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
         ]
+    }
+
+    private static func queryDateValue(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
     }
 
     private func send(
