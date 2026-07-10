@@ -1,0 +1,202 @@
+[
+  {
+    "name": "empty-input",
+    "input": "",
+    "sanitized": ""
+  },
+  {
+    "name": "plain-text",
+    "input": "Nota clinica senza markup",
+    "sanitized": "Nota clinica senza markup"
+  },
+  {
+    "name": "paragraph",
+    "input": "<p>Visita di controllo</p>",
+    "sanitized": "<p>Visita di controllo</p>"
+  },
+  {
+    "name": "line-break",
+    "input": "<p>Prima riga<br />Seconda riga</p>",
+    "sanitized": "<p>Prima riga<br>Seconda riga</p>"
+  },
+  {
+    "name": "strong",
+    "input": "<p><strong>Allergia nota</strong></p>",
+    "sanitized": "<p><strong>Allergia nota</strong></p>"
+  },
+  {
+    "name": "emphasis",
+    "input": "<p><em>Da confermare</em></p>",
+    "sanitized": "<p><em>Da confermare</em></p>"
+  },
+  {
+    "name": "underline",
+    "input": "<p><u>Dato rilevante</u></p>",
+    "sanitized": "<p><u>Dato rilevante</u></p>"
+  },
+  {
+    "name": "strikethrough",
+    "input": "<p><s>Terapia sospesa</s></p>",
+    "sanitized": "<p><s>Terapia sospesa</s></p>"
+  },
+  {
+    "name": "unordered-list",
+    "input": "<ul><li>Emocromo</li><li>PCR</li></ul>",
+    "sanitized": "<ul><li>Emocromo</li><li>PCR</li></ul>"
+  },
+  {
+    "name": "ordered-list",
+    "input": "<ol><li>Valutare</li><li>Ricontrollare</li></ol>",
+    "sanitized": "<ol><li>Valutare</li><li>Ricontrollare</li></ol>"
+  },
+  {
+    "name": "heading-h1",
+    "input": "<h1>Diario clinico</h1>",
+    "sanitized": "<h1>Diario clinico</h1>"
+  },
+  {
+    "name": "heading-h2",
+    "input": "<h2>Valutazione</h2>",
+    "sanitized": "<h2>Valutazione</h2>"
+  },
+  {
+    "name": "heading-h3",
+    "input": "<h3>Piano</h3>",
+    "sanitized": "<h3>Piano</h3>"
+  },
+  {
+    "name": "blockquote",
+    "input": "<blockquote>Riferito dal caregiver</blockquote>",
+    "sanitized": "<blockquote>Riferito dal caregiver</blockquote>"
+  },
+  {
+    "name": "alias-div",
+    "input": "<div>Paragrafo legacy</div>",
+    "sanitized": "<p>Paragrafo legacy</p>"
+  },
+  {
+    "name": "alias-bold",
+    "input": "<p><b>Importante</b></p>",
+    "sanitized": "<p><strong>Importante</strong></p>"
+  },
+  {
+    "name": "alias-italic",
+    "input": "<p><i>Osservazione</i></p>",
+    "sanitized": "<p><em>Osservazione</em></p>"
+  },
+  {
+    "name": "alias-strike",
+    "input": "<p><strike>Non attuale</strike></p>",
+    "sanitized": "<p><s>Non attuale</s></p>"
+  },
+  {
+    "name": "alias-del",
+    "input": "<p><del>Rimosso</del></p>",
+    "sanitized": "<p><s>Rimosso</s></p>"
+  },
+  {
+    "name": "remove-script-with-content",
+    "input": "<p>Prima</p><script>alert(1)</script><p>Dopo</p>",
+    "sanitized": "<p>Prima</p><p>Dopo</p>"
+  },
+  {
+    "name": "remove-style-with-content",
+    "input": "<style>body{display:none}</style><p>Visibile</p>",
+    "sanitized": "<p>Visibile</p>"
+  },
+  {
+    "name": "remove-iframe-with-content",
+    "input": "<iframe src=\"https://evil.test\">segreto</iframe><p>Sicuro</p>",
+    "sanitized": "<p>Sicuro</p>"
+  },
+  {
+    "name": "remove-object-with-content",
+    "input": "<object data=\"x\">payload</object><p>Sicuro</p>",
+    "sanitized": "<p>Sicuro</p>"
+  },
+  {
+    "name": "remove-embed-with-content",
+    "input": "<embed src=\"x\">payload</embed><p>Sicuro</p>",
+    "sanitized": "<p>Sicuro</p>"
+  },
+  {
+    "name": "remove-meta-with-content",
+    "input": "<meta name=\"x\">payload</meta><p>Sicuro</p>",
+    "sanitized": "<p>Sicuro</p>"
+  },
+  {
+    "name": "remove-link-with-content",
+    "input": "<link href=\"x\">payload</link><p>Sicuro</p>",
+    "sanitized": "<p>Sicuro</p>"
+  },
+  {
+    "name": "strip-hostile-allowed-attributes",
+    "input": "<p style=\"color:red\" onclick=\"alert(1)\"><strong data-x=\"1\">Contenuto</strong></p>",
+    "sanitized": "<p><strong>Contenuto</strong></p>"
+  },
+  {
+    "name": "strip-hostile-void-attributes",
+    "input": "<p>Prima<img/src=x onerror=alert(1)>Dopo</p>",
+    "sanitized": "<p>PrimaDopo</p>"
+  },
+  {
+    "name": "strip-href-wrapper",
+    "input": "<p><a href=\"javascript:alert(1)\">Testo</a></p>",
+    "sanitized": "<p>Testo</p>"
+  },
+  {
+    "name": "nested-lists",
+    "input": "<ul><li>Esami<ul><li>Emocromo</li><li>Creatinina</li></ul></li><li>Controllo</li></ul>",
+    "sanitized": "<ul><li>Esami<ul><li>Emocromo</li><li>Creatinina</li></ul></li><li>Controllo</li></ul>"
+  },
+  {
+    "name": "nested-blockquotes",
+    "input": "<blockquote><p>Caregiver</p><blockquote><p>Paziente</p></blockquote></blockquote>",
+    "sanitized": "<blockquote><p>Caregiver</p><blockquote><p>Paziente</p></blockquote></blockquote>"
+  },
+  {
+    "name": "heading-h4-not-allowed",
+    "input": "<h4>Heading degradato</h4>",
+    "sanitized": "Heading degradato"
+  },
+  {
+    "name": "residual-less-than",
+    "input": "Dose < 5 mg e valore > 2",
+    "sanitized": "Dose &lt; 5 mg e valore > 2"
+  },
+  {
+    "name": "html-entities",
+    "input": "<p>&amp; &lt; &gt; &quot; &#39; &nbsp;</p>",
+    "sanitized": "<p>&amp; &lt; &gt; &quot; &#39; &nbsp;</p>"
+  },
+  {
+    "name": "malformed-unclosed-allowed-tag",
+    "input": "<p><strong>Valore non chiuso",
+    "sanitized": "<p><strong>Valore non chiuso"
+  },
+  {
+    "name": "malformed-crossed-nesting",
+    "input": "<p><strong>Incrocio</p></strong>",
+    "sanitized": "<p><strong>Incrocio</p></strong>"
+  },
+  {
+    "name": "unicode-and-emoji",
+    "input": "<p>Febbre 38,5 °C • caffè 🩺 👩‍⚕️</p>",
+    "sanitized": "<p>Febbre 38,5 °C • caffè 🩺 👩‍⚕️</p>"
+  },
+  {
+    "name": "long-multi-block-content",
+    "input": "<h2>Follow-up complesso</h2><p><strong>Sintesi:</strong> quadro stabile con monitoraggio domiciliare.</p><ul><li>Pressione mattino e sera</li><li>Controllo esami tra 7 giorni</li></ul><blockquote><p>Segnalare subito nuovi sintomi respiratori o neurologici.</p></blockquote><p><em>Rivalutazione programmata.</em></p>",
+    "sanitized": "<h2>Follow-up complesso</h2><p><strong>Sintesi:</strong> quadro stabile con monitoraggio domiciliare.</p><ul><li>Pressione mattino e sera</li><li>Controllo esami tra 7 giorni</li></ul><blockquote><p>Segnalare subito nuovi sintomi respiratori o neurologici.</p></blockquote><p><em>Rivalutazione programmata.</em></p>"
+  },
+  {
+    "name": "native-soap-template",
+    "input": "<p>S: motivo della visita, sintomi riferiti, contesto funzionale</p><p>O: parametri, esame obiettivo, elementi documentali</p><p>A: valutazione clinica da rivedere</p><p>P: piano, follow-up, indicazioni condivise</p>",
+    "sanitized": "<p>S: motivo della visita, sintomi riferiti, contesto funzionale</p><p>O: parametri, esame obiettivo, elementi documentali</p><p>A: valutazione clinica da rivedere</p><p>P: piano, follow-up, indicazioni condivise</p>"
+  },
+  {
+    "name": "non-idempotent-nested-empty-block",
+    "input": "<p><p></p></p><p>Uno<br><br><br><br>Due</p>",
+    "sanitized": "<p></p><p>Uno<br><br>Due</p>"
+  }
+]
