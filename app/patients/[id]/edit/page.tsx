@@ -174,7 +174,10 @@ export default function EditPatientPage() {
 
         if (actionType === 'delete') {
             try {
-                await db.patients.delete(id, { version: patientVersion });
+                await db.patients.delete(id, {
+                    version: patientVersion,
+                    deletionReason: data.deletionReason,
+                });
                 router.push('/'); // Redirect to dashboard
             } catch (error) {
                 showToast({ tone: 'error', title: 'Eliminazione non riuscita', description: messageFromError(error, "Errore durante l'eliminazione.") });
@@ -183,6 +186,8 @@ export default function EditPatientPage() {
             try {
                 await db.patients.update(id, {
                     isArchived: true,
+                    archiveReason: data.archiveReason,
+                    archiveNote: data.archiveNote ?? null,
                     version: patientVersion,
                     updatedAt: new Date()
                 });
@@ -259,6 +264,16 @@ export default function EditPatientPage() {
                             <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
                                 Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
                             </p>
+                            {patient.archiveReason && (
+                                <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>
+                                    Motivo: {patient.archiveReason === 'assigned_mmg' ? 'Assegnato a MMG' : patient.archiveReason === 'deceased' ? 'Decesso' : 'Altro'}
+                                </p>
+                            )}
+                            {patient.archiveNote && (
+                                <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                    {patient.archiveNote}
+                                </p>
+                            )}
                             <button
                                 onClick={handleRestore}
                                 className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"

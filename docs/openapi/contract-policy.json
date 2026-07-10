@@ -172,6 +172,11 @@
       "change": "PUT /api/v1/network/patients/{id}/observations/{observationId} request changed",
       "trackingIssue": "WUL-40",
       "reason": "Additive optional reference-range fields accepted on observation update (S6): existing payloads remain valid."
+    },
+    {
+      "change": "DELETE /api/v1/patients/{id} request changed",
+      "trackingIssue": "WUL-306",
+      "reason": "Additive optional deletionReason accepted on patient soft-delete tombstones; existing version-only payloads remain valid."
     }
   ]
 }
