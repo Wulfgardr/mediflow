@@ -338,6 +338,7 @@ final class SettingsAmbulatoriesModel: ObservableObject {
 struct SettingsWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
+    @ObservedObject var appearance: AppleAppearanceStore
     @StateObject private var accessModel = SettingsAccessModel()
     @StateObject private var profileModel: SettingsProfileModel
     @StateObject private var ambulatoriesModel: SettingsAmbulatoriesModel
@@ -349,9 +350,14 @@ struct SettingsWorkspaceView: View {
     @State private var showsDeletionConfirmation = false
     @State private var showsClearConfirmation = false
 
-    init(capabilities: ClinicalWorkspaceCapabilitiesStore, workspaceModel: PairedPatientsWorkspaceModel) {
+    init(
+        capabilities: ClinicalWorkspaceCapabilitiesStore,
+        workspaceModel: PairedPatientsWorkspaceModel,
+        appearance: AppleAppearanceStore
+    ) {
         self.capabilities = capabilities
         self.workspaceModel = workspaceModel
+        self.appearance = appearance
         _profileModel = StateObject(wrappedValue: SettingsProfileModel(
             connectionProvider: { workspaceModel.clinicalWorkspaceConnection },
             profileUpdated: { displayName, ambulatoryName in
@@ -370,6 +376,8 @@ struct SettingsWorkspaceView: View {
             Section("Accesso") { accessContent }
             Section("Profilo") { profileContent }
             Section("Ambulatori") { ambulatoryContent }
+            Section("Aspetto") { appearanceContent }
+            Section("Privacy") { privacyContent }
         }
         .navigationTitle("Impostazioni")
         .task(id: workspaceModel.operatorIdentity) {
@@ -474,6 +482,27 @@ struct SettingsWorkspaceView: View {
             ClinicalCapabilityGateView(store: capabilities, capability: "network.ambulatories.write")
                 .frame(minHeight: 160)
         }
+    }
+
+    @ViewBuilder
+    private var appearanceContent: some View {
+        Picker("Tema", selection: $appearance.theme) {
+            ForEach(AppleAppearanceTheme.allCases) { theme in
+                Text(theme.title).tag(theme)
+            }
+        }
+        Toggle("Riduci movimento", isOn: $appearance.reduceMotionOverride)
+        Text("Riduce gli effetti visivi anche se il dispositivo non li limita.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var privacyContent: some View {
+        Toggle("Oscura contenuti clinici", isOn: $appearance.privacyShieldEnabled)
+        Text("Quando è attivo, MediFlow mantiene coperti i contenuti clinici anche mentre l'app è aperta.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder

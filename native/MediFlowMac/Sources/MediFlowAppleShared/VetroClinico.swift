@@ -31,9 +31,14 @@ public enum VetroPalette {
 /// material otherwise. Use via the `.vetroGlass(...)` View modifier below.
 struct VetroGlassModifier<S: Shape>: ViewModifier {
     let shape: S
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.appleReduceMotionOverride) private var reduceMotionOverride
 
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *), !AppleAppearanceStore.shouldReduceMotion(
+            systemReduceMotion: systemReduceMotion,
+            override: reduceMotionOverride
+        ) {
             content.glassEffect(.regular, in: shape)
         } else {
             content.background(.regularMaterial, in: shape)
