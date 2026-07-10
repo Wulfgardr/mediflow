@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { eq } from 'drizzle-orm';
 
 import { buildAttachmentPath } from './attachment-path';
 import { ambulatories, attachments, patients, patientsToAmbulatories } from './schema';
@@ -36,7 +37,11 @@ function bootstrapDatabase(): void {
 bootstrapDatabase();
 
 const { dbServer } = await import('./db-server.ts');
-const { listNetworkScopedAttachments, getNetworkScopedAttachment } = await import('./network-attachment-read.ts');
+const {
+    NETWORK_ATTACHMENT_METADATA_COLUMNS,
+    listNetworkScopedAttachments,
+    getNetworkScopedAttachment,
+} = await import('./network-attachment-read.ts');
 
 const SCOPE_AMBULATORY = 'amb-attachment-read-scope';
 const PATIENT_ID = 'patient-attachment-read-1';
@@ -111,6 +116,18 @@ test('listNetworkScopedAttachments returns metadata without the data payload', a
     assert.ok(summary.ocrQueueUpdatedAt);
     assert.ok(summary.createdAt);
     assert.equal('data' in summary, false);
+});
+
+test('the network attachment list projection never selects the data blob', () => {
+    const query = dbServer
+        .select(NETWORK_ATTACHMENT_METADATA_COLUMNS)
+        .from(attachments)
+        .where(eq(attachments.patientId, PATIENT_ID))
+        .toSQL();
+
+    assert.doesNotMatch(query.sql, /"attachments"\."data"/);
+    const detailQuery = dbServer.select().from(attachments).where(eq(attachments.id, ATTACHMENT_ID)).toSQL();
+    assert.match(detailQuery.sql, /"data"/);
 });
 
 test('getNetworkScopedAttachment returns the full record including the sealed data payload', async () => {

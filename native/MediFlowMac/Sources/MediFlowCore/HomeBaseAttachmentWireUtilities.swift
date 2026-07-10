@@ -134,15 +134,36 @@ public enum HomeBaseAttachmentWirePrecheck {
 public enum HomeBaseAttachmentShareFile {
     public enum ShareFileError: Error, Equatable {
         case emptyFileName
+        case unsafeFileName
     }
 
+    // @Codex: keep decrypted, client-controlled names inside a fresh owned
+    // directory so path components and filename collisions cannot overwrite an
+    // existing temporary file.
     public static func write(bytes: Data, suggestedName: String, to directory: URL = FileManager.default.temporaryDirectory) throws -> URL {
         let trimmedName = suggestedName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { throw ShareFileError.emptyFileName }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent(trimmedName)
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
+
+        let normalizedName = trimmedName.replacingOccurrences(of: "\\", with: "/")
+        guard let lastComponent = normalizedName.split(separator: "/", omittingEmptySubsequences: true).last else {
+            throw ShareFileError.emptyFileName
+        }
+        let safeName = String(lastComponent)
+        guard safeName != ".", safeName != ".." else { throw ShareFileError.unsafeFileName }
+
+        let rootDirectory = directory.standardizedFileURL
+        try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
+        let shareDirectory = rootDirectory
+            .appendingPathComponent("mediflow-attachment-share-\(UUID().uuidString)", isDirectory: true)
+            .standardizedFileURL
+        guard shareDirectory.deletingLastPathComponent().standardizedFileURL == rootDirectory else {
+            throw ShareFileError.unsafeFileName
+        }
+        try FileManager.default.createDirectory(at: shareDirectory, withIntermediateDirectories: false)
+
+        let url = shareDirectory.appendingPathComponent(safeName, isDirectory: false).standardizedFileURL
+        guard url.deletingLastPathComponent().standardizedFileURL == shareDirectory else {
+            throw ShareFileError.unsafeFileName
         }
         try bytes.write(to: url, options: [.atomic])
         return url

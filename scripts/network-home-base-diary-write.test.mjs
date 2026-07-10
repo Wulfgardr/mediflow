@@ -233,7 +233,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(plaintextAttachmentJson.response.status, 400);
         assert.equal(plaintextAttachmentJson.json?.error, 'Network diary attachment references must be sealed with ENC:');
 
-        const clearAttachments = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+        const emptyAttachmentArray = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
                 Cookie: sessionCookie,
@@ -243,7 +243,30 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 attachments: [],
             },
         });
-        assert.equal(clearAttachments.response.status, 200, 'An empty attachment reference array must clear the diary value');
+        assert.equal(emptyAttachmentArray.response.status, 400, 'Even an empty plaintext array must be rejected');
+        assert.equal(emptyAttachmentArray.json?.error, 'Network diary attachment references must be sealed with ENC:');
+
+        const detailAfterRejectedArray = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(detailAfterRejectedArray.response.status, 200);
+        assert.equal(detailAfterRejectedArray.json?.attachments, createBody.attachments);
+        assert.equal(detailAfterRejectedArray.json?.version, 1);
+
+        const clearAttachments = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                attachments: null,
+            },
+        });
+        assert.equal(clearAttachments.response.status, 200, 'Null is the documented clear representation');
         assert.deepEqual(clearAttachments.json, { success: true });
 
         const clearDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
@@ -253,7 +276,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
         });
         assert.equal(clearDetail.response.status, 200);
-        assert.equal(clearDetail.json?.attachments, '[]');
+        assert.equal(clearDetail.json?.attachments, null);
         assert.equal(clearDetail.json?.version, 2);
 
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {

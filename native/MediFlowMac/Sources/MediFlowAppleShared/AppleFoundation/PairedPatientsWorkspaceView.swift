@@ -11,11 +11,10 @@ import UIKit
 struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var model: PairedPatientsWorkspaceModel
-    // S6 (D7-bis): gates the new documents surfaces on the same host-exposed
-    // capability store the other workspace tabs already use (loaded once at the
-    // root, AppleFoundationViews.swift). A legacy pairing that predates the new
-    // capabilities still 403s at call time; that path is handled by the existing
-    // generic runTask 403 message, not by this proactive gate.
+    // S6 (D7-bis): gates the new document surfaces on the effective capability
+    // matrix returned for this pairing. The server downgrades host-supported but
+    // ungranted keys to unavailable, so a legacy pairing gets proactive re-pair
+    // guidance before a data-plane call can fail with 403.
     @ObservedObject private var capabilities: ClinicalWorkspaceCapabilitiesStore
     @State private var confirmsClearingPairing = false
     @State private var entryDeletionCandidate: HomeBaseEntrySummary?
@@ -2096,8 +2095,8 @@ struct PairedPatientsWorkspaceView: View {
             handlePickedAttachmentFile(result)
         }
         .onChange(of: pickedPhotoItem) { newItem in
-            guard let newItem else { return }
-            Task { await handlePickedAttachmentPhoto(newItem) }
+            guard let newItem, let patientId = model.selectedPatient?.id else { return }
+            Task { await handlePickedAttachmentPhoto(newItem, patientId: patientId) }
         }
         .sheet(item: $attachmentDetailCandidate, onDismiss: { model.dismissAttachmentDetail() }) { summary in
             attachmentDetailSheet(summary)
@@ -2141,21 +2140,28 @@ struct PairedPatientsWorkspaceView: View {
         case .failure(let error):
             attachmentPickerError = "Selezione del file non riuscita: \(error.localizedDescription)"
         case .success(let urls):
-            guard let url = urls.first else { return }
+            guard let url = urls.first, let patientId = model.selectedPatient?.id else { return }
             let accessedScopedResource = url.startAccessingSecurityScopedResource()
             defer { if accessedScopedResource { url.stopAccessingSecurityScopedResource() } }
             do {
                 let rawData = try Data(contentsOf: url)
                 let mimeType = Self.mimeType(forPathExtension: url.pathExtension)
                 let fileName = url.lastPathComponent
-                Task { await model.uploadAttachmentForSelectedPatient(fileName: fileName, mimeType: mimeType, rawData: rawData) }
+                Task {
+                    await model.uploadAttachmentForSelectedPatient(
+                        patientId: patientId,
+                        fileName: fileName,
+                        mimeType: mimeType,
+                        rawData: rawData
+                    )
+                }
             } catch {
                 attachmentPickerError = "Lettura del file non riuscita: \(error.localizedDescription)"
             }
         }
     }
 
-    private func handlePickedAttachmentPhoto(_ item: PhotosPickerItem) async {
+    private func handlePickedAttachmentPhoto(_ item: PhotosPickerItem, patientId: String) async {
         defer { pickedPhotoItem = nil }
         do {
             guard let rawData = try await item.loadTransferable(type: Data.self) else {
@@ -2167,7 +2173,12 @@ struct PairedPatientsWorkspaceView: View {
             let mimeType = contentType?.preferredMIMEType ?? "image/jpeg"
             let fileExtension = contentType?.preferredFilenameExtension ?? "jpg"
             let fileName = "foto-\(Int(Date().timeIntervalSince1970)).\(fileExtension)"
-            await model.uploadAttachmentForSelectedPatient(fileName: fileName, mimeType: mimeType, rawData: rawData)
+            await model.uploadAttachmentForSelectedPatient(
+                patientId: patientId,
+                fileName: fileName,
+                mimeType: mimeType,
+                rawData: rawData
+            )
         } catch {
             attachmentPickerError = "Lettura della foto non riuscita: \(error.localizedDescription)"
         }

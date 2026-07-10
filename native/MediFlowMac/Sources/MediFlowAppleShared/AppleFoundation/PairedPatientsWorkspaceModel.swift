@@ -35,6 +35,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         didSet {
             guard oldValue?.id != selectedPatient?.id else { return }
             invalidateAttachmentPatientState()
+            invalidatePatientBoundNewEntryState()
         }
     }
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
@@ -67,6 +68,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // every time a NEW draft is computed, so a stale review never authorizes a
     // later, different draft.
     @Published var newEntryVisitDraftReviewed = false
+    // @Codex: defense in depth for the review/insert gate. A response can only
+    // authorize insertion while the same patient remains selected.
+    private var newEntryVisitDraftPatientId: String?
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
     @Published var editEntryTitle = ""
@@ -958,6 +962,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.newEntryType = .note
             self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
             self.newEntryAttachmentIds = []
+            self.newEntryVisitDraftPatientId = nil
             self.newEntryDraftId = UUID().uuidString
             self.statusMessage = "Voce diario inviata all'home-base."
             do {
@@ -1132,11 +1137,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// a different draft's insertion.
     func computeVisitDraftForNewEntry() async {
         guard canComputeVisitDraft else { return }
-        guard let sessionCookie, let credentials = pairedCredentials else {
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
         let transcript = newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let draftId = newEntryDraftId
+        newEntryVisitDraftResponse = nil
+        newEntryVisitDraftPatientId = nil
+        newEntryVisitDraftReviewed = false
         await runTask {
             let response = try await self.makeClient().computeVisitDraft(
                 input: HomeBaseVisitDraftInput(transcript: transcript),
@@ -1144,7 +1153,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            guard self.selectedPatient?.id == patientId, self.newEntryDraftId == draftId else { return }
             self.newEntryVisitDraftResponse = response
+            self.newEntryVisitDraftPatientId = patientId
             self.newEntryVisitDraftReviewed = false
             self.statusMessage = "Bozza visita elaborata: rivedi il contenuto prima di inserirlo nella voce."
         }
@@ -1152,11 +1163,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     func discardVisitDraft() {
         newEntryVisitDraftResponse = nil
+        newEntryVisitDraftPatientId = nil
         newEntryVisitDraftReviewed = false
     }
 
     var canInsertVisitDraftIntoNewEntry: Bool {
-        newEntryVisitDraftResponse != nil && newEntryVisitDraftReviewed
+        newEntryVisitDraftResponse != nil
+            && newEntryVisitDraftReviewed
+            && newEntryVisitDraftPatientId == selectedPatient?.id
     }
 
     /// ADR 0073 form_prefill_only: without the explicit review checkbox this is
@@ -1176,6 +1190,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newEntryEditorDocument.blocks.append(contentsOf: draftBlocks)
         newEntryVisitTranscript = ""
         newEntryVisitDraftResponse = nil
+        newEntryVisitDraftPatientId = nil
         newEntryVisitDraftReviewed = false
         statusMessage = "Bozza inserita nella voce: rivedi il contenuto prima di salvare."
     }
@@ -2801,6 +2816,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// UIImage-NSImage without ever writing the bytes to disk (D12).
     func openAttachmentDetail(_ summary: HomeBaseAttachmentSummary) async {
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
+        guard summary.patientId == patientId else { return }
         attachmentShareURL = nil
         await runTask {
             let detail = try await self.makeClient().fetchAttachment(
@@ -2810,6 +2826,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            guard self.selectedPatient?.id == patientId else { return }
             self.selectedAttachmentDetail = ClinicalFieldCrypto.decryptAttachmentDetail(detail, masterKey: self.masterKey)
         }
     }
@@ -2854,9 +2871,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// nothing is sent in that case. A successfully created attachment enters the
     /// OCR queue as `pending`/`paired_upload` server-side (D2): the refreshed list
     /// shows that state with the existing Italian label, not a new one.
-    func uploadAttachmentForSelectedPatient(fileName: String, mimeType: String, rawData: Data) async {
+    func uploadAttachmentForSelectedPatient(patientId: String, fileName: String, mimeType: String, rawData: Data) async {
+        guard selectedPatient?.id == patientId else {
+            errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
+            return
+        }
         guard canUploadAttachment else { return }
-        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
+        guard let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
@@ -2889,6 +2910,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 self.errorMessage = bodyPrecheck.message
                 return
             }
+            guard self.selectedPatient?.id == patientId else {
+                self.errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
+                return
+            }
             _ = try await self.makeClient().createAttachment(
                 patientId: patientId,
                 payload: payload,
@@ -2919,6 +2944,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         attachmentShareURL = nil
         fseDocumentValidationResult = nil
         fseDocumentValidationTargetLabel = nil
+    }
+
+    // @Codex: new-entry content is patient-bound PHI. Switching patients must
+    // invalidate both pending/reviewed visit drafts and anything already
+    // inserted into the composer before it can be saved under another patient.
+    private func invalidatePatientBoundNewEntryState() {
+        newEntryTitle = ""
+        newEntryType = .note
+        newEntryEditorDocument = ClinicalRichTextEditorDocument()
+        newEntryAttachmentIds = []
+        newEntryVisitTranscript = ""
+        newEntryVisitDraftResponse = nil
+        newEntryVisitDraftPatientId = nil
+        newEntryVisitDraftReviewed = false
+        newEntryDraftId = UUID().uuidString
     }
 
     private func fetchDecryptedAttachments(
@@ -3033,6 +3073,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             newEntryAttachmentIds = []
             newEntryVisitTranscript = ""
             newEntryVisitDraftResponse = nil
+            newEntryVisitDraftPatientId = nil
             newEntryVisitDraftReviewed = false
             newEntryDraftId = UUID().uuidString
             cancelEditingEntry()

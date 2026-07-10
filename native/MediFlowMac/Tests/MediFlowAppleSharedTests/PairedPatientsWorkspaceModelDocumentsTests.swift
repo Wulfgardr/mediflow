@@ -61,6 +61,34 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         XCTAssertEqual(fetchCount, 1)
     }
 
+    func testInFlightAttachmentDetailDoesNotPublishAfterPatientChanges() async {
+        let firstPatient = detail(id: "p1")
+        let secondPatient = detail(id: "p2")
+        let summary = attachmentSummary(id: "a1", name: sealedField("referto.pdf"))
+        let source = DocumentsMockDataSource(
+            details: ["p1": firstPatient, "p2": secondPatient],
+            attachments: [summary],
+            attachmentDetail: attachmentDetail(id: "a1", name: sealedField("referto.pdf"), data: sealedField("data:text/plain;base64,QQ==")),
+            fetchAttachmentDelayNanoseconds: 50_000_000
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: firstPatient)
+
+        let loading = Task { await model.openAttachmentDetail(summary) }
+        for _ in 0..<100 {
+            if await source.fetchAttachmentCount > 0 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let startedCalls = await source.fetchAttachmentCount
+        XCTAssertEqual(startedCalls, 1)
+
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: secondPatient)
+        await loading.value
+
+        let detail = await model.selectedAttachmentDetail
+        XCTAssertNil(detail)
+    }
+
     func testUploadAttachmentSealsPayloadAndExcludesServerControlledFields() async throws {
         let patient = detail(id: "p1")
         let source = DocumentsMockDataSource(details: ["p1": patient])
@@ -68,7 +96,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
         let rawBytes = Data("hello referto".utf8)
-        await model.uploadAttachmentForSelectedPatient(fileName: "referto.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "referto.pdf", mimeType: "application/pdf", rawData: rawBytes)
 
         let payload = await source.lastCreatePayload
         let unwrapped = try XCTUnwrap(payload)
@@ -90,6 +118,8 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
 
         let createCount = await source.createAttachmentCalls
         XCTAssertEqual(createCount, 1)
+        let createdPatientId = await source.lastCreatePatientId
+        XCTAssertEqual(createdPatientId, patient.id)
         let status = await model.statusMessage
         XCTAssertEqual(status, "Documento caricato: in coda per elaborazione sull'home-base.")
     }
@@ -105,7 +135,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let oversizedRawByteCount = 20 * 1024 * 1024
         let rawBytes = Data(count: oversizedRawByteCount)
 
-        await model.uploadAttachmentForSelectedPatient(fileName: "scan.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "scan.pdf", mimeType: "application/pdf", rawData: rawBytes)
 
         let createCount = await source.createAttachmentCalls
         XCTAssertEqual(createCount, 0)
@@ -114,6 +144,28 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
             error,
             HomeBaseAttachmentWirePrecheck.check(rawByteCount: oversizedRawByteCount).message
         )
+    }
+
+    func testUploadAttachmentRejectsCapturedPatientAfterSelectionChanges() async {
+        let firstPatient = detail(id: "p1")
+        let secondPatient = detail(id: "p2")
+        let source = DocumentsMockDataSource(details: ["p1": firstPatient, "p2": secondPatient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: firstPatient)
+
+        let capturedPatientId = firstPatient.id
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: secondPatient)
+        await model.uploadAttachmentForSelectedPatient(
+            patientId: capturedPatientId,
+            fileName: "referto.pdf",
+            mimeType: "application/pdf",
+            rawData: Data("documento".utf8)
+        )
+
+        let createCalls = await source.createAttachmentCalls
+        let errorMessage = await model.errorMessage
+        XCTAssertEqual(createCalls, 0)
+        XCTAssertEqual(errorMessage, "Il paziente selezionato e cambiato: scegli di nuovo il documento.")
     }
 
     func testFollowupSuggestionsDedupAgainstExistingCheckupsAndPrefillSetsFormFields() async {
@@ -169,11 +221,17 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let writeMessage = await store.unavailableMessage(for: "network.replica.write-documents")
         XCTAssertEqual(
             readonlyMessage,
-            "L'host collegato non espone ancora l'archivio documenti (capability network.replica.readonly-documents). Aggiorna MediFlow sull'host."
+            "L'host o il pairing corrente non espongono ancora l'archivio documenti. Aggiorna MediFlow sull'host e ripeti il pairing."
         )
         XCTAssertEqual(
             writeMessage,
             "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+        )
+
+        let visitDraftMessage = await store.unavailableMessage(for: "network.compute.visit-draft")
+        XCTAssertEqual(
+            visitDraftMessage,
+            "L'host o il pairing corrente non espongono ancora l'elaborazione della bozza visita. Aggiorna MediFlow sull'host e ripeti il pairing."
         )
     }
 
@@ -292,7 +350,9 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     private let attachmentDetailFixture: HomeBaseAttachmentDetail?
     private let checkups: [HomeBaseCheckupSummary]
     private let capabilitiesFixture: [NetworkCapability]
+    private let fetchAttachmentDelayNanoseconds: UInt64
     private(set) var lastCreatePayload: HomeBaseAttachmentCreatePayload?
+    private(set) var lastCreatePatientId: String?
     private(set) var createAttachmentCalls = 0
     private(set) var fetchAttachmentCount = 0
 
@@ -301,13 +361,15 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         attachments: [HomeBaseAttachmentSummary] = [],
         attachmentDetail: HomeBaseAttachmentDetail? = nil,
         checkups: [HomeBaseCheckupSummary] = [],
-        capabilities: [NetworkCapability] = []
+        capabilities: [NetworkCapability] = [],
+        fetchAttachmentDelayNanoseconds: UInt64 = 0
     ) {
         self.details = details
         self.attachments = attachments
         self.attachmentDetailFixture = attachmentDetail
         self.checkups = checkups
         self.capabilitiesFixture = capabilities
+        self.fetchAttachmentDelayNanoseconds = fetchAttachmentDelayNanoseconds
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
@@ -419,12 +481,16 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
 
     func fetchAttachment(patientId: String, attachmentId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseAttachmentDetail {
         fetchAttachmentCount += 1
+        if fetchAttachmentDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: fetchAttachmentDelayNanoseconds)
+        }
         guard let attachmentDetailFixture else { throw HomeBaseClientError.httpStatus(404, "Not found") }
         return attachmentDetailFixture
     }
 
     func createAttachment(patientId: String, payload: HomeBaseAttachmentCreatePayload, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseCreatedResource {
         createAttachmentCalls += 1
+        lastCreatePatientId = patientId
         lastCreatePayload = payload
         return HomeBaseCreatedResource(id: "attachment", version: nil)
     }
