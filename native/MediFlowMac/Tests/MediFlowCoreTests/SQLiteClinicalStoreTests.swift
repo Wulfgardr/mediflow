@@ -40,7 +40,7 @@ final class SQLiteClinicalStoreTests: XCTestCase {
         try db.run("SELECT \(column) FROM \(table) WHERE id = ?", bind: [.text(id)]) { $0.int(0) }.first ?? nil
     }
 
-    // MARK: Checkup (notes-only encrypted) — the representative happy + edge paths
+    // MARK: Checkup (notes-only encrypted) - the representative happy + edge paths
 
     func testUpdateCheckupSetsFieldsSealsNotesAndBumpsVersion() throws {
         let (path, seed) = try makeDB()
@@ -134,7 +134,7 @@ final class SQLiteClinicalStoreTests: XCTestCase {
         XCTAssertEqual(try rawText(reader, "checkups", "deletion_reason", id: "c1"), "obsolete")
     }
 
-    // MARK: Entry / therapy / observation — per-entity crypto coverage
+    // MARK: Entry / therapy / observation - per-entity crypto coverage
 
     func testUpdateEntrySealsTitleAndContent() throws {
         let (path, seed) = try makeDB()
