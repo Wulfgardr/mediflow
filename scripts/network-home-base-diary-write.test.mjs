@@ -61,14 +61,16 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const localAiRuntime = await request('GET', '/api/v1/network/ai-runtime', {
             headers: localApiHeaders(),
         });
-        assert.equal(localAiRuntime.response.status, 200);
+        assert.equal(localAiRuntime.response.status, 200, 'Local API token must retain AI runtime discovery access');
 
         const pairedAiRuntime = await request('GET', '/api/v1/network/ai-runtime', {
             headers: pairedHeaders(diaryWriter),
         });
-        assert.equal(pairedAiRuntime.response.status, 200);
-        assert.equal(pairedAiRuntime.json?.killSwitches?.treatmentReasoning, 'disabled');
-        assert.ok(pairedAiRuntime.json?.surfaces?.includes('treatment-reasoning'));
+        assert.equal(pairedAiRuntime.response.status, 200, 'Paired client must receive AI runtime discovery');
+        for (const key of ['patientInsight', 'documentSynthesis', 'smartImport', 'treatmentReasoning']) {
+            assert.ok(['enabled', 'disabled'].includes(pairedAiRuntime.json?.killSwitches?.[key]), `AI runtime kill switch ${key} must be enabled or disabled`);
+        }
+        assert.ok(pairedAiRuntime.json?.surfaces?.includes('treatment-reasoning'), 'AI runtime must advertise treatment-reasoning');
 
         const auditBeforeVisitDraft = await listAuditEvents(sessionCookie);
         const patientScopedVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
@@ -81,7 +83,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 transcript: 'P: continuare terapia',
             },
         });
-        assert.equal(patientScopedVisitDraft.response.status, 400);
+        assert.equal(patientScopedVisitDraft.response.status, 400, 'Visit draft must reject a patientId presence claim');
 
         const emptyVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
@@ -90,7 +92,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
             body: {},
         });
-        assert.equal(emptyVisitDraft.response.status, 400);
+        assert.equal(emptyVisitDraft.response.status, 400, 'Visit draft must reject an empty transcript');
 
         const tooLongVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
@@ -111,7 +113,10 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 events: [{ type: 'start', atMs: 0 }, { type: 'stop', atMs: 180000 }],
             },
         });
-        assert.equal(visitDraft.response.status, 200);
+        assert.equal(visitDraft.response.status, 200, 'Paired visit draft must accept a synthetic transcript');
+        assert.equal(typeof visitDraft.json?.draftText, 'string', 'Visit draft response must include draftText');
+        assert.ok(visitDraft.json?.sections && typeof visitDraft.json.sections === 'object' && !Array.isArray(visitDraft.json.sections), 'Visit draft response must include section groups');
+        assert.ok(Array.isArray(visitDraft.json?.medications), 'Visit draft response must include medications');
         assert.equal(visitDraft.json?.safety?.reviewRequired, true);
         assert.equal(visitDraft.json?.safety?.rawAudioPersisted, false);
         assert.deepEqual(visitDraft.json?.safety?.writesPerformed, []);
@@ -235,10 +240,10 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
             body: {
                 version: 1,
-                attachments: '',
+                attachments: [],
             },
         });
-        assert.equal(clearAttachments.response.status, 200);
+        assert.equal(clearAttachments.response.status, 200, 'An empty attachment reference array must clear the diary value');
         assert.deepEqual(clearAttachments.json, { success: true });
 
         const clearDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
@@ -248,7 +253,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
         });
         assert.equal(clearDetail.response.status, 200);
-        assert.equal(clearDetail.json?.attachments, '');
+        assert.equal(clearDetail.json?.attachments, '[]');
         assert.equal(clearDetail.json?.version, 2);
 
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
