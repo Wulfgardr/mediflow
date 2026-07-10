@@ -63,8 +63,7 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
 }
 
 function isEmptyAttachmentValue(value: unknown): boolean {
-    if (value === undefined || value === null || value === '') return true;
-    return Array.isArray(value) && value.length === 0;
+    return value === undefined || value === null || value === '';
 }
 
 function validateNetworkEntryMutationBoundary(

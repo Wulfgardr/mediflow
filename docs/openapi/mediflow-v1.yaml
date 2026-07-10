@@ -254,6 +254,10 @@ paths:
       summary: List home-base capabilities
       description: |
         Returns the versionable capability matrix exposed by the current node.
+        A local bearer-token caller receives the full host inventory. A paired
+        caller receives its effective matrix: host capabilities that require
+        pairing but are absent from that client's grants are reported as
+        `unavailable` until the client is paired again.
         Capabilities may be `available`, `disabled`, `planned`, or `unavailable`
         while only the first read-only remote patient surface is live; sync,
         cache, and broader replica flows remain follow-up workstreams.
@@ -263,7 +267,7 @@ paths:
           pairedClientToken: []
       responses:
         '200':
-          description: Versionable capability matrix for the current node.
+          description: Versionable host matrix or paired-client effective capability matrix, according to the authentication mode.
           content:
             application/json:
               schema:
@@ -5540,7 +5544,7 @@ components:
           type:
             - string
             - 'null'
-          description: Sealed opaque OCR replay artifact beginning with `ENC:`, when present.
+          description: Server-generated deterministic OCR replay artifact serialized as plaintext JSON without raw OCR text or file names, when present.
         createdAt:
           type:
             - string
@@ -5623,7 +5627,7 @@ components:
           type:
             - string
             - 'null'
-          description: Sealed opaque OCR replay artifact beginning with `ENC:`, when present.
+          description: Server-generated deterministic OCR replay artifact serialized as plaintext JSON without raw OCR text or file names, when present.
         createdAt:
           type:
             - string

@@ -348,6 +348,69 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         XCTAssertEqual(updateEntryCalls, 0)
     }
 
+    func testChangingPatientClearsReviewedVisitDraftAndComposer() async {
+        let firstPatient = detail(id: "p1")
+        let secondPatient = detail(id: "p2")
+        let draft = visitDraftResponse(subjective: ["Contenuto del primo paziente"])
+        let source = S7MockDataSource(details: ["p1": firstPatient, "p2": secondPatient], visitDraft: draft)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: firstPatient)
+
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione del primo paziente." }
+        await model.computeVisitDraftForNewEntry()
+        await MainActor.run {
+            model.newEntryVisitDraftReviewed = true
+            model.insertVisitDraftIntoNewEntry()
+        }
+        let firstPatientBlockCount = await model.newEntryEditorDocument.blocks.count
+        XCTAssertGreaterThan(firstPatientBlockCount, 0)
+
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: secondPatient)
+
+        let secondPatientBlockCount = await model.newEntryEditorDocument.blocks.count
+        let transcript = await model.newEntryVisitTranscript
+        let response = await model.newEntryVisitDraftResponse
+        let reviewed = await model.newEntryVisitDraftReviewed
+        let canInsert = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertEqual(secondPatientBlockCount, 0)
+        XCTAssertEqual(transcript, "")
+        XCTAssertNil(response)
+        XCTAssertFalse(reviewed)
+        XCTAssertFalse(canInsert)
+    }
+
+    func testInFlightVisitDraftDoesNotPublishAfterPatientChanges() async {
+        let firstPatient = detail(id: "p1")
+        let secondPatient = detail(id: "p2")
+        let draft = visitDraftResponse(subjective: ["Bozza tardiva"])
+        let source = S7MockDataSource(
+            details: ["p1": firstPatient, "p2": secondPatient],
+            visitDraft: draft,
+            visitDraftDelayNanoseconds: 50_000_000
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: firstPatient)
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione in elaborazione." }
+
+        let computation = Task { await model.computeVisitDraftForNewEntry() }
+        for _ in 0..<100 {
+            if await source.computeVisitDraftCalls > 0 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let startedCalls = await source.computeVisitDraftCalls
+        XCTAssertEqual(startedCalls, 1)
+
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: secondPatient)
+        await computation.value
+
+        let response = await model.newEntryVisitDraftResponse
+        let reviewed = await model.newEntryVisitDraftReviewed
+        let blockCount = await model.newEntryEditorDocument.blocks.count
+        XCTAssertNil(response)
+        XCTAssertFalse(reviewed)
+        XCTAssertEqual(blockCount, 0)
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -438,19 +501,23 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
     private let details: [String: HomeBasePatientDetail]
     private let attachments: [HomeBaseAttachmentSummary]
     private let visitDraft: HomeBaseVisitDraftResponse?
+    private let visitDraftDelayNanoseconds: UInt64
     private(set) var lastCreateEntryPayload: HomeBaseEntryCreatePayload?
     private(set) var lastUpdateEntryPayload: HomeBaseEntryUpdatePayload?
     private(set) var createEntryCalls = 0
     private(set) var updateEntryCalls = 0
+    private(set) var computeVisitDraftCalls = 0
 
     init(
         details: [String: HomeBasePatientDetail],
         attachments: [HomeBaseAttachmentSummary] = [],
-        visitDraft: HomeBaseVisitDraftResponse? = nil
+        visitDraft: HomeBaseVisitDraftResponse? = nil,
+        visitDraftDelayNanoseconds: UInt64 = 0
     ) {
         self.details = details
         self.attachments = attachments
         self.visitDraft = visitDraft
+        self.visitDraftDelayNanoseconds = visitDraftDelayNanoseconds
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
@@ -573,6 +640,10 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
     }
 
     func computeVisitDraft(input: HomeBaseVisitDraftInput, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseVisitDraftResponse {
+        computeVisitDraftCalls += 1
+        if visitDraftDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: visitDraftDelayNanoseconds)
+        }
         guard let visitDraft else { throw HomeBaseClientError.contract }
         return visitDraft
     }

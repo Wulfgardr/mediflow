@@ -180,7 +180,7 @@ test('network attachment create requires name, path, and data sealed with ENC:',
     }
 });
 
-test('network attachment create requires a non-empty type and a non-negative size', async () => {
+test('network attachment create requires a non-empty type and a non-negative safe integer size', async () => {
     resetDatabase();
 
     const missingType = await createNetworkScopedAttachment(makeContext(), validCreateBody({ type: '' }));
@@ -189,11 +189,13 @@ test('network attachment create requires a non-empty type and a non-negative siz
         error: 'Network document write boundary requires a non-empty type',
     });
 
-    const negativeSize = await createNetworkScopedAttachment(makeContext(), validCreateBody({ size: -1 }));
-    assert.equal(negativeSize.status, 400);
-    assert.deepEqual(negativeSize.value, {
-        error: 'Network document write boundary requires a non-negative size',
-    });
+    for (const size of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.POSITIVE_INFINITY]) {
+        const invalidSize = await createNetworkScopedAttachment(makeContext(), validCreateBody({ size }));
+        assert.equal(invalidSize.status, 400, `expected 400 for invalid size ${size}`);
+        assert.deepEqual(invalidSize.value, {
+            error: 'Network document write boundary requires a non-negative integer size',
+        });
+    }
 });
 
 test('network attachment create enforces the shared wire size limit', async () => {

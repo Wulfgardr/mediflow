@@ -94,4 +94,38 @@ final class HomeBaseAttachmentModelsTests: XCTestCase {
         XCTAssertEqual(decoded.ocrQueueState, .pending)
         XCTAssertEqual(decoded.ocrQueueReason, .pairedUpload)
     }
+
+    // @Codex: a decrypted attachment name is client-controlled. Sharing must
+    // never let path components escape the owned temporary directory or let a
+    // same-name share overwrite a previous file.
+    func testAttachmentShareFileConfinesNamesAndUsesFreshDirectories() throws {
+        let testRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("HomeBaseAttachmentShareFileTests-\(UUID().uuidString)", isDirectory: true)
+        let ownedDirectory = testRoot.appendingPathComponent("owned", isDirectory: true)
+        let sentinel = testRoot.appendingPathComponent("sentinel.txt", isDirectory: false)
+        defer { try? FileManager.default.removeItem(at: testRoot) }
+
+        try FileManager.default.createDirectory(at: ownedDirectory, withIntermediateDirectories: true)
+        try Data("sentinel".utf8).write(to: sentinel)
+
+        let first = try HomeBaseAttachmentShareFile.write(
+            bytes: Data("first".utf8),
+            suggestedName: "../sentinel.txt",
+            to: ownedDirectory
+        )
+        let second = try HomeBaseAttachmentShareFile.write(
+            bytes: Data("second".utf8),
+            suggestedName: "sentinel.txt",
+            to: ownedDirectory
+        )
+
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("sentinel".utf8))
+        XCTAssertEqual(first.lastPathComponent, "sentinel.txt")
+        XCTAssertEqual(second.lastPathComponent, "sentinel.txt")
+        XCTAssertNotEqual(first.deletingLastPathComponent(), second.deletingLastPathComponent())
+        XCTAssertEqual(first.deletingLastPathComponent().deletingLastPathComponent(), ownedDirectory.standardizedFileURL)
+        XCTAssertEqual(second.deletingLastPathComponent().deletingLastPathComponent(), ownedDirectory.standardizedFileURL)
+        XCTAssertEqual(try Data(contentsOf: first), Data("first".utf8))
+        XCTAssertEqual(try Data(contentsOf: second), Data("second".utf8))
+    }
 }

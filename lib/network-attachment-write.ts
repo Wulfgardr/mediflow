@@ -49,8 +49,8 @@ function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isFiniteNonNegativeNumber(value: unknown): value is number {
-    return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+function isNonNegativeSafeInteger(value: unknown): value is number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 function validateNetworkAttachmentCreateBody(
@@ -85,11 +85,11 @@ function validateNetworkAttachmentCreateBody(
         };
     }
 
-    if (!isFiniteNonNegativeNumber(body.size)) {
+    if (!isNonNegativeSafeInteger(body.size)) {
         return {
             ok: false,
             status: 400,
-            value: { error: 'Network document write boundary requires a non-negative size' },
+            value: { error: 'Network document write boundary requires a non-negative integer size' },
         };
     }
 
