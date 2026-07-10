@@ -1,5 +1,8 @@
 // Codex: created 2026-02-01
 
+/* @Codex */
+import type { DocumentOcrQueueReason, DocumentOcrQueueState } from '../../domain/documents/document-ocr-queue';
+
 export type PatientSummary = {
     id: string;
     firstName: string;
@@ -173,6 +176,28 @@ export type ObservationSummary = {
     deletedAt: string | null;
     /* @Codex */
     deletionReason: string | null;
+};
+
+/* @Codex */
+export type AttachmentSummary = {
+    id: string;
+    patientId: string;
+    name: string;
+    type: string;
+    size: number;
+    path: string;
+    summarySnapshot: string | null;
+    parseEvidenceArtifactSnapshot: string | null;
+    ocrQueueState: DocumentOcrQueueState | null;
+    ocrQueueReason: DocumentOcrQueueReason | null;
+    ocrQueueUpdatedAt: string | null;
+    ocrReplayArtifactSnapshot: string | null;
+    createdAt: string | null;
+};
+
+/* @Codex */
+export type AttachmentDetail = AttachmentSummary & {
+    data: string | null;
 };
 
 /* @Codex */
@@ -473,6 +498,10 @@ export type NetworkCapabilityKey =
     | 'network.fse.validate'
     /* @Codex */
     | 'network.catalogs.readonly'
+    /* @Codex */
+    | 'network.replica.readonly-documents'
+    /* @Codex */
+    | 'network.replica.write-documents'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

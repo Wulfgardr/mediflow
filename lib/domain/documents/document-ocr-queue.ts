@@ -14,6 +14,8 @@ export const DOCUMENT_OCR_QUEUE_REASONS = [
     'image_or_scan',
     'corrupted_pdf',
     'password_protected',
+    /* @Codex: WUL-194 W5 S1, paired client upload entering the OCR queue. */
+    'paired_upload',
 ] as const;
 
 export type DocumentOcrQueueReason = (typeof DOCUMENT_OCR_QUEUE_REASONS)[number];
@@ -41,6 +43,7 @@ export const DOCUMENT_OCR_QUEUE_REASON_LABELS_IT: Record<DocumentOcrQueueReason,
     image_or_scan: 'immagine/scansione',
     corrupted_pdf: 'PDF corrotto',
     password_protected: 'PDF protetto da password',
+    paired_upload: 'caricato da client di rete',
 };
 
 export function isDocumentOcrQueueState(value: unknown): value is DocumentOcrQueueState {

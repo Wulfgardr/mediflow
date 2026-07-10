@@ -2609,6 +2609,154 @@ paths:
           $ref: '#/components/responses/ObservationVersionConflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/attachments:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientAttachments
+      summary: List attachment metadata through the paired home-base data plane
+      description: |
+        Returns attachment metadata for one patient, limited to the effective
+        ambulatory scope resolved by the home-base. The list omits the
+        `data` payload, mirroring the host attachment list projection
+        (`GET /api/attachments`). This route requires a valid paired client
+        with `network.replica.readonly-documents` and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped attachment metadata from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttachmentSummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientAttachment
+      summary: Create an attachment through the paired home-base data plane
+      description: |
+        Creates an attachment for one scoped, active patient (ADR 0076,
+        Classe A). The route requires a paired client with
+        `network.replica.write-documents`, an active operator session, and
+        the effective ambulatory scope resolved by the home-base node.
+        `name`, `path`, and `data` must already be sealed with the `ENC:`
+        format produced by the client crypto layer; plaintext or missing
+        sealed fields are rejected. `type` and `size` are plaintext metadata
+        declared by the client, matching the host attachment upload.
+        Document-derived and server-controlled fields (`patientId` bound to
+        the path parameter, `id`, `summarySnapshot`,
+        `parseEvidenceArtifactSnapshot`, `ocrQueueState`, `ocrQueueReason`,
+        `createdAt`, `updatedAt`) are rejected by presence; the server always
+        queues the created attachment with `ocrQueueState: pending` and
+        `ocrQueueReason: paired_upload`. There is no paired update or delete
+        for attachments.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachmentCreateRequest'
+            examples:
+              createNetworkAttachment:
+                value:
+                  name: 'ENC:aXY=:bmFtZS1jaXBoZXI='
+                  path: 'ENC:aXY=:cGF0aC1jaXBoZXI='
+                  data: 'ENC:aXY=:ZGF0YS1jaXBoZXI='
+                  type: application/pdf
+                  size: 20480
+      responses:
+        '201':
+          description: Attachment created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/attachments/{attachmentId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientAttachment
+      summary: Get an attachment through the paired home-base data plane
+      description: |
+        Returns one full attachment, including the sealed `data` payload,
+        for a scoped patient. Returns 404 when the attachment does not
+        belong to the patient identified by the path. This route requires a
+        paired client with `network.replica.readonly-documents` and an
+        operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: attachmentId
+          in: path
+          required: true
+          description: Attachment identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped attachment from the paired node, including the sealed payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-patient:
     get:
       tags:
@@ -2777,6 +2925,16 @@ components:
             notFound:
               value:
                 error: Not found
+    PayloadTooLarge:
+      description: Attachment payload exceeds the configured wire size limit shared with the host attachment upload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            tooLarge:
+              value:
+                error: Attachment payload too large
     VersionConflict:
       description: Ambulatory compare-on-write conflict. Refresh the returned PHI-safe snapshot before retrying.
       content:
@@ -3795,6 +3953,8 @@ components:
             - network.replica.write-prosthetic-prescriptions
             - network.fse.validate
             - network.catalogs.readonly
+            - network.replica.readonly-documents
+            - network.replica.write-documents
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync
@@ -5102,6 +5262,213 @@ components:
         version:
           type: integer
           minimum: 1
+    AttachmentSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - name
+        - type
+        - size
+        - path
+        - createdAt
+      description: |
+        Attachment metadata projection: mirrors the host list projection
+        (`GET /api/attachments`) and omits the `data` payload.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`.
+        type:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        path:
+          type: string
+          description: Server-normalized attachment path derived from the sealed path token.
+        summarySnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque document-derived summary beginning with `ENC:`, when present.
+        parseEvidenceArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque parse-evidence artifact beginning with `ENC:`, when present.
+        ocrQueueState:
+          type:
+            - string
+            - 'null'
+          enum:
+            - pending
+            - processing
+            - ocr_done
+            - ocr_failed
+            - manual_review
+            - null
+        ocrQueueReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - text_layer_absent
+            - text_too_short
+            - image_or_scan
+            - corrupted_pdf
+            - password_protected
+            - paired_upload
+            - null
+        ocrQueueUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        ocrReplayArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque OCR replay artifact beginning with `ENC:`, when present.
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    AttachmentDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - name
+        - type
+        - size
+        - path
+        - createdAt
+      description: |
+        Full attachment record, including the sealed `data` payload.
+        Returned only from the single-attachment paired route.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`.
+        type:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        path:
+          type: string
+          description: Server-normalized attachment path derived from the sealed path token.
+        data:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque attachment payload beginning with `ENC:`, when present.
+        summarySnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque document-derived summary beginning with `ENC:`, when present.
+        parseEvidenceArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque parse-evidence artifact beginning with `ENC:`, when present.
+        ocrQueueState:
+          type:
+            - string
+            - 'null'
+          enum:
+            - pending
+            - processing
+            - ocr_done
+            - ocr_failed
+            - manual_review
+            - null
+        ocrQueueReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - text_layer_absent
+            - text_too_short
+            - image_or_scan
+            - corrupted_pdf
+            - password_protected
+            - paired_upload
+            - null
+        ocrQueueUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        ocrReplayArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque OCR replay artifact beginning with `ENC:`, when present.
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    AttachmentCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - path
+        - data
+        - type
+        - size
+      description: |
+        Attachment creation payload for paired clients (ADR 0076, Classe A).
+        `name`, `path`, and `data` must already be sealed with the `ENC:`
+        format produced by the client crypto layer; the paired boundary
+        rejects plaintext or missing sealed fields. `type` and `size` are
+        plaintext metadata declared by the client, matching the host
+        attachment upload. Server-controlled `patientId` (bound to the path
+        parameter), `id`, `summarySnapshot`, `parseEvidenceArtifactSnapshot`,
+        `ocrQueueState`, `ocrQueueReason`, `createdAt`, and `updatedAt` are
+        rejected by presence.
+      properties:
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`; the paired network boundary rejects plaintext.
+        path:
+          type: string
+          description: Sealed opaque attachment path beginning with `ENC:`; the paired network boundary rejects plaintext.
+        data:
+          type: string
+          description: Sealed opaque attachment payload beginning with `ENC:`; the paired network boundary rejects plaintext. The shared wire size limit applies to this sealed value.
+        type:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 0
+    AttachmentCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+      description: |
+        Attachments have no version column (hard delete, no paired update):
+        the create response carries only the server-generated identifier.
+      properties:
+        id:
+          type: string
     PatientMutationRequest:
       type: object
       additionalProperties: false
