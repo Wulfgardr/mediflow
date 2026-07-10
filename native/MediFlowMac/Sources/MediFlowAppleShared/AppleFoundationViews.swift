@@ -281,7 +281,7 @@ public struct AppleFoundationMobileRootView: View {
     private func detailView(for section: ClinicalWorkspaceSection) -> some View {
         switch section {
         case .patients:
-            PairedPatientsWorkspaceView(model: workspaceModel)
+            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore)
                 .accessibilityIdentifier("clinical-workspace-patients-view")
         case .agenda:
             AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)

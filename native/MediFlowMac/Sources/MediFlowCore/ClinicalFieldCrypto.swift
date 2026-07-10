@@ -144,4 +144,38 @@ public enum ClinicalFieldCrypto {
             deletionReason: string(o.deletionReason, masterKey)
         )
     }
+
+    // S6 (Wave 5, ADR 0076 Classe A): attachments encrypt name/path/data/
+    // summarySnapshot/parseEvidenceArtifactSnapshot (lib/db.ts ENCRYPTED_FIELDS);
+    // type/size/ocrQueue*/ocrReplayArtifactSnapshot/createdAt stay plaintext, same
+    // as the host (the queue state machine and the size limit both need to read
+    // them without the operator key).
+    public static func decryptAttachment(_ a: HomeBaseAttachmentSummary, masterKey: SymmetricKey?) -> HomeBaseAttachmentSummary {
+        HomeBaseAttachmentSummary(
+            id: a.id, patientId: a.patientId,
+            name: string(a.name, masterKey) ?? "",
+            type: a.type, size: a.size,
+            path: string(a.path, masterKey) ?? "",
+            summarySnapshot: string(a.summarySnapshot, masterKey),
+            parseEvidenceArtifactSnapshot: string(a.parseEvidenceArtifactSnapshot, masterKey),
+            ocrQueueState: a.ocrQueueState, ocrQueueReason: a.ocrQueueReason, ocrQueueUpdatedAt: a.ocrQueueUpdatedAt,
+            ocrReplayArtifactSnapshot: a.ocrReplayArtifactSnapshot,
+            createdAt: a.createdAt
+        )
+    }
+
+    public static func decryptAttachmentDetail(_ a: HomeBaseAttachmentDetail, masterKey: SymmetricKey?) -> HomeBaseAttachmentDetail {
+        HomeBaseAttachmentDetail(
+            id: a.id, patientId: a.patientId,
+            name: string(a.name, masterKey) ?? "",
+            type: a.type, size: a.size,
+            path: string(a.path, masterKey) ?? "",
+            summarySnapshot: string(a.summarySnapshot, masterKey),
+            parseEvidenceArtifactSnapshot: string(a.parseEvidenceArtifactSnapshot, masterKey),
+            ocrQueueState: a.ocrQueueState, ocrQueueReason: a.ocrQueueReason, ocrQueueUpdatedAt: a.ocrQueueUpdatedAt,
+            ocrReplayArtifactSnapshot: a.ocrReplayArtifactSnapshot,
+            createdAt: a.createdAt,
+            data: string(a.data, masterKey)
+        )
+    }
 }

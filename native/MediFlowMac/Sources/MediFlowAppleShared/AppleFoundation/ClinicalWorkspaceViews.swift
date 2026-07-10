@@ -67,6 +67,10 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             return "L'host collegato non espone ancora il diario clinico globale (capability network.replica.readonly-clinical-diary-global). Aggiorna MediFlow sull'host."
         case "network.ambulatories.write":
             return "L'host collegato non espone la gestione ambulatori. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+        case "network.replica.readonly-documents":
+            return "L'host collegato non espone ancora l'archivio documenti (capability network.replica.readonly-documents). Aggiorna MediFlow sull'host."
+        case "network.replica.write-documents":
+            return "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
         default:
             return "L'host collegato non espone ancora la lettura pazienti richiesta (capability \(key)). Aggiorna MediFlow sull'host."
         }

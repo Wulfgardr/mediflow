@@ -135,6 +135,24 @@ enum PairedPrescriptionSource: String, CaseIterable, Identifiable {
 }
 
 /* @Codex */
+// S6 (D15): the two single-record FSE profiles validateFseDocument already
+// supports (lib/fse-validation.ts PROFILE_THERAPY_MEDICATION /
+// PROFILE_OBSERVATION_VITALS). Raw values are the exact wire profile strings.
+enum PairedFseDocumentValidationProfile: String, CaseIterable, Identifiable {
+    case therapyMedication = "therapy-medication-v1"
+    case observationVitals = "observation-vitals-v1"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .therapyMedication: "Terapia"
+        case .observationVitals: "Osservazione"
+        }
+    }
+}
+
+/* @Codex */
 enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
     case prescribed
     case ordered

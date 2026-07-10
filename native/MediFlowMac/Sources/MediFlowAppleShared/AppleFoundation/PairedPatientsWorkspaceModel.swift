@@ -184,6 +184,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newProstheticSource: PairedPrescriptionSource = .manual
     @Published var newProstheticDocumentRefs = ""
     @Published var newProstheticNotes = ""
+    // S6 (Wave 5, ADR 0076 Classe A/D7-bis): documents archive, on-demand
+    // preview/share, upload with wire precheck, single-record FSE validation.
+    @Published private(set) var attachments: [HomeBaseAttachmentSummary] = []
+    @Published private(set) var selectedAttachmentDetail: HomeBaseAttachmentDetail?
+    @Published private(set) var attachmentShareURL: URL?
+    @Published private(set) var fseDocumentValidationResult: HomeBaseFseDocumentValidationResponse?
+    @Published private(set) var fseDocumentValidationTargetLabel: String?
+    // "Nuovo controllo online" form provenance: manual by default, switched to
+    // ai_suggestion only when precompiled from a follow-up suggestion (D13,
+    // ADR 0073 form_prefill_only). Never set anywhere else.
+    @Published private(set) var newCheckupSource = "manual"
     @Published private(set) var discoveryMessage: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
@@ -689,6 +700,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         prostheticPrescriptions = []
         patientFHIRExportURL = nil
         pendingFHIRWarningValidation = nil
+        attachments = []
+        selectedAttachmentDetail = nil
+        attachmentShareURL = nil
+        fseDocumentValidationResult = nil
+        fseDocumentValidationTargetLabel = nil
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
@@ -701,6 +717,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             observations = Self.uiTestSeededObservations(patientId: patient.id)
             patientReportURL = nil
             patientFHIRExportURL = nil
+            attachments = []
+            selectedAttachmentDetail = nil
+            attachmentShareURL = nil
+            fseDocumentValidationResult = nil
+            fseDocumentValidationTargetLabel = nil
             return
         }
         #endif
@@ -709,6 +730,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.patientReportURL = nil
             self.patientFHIRExportURL = nil
             self.pendingFHIRWarningValidation = nil
+            self.selectedAttachmentDetail = nil
+            self.attachmentShareURL = nil
+            self.fseDocumentValidationResult = nil
+            self.fseDocumentValidationTargetLabel = nil
             let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: patient.id,
                 credentials: credentials,
@@ -1844,7 +1869,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     date: self.newCheckupDate,
                     title: title,
                     status: self.newCheckupStatus.rawValue,
-                    notes: try self.sealField(notes)
+                    notes: try self.sealField(notes),
+                    source: self.newCheckupSource
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -2491,6 +2517,244 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
     }
 
+    // MARK: - S6 (Wave 5): documents archive, insights, follow-up, FSE single-record
+
+    /// documentInsights is already part of the decrypted patient detail (no new
+    /// endpoint, no new capability: D13 does not gate this, only the attachments
+    /// family in D1/D7-bis does). Decoded read-only for the Archivio Intelligente
+    /// and Evidence Stack surfaces.
+    var documentInsights: [ClinicalDocumentInsight] {
+        DocumentInsightsCodec.decode(selectedPatient?.documentInsights)
+    }
+
+    /// "Referti recenti" tile row (web: app/patients/[id]/modules/page.tsx:266,
+    /// `documentInsights.slice(0, 4)`): first 4 in stored order, no re-sort.
+    var evidenceStackInsights: [ClinicalDocumentInsight] {
+        Array(documentInsights.prefix(4))
+    }
+
+    /// Follow-up suggestions projected from document insights (D13, port of
+    /// lib/patient-followup-projection.ts), with the same de-dup against
+    /// already-created checkups the web does in FollowupSuggestions.tsx (hide a
+    /// suggestion once a checkup with the same normalized title exists).
+    var followupSuggestions: [FollowupSuggestion] {
+        let existingTitles = Set(checkups.map { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+        return PatientFollowupProjection.project(documentInsights)
+            .filter { !existingTitles.contains($0.label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) }
+    }
+
+    /// Precompiles the existing "Nuovo controllo online" form from a follow-up
+    /// suggestion (D13, ADR 0073 form_prefill_only): title/date/notes are filled
+    /// in, provenance (excerpt + file name) goes into the notes the form already
+    /// seals ENC on submit, source is marked ai_suggestion. NO auto-save: the
+    /// form opens precompiled and the operator still has to tap "Salva
+    /// controllo" from createCheckupForSelectedPatient(), same as the web
+    /// (components/followup-suggestions.tsx openForm/confirm).
+    func prefillNewCheckupFromFollowup(_ suggestion: FollowupSuggestion) {
+        cancelEditingCheckup()
+        newCheckupTitle = suggestion.label
+        newCheckupDate = Date()
+        newCheckupNotes = "\(suggestion.excerpt)\nSuggerito da \(suggestion.citation.fileName)"
+        newCheckupStatus = .pending
+        newCheckupSource = "ai_suggestion"
+        statusMessage = "Controllo precompilato dal follow-up: rivedi e salva per confermare."
+    }
+
+    var canLoadAttachments: Bool {
+        selectedPatient != nil && sessionCookie != nil && pairedCredentials != nil && connectionState == .pairedOnline
+    }
+
+    var canUploadAttachment: Bool {
+        canLoadAttachments && !isWorking
+    }
+
+    /* @Codex */
+    func loadSelectedPatientAttachments() async {
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            self.attachments = try await self.fetchDecryptedAttachments(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.selectedAttachmentDetail = nil
+            self.attachmentShareURL = nil
+            self.statusMessage = self.attachments.isEmpty
+                ? "Nessun documento caricato per questo paziente."
+                : "\(self.attachments.count) documenti caricati."
+        }
+    }
+
+    /// On-demand detail fetch (D1: the list route never returns `data`). Preview
+    /// stays in memory: the decrypted data URL is decoded straight into PDFKit /
+    /// UIImage-NSImage without ever writing the bytes to disk (D12).
+    func openAttachmentDetail(_ summary: HomeBaseAttachmentSummary) async {
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
+        attachmentShareURL = nil
+        await runTask {
+            let detail = try await self.makeClient().fetchAttachment(
+                patientId: patientId,
+                attachmentId: summary.id,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.selectedAttachmentDetail = ClinicalFieldCrypto.decryptAttachmentDetail(detail, masterKey: self.masterKey)
+        }
+    }
+
+    func dismissAttachmentDetail() {
+        selectedAttachmentDetail = nil
+        attachmentShareURL = nil
+    }
+
+    /// Writes the decrypted attachment to a temporary file for sharing: same
+    /// posture as the existing W1 report/export flow (PatientReportDocument.swift,
+    /// PatientReportPDFRenderer.render), not a new one (D12). nil `data` or a
+    /// malformed data URL surfaces an honest error instead of silently sharing
+    /// nothing.
+    func prepareAttachmentShareFile() {
+        guard let detail = selectedAttachmentDetail else { return }
+        guard let dataURL = detail.data, let decoded = HomeBaseAttachmentDataURL.decode(dataURL) else {
+            errorMessage = "Condivisione non disponibile: il documento decifrato non e leggibile."
+            return
+        }
+        do {
+            attachmentShareURL = try HomeBaseAttachmentShareFile.write(
+                bytes: decoded.bytes,
+                suggestedName: Self.attachmentShareFileName(detail)
+            )
+        } catch {
+            errorMessage = "Preparazione del file per la condivisione non riuscita: \(error.localizedDescription)"
+        }
+    }
+
+    private static func attachmentShareFileName(_ detail: HomeBaseAttachmentDetail) -> String {
+        let trimmed = detail.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "documento-\(detail.id)" : trimmed
+    }
+
+    /// Uploads a new attachment (D2/D12, ADR 0076 Classe A). `data` is a
+    /// "data:<mime>;base64,<payload>" string, the exact wire shape the web
+    /// writes (components/document-upload.tsx:179-193), so the decrypted payload
+    /// on the host stays identical to what the web would have written. The wire
+    /// precheck (D2) estimates the sealed payload size BEFORE encrypting and
+    /// refuses with an honest message if the estimate exceeds the host limit;
+    /// nothing is sent in that case. A successfully created attachment enters the
+    /// OCR queue as `pending`/`paired_upload` server-side (D2): the refreshed list
+    /// shows that state with the existing Italian label, not a new one.
+    func uploadAttachmentForSelectedPatient(fileName: String, mimeType: String, rawData: Data) async {
+        guard canUploadAttachment else { return }
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        let trimmedName = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Il documento non ha un nome file valido."
+            return
+        }
+        let precheck = HomeBaseAttachmentWirePrecheck.check(rawByteCount: rawData.count)
+        guard !precheck.exceedsLimit else {
+            errorMessage = precheck.message
+            return
+        }
+        await runTask {
+            guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
+            let dataURL = HomeBaseAttachmentDataURL.encode(mimeType: mimeType, bytes: rawData)
+            let payload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
+                name: trimmedName,
+                path: "uploads/\(trimmedName)",
+                data: dataURL,
+                type: mimeType,
+                size: rawData.count,
+                masterKey: masterKey
+            )
+            _ = try await self.makeClient().createAttachment(
+                patientId: patientId,
+                payload: payload,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.attachments = try await self.fetchDecryptedAttachments(
+                patientId: patientId,
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
+        }
+    }
+
+    private func fetchDecryptedAttachments(
+        patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseAttachmentSummary] {
+        try await makeClient().fetchAttachments(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .map { ClinicalFieldCrypto.decryptAttachment($0, masterKey: masterKey) }
+    }
+
+    /// D15: single-record FSE validation for an already-loaded therapy or
+    /// observation (validateFseDocument, client method and boundary already
+    /// tested). This is unrelated to file previewability: "documento FSE" here
+    /// names a therapy/observation record checked against one of the two
+    /// profiles the boundary supports (lib/fse-validation.ts), the same two
+    /// categories fetchFseValidatePatient already scans for the whole patient.
+    func validateFseTherapy(_ therapy: HomeBaseTherapySummary) async {
+        await validateFseDocument(
+            profile: .therapyMedication,
+            label: therapy.drugName,
+            document: .object([
+                "drugName": .string(therapy.drugName),
+                "aic": therapy.aic.map(HomeBaseJSONValue.string) ?? .null,
+                "atc": therapy.atc.map(HomeBaseJSONValue.string) ?? .null,
+            ])
+        )
+    }
+
+    func validateFseObservation(_ observation: HomeBaseObservationSummary) async {
+        await validateFseDocument(
+            profile: .observationVitals,
+            label: observation.display,
+            document: .object([
+                "codeSystem": .string(observation.codeSystem),
+                "code": .string(observation.code),
+                "unitSystem": .string(observation.unitSystem),
+                "unitCode": .string(observation.unitCode),
+                "value": .string(observation.value),
+            ])
+        )
+    }
+
+    func dismissFseDocumentValidation() {
+        fseDocumentValidationResult = nil
+        fseDocumentValidationTargetLabel = nil
+    }
+
+    private func validateFseDocument(profile: PairedFseDocumentValidationProfile, label: String, document: HomeBaseJSONValue) async {
+        guard let sessionCookie, let credentials = pairedCredentials, connectionState == .pairedOnline else {
+            errorMessage = "Apri prima un paziente con sessione paired online."
+            return
+        }
+        await runTask {
+            let response = try await self.makeClient().validateFseDocument(
+                payload: HomeBaseFseDocumentValidationPayload(profile: profile.rawValue, document: document),
+                credentials: credentials,
+                sessionCookie: sessionCookie,
+                ambulatoryId: self.ambulatoryId.trimmedOrNil
+            )
+            self.fseDocumentValidationResult = response
+            self.fseDocumentValidationTargetLabel = label
+            self.statusMessage = response.ok
+                ? "Documento FSE valido per il profilo \(response.profile)."
+                : "Documento FSE non valido: \(response.errors.count) errori, \(response.warnings.count) avvisi."
+        }
+    }
+
     /* @Codex */
     func checkNetworkRevisionOnForeground() async {
         await checkNetworkRevision(refreshOnChange: true)
@@ -2528,6 +2792,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             checkups = []
             observations = []
             patientReportURL = nil
+            attachments = []
+            selectedAttachmentDetail = nil
+            attachmentShareURL = nil
+            fseDocumentValidationResult = nil
+            fseDocumentValidationTargetLabel = nil
             newEntryTitle = ""
             newEntryType = .note
             newEntryContent = ""
@@ -3285,6 +3554,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newCheckupNotes = ""
         newCheckupStatus = .pending
         newCheckupDate = Date()
+        newCheckupSource = "manual"
     }
 
     /* @Codex */
