@@ -379,6 +379,49 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             id: entryId, patientId: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey))
     }
 
+    public func fetchAttachments(
+        patientId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseAttachmentSummary] {
+        try await fallback.fetchAttachments(
+            patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    public func fetchAttachment(
+        patientId: String, attachmentId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseAttachmentDetail {
+        try await fallback.fetchAttachment(
+            patientId: patientId, attachmentId: attachmentId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    public func createAttachment(
+        patientId: String, payload: HomeBaseAttachmentCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        try await fallback.createAttachment(
+            patientId: patientId, payload: payload, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    public func computeVisitDraft(
+        input: HomeBaseVisitDraftInput,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseVisitDraftResponse {
+        try await fallback.computeVisitDraft(
+            input: input, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
+    public func fetchAiRuntimeStatus(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseNetworkAiRuntimeSummary {
+        try await fallback.fetchAiRuntimeStatus(
+            credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+    }
+
     public func fetchTherapies(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String,
         ambulatoryId: String?, limit: Int

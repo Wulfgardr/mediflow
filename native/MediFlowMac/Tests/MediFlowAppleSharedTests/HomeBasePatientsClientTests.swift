@@ -1,6 +1,7 @@
 // Codex: created 2026-04-18
 // @Codex
 import Foundation
+import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
@@ -8,6 +9,64 @@ final class HomeBasePatientsClientTests: XCTestCase {
     override func tearDown() {
         MockHomeBaseURLProtocol.requestHandler = nil
         super.tearDown()
+    }
+
+    func testCreateAttachmentSendsOnlySealedPairedProjection() async throws {
+        let masterKey = SymmetricKey(data: Data(repeating: 5, count: 32))
+        let rawData = Data("PDF".utf8).base64EncodedString()
+        let payload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
+            name: "referto.pdf",
+            path: "uploads/referto.pdf",
+            data: rawData,
+            type: "application/pdf",
+            size: 3,
+            masterKey: masterKey
+        )
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/patient-1/attachments")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+            XCTAssertEqual(
+                request.value(forHTTPHeaderField: "Cookie"),
+                "mediflow_session=session-123; ambulatory_id=amb-1"
+            )
+
+            let object = try self.requestObject(request)
+            XCTAssertEqual(Set(object.keys), Set(["name", "path", "data", "type", "size"]))
+            for field in ["name", "path", "data"] {
+                let value = try XCTUnwrap(object[field] as? String)
+                XCTAssertTrue(value.hasPrefix(CryptoService.encPrefix), "field \(field)")
+            }
+            for field in [
+                "id", "patientId", "summarySnapshot", "parseEvidenceArtifactSnapshot",
+                "ocrQueueState", "ocrQueueReason", "createdAt", "updatedAt",
+            ] {
+                XCTAssertFalse(object.keys.contains(field), "field \(field)")
+            }
+            XCTAssertEqual(object["type"] as? String, "application/pdf")
+            XCTAssertEqual(object["size"] as? Int, 3)
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 201,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"id":"attachment-1"}"#.utf8))
+        }
+
+        let created = try await client.createAttachment(
+            patientId: "patient-1",
+            payload: payload,
+            credentials: creds,
+            sessionCookie: cookie,
+            ambulatoryId: "amb-1"
+        )
+
+        XCTAssertEqual(created, HomeBaseCreatedResource(id: "attachment-1", version: nil))
     }
 
     func testLoginSendsNativePayloadAndReturnsSessionCookie() async throws {
@@ -2011,7 +2070,10 @@ final class HomeBasePatientsClientTests: XCTestCase {
             let method = request.httpMethod ?? "GET"
             let url = try XCTUnwrap(request.url)
             requests.append("\(method) \(url.absoluteString)")
-            let statusCode = method == "POST" && url.path == "/api/v1/network/ambulatories" ? 201 : 200
+            let statusCode = method == "POST" && (
+                url.path == "/api/v1/network/ambulatories"
+                    || url.path == "/api/v1/network/patients/patient-1/attachments"
+            ) ? 201 : 200
             let response = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
             switch (method, url.path) {
             case ("POST", "/api/auth/change-pin"):
@@ -2082,6 +2144,41 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 return (response, Data(#"{"id":"pp-1","version":1}"#.utf8))
             case ("PUT", "/api/v1/network/prosthetic-prescriptions/pp-1"):
                 return (response, Data(#"{"success":true}"#.utf8))
+            case ("GET", "/api/v1/network/patients/patient-1/attachments"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+                return (response, Data(#"[{"id":"attachment-1","patientId":"patient-1","name":"ENC:name:value","type":"application/pdf","size":3,"path":"ENC:path:value","summarySnapshot":null,"parseEvidenceArtifactSnapshot":null,"ocrQueueState":"pending","ocrQueueReason":"paired_upload","ocrQueueUpdatedAt":"2026-07-10T10:11:12.123Z","ocrReplayArtifactSnapshot":null,"createdAt":"2026-07-10T10:11:13.456Z"}]"#.utf8))
+            case ("GET", "/api/v1/network/patients/patient-1/attachments/attachment-1"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+                return (response, Data(#"{"id":"attachment-1","patientId":"patient-1","name":"ENC:name:value","type":"application/pdf","size":3,"path":"ENC:path:value","summarySnapshot":null,"parseEvidenceArtifactSnapshot":null,"ocrQueueState":"pending","ocrQueueReason":"paired_upload","ocrQueueUpdatedAt":"2026-07-10T10:11:12.123Z","ocrReplayArtifactSnapshot":null,"createdAt":"2026-07-10T10:11:13.456Z","data":"ENC:data:value"}"#.utf8))
+            case ("POST", "/api/v1/network/patients/patient-1/attachments"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+                return (response, Data(#"{"id":"attachment-2"}"#.utf8))
+            case ("POST", "/api/v1/network/visit-draft"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+                let payload = try self.requestObject(request)
+                XCTAssertEqual(payload["transcript"] as? String, "S: quadro stabile")
+                XCTAssertFalse(payload.keys.contains("patientId"))
+                return (response, Data(#"{"schemaVersion":"mediflow.visit_transcript_draft.v1","draftText":"S: quadro stabile","sections":{"subjective":["quadro stabile"],"objective":[],"assessment":[],"plan":[]},"medications":[],"session":{"state":"stopped","eventCount":0,"pauseCount":0,"resumeCount":0,"recordedMs":0,"pausedMs":0,"warnings":[]},"safety":{"reviewRequired":true,"forbiddenAutoWriteCount":0,"rawAudioPersisted":false,"writesPerformed":[]}}"#.utf8))
+            case ("GET", "/api/v1/network/ai-runtime"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+                return (response, Data(#"{"plane":"ai-plane-separate-from-data-plane","mode":"centralized-available","localRuntime":{"provider":"ollama","state":"configured","targetPolicy":"loopback-only","hardwareProfile":"high","clinicalModel":null,"reasoningModel":null,"ocrModel":null},"centralRuntime":{"state":"available","capabilityStatus":"available","requiresPairing":true,"executionTarget":"paired-home-base"},"fallbackPolicy":"client-local-runtime-else-ai-unavailable","rolloutGate":"lane-benchmarks-and-rollout-governance-required","surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],"killSwitches":{"patientInsight":"enabled","documentSynthesis":"disabled","smartImport":"enabled","treatmentReasoning":"disabled"},"guardrails":[]}"#.utf8))
             case ("GET", "/api/v1/network/capabilities"):
                 return (response, Data(#"{"nodeId":"node-1","operatingMode":"network-home-base","protocolVersion":"1","capabilities":[]}"#.utf8))
             case ("GET", "/api/v1/network/identity"):
@@ -2100,6 +2197,14 @@ final class HomeBasePatientsClientTests: XCTestCase {
             }
         }
         let source: any HomeBasePatientsDataSource = client
+        let attachmentPayload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
+            name: "referto.pdf",
+            path: "uploads/referto.pdf",
+            data: Data("PDF".utf8).base64EncodedString(),
+            type: "application/pdf",
+            size: 3,
+            masterKey: SymmetricKey(data: Data(repeating: 6, count: 32))
+        )
 
         _ = try await source.changePin(currentPin: "1357", newPin: "2468", encryptedMasterKey: "v2:wrapped", salt: "AAECAwQFBgcICQoLDA0ODw==", credentials: creds, sessionCookie: cookie)
         _ = try await source.logout(credentials: creds, sessionCookie: cookie)
@@ -2122,12 +2227,23 @@ final class HomeBasePatientsClientTests: XCTestCase {
         _ = try await source.fetchProstheticPrescriptions(patientId: "patient-1", credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.createProstheticPrescription(payload: HomeBaseProstheticPrescriptionCreatePayload(patientId: "patient-1", prescribedAt: fixtureDate, description: "Ausilio"), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.updateProstheticPrescription(prescriptionId: "pp-1", payload: HomeBaseProstheticPrescriptionUpdatePayload(version: 1, status: "tested"), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        let attachments = try await source.fetchAttachments(patientId: "patient-1", credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        let attachment = try await source.fetchAttachment(patientId: "patient-1", attachmentId: "attachment-1", credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        _ = try await source.createAttachment(patientId: "patient-1", payload: attachmentPayload, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        let draft = try await source.computeVisitDraft(input: HomeBaseVisitDraftInput(transcript: "S: quadro stabile"), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+        let aiRuntime = try await source.fetchAiRuntimeStatus(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchNetworkCapabilities(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchNetworkIdentity(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchNetworkNode(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchNetworkRevision(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchFseValidatePatient(patientId: "patient-1", credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.validateFseDocument(payload: HomeBaseFseDocumentValidationPayload(profile: "FSE_TEST", payload: .object(["id": .string("doc-1")])), credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+
+        XCTAssertNotNil(attachments.first?.createdAt)
+        XCTAssertEqual(attachment.data, "ENC:data:value")
+        XCTAssertEqual(draft.safety.writesPerformed, [])
+        XCTAssertEqual(aiRuntime.killSwitches.treatmentReasoning, .disabled)
+        XCTAssertTrue(aiRuntime.surfaces.contains("treatment-reasoning"))
 
         XCTAssertEqual(requests, [
             "POST https://localhost:3443/api/auth/change-pin",
@@ -2151,6 +2267,11 @@ final class HomeBasePatientsClientTests: XCTestCase {
             "GET https://localhost:3443/api/v1/network/prosthetic-prescriptions?patientId=patient-1",
             "POST https://localhost:3443/api/v1/network/prosthetic-prescriptions",
             "PUT https://localhost:3443/api/v1/network/prosthetic-prescriptions/pp-1",
+            "GET https://localhost:3443/api/v1/network/patients/patient-1/attachments",
+            "GET https://localhost:3443/api/v1/network/patients/patient-1/attachments/attachment-1",
+            "POST https://localhost:3443/api/v1/network/patients/patient-1/attachments",
+            "POST https://localhost:3443/api/v1/network/visit-draft",
+            "GET https://localhost:3443/api/v1/network/ai-runtime",
             "GET https://localhost:3443/api/v1/network/capabilities",
             "GET https://localhost:3443/api/v1/network/identity",
             "GET https://localhost:3443/api/v1/network/node",

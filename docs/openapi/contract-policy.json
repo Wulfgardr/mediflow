@@ -182,6 +182,26 @@
       "change": "DELETE /api/v1/patients/{id} request changed",
       "trackingIssue": "WUL-306",
       "reason": "Additive optional deletionReason accepted on patient soft-delete tombstones; existing version-only payloads remain valid."
+    },
+    {
+      "change": "GET /api/v1/network/ai-runtime changed auth requirements",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 5 adds paired-client credentials as an alternative discovery auth mode. Existing local bearer-token clients remain valid; the paired branch is gated by network-home-base mode."
+    },
+    {
+      "change": "GET /api/v1/network/ai-runtime response 200 changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 5 adds the fail-closed AI kill-switch projection and treatment-reasoning surface. Existing clients can ignore the additive fields and enum value."
+    },
+    {
+      "change": "POST /api/v1/network/patients/{id}/entries request changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 5 adds an optional sealed attachments field. Existing payloads remain valid, while non-empty values must use the pre-existing ENC transport format."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} request changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 5 adds an optional sealed attachments field. Existing payloads remain valid, while non-empty values must use the pre-existing ENC transport format."
     }
   ]
 }

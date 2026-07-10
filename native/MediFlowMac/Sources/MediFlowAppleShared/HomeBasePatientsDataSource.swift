@@ -142,6 +142,30 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
+    func fetchAttachments(
+        patientId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseAttachmentSummary]
+
+    func fetchAttachment(
+        patientId: String, attachmentId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseAttachmentDetail
+
+    func createAttachment(
+        patientId: String, payload: HomeBaseAttachmentCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource
+
+    func computeVisitDraft(
+        input: HomeBaseVisitDraftInput,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseVisitDraftResponse
+
+    func fetchAiRuntimeStatus(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseNetworkAiRuntimeSummary
+
     func fetchTherapies(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String,
         ambulatoryId: String?, limit: Int

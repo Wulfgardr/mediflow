@@ -17,6 +17,8 @@ import { dbServer } from './db-server';
 /* @Codex */
 import { buildEntryVersionConflictPayload, parseEntryExpectedVersion } from './entry-concurrency';
 /* @Codex */
+import { isSealedValue } from './network-patient-lifecycle';
+/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
 /* @Codex */
 import { entries, patientsToAmbulatories } from './schema';
@@ -61,8 +63,7 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
 }
 
 function isEmptyAttachmentValue(value: unknown): boolean {
-    if (value === undefined || value === null || value === '') return true;
-    return Array.isArray(value) && value.length === 0;
+    return value === undefined || value === null || value === '';
 }
 
 function validateNetworkEntryMutationBoundary(
@@ -91,11 +92,13 @@ function validateNetworkEntryMutationBoundary(
         }
     }
 
-    if (hasOwn(body, 'attachments') && !isEmptyAttachmentValue(body.attachments)) {
+    if (hasOwn(body, 'attachments')
+        && !isEmptyAttachmentValue(body.attachments)
+        && !isSealedValue(body.attachments)) {
         return {
-            status: 403,
+            status: 400,
             value: {
-                error: 'Network diary write boundary excludes attachment writes',
+                error: 'Network diary attachment references must be sealed with ENC:',
             },
         };
     }

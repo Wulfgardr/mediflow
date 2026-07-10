@@ -1,5 +1,6 @@
 /* @Codex */
 import type {
+    NetworkAiRuntimeKillSwitches,
     NetworkAiRuntimeHardwareProfile,
     NetworkAiRuntimeSummary,
     NetworkOperatingMode,
@@ -13,12 +14,14 @@ export type NetworkAiRuntimeInput = {
     clinicalModel: string | null;
     reasoningModel: string | null;
     ocrModel: string | null;
+    killSwitches: NetworkAiRuntimeKillSwitches;
 };
 
 const NETWORK_AI_RUNTIME_SURFACES = [
     'patient-insight',
     'smart-import',
     'document-synthesis',
+    'treatment-reasoning',
 ] as const;
 
 const NETWORK_AI_RUNTIME_GUARDRAILS = [
@@ -74,6 +77,7 @@ export function deriveNetworkAiRuntimeSummary(input: NetworkAiRuntimeInput): Net
         fallbackPolicy: 'client-local-runtime-else-ai-unavailable',
         rolloutGate: 'lane-benchmarks-and-rollout-governance-required',
         surfaces: [...NETWORK_AI_RUNTIME_SURFACES],
+        killSwitches: input.killSwitches,
         guardrails: [...NETWORK_AI_RUNTIME_GUARDRAILS],
     };
 }

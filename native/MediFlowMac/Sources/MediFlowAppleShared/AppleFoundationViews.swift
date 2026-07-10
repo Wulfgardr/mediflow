@@ -238,7 +238,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
             }
         }
-        .task(id: workspaceModel.connectionState) {
+        .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
@@ -281,7 +281,7 @@ public struct AppleFoundationMobileRootView: View {
     private func detailView(for section: ClinicalWorkspaceSection) -> some View {
         switch section {
         case .patients:
-            PairedPatientsWorkspaceView(model: workspaceModel)
+            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore)
                 .accessibilityIdentifier("clinical-workspace-patients-view")
         case .agenda:
             AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)

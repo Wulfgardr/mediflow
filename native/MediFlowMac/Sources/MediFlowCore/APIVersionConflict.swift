@@ -19,7 +19,7 @@ import Foundation
 // Swift's default Encodable OMITS nil optionals whereas the web's payload shape
 // keeps them:
 //   - the payload ALWAYS includes currentVersion/currentUpdatedAt/currentSnapshot
-//     (as explicit null in the "missing" state) — encodeNil, never encodeIfPresent;
+//     (as explicit null in the "missing" state) - encodeNil, never encodeIfPresent;
 //   - the snapshot is ENTITY-SPECIFIC: a patient snapshot is {id, version,
 //     updatedAt, isArchived} (omits patientId/deletedAt); a clinical snapshot is
 //     {id, patientId, version, updatedAt, deletedAt} (omits isArchived).

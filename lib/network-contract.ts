@@ -254,6 +254,12 @@ function capability(
     };
 }
 
+/**
+ * Canonical capability inventory: runtime, NetworkCapabilityKey, and OpenAPI
+ * enumerate the same 29 keys: 25 active network keys, 2 planned network keys,
+ * and 2 local backup keys. The local Apple QA manifest records the active key
+ * set alongside 24 separate acceptance records, not as a duplicate key enum.
+ */
 export function buildNetworkCapabilitiesResponse(input: {
     nodeId: string;
     snapshot: NetworkSettingsSnapshot;
@@ -396,6 +402,24 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Read-only access to local reference catalogs and terminology lookup from a paired client with a valid operator session; excludes catalog sync and offline distribution.'
+            ),
+            capability(
+                'network.replica.readonly-documents',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Read-only attachment metadata and single-document access scoped to the active ambulatory from a paired client with a valid operator session; the list projection omits the payload.'
+            ),
+            capability(
+                'network.replica.write-documents',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired attachment create boundary for sealed manual document content; excludes remote update, remote delete, and every document-derived or AI-produced field.'
+            ),
+            capability(
+                'network.compute.visit-draft',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired deterministic visit-draft computation with no patient scope, persistence, audit mutation, or AI invocation.'
             ),
             capability(
                 'network.replica.sync',

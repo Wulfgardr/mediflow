@@ -31,6 +31,8 @@ export const AUDIT_EVENT_TYPES = [
     'observation.created',
     'observation.updated',
     'observation.deleted',
+    /* @Codex: WUL-194 W5 S1, paired document domain boundary. */
+    'attachment.created',
     'prosthetic.prescription.created',
     'prosthetic.prescription.updated',
     'prosthetic.prescription.deleted',
@@ -54,7 +56,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings';
+export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -381,6 +383,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         entry: 0,
         therapy: 0,
         observation: 0,
+        attachment: 0,
         prosthetic_prescription: 0,
         service_prescription: 0,
         service_prescription_item: 0,

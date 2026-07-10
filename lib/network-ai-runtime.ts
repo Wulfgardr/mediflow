@@ -12,6 +12,8 @@ import { settings } from './schema';
 import { NETWORK_MODE_KEY, normalizeNetworkOperatingMode } from './network-contract';
 /* @Codex */
 import { deriveNetworkAiRuntimeSummary } from './network-ai-runtime-model';
+/* @Codex */
+import { resolveAiLaneKillSwitchState } from './ai-lane-kill-switch';
 
 const NETWORK_AI_RUNTIME_SETTINGS_KEYS = [
     NETWORK_MODE_KEY,
@@ -23,9 +25,22 @@ const NETWORK_AI_RUNTIME_SETTINGS_KEYS = [
     'aiModel_reasoning',
     'aiModel_ocr',
     'hardwareProfile',
+    'aiPatientInsightKillSwitch',
+    'aiDocumentSynthesisKillSwitch',
+    'aiSmartImportKillSwitch',
+    'aiTreatmentReasoningKillSwitch',
 ] as const;
 
 type NetworkAiRuntimeSettingsSnapshot = Partial<Record<(typeof NETWORK_AI_RUNTIME_SETTINGS_KEYS)[number], string>>;
+
+export function resolveNetworkAiRuntimeKillSwitches(snapshot: NetworkAiRuntimeSettingsSnapshot) {
+    return {
+        patientInsight: resolveAiLaneKillSwitchState(snapshot.aiPatientInsightKillSwitch),
+        documentSynthesis: resolveAiLaneKillSwitchState(snapshot.aiDocumentSynthesisKillSwitch),
+        smartImport: resolveAiLaneKillSwitchState(snapshot.aiSmartImportKillSwitch),
+        treatmentReasoning: resolveAiLaneKillSwitchState(snapshot.aiTreatmentReasoningKillSwitch),
+    } as const;
+}
 
 function normalizeSetting(value: string | null | undefined): string | null {
     const normalized = value?.trim();
@@ -81,5 +96,6 @@ export async function getNetworkAiRuntimeSummary(
         reasoningModel: normalizeSetting(snapshot.aiModel_reasoning)
             ?? normalizeSetting(snapshot.aiModel),
         ocrModel: normalizeSetting(snapshot.aiModel_ocr),
+        killSwitches: resolveNetworkAiRuntimeKillSwitches(snapshot),
     });
 }

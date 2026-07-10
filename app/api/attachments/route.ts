@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 /* @Codex */
-import { getAttachmentPayloadByteSize } from '@/lib/attachment-payload';
+import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 /* @Codex */
@@ -42,14 +42,6 @@ const ATTACHMENT_METADATA_COLUMNS = {
     createdAt: attachments.createdAt,
 } as const;
 
-/* @Codex */
-const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-
-/* @Codex */
-function resolveMaxAttachmentBytes(): number {
-    const configured = Number.parseInt(process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES ?? '', 10);
-    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ATTACHMENT_BYTES;
-}
 import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
 
 /* @Codex */
