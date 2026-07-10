@@ -106,13 +106,12 @@ public enum NetworkWriteBoundary {
         }
     }
 
-    /// `attachmentsNonEmpty`: the caller's equivalent of !isEmptyAttachmentValue
-    /// (entry only). Only consulted when 'attachments' is in `presentFields`.
+    /// Entry attachment references are either empty or sealed before reaching the store.
     public static func validateSubResource(
         _ resource: SubResource,
         mode: Mode,
         presentFields: Set<String>,
-        attachmentsNonEmpty: Bool = false
+        attachmentsValue: String? = nil
     ) -> Verdict {
         let label = resource.label
         for field in forbiddenSubResourceWriteFields where presentFields.contains(field) {
@@ -121,8 +120,15 @@ public enum NetworkWriteBoundary {
         for field in forbiddenClientFields(resource, mode) where presentFields.contains(field) {
             return .rejected(status: 400, error: "Network \(label) write boundary rejects client-controlled \(field)")
         }
-        if resource == .entry, presentFields.contains("attachments"), attachmentsNonEmpty {
-            return .rejected(status: 403, error: "Network diary write boundary excludes attachment writes")
+        if resource == .entry,
+           presentFields.contains("attachments"),
+           let attachmentsValue,
+           !attachmentsValue.isEmpty,
+           !attachmentsValue.hasPrefix(CryptoService.encPrefix) {
+            return .rejected(
+                status: 400,
+                error: "Network diary attachment references must be sealed with ENC:"
+            )
         }
         return .allowed
     }

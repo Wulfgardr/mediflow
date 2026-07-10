@@ -16,6 +16,7 @@ const REPORT_PATH = resolveReportPath();
 const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_DIARY_CAPABILITY = 'network.replica.readonly-clinical-diary';
 const WRITE_DIARY_CAPABILITY = 'network.replica.write-clinical-diary';
+const VISIT_DRAFT_CAPABILITY = 'network.compute.visit-draft';
 
 const scenarioResults = [];
 
@@ -44,7 +45,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             'Desk iPad diary readonly',
         );
         const diaryWriter = await pairClient(
-            [READ_PATIENTS_CAPABILITY, READ_DIARY_CAPABILITY, WRITE_DIARY_CAPABILITY],
+            [READ_PATIENTS_CAPABILITY, READ_DIARY_CAPABILITY, WRITE_DIARY_CAPABILITY, VISIT_DRAFT_CAPABILITY],
             'Desk iPad diary writer',
         );
 
@@ -56,6 +57,70 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         });
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
+
+        const localAiRuntime = await request('GET', '/api/v1/network/ai-runtime', {
+            headers: localApiHeaders(),
+        });
+        assert.equal(localAiRuntime.response.status, 200, 'Local API token must retain AI runtime discovery access');
+
+        const pairedAiRuntime = await request('GET', '/api/v1/network/ai-runtime', {
+            headers: pairedHeaders(diaryWriter),
+        });
+        assert.equal(pairedAiRuntime.response.status, 200, 'Paired client must receive AI runtime discovery');
+        for (const key of ['patientInsight', 'documentSynthesis', 'smartImport', 'treatmentReasoning']) {
+            assert.ok(['enabled', 'disabled'].includes(pairedAiRuntime.json?.killSwitches?.[key]), `AI runtime kill switch ${key} must be enabled or disabled`);
+        }
+        assert.ok(pairedAiRuntime.json?.surfaces?.includes('treatment-reasoning'), 'AI runtime must advertise treatment-reasoning');
+
+        const auditBeforeVisitDraft = await listAuditEvents(sessionCookie);
+        const patientScopedVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                patientId,
+                transcript: 'P: continuare terapia',
+            },
+        });
+        assert.equal(patientScopedVisitDraft.response.status, 400, 'Visit draft must reject a patientId presence claim');
+
+        const emptyVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {},
+        });
+        assert.equal(emptyVisitDraft.response.status, 400, 'Visit draft must reject an empty transcript');
+
+        const tooLongVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: { transcript: 'x'.repeat(12_001) },
+        });
+        assert.equal(tooLongVisitDraft.response.status, 413);
+
+        const visitDraft = await request('POST', '/api/v1/network/visit-draft', {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                transcript: 'S: tosse persistente. P: continuare terapia e rivalutare.',
+                events: [{ type: 'start', atMs: 0 }, { type: 'stop', atMs: 180000 }],
+            },
+        });
+        assert.equal(visitDraft.response.status, 200, 'Paired visit draft must accept a synthetic transcript');
+        assert.equal(typeof visitDraft.json?.draftText, 'string', 'Visit draft response must include draftText');
+        assert.ok(visitDraft.json?.sections && typeof visitDraft.json.sections === 'object' && !Array.isArray(visitDraft.json.sections), 'Visit draft response must include section groups');
+        assert.ok(Array.isArray(visitDraft.json?.medications), 'Visit draft response must include medications');
+        assert.equal(visitDraft.json?.safety?.reviewRequired, true);
+        assert.equal(visitDraft.json?.safety?.rawAudioPersisted, false);
+        assert.deepEqual(visitDraft.json?.safety?.writesPerformed, []);
+        assert.deepEqual(await listAuditEvents(sessionCookie), auditBeforeVisitDraft);
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
@@ -90,6 +155,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             content: 'prima nota',
             setting: 'ambulatory',
             metadata: { lane: 'network-diary-write-smoke' },
+            attachments: 'ENC:aXY=:c2VhbGVkcmVmcw==',
         };
         const create = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
@@ -139,6 +205,79 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(detail.json?.version, 1);
         assert.equal(detail.json?.title, 'Diario rete');
         assert.equal(detail.json?.setting, 'ambulatory');
+        assert.equal(detail.json?.attachments, createBody.attachments);
+
+        const plaintextAttachmentArray = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                attachments: [{ id: 'plaintext-reference' }],
+            },
+        });
+        assert.equal(plaintextAttachmentArray.response.status, 400);
+        assert.equal(plaintextAttachmentArray.json?.error, 'Network diary attachment references must be sealed with ENC:');
+
+        const plaintextAttachmentJson = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                attachments: '["plaintext-reference"]',
+            },
+        });
+        assert.equal(plaintextAttachmentJson.response.status, 400);
+        assert.equal(plaintextAttachmentJson.json?.error, 'Network diary attachment references must be sealed with ENC:');
+
+        const emptyAttachmentArray = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                attachments: [],
+            },
+        });
+        assert.equal(emptyAttachmentArray.response.status, 400, 'Even an empty plaintext array must be rejected');
+        assert.equal(emptyAttachmentArray.json?.error, 'Network diary attachment references must be sealed with ENC:');
+
+        const detailAfterRejectedArray = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(detailAfterRejectedArray.response.status, 200);
+        assert.equal(detailAfterRejectedArray.json?.attachments, createBody.attachments);
+        assert.equal(detailAfterRejectedArray.json?.version, 1);
+
+        const clearAttachments = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 1,
+                attachments: null,
+            },
+        });
+        assert.equal(clearAttachments.response.status, 200, 'Null is the documented clear representation');
+        assert.deepEqual(clearAttachments.json, { success: true });
+
+        const clearDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(clearDetail.response.status, 200);
+        assert.equal(clearDetail.json?.attachments, null);
+        assert.equal(clearDetail.json?.version, 2);
 
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
@@ -146,7 +285,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 Cookie: sessionCookie,
             },
             body: {
-                version: 1,
+                version: 2,
                 content: 'nota aggiornata',
             },
         });
@@ -161,7 +300,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         });
         assert.equal(updatedDetail.response.status, 200);
         assert.equal(updatedDetail.json?.content, 'nota aggiornata');
-        assert.equal(updatedDetail.json?.version, 2);
+        assert.equal(updatedDetail.json?.version, 3);
 
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
@@ -169,28 +308,15 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 Cookie: sessionCookie,
             },
             body: {
-                version: 1,
+                version: 2,
                 content: 'stale update',
             },
         });
         assert.equal(conflict.response.status, 409);
         assert.equal(conflict.json?.code, 'VERSION_CONFLICT');
         assert.equal(conflict.json?.entity, 'entry');
-        assert.equal(conflict.json?.currentVersion, 2);
+        assert.equal(conflict.json?.currentVersion, 3);
         assert.equal(Object.prototype.hasOwnProperty.call(conflict.json?.currentSnapshot ?? {}, 'content'), false);
-
-        const attachmentWrite = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
-            headers: {
-                ...pairedHeaders(diaryWriter),
-                Cookie: sessionCookie,
-            },
-            body: {
-                version: 2,
-                attachments: [{ id: 'blocked' }],
-            },
-        });
-        assert.equal(attachmentWrite.response.status, 403);
-        assert.equal(attachmentWrite.json?.error, 'Network diary write boundary excludes attachment writes');
 
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
@@ -198,7 +324,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 Cookie: sessionCookie,
             },
             body: {
-                version: 2,
+                version: 3,
                 documentInsights: 'blocked remote document-derived field',
             },
         });
@@ -211,7 +337,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
                 Cookie: sessionCookie,
             },
             body: {
-                version: 2,
+                version: 3,
                 deletedAt: '2026-05-02T10:00:00.000Z',
                 deletionReason: 'network-smoke-soft-delete',
             },
@@ -225,7 +351,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
         });
         assert.equal(deletedDetail.response.status, 200);
-        assert.equal(deletedDetail.json?.version, 3);
+        assert.equal(deletedDetail.json?.version, 4);
         assert.equal(deletedDetail.json?.deletedAt, '2026-05-02T10:00:00.000Z');
 
         const createdAudit = await findAuditEvent('entry.created', entryId, sessionCookie);
@@ -233,16 +359,16 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
         assert.ok(createdAudit.redactedMetadata?.flags?.includes(`paired-client:${diaryWriter.pairedClientId}`));
-        assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['type', 'title', 'date', 'content', 'setting', 'metadata']);
+        assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['type', 'title', 'date', 'content', 'setting', 'metadata', 'attachments']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('entry.updated', entryId, sessionCookie);
+        const updatedAudit = await findAuditEvent('entry.updated', entryId, sessionCookie, ['content']);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['content']);
-        assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
+        assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 3);
 
         const deletedAudit = await findAuditEvent('entry.deleted', entryId, sessionCookie);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
-        assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
+        assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 4);
 
         scenarioResults.push({
             name: 'paired clinical diary write',
@@ -251,12 +377,20 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             entryId,
             readOnlyForbiddenStatus: readOnlyCreate.response.status,
             missingSessionStatus: missingSession.response.status,
+            localAiRuntimeStatus: localAiRuntime.response.status,
+            pairedAiRuntimeStatus: pairedAiRuntime.response.status,
+            patientScopedVisitDraftStatus: patientScopedVisitDraft.response.status,
+            emptyVisitDraftStatus: emptyVisitDraft.response.status,
+            tooLongVisitDraftStatus: tooLongVisitDraft.response.status,
+            visitDraftStatus: visitDraft.response.status,
             createStatus: create.response.status,
             idempotentCreateStatus: idempotentCreate.response.status,
             conflictingCreateStatus: conflictingCreate.response.status,
             updateStatus: update.response.status,
             conflictStatus: conflict.response.status,
-            attachmentStatus: attachmentWrite.response.status,
+            plaintextAttachmentArrayStatus: plaintextAttachmentArray.response.status,
+            plaintextAttachmentJsonStatus: plaintextAttachmentJson.response.status,
+            clearAttachmentsStatus: clearAttachments.response.status,
             aiFieldStatus: aiField.response.status,
             softDeleteStatus: softDelete.response.status,
             pairedClientId: diaryWriter.pairedClientId,
@@ -266,17 +400,23 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
     }
 });
 
-async function findAuditEvent(eventType, subjectRef, sessionCookie) {
-    const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=entry&limit=20`, {
+async function findAuditEvent(eventType, subjectRef, sessionCookie, changedFields) {
+    const auditEvents = await listAuditEvents(sessionCookie, `eventType=${eventType}&subjectType=entry&limit=20`);
+    const event = auditEvents.find((row) => row.subjectRef === subjectRef
+        && (!changedFields || JSON.stringify(row.redactedMetadata?.changedFields) === JSON.stringify(changedFields)));
+    assert.ok(event, `Expected ${eventType} audit event for ${subjectRef}`);
+    return event;
+}
+
+async function listAuditEvents(sessionCookie, query = 'limit=500') {
+    const audit = await request('GET', `/api/system/audit?${query}`, {
         headers: {
             Cookie: sessionCookie,
         },
     });
     assert.equal(audit.response.status, 200);
     assert.ok(Array.isArray(audit.json));
-    const event = audit.json.find((row) => row.subjectRef === subjectRef);
-    assert.ok(event, `Expected ${eventType} audit event for ${subjectRef}`);
-    return event;
+    return audit.json;
 }
 
 async function assertServerReady() {

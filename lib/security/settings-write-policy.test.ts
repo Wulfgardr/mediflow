@@ -42,7 +42,7 @@ test('local token can write only the enumerated bootstrap keys', () => {
     assert.equal(evaluateSettingsWrite('clinicName', localTokenSession).allowed, true);
 
     // Operator/AI keys: denied for the local token.
-    for (const key of ['aiUrl', 'aiProvider', 'aiModel_clinical', 'aiPatientInsightKillSwitch', 'uiStyleMode']) {
+    for (const key of ['aiUrl', 'aiProvider', 'aiModel_clinical', 'aiPatientInsightKillSwitch', 'aiTreatmentReasoningKillSwitch', 'uiStyleMode']) {
         const decision = evaluateSettingsWrite(key, localTokenSession);
         assert.equal(decision.allowed, false, `${key} must be denied for local-token`);
         assert.equal(decision.allowed === false && decision.status, 403);
@@ -90,7 +90,7 @@ test('current key/writer pairs still resolve to allowed', () => {
         'aiProvider', 'aiUrl', 'ollamaUrl', 'aiModel', 'aiModel_clinical',
         'aiModel_reasoning', 'aiModel_ocr', 'aiModelDefaultVersion', 'hardwareProfile',
         'aiInsightMode', 'aiInsightManualConfig', 'aiPatientInsightKillSwitch',
-        'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'uiReduceMotion',
+        'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch', 'uiReduceMotion',
         'uiReduceTransparency', 'uiStyleMode', 'terminologyRegistry', 'clinicName', 'network.mode',
     ];
     for (const key of webWritten) {

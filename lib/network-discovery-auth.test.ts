@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { StoredNetworkPairedClient } from './network-pairing-model';
+import type { NetworkCapabilitiesResponse } from './api/v1/types';
 
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'network-discovery-auth-test-token';
 
@@ -18,6 +19,26 @@ function createPairedClient(): StoredNetworkPairedClient {
         tokenHash: 'hash',
     };
 }
+
+const capabilitiesResponse: NetworkCapabilitiesResponse = {
+    nodeId: 'node-1',
+    operatingMode: 'network-home-base',
+    protocolVersion: '1.11.0',
+    capabilities: [
+        {
+            key: 'network.replica.readonly-documents',
+            status: 'available',
+            requiresPairing: true,
+            description: 'Documents',
+        },
+        {
+            key: 'local.backup.artifact.v1',
+            status: 'available',
+            requiresPairing: false,
+            description: 'Backup',
+        },
+    ],
+};
 
 function unauthorizedResponse(): Response {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -53,6 +74,30 @@ test('resolveNetworkDiscoveryAuth accepts paired credentials when local token is
     if (!result.ok) return;
     assert.equal(result.context.authMode, 'paired-client');
     assert.equal(result.context.pairedClient.clientId, 'client-1');
+});
+
+test('paired discovery projects host capabilities through the current grant set', async () => {
+    const { projectNetworkCapabilitiesForDiscoveryAuth } = await import('./network-discovery-auth.ts');
+    const pairedClient = createPairedClient();
+
+    const legacy = projectNetworkCapabilitiesForDiscoveryAuth(capabilitiesResponse, {
+        authMode: 'paired-client',
+        pairedClient,
+    });
+    assert.equal(legacy.capabilities[0]?.status, 'unavailable');
+    assert.equal(legacy.capabilities[1]?.status, 'available');
+
+    const reapproved = projectNetworkCapabilitiesForDiscoveryAuth(capabilitiesResponse, {
+        authMode: 'paired-client',
+        pairedClient: {
+            ...pairedClient,
+            grantedCapabilities: ['network.replica.readonly-documents'],
+        },
+    });
+    assert.equal(reapproved.capabilities[0]?.status, 'available');
+
+    const local = projectNetworkCapabilitiesForDiscoveryAuth(capabilitiesResponse, { authMode: 'local-token' });
+    assert.deepEqual(local, capabilitiesResponse);
 });
 
 test('resolveNetworkDiscoveryAuth returns the standard 401 when both auth modes are absent', async () => {

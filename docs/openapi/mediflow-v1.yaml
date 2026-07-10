@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.20.0
+  version: 1.21.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -254,6 +254,10 @@ paths:
       summary: List home-base capabilities
       description: |
         Returns the versionable capability matrix exposed by the current node.
+        A local bearer-token caller receives the full host inventory. A paired
+        caller receives its effective matrix: host capabilities that require
+        pairing but are absent from that client's grants are reported as
+        `unavailable` until the client is paired again.
         Capabilities may be `available`, `disabled`, `planned`, or `unavailable`
         while only the first read-only remote patient surface is live; sync,
         cache, and broader replica flows remain follow-up workstreams.
@@ -263,7 +267,7 @@ paths:
           pairedClientToken: []
       responses:
         '200':
-          description: Versionable capability matrix for the current node.
+          description: Versionable host matrix or paired-client effective capability matrix, according to the authentication mode.
           content:
             application/json:
               schema:
@@ -338,9 +342,13 @@ paths:
       description: |
         Returns the PHI-safe AI runtime posture declared by the current node.
         This summary keeps `AI plane` separate from the shared `data plane` and
-        only describes local-vs-centralized capability plus fallback policy.
+        only describes local-vs-centralized capability, fail-closed kill-switch
+        status, and fallback policy. It accepts either the local bearer token or
+        a paired client while the node is in network-home-base mode.
       security:
         - bearerAuth: []
+        - pairedClientId: []
+          pairedClientToken: []
       responses:
         '200':
           description: Current PHI-safe AI runtime summary.
@@ -350,6 +358,57 @@ paths:
                 $ref: '#/components/schemas/NetworkAiRuntimeSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/NetworkModeDisabled'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/visit-draft:
+    post:
+      tags:
+        - Network
+      operationId: computeNetworkVisitDraft
+      summary: Compute a deterministic visit draft through the paired data plane
+      description: |
+        Computes the same deterministic, review-first draft as the web visit
+        route (ADR 0076, Classe E). The route requires a paired client with
+        `network.compute.visit-draft`, an active operator session, and the
+        effective ambulatory scope. It does not persist data or write an audit
+        mutation. `patientId` is intentionally not accepted because this
+        compute operation does not apply a patient scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkVisitDraftRequest'
+            examples:
+              computeVisitDraft:
+                value:
+                  transcript: "Paziente riferisce tosse. P: continuare terapia e rivalutare."
+                  events:
+                    - type: start
+                      atMs: 0
+                    - type: stop
+                      atMs: 180000
+      responses:
+        '200':
+          description: Review-first draft with no persisted audio or writes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkVisitDraftResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/pairing-intents:
@@ -2609,6 +2668,154 @@ paths:
           $ref: '#/components/responses/ObservationVersionConflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/attachments:
+    get:
+      tags:
+        - Network
+      operationId: listNetworkPatientAttachments
+      summary: List attachment metadata through the paired home-base data plane
+      description: |
+        Returns attachment metadata for one patient, limited to the effective
+        ambulatory scope resolved by the home-base. The list omits the
+        `data` payload, mirroring the host attachment list projection
+        (`GET /api/attachments`). This route requires a valid paired client
+        with `network.replica.readonly-documents` and an operator session
+        cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped attachment metadata from the paired node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttachmentSummary'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkPatientAttachment
+      summary: Create an attachment through the paired home-base data plane
+      description: |
+        Creates an attachment for one scoped, active patient (ADR 0076,
+        Classe A). The route requires a paired client with
+        `network.replica.write-documents`, an active operator session, and
+        the effective ambulatory scope resolved by the home-base node.
+        `name`, `path`, and `data` must already be sealed with the `ENC:`
+        format produced by the client crypto layer; plaintext or missing
+        sealed fields are rejected. `type` and `size` are plaintext metadata
+        declared by the client, matching the host attachment upload.
+        Document-derived and server-controlled fields (`patientId` bound to
+        the path parameter, `id`, `summarySnapshot`,
+        `parseEvidenceArtifactSnapshot`, `ocrQueueState`, `ocrQueueReason`,
+        `createdAt`, `updatedAt`) are rejected by presence; the server always
+        queues the created attachment with `ocrQueueState: pending` and
+        `ocrQueueReason: paired_upload`. There is no paired update or delete
+        for attachments.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachmentCreateRequest'
+            examples:
+              createNetworkAttachment:
+                value:
+                  name: 'ENC:aXY=:bmFtZS1jaXBoZXI='
+                  path: 'ENC:aXY=:cGF0aC1jaXBoZXI='
+                  data: 'ENC:aXY=:ZGF0YS1jaXBoZXI='
+                  type: application/pdf
+                  size: 20480
+      responses:
+        '201':
+          description: Attachment created through the paired boundary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/attachments/{attachmentId}:
+    get:
+      tags:
+        - Network
+      operationId: getNetworkPatientAttachment
+      summary: Get an attachment through the paired home-base data plane
+      description: |
+        Returns one full attachment, including the sealed `data` payload,
+        for a scoped patient. Returns 404 when the attachment does not
+        belong to the patient identified by the path. This route requires a
+        paired client with `network.replica.readonly-documents` and an
+        operator session cookie.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Patient identifier.
+          schema:
+            type: string
+        - name: attachmentId
+          in: path
+          required: true
+          description: Attachment identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped attachment from the paired node, including the sealed payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentDetail'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-patient:
     get:
       tags:
@@ -2777,6 +2984,16 @@ components:
             notFound:
               value:
                 error: Not found
+    PayloadTooLarge:
+      description: Attachment payload exceeds the configured wire size limit shared with the host attachment upload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            tooLarge:
+              value:
+                error: Attachment payload too large
     VersionConflict:
       description: Ambulatory compare-on-write conflict. Refresh the returned PHI-safe snapshot before retrying.
       content:
@@ -3729,6 +3946,7 @@ components:
         - fallbackPolicy
         - rolloutGate
         - surfaces
+        - killSwitches
         - guardrails
       properties:
         plane:
@@ -3758,10 +3976,146 @@ components:
               - patient-insight
               - smart-import
               - document-synthesis
+              - treatment-reasoning
+        killSwitches:
+          $ref: '#/components/schemas/NetworkAiRuntimeKillSwitches'
         guardrails:
           type: array
           items:
             type: string
+    NetworkAiRuntimeKillSwitches:
+      type: object
+      additionalProperties: false
+      required:
+        - patientInsight
+        - documentSynthesis
+        - smartImport
+        - treatmentReasoning
+      properties:
+        patientInsight:
+          type: string
+          enum: [enabled, disabled]
+        documentSynthesis:
+          type: string
+          enum: [enabled, disabled]
+        smartImport:
+          type: string
+          enum: [enabled, disabled]
+        treatmentReasoning:
+          type: string
+          enum: [enabled, disabled]
+    NetworkVisitDraftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        segments:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [text]
+            properties:
+              text:
+                type: string
+                minLength: 1
+              speaker:
+                type: string
+              atMs:
+                type: number
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [type, atMs]
+            properties:
+              type:
+                type: string
+                enum: [start, pause, resume, stop]
+              atMs:
+                type: number
+                minimum: 0
+      description: Provide a non-empty transcript or at least one non-empty segment. The combined transcript and segment text limit is 12000 characters. `patientId` is rejected by presence.
+    NetworkVisitDraftResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - draftText
+        - sections
+        - medications
+        - session
+        - safety
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.visit_transcript_draft.v1
+        draftText:
+          type: string
+        sections:
+          type: object
+          additionalProperties: false
+          required: [subjective, objective, assessment, plan]
+          properties:
+            subjective:
+              type: array
+              items: { type: string }
+            objective:
+              type: array
+              items: { type: string }
+            assessment:
+              type: array
+              items: { type: string }
+            plan:
+              type: array
+              items: { type: string }
+        medications:
+          type: array
+          items:
+            type: object
+        session:
+          type: object
+          additionalProperties: false
+          required: [state, eventCount, pauseCount, resumeCount, recordedMs, pausedMs, warnings]
+          properties:
+            state:
+              type: string
+              enum: [idle, recording, paused, stopped]
+            eventCount:
+              type: integer
+            pauseCount:
+              type: integer
+            resumeCount:
+              type: integer
+            recordedMs:
+              type: number
+            pausedMs:
+              type: number
+            warnings:
+              type: array
+              items: { type: string }
+        safety:
+          type: object
+          additionalProperties: false
+          required: [reviewRequired, forbiddenAutoWriteCount, rawAudioPersisted, writesPerformed]
+          properties:
+            reviewRequired:
+              type: boolean
+              const: true
+            forbiddenAutoWriteCount:
+              type: integer
+              const: 0
+            rawAudioPersisted:
+              type: boolean
+              const: false
+            writesPerformed:
+              type: array
+              maxItems: 0
+              items: {}
     NetworkCapability:
       type: object
       additionalProperties: false
@@ -3784,6 +4138,8 @@ components:
             - network.replica.readonly-therapies
             - network.replica.write-therapies
             - network.replica.readonly-checkups
+            - network.replica.readonly-agenda
+            - network.replica.readonly-clinical-diary-global
             - network.replica.write-checkups
             - network.replica.readonly-observations
             - network.replica.write-observations
@@ -3793,6 +4149,9 @@ components:
             - network.replica.write-prosthetic-prescriptions
             - network.fse.validate
             - network.catalogs.readonly
+            - network.replica.readonly-documents
+            - network.replica.write-documents
+            - network.compute.visit-draft
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync
@@ -4422,8 +4781,10 @@ components:
         - content
       description: |
         Clinical diary creation payload for paired clients. Server-controlled
-        `patientId`, `createdAt`, `updatedAt`, and `version` are rejected, and
-        remote attachment/document-derived writes remain outside this boundary.
+        `patientId`, `createdAt`, `updatedAt`, and `version` are rejected.
+        `attachments` may be omitted or cleared, otherwise it must be a client
+        sealed `ENC:` string because the paired host does not inspect attachment
+        references. AI and document-derived fields remain outside this boundary.
       properties:
         id:
           type: string
@@ -4452,6 +4813,11 @@ components:
             - type: object
             - type: array
             - type: 'null'
+        attachments:
+          type:
+            - string
+            - 'null'
+          description: Omit or clear this field, or send a sealed `ENC:` attachment-reference payload. Plaintext JSON and arrays are rejected.
     EntryMutationRequest:
       type: object
       additionalProperties: false
@@ -4459,8 +4825,9 @@ components:
         - version
       description: |
         Partial clinical diary update payload. At least one field other than
-        `version` must be provided. Attachment/document-derived writes are
-        rejected by the paired boundary.
+        `version` must be provided. `attachments` may be cleared or supplied
+        only as a sealed `ENC:` attachment-reference payload; AI and
+        document-derived writes remain rejected by the paired boundary.
       properties:
         version:
           type: integer
@@ -4490,6 +4857,11 @@ components:
             - type: object
             - type: array
             - type: 'null'
+        attachments:
+          type:
+            - string
+            - 'null'
+          description: Clear the field or send a sealed `ENC:` attachment-reference payload. Plaintext JSON and arrays are rejected.
         deletedAt:
           type:
             - string
@@ -5100,6 +5472,213 @@ components:
         version:
           type: integer
           minimum: 1
+    AttachmentSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - name
+        - type
+        - size
+        - path
+        - createdAt
+      description: |
+        Attachment metadata projection: mirrors the host list projection
+        (`GET /api/attachments`) and omits the `data` payload.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`.
+        type:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        path:
+          type: string
+          description: Server-normalized attachment path derived from the sealed path token.
+        summarySnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque document-derived summary beginning with `ENC:`, when present.
+        parseEvidenceArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque parse-evidence artifact beginning with `ENC:`, when present.
+        ocrQueueState:
+          type:
+            - string
+            - 'null'
+          enum:
+            - pending
+            - processing
+            - ocr_done
+            - ocr_failed
+            - manual_review
+            - null
+        ocrQueueReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - text_layer_absent
+            - text_too_short
+            - image_or_scan
+            - corrupted_pdf
+            - password_protected
+            - paired_upload
+            - null
+        ocrQueueUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        ocrReplayArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Server-generated deterministic OCR replay artifact serialized as plaintext JSON without raw OCR text or file names, when present.
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    AttachmentDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - patientId
+        - name
+        - type
+        - size
+        - path
+        - createdAt
+      description: |
+        Full attachment record, including the sealed `data` payload.
+        Returned only from the single-attachment paired route.
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`.
+        type:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        path:
+          type: string
+          description: Server-normalized attachment path derived from the sealed path token.
+        data:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque attachment payload beginning with `ENC:`, when present.
+        summarySnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque document-derived summary beginning with `ENC:`, when present.
+        parseEvidenceArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Sealed opaque parse-evidence artifact beginning with `ENC:`, when present.
+        ocrQueueState:
+          type:
+            - string
+            - 'null'
+          enum:
+            - pending
+            - processing
+            - ocr_done
+            - ocr_failed
+            - manual_review
+            - null
+        ocrQueueReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - text_layer_absent
+            - text_too_short
+            - image_or_scan
+            - corrupted_pdf
+            - password_protected
+            - paired_upload
+            - null
+        ocrQueueUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        ocrReplayArtifactSnapshot:
+          type:
+            - string
+            - 'null'
+          description: Server-generated deterministic OCR replay artifact serialized as plaintext JSON without raw OCR text or file names, when present.
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    AttachmentCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - path
+        - data
+        - type
+        - size
+      description: |
+        Attachment creation payload for paired clients (ADR 0076, Classe A).
+        `name`, `path`, and `data` must already be sealed with the `ENC:`
+        format produced by the client crypto layer; the paired boundary
+        rejects plaintext or missing sealed fields. `type` and `size` are
+        plaintext metadata declared by the client, matching the host
+        attachment upload. Server-controlled `patientId` (bound to the path
+        parameter), `id`, `summarySnapshot`, `parseEvidenceArtifactSnapshot`,
+        `ocrQueueState`, `ocrQueueReason`, `createdAt`, and `updatedAt` are
+        rejected by presence.
+      properties:
+        name:
+          type: string
+          description: Sealed opaque attachment name beginning with `ENC:`; the paired network boundary rejects plaintext.
+        path:
+          type: string
+          description: Sealed opaque attachment path beginning with `ENC:`; the paired network boundary rejects plaintext.
+        data:
+          type: string
+          description: Sealed opaque attachment payload beginning with `ENC:`; the paired network boundary rejects plaintext. The shared wire size limit applies to this sealed value.
+        type:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 0
+    AttachmentCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+      description: |
+        Attachments have no version column (hard delete, no paired update):
+        the create response carries only the server-generated identifier.
+      properties:
+        id:
+          type: string
     PatientMutationRequest:
       type: object
       additionalProperties: false

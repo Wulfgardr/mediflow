@@ -127,6 +127,274 @@ public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
     public let updatedAt: Date?
 }
 
+public enum HomeBaseDocumentOcrQueueState: String, Codable, Hashable, Sendable {
+    case pending
+    case processing
+    case ocrDone = "ocr_done"
+    case ocrFailed = "ocr_failed"
+    case manualReview = "manual_review"
+}
+
+public enum HomeBaseDocumentOcrQueueReason: String, Codable, Hashable, Sendable {
+    case textLayerAbsent = "text_layer_absent"
+    case textTooShort = "text_too_short"
+    case imageOrScan = "image_or_scan"
+    case corruptedPdf = "corrupted_pdf"
+    case passwordProtected = "password_protected"
+    case pairedUpload = "paired_upload"
+}
+
+public struct HomeBaseAttachmentSummary: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let name: String
+    public let type: String
+    public let size: Int
+    public let path: String
+    public let summarySnapshot: String?
+    public let parseEvidenceArtifactSnapshot: String?
+    public let ocrQueueState: HomeBaseDocumentOcrQueueState?
+    public let ocrQueueReason: HomeBaseDocumentOcrQueueReason?
+    public let ocrQueueUpdatedAt: Date?
+    public let ocrReplayArtifactSnapshot: String?
+    public let createdAt: Date?
+
+    public init(
+        id: String,
+        patientId: String,
+        name: String,
+        type: String,
+        size: Int,
+        path: String,
+        summarySnapshot: String?,
+        parseEvidenceArtifactSnapshot: String?,
+        ocrQueueState: HomeBaseDocumentOcrQueueState?,
+        ocrQueueReason: HomeBaseDocumentOcrQueueReason?,
+        ocrQueueUpdatedAt: Date?,
+        ocrReplayArtifactSnapshot: String?,
+        createdAt: Date?
+    ) {
+        self.id = id
+        self.patientId = patientId
+        self.name = name
+        self.type = type
+        self.size = size
+        self.path = path
+        self.summarySnapshot = summarySnapshot
+        self.parseEvidenceArtifactSnapshot = parseEvidenceArtifactSnapshot
+        self.ocrQueueState = ocrQueueState
+        self.ocrQueueReason = ocrQueueReason
+        self.ocrQueueUpdatedAt = ocrQueueUpdatedAt
+        self.ocrReplayArtifactSnapshot = ocrReplayArtifactSnapshot
+        self.createdAt = createdAt
+    }
+}
+
+public struct HomeBaseAttachmentDetail: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let patientId: String
+    public let name: String
+    public let type: String
+    public let size: Int
+    public let path: String
+    public let summarySnapshot: String?
+    public let parseEvidenceArtifactSnapshot: String?
+    public let ocrQueueState: HomeBaseDocumentOcrQueueState?
+    public let ocrQueueReason: HomeBaseDocumentOcrQueueReason?
+    public let ocrQueueUpdatedAt: Date?
+    public let ocrReplayArtifactSnapshot: String?
+    public let createdAt: Date?
+    public let data: String?
+
+    public init(
+        id: String,
+        patientId: String,
+        name: String,
+        type: String,
+        size: Int,
+        path: String,
+        summarySnapshot: String?,
+        parseEvidenceArtifactSnapshot: String?,
+        ocrQueueState: HomeBaseDocumentOcrQueueState?,
+        ocrQueueReason: HomeBaseDocumentOcrQueueReason?,
+        ocrQueueUpdatedAt: Date?,
+        ocrReplayArtifactSnapshot: String?,
+        createdAt: Date?,
+        data: String?
+    ) {
+        self.id = id
+        self.patientId = patientId
+        self.name = name
+        self.type = type
+        self.size = size
+        self.path = path
+        self.summarySnapshot = summarySnapshot
+        self.parseEvidenceArtifactSnapshot = parseEvidenceArtifactSnapshot
+        self.ocrQueueState = ocrQueueState
+        self.ocrQueueReason = ocrQueueReason
+        self.ocrQueueUpdatedAt = ocrQueueUpdatedAt
+        self.ocrReplayArtifactSnapshot = ocrReplayArtifactSnapshot
+        self.createdAt = createdAt
+        self.data = data
+    }
+}
+
+public struct HomeBaseAttachmentCreatePayload: Encodable, Sendable {
+    public let name: String
+    public let path: String
+    public let data: String
+    public let type: String
+    public let size: Int
+
+    init(name: String, path: String, data: String, type: String, size: Int) {
+        self.name = name
+        self.path = path
+        self.data = data
+        self.type = type
+        self.size = size
+    }
+}
+
+public struct HomeBaseVisitDraftInput: Encodable, Equatable, Sendable {
+    public let transcript: String?
+    public let segments: [HomeBaseVisitTranscriptSegment]?
+    public let events: [HomeBaseVisitSessionEvent]?
+
+    public init(
+        transcript: String? = nil,
+        segments: [HomeBaseVisitTranscriptSegment]? = nil,
+        events: [HomeBaseVisitSessionEvent]? = nil
+    ) {
+        self.transcript = transcript
+        self.segments = segments
+        self.events = events
+    }
+}
+
+public struct HomeBaseVisitTranscriptSegment: Codable, Equatable, Sendable {
+    public let text: String
+    public let speaker: String?
+    public let atMs: Double?
+
+    public init(text: String, speaker: String? = nil, atMs: Double? = nil) {
+        self.text = text
+        self.speaker = speaker
+        self.atMs = atMs
+    }
+}
+
+public enum HomeBaseVisitSessionEventType: String, Codable, Sendable {
+    case start
+    case pause
+    case resume
+    case stop
+}
+
+public struct HomeBaseVisitSessionEvent: Codable, Equatable, Sendable {
+    public let type: HomeBaseVisitSessionEventType
+    public let atMs: Double
+
+    public init(type: HomeBaseVisitSessionEventType, atMs: Double) {
+        self.type = type
+        self.atMs = atMs
+    }
+}
+
+public struct HomeBaseVisitDraftResponse: Codable, Equatable, Sendable {
+    public struct Sections: Codable, Equatable, Sendable {
+        public let subjective: [String]
+        public let objective: [String]
+        public let assessment: [String]
+        public let plan: [String]
+    }
+
+    public struct MedicationCandidate: Codable, Equatable, Sendable {
+        public struct Match: Codable, Equatable, Sendable {
+            public let aic: String
+            public let name: String
+            public let activePrinciple: String?
+            public let atc: String?
+        }
+
+        public let drugMention: String
+        public let drugQuery: String
+        public let activePrinciple: String?
+        public let dosage: String?
+        public let therapyState: String
+        public let confidence: String
+        public let evidence: String
+        public let matchType: String
+        public let match: Match?
+        public let canApply: Bool
+        public let blockedReason: String
+    }
+
+    public struct Session: Codable, Equatable, Sendable {
+        public let state: String
+        public let eventCount: Int
+        public let pauseCount: Int
+        public let resumeCount: Int
+        public let recordedMs: Double
+        public let pausedMs: Double
+        public let warnings: [String]
+    }
+
+    public struct Safety: Codable, Equatable, Sendable {
+        public let reviewRequired: Bool
+        public let forbiddenAutoWriteCount: Int
+        public let rawAudioPersisted: Bool
+        public let writesPerformed: [HomeBaseJSONValue]
+    }
+
+    public let schemaVersion: String
+    public let draftText: String
+    public let sections: Sections
+    public let medications: [MedicationCandidate]
+    public let session: Session
+    public let safety: Safety
+}
+
+public enum HomeBaseNetworkAiKillSwitchState: String, Codable, Sendable {
+    case enabled
+    case disabled
+}
+
+public struct HomeBaseNetworkAiRuntimeSummary: Codable, Equatable, Sendable {
+    public struct LocalRuntime: Codable, Equatable, Sendable {
+        public let provider: String
+        public let state: String
+        public let targetPolicy: String
+        public let hardwareProfile: String
+        public let clinicalModel: String?
+        public let reasoningModel: String?
+        public let ocrModel: String?
+    }
+
+    public struct CentralRuntime: Codable, Equatable, Sendable {
+        public let state: String
+        public let capabilityStatus: String
+        public let requiresPairing: Bool
+        public let executionTarget: String
+    }
+
+    public struct KillSwitches: Codable, Equatable, Sendable {
+        public let patientInsight: HomeBaseNetworkAiKillSwitchState
+        public let documentSynthesis: HomeBaseNetworkAiKillSwitchState
+        public let smartImport: HomeBaseNetworkAiKillSwitchState
+        public let treatmentReasoning: HomeBaseNetworkAiKillSwitchState
+    }
+
+    public let plane: String
+    public let mode: String
+    public let localRuntime: LocalRuntime
+    public let centralRuntime: CentralRuntime
+    public let fallbackPolicy: String
+    public let rolloutGate: String
+    public let surfaces: [String]
+    public let killSwitches: KillSwitches
+    public let guardrails: [String]
+}
+
 /* @Codex */
 public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, drugName: String, aic: String?, atc: String?, activePrinciple: String?, dosage: String, motivation: String?, diagnosisCode: String?, diagnosisName: String?, status: String, startDate: Date, endDate: Date?, version: Int, createdAt: Date?, updatedAt: Date?, deletedAt: Date?, deletionReason: String?) {
@@ -587,9 +855,11 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     // plaintext JSON (sealed in-core) or an already-encrypted ENC: string (stored
     // verbatim), omitted when nil so ordinary diary entries are unchanged.
     public let metadata: String?
+    public let attachments: String?
 
     public init(id: String, type: String, title: String? = nil, date: Date, content: String,
-                setting: String? = nil, metadata: String? = nil) {
+                setting: String? = nil, metadata: String? = nil,
+                attachmentReferences: HomeBaseSealedEntryAttachmentReferences? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -597,6 +867,7 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
         self.content = content
         self.setting = setting
         self.metadata = metadata
+        self.attachments = attachmentReferences?.encodedValue
     }
 }
 
@@ -610,12 +881,11 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
     public let setting: String?
     public let deletedAt: Date?
     public let deletionReason: String?
+    let attachments: String?
     private let shouldEncodeDeletedAt: Bool
     private let shouldEncodeDeletionReason: Bool
-    // NOTE: metadata (an ENCRYPTED structured field) is intentionally absent here:
-    // its update input shape (plaintext-to-seal vs pre-encrypted) is unresolved, so
-    // metadata edits stay create-only on-device. attachments is excluded by design
-    // (the web boundary rejects attachment writes).
+    let shouldEncodeAttachments: Bool
+    // metadata remains create-only because its update shape is unresolved.
 
     public init(
         version: Int,
@@ -627,7 +897,8 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         deletedAt: Date? = nil,
         deletionReason: String? = nil,
         shouldEncodeDeletedAt: Bool = false,
-        shouldEncodeDeletionReason: Bool = false
+        shouldEncodeDeletionReason: Bool = false,
+        attachmentReferences: HomeBaseSealedEntryAttachmentReferences? = nil
     ) {
         self.version = version
         self.type = type
@@ -637,8 +908,10 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         self.setting = setting
         self.deletedAt = deletedAt
         self.deletionReason = deletionReason
+        self.attachments = attachmentReferences?.encodedValue
         self.shouldEncodeDeletedAt = shouldEncodeDeletedAt
         self.shouldEncodeDeletionReason = shouldEncodeDeletionReason
+        self.shouldEncodeAttachments = attachmentReferences != nil
     }
 
     enum CodingKeys: String, CodingKey {
@@ -650,6 +923,7 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
         case setting
         case deletedAt
         case deletionReason
+        case attachments
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -677,6 +951,13 @@ public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
             }
         } else {
             try container.encodeIfPresent(deletionReason, forKey: .deletionReason)
+        }
+        if shouldEncodeAttachments {
+            if let attachments {
+                try container.encode(attachments, forKey: .attachments)
+            } else {
+                try container.encodeNil(forKey: .attachments)
+            }
         }
     }
 }

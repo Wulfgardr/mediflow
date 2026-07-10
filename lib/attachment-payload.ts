@@ -1,9 +1,11 @@
 /* @Codex */
 const BASE64_PAYLOAD_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 /* @Codex */
-const ENCRYPTED_ATTACHMENT_PATTERN = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
+export const ENCRYPTED_ATTACHMENT_PATTERN = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
 /* @Codex */
 const DATA_URL_BASE64_PREFIX = /^data:[^,]*;base64,/i;
+/* @Codex */
+const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 /* @Codex */
 function isPlainBase64(value: string): boolean {
@@ -32,4 +34,17 @@ export function getAttachmentPayloadByteSize(value: unknown): { ok: true; size: 
     }
 
     return { ok: true, size: Buffer.byteLength(value, 'utf8') };
+}
+
+/* @Codex */
+export function isSealedAttachmentValue(value: unknown): value is string {
+    return typeof value === 'string' && ENCRYPTED_ATTACHMENT_PATTERN.test(value);
+}
+
+/* @Codex: extracted from app/api/attachments/route.ts (WUL-194 W5 S1) so the
+   paired network boundary shares the exact same wire size limit as the host
+   attachment upload; behavior and default are unchanged. */
+export function resolveMaxAttachmentBytes(): number {
+    const configured = Number.parseInt(process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES ?? '', 10);
+    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ATTACHMENT_BYTES;
 }

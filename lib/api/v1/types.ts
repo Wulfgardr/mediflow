@@ -1,5 +1,8 @@
 // Codex: created 2026-02-01
 
+/* @Codex */
+import type { DocumentOcrQueueReason, DocumentOcrQueueState } from '../../domain/documents/document-ocr-queue';
+
 export type PatientSummary = {
     id: string;
     firstName: string;
@@ -173,6 +176,28 @@ export type ObservationSummary = {
     deletedAt: string | null;
     /* @Codex */
     deletionReason: string | null;
+};
+
+/* @Codex */
+export type AttachmentSummary = {
+    id: string;
+    patientId: string;
+    name: string;
+    type: string;
+    size: number;
+    path: string;
+    summarySnapshot: string | null;
+    parseEvidenceArtifactSnapshot: string | null;
+    ocrQueueState: DocumentOcrQueueState | null;
+    ocrQueueReason: DocumentOcrQueueReason | null;
+    ocrQueueUpdatedAt: string | null;
+    ocrReplayArtifactSnapshot: string | null;
+    createdAt: string | null;
+};
+
+/* @Codex */
+export type AttachmentDetail = AttachmentSummary & {
+    data: string | null;
 };
 
 /* @Codex */
@@ -402,7 +427,16 @@ export type NetworkAiRuntimeHardwareProfile = 'low' | 'medium' | 'high' | 'custo
 export type NetworkAiRuntimeSurface =
     | 'patient-insight'
     | 'smart-import'
-    | 'document-synthesis';
+    | 'document-synthesis'
+    | 'treatment-reasoning';
+
+/* @Codex */
+export type NetworkAiRuntimeKillSwitches = {
+    patientInsight: 'enabled' | 'disabled';
+    documentSynthesis: 'enabled' | 'disabled';
+    smartImport: 'enabled' | 'disabled';
+    treatmentReasoning: 'enabled' | 'disabled';
+};
 
 /* @Codex */
 export type NetworkAiRuntimeSummary = {
@@ -426,6 +460,7 @@ export type NetworkAiRuntimeSummary = {
     fallbackPolicy: 'client-local-runtime-else-ai-unavailable';
     rolloutGate: 'lane-benchmarks-and-rollout-governance-required';
     surfaces: NetworkAiRuntimeSurface[];
+    killSwitches: NetworkAiRuntimeKillSwitches;
     guardrails: string[];
 };
 
@@ -473,6 +508,12 @@ export type NetworkCapabilityKey =
     | 'network.fse.validate'
     /* @Codex */
     | 'network.catalogs.readonly'
+    /* @Codex */
+    | 'network.replica.readonly-documents'
+    /* @Codex */
+    | 'network.replica.write-documents'
+    /* @Codex */
+    | 'network.compute.visit-draft'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

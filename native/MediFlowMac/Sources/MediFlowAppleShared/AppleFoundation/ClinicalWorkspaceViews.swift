@@ -4,14 +4,26 @@ import MediFlowCore
 
 /* @Codex */
 struct ClinicalWorkspaceConnection {
+    struct Identity: Hashable {
+        let clientId: String
+        let clientToken: String
+        let sessionCookie: String
+        let ambulatoryId: String?
+    }
+
     let dataSource: any HomeBasePatientsDataSource
     let credentials: HomeBasePairedCredentials
     let sessionCookie: String
     let ambulatoryId: String?
     let masterKey: SymmetricKey?
 
-    var identity: String {
-        "\(credentials.clientId):\(ambulatoryId ?? ""):\(sessionCookie.hashValue)"
+    var identity: Identity {
+        Identity(
+            clientId: credentials.clientId,
+            clientToken: credentials.clientToken,
+            sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId
+        )
     }
 }
 
@@ -29,14 +41,23 @@ enum ClinicalWorkspaceLoadState: Equatable {
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
     private var availableKeys = Set<String>()
-    private var loadedConnectionIdentity: String?
+    private var loadedConnectionIdentity: ClinicalWorkspaceConnection.Identity?
+    private var requestGeneration: UInt64 = 0
 
     func loadIfNeeded(using connection: ClinicalWorkspaceConnection?) async {
         guard let connection else {
+            requestGeneration &+= 1
+            availableKeys.removeAll()
+            loadedConnectionIdentity = nil
             state = .unavailable("Collega l'home-base per verificare le capability disponibili.")
             return
         }
-        guard loadedConnectionIdentity != connection.identity else { return }
+        let connectionIdentity = connection.identity
+        guard loadedConnectionIdentity != connectionIdentity || state != .loaded else { return }
+        requestGeneration &+= 1
+        let generation = requestGeneration
+        availableKeys.removeAll()
+        loadedConnectionIdentity = nil
         state = .loading
         do {
             let response = try await connection.dataSource.fetchNetworkCapabilities(
@@ -44,12 +65,18 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
                 sessionCookie: connection.sessionCookie,
                 ambulatoryId: connection.ambulatoryId
             )
+            guard requestGeneration == generation else { return }
             availableKeys = Set(response.capabilities.compactMap { capability in
                 capability.status == "available" ? capability.key : nil
             })
-            loadedConnectionIdentity = connection.identity
+            loadedConnectionIdentity = connectionIdentity
             state = .loaded
         } catch {
+            guard requestGeneration == generation else { return }
+            if Task.isCancelled {
+                state = .idle
+                return
+            }
             state = .failed("Non è stato possibile verificare le capability dell'host: \(error.localizedDescription)")
         }
     }
@@ -67,6 +94,12 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             return "L'host collegato non espone ancora il diario clinico globale (capability network.replica.readonly-clinical-diary-global). Aggiorna MediFlow sull'host."
         case "network.ambulatories.write":
             return "L'host collegato non espone la gestione ambulatori. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+        case "network.replica.readonly-documents":
+            return "L'host o il pairing corrente non espongono ancora l'archivio documenti. Aggiorna MediFlow sull'host e ripeti il pairing."
+        case "network.replica.write-documents":
+            return "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+        case "network.compute.visit-draft":
+            return "L'host o il pairing corrente non espongono ancora l'elaborazione della bozza visita. Aggiorna MediFlow sull'host e ripeti il pairing."
         default:
             return "L'host collegato non espone ancora la lettura pazienti richiesta (capability \(key)). Aggiorna MediFlow sull'host."
         }
