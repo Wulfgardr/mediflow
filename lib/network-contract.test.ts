@@ -190,6 +190,18 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.ok(catalogSync);
     assert.equal(catalogSync.status, 'planned');
     assert.equal(catalogSync.requiresPairing, true);
+
+    const documentRead = response.capabilities.find((item) => item.key === 'network.replica.readonly-documents');
+    assert.ok(documentRead);
+    assert.equal(documentRead.status, 'available');
+    assert.equal(documentRead.requiresPairing, true);
+
+    const documentWrite = response.capabilities.find((item) => item.key === 'network.replica.write-documents');
+    assert.ok(documentWrite);
+    assert.equal(documentWrite.status, 'available');
+    assert.equal(documentWrite.requiresPairing, true);
+
+    assert.equal(response.capabilities.length, 28);
 });
 
 test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states', () => {
