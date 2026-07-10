@@ -4,14 +4,26 @@ import MediFlowCore
 
 /* @Codex */
 struct ClinicalWorkspaceConnection {
+    struct Identity: Hashable {
+        let clientId: String
+        let clientToken: String
+        let sessionCookie: String
+        let ambulatoryId: String?
+    }
+
     let dataSource: any HomeBasePatientsDataSource
     let credentials: HomeBasePairedCredentials
     let sessionCookie: String
     let ambulatoryId: String?
     let masterKey: SymmetricKey?
 
-    var identity: String {
-        "\(credentials.clientId):\(ambulatoryId ?? ""):\(sessionCookie.hashValue)"
+    var identity: Identity {
+        Identity(
+            clientId: credentials.clientId,
+            clientToken: credentials.clientToken,
+            sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId
+        )
     }
 }
 
@@ -29,14 +41,17 @@ enum ClinicalWorkspaceLoadState: Equatable {
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
     private var availableKeys = Set<String>()
-    private var loadedConnectionIdentity: String?
+    private var loadedConnectionIdentity: ClinicalWorkspaceConnection.Identity?
 
     func loadIfNeeded(using connection: ClinicalWorkspaceConnection?) async {
         guard let connection else {
+            availableKeys.removeAll()
+            loadedConnectionIdentity = nil
             state = .unavailable("Collega l'home-base per verificare le capability disponibili.")
             return
         }
         guard loadedConnectionIdentity != connection.identity else { return }
+        availableKeys.removeAll()
         state = .loading
         do {
             let response = try await connection.dataSource.fetchNetworkCapabilities(
