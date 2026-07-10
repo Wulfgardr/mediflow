@@ -335,6 +335,39 @@ final class SettingsAmbulatoriesModel: ObservableObject {
     }
 }
 
+@MainActor
+final class SettingsAiFunctionsModel: ObservableObject {
+    @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
+    @Published private(set) var runtime: HomeBaseNetworkAiRuntimeSummary?
+
+    private let connectionProvider: () -> ClinicalWorkspaceConnection?
+
+    init(connectionProvider: @escaping () -> ClinicalWorkspaceConnection?) {
+        self.connectionProvider = connectionProvider
+    }
+
+    func load() async {
+        guard let connection = connectionProvider() else {
+            runtime = nil
+            state = .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni AI.")
+            return
+        }
+
+        state = .loading
+        do {
+            runtime = try await connection.dataSource.fetchAiRuntimeStatus(
+                credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie,
+                ambulatoryId: connection.ambulatoryId
+            )
+            state = .loaded
+        } catch {
+            runtime = nil
+            state = .failed("Stato non disponibile.")
+        }
+    }
+}
+
 struct SettingsWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -342,6 +375,7 @@ struct SettingsWorkspaceView: View {
     @StateObject private var accessModel = SettingsAccessModel()
     @StateObject private var profileModel: SettingsProfileModel
     @StateObject private var ambulatoriesModel: SettingsAmbulatoriesModel
+    @StateObject private var aiFunctionsModel: SettingsAiFunctionsModel
     @State private var currentPin = ""
     @State private var newPin = ""
     @State private var newPinConfirmation = ""
@@ -369,6 +403,9 @@ struct SettingsWorkspaceView: View {
             connectionProvider: { workspaceModel.clinicalWorkspaceConnection },
             sessionExpired: { await workspaceModel.lockSessionNow() }
         ))
+        _aiFunctionsModel = StateObject(wrappedValue: SettingsAiFunctionsModel(
+            connectionProvider: { workspaceModel.clinicalWorkspaceConnection }
+        ))
     }
 
     var body: some View {
@@ -376,6 +413,7 @@ struct SettingsWorkspaceView: View {
             Section("Accesso") { accessContent }
             Section("Profilo") { profileContent }
             Section("Ambulatori") { ambulatoryContent }
+            Section("Funzioni AI") { aiFunctionsContent }
             Section("Aspetto") { appearanceContent }
             Section("Privacy") { privacyContent }
         }
@@ -386,6 +424,9 @@ struct SettingsWorkspaceView: View {
         .task(id: workspaceModel.connectionState) {
             guard capabilities.hasCapability("network.ambulatories.write") else { return }
             await ambulatoriesModel.load()
+        }
+        .task(id: workspaceModel.connectionState) {
+            await aiFunctionsModel.load()
         }
         .confirmationDialog("Eliminare questo ambulatorio?", isPresented: $showsDeletionConfirmation, titleVisibility: .visible) {
             Button("Elimina", role: .destructive) {
@@ -498,6 +539,33 @@ struct SettingsWorkspaceView: View {
     }
 
     @ViewBuilder
+    private var aiFunctionsContent: some View {
+        Text("Sola lettura. Modifica sul nodo home base.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+        if aiFunctionsModel.state == .loading {
+            ProgressView()
+        } else if let runtime = aiFunctionsModel.runtime, aiFunctionsModel.state == .loaded {
+            settingsStatusRow("Patient Insight", value: aiFunctionState(runtime.killSwitches.patientInsight))
+            settingsStatusRow("Document Synthesis", value: aiFunctionState(runtime.killSwitches.documentSynthesis))
+            settingsStatusRow("Smart Import", value: aiFunctionState(runtime.killSwitches.smartImport))
+            settingsStatusRow("Treatment Reasoning", value: aiFunctionState(runtime.killSwitches.treatmentReasoning))
+            settingsStatusRow("Piano AI", value: runtime.plane)
+            settingsStatusRow("Modalità", value: runtime.mode)
+            settingsStatusRow("Runtime locale", value: "\(runtime.localRuntime.state), \(runtime.localRuntime.provider)")
+            settingsStatusRow("Runtime centrale", value: runtime.centralRuntime.state)
+            settingsStatusRow("Superfici", value: runtime.surfaces.isEmpty ? "Nessuna" : runtime.surfaces.joined(separator: ", "))
+        } else if case .unavailable(let message) = aiFunctionsModel.state {
+            settingsMessage(message)
+        } else if case .failed(let message) = aiFunctionsModel.state {
+            settingsMessage(message)
+        } else {
+            settingsMessage("Stato non disponibile.")
+        }
+    }
+
+    @ViewBuilder
     private var privacyContent: some View {
         Toggle("Oscura contenuti clinici", isOn: $appearance.privacyShieldEnabled)
         Text("Quando è attivo, MediFlow mantiene coperti i contenuti clinici anche mentre l'app è aperta.")
@@ -554,5 +622,21 @@ struct SettingsWorkspaceView: View {
         Text(message)
             .font(.subheadline)
             .foregroundStyle(.secondary)
+    }
+
+    private func settingsStatusRow(_ label: String, value: String) -> some View {
+        LabeledContent(label) {
+            Text(value)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func aiFunctionState(_ state: HomeBaseNetworkAiKillSwitchState) -> String {
+        switch state {
+        case .enabled:
+            return "Attivo"
+        case .disabled:
+            return "Disattivato"
+        }
     }
 }

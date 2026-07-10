@@ -73,6 +73,46 @@ final class SettingsWorkspaceTests: XCTestCase {
         )
     }
 
+    func testAiFunctionsModelLoadsRuntimeStatusWithoutMutations() async throws {
+        let source = S6MockDataSource(details: [:], aiRuntime: try aiRuntime())
+        let model = SettingsAiFunctionsModel(connectionProvider: { self.connection(source) })
+
+        await model.load()
+
+        XCTAssertEqual(model.state, .loaded)
+        XCTAssertEqual(model.runtime?.killSwitches.patientInsight, .enabled)
+        XCTAssertEqual(model.runtime?.killSwitches.documentSynthesis, .disabled)
+        XCTAssertEqual(model.runtime?.killSwitches.smartImport, .enabled)
+        XCTAssertEqual(model.runtime?.killSwitches.treatmentReasoning, .disabled)
+        XCTAssertEqual(model.runtime?.localRuntime.state, "configured")
+        XCTAssertEqual(model.runtime?.centralRuntime.state, "available")
+        let fetchCount = await source.fetchAiRuntimeStatusCount
+        let createCount = await source.createAmbulatoryCount
+        XCTAssertEqual(fetchCount, 1)
+        XCTAssertEqual(createCount, 0)
+    }
+
+    func testAiFunctionsModelFailsClosedWhenRuntimeStatusIsUnavailable() async {
+        let source = S6MockDataSource(details: [:])
+        let model = SettingsAiFunctionsModel(connectionProvider: { self.connection(source) })
+
+        await model.load()
+
+        XCTAssertEqual(model.state, .failed("Stato non disponibile."))
+        XCTAssertNil(model.runtime)
+        let fetchCount = await source.fetchAiRuntimeStatusCount
+        XCTAssertEqual(fetchCount, 1)
+    }
+
+    func testAiFunctionsModelReportsMissingConnectionHonestly() async {
+        let model = SettingsAiFunctionsModel(connectionProvider: { nil })
+
+        await model.load()
+
+        XCTAssertEqual(model.state, .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni AI."))
+        XCTAssertNil(model.runtime)
+    }
+
     func testProfileModelSavesAndNotifiesOperatorIdentityOwner() async {
         let source = S6MockDataSource(details: [:])
         var saved: (String?, String?)?
@@ -107,6 +147,13 @@ final class SettingsWorkspaceTests: XCTestCase {
         NetworkAmbulatorySummary(
             id: id, name: name, address: nil, type: "live", isDefault: false,
             version: version, createdAt: nil
+        )
+    }
+
+    private func aiRuntime() throws -> HomeBaseNetworkAiRuntimeSummary {
+        try JSONDecoder().decode(
+            HomeBaseNetworkAiRuntimeSummary.self,
+            from: Data(#"{"plane":"ai-plane-separate-from-data-plane","mode":"centralized-available","localRuntime":{"provider":"ollama","state":"configured","targetPolicy":"loopback-only","hardwareProfile":"high","clinicalModel":null,"reasoningModel":null,"ocrModel":null},"centralRuntime":{"state":"available","capabilityStatus":"available","requiresPairing":true,"executionTarget":"paired-home-base"},"fallbackPolicy":"client-local-runtime-else-ai-unavailable","rolloutGate":"lane-benchmarks-and-rollout-governance-required","surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],"killSwitches":{"patientInsight":"enabled","documentSynthesis":"disabled","smartImport":"enabled","treatmentReasoning":"disabled"},"guardrails":[]}"#.utf8)
         )
     }
 }

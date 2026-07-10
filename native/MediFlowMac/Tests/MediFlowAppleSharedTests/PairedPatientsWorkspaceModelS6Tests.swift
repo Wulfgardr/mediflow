@@ -153,11 +153,13 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
     private let ambulatories: [NetworkAmbulatorySummary]
     private let ambulatoryMutationError: HomeBaseClientError?
     private let profileError: HomeBaseClientError?
+    private let aiRuntime: HomeBaseNetworkAiRuntimeSummary?
     private(set) var lastServiceUpdate: ServiceUpdate?
     private(set) var itemUpdates: [ItemUpdate] = []
     private(set) var fetchPatientCount = 0
     private(set) var fetchAmbulatoriesCount = 0
     private(set) var createAmbulatoryCount = 0
+    private(set) var fetchAiRuntimeStatusCount = 0
 
     init(
         details: [String: HomeBasePatientDetail],
@@ -172,7 +174,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         shouldFail: Bool = false,
         ambulatories: [NetworkAmbulatorySummary] = [],
         ambulatoryMutationError: HomeBaseClientError? = nil,
-        profileError: HomeBaseClientError? = nil
+        profileError: HomeBaseClientError? = nil,
+        aiRuntime: HomeBaseNetworkAiRuntimeSummary? = nil
     ) {
         self.details = details
         self.services = services
@@ -187,6 +190,7 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         self.ambulatories = ambulatories
         self.ambulatoryMutationError = ambulatoryMutationError
         self.profileError = profileError
+        self.aiRuntime = aiRuntime
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
@@ -454,7 +458,9 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
     func fetchAiRuntimeStatus(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseNetworkAiRuntimeSummary {
-        throw HomeBaseClientError.contract
+        fetchAiRuntimeStatusCount += 1
+        guard let aiRuntime else { throw HomeBaseClientError.contract }
+        return aiRuntime
     }
 
     func fetchTherapies(
