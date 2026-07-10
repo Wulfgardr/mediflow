@@ -3,8 +3,6 @@ import { randomUUID } from 'node:crypto';
 /* @Codex */
 import { and, eq } from 'drizzle-orm';
 /* @Codex */
-import { buildAttachmentPath } from './attachment-path';
-/* @Codex */
 import { getAttachmentPayloadByteSize, isSealedAttachmentValue, resolveMaxAttachmentBytes } from './attachment-payload';
 /* @Codex */
 import {
@@ -34,18 +32,12 @@ type NetworkAttachmentMutationResponse =
     | { status: 400 | 404 | 413; value: Record<string, unknown> };
 
 // D2/D3 (ADR 0076, Classe A): the paired create payload is a projection of the
-// web payload, not a replica. patientId comes from the path; every
-// document-derived and server-controlled field is rejected by presence.
-const NETWORK_FORBIDDEN_ATTACHMENT_CREATE_FIELDS = [
-    'patientId',
-    'id',
-    'summarySnapshot',
-    'parseEvidenceArtifactSnapshot',
-    'ocrQueueState',
-    'ocrQueueReason',
-    'createdAt',
-    'updatedAt',
-] as const;
+// web payload, not a replica. patientId comes from the path; the boundary
+// accepts ONLY this exact allowlist and rejects every other key by presence
+// (server-controlled, document-derived and unknown fields alike), matching the
+// OpenAPI additionalProperties: false contract. An allowlist, not a denylist:
+// a field added to the host schema later cannot silently slip through here.
+const NETWORK_ALLOWED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data', 'type', 'size'] as const;
 
 const NETWORK_SEALED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data'] as const;
 
@@ -64,12 +56,13 @@ function isFiniteNonNegativeNumber(value: unknown): value is number {
 function validateNetworkAttachmentCreateBody(
     body: Record<string, unknown>
 ): { ok: true } | { ok: false; status: 400; value: Record<string, unknown> } {
-    for (const field of NETWORK_FORBIDDEN_ATTACHMENT_CREATE_FIELDS) {
-        if (hasOwn(body, field)) {
+    const allowed = new Set<string>(NETWORK_ALLOWED_ATTACHMENT_CREATE_FIELDS);
+    for (const key of Object.keys(body)) {
+        if (!allowed.has(key)) {
             return {
                 ok: false,
                 status: 400,
-                value: { error: `Network document write boundary rejects client-controlled ${field}` },
+                value: { error: `Network document write boundary rejects unexpected field ${key}` },
             };
         }
     }
@@ -174,7 +167,12 @@ export async function createNetworkScopedAttachment(
     const newId = randomUUID();
     const now = new Date();
     const name = body.name as string;
-    const path = buildAttachmentPath(body.path, name, newId);
+    // The client seals `path` (ADR 0076 Classe A) and a keyless host cannot
+    // read it: persist it verbatim. Running it through buildAttachmentPath would
+    // de-seal the ciphertext into a derived plaintext token, breaking the
+    // zero-knowledge invariant. Logical-path normalization belongs on the client
+    // before sealing.
+    const path = body.path as string;
 
     const commit = dbServer.transaction((tx): NetworkAttachmentMutationResponse => {
         if (!patientIsActiveAndInScope(tx, context.patientId, context.scopeAmbulatoryId)) {

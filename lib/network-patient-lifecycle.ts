@@ -66,8 +66,17 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
 }
 
+// A sealed field is the two-segment envelope the client crypto emits,
+// `ENC:<base64 iv>:<base64 ciphertext>` (lib/db.ts encryptFields). A keyless
+// host cannot verify the encryption, but it MUST reject values that only look
+// sealed by prefix: `ENC:["patient-id"]` (raw JSON) or `ENC: +39 333...` (free
+// text) would otherwise land plaintext in a column contracted to hold opaque
+// ciphertext. The anchored pattern requires two non-empty base64 segments, so
+// accidental plaintext (brackets, quotes, spaces, hyphens) is rejected.
+const SEALED_FIELD_ENVELOPE_PATTERN = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
+
 export function isSealedValue(value: unknown): boolean {
-    return typeof value === 'string' && value.startsWith('ENC:');
+    return typeof value === 'string' && SEALED_FIELD_ENVELOPE_PATTERN.test(value);
 }
 
 function hasRequiredString(value: unknown): boolean {

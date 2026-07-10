@@ -60,7 +60,7 @@ function resetDatabase(): void {
         firstName: 'Ada',
         lastName: 'Sealed',
         taxCode: 'ADASEALED01',
-        archiveReason: 'ENC:iv:previous-reason',
+        archiveReason: 'ENC:iv:previousreason',
         version: 3,
     }]).run();
     dbServer.insert(patientsToAmbulatories).values([{ patientId: PATIENT_ID, ambulatoryId: SCOPE_AMBULATORY }]).run();
@@ -85,7 +85,28 @@ test('network update rejects plaintext sensitive fields', async () => {
         assert.deepEqual(result.value, { error: 'Network update requires sealed sensitive fields' });
     }
     const row = dbServer.select().from(patients).all()[0];
-    assert.equal(row.archiveReason, 'ENC:iv:previous-reason');
+    assert.equal(row.archiveReason, 'ENC:iv:previousreason');
+    assert.equal(row.version, 3);
+});
+
+test('network update rejects plaintext smuggled behind an ENC: prefix', async () => {
+    resetDatabase();
+    // The sealed guard must reject values that only look sealed by prefix:
+    // raw JSON, free text with spaces, or a missing envelope segment would
+    // otherwise land plaintext in a ciphertext-only column.
+    const spoofed = [
+        'ENC:["patient-id"]',
+        'ENC: +39 333 1234567',
+        'ENC:onlyonesegment',
+        'ENC::',
+        'ENC:iv:has-a-hyphen',
+    ];
+    for (const value of spoofed) {
+        const result = await updateNetworkScopedPatient(makeContext(), { version: 3, diagnoses: value });
+        assert.equal(result.status, 400, `expected 400 for spoofed value ${value}`);
+        assert.deepEqual(result.value, { error: 'Network update requires sealed sensitive fields' });
+    }
+    const row = dbServer.select().from(patients).all()[0];
     assert.equal(row.version, 3);
 });
 
@@ -94,17 +115,17 @@ test('network update accepts sealed sensitive fields and null clearing', async (
     const sealed = await updateNetworkScopedPatient(makeContext(), {
         version: 3,
         isArchived: true,
-        phone: 'ENC:iv:new-phone',
-        diagnoses: 'ENC:iv:new-diagnoses',
-        archiveReason: 'ENC:iv:new-reason',
-        archiveNote: 'ENC:iv:new-note',
+        phone: 'ENC:iv:newphone',
+        diagnoses: 'ENC:iv:newdiagnoses',
+        archiveReason: 'ENC:iv:newreason',
+        archiveNote: 'ENC:iv:newnote',
     });
     assert.equal(sealed.status, 200);
     let row = dbServer.select().from(patients).all()[0];
-    assert.equal(row.archiveReason, 'ENC:iv:new-reason');
-    assert.equal(row.archiveNote, 'ENC:iv:new-note');
-    assert.equal(row.phone, 'ENC:iv:new-phone');
-    assert.equal(row.diagnoses, 'ENC:iv:new-diagnoses');
+    assert.equal(row.archiveReason, 'ENC:iv:newreason');
+    assert.equal(row.archiveNote, 'ENC:iv:newnote');
+    assert.equal(row.phone, 'ENC:iv:newphone');
+    assert.equal(row.diagnoses, 'ENC:iv:newdiagnoses');
     assert.equal(row.version, 4);
 
     const cleared = await updateNetworkScopedPatient(makeContext(), {
