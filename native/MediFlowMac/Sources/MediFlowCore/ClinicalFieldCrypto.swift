@@ -5,6 +5,43 @@
 import Foundation
 import Crypto  // swift-crypto: re-exports CryptoKit on Apple, BoringSSL on Linux/Windows (ADR 0071)
 
+public enum HomeBaseAttachmentCryptoError: LocalizedError, Equatable {
+    case attachmentNotOwned([String])
+    case invalidSize
+    case sealingFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .attachmentNotOwned(let ids):
+            return "Riferimenti allegato non appartenenti al paziente: \(ids.joined(separator: ", "))"
+        case .invalidSize:
+            return "La dimensione dell'allegato non puo essere negativa."
+        case .sealingFailed:
+            return "Cifratura dell'allegato non riuscita."
+        }
+    }
+}
+
+public struct HomeBaseSealedEntryAttachmentReferences: Equatable, Sendable {
+    let encodedValue: String?
+
+    public var isClear: Bool { encodedValue == nil }
+}
+
+public enum HomeBaseAttachmentReferenceValidator {
+    @discardableResult
+    public static func validate(
+        patientAttachmentIds: Set<String>,
+        referencedAttachmentIds: [String]
+    ) throws -> [String] {
+        let unknown = Array(Set(referencedAttachmentIds).subtracting(patientAttachmentIds)).sorted()
+        guard unknown.isEmpty else {
+            throw HomeBaseAttachmentCryptoError.attachmentNotOwned(unknown)
+        }
+        return referencedAttachmentIds
+    }
+}
+
 public enum ClinicalFieldCrypto {
     private static func string(_ value: String?, _ key: SymmetricKey?) -> String? {
         PatientFieldCrypto.decryptStringField(value, masterKey: key)
@@ -12,6 +49,52 @@ public enum ClinicalFieldCrypto {
 
     private static func structured(_ value: String?, _ key: SymmetricKey?) -> String? {
         PatientFieldCrypto.decryptStructuredField(value, masterKey: key)
+    }
+
+    public static func sealAttachmentCreatePayload(
+        name: String,
+        path: String,
+        data: String,
+        type: String,
+        size: Int,
+        masterKey: SymmetricKey
+    ) throws -> HomeBaseAttachmentCreatePayload {
+        guard size >= 0 else { throw HomeBaseAttachmentCryptoError.invalidSize }
+        return HomeBaseAttachmentCreatePayload(
+            name: try sealString(name, masterKey: masterKey),
+            path: try sealString(path, masterKey: masterKey),
+            data: try sealString(data, masterKey: masterKey),
+            type: type,
+            size: size
+        )
+    }
+
+    public static func sealEntryAttachmentReferences(
+        patientAttachmentIds: Set<String>,
+        referencedAttachmentIds: [String],
+        masterKey: SymmetricKey
+    ) throws -> HomeBaseSealedEntryAttachmentReferences {
+        let validated = try HomeBaseAttachmentReferenceValidator.validate(
+            patientAttachmentIds: patientAttachmentIds,
+            referencedAttachmentIds: referencedAttachmentIds
+        )
+        guard !validated.isEmpty else {
+            return HomeBaseSealedEntryAttachmentReferences(encodedValue: nil)
+        }
+        let jsonData = try JSONEncoder().encode(validated)
+        guard let json = String(data: jsonData, encoding: .utf8),
+              let sealed = CryptoService.encryptField(json, masterKey: masterKey) else {
+            throw HomeBaseAttachmentCryptoError.sealingFailed
+        }
+        return HomeBaseSealedEntryAttachmentReferences(encodedValue: sealed)
+    }
+
+    private static func sealString(_ value: String, masterKey: SymmetricKey) throws -> String {
+        guard let json = CryptoService.jsonEncode(value),
+              let sealed = CryptoService.encryptField(json, masterKey: masterKey) else {
+            throw HomeBaseAttachmentCryptoError.sealingFailed
+        }
+        return sealed
     }
 
     public static func decryptEntry(_ e: HomeBaseEntrySummary, masterKey: SymmetricKey?) -> HomeBaseEntrySummary {

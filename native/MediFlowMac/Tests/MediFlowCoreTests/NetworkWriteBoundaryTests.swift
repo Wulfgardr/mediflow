@@ -144,14 +144,31 @@ final class NetworkWriteBoundaryTests: XCTestCase {
     }
 
     func testEntryAttachmentsBoundary() {
-        // non-empty attachments rejected (diary only)
         XCTAssertEqual(
-            B.validateSubResource(.entry, mode: .create, presentFields: ["title", "attachments"], attachmentsNonEmpty: true),
-            .rejected(status: 403, error: "Network diary write boundary excludes attachment writes"))
-        // empty attachments allowed
-        XCTAssertEqual(
-            B.validateSubResource(.entry, mode: .create, presentFields: ["title", "attachments"], attachmentsNonEmpty: false),
+            B.validateSubResource(
+                .entry,
+                mode: .create,
+                presentFields: ["title", "attachments"],
+                attachmentsValue: "ENC:iv:ciphertext"
+            ),
             .allowed)
+        XCTAssertEqual(
+            B.validateSubResource(
+                .entry,
+                mode: .create,
+                presentFields: ["title", "attachments"],
+                attachmentsValue: nil
+            ),
+            .allowed)
+        XCTAssertEqual(
+            B.validateSubResource(
+                .entry,
+                mode: .create,
+                presentFields: ["title", "attachments"],
+                attachmentsValue: #"["attachment-1"]"#
+            ),
+            .rejected(status: 400, error: "Network diary attachment references must be sealed with ENC:")
+        )
     }
 
     func testCleanSubResourceWritesAllowed() {

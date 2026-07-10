@@ -281,6 +281,59 @@ final class SQLiteClinicalStoreTests: XCTestCase {
             "primo")
     }
 
+    func testEntryAttachmentReferencesPersistOnlyThroughValidatedSealAndCanClear() throws {
+        let (path, _) = try makeDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLiteClinicalStore(path: path)
+        let references = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
+            patientAttachmentIds: ["attachment-1", "attachment-2"],
+            referencedAttachmentIds: ["attachment-2", "attachment-1"],
+            masterKey: masterKey
+        )
+        let payload = HomeBaseEntryCreatePayload(
+            id: "e-attachments",
+            type: "note",
+            date: Date(timeIntervalSince1970: 1_750_000_000),
+            content: "voce con allegati",
+            attachmentReferences: references
+        )
+
+        XCTAssertEqual(
+            try store.createEntry(
+                payload,
+                patientId: "fixture-1",
+                scopeAmbulatoryId: "AMB-1",
+                masterKey: masterKey
+            ),
+            .created(id: "e-attachments", version: 1)
+        )
+        let reader = try SQLiteConnection(readOnlyPath: path)
+        let stored = try XCTUnwrap(try rawText(reader, "entries", "attachments", id: "e-attachments"))
+        XCTAssertTrue(stored.hasPrefix(CryptoService.encPrefix))
+        let decrypted = try XCTUnwrap(CryptoService.decryptField(stored, masterKey: masterKey))
+        XCTAssertEqual(
+            try JSONDecoder().decode([String].self, from: Data(decrypted.utf8)),
+            ["attachment-2", "attachment-1"]
+        )
+
+        let clear = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
+            patientAttachmentIds: [],
+            referencedAttachmentIds: [],
+            masterKey: masterKey
+        )
+        XCTAssertEqual(
+            try store.updateEntry(
+                id: "e-attachments",
+                patientId: "fixture-1",
+                scopeAmbulatoryId: "AMB-1",
+                payload: HomeBaseEntryUpdatePayload(version: 1, attachmentReferences: clear),
+                masterKey: masterKey
+            ),
+            .updated(version: 2)
+        )
+        XCTAssertNil(try rawText(reader, "entries", "attachments", id: "e-attachments"))
+    }
+
     /// Regression (adversarial audit, slice 5): production ALWAYS pre-seals title/
     /// content before calling createEntry (PairedPatientsWorkspaceModel.sealField), so
     /// a retry of the SAME logical content under the SAME draft id arrives re-sealed

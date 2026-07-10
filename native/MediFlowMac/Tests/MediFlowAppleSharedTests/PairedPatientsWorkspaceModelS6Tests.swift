@@ -423,6 +423,40 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         HomeBaseMutationAcknowledgement(success: true)
     }
 
+    func fetchAttachments(
+        patientId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> [HomeBaseAttachmentSummary] {
+        []
+    }
+
+    func fetchAttachment(
+        patientId: String, attachmentId: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseAttachmentDetail {
+        throw HomeBaseClientError.httpStatus(404, "Not found")
+    }
+
+    func createAttachment(
+        patientId: String, payload: HomeBaseAttachmentCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        HomeBaseCreatedResource(id: "attachment", version: nil)
+    }
+
+    func computeVisitDraft(
+        input: HomeBaseVisitDraftInput,
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseVisitDraftResponse {
+        throw HomeBaseClientError.contract
+    }
+
+    func fetchAiRuntimeStatus(
+        credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseNetworkAiRuntimeSummary {
+        throw HomeBaseClientError.contract
+    }
+
     func fetchTherapies(
         patientId: String,
         credentials: HomeBasePairedCredentials,

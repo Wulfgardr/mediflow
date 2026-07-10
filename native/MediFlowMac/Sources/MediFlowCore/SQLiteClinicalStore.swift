@@ -201,11 +201,17 @@ public struct SQLiteClinicalStore {
         b.sealString("content", "content", payload.content)  // entries: content ENCRYPTED
         b.date("date", "date", payload.date)
         b.plainText("setting", "setting", Self.normalizedSetting(payload.setting))   // entries: setting plaintext, '' -> nil
+        b.structuredPatch(
+            "attachments", "attachments",
+            value: payload.attachments,
+            isPresent: payload.shouldEncodeAttachments
+        )
         b.date("deletedAt", "deleted_at", payload.deletedAt)
         b.sealString("deletionReason", "deletion_reason", payload.deletionReason)
         return try runUpdate(.entry, "entry", "entries", Self.entryColumns,
                              id: id, patientId: patientId, scope: scopeAmbulatoryId,
-                             rawVersion: payload.version, builder: b, now: now)
+                             rawVersion: payload.version, builder: b, now: now,
+                             attachmentsValue: payload.attachments)
     }
 
     public func updateTherapy(
@@ -288,14 +294,19 @@ public struct SQLiteClinicalStore {
         b.sealRequired("content", "content", payload.content)  // entries: content ENCRYPTED
         b.plainText("setting", "setting", Self.normalizedSetting(payload.setting))
         b.sealStructuredOrPassthrough("metadata", "metadata", payload.metadata)  // ENC structured or verbatim
-        b.serverNull("attachments")  // attachment writes are excluded by the boundary
+        if let attachments = payload.attachments {
+            b.sealStructuredOrPassthrough("attachments", "attachments", attachments)
+        } else {
+            b.serverNull("attachments")
+        }
         b.serverCreate(id: id, patientId: patientId, now: now)
         // Idempotency only when the client supplied the id (1:1 with the web).
         let idempotency: ((SQLiteConnection) throws -> ClinicalCreateOutcome?)? = clientId.isEmpty ? nil : { db in
             try self.entryCreateIdempotency(db, id: id, patientId: patientId, payload: payload, masterKey: masterKey)
         }
         return try runCreate(.entry, "entries", Self.entryColumns, id: id, patientId: patientId,
-                             scope: scopeAmbulatoryId, builder: b, idempotency: idempotency)
+                             scope: scopeAmbulatoryId, builder: b,
+                             attachmentsValue: payload.attachments, idempotency: idempotency)
     }
 
     public func createTherapy(
@@ -373,10 +384,12 @@ public struct SQLiteClinicalStore {
     private func runCreate(
         _ resource: NetworkWriteBoundary.SubResource, _ table: String, _ requiredColumns: [String],
         id: String, patientId: String, scope: String, builder: AssignmentBuilder,
+        attachmentsValue: String? = nil,
         idempotency: ((SQLiteConnection) throws -> ClinicalCreateOutcome?)? = nil
     ) throws -> ClinicalCreateOutcome {
         let boundary = NetworkWriteBoundary.validateSubResource(
-            resource, mode: .create, presentFields: builder.presentFields)
+            resource, mode: .create, presentFields: builder.presentFields,
+            attachmentsValue: attachmentsValue)
         if case .rejected(let status, let error) = boundary {
             return .boundaryRejected(status: status, error: error)
         }
@@ -443,7 +456,8 @@ public struct SQLiteClinicalStore {
             && PatientFieldCrypto.decryptStructuredField(existing.metadata, masterKey: masterKey)
                 == PatientFieldCrypto.decryptStructuredField(payload.metadata, masterKey: masterKey)
             && existing.setting == Self.normalizedSetting(payload.setting)
-            && existing.attachments == nil
+            && PatientFieldCrypto.decryptStructuredField(existing.attachments, masterKey: masterKey)
+                == PatientFieldCrypto.decryptStructuredField(payload.attachments, masterKey: masterKey)
             && existing.deletedAt == nil
             && existing.date.map { Int($0.timeIntervalSince1970) } == Int(payload.date.timeIntervalSince1970)
         return same
@@ -456,7 +470,8 @@ public struct SQLiteClinicalStore {
     private func runUpdate(
         _ resource: NetworkWriteBoundary.SubResource, _ entity: String, _ table: String,
         _ requiredColumns: [String], id: String, patientId: String, scope: String,
-        rawVersion: Int, builder: AssignmentBuilder, now: Date
+        rawVersion: Int, builder: AssignmentBuilder, now: Date,
+        attachmentsValue: String? = nil
     ) throws -> ClinicalWriteOutcome {
         // 1. Version first (1:1 parse{Entity}ExpectedVersion).
         guard let expected = ClinicalConcurrency.parseExpectedVersion(rawVersion) else {
@@ -466,7 +481,8 @@ public struct SQLiteClinicalStore {
         //    the forbidden AI / client-controlled fields, so this is .allowed today;
         //    kept wired as the authority seam for future untyped / peer-sourced writes.
         let boundary = NetworkWriteBoundary.validateSubResource(
-            resource, mode: .update, presentFields: builder.presentFields)
+            resource, mode: .update, presentFields: builder.presentFields,
+            attachmentsValue: attachmentsValue)
         if case .rejected(let status, let error) = boundary {
             return .boundaryRejected(status: status, error: error)
         }
@@ -619,6 +635,25 @@ public struct SQLiteClinicalStore {
         mutating func sealStructuredOrPassthrough(_ field: String, _ column: String, _ value: String?) {
             guard let value else { return }
             presentFields.insert(field)
+            guard case .sealed(let enc?) = CryptoService.encryptOrPassthrough(value, masterKey: masterKey) else {
+                failed = true
+                return
+            }
+            pairs.append((column, .text(enc)))
+        }
+
+        mutating func structuredPatch(
+            _ field: String,
+            _ column: String,
+            value: String?,
+            isPresent: Bool
+        ) {
+            guard isPresent else { return }
+            presentFields.insert(field)
+            guard let value else {
+                pairs.append((column, .null))
+                return
+            }
             guard case .sealed(let enc?) = CryptoService.encryptOrPassthrough(value, masterKey: masterKey) else {
                 failed = true
                 return

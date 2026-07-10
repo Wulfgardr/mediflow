@@ -531,6 +531,98 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
+    public func fetchAttachments(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> [HomeBaseAttachmentSummary] {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("attachments")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode([HomeBaseAttachmentSummary].self, from: data)
+    }
+
+    public func fetchAttachment(
+        patientId: String,
+        attachmentId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseAttachmentDetail {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("attachments")
+            .appendingPathComponent(attachmentId)
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(HomeBaseAttachmentDetail.self, from: data)
+    }
+
+    public func createAttachment(
+        patientId: String,
+        payload: HomeBaseAttachmentCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseCreatedResource {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("attachments")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseCreatedResource.self, from: data)
+    }
+
+    public func computeVisitDraft(
+        input: HomeBaseVisitDraftInput,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseVisitDraftResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("visit-draft")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(input)
+        )
+        return try decode(HomeBaseVisitDraftResponse.self, from: data)
+    }
+
+    public func fetchAiRuntimeStatus(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?
+    ) async throws -> HomeBaseNetworkAiRuntimeSummary {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ai-runtime")
+        let (data, _) = try await send(
+            to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        )
+        return try decode(HomeBaseNetworkAiRuntimeSummary.self, from: data)
+    }
+
     /* @Codex */
     public func fetchTherapies(
         patientId: String,
