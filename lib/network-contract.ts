@@ -254,6 +254,12 @@ function capability(
     };
 }
 
+/**
+ * Canonical capability inventory: runtime, NetworkCapabilityKey, and OpenAPI
+ * enumerate the same 26 keys: 22 active network keys, 2 planned network keys,
+ * and 2 local backup keys. The local Apple QA manifest records the active key
+ * set alongside 22 separate acceptance records, not as a duplicate key enum.
+ */
 export function buildNetworkCapabilitiesResponse(input: {
     nodeId: string;
     snapshot: NetworkSettingsSnapshot;
