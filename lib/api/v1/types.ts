@@ -427,7 +427,16 @@ export type NetworkAiRuntimeHardwareProfile = 'low' | 'medium' | 'high' | 'custo
 export type NetworkAiRuntimeSurface =
     | 'patient-insight'
     | 'smart-import'
-    | 'document-synthesis';
+    | 'document-synthesis'
+    | 'treatment-reasoning';
+
+/* @Codex */
+export type NetworkAiRuntimeKillSwitches = {
+    patientInsight: 'enabled' | 'disabled';
+    documentSynthesis: 'enabled' | 'disabled';
+    smartImport: 'enabled' | 'disabled';
+    treatmentReasoning: 'enabled' | 'disabled';
+};
 
 /* @Codex */
 export type NetworkAiRuntimeSummary = {
@@ -451,6 +460,7 @@ export type NetworkAiRuntimeSummary = {
     fallbackPolicy: 'client-local-runtime-else-ai-unavailable';
     rolloutGate: 'lane-benchmarks-and-rollout-governance-required';
     surfaces: NetworkAiRuntimeSurface[];
+    killSwitches: NetworkAiRuntimeKillSwitches;
     guardrails: string[];
 };
 
@@ -502,6 +512,8 @@ export type NetworkCapabilityKey =
     | 'network.replica.readonly-documents'
     /* @Codex */
     | 'network.replica.write-documents'
+    /* @Codex */
+    | 'network.compute.visit-draft'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
     | 'network.catalogs.sync'

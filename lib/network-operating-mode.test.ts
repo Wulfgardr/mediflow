@@ -62,6 +62,12 @@ function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): Networ
                 'smart-import',
                 'document-synthesis',
             ],
+            killSwitches: {
+                patientInsight: 'disabled',
+                documentSynthesis: 'disabled',
+                smartImport: 'disabled',
+                treatmentReasoning: 'disabled',
+            },
             guardrails: [
                 'AI plane separato dal data plane clinico.',
             ],
@@ -191,6 +197,12 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
                 'smart-import',
                 'document-synthesis',
             ],
+            killSwitches: {
+                patientInsight: 'enabled',
+                documentSynthesis: 'enabled',
+                smartImport: 'enabled',
+                treatmentReasoning: 'enabled',
+            },
             guardrails: [
                 'AI plane separato dal data plane clinico.',
             ],
@@ -291,6 +303,12 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
                 'smart-import',
                 'document-synthesis',
             ],
+            killSwitches: {
+                patientInsight: 'disabled',
+                documentSynthesis: 'disabled',
+                smartImport: 'disabled',
+                treatmentReasoning: 'disabled',
+            },
             guardrails: [
                 'AI plane separato dal data plane clinico.',
             ],

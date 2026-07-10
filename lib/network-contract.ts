@@ -256,7 +256,7 @@ function capability(
 
 /**
  * Canonical capability inventory: runtime, NetworkCapabilityKey, and OpenAPI
- * enumerate the same 28 keys: 24 active network keys, 2 planned network keys,
+ * enumerate the same 29 keys: 25 active network keys, 2 planned network keys,
  * and 2 local backup keys. The local Apple QA manifest records the active key
  * set alongside 23 separate acceptance records, not as a duplicate key enum.
  */
@@ -414,6 +414,12 @@ export function buildNetworkCapabilitiesResponse(input: {
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
                 'Paired attachment create boundary for sealed manual document content; excludes remote update, remote delete, and every document-derived or AI-produced field.'
+            ),
+            capability(
+                'network.compute.visit-draft',
+                operatingMode === 'network-home-base' ? 'available' : 'disabled',
+                true,
+                'Paired deterministic visit-draft computation with no patient scope, persistence, audit mutation, or AI invocation.'
             ),
             capability(
                 'network.replica.sync',
