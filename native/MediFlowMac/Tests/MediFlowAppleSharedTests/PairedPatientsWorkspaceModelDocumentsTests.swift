@@ -351,6 +351,7 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     private let checkups: [HomeBaseCheckupSummary]
     private let capabilitiesFixture: [NetworkCapability]
     private let fetchAttachmentDelayNanoseconds: UInt64
+    private let fetchCapabilitiesDelayNanoseconds: UInt64
     private(set) var lastCreatePayload: HomeBaseAttachmentCreatePayload?
     private(set) var lastCreatePatientId: String?
     private(set) var createAttachmentCalls = 0
@@ -362,7 +363,8 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         attachmentDetail: HomeBaseAttachmentDetail? = nil,
         checkups: [HomeBaseCheckupSummary] = [],
         capabilities: [NetworkCapability] = [],
-        fetchAttachmentDelayNanoseconds: UInt64 = 0
+        fetchAttachmentDelayNanoseconds: UInt64 = 0,
+        fetchCapabilitiesDelayNanoseconds: UInt64 = 0
     ) {
         self.details = details
         self.attachments = attachments
@@ -370,6 +372,7 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         self.checkups = checkups
         self.capabilitiesFixture = capabilities
         self.fetchAttachmentDelayNanoseconds = fetchAttachmentDelayNanoseconds
+        self.fetchCapabilitiesDelayNanoseconds = fetchCapabilitiesDelayNanoseconds
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
@@ -587,7 +590,10 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     }
 
     func fetchNetworkCapabilities(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> NetworkCapabilitiesResponse {
-        NetworkCapabilitiesResponse(nodeId: "node", operatingMode: "network-home-base", protocolVersion: "1", capabilities: capabilitiesFixture)
+        if fetchCapabilitiesDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: fetchCapabilitiesDelayNanoseconds)
+        }
+        return NetworkCapabilitiesResponse(nodeId: "node", operatingMode: "network-home-base", protocolVersion: "1", capabilities: capabilitiesFixture)
     }
 
     func fetchNetworkIdentity(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> NetworkIdentitySummary {
